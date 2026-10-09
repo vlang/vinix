@@ -188,7 +188,9 @@ static void memory_recovery(void) {
         for (size_t i = 0; i < 32 * 1024 * 1024 / page; ++i) p[i * page] = 43;
         _exit(77);
     }
-    int status; CHECK(waitpid(pid, &status, 0) == pid); CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+    int status = -1; pid_t reaped = waitpid(pid, &status, 0);
+    printf("CGROUP oom-victim pid=%d reaped=%d status=%#x\n", pid, reaped, status); fflush(stdout);
+    CHECK(reaped == pid); CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
     CHECK(field(ROOT "/oom/memory.events", "oom_kill ") > 0);
     sleep(2);
     pid = fork(); CHECK(pid >= 0);
@@ -214,6 +216,36 @@ static void memory_migration(void) {
         CHECK(munmap(p, 2 * 1024 * 1024) == 0); _exit(0);
     }
     wait_ok(pid); pass("memory-migration-admission-rollback");
+}
+
+static void oom_exit_race(void) {
+    // Fast faulting victims can reach exit_group before the next timer IRQ.
+    // Use a fresh controller each time so its previous-victim grace cannot
+    // defer enforcement for a different process.
+    for (int round = 0; round < 40; ++round) {
+        char group[128], path[160]; snprintf(group, sizeof group, ROOT "/oom-race-%d", round);
+        CHECK(mkdir(group, 0700) == 0);
+        pid_t pid = fork(); CHECK(pid >= 0);
+        if (!pid) {
+            CHECK(move(group, 0) == 0); char text[64];
+            snprintf(path, sizeof path, "%s/memory.current", group);
+            // Allow initial mapping metadata, then exceed the anonymous quota.
+            snprintf(text, sizeof text, "%llu", (unsigned long long)(number(path) + 128 * 1024));
+            snprintf(path, sizeof path, "%s/memory.max", group); CHECK(put(path, text) == 0);
+            unsigned char *p = mmap(NULL, 32 * 1024 * 1024, PROT_READ | PROT_WRITE,
+                                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0); CHECK(p != MAP_FAILED);
+            for (size_t i = 0; i < 64; ++i) p[i * page] = 45;
+            _exit(77);
+        }
+        int status = -1; pid_t reaped = waitpid(pid, &status, 0);
+        if (reaped != pid || status != SIGKILL) {
+            printf("CGROUP oom-race round=%d pid=%d reaped=%d status=%#x\n", round, pid, reaped, status); fflush(stdout);
+        }
+        CHECK(reaped == pid); CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGKILL);
+        snprintf(path, sizeof path, "%s/memory.events", group); CHECK(field(path, "oom_kill ") > 0);
+        CHECK(rmdir(group) == 0);
+    }
+    pass("oom-signal-wins-fast-fault-exit-race");
 }
 
 static void shared_child(void) {
@@ -384,7 +416,7 @@ int main(int argc, char **argv) {
     const char *devices[] = {"/dev/vda", "/dev/sd0", "/dev/ata0", "/dev/nvme0n1"};
     for (size_t i = 0; i < sizeof devices / sizeof devices[0]; ++i) if (access(devices[i], F_OK) == 0) { strcpy(disk, devices[i]); break; }
     CHECK(disk[0]); for (int i = 0; swapon(disk, 0) != 0; ++i) { CHECK(errno == EAGAIN && i < 40); sleep(1); }
-    migration(); pid_quota(); exec_quota(); kernel_quota(); committed_memory(); memory_recovery(); memory_migration(); shared_memory();
+    migration(); pid_quota(); exec_quota(); kernel_quota(); committed_memory(); memory_recovery(); oom_exit_race(); memory_migration(); shared_memory();
     cpu_quota(); io_quota(); pressure(); hierarchy_limits(); invalid_limits(); allocation_recovery();
     CHECK(field(ROOT "/memory.stat", "anon ") > 0 && field(ROOT "/memory.stat", "kernel ") > 0);
     CHECK(swapoff(disk) == 0); printf("CGROUP PASS\n"); fflush(stdout); for (;;) pause();

@@ -1021,7 +1021,7 @@ fn nap(ns i64) Nap {
 // blocks nearly every signal; only a deliverable one counts.
 fn pending_signal() Nap {
 	t := proc.current_thread()
-	pending := katomic.load(&t.pending_signals) & ~t.masked_signals
+	pending := proc.pending_signals(t) & ~t.masked_signals
 	if pending == 0 {
 		return .slept
 	}

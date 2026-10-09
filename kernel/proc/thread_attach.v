@@ -32,6 +32,6 @@ pub fn attach_thread(mut process Process, mut t Thread) ?int {
 	// Free its previous capacity when the thread list grows.
 	process.threads.flags |= .noslices
 	process.threads << t
-	process.constructing = false
+	if !t.not_started { process.constructing = false }
 	return t.tid
 }

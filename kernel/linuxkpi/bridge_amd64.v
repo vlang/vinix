@@ -121,7 +121,10 @@ fn current_task() voidptr {
 @[export: 'vinix_linuxkpi_task_signal_pending']
 fn task_signal_pending(owner voidptr, fatal bool) bool {
 	t := unsafe { &proc.Thread(owner) }
-	pending := katomic.load(&t.pending_signals)
+	// The current task owns its Process through this driver call. A retained
+	// non-current task only pins Thread storage, so do not borrow its Process.
+	pending := if voidptr(t) == voidptr(proc.current_thread()) { proc.pending_signals(t) }
+		else { katomic.load(&t.pending_signals) }
 	if katomic.load(&t.must_exit) || pending & (u64(1) << 8) != 0 {
 		return true
 	}

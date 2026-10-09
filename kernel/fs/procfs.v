@@ -1138,8 +1138,10 @@ fn maps_text(pid int, detailed bool) string {
 			proc.unlock_table()
 			return ''
 		}
-		brk_base = process.brk_base
-		brk_current = process.brk_current
+		if process.pagemap != unsafe { nil } {
+			brk_base = katomic.load(&process.pagemap.brk_base)
+			brk_current = katomic.load(&process.pagemap.brk_current)
+		}
 		stack_end = process.stack_end
 		exe_node = unsafe { &VFSNode(process.exe_node) }
 		got := mmap.mappings(process.pagemap, detailed) or {

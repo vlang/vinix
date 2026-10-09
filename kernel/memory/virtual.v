@@ -133,6 +133,14 @@ pub mut:
 	kernel_owner kbudget.Owner
 	kernel_charge kbudget.Charge
 	l           klock.Lock
+	// Process owners, including non-thread CLONE_VM children. Inspection pins
+	// are separate: only the final process release may destroy this map.
+	owners      u64 = 1
+	// The program break belongs to the address space, not a process sharing it.
+	brk_busy    bool
+	brk_changed eventstruct.Event
+	brk_base    u64
+	brk_current u64
 	// MCL_FUTURE belongs to the address space shared by CLONE_VM threads.
 	lock_future bool
 	// Resident user-address leaf mappings only; writers hold l, observers use atomics.

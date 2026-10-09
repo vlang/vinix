@@ -3,6 +3,7 @@ module mmap
 
 import memory
 import pager
+import katomic
 
 pub struct AnonymousUsage {
 pub mut:
@@ -57,7 +58,7 @@ pub fn anonymous_usage(_pagemap &memory.Pagemap) ?AnonymousUsage {
 fn covered_aliases(global &MmapRangeGlobal, page u64) u64 {
 	mut aliases := u64(0)
 	for local in global.locals {
-		if shadow_covered(local, page) { aliases++ }
+		if shadow_covered(local, page) { aliases += katomic.load(&local.pagemap.owners) }
 	}
 	return if aliases == 0 { u64(1) } else { aliases }
 }

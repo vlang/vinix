@@ -36,6 +36,14 @@ pub fn register_cpu_signal_hook(hook voidptr) {
 	cpu_signal_hook = hook
 }
 
+// sched's real timer retains a Process pin while calling this same delivery
+// hook, after releasing its timer lock. The target may be in an exec handoff.
+pub fn send_real_itimer_signal(process &Process) {
+	if cpu_signal_hook == unsafe { nil } { return }
+	hook := unsafe { CPUSignalHook(cpu_signal_hook) }
+	hook(process, 14)
+}
+
 fn send_cpu_signals(process &Process, signals u64) {
 	if signals == 0 || cpu_signal_hook == unsafe { nil } {
 		return

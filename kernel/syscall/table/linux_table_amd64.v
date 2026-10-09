@@ -522,7 +522,7 @@ pub fn init_syscall_table() {
 	syscall_table[39] = voidptr(userland.syscall_getpid) // getpid
 	syscall_table[56] = voidptr(userland.syscall_clone) // clone
 	syscall_table[57] = voidptr(userland.syscall_fork) // fork
-	syscall_table[58] = voidptr(userland.syscall_fork) // vfork
+	syscall_table[58] = voidptr(userland.syscall_vfork) // vfork
 	syscall_table[59] = voidptr(userland.syscall_execve) // execve
 	syscall_table[60] = voidptr(userland.syscall_exit) // exit
 	syscall_table[61] = voidptr(userland.syscall_wait4) // wait4

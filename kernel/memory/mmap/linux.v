@@ -6,6 +6,7 @@ module mmap
 // mremap, mincore, madvise and brk.
 
 import errno
+import katomic
 import krandom
 import lib
 import memory
@@ -619,8 +620,11 @@ pub fn syscall_madvise(_ voidptr, address u64, length u64, advice int) (u64, u64
 // reports where it ended up, which is the old value when the move fails.
 pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 	mut process := proc.current_thread().process
+	mut heap_map := process.pagemap
+	begin_brk(mut heap_map) or { return heap_map.brk_current, 0 }
+	defer { end_brk(mut heap_map) }
 
-	if process.brk_base == 0 {
+	if process.pagemap.brk_base == 0 {
 		// Reserve the arena once and commit pages with mprotect as the break
 		// grows. Building the heap from adjacent MAP_FIXED mappings exposed
 		// separate backing ranges to libc and corrupted QEMU's allocator under
@@ -631,22 +635,24 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 			return 0, 0
 		}
 		start := random_brk_start()
-		process.brk_base = start
-		process.brk_current = start
+		pagemap.l.acquire()
+		katomic.store(mut &pagemap.brk_base, start)
+		katomic.store(mut &pagemap.brk_current, start)
+		pagemap.l.release()
 	}
 
-	if address == 0 || address == process.brk_current {
-		return process.brk_current, 0
+	if address == 0 || address == process.pagemap.brk_current {
+		return process.pagemap.brk_current, 0
 	}
-	if address < process.brk_base || address > brk_arena_base + brk_arena_size {
-		return process.brk_current, 0
+	if address < process.pagemap.brk_base || address > brk_arena_base + brk_arena_size {
+		return process.pagemap.brk_current, 0
 	}
-	requested_data := address - process.brk_base
+	requested_data := address - process.pagemap.brk_base
 	if !proc.limit_allows(process, proc.rlimit_data, requested_data) {
-		return process.brk_current, 0
+		return process.pagemap.brk_current, 0
 	}
 
-	current_page := lib.align_up(process.brk_current, page_size)
+	current_page := lib.align_up(process.pagemap.brk_current, page_size)
 	wanted_page := lib.align_up(address, page_size)
 
 	if wanted_page > current_page {
@@ -654,33 +660,35 @@ pub fn syscall_brk(_ voidptr, address u64) (u64, u64) {
 		growth := wanted_page - current_page
 		if growth > u64(-1) - current_as
 			|| !proc.limit_allows(process, proc.rlimit_as, current_as + growth) {
-			return process.brk_current, 0
+			return process.pagemap.brk_current, 0
 		}
 		mut pagemap := process.pagemap
 		pagemap.l.acquire()
 		if immutable_overlap_unlocked(pagemap, current_page, growth) {
 			pagemap.l.release()
-			return process.brk_current, 0
+			return process.pagemap.brk_current, 0
 		}
 		future_locked := pagemap.lock_future
 		pagemap.l.release()
 		if future_locked {
 			lock_range(mut pagemap, current_page, growth, true, true) or {
-				return process.brk_current, 0
+				return process.pagemap.brk_current, 0
 			}
 		}
 		mprotect(mut pagemap, voidptr(current_page), wanted_page - current_page, prot_read | prot_write) or {
 			if future_locked { lock_range(mut pagemap, current_page, growth, false, true) or {} }
-			return process.brk_current, 0
+			return process.pagemap.brk_current, 0
 		}
 	} else if wanted_page < current_page {
 		mut pagemap := process.pagemap
 		mprotect(mut pagemap, voidptr(wanted_page), current_page - wanted_page, prot_none) or {
-			return process.brk_current, 0
+			return process.pagemap.brk_current, 0
 		}
 		lock_range(mut pagemap, wanted_page, current_page - wanted_page, false, true) or {}
 	}
 
-	process.brk_current = address
-	return process.brk_current, 0
+	heap_map.l.acquire()
+	katomic.store(mut &heap_map.brk_current, address)
+	heap_map.l.release()
+	return process.pagemap.brk_current, 0
 }

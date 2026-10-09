@@ -16,6 +16,11 @@ import proc
 import usercopy
 
 // clone(2) flags. Only the ones that change what we build are listed.
+pub const clone_vm = u64(0x00000100)
+pub const clone_fs = u64(0x00000200)
+pub const clone_files = u64(0x00000400)
+pub const clone_sighand = u64(0x00000800)
+pub const clone_vfork = u64(0x00004000)
 pub const clone_thread = u64(0x00010000)
 
 pub const clone_settls = u64(0x00080000)
@@ -100,6 +105,38 @@ mut:
 }
 
 const clone_args_size_ver0 = u64(64)
+
+// Linux requires shared handlers to share VM and threads to share handlers.
+fn valid_clone_sharing(flags u64) bool {
+	return !(flags & clone_sighand != 0 && flags & clone_vm == 0)
+		&& !(flags & clone_thread != 0 && flags & clone_sighand == 0)
+}
+
+// FS, descriptor and handler ownership is currently process-scoped. Refuse
+// combinations we cannot honor instead of silently copying requested sharing
+// or silently sharing state the caller asked to keep independent.
+fn supported_clone_sharing(flags u64) bool {
+	if flags & clone_thread == 0 { return flags & (clone_fs | clone_files | clone_sighand) == 0 }
+	return flags & (clone_fs | clone_files) == (clone_fs | clone_files) && flags & clone_vfork == 0
+}
+
+// Called only after switching off and releasing the child's old map. The
+// parent owns a Process pin, so a simultaneous waiter cannot recycle the event.
+fn complete_vfork(mut process proc.Process) {
+	if !katomic.load(&process.vfork_pending) { return }
+	katomic.store(mut &process.vfork_pending, false)
+	event.trigger(mut &process.vfork_done, false)
+}
+
+fn await_vfork(mut child proc.Process) {
+	defer { proc.unpin_process(&child) }
+	for katomic.load(&child.vfork_pending) {
+		// Ordinary caught signals remain pending until clone returns. Fatal
+		// kill or sibling teardown may abort the wait, leaving the child's map
+		// reference intact until its own exec/exit.
+		event.await_one_masked(mut child.vfork_done, u64(1) << 8) or { break }
+	}
+}
 
 // ── tid address and robust futex lists ───────────────────────────────────────
 

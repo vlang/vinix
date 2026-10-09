@@ -7,11 +7,8 @@ module userland
 // taken by a handler, so an event loop waits for them with everything else.
 // systemd's sd-event takes every signal it handles this way.
 //
-// The same on arm64 and amd64. What differs is how each keeps its signal
-// sets -- signal n in bit n-1 on arm64, in bit n on amd64 -- and each
-// architecture's signal code supplies take_pending(), signal_bit(),
-// unblockable_mask() and sigset_size in its own layout; masks are kept in it
-// too, converted from the caller's sigset on the way in.
+// Shared by both architectures; signal n is represented by bit n-1.
+
 
 import errno
 import event
@@ -33,6 +30,11 @@ const sfd_cloexec = resource.o_cloexec
 // One struct signalfd_siginfo per signal read.
 const signalfd_siginfo_size = u64(128)
 
+struct SignalFDReadInfo {
+mut:
+	words [16]u64
+}
+
 struct SignalFD {
 mut:
 	stat     stat.Stat
@@ -43,12 +45,6 @@ mut:
 	can_mmap bool
 
 	mask u64
-	// The process whose signals make it readable: the one that made it, or
-	// last set its mask.
-	owner int
-	// Raised each time a signal makes it readable, so that a look at what is
-	// pending that raced with one does not clear what it set.
-	notifications u64
 	// The interface box its descriptor holds, freed with it.
 	box &resource.Resource = unsafe { nil }
 }
@@ -63,51 +59,21 @@ fn (mut this SignalFD) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
 
-// Take one signal in `wanted` for the calling thread: its own first, then one
-// another thread of its process holds and blocks. A signal sent to a process
-// waits on one of its threads here, not on the process, and the thread that
-// reads the descriptor is seldom that one. Fills in `info` as a
-// signalfd_siginfo; 0 when there is none.
+// Read only the caller's thread-directed signals and its process pool. A
+// sibling's private pending signal must stay available to that sibling.
 fn take_for_signalfd(current &proc.Thread, wanted u64, mut info [16]u64) int {
 	mut own := unsafe { current }
-	if signum := take_pending(mut own, wanted) {
-		fill_signalfd_info(mut info, current, signum)
-		posixtimer.acknowledge_signal(mut own, signum)
-		return signum
-	}
-	mut process := current.process
-	mut holder := &proc.Thread(unsafe { nil })
-	mut taken := 0
-	process.threads_lock.acquire()
-	for t in process.threads {
-		if t.tid == current.tid || katomic.load(&t.is_dead) {
-			continue
-		}
-		mut other := unsafe { t }
-		// Only what that thread blocks: one it does not is on its way to its
-		// handler.
-		if signum := take_pending(mut other, wanted & katomic.load(&t.masked_signals)) {
-			holder = t
-			taken = signum
-			proc.pin_thread(holder)
-			break
-		}
-	}
-	process.threads_lock.release()
-	if taken == 0 {
-		return 0
-	}
-	mut other := unsafe { holder }
-	fill_signalfd_info(mut info, other, taken)
-	posixtimer.acknowledge_signal(mut other, taken)
-	proc.unpin_thread(holder)
-	return taken
+	signum, shared := take_wait_signal(mut own, wanted)
+	if signum == -1 { return 0 }
+	fill_signalfd_info(mut info, current, signum, shared)
+	if !shared { posixtimer.acknowledge_signal(mut own, signum) }
+	return signum
 }
 
 // struct signalfd_siginfo: ssi_signo, ssi_errno, ssi_code, then for a POSIX
 // timer its overrun at 32 and value in ssi_int and ssi_ptr, at 44 and 48.
-fn fill_signalfd_info(mut info [16]u64, holder &proc.Thread, signum int) {
-	timer_info := posixtimer.signal_info(holder, signum)
+fn fill_signalfd_info(mut info [16]u64, holder &proc.Thread, signum int, shared bool) {
+	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(holder, signum) }
 	unsafe {
 		mut words := &u32(&info[0])
 		words[0] = u32(signum)
@@ -120,48 +86,24 @@ fn fill_signalfd_info(mut info [16]u64, holder &proc.Thread, signum int) {
 	}
 }
 
-// The signals in `mask` some thread of process `pid` has pending.
-fn process_pending(pid int, mask u64) u64 {
-	if pid <= 0 || pid >= proc.max_pid {
-		return 0
-	}
-	mut process := processes[pid]
-	if process == unsafe { nil } {
-		return 0
-	}
-	mut pending := u64(0)
-	process.threads_lock.acquire()
-	for t in process.threads {
-		pending |= katomic.load(&t.pending_signals) & mask
-	}
-	process.threads_lock.release()
-	return pending & mask
+// Readiness for the current reader follows the same private/shared ownership
+// as read(), rather than advertising a sibling's private signal.
+fn process_pending(mask u64) u64 {
+	current := proc.current_thread()
+	if current == unsafe { nil } { return 0 }
+	return proc.pending_signals(current) & mask
 }
 
-// Readable when its owner has one of its signals pending. The look at what is
-// pending is made with no lock of this descriptor held; a signal that came
-// meanwhile raised `notifications`, and keeps it readable.
-fn (mut this SignalFD) refresh() {
+fn (mut this SignalFD) poll_status() int {
 	this.l.acquire()
-	seen := this.notifications
 	mask := this.mask
-	owner := this.owner
 	this.l.release()
-
-	pending := process_pending(owner, mask)
-
-	this.l.acquire()
-	if pending != 0 || this.notifications != seen {
-		this.status |= file.pollin
-	} else {
-		this.status &= ~file.pollin
-	}
-	this.l.release()
+	return if process_pending(mask) != 0 { file.pollin } else { 0 }
 }
 
-// sendsig() made `signal` pending on a thread of process `pid`: the
-// descriptors of that process that read it are readable now.
-fn notify_signalfds(pid int, signal int) {
+// Matching descriptors receive a wake even after fork or descriptor passing.
+// Their per-reader callback determines readiness from the current pool.
+fn notify_signalfds(_pid int, signal int) {
 	if katomic.load(&signalfds_count) == 0 {
 		return
 	}
@@ -169,12 +111,12 @@ fn notify_signalfds(pid int, signal int) {
 	signalfds_lock.acquire()
 	for mut sfd in signalfds {
 		sfd.l.acquire()
-		if sfd.owner != pid || sfd.mask & bit == 0 {
+		// A forked or passed descriptor observes the current reader's signals.
+		// Broadcast a matching wake; per-reader readiness filters other pools.
+		if sfd.mask & bit == 0 {
 			sfd.l.release()
 			continue
 		}
-		sfd.notifications++
-		sfd.status |= file.pollin
 		sfd.l.release()
 		event.trigger(mut sfd.event, false)
 	}
@@ -206,19 +148,19 @@ fn (mut this SignalFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?
 	nonblocking := handle != unsafe { nil } && handle.flags & resource.o_nonblock != 0
 	mut current := proc.current_thread()
 	mut done := u64(0)
-	defer {
-		this.refresh()
-	}
+	// Passing a local fixed array by mutable reference makes V promote it to
+	// the heap. This buffer is borrowed synchronously and stays in this frame.
+	mut info := unsafe { &SignalFDReadInfo(C.__builtin_alloca(sizeof(SignalFDReadInfo))) }
 	for done + signalfd_siginfo_size <= count {
 		this.l.acquire()
 		wanted := this.mask
 		this.l.release()
 
-		mut info := [16]u64{}
-		signum := take_for_signalfd(current, wanted, mut info)
+		unsafe { *info = SignalFDReadInfo{} }
+		signum := take_for_signalfd(current, wanted, mut info.words)
 		if signum != 0 {
 			unsafe {
-				C.memcpy(voidptr(u64(buf) + done), voidptr(&info[0]), signalfd_siginfo_size)
+				C.memcpy(voidptr(u64(buf) + done), voidptr(&info.words[0]), signalfd_siginfo_size)
 			}
 			done += signalfd_siginfo_size
 			continue
@@ -232,6 +174,13 @@ fn (mut this SignalFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?
 		}
 		// A signal the thread does not block, or its process going away, ends
 		// the wait, as either ends any other.
+		// Matching broadcasts from another process can keep the event pending.
+		// Check cancellation before consuming another such spurious wake.
+		if katomic.load(&current.must_exit)
+			|| proc.pending_signals(current) & ~katomic.load(&current.masked_signals) != 0 {
+			errno.set(errno.eintr)
+			return none
+		}
 		if !this.wait(_handle) {
 			errno.set(errno.eintr)
 			return none
@@ -303,32 +252,28 @@ pub fn syscall_signalfd4(_ voidptr, fdnum int, mask_ptr u64, sizemask u64, flags
 // Make a signalfd for `mask`, given in this kernel's layout, or give the one
 // `fdnum` is that mask.
 fn signalfd_set(fdnum int, mask u64, flags int) (u64, u64) {
-	pid := proc.current_thread().process.pid
-
 	if fdnum != -1 {
 		mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
 			return errno.err, errno.get()
 		}
+		defer { fd.unref() }
 		mut existing := &SignalFD(unsafe { nil })
 		mut res := fd.handle.resource
 		if mut res is SignalFD {
 			existing = res
 		}
-		fd.unref()
 		if existing == unsafe { nil } {
 			return errno.err, errno.einval
 		}
 		existing.l.acquire()
 		existing.mask = mask
-		existing.owner = pid
 		existing.l.release()
-		existing.refresh()
+		event.trigger(mut &existing.event, false)
 		return u64(fdnum), 0
 	}
 
 	mut sfd := &SignalFD{
 		mask:  mask
-		owner: pid
 	}
 	sfd.stat.mode = stat.ifchr | 0o600
 	// Listed before it has a descriptor, which, should making one fail, is
@@ -341,7 +286,6 @@ fn signalfd_set(fdnum int, mask u64, flags int) (u64, u64) {
 	mut res := sfd.box
 	newfd := file.fdnum_create_from_resource(unsafe { nil }, mut res, flags | resource.o_rdwr,
 		0, false) or { return errno.err, errno.get() }
-	// Signals it reads may be pending already.
-	sfd.refresh()
+	// poll_status also observes signals queued before descriptor creation.
 	return u64(newfd), 0
 }

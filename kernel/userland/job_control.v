@@ -144,8 +144,8 @@ pub fn notify_signal_parent(target &proc.Process) {
 
 // Select a pending signal while retaining the generation of a stop signal.
 // SIGKILL wins over a stop request, and neither KILL nor STOP is maskable.
-fn take_pending_signal(mut t proc.Thread) int {
-	if katomic.btr(mut &t.pending_signals, u8(sigkill - 1)) { return sigkill }
+fn take_pending_signal(mut t proc.Thread) (int, bool) {
+	if katomic.btr(mut &t.pending_signals, u8(sigkill - 1)) { return sigkill, false }
 	for i := u8(0); i < 64; i++ {
 		signal := int(i) + 1
 		if signal != sigstop && t.masked_signals & (u64(1) << i) != 0 { continue }
@@ -155,12 +155,14 @@ fn take_pending_signal(mut t proc.Thread) int {
 			present := katomic.btr(mut &t.pending_signals, i)
 			if present { t.job_delivered_stop_generation = t.job_stop_generation }
 			process.job_lock.release()
-			if present { return signal }
+			if present { return signal, false }
 		} else if katomic.btr(mut &t.pending_signals, i) {
-			return signal
+			return signal, false
+		} else if katomic.btr(mut &t.process.shared_pending_signals, i) {
+			return signal, true
 		}
 	}
-	return -1
+	return -1, false
 }
 
 fn request_group_stop(mut t proc.Thread, signal int) {
@@ -221,7 +223,7 @@ fn job_boundary() {
 	mut process := t.process
 	if process == unsafe { nil } { return }
 	for owes_job_stop(t) && !katomic.load(&t.must_exit)
-		&& katomic.load(&t.pending_signals) & (u64(1) << (sigkill - 1)) == 0 {
+		&& proc.pending_signals(t) & (u64(1) << (sigkill - 1)) == 0 {
 		process.threads_lock.acquire()
 		process.job_lock.acquire()
 		if process.job_stop_signal != 0 { t.job_parked_generation = process.job_generation }
@@ -298,7 +300,7 @@ fn publish_child_change(child &proc.Process, stop_or_continue bool) {
 // must leave the wait restartable after CONT rather than expose a false EINTR.
 fn job_wake_restarts_syscall(t &proc.Thread) bool {
 	if owes_job_stop(t) { return true }
-	pending := katomic.load(&t.pending_signals)
+	pending := proc.pending_signals(t)
 	if pending & (u64(1) << (sigstop - 1)) != 0 { return true }
 	for signal in [sigtstp, sigttin, sigttou]! {
 		bit := u64(1) << (signal - 1)

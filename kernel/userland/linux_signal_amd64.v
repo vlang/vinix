@@ -87,7 +87,7 @@ fn get_u64(buf []u8, offset u64) u64 {
 }
 
 // Deliver `which` to the calling Linux process on its way back to userspace.
-fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int, info_code int, info_addr u64, restarting bool) {
+fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int, info_code int, info_addr u64, restarting bool, shared bool) {
 	mut t := unsafe { proc.current_thread() }
 	sigaction := t.sigactions[which]
 	handler := u64(sigaction.sa_sigaction)
@@ -165,13 +165,13 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 	}
 	// A POSIX timer's signal reports SI_TIMER, the overrun count and the
 	// sigevent's value; musl's SIGEV_THREAD helper ignores it otherwise.
-	timer_info := posixtimer.signal_info(t, which)
+	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(t, which) }
 	if timer_info.found {
 		put_u32(mut buf, frame_siginfo + 8, u32(timer_info.code))
 		put_u32(mut buf, frame_siginfo + 20, u32(timer_info.overrun))
 		put_u64(mut buf, frame_siginfo + 24, timer_info.value)
 	}
-	posixtimer.acknowledge_signal(mut t, which)
+	if !shared { posixtimer.acknowledge_signal(mut t, which) }
 
 	// The registers still hold the program's FPU state; the kernel uses none.
 	fpu_save(t.fpu_storage)
@@ -325,7 +325,7 @@ fn default_ignores(signum int) bool {
 // handler has run.
 pub fn syscall_pause(_ voidptr) (u64, u64) {
 	mut t := proc.current_thread()
-	for !katomic.load(&t.must_exit) && katomic.load(&t.pending_signals) & ~t.masked_signals == 0 {
+	for !katomic.load(&t.must_exit) && proc.pending_signals(t) & ~t.masked_signals == 0 {
 		sleep_for_signal(unsafe { nil }, 0)
 	}
 	return errno.err, errno.eintr

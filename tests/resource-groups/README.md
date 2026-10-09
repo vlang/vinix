@@ -19,14 +19,21 @@ python3 tests/resource-groups/run.py --arch aarch64 --kernel-dir /path/to/arm/ke
 python3 tests/resource-groups/run.py --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /tmp/groups-x86
 ```
 
-The runner creates its own disposable disk, enables encrypted swap and disables
-networking. The fixture requires `CGROUP PASS` after concurrent thread/fork
+The runner defaults to four CPUs (`--smp` overrides it), creates its own
+disposable disk, enables encrypted swap and disables networking. The fixture
+requires `CGROUP PASS` after concurrent thread/fork
 admission, leader and worker exec at the PID ceiling, kernel-memory exhaustion
 and retry, pageout/refault/PROT_NONE/unmap accounting, shared/private fork and
 swap limits, memory-high delays, OOM recovery, memory migration rejection,
 CPU user/system accounting, hierarchical disk pacing and limit removal,
 independent/duplicated pressure subscriptions, poll/epoll wakeups, subscription
 exhaustion, hierarchy removal/reuse and malformed limits.
+
+Forty fresh OOM controllers also race 64 first-touch page faults against an
+immediate `exit_group(77)`. Each victim must report SIGKILL and an `oom_kill`
+event. This reproduces an ARM return-path bug: successful faults renewed the
+quantum without checking pending signals, letting a victim reach exit before
+its queued kill ran. Failures print the raw wait status for diagnosis.
 
 After warming controller reads/writes and pressure opens, it repeats 200 batches
 and waits beyond the reader grace period. `CGROUP SLAB` reports live-object

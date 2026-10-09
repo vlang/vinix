@@ -203,7 +203,7 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	// checked after dequeue. Clearing it later would lose that second wake.
 	katomic.store(mut &t.enqueued_by_signal, false)
 	mask := if explicit_mask { interrupt_mask } else { ~t.masked_signals }
-	if katomic.load(&t.pending_signals) & mask != 0 {
+	if proc.pending_signals(t) & mask != 0 {
 		unlock_events(mut events)
 		return none
 	}
@@ -247,7 +247,7 @@ fn await_internal(mut events []&eventstruct.Event, block bool, watch_generation 
 	// Child exit raises an event and SIGCHLD together. If both wake this wait,
 	// retain the consumed event; otherwise waitpid loses the zombie forever.
 	if (interrupted_by_signal || katomic.load(&t.must_exit)) && t.which_event == u64(-1) {
-		if katomic.load(&t.must_exit) || katomic.load(&t.pending_signals) & mask != 0 {
+		if katomic.load(&t.must_exit) || proc.pending_signals(t) & mask != 0 {
 			return none
 		}
 		// A sender can publish its wake after the target already consumed the

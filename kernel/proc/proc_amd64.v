@@ -106,6 +106,8 @@ pub mut:
 	pending_signals    u64
 	masked_signals     u64
 	enqueued_by_signal bool
+	// Attached for identity/TID setup, but forbidden to run until clone publishes.
+	not_started        bool
 	job_stop_generation           u64
 	job_delivered_stop_generation u64
 	job_parked_generation         u64

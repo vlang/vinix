@@ -118,18 +118,9 @@ fn sendsig_with_timer_lock(_thread &proc.Thread, signal u8, timer_locked bool) {
 	}
 }
 
-// Deliver a signal aimed at a whole process. Signal state is per-thread here,
-// so there is no process-wide pending mask to raise; the signal goes to the
-// first thread that does not block it, as Linux picks one, and only when every
-// thread blocks it does it wait on the main thread. Always choosing the main
-// thread lost signals for good in Go programs, whose main thread commonly sits
-// with them blocked while other threads are the ones meant to take them.
-//
-// Linux keeps such a signal pending on the process, where any thread waiting
-// for it in sigwait(2) takes it. The nearest here is to give it to a thread
-// that waits for it now: MariaDB blocks SIGTERM in every thread, sends it to
-// its own pid to stop the thread that sigwait()s for it, and that thread
-// never saw it on the main thread, so the server never stopped.
+// Ordinary process signals use a shared pending pool. Choosing a thread to
+// wake does not give that thread exclusive ownership: a sibling entering
+// sigwait later can claim a signal queued while everybody blocked it.
 fn signal_process(mut target proc.Process, signal int) bool {
 	if signal <= 0 || signal > 64 { return false }
 	posixtimer.lock_signal_info()
@@ -177,11 +168,12 @@ fn finish_exec_signals(mut target proc.Process, mut replacement proc.Thread,
 	target.exec_signal_thread = unsafe { nil }
 	for signal := 1; signal <= 64; signal++ {
 		bit := u64(1) << (signal - 1)
-		if replacement.pending_signals & bit == 0 { continue }
+		if (replacement.pending_signals | katomic.load(&target.shared_pending_signals)) & bit == 0 { continue }
 		handler := replacement.sigactions[signal].sa_sigaction
 		if replacement.masked_signals & bit == 0 && (handler == sig_ign
 			|| (handler == sig_dfl && (has_default_ignore_action(signal) || signal == sigcont))) {
 			replacement.pending_signals &= ~bit
+			katomic.btr(mut &target.shared_pending_signals, u8(signal - 1))
 			continue
 		}
 		notify_signalfds(target.pid, signal)
@@ -210,14 +202,18 @@ fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_loc
 	changed := apply_job_signal_locked(mut target, signal)
 	if changed && !timer_locked { proc.pin_process(&target) }
 	if target.exec_transition {
-		target.exec_pending_signals |= bit
+		if stop_signal(signal) || signal == sigcont || signal == sigkill {
+			target.exec_pending_signals |= bit
+		} else {
+			katomic.bts(mut &target.shared_pending_signals, u8(signal - 1))
+		}
 		target.threads_lock.release()
 		return true, changed
 	}
 	mut chosen := &proc.Thread(unsafe { nil })
 	mut waiting := &proc.Thread(unsafe { nil })
 	for t in target.threads {
-		if katomic.load(&t.is_dead) {
+		if katomic.load(&t.is_dead) || katomic.load(&t.exit_claimed) != 0 {
 			continue
 		}
 		if chosen == unsafe { nil } {
@@ -240,7 +236,7 @@ fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_loc
 		if timer_locked {
 			// Keep claim_teardown out until delivery finishes: exit changes
 			// the final thread's Process before clearing this thread list.
-			sendsig_with_timer_lock(chosen, u8(signal), true)
+			queue_process_signal(mut target, chosen, signal, timer_locked)
 		}
 	}
 	target.threads_lock.release()
@@ -249,9 +245,60 @@ fn signal_process_with_timer_lock(mut target proc.Process, signal int, timer_loc
 		return false, changed
 	}
 
-	if !timer_locked { sendsig_with_timer_lock(chosen, u8(signal), false) }
+	if !timer_locked { queue_process_signal(mut target, chosen, signal, timer_locked) }
+	if !stop_signal(signal) && signal != sigcont && signal != sigkill {
+		wake_shared_signal_waiters(mut target, signal)
+	}
 	proc.unpin_thread(chosen)
 	return true, changed
+}
+
+// A failed siginfo usercopy returns the shared signal to its original pool.
+// Wake every eligible observer: one may already have slept after the first
+// waiter claimed it. Pins cover each runqueue operation outside the list lock.
+fn requeue_shared_signal(mut process proc.Process, signal int) {
+	katomic.bts(mut &process.shared_pending_signals, u8(signal - 1))
+	notify_signalfds(process.pid, signal)
+	wake_shared_signal_waiters(mut process, signal)
+}
+
+fn wake_shared_signal_waiters(mut process proc.Process, signal int) {
+	bit := u64(1) << (signal - 1)
+	if katomic.load(&process.shared_pending_signals) & bit == 0 { return }
+	mut previous := -1
+	for {
+		process.threads_lock.acquire()
+		mut chosen := &proc.Thread(unsafe { nil })
+		for t in process.threads {
+			if t.tid > previous && !katomic.load(&t.is_dead) && katomic.load(&t.exit_claimed) == 0
+				&& (katomic.load(&t.masked_signals) & bit == 0 || katomic.load(&t.sigwait_set) & bit != 0)
+				&& (chosen == unsafe { nil } || t.tid < chosen.tid) { chosen = t }
+		}
+		if chosen != unsafe { nil } { proc.pin_thread(chosen) }
+		process.threads_lock.release()
+		if chosen == unsafe { nil } { return }
+		previous = chosen.tid
+		sched.enqueue_thread(chosen, true)
+		proc.unpin_thread(chosen)
+	}
+}
+
+fn queue_process_signal(mut target proc.Process, chosen &proc.Thread, signal int, timer_locked bool) {
+	// Stop/continue carry a per-thread selection generation for the existing
+	// process job-control protocol; fatal kill must also retain its priority.
+	if stop_signal(signal) || signal == sigcont || signal == sigkill {
+		sendsig_with_timer_lock(chosen, u8(signal), timer_locked)
+		return
+	}
+	bit := u64(1) << (signal - 1)
+	blocked := katomic.load(&chosen.masked_signals) & bit != 0
+	handler := chosen.sigactions[signal].sa_sigaction
+	if !blocked && (handler == sig_ign || (handler == sig_dfl && has_default_ignore_action(signal))) { return }
+	katomic.bts(mut &target.shared_pending_signals, u8(signal - 1))
+	notify_signalfds(target.pid, signal)
+	if !blocked || katomic.load(&chosen.sigwait_set) & bit != 0 {
+		sched.enqueue_thread(chosen, true)
+	}
 }
 
 // Send `signal` to process `pid` from inside the kernel: cgroup.kill, the death

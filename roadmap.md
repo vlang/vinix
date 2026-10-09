@@ -121,8 +121,10 @@ upgrade, rollback and recovery are repeatable from published images.
 - [x] Complete resource groups: memory/CPU/I/O/PID limits, pressure notifications,
   workload accounting and predictable recovery from quota exhaustion. See
   [implementation and limits](docs/resource-groups.md) and [acceptance tests](tests/resource-groups/README.md).
-- [ ] Qualify fork/exec/exit, vfork/clone semantics, signals, timers, futexes and
+- [x] Qualify fork/exec/exit, vfork/clone semantics, signals, timers, futexes and
   job control under SMP, cancellation, rapid process churn and resource pressure.
+  See [implementation and qualification limits](docs/process-smp.md) and
+  [acceptance tests](tests/process-smp/README.md).
 - [ ] Improve run-queue and allocator scalability, priority inheritance, workload
   QoS, heterogeneous-core placement and deadline-driven idle/timer coalescing.
 - [ ] Complete architecture-specific address-space/TLB work and large-page

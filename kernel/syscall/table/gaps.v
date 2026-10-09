@@ -495,7 +495,7 @@ fn syscall_linux_rt_sigpending(_ voidptr, set u64, sigsetsize u64) (u64, u64) {
 	}
 
 	current_thread := proc.current_thread()
-	pending := proc.sigset_to_user(katomic.load(&current_thread.pending_signals) & current_thread.masked_signals)
+	pending := proc.sigset_to_user(proc.pending_signals(current_thread) & current_thread.masked_signals)
 
 	if !usercopy.copy_to_user(set, voidptr(&pending), sizeof(u64)) {
 		return errno.err, errno.efault

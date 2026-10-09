@@ -302,7 +302,7 @@ pub fn async_signal_deliverable() bool {
 	if unsafe { t == nil } || t.sigentry != 0 {
 		return false
 	}
-	return katomic.load(&t.pending_signals) & ~t.masked_signals != 0
+	return proc.pending_signals(t) & ~t.masked_signals != 0
 }
 
 // The scheduler can restore a selected thread without running the lower-EL
@@ -312,7 +312,7 @@ pub fn async_signal_deliverable() bool {
 pub fn interrupt_return(context &cpulocal.GPRState) {
 	mut t := proc.current_thread()
 	if t == unsafe { nil } || context.pstate & 0xf != 0 { return }
-	pending := katomic.load(&t.pending_signals)
+	pending := proc.pending_signals(t)
 	deliverable := ~t.masked_signals | unblockable_mask()
 	if !katomic.load(&t.must_exit) && !owes_job_stop(t) && pending & deliverable == 0 { return }
 	t.async_context = *context
@@ -362,7 +362,7 @@ pub fn dispatch_fatal_signal(_ &cpulocal.GPRState) {
 	if unsafe { t == nil } {
 		return
 	}
-	pending := katomic.load(&t.pending_signals)
+	pending := proc.pending_signals(t)
 	if pending & (u64(1) << (sigkill - 1)) != 0 {
 		exit_with_fatal_signal(u8(sigkill))
 	}
@@ -386,7 +386,10 @@ pub fn dispatch_fatal_signal(_ &cpulocal.GPRState) {
 			|| signum == sigttin || signum == sigttou {
 			continue
 		}
-		exit_with_fatal_signal(u8(signum))
+		if katomic.btr(mut &t.pending_signals, i)
+			|| katomic.btr(mut &t.process.shared_pending_signals, i) {
+			exit_with_fatal_signal(u8(signum))
+		}
 	}
 }
 
@@ -417,13 +420,13 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	mut t := unsafe { proc.current_thread() }
 	restarting := t.restarting_syscall
 	t.restarting_syscall = false
-	which := take_pending_signal(mut t)
+	which, shared := take_pending_signal(mut t)
 
 	if which == -1 {
 		return
 	}
-	timer_info := posixtimer.signal_info(t, which)
-	posixtimer.acknowledge_signal(mut t, which)
+	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(t, which) }
+	if !shared { posixtimer.acknowledge_signal(mut t, which) }
 
 	sigaction := t.sigactions[which]
 	handler := sigaction.sa_sigaction
@@ -1347,8 +1350,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		curr_process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		// The new program has no break yet; its first brk() reserves the arena
 		// in the address space it now has.
-		curr_process.brk_base = 0
-		curr_process.brk_current = 0
+		complete_vfork(mut curr_process)
 
 		curr_process.threads_lock.acquire()
 		curr_process.threads.clear()

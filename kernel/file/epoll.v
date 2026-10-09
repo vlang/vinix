@@ -522,7 +522,7 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 		// thread whose process is exiting: the sibling tearing it down waits
 		// for it to come back out, and a wait here never reaches the check in
 		// event.await while an event stays pending.
-		if t.pending_signals & ~t.masked_signals != 0 || thread_told_to_exit(t) {
+		if proc.pending_signals(t) & ~t.masked_signals != 0 || thread_told_to_exit(t) {
 			return errno.err, errno.eintr
 		}
 	}
@@ -551,7 +551,7 @@ fn (mut this EpollResource) collect_ready(maxevents int) ?EpollReadySnapshot {
 			continue
 		}
 		mut watched := entry.handle.resource
-		revents := epoll_ready_events(mut entry, watched.status, watched.event.generation)
+		revents := epoll_ready_events(mut entry, resource.poll_status(mut watched), watched.event.generation)
 		if revents != 0 {
 			events << EpollEvent{
 				events: revents

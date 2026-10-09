@@ -40,7 +40,24 @@ fn inherited_sched_params(source &proc.Thread) proc.SchedParams {
 // the new pidfd may otherwise finish and free t before the creator enqueues it.
 pub fn publish_user_thread(mut process proc.Process, t &proc.Thread) {
 	proc.lock_table()
+	process.constructing = false
+	katomic.store(mut unsafe { &t.not_started }, false)
 	proc.publish_pidfd_identity_locked(mut process)
+	enqueue_thread(t, false)
+	proc.unlock_table()
+}
+
+pub fn publish_cloned_thread(t &proc.Thread) {
+	proc.lock_table()
+	// A creator can be inside clone when another sibling starts exit or exec.
+	// It must finish publication, but can leave through must_exit before libc
+	// links the child into its thread list. Its clear_child_tid then unlocks
+	// that list. Keep the child in kernel unwind too: user code would otherwise
+	// attempt to unlink a TCB that its creator never finished linking.
+	if t.process.exiting || t.process.exec_transition {
+		katomic.store(mut unsafe { &t.must_exit }, true)
+	}
+	katomic.store(mut unsafe { &t.not_started }, false)
 	enqueue_thread(t, false)
 	proc.unlock_table()
 }
@@ -55,6 +72,10 @@ pub fn new_process(old_process &proc.Process, pagemap &memory.Pagemap) ?&proc.Pr
 }
 
 pub fn new_process_in_group(old_process &proc.Process, pagemap &memory.Pagemap, account &proc.CGroupAccount) ?&proc.Process {
+	return new_process_with_vm(old_process, pagemap, account, false)
+}
+
+pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, account &proc.CGroupAccount, share_vm bool) ?&proc.Process {
 	if unsafe { old_process != nil } && !proc.may_create_process(old_process) {
 		errno.set(errno.eagain)
 		return none
@@ -114,18 +135,17 @@ pub fn new_process_in_group(old_process &proc.Process, pagemap &memory.Pagemap, 
 		// a fork keeps the placement its parent asked for.
 		new_proc.mempolicy_mode = old_process.mempolicy_mode
 		new_proc.mempolicy_nodemask = old_process.mempolicy_nodemask
-		new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap, owner) or {
-			proc.free_pid(new_proc.pid)
-			return none
+		if share_vm {
+			new_proc.pagemap = mmap.share_pagemap(old_process.pagemap)
+		} else {
+			new_proc.pagemap = mmap.fork_pagemap(old_process.pagemap, owner) or {
+				proc.free_pid(new_proc.pid)
+				return none
+			}
 		}
 		new_proc.thread_stack_top = old_process.thread_stack_top
 		new_proc.stack_end = old_process.stack_end
 		new_proc.saved_auxv = old_process.saved_auxv.clone()
-		// The child has the parent's heap, so it has its break too. Starting
-		// from none, its first brk() tried to reserve the arena the copy of the
-		// address space already held there, failed, and reported a break of 0.
-		new_proc.brk_base = old_process.brk_base
-		new_proc.brk_current = old_process.brk_current
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
 		new_proc.current_directory = proc.current_directory_of(old_process)
   proc.inherit_command_line(mut new_proc, old_process) or {

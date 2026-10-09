@@ -3,137 +3,100 @@
 @[has_globals]
 module sched
 
-// setitimer(ITIMER_REAL) and alarm(): SIGALRM once the time is up, and again
-// every interval after that, counted down on the scheduler's clock. Each arch
-// says what drives tick_itimers() through itimer_armed(): arm64's scheduler
-// tick on every CPU, amd64's clock tick.
-
-import katomic
+// ITIMER_REAL belongs to the process. Its active list uses fields in the
+// already charged Process object, so arming timers cannot exhaust a separate
+// fixed table or allocate on the scheduler/IRQ path.
 import klock
 import proc
-
-const max_itimer_real = 32
-
-struct ItimerRealEntry {
-mut:
-	thrd        &proc.Thread = unsafe { nil }
-	value_us    i64
-	interval_us i64
-	active      bool
-}
+import time
 
 __global (
-	itimer_real_entries [max_itimer_real]ItimerRealEntry
-	itimer_real_lock    klock.Lock
-	itimer_last_ns      u64
+	itimer_real_head &proc.Process = unsafe { nil }
+	itimer_real_lock klock.Lock
 )
 
-// A tick that finds the table busy leaves the time to the next one, which
-// counts it: the elapsed time is measured, not assumed, and measured under the
-// lock. arm64 used to read its counter and take the last reading outside it,
-// on four CPUs at once: one whose reading was older than the reading another
-// had just stored subtracted into a wrap-around, took that for eons, and
-// fired every armed timer -- alarm(60) raised SIGALRM within milliseconds.
+fn unlink_itimer(mut p proc.Process) {
+	if !p.itimer_linked { return }
+	if p.itimer_previous == unsafe { nil } {
+		itimer_real_head = p.itimer_next
+	} else {
+		p.itimer_previous.itimer_next = p.itimer_next
+	}
+	if p.itimer_next != unsafe { nil } {
+		p.itimer_next.itimer_previous = p.itimer_previous
+	}
+	p.itimer_previous = unsafe { nil }
+	p.itimer_next = unsafe { nil }
+	p.itimer_linked = false
+}
+
+fn remaining_itimer(p &proc.Process, now_us u64) i64 {
+	return if p.itimer_deadline_us > now_us { i64(p.itimer_deadline_us - now_us) } else { i64(0) }
+}
+
 fn tick_itimers() {
-	if !itimer_real_lock.test_and_acquire() {
-		return
-	}
-	defer {
+	if !itimer_real_lock.test_and_acquire() { return }
+	now_us := time.monotonic_ns() / 1000
+	for {
+		mut due := &proc.Process(unsafe { nil })
+		for p := itimer_real_head; p != unsafe { nil }; p = p.itimer_next {
+			if p.itimer_deadline_us <= now_us { due = unsafe { p }; break }
+		}
+		if due == unsafe { nil } { itimer_real_lock.release(); return }
+		if due.itimer_interval_us == 0 {
+			due.itimer_deadline_us = 0
+			unlink_itimer(mut due)
+		} else {
+			// Advance from the original phase. Late ticks coalesce ordinary
+			// signals, but never add their scheduling delay to every period.
+			remaining := due.itimer_interval_us - (now_us - due.itimer_deadline_us) % due.itimer_interval_us
+			due.itimer_deadline_us = now_us + remaining
+		}
+		proc.pin_process(due)
 		itimer_real_lock.release()
-	}
-
-	now := clock_ns()
-	if itimer_last_ns == 0 || now <= itimer_last_ns {
-		if itimer_last_ns == 0 {
-			itimer_last_ns = now
-		}
-		return
-	}
-	elapsed_us := i64((now - itimer_last_ns) / 1000)
-	if elapsed_us <= 0 {
-		return
-	}
-	itimer_last_ns += u64(elapsed_us) * 1000
-
-	for i := 0; i < max_itimer_real; i++ {
-		mut e := unsafe { &itimer_real_entries[i] }
-		if !e.active || e.value_us <= 0 {
-			continue
-		}
-		e.value_us -= elapsed_us
-		if e.value_us <= 0 {
-			// SIGALRM.
-			katomic.bts(mut &e.thrd.pending_signals, proc.pending_bit(14))
-			enqueue_thread(e.thrd, true)
-			if e.interval_us > 0 {
-				e.value_us = e.interval_us
-			} else {
-				e.active = false
-			}
-		}
+		// Delivery selects a live, unblocked process thread, including an exec
+		// transition. No process/thread/event lock is taken under our list lock.
+		proc.send_real_itimer_signal(due)
+		proc.unpin_process(due)
+		if !itimer_real_lock.test_and_acquire() { return }
 	}
 }
 
-// set_itimer_real arms or disarms `thrd`'s ITIMER_REAL timer and returns the
-// previous (value_us, interval_us).
+// Fork starts with empty timer fields. Exec and the arming thread's exit keep
+// these fields on the surviving Process; only process exit removes the timer.
 pub fn set_itimer_real(thrd &proc.Thread, value_us i64, interval_us i64) (i64, i64) {
-	arming := value_us > 0 || interval_us > 0
-	if arming {
-		itimer_armed()
-	}
-
+	if value_us > 0 { itimer_armed() }
+	mut p := thrd.process
 	itimer_real_lock.acquire()
-	defer {
-		itimer_real_lock.release()
+	defer { itimer_real_lock.release() }
+	now_us := time.monotonic_ns() / 1000
+	old_value := remaining_itimer(p, now_us)
+	old_interval := i64(p.itimer_interval_us)
+	p.itimer_interval_us = u64(interval_us)
+	p.itimer_deadline_us = if value_us > 0 { now_us + u64(value_us) } else { u64(0) }
+	if value_us <= 0 {
+		unlink_itimer(mut p)
+	} else if !p.itimer_linked {
+		p.itimer_next = itimer_real_head
+		if itimer_real_head != unsafe { nil } { itimer_real_head.itimer_previous = p }
+		itimer_real_head = p
+		p.itimer_linked = true
 	}
-
-	for i := 0; i < max_itimer_real; i++ {
-		mut e := unsafe { &itimer_real_entries[i] }
-		if e.active && e.thrd == thrd {
-			old_value := e.value_us
-			old_interval := e.interval_us
-			if !arming {
-				e.active = false
-			} else {
-				e.value_us = value_us
-				e.interval_us = interval_us
-			}
-			return old_value, old_interval
-		}
-	}
-
-	if arming {
-		if itimer_last_ns == 0 {
-			itimer_last_ns = clock_ns()
-		}
-		for i := 0; i < max_itimer_real; i++ {
-			mut e := unsafe { &itimer_real_entries[i] }
-			if !e.active {
-				e.thrd = unsafe { thrd }
-				e.value_us = value_us
-				e.interval_us = interval_us
-				e.active = true
-				break
-			}
-		}
-	}
-
-	return 0, 0
+	return old_value, old_interval
 }
 
-// get_itimer_real returns the current (value_us, interval_us) for a thread.
 pub fn get_itimer_real(thrd &proc.Thread) (i64, i64) {
 	itimer_real_lock.acquire()
-	defer {
-		itimer_real_lock.release()
-	}
+	defer { itimer_real_lock.release() }
+	return remaining_itimer(thrd.process, time.monotonic_ns() / 1000), i64(thrd.process.itimer_interval_us)
+}
 
-	for i := 0; i < max_itimer_real; i++ {
-		e := itimer_real_entries[i]
-		if e.active && e.thrd == thrd {
-			return e.value_us, e.interval_us
-		}
-	}
-
-	return 0, 0
+// Called after every sibling has unwound, before process identity is reaped.
+// A tick already dispatching owns a Process pin across delivery.
+pub fn remove_itimer_real(mut p proc.Process) {
+	itimer_real_lock.acquire()
+	defer { itimer_real_lock.release() }
+	unlink_itimer(mut p)
+	p.itimer_deadline_us = 0
+	p.itimer_interval_us = 0
 }

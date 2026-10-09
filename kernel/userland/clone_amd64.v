@@ -84,6 +84,8 @@ pub fn syscall_clone3(gpr_state voidptr, uargs u64, size u64) (u64, u64) {
 }
 
 fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, child_tid u64, tls u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
+	if !valid_clone_sharing(flags) { return errno.err, errno.einval }
+	if !supported_clone_sharing(flags) { return errno.err, errno.enotsup }
 	// Returning a PID while leaving the requested pidfd word untouched would
 	// falsely report success. Descriptor construction/rollback is unsupported.
 	if flags & clone_pidfd != 0 { return errno.err, errno.einval }
@@ -111,9 +113,7 @@ fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64
 	} else if !proc.cgroup_may_add_task(proc.current_thread().process) {
 		return errno.err, errno.eagain
 	}
-	// CLONE_THREAD, not CLONE_VM, decides between a thread and a process:
-	// posix_spawn and vfork ask for CLONE_VM but only need a child that can
-	// execve without replacing us, which a copied address space gives them.
+	// CLONE_VM shares the map independently of CLONE_THREAD's task identity.
 	if flags & clone_thread != 0 {
 		return clone_thread_of_current(state, flags, child_stack, parent_tid, child_tid, tls)
 	}
@@ -151,19 +151,17 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 		usercopy.copy_to_user(child_tid, voidptr(&tid), sizeof(u32))
 	}
 
-	sched.enqueue_thread(new_thread, false)
+	sched.publish_cloned_thread(new_thread)
 
 	return u64(tid), 0
 }
 
-// Everything else, fork(2) and vfork(2) included: a new process with a copy of
-// the caller's address space and descriptor table, running one thread that
-// resumes where the caller did.
+// A separate process, with a shared or forked map as requested.
 fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, child_tid u64, tls u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
 	mut old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
-	mut new_process := sched.new_process_in_group(old_process, unsafe { nil }, if into_cgroup { fs.cgroup_account_of(cgroup) } else { old_process.cgroup_account }) or {
+	mut new_process := sched.new_process_with_vm(old_process, unsafe { nil }, if into_cgroup { fs.cgroup_account_of(cgroup) } else { old_process.cgroup_account }, flags & clone_vm != 0) or {
 		return errno.err, errno.get()
 	}
 
@@ -257,7 +255,12 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 
 	// Another parent thread can reap the child as soon as it runs.
 	pid := proc.pid_in(new_process, viewer)
+	if flags & clone_vfork != 0 {
+		new_process.vfork_pending = true
+		proc.pin_process(new_process)
+	}
 	sched.publish_user_thread(mut new_process, new_thread)
+	if flags & clone_vfork != 0 { await_vfork(mut new_process) }
 
 	return u64(pid), 0
 }
@@ -274,9 +277,13 @@ fn abandon_new_process(mut new_process proc.Process) {
 	proc.free_pid(new_process.pid)
 }
 
-// fork(2) and vfork(2).
+// fork(2) and the dedicated x86 vfork(2) entry.
 pub fn syscall_fork(gpr_state &cpulocal.GPRState) (u64, u64) {
 	return clone_new_process(gpr_state, u64(sigchld), 0, 0, 0, 0, false, unsafe { nil })
+}
+
+pub fn syscall_vfork(gpr_state &cpulocal.GPRState) (u64, u64) {
+	return clone_new_process(gpr_state, clone_vm | clone_vfork | u64(sigchld), 0, 0, 0, 0, false, unsafe { nil })
 }
 
 // What exit gives back of the process' x86 segments: its LDT.
@@ -297,7 +304,7 @@ fn thread_in_kernel(t &proc.Thread) bool {
 fn stop_claimed_thread(mut victim proc.Thread) {
 	// Marked first so that no wakeup can put it back on the run queue.
 	katomic.store(mut &victim.is_dead, true)
-	// Waits until it is off every CPU, disarms its ITIMER_REAL and gives its
+	// Waits until it is off every CPU and gives its
 	// stacks back.
 	sched.stop_thread_for_good(victim)
 	fs.release_thread_fs(mut victim)

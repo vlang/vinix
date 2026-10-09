@@ -163,7 +163,7 @@ pub fn syscall_rt_sigprocmask(_ voidptr, how int, set_ptr u64, oldset_ptr u64, s
 // True once a signal outside `mask` is pending, i.e. something that would be
 // delivered as soon as we return to userspace.
 fn deliverable_signal(t &proc.Thread, mask u64) bool {
-	return katomic.load(&t.pending_signals) & ~mask != 0
+	return proc.pending_signals(t) & ~mask != 0
 }
 
 // Sleep until a signal wakes us. Any sendsig() puts the thread back on the run
@@ -260,7 +260,7 @@ pub fn syscall_rt_sigsuspend(_ voidptr, mask_ptr u64, sigsetsize u64) (u64, u64)
 // Whether the pending signal that got through `mask` has a real handler, as
 // opposed to a default or ignored disposition that dispatch will drop.
 fn has_handler_for_pending(t &proc.Thread, mask u64) bool {
-	pending := katomic.load(&t.pending_signals) & ~mask
+	pending := proc.pending_signals(t) & ~mask
 	for signum := 1; signum <= max_signal; signum++ {
 		if pending & signal_bit(signum) == 0 {
 			continue
@@ -308,13 +308,15 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 	}
 
 	for {
-		if which := take_pending(mut current_thread, wanted) {
-			if info_ptr != 0 && !write_signal_info(info_ptr, current_thread, which) {
+		which, shared := take_wait_signal(mut current_thread, wanted)
+		if which != -1 {
+			if info_ptr != 0 && !write_signal_info(info_ptr, current_thread, which, shared) {
 				// Hand the signal back rather than losing it.
-				katomic.bts(mut &current_thread.pending_signals, u8(which - 1))
+				if shared { requeue_shared_signal(mut current_thread.process, which) }
+				else { katomic.bts(mut &current_thread.pending_signals, u8(which - 1)) }
 				return errno.err, errno.efault
 			}
-			posixtimer.acknowledge_signal(mut current_thread, which)
+			if !shared { posixtimer.acknowledge_signal(mut current_thread, which) }
 			return u64(which), 0
 		}
 
@@ -350,23 +352,26 @@ pub fn syscall_rt_sigtimedwait(_ voidptr, set_ptr u64, info_ptr u64, timeout_ptr
 }
 
 // Claim the lowest-numbered pending signal that is in `wanted`.
-fn take_pending(mut t proc.Thread, wanted u64) ?int {
+fn take_wait_signal(mut t proc.Thread, wanted u64) (int, bool) {
 	for signum := 1; signum <= max_signal; signum++ {
 		if wanted & signal_bit(signum) == 0 {
 			continue
 		}
 		if katomic.btr(mut &t.pending_signals, u8(signum - 1)) == true {
-			return signum
+			return signum, false
+		}
+		if katomic.btr(mut &t.process.shared_pending_signals, u8(signum - 1)) {
+			return signum, true
 		}
 	}
-	return none
+	return -1, false
 }
 
 // The 128-byte siginfo_t for a synchronously accepted signal. Ordinary signals
 // use SI_USER; POSIX timers retain SI_TIMER, their value, and overrun count.
-fn write_signal_info(info_ptr u64, thrd &proc.Thread, signum int) bool {
+fn write_signal_info(info_ptr u64, thrd &proc.Thread, signum int, shared bool) bool {
 	mut raw := [16]u64{}
-	timer_info := posixtimer.signal_info(thrd, signum)
+	timer_info := if shared { posixtimer.SignalInfo{} } else { posixtimer.signal_info(thrd, signum) }
 	unsafe {
 		mut words := &u32(&raw[0])
 		words[0] = u32(signum) // si_signo

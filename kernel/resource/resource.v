@@ -67,6 +67,27 @@ pub interface ReadOnlyResource {
 	read_only_backend() bool
 }
 
+// Some readiness (signalfd's private signals) belongs to the calling thread.
+// A descriptor retains the backend for this synchronous, borrowed callback.
+pub interface PollableResource {
+mut:
+	poll_status() int
+}
+
+struct PollScratch {
+mut:
+	backend PollableResource
+}
+
+pub fn poll_status(mut res Resource) int {
+	if mut res is PollableResource {
+		mut scratch := unsafe { &PollScratch(C.__builtin_alloca(sizeof(PollScratch))) }
+		unsafe { scratch.backend = PollableResource(res) }
+		return scratch.backend.poll_status()
+	}
+	return res.status
+}
+
 struct ReadOnlyScratch {
 mut:
 	backend ReadOnlyResource

@@ -454,7 +454,7 @@ fn deliver_signal_on_tick(t &proc.Thread, state &cpulocal.GPRState) {
 	}
 	deliverable := ~t.masked_signals | (u64(1) << 8) | (u64(1) << 18)
 	job_stop := t.process != unsafe { nil } && katomic.load(&t.process.job_stop_signal) != 0
-	if !katomic.load(&t.must_exit) && !job_stop && katomic.load(&t.pending_signals) & deliverable == 0 {
+	if !katomic.load(&t.must_exit) && !job_stop && proc.pending_signals(t) & deliverable == 0 {
 		return
 	}
 	hook := unsafe { UserSignalHook(user_signal_hook) }
@@ -828,6 +828,7 @@ pub fn enqueue_thread_traced(_thread &proc.Thread, by_signal bool) bool {
 
 fn enqueue_thread_impl(_thread &proc.Thread, by_signal bool, trace bool) bool {
 	mut t := unsafe { _thread }
+	if katomic.load(&t.not_started) { return false }
 	if trace {
 		println('exec[gpu]/sched: entered enqueue_thread')
 		first_cpu := cpu.read_tpidr_el1()
@@ -929,17 +930,31 @@ pub fn intercept_thread(_thread &proc.Thread) ? {
 
 	dequeue_thread(t)
 
-	running_on := t.running_on
-	if running_on == u64(-1) {
-		return
-	}
+	running_on := katomic.load(&t.running_on)
+	if running_on != u64(-1) { send_reschedule(running_on) }
 
-	// On ARM64, send an SGI (software-generated interrupt) to wake the target CPU.
-	// For now, use SEV as a simple cross-CPU notification.
-	cpu.sev()
-
+	// A dispatch or switch-away can hold this lock while running_on is -1.
+	// Drain the handoff before a sibling classifies the saved context.
 	t.l.acquire()
 	t.l.release()
+}
+
+// The caller has pinned and marked this thread dead. Wait through a scheduler
+// handoff as well as execution; no timeout permits early resource teardown.
+pub fn stop_thread_for_good(_thread &proc.Thread) {
+	mut t := unsafe { _thread }
+	mut kicked_cpu := u64(-1)
+	for {
+		dequeue_thread(t)
+		on := katomic.load(&t.running_on)
+		if on == u64(-1) {
+			if !t.l.is_held() { return }
+		} else if on != kicked_cpu {
+			send_reschedule(on)
+			kicked_cpu = on
+		}
+		asm volatile aarch64 { yield; ; ; memory }
+	}
 }
 
 @[noreturn]
@@ -1140,13 +1155,10 @@ fn dequeue_and_die_impl(trace bool) {
 	proc.account_context_switch(t, true)
 	proc.charge_cpu_time(mut t, timer.get_ns())
 	if trace {
-		println('exec[gpu]/sched: CPU time charged; disarming interval timer')
+		println('exec[gpu]/sched: CPU time charged')
 	}
-	// tick_itimers() keeps a raw pointer to every armed thread, so the entry
-	// has to go before the Thread struct can be recycled.
-	set_itimer_real(t, 0, 0)
 	if trace {
-		println('exec[gpu]/sched: interval timer disarmed; releasing thread lock')
+		println('exec[gpu]/sched: releasing thread lock')
 	}
 	// A running thread holds its own lock, taken by get_next_thread(). Nothing
 	// will ever deschedule us to release it, and intercept_thread() would spin
@@ -1461,6 +1473,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		process: process
 		ttbr0: process.pagemap.tagged_root()
 		gpr_state: state
+		not_started: true
 		timeslice: source.timeslice
 		running_on: u64(-1)
 		kernel_stack: u64(kernel_stack_base) + kernel_stack_size

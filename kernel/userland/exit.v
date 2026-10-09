@@ -44,6 +44,9 @@ fn thread_exit(status int, group bool) {
 	if !proc.claim_thread_exit(current_thread) {
 		sched.park_stopped_thread()
 	}
+	if group {
+		exit_process(mut current_process, mut current_thread, encode_exit_status(status), false)
+	}
 
 	// Hand back whatever this thread still owns while its address space is
 	// mapped: robust futexes it holds, and the tid word pthread_join waits on.
@@ -60,7 +63,7 @@ fn thread_exit(status int, group bool) {
 		sched.dequeue_and_die()
 	}
 
-	exit_process(mut current_process, mut current_thread, encode_exit_status(status))
+	exit_process(mut current_process, mut current_thread, encode_exit_status(status), true)
 }
 
 // OpenBSD kills a process that breaks a pledge(2) promise with SIGABRT,
@@ -83,11 +86,7 @@ pub fn exit_with_fatal_signal(signal u8) {
 		sched.park_stopped_thread()
 	}
 
-	release_robust_list(mut current_thread)
-	clear_child_tid(mut current_thread)
-	fs.release_thread_fs(mut current_thread)
-
-	exit_process(mut current_process, mut current_thread, encode_fatal_signal(signal))
+	exit_process(mut current_process, mut current_thread, encode_fatal_signal(signal), false)
 }
 
 // Drop the calling thread from its process, reporting whether it was the last
@@ -142,12 +141,17 @@ fn abort_exec(mut process proc.Process, mut old_thread proc.Thread) {
 }
 
 @[noreturn]
-fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread, status int) {
+fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread, status int, thread_released bool) {
 	// The descriptor belongs to this owned Thread frame across teardown. A
 	// fixed alloca avoids V promotion and carries no child/adopter pointers.
 	mut orphan_change := unsafe { &proc.OrphanChange(C.__builtin_alloca(sizeof(proc.OrphanChange))) }
 	unsafe { *orphan_change = proc.OrphanChange{} }
 	if !claim_teardown(mut current_process, mut orphan_change) {
+		if !thread_released {
+			release_robust_list(mut current_thread)
+			clear_child_tid(mut current_thread)
+			fs.release_thread_fs(mut current_thread)
+		}
 		// Somebody else got here first. Step out of the thread list before
 		// dying so the thread doing the teardown never has to reach us.
 		leave_process(mut current_process, current_thread)
@@ -157,6 +161,15 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	// Get every other thread off the CPUs before the address space goes away.
 	kill_sibling_threads(mut current_process, current_thread)
+	// clear_child_tid can be musl's shared thread-list lock. Claim the process
+	// and retire siblings before releasing it: a creator killed at clone return
+	// has not yet linked its new child, which must never unlink itself in libc.
+	if !thread_released {
+		release_robust_list(mut current_thread)
+		clear_child_tid(mut current_thread)
+		fs.release_thread_fs(mut current_thread)
+	}
+	sched.remove_itimer_real(mut current_process)
 	proc.notify_session_exit(current_process)
 	posixtimer.remove_process_timers(current_process)
 	release_process_segments(mut current_process)
@@ -257,6 +270,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	fs.release_process_namespaces(mut current_process)
 
 	mmap.delete_pagemap(mut old_pagemap) or {}
+	complete_vfork(mut current_process)
 	oom_victim_gone(current_process)
 
 	// The Thread structs are about to be recycled, so nothing may reach them
@@ -351,12 +365,12 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 	for t in current_process.threads {
 		if voidptr(t) != voidptr(current_thread) {
 			proc.pin_thread(t)
+			katomic.store(mut unsafe { &t.must_exit }, true)
 			others << t
 		}
 	}
 	current_process.threads_lock.release()
 	for mut other in others {
-		katomic.store(mut &other.must_exit, true)
 		sched.enqueue_thread(other, true)
 		proc.unpin_thread(other)
 	}
@@ -400,10 +414,12 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 			proc.unpin_thread(victim)
 			continue
 		}
-		if victim.syscall_nr != -1 || thread_in_kernel(victim) {
+		if katomic.load(&victim.not_started) || victim.syscall_nr != -1 || thread_in_kernel(victim) {
 			// The syscall or page fault owns kernel references and locks. Let it
 			// resume and leave through the ordinary must_exit path before the
 			// process tears down what it is using.
+			// An unpublished clone is also owned by its creating syscall; its
+			// creator must finish TID setup/publication before it can be retired.
 			sched.enqueue_thread(victim, true)
 			wait_for_thread_to_leave(mut current_process, victim)
 			proc.unpin_thread(victim)

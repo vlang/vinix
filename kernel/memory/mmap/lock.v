@@ -19,8 +19,8 @@ fn lockable_range(local &MmapRangeLocal, process &proc.Process) bool {
 	if local.flags & map_brk_reservation == 0 || local.prot != prot_none { return true }
 	// A committed heap page can be made PROT_NONE by the program. It still
 	// differs from the enormous reserve before/after the actual program break.
-	return process.brk_current > process.brk_base && local.base >= process.brk_base
-		&& local.base + local.length <= lib.align_up(process.brk_current, page_size)
+	return process.pagemap.brk_current > process.pagemap.brk_base && local.base >= process.pagemap.brk_base
+		&& local.base + local.length <= lib.align_up(process.pagemap.brk_current, page_size)
 }
 
 fn locked_bytes_unlocked(pagemap &memory.Pagemap) u64 {

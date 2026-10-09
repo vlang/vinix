@@ -11,6 +11,21 @@
 #ifndef JOB_DETACHED_CHURN
 #define JOB_DETACHED_CHURN 0
 #endif
+#ifndef JOB_TEARDOWN_PROCESSES
+#define JOB_TEARDOWN_PROCESSES 30
+#endif
+#ifndef JOB_TEARDOWN_BATCHES
+#define JOB_TEARDOWN_BATCHES 2
+#endif
+// x86 currently reserves two 2 MiB kernel stacks per thread. Stay below the
+// 256 MiB creator ceiling while still exceeding 32 simultaneous waiters.
+#if defined(__x86_64__)
+#define JOB_WAITERS 48
+#define JOB_WORKERS 48
+#else
+#define JOB_WAITERS 70
+#define JOB_WORKERS 64
+#endif
 #include <errno.h>
 #include <limits.h>
 #include <pthread.h>
@@ -35,7 +50,7 @@
 #include <unistd.h>
 
 static int failures;
-struct shared { unsigned long loops[4]; int command, seen_usr, seen_cont, seen_tstp;
+struct shared { unsigned long loops[4], admission_retries; int command, seen_usr, seen_cont, seen_tstp;
                int orphan_hups[40], orphan_conts[40]; };
 static struct shared *state;
 static void check(int ok, const char *name) {
@@ -256,7 +271,7 @@ static void *child_waiter(void *arg) {
  return NULL;
 }
 static void many_waiters(void) {
- enum {N=70}; int p[2];pipe(p);pid_t child=fork();
+ enum {N=JOB_WAITERS}; int p[2];pipe(p);pid_t child=fork();
  if(!child){close(p[1]);char c;read(p[0],&c,1);_exit(23);}
  close(p[0]);struct waiting waits[N];pthread_t threads[N];int created=0;
  for(int i=0;i<N;i++) { waits[i]=(struct waiting){.child=child};
@@ -269,7 +284,7 @@ static void many_waiters(void) {
   if(waits[i].result==child && waits[i].status==(23<<8))won++;
   else if(waits[i].result==-1 && waits[i].error==ECHILD)errors++;
  }
- check(created==N && won==1 && errors==N-1,"70 same-parent waiters safely compete for one exit event");
+ check(created==N && won==1 && errors==N-1,"more than 32 same-parent waiters safely compete for one exit event");
 }
 
 struct slab { unsigned long bytes, objects; };
@@ -303,6 +318,19 @@ static void allocation_cycles(void) {
 static void *short_thread(void *unused) {
  (void)unused;for(int i=0;i<10000;i++)atomic_fetch_add(&state->loops[1],1);return NULL;
 }
+static int teardown_create(pthread_t *thread,const pthread_attr_t *attr,
+                           void *(*entry)(void *)) {
+ // Retired kernel stacks remain charged until their reaper finishes. A burst
+ // can legitimately refuse admission; keep racing teardown during that wait.
+ // Unexpected errors or exhausting 2000 one-millisecond retries still fail.
+ int result=0;
+ for(int attempt=0;attempt<2000;attempt++) {
+  result=pthread_create(thread,attr,entry,NULL);
+  if(!result || (result!=EAGAIN && result!=ENOMEM))return result;
+  atomic_fetch_add(&state->admission_retries,1);usleep(1000);
+ }
+ return result;
+}
 static void clone_exit_races(void) {
  memset(state,0,sizeof(*state));int p[2];pipe(p);pid_t child=fork();
  if(!child){close(p[0]);write(p[1],"r",1);close(p[1]);for(;;){pthread_t t;
@@ -323,15 +351,15 @@ static int clone_teardown_batch(int count) {
  int valid=1,status=0;
  for(int i=0;i<count;i++) {
   int p[2];pipe(p);pid_t child=fork();
-  if(!child){close(p[0]);if(i%2){pthread_t terminator;if(pthread_create(&terminator,NULL,terminate_group,NULL))_exit(92);}
+  if(!child){close(p[0]);if(i%2){pthread_t terminator;if(teardown_create(&terminator,NULL,terminate_group))_exit(92);}
    write(p[1],"r",1);close(p[1]);
    if(JOB_DETACHED_CHURN){for(;;){pthread_t t;
-    if(pthread_create(&t,NULL,short_thread,NULL)) { _exit(91); }
+    if(teardown_create(&t,NULL,short_thread)) { _exit(91); }
     pthread_detach(t);}}
    pthread_attr_t attr;
    if(pthread_attr_init(&attr)||pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED))_exit(93);
-   for(int worker=0;worker<64;worker++){pthread_t t;
-    if(pthread_create(&t,&attr,teardown_loop,NULL))_exit(91);}
+   for(int worker=0;worker<JOB_WORKERS;worker++){pthread_t t;
+    if(teardown_create(&t,&attr,teardown_loop))_exit(91);}
    for(;;)pause();}
   close(p[1]);char c;read(p[0],&c,1);close(p[0]);if(!(i%2)){usleep(3000);kill(child,SIGKILL);}
   pid_t got=waitpid(child,&status,0);
@@ -342,12 +370,29 @@ static int clone_teardown_batch(int count) {
  return valid;
 }
 static unsigned long free_memory_kib(void) {
- FILE *f=fopen("/proc/meminfo","r");if(!f)return 0;char line[256];unsigned long free=0;
- while(fgets(line,sizeof(line),f))if(sscanf(line,"MemFree: %lu kB",&free)==1)break;
+ FILE *f=fopen("/proc/meminfo","r");if(!f)return 0;char line[256];unsigned long free=0,slab=0,cached=0;
+ while(fgets(line,sizeof(line),f)) {
+  if(sscanf(line,"MemFree: %lu kB",&free)==1)continue;
+  if(sscanf(line,"Slab: %lu kB",&slab)==1)continue;
+  sscanf(line,"Cached: %lu kB",&cached);
+ }
+ printf("JOB-MEM snapshot free_kib=%lu slab_kib=%lu cached_kib=%lu\n",free,slab,cached);
  fclose(f);return free;
 }
 static void settle_teardown(void) {
- usleep(2500000);pid_t child=fork();if(!child)_exit(0);waitpid(child,NULL,0);usleep(10000);
+ // Cover both the two-second process quarantine and five-second reader grace.
+ // x86 teardown also drains guarded stacks page by page through SMP shootdowns.
+ usleep(6500000);pid_t child=fork();if(!child)_exit(0);waitpid(child,NULL,0);usleep(10000);
+ // waitpid observes exit before the final scheduler stack reclamation. SMP
+ // shootdowns can leave that reaper actively returning pages at the sample.
+ // Require a quiet half-second, with a bounded deadline; retained pages still
+ // count against the unchanged 512 KiB per-batch limit below.
+ unsigned long previous=free_memory_kib();int stable=0;
+ for(int sample=0;sample<100 && stable<5;sample++) {
+  usleep(100000);unsigned long current=free_memory_kib();
+  stable=current==previous?stable+1:0;previous=current;
+ }
+ check(stable==5,"physical page reclamation settles before retention measurement");
 }
 static void allocation_tracking(int dump) {
  FILE *f=fopen(dump?"/proc/allocsites":"/proc/allocstart","r");if(!f)return;
@@ -355,7 +400,8 @@ static void allocation_tracking(int dump) {
  fclose(f);
 }
 static void clone_teardown_races(void) {
- int valid=clone_teardown_batch(30);settle_teardown();
+ unsigned long retries=atomic_load(&state->admission_retries);
+ int valid=clone_teardown_batch(JOB_TEARDOWN_PROCESSES);settle_teardown();
  allocation_tracking(0);
  struct slab before[32],after[32];int classes=read_slab(before);unsigned long free_before=free_memory_kib();
  valid &= classes>0 && free_before>0;
@@ -369,8 +415,8 @@ static void clone_teardown_races(void) {
   printf("JOB-SLAB teardown_control class=%lu delta=%ld\n",after[i].bytes,delta);
  }
  memcpy(before,after,sizeof(before));free_before=free_control;
- for(int batch=0;batch<2;batch++) {
-  valid &= clone_teardown_batch(30);settle_teardown();valid &= read_slab(after)==classes;
+ for(int batch=0;batch<JOB_TEARDOWN_BATCHES;batch++) {
+  valid &= clone_teardown_batch(JOB_TEARDOWN_PROCESSES);settle_teardown();valid &= read_slab(after)==classes;
   unsigned long free_after=free_memory_kib();
   printf("JOB-MEM teardown_batch=%d free_kib_delta=%ld\n",batch+1,(long)free_after-(long)free_before);
   if(free_before>free_after+512)valid=0;
@@ -382,6 +428,7 @@ static void clone_teardown_races(void) {
   memcpy(before,after,sizeof(before));free_before=free_after;
  }
  allocation_tracking(1);
+ printf("JOB-ADMISSION teardown retries=%lu\n",atomic_load(&state->admission_retries)-retries);
  check(valid,"thread attachment racing teardown returns physical pages and slab objects");
 }
 static volatile sig_atomic_t children_signaled;

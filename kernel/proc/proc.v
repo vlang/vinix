@@ -255,11 +255,20 @@ pub mut:
 	wait_reaped             bool
 	child_generation        u64
 	child_waiters           voidptr
+	// Ordinary process-directed signals remain claimable by any sibling.
+	// Thread-directed signals and POSIX timer metadata stay on their Thread.
+	shared_pending_signals u64
 	mmap_anon_non_fixed_base u64
-	// Program break. It gets its own arena so that growing it can never run
-	// into the anonymous mmap region or the thread stacks.
-	brk_base          u64
-	brk_current       u64
+	// A vfork parent pins this object until its child releases the old map.
+	// The completion flag also handles a wake before the parent starts waiting.
+	vfork_pending bool
+	vfork_done eventstruct.Event
+	// sched's ITIMER_REAL list lock protects all of these inline timer fields.
+	itimer_previous &Process = unsafe { nil }
+	itimer_next &Process = unsafe { nil }
+	itimer_linked bool
+	itimer_deadline_us u64
+	itimer_interval_us u64
 	current_directory voidptr
 	current_mount     lib.MountContext
 	fs_lock           klock.Lock
@@ -416,6 +425,14 @@ pub mut:
 	// x86: the LDT modify_ldt(2) gave the process, a sched.Ldt, or nil.
 	// Changed under sched's ldt_lock; see sched/segments_amd64.v.
 	ldt voidptr
+}
+
+// The caller owns a live thread and its process (a running syscall/IRQ or a
+// process-table/list borrow). Pending bits are atomically claimed at dispatch.
+pub fn pending_signals(t &Thread) u64 {
+	private := katomic.load(&t.pending_signals)
+	if t.process == unsafe { nil } { return private }
+	return private | katomic.load(&t.process.shared_pending_signals)
 }
 
 // Read-mostly limits are naturally aligned u64s.  Writers serialize complete

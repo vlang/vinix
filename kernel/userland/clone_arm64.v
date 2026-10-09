@@ -84,6 +84,8 @@ fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64
 }
 
 fn do_clone_into(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
+	if !valid_clone_sharing(flags) { return errno.err, errno.einval }
+	if !supported_clone_sharing(flags) { return errno.err, errno.enotsup }
 	// Returning a PID while leaving the requested pidfd word untouched would
 	// falsely report success. Descriptor construction/rollback is unsupported.
 	if flags & clone_pidfd != 0 { return errno.err, errno.einval }
@@ -107,9 +109,7 @@ fn do_clone_into(state &cpulocal.GPRState, flags u64, child_stack u64, parent_ti
 	} else if !proc.cgroup_may_add_task(proc.current_thread().process) {
 		return errno.err, errno.eagain
 	}
-	// CLONE_THREAD, not CLONE_VM, decides between a thread and a process:
-	// posix_spawn and vfork ask for CLONE_VM but still expect a child that can
-	// execve without replacing us, which our separate address spaces give them.
+	// CLONE_VM shares the map independently of CLONE_THREAD's task identity.
 	if flags & clone_thread != 0 {
 		return clone_thread_of_current(state, flags, child_stack, parent_tid, tls,
 			child_tid)
@@ -149,18 +149,17 @@ fn clone_thread_of_current(state &cpulocal.GPRState, flags u64, child_stack u64,
 		usercopy.copy_to_user(child_tid, voidptr(&tid), sizeof(u32))
 	}
 
-	sched.enqueue_thread(new_thread, false)
+	sched.publish_cloned_thread(new_thread)
 
 	return u64(tid), 0
 }
 
-// Everything else: a new process with a copy of our address space and
-// descriptor table, running a single thread that resumes where we did.
+// A separate process, with a shared or forked map as requested.
 fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64, tls u64, child_tid u64, into_cgroup bool, cgroup voidptr) (u64, u64) {
 	mut old_thread := proc.current_thread()
 	mut old_process := old_thread.process
 
-	mut new_process := sched.new_process_in_group(old_process, unsafe { nil }, if into_cgroup { fs.cgroup_account_of(cgroup) } else { old_process.cgroup_account }) or {
+	mut new_process := sched.new_process_with_vm(old_process, unsafe { nil }, if into_cgroup { fs.cgroup_account_of(cgroup) } else { old_process.cgroup_account }, flags & clone_vm != 0) or {
 		return errno.err, errno.get()
 	}
 
@@ -246,7 +245,12 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 
 	// Another parent thread can reap the child as soon as it runs.
 	pid := proc.pid_in(new_process, viewer)
+	if flags & clone_vfork != 0 {
+		new_process.vfork_pending = true
+		proc.pin_process(new_process)
+	}
 	sched.publish_user_thread(mut new_process, new_thread)
+	if flags & clone_vfork != 0 { await_vfork(mut new_process) }
 
 	return u64(pid), 0
 }
@@ -268,16 +272,7 @@ fn stop_claimed_thread(mut victim proc.Thread) {
 	// Marked first so that an event trigger racing with us cannot put the
 	// thread back on the run queue behind our back.
 	katomic.store(mut &victim.is_dead, true)
-	sched.dequeue_thread(victim)
-	// It may still be on another CPU finishing what it was doing; the
-	// descriptors and address space it could reach are torn down next.
-	for n := 0; n < 1000000 && katomic.load(&victim.running_on) != u64(-1); n++ {
-		asm volatile aarch64 {
-			yield
-			; ; ; memory
-		}
-	}
-	sched.set_itimer_real(victim, 0, 0)
+	sched.stop_thread_for_good(victim)
 	// A thread that split off its own root and mount namespace -- runc keeps
 	// one in the container's namespace for opening mount sources -- holds a
 	// reference that would otherwise keep the namespace, and every directory it

@@ -105,7 +105,7 @@ fn owes_async_work(t &proc.Thread) bool {
 	if katomic.load(&t.must_exit) || owes_job_stop(t) {
 		return true
 	}
-	pending := katomic.load(&t.pending_signals)
+	pending := proc.pending_signals(t)
 	return pending & ~t.masked_signals != 0 || pending & unblockable_mask() != 0
 }
 
@@ -187,13 +187,13 @@ fn dispatch_signal(context &cpulocal.GPRState, info_signum int, info_code int, i
 	mut t := unsafe { proc.current_thread() }
 	restarting := t.restarting_syscall
 	t.restarting_syscall = false
-	which := take_pending_signal(mut t)
+	which, shared := take_pending_signal(mut t)
 
 	if which == -1 {
 		return
 	}
 
-	dispatch_linux_signal(context, which, info_signum, info_code, info_addr, restarting)
+	dispatch_linux_signal(context, which, info_signum, info_code, info_addr, restarting, shared)
 }
 
 // Dispatch a signal to _self_, this is called from the scheduler or at the
@@ -581,8 +581,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		process.mmap_anon_non_fixed_base = elf.initial_mmap_base()
 		// The old program's break went with its page map; the new one
 		// reserves its own arena on its first brk().
-		process.brk_base = 0
-		process.brk_current = 0
+		complete_vfork(mut process)
 
 		// Same lock new_user_thread's append holds: without it, a concurrent
 		// reader of process.threads (syscall_kill's broadcast path) could

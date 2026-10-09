@@ -409,7 +409,7 @@ fn nap(ns i64) Nap {
 // at its default action as one that kills or stops the process.
 fn pending_signal() Nap {
 	t := proc.current_thread()
-	pending := katomic.load(&t.pending_signals) & ~t.masked_signals
+	pending := proc.pending_signals(t) & ~t.masked_signals
 	if pending == 0 {
 		return .slept
 	}

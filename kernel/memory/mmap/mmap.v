@@ -421,10 +421,10 @@ fn address_space_bytes_unlocked(pagemap &memory.Pagemap, process &proc.Process) 
 		range_local := unsafe { &MmapRangeLocal(ptr) }
 		mut charged := range_local.length
 		if range_local.flags & map_brk_reservation != 0 {
-			if process.brk_base == 0 || process.brk_current <= process.brk_base {
+			if process.pagemap.brk_base == 0 || process.pagemap.brk_current <= process.pagemap.brk_base {
 				charged = 0
 			} else {
-				charged = overlap_length(range_local.base, range_local.length, process.brk_base, lib.align_up(process.brk_current - process.brk_base, page_size))
+				charged = overlap_length(range_local.base, range_local.length, process.pagemap.brk_base, lib.align_up(process.pagemap.brk_current - process.pagemap.brk_base, page_size))
 			}
 		}
 		if charged > u64(-1) - total {
@@ -439,19 +439,19 @@ fn charged_overlap(range_local &MmapRangeLocal, process &proc.Process, base u64,
 	if range_local.flags & map_brk_reservation == 0 {
 		return overlap_length(range_local.base, range_local.length, base, length)
 	}
-	if process.brk_base == 0 || process.brk_current <= process.brk_base {
+	if process.pagemap.brk_base == 0 || process.pagemap.brk_current <= process.pagemap.brk_base {
 		return 0
 	}
-	heap_length := lib.align_up(process.brk_current - process.brk_base, page_size)
-	heap_overlap_base := if range_local.base > process.brk_base {
+	heap_length := lib.align_up(process.pagemap.brk_current - process.pagemap.brk_base, page_size)
+	heap_overlap_base := if range_local.base > process.pagemap.brk_base {
 		range_local.base
 	} else {
-		process.brk_base
+		process.pagemap.brk_base
 	}
-	heap_end := if range_local.base + range_local.length < process.brk_base + heap_length {
+	heap_end := if range_local.base + range_local.length < process.pagemap.brk_base + heap_length {
 		range_local.base + range_local.length
 	} else {
-		process.brk_base + heap_length
+		process.pagemap.brk_base + heap_length
 	}
 	if heap_end <= heap_overlap_base {
 		return 0
@@ -530,7 +530,48 @@ pub fn delete_pagemap_traced(mut pagemap memory.Pagemap) ? {
 	delete_pagemap_impl(mut pagemap, true)?
 }
 
+// The caller already owns a process reference. Called before publishing the
+// child, while the parent cannot exec/exit past its creating syscall.
+pub fn share_pagemap(_pagemap &memory.Pagemap) &memory.Pagemap {
+	mut pagemap := unsafe { _pagemap }
+	pagemap.l.acquire()
+	katomic.inc(mut &pagemap.owners)
+	pagemap.l.release()
+	return pagemap
+}
+
+// A brk transaction can populate a swapped page or reclaim memory. Keep the
+// map spinlock only around its busy flag, never across those sleeping paths.
+fn begin_brk(mut pagemap memory.Pagemap) ? {
+	for {
+		pagemap.l.acquire()
+		if !pagemap.brk_busy {
+			pagemap.brk_busy = true
+			pagemap.l.release()
+			return
+		}
+		generation := event.generation(mut pagemap.brk_changed)
+		pagemap.l.release()
+		event.await_one_from_generation_masked(mut pagemap.brk_changed, generation) or {
+			errno.set(errno.eintr)
+			return none
+		}
+	}
+}
+
+fn end_brk(mut pagemap memory.Pagemap) {
+	pagemap.l.acquire()
+	pagemap.brk_busy = false
+	event.trigger(mut pagemap.brk_changed, true)
+	pagemap.l.release()
+}
+
 fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
+	pagemap.l.acquire()
+	katomic.dec(mut &pagemap.owners)
+	last := pagemap.owners == 0
+	pagemap.l.release()
+	if !last { return }
 	if trace {
 		println('exec[gpu]/vm: acquiring old page-map lock')
 	}
@@ -633,8 +674,12 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 		}
 	}
 
+	begin_brk(mut old_pagemap)?
+	defer { end_brk(mut old_pagemap) }
 	old_pagemap.l.acquire()
 	new_pagemap.l.acquire()
+	new_pagemap.brk_base = old_pagemap.brk_base
+	new_pagemap.brk_current = old_pagemap.brk_current
 	defer {
 		new_pagemap.l.release()
 		old_pagemap.l.release()

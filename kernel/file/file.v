@@ -204,14 +204,19 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 		if voidptr(tmo_p) != unsafe { nil } && tmo_p.tv_sec == 0 && tmo_p.tv_nsec == 0 {
 			return 0, 0
 		}
-		mut sleeper := eventstruct.Event{}
-		mut sleep_storage := [unsafe { &sleeper }]!
+		// The event only lives for this synchronous wait. V promoted the local
+		// Event when its address escaped through the listener list, retaining
+		// one slab object on every interrupted poll(NULL, 0, ...).
+		mut sleeper := unsafe { &eventstruct.Event(C.vinix_stack_alloc(sizeof(eventstruct.Event))) }
+		unsafe { *sleeper = eventstruct.Event{} }
+		mut sleep_storage := unsafe { &&eventstruct.Event(C.vinix_stack_alloc(sizeof(voidptr))) }
+		unsafe { *sleep_storage = sleeper }
 		mut timer := &time.Timer(unsafe { nil })
 		if voidptr(tmo_p) != unsafe { nil } {
 			timer = time.new_timer(*tmo_p)
-			sleep_storage[0] = &timer.event
+			unsafe { *sleep_storage = &timer.event }
 		}
-		mut sleep_events := unsafe { event.stack_list(&sleep_storage[0], sleep_storage.len) }
+		mut sleep_events := unsafe { event.stack_list(sleep_storage, 1) }
 		defer {
 			if voidptr(timer) != unsafe { nil } {
 				timer.disarm()
@@ -259,7 +264,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 
 		mut resource_ := fd.handle.resource
 
-		status := resource_.status
+		status := resource.poll_status(mut resource_)
 
 		revents := poll_revents(status, fdd.events)
 		if revents != 0 {
@@ -320,7 +325,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 		// whereas an event's pending wake can be consumed by another poller.
 		for i in 0 .. fdlist.len {
 			mut fdd := unsafe { &fds[fdnums[i]] }
-			fdd.revents = poll_revents(fdlist[i].handle.resource.status, fdd.events)
+			fdd.revents = poll_revents(resource.poll_status(mut fdlist[i].handle.resource), fdd.events)
 			if fdd.revents != 0 { ret++ }
 		}
 		if ret != 0 { return ret, 0 }

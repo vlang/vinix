@@ -423,6 +423,7 @@ fn send_reschedule(number u64) bool {
 
 pub fn enqueue_thread(_thread &proc.Thread, by_signal bool) bool {
 	mut t := unsafe { _thread }
+	if katomic.load(&t.not_started) { return false }
 
 	if by_signal {
 		katomic.store(mut &t.enqueued_by_signal, true)
@@ -529,7 +530,6 @@ pub fn stop_thread_for_good(_thread &proc.Thread) {
 			; ; ; memory
 		}
 	}
-	set_itimer_real(t, 0, 0)
 	if katomic.cas(mut &t.reap_claim, u32(0), u32(reap_claim_stopped)) {
 		proc.linuxkpi_mark_task_dead(mut t)
 		bury_thread(t)
@@ -626,8 +626,6 @@ pub fn dequeue_and_die() {
 	// Whichever of the two claims it gives back its stacks.
 	claimed := katomic.cas(mut &t.reap_claim, u32(0), u32(reap_claim_self))
 	dequeue_thread(t)
-	// ITIMER_REAL keeps a pointer to the thread that armed it.
-	set_itimer_real(t, 0, 0)
 	// This thread leaves the CPU here rather than through the switch in
 	// scheduler_isr, so its last turn is charged here or not at all.
 	proc.charge_cpu_time(mut t, time.monotonic_ns())
@@ -849,6 +847,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		process:        process
 		cr3:            u64(process.pagemap.top_level)
 		gpr_state:      *state
+		not_started:    true
 		timeslice:      source.timeslice
 		running_on:     u64(-1)
 		kernel_stack:   u64(kernel_stack_base) + stack_size

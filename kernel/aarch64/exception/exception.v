@@ -187,7 +187,18 @@ fn from_userspace(gpr_state &cpulocal.GPRState) bool {
 pub fn sync_handler(esr u64, far u64, gpr_state &cpulocal.GPRState) {
 	user_entry := from_userspace(gpr_state)
 	if user_entry { proc.cpu_enter_kernel() }
-	defer { if user_entry { proc.cpu_leave_kernel() } }
+	defer {
+		if user_entry {
+			// A successful first-touch fault can queue cgroup SIGKILL and
+			// renew the scheduler quantum. Observe it before returning to EL0,
+			// after page-in locks and references have unwound. Redirect onto
+			// the thread's own stack as at interrupt return; kernel faults
+			// keep their original continuation and never enter this boundary.
+			cpu.interrupt_toggle(false)
+			proc.cpu_leave_kernel()
+			userland.interrupt_return(gpr_state)
+		}
+	}
 	ec := (esr >> 26) & 0x3f // Exception Class
 	if !user_entry && ec == 0x25 {
 		resume := memory.stack_guard_probe_fixup(gpr_state.pc, far)

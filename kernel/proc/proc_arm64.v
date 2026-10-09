@@ -82,6 +82,8 @@ pub mut:
 	clear_child_tid  u64  // set_tid_address()/CLONE_CHILD_CLEARTID futex word
 	robust_list_head u64  // set_robust_list() head, walked on thread exit
 	is_dead          bool // torn down; must never be enqueued again
+	// Attached for identity/TID setup, but forbidden to run until clone publishes.
+	not_started      bool
 	// Physical bases of the pages backing this thread, so that they can be
 	// reclaimed once nothing is executing on them any more.
 	fpu_storage_phys u64
