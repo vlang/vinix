@@ -86,9 +86,11 @@ def call(operation, arguments, namespace, *, controller=None):
                 return False
             error = errors[record["binding_error"]]
             traceback = error.__traceback__
+            context = BaseException.__context__.__get__(error)
             try:
                 raise error.with_traceback(traceback)
             except BaseException:
+                BaseException.__context__.__set__(error, context)
                 replay = error.__traceback__
                 error.__traceback__ = traceback
                 try:
@@ -96,6 +98,7 @@ def call(operation, arguments, namespace, *, controller=None):
                 finally:
                     if error.__traceback__ is replay:
                         error.__traceback__ = traceback
+                    replay = traceback = error = context = None
         finally:
             owner.manager = owner.method = owner.kwargs = None
 
@@ -104,6 +107,9 @@ def call(operation, arguments, namespace, *, controller=None):
             return next_id
         if method == "release":
             release(row["ids"])
+            return None
+        if method == "retire_error":
+            errors[row["error"]["binding_error"]] = None
             return None
         if method == "release_since":
             release([key for key in objects if int(key) >= row["checkpoint"]], row.get("keep", ()))
@@ -143,6 +149,7 @@ def call(operation, arguments, namespace, *, controller=None):
             error = errors[row["error"]["binding_error"]]
             kind = objects[row["class"]]
             traceback = error.__traceback__
+            context = BaseException.__context__.__get__(error)
             try:
                 try:
                     raise error.with_traceback(traceback)
@@ -152,6 +159,8 @@ def call(operation, arguments, namespace, *, controller=None):
                     return False
             finally:
                 error.__traceback__ = traceback
+                BaseException.__context__.__set__(error, context)
+                error = traceback = context = None
         if method == "error_object":
             return retain(errors[row["error"]["binding_error"]])
         if method == "error_attribute":
@@ -216,9 +225,11 @@ def call(operation, arguments, namespace, *, controller=None):
         if active is None:
             return library_primitive(method, row)
         error, traceback = active, active.__traceback__
+        context = BaseException.__context__.__get__(error)
         try:
             raise error.with_traceback(traceback)
         except BaseException:
+            BaseException.__context__.__set__(error, context)
             replay = error.__traceback__
             error.__traceback__ = traceback
             try:
@@ -226,6 +237,7 @@ def call(operation, arguments, namespace, *, controller=None):
             finally:
                 if error.__traceback__ is replay:
                     error.__traceback__ = traceback
+                replay = traceback = error = context = None
 
     keys = [retain(item) for item in arguments]
     result = (_controller if controller is None else controller).call({"operation": operation, "arguments": keys}, primitive,
