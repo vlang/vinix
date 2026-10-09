@@ -61,7 +61,7 @@ def call(operation, arguments, namespace, resources=None, controller=None):
 
     class Owner:
         def __init__(self, manager):
-            self.manager, self.active = manager, True
+            self.manager, self.active, self.entered_id = manager, True, None
         def __exit__(self, *error):
             if not self.active: return False
             self.active = False
@@ -115,6 +115,15 @@ def call(operation, arguments, namespace, resources=None, controller=None):
         if method == "release":
             for ident in row["ids"]: resources.pop(ident, None)
             return None
+        if method == "checkpoint":
+            return resources.get("next_id", 0) + 1
+        if method == "release_since":
+            keep = set(row.get("keep", ())) | entered.keys()
+            keep.update(entry.entered_id for entry in entered.values())
+            for ident in tuple(resources):
+                if isinstance(ident, str) and ident.isdecimal() and int(ident) >= row["checkpoint"] and ident not in keep:
+                    resources.pop(ident)
+            return None
         if pending:
             raise pending.pop(0)
         if method == "retiring":
@@ -151,7 +160,10 @@ def call(operation, arguments, namespace, resources=None, controller=None):
                 entered[row["owner"]] = entry
                 contexts.push(entry)
             mode = row.get("result", "value")
-            if mode == "owner": return retain(value)
+            if mode == "owner":
+                ident = retain(value)
+                if row.get("method") == "__enter__": entry.entered_id = ident
+                return ident
             if mode == "path": return str(value)
             if mode == "bytes": return value.hex()
             return value
