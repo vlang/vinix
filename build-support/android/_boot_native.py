@@ -361,6 +361,8 @@ def _build_primitive(operation, row, context, resources):
     if operation == 'dictionary':
         return _register(resources, dict(zip(_build_arguments(row['keys'], resources),
                                             _build_arguments(row['values'], resources))))
+    if operation == 'mapping_unpack':
+        return _register(resources, {**resources[row['id']]})
     if operation == 'sort_attribute':
         return _register(resources, sorted(resources[row['id']], key=lambda item: getattr(item, row['name'])))
     if operation == 'pool_map':
@@ -397,6 +399,8 @@ def _build_primitive(operation, row, context, resources):
         return _build_exit(manager, exception)
     if operation == 'raise':
         raise getattr(_builtins, row['kind'])(*_build_arguments(row.get('arguments', []), resources))
+    if operation == 'raise_existing':
+        raise resources[row['id']]
     if operation == 'exception_is':
         return isinstance(resources['errors'][row['error']['binding_error']],
                           tuple(getattr(_builtins, name) for name in row['kinds']))
