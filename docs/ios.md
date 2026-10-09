@@ -554,6 +554,23 @@ sources, dispatch data and `OS_dispatch_queue` Objective-C classes remain
 unsupported. Function contexts remain application-owned, and application
 threads must finish before their image is unloaded.
 
+`fcntl` now adapts Darwin descriptor duplication, close-on-exec flags and file
+status flags in V. A small ARM64 entry passes the variadic stack; getters do
+not read a missing third argument. Duplicate descriptors share offsets and
+append/nonblocking/sync status while keeping independent descriptor flags.
+Invalid duplicate search floors report Darwin `EINVAL`; real exhaustion keeps
+`EMFILE`. `fsync` calls the native filesystem flush with Darwin error conversion.
+EOSSDK's disassembly confirms nonblocking/close-on-exec use and its fallback
+from `F_FULLFSYNC` to `fsync`.
+
+Shared Mac/iOS fixtures check flag changes through three aliases, real append
+writes and shared offsets, native flushing, nonblocking socket receives,
+negative/oversized duplicate floors and eight simultaneous clients. ASAN and
+the full ARM64 C++/GLES/PPSSPP regression pass. Apple-specific controls,
+record locks, SIGIO configuration and simultaneous independent Darwin sync
+bits remain unsupported and fail explicitly. These entries resolve four
+additional strong imports across Fortnite and EOSSDK.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -567,7 +584,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _fcntl
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _freeaddrinfo
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -575,12 +592,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,263 | 895 | 81 |
-| EOSSDK | 477 | 185 | 18 |
+| Fortnite executable | 1,265 | 893 | 81 |
+| EOSSDK | 479 | 183 | 18 |
 | MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,792 | 1,204 | 122 |
+| All images | 1,796 | 1,200 | 122 |
 
-The C++/GLES/Text variant reports 1,805 resolved imports, 1,191 unresolved strong
+The C++/GLES/Text variant reports 1,809 resolved imports, 1,187 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

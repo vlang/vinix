@@ -191,6 +191,10 @@ SYM(ios_asprintf):
 SYM(ios_open):
     mov x2, sp
     b SYM(ios_open_stack)
+.global SYM(ios_fcntl)
+SYM(ios_fcntl):
+    mov x2, sp
+    b SYM(ios_fcntl_stack)
 .global SYM(ios_snprintf_checked)
 SYM(ios_snprintf_checked):
     mov x5, sp

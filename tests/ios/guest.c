@@ -133,6 +133,9 @@ int main(void) {
     run("/opt/ios/dispatch", NULL, NULL, NULL, 0,
         "IOS-DISPATCH: FIFO blocks/functions, concurrent workers, serial targets, deadlines and finalizers\n");
     puts("iOS PASS: Darwin dispatch queues, deadlines and callback ownership");
+    run("/opt/ios/fcntl", NULL, NULL, NULL, 0,
+        "IOS-FCNTL: shared status and offsets, descriptor flags, duplicates, native flush and nonblocking sockets\n");
+    puts("iOS PASS: Darwin descriptor controls and real file synchronization");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

@@ -200,6 +200,7 @@ void ios_sprintf(void);
 void ios_sscanf(void);
 void ios_asprintf(void);
 void ios_open(void);
+void ios_fcntl(void);
 void ios_snprintf_checked(void);
 void ios_sprintf_checked(void);
 #define IOS_ARC_REGISTERS(M) M(0) M(1) M(2) M(3) M(4) M(5) M(6) M(7) \
@@ -238,6 +239,7 @@ static void ios_sprintf(void) { abort(); }
 static void ios_sscanf(void) { abort(); }
 static void ios_asprintf(void) { abort(); }
 static void ios_open(void) { abort(); }
+static void ios_fcntl(void) { abort(); }
 static void ios_snprintf_checked(void) { abort(); }
 static void ios_sprintf_checked(void) { abort(); }
 static void *ios_arc_register(int reg, int releasing) { (void)reg; (void)releasing; return NULL; }
