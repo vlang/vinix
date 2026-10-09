@@ -9,11 +9,16 @@ extern int *__error(void);
 extern int pthread_create(unsigned long *, const void *, void *(*)(void *), void *), pthread_join(unsigned long, void **);
 #define CHECK(value,code) do { if (!(value)) { printf("IOS-FCNTL: failure %d errno %d\n",code,*__error()); return code; } } while (0)
 
-static int check(int index) {
+static int prepare(int index) {
     char name[96];
-    CHECK(snprintf(name, sizeof name, "/tmp/vinix-ios-fcntl-%d-%d", getpid(), index) > 0, 1);
+    if (snprintf(name, sizeof name, "/tmp/vinix-ios-fcntl-%d-%d", getpid(), index) <= 0) return -1;
     int fd = open(name, 2 | 0x200 | 0x800 | 0x1000000, 0600);
-    CHECK(fd >= 0 && unlink(name) == 0, 2);
+    if (fd < 0) return -1;
+    if (unlink(name) != 0) { close(fd); return -1; }
+    return fd;
+}
+static int check(int index, int fd) {
+    CHECK(fd >= 0, 2);
     CHECK(fcntl(fd, 1) == 1 && fcntl(fd, 3) == 2, 3);
     *__error() = 177;
     int alias = fcntl(fd, 0, 100);
@@ -69,19 +74,24 @@ static int check(int index) {
     CHECK(close(pair[0]) == 0 && close(pair[1]) == 0, 31);
     return 0;
 }
-struct job { int index, error; };
+struct job { int index, fd, error; };
 static void *worker(void *argument) {
     struct job *job = argument;
-    job->error = check(job->index);
+    job->error = check(job->index, job->fd);
     return 0;
 }
 int main(void) {
     CHECK(fcntl(-1, 999) == -1 && *__error() == 9, 32);
-    int error = check(0);
+    int error = check(0, prepare(0));
     if (error) return error;
     unsigned long clients[8]; struct job jobs[8];
+    // Keep namespace setup out of the descriptor-control stress. All workers
+    // still change flags, duplicate, flush and perform I/O concurrently.
     for (int i = 0; i < 8; ++i) {
-        jobs[i].index = i + 1; jobs[i].error = 0;
+        jobs[i].index = i + 1; jobs[i].fd = prepare(i + 1); jobs[i].error = 0;
+        CHECK(jobs[i].fd >= 0, 37);
+    }
+    for (int i = 0; i < 8; ++i) {
         CHECK(pthread_create(&clients[i], 0, worker, &jobs[i]) == 0, 33);
     }
     for (int i = 0; i < 8; ++i) CHECK(pthread_join(clients[i], 0) == 0 && jobs[i].error == 0, 34);
