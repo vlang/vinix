@@ -132,6 +132,32 @@ int main(void) {
     run("/opt/ios/security", NULL, NULL, NULL, 0,
         "IOS-SECURITY: owned DER certificates, RSA/EC public keys, attributes, decode errors, typed constants and secure random bytes");
     puts("iOS PASS: native Security certificates, public keys, constants and random bytes");
+    run("/opt/ios/keychain", NULL, NULL, NULL, 0,
+        "IOS-KEYCHAIN: generic passwords, duplicate/update/delete, binary data, one/all results and ownership");
+    for (int pass = 0; pass < 3; pass++) {
+        const char *mode = pass == 0 ? "write" : pass == 1 ? "read" : "delete";
+        run("/opt/ios/keychain", mode, NULL, NULL, 0,
+            "IOS-KEYCHAIN: credential persisted across process restart");
+    }
+    pid_t writers[2];
+    for (int i = 0; i < 2; i++) {
+        writers[i] = fork();
+        if (writers[i] < 0) fail("keychain writer fork");
+        if (!writers[i]) {
+            run("/opt/ios/keychain", "race", i ? "writer-two" : "writer-one", NULL, 0,
+                "IOS-KEYCHAIN: concurrent credential writer completed");
+            fflush(stdout);
+            _exit(0);
+        }
+    }
+    for (int i = 0; i < 2; i++) {
+        int status;
+        while (waitpid(writers[i], &status, 0) < 0) if (errno != EINTR) fail("keychain writer wait");
+        if (!WIFEXITED(status) || WEXITSTATUS(status)) fail("keychain concurrent writer");
+    }
+    run("/opt/ios/keychain", "read-race", NULL, NULL, 0,
+        "IOS-KEYCHAIN: concurrent credentials preserved");
+    puts("iOS PASS: native keychain queries, ownership and persistent credentials");
     run("/opt/ios/common-crypto", NULL, NULL, NULL, 0,
         "IOS-CRYPTO: SHA digests, long-key HMAC, NIST AES CBC/ECB, padding, in-place buffers and error/size ABI");
     puts("iOS PASS: native CommonCrypto SHA, HMAC and AES calling conventions");

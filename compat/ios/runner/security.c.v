@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Certificate/key data APIs. Parsing a certificate does not establish trust;
-// SecTrust, cryptographic operations and keychain services remain unsupported.
+// SecTrust and asymmetric cryptographic operations remain unsupported.
 module main
 
 import crypto.sha1
@@ -556,6 +556,10 @@ fn sec_random_copy(random u64, count u64, bytes &u8) int {
 
 fn security_symbol(symbol string) ?u64 {
 	address := match symbol {
+		'_SecItemAdd' { voidptr(sec_item_add) }
+		'_SecItemCopyMatching' { voidptr(sec_item_copy) }
+		'_SecItemUpdate' { voidptr(sec_item_update) }
+		'_SecItemDelete' { voidptr(sec_item_delete) }
 		'_SecCertificateGetTypeID' { voidptr(sec_certificate_type_id) }
 		'_SecCertificateCreateWithData' { voidptr(sec_certificate_create) }
 		'_SecCertificateCopyData' { voidptr(sec_certificate_data) }

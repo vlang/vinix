@@ -13,6 +13,11 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <dirent.h>
+/* A portable non-elidable wipe; keychain storage policy and crypto stay in V. */
+static void ios_secure_zero(void *bytes, size_t length) {
+    volatile unsigned char *cursor = (volatile unsigned char *)bytes;
+    while (length--) *cursor++ = 0;
+}
 static int ios_readdir_info(void *directory, char *name, uint64_t *fields) {
     struct dirent *entry = readdir((DIR *)directory);
     if (!entry) return 0;

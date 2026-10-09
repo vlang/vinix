@@ -322,8 +322,8 @@ OS cryptographic random bytes. DER cursors and EC field arithmetic use bounded
 stack storage. ASAN and the ARM64 C++/GLES/PPSSPP regression pass. Subject
 summaries currently support UTF-8, PrintableString and IA5String; other string
 encodings and public-key algorithms/curves remain unsupported. This resolves
-43 strong imports and one weak import. Trust evaluation, signing/verification,
-keychain persistence and access control remain unimplemented; certificate
+43 strong imports and one weak import. Trust evaluation, signing/verification
+and Apple's access-control service remain unimplemented; certificate
 parsing alone does not authenticate a peer.
 
 Fortnite's CommonCrypto imports now use V cryptographic primitives: one-shot
@@ -337,11 +337,42 @@ it does not authenticate ciphertext. Partial overlapping AES buffers, partial
 padded ciphertext blocks, non-AES ciphers, MD5 HMAC and incremental cryptor
 APIs remain unsupported. This resolves five more strong imports.
 
+`SecItemAdd`, `SecItemCopyMatching`, `SecItemUpdate` and `SecItemDelete` now
+implement EOSSDK's local generic-password queries in V. Service/account
+identity, numeric type matching, binary data, duplicate/not-found errors,
+copied data/attribute results and one/all queries are implemented. Updates
+and deletes cover every match; a duplicate-producing update leaves the
+stored records intact. The shared fixture compares CRUD and output ownership
+with an isolated temporary Mac keychain; no existing user keychain is queried.
+The Mac legacy keychain's default item reference and single-item mutations
+differ from iOS, so shared comparisons use explicit accounts and return flags.
+
+The store uses AES-256-CBC with a random IV and a separate HMAC-SHA-256 key;
+the header, IV and ciphertext are authenticated before decryption, with strict
+PKCS#7 validation. Files are replaced atomically under a stable `flock`, with
+file/directory `fsync`. Owner-only directories (0700) and regular files (0600)
+are required; symlink and hardlink files are rejected. A missing key, damaged
+file or authentication failure returns an error without resetting records.
+The key and store live under `Documents/Library/Keychains/<bundle-id>`;
+`VINIX_IOS_KEYCHAIN` can select a private root for tests or deployment.
+Fixtures exercise process restart, concurrent writers, tampering, wrong/missing
+keys, unsafe modes, symlinks and an independent OpenSSL/Python encrypted vector.
+
+This backend supports explicit `AfterFirstUnlock`/`AfterFirstUnlockThisDeviceOnly`
+local items for the running user. The per-app namespace and Unix permissions
+do not isolate apps sharing a uid, and the encryption key is a local 0600 file,
+not a hardware-protected key. Vinix has no device lock-state service, secure
+enclave, keychain synchronization, entitlement-backed access groups, interactive
+authentication or persistent item references. Those policies, unsupported item
+classes and the default `WhenUnlocked` policy return explicit errors. This
+resolves eight strong imports across the game and EOSSDK without claiming Apple's
+data-protection or trust services.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/Security.framework/Security (_SecItemAdd)
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/Security.framework/Security (_SecPolicyCreateBasicX509)
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -349,10 +380,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,185 | 973 | 81 |
-| EOSSDK | 413 | 249 | 18 |
+| Fortnite executable | 1,189 | 969 | 81 |
+| EOSSDK | 417 | 245 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,649 | 1,347 | 122 |
+| All images | 1,657 | 1,339 | 122 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

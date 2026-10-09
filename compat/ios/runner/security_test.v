@@ -41,6 +41,6 @@ fn test_security_der_bounds_curve_validation_and_unsupported_services() {
 	assert sec_random_copy(1, 1, unsafe { &bytes[0] }) != 0
 	assert sec_random_copy(0, ~u64(0), unsafe { &bytes[0] }) != 0
 	assert security_symbol('_SecTrustEvaluateWithError') == none
-	assert security_symbol('_SecItemAdd') == none
+	assert security_symbol('_SecItemAdd') != none
 	assert ios_runtime.live == 0
 }
