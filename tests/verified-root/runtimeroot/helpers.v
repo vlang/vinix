@@ -230,6 +230,7 @@ pub fn dispatch(row map[string]ah.Value) !ah.Value {
 		'device_blocks' { return ah.Value(device_blocks(args[0], args[1], args[2])!) }
 		'enroll' { enroll(args[0], args[1], args[2], args[3])! }
 		'tamper' { tamper(args[0], args[1])! }
+		'main' { main_workflow(args[0], args[1])! }
 		else { return error('unknown verified-root runtime helper') }
 	}
 	return ah.Value(json2.Null{})
