@@ -94,3 +94,9 @@ The evidence includes original/native call, fork and guardian fixtures, actual
 PTY ownership, weak-object/factory/error controls, nested/threaded sessions,
 reference counts and cold builds on both interpreter architectures. No new
 kernel rebuild, QEMU guest or hardware execution is claimed by this stage.
+
+The object bridge owns its fourteen fixed attribute-name literals for the native
+implementation lifetime, matching Python `co_names` identity and ownership.
+Dynamic caller method names continue through the actual borrowed `getattr`
+operand and never enter the finite literal pool. The separate correction has
+zero Python migration credit.

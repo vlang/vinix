@@ -4,6 +4,7 @@ module cpythonhost
 fn C.PyObject_GetItem(voidptr, voidptr) voidptr
 fn C.PyObject_SetItem(voidptr, voidptr, voidptr) i32
 fn C.PyObject_GetAttr(voidptr, voidptr) voidptr
+fn C.PyUnicode_InternFromString(&char) voidptr
 fn C.PyList_Append(voidptr, voidptr) i32
 fn C.PyList_AsTuple(voidptr) voidptr
 fn C.PyDict_SetItem(voidptr, voidptr, voidptr) i32
@@ -40,8 +41,23 @@ mut:
 __global gap_libraries = map[u64]&GapLibrary{}
 __global gap_library_serial u64 = 1
 
+// Own the finite fixed attribute literals for this implementation lifetime,
+// like Python co_names. Dynamic row names never enter this pool.
+__global gap_literal_names = map[string]voidptr{}
+
+fn gap_literal_name(name string) voidptr {
+	if value := gap_literal_names[name] { return own(value) }
+	value := unsafe { C.PyUnicode_InternFromString(name.str) }
+	if value != unsafe { nil } { gap_literal_names[name] = own(value) }
+	return value
+}
+
 fn gap_attr(value voidptr, name string) voidptr {
-	return unsafe { C.PyObject_GetAttrString(value, name.str) }
+	key := gap_literal_name(name)
+	if key == unsafe { nil } { return key }
+	result := C.PyObject_GetAttr(value, key)
+	drop(key)
+	return result
 }
 
 fn gap_item(value voidptr, name string) voidptr {
