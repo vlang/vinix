@@ -8,6 +8,7 @@ exports:
                _CFErrorGetTypeID, _CFErrorGetCode, _CFErrorGetDomain,
                _CFStringGetTypeID, _CFArrayGetTypeID, _CFDictionaryGetTypeID,
                _CFDataGetTypeID, _CFNumberGetTypeID, _CFBooleanGetTypeID,
+               _CFDateGetTypeID, _CFDateCreate, _CFDateGetAbsoluteTime,
                _CFStringCreateWithCString, _CFStringCreateWithBytes,
                _CFStringGetLength, _CFStringGetBytes, _CFStringGetCString,
                _CFArrayCreate, _CFArrayGetCount, _CFArrayGetValueAtIndex,

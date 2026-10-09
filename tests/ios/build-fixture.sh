@@ -33,7 +33,7 @@ done
     -no_fixup_chains -e _main "$output/lazy.o" "$repo/tests/ios/libSystem.tbd" \
     "$repo/tests/ios/lazy.tbd" -o "$output/lazy"
 SDK="${IOS_SDK:-$(xcrun --show-sdk-path)}"
-for name in security keychain; do
+for name in security keychain security-trust; do
     "${IOS_CLANG:-clang}" -target arm64-apple-ios15.0 -nostdinc -isysroot "$output" \
         -fno-objc-arc -fno-objc-exceptions -fno-stack-protector -O1 -Wall -Wextra -Werror \
         -c "$repo/tests/ios/$name.m" -o "$output/$name.o"

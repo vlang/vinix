@@ -15,6 +15,9 @@ mkdir -p "$output"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"
+"${IOS_CLANG:-clang}" -DIOS_TRUST_REFERENCE -fno-objc-arc -O1 -Wall -Wextra -Werror \
+    -framework Security -framework Foundation "$repo/tests/ios/security-trust.m" -o "$output/security-trust"
+"$output/security-trust"
 "${IOS_CLANG:-clang}" -fobjc-arc -O1 -Wall -Wextra -Werror -framework Foundation -framework GameController \
     "$repo/tests/ios/game-constants.m" -o "$output/game-constants"
 "$output/game-constants"

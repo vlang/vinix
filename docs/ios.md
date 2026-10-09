@@ -322,7 +322,7 @@ OS cryptographic random bytes. DER cursors and EC field arithmetic use bounded
 stack storage. ASAN and the ARM64 C++/GLES/PPSSPP regression pass. Subject
 summaries currently support UTF-8, PrintableString and IA5String; other string
 encodings and public-key algorithms/curves remain unsupported. This resolves
-43 strong imports and one weak import. Trust evaluation, signing/verification
+43 strong imports and one weak import. General chain evaluation, signing/verification
 and Apple's access-control service remain unimplemented; certificate
 parsing alone does not authenticate a peer.
 
@@ -371,16 +371,44 @@ data-protection or trust services.
 Security also constructs owned basic-X.509 and SSL policy objects in V.
 Policy identifiers, optional hostname/client properties, retained metadata,
 equality and hash consistency match the Mac reference. ASAN and the full
-ARM64 C++/GLES/PPSSPP regression pass. Creating a policy does
-not evaluate a certificate: `SecTrustCreateWithCertificates`, trust evaluation
-and peer authentication are still unsupported. This resolves one additional
-strong import in EOSSDK.
+ARM64 C++/GLES/PPSSPP regression pass. Creating a policy does not evaluate a
+certificate. This resolves one additional strong import in EOSSDK.
+
+`SecTrustCreateWithCertificates` now owns immutable certificate and policy
+snapshots, and both public-key getters return independently owned key bytes
+without implying trust. The single-certificate count/index getters, copied
+policies, anchor/date/policy setters and network-fetch preference are implemented
+in V. `CFDateCreate`, its type ID, absolute-time getter and value equality support
+the floating-point verify-date ABI. Mac comparison tests check the exported key
+bytes: the deprecated Mac trust getter uses a different internal key class.
+
+Trust evaluation has a deliberately bounded positive path: one self-issued CA
+certificate, the basic X.509 policy, and an explicitly supplied DER-identical
+anchor with custom-anchors-only enabled. Canonical UTC/GeneralizedTime dates,
+public-key validity and matching inner/outer signature algorithm fields are
+checked. The accepted extension profile is `basicConstraints` with `CA:true`
+and no path length, plus optional noncritical subject/authority key identifiers;
+every other extension and unique-ID field is rejected. The anchor's own
+self-signature is not an issuer-chain proof, and the Mac reference also accepts
+an explicitly trusted anchor with an altered self-signature.
+
+An empty or mismatched explicit anchor set yields a real negative trust decision;
+expired/not-yet-valid dates yield the measured Security date error. Setters
+invalidate cached results. Legacy evaluation distinguishes API failure from a
+negative trust result; the Boolean evaluator returns owned CFErrors and clears
+the error output on success. System roots, chain building, SSL/hostname policies,
+revocation and other profiles return `errSecUnimplemented` with an invalid trust
+result. Multi-certificate count/index requests fail explicitly because no chain
+has been built. This does not authenticate Fortnite's TLS peers or implement
+general asymmetric signature verification. Shared Mac fixtures, malformed-profile
+cases, ASAN ownership checks and the full ARM64 C++/GLES/PPSSPP regression pass.
+This resolves eight additional strong imports across Fortnite and EOSSDK.
 
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/Security.framework/Security (_SecTrustCopyPublicKey)
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/CFNetwork.framework/CFNetwork (_CFNetworkCopySystemProxySettings)
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -388,10 +416,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,189 | 969 | 81 |
-| EOSSDK | 418 | 244 | 18 |
+| Fortnite executable | 1,190 | 968 | 81 |
+| EOSSDK | 425 | 237 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,658 | 1,338 | 122 |
+| All images | 1,666 | 1,330 | 122 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

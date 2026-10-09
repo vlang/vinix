@@ -5,6 +5,13 @@ install-name: '/System/Library/Frameworks/Security.framework/Security'
 exports:
   - targets: [ arm64-ios ]
     symbols: [ _SecPolicyGetTypeID, _SecPolicyCreateBasicX509, _SecPolicyCreateSSL,
+               _SecTrustGetTypeID, _SecTrustCreateWithCertificates,
+               _SecTrustCopyPublicKey, _SecTrustCopyKey,
+               _SecTrustGetCertificateCount, _SecTrustGetCertificateAtIndex,
+               _SecTrustEvaluate, _SecTrustEvaluateWithError, _SecTrustGetTrustResult,
+               _SecTrustSetAnchorCertificates, _SecTrustSetAnchorCertificatesOnly,
+               _SecTrustSetVerifyDate, _SecTrustSetPolicies, _SecTrustCopyPolicies,
+               _SecTrustSetNetworkFetchAllowed, _SecTrustGetNetworkFetchAllowed,
                _SecPolicyCopyProperties, _kSecPolicyOid, _kSecPolicyName,
                _kSecPolicyClient, _kSecPolicyAppleX509Basic, _kSecPolicyAppleSSL,
                _SecItemAdd, _SecItemCopyMatching, _SecItemUpdate, _SecItemDelete,

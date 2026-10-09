@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Certificate/key data APIs. Parsing a certificate does not establish trust;
-// SecTrust and asymmetric cryptographic operations remain unsupported.
+// Certificate/key data APIs. Parsing a certificate does not establish trust.
 module main
 
 import crypto.sha1
@@ -120,8 +119,15 @@ fn security_der_valid(bytes &u8, field SecurityDer, depth int) bool {
 struct SecurityCertificate {
 	certificate SecurityDer
 	serial      SecurityDer
+	issuer      SecurityDer
+	not_before  SecurityDer
+	not_after   SecurityDer
 	subject     SecurityDer
 	spki        SecurityDer
+	algorithm   SecurityDer
+	signature   SecurityDer
+	extensions  SecurityDer
+	unique_ids  bool
 }
 
 fn security_name_valid(bytes &u8, name SecurityDer) bool {
@@ -177,10 +183,10 @@ fn security_certificate_parse(bytes &u8, count int) ?SecurityCertificate {
 	if !security_name_valid(bytes, issuer) { return none }
 	validity := fields.expect(0x30) or { return none }
 	mut dates := security_inside(bytes, validity)
-	for _ in 0 .. 2 {
-		date := dates.next() or { return none }
-		if date.tag !in [u8(23), 24] || date.length == 0 { return none }
-	}
+	not_before := dates.next() or { return none }
+	not_after := dates.next() or { return none }
+	if not_before.tag !in [u8(23), 24] || not_after.tag !in [u8(23), 24] ||
+		not_before.length == 0 || not_after.length == 0 { return none }
 	if dates.pos != dates.limit { return none }
 	subject := fields.expect(0x30) or { return none }
 	if !security_name_valid(bytes, subject) { return none }
@@ -191,12 +197,19 @@ fn security_certificate_parse(bytes &u8, count int) ?SecurityCertificate {
 	key_bits := public.expect(3) or { return none }
 	if public.pos != public.limit || key_bits.length < 2 { return none }
 	mut previous := u8(0x80)
+	mut extensions := SecurityDer{}
+	mut unique_ids := false
 	for fields.pos < fields.limit {
 		optional := fields.next() or { return none }
 		if optional.tag !in [u8(0x81), 0x82, 0xa3] || optional.tag <= previous { return none }
 		previous = optional.tag
+		if optional.tag == 0xa3 { extensions = optional } else { unique_ids = true }
 	}
-	return SecurityCertificate{outer, serial, subject, spki}
+	return SecurityCertificate{
+		certificate: outer, serial: serial, issuer: issuer, not_before: not_before,
+		not_after: not_after, subject: subject, spki: spki, algorithm: algorithm,
+		signature: signature, extensions: extensions, unique_ids: unique_ids
+	}
 }
 
 fn sec_certificate_type_id() u64 { return ios_runtime.names['VinixSecCertificate'] }
@@ -273,10 +286,14 @@ fn sec_certificate_summary(object u64) u64 {
 }
 
 fn security_decode_error(error_output &u64) {
+	security_error(error_output, -26275)
+}
+
+fn security_error(error_output &u64, code int) {
 	if error_output == unsafe { nil } { return }
 	object := objc_allocate(cf_error_type_id())
 	mut header := obj_header(object)
-	header.number = -26275 // errSecDecode
+	header.number = code
 	header.fields[0] = owned_string('NSOSStatusErrorDomain')
 	unsafe { *error_output = object }
 }
@@ -556,6 +573,21 @@ fn sec_random_copy(random u64, count u64, bytes &u8) int {
 
 fn security_symbol(symbol string) ?u64 {
 	address := match symbol {
+		'_SecTrustGetTypeID' { voidptr(sec_trust_type_id) }
+		'_SecTrustCreateWithCertificates' { voidptr(sec_trust_create) }
+		'_SecTrustCopyPublicKey', '_SecTrustCopyKey' { voidptr(sec_trust_key) }
+		'_SecTrustGetCertificateCount' { voidptr(sec_trust_count) }
+		'_SecTrustGetCertificateAtIndex' { voidptr(sec_trust_certificate) }
+		'_SecTrustEvaluate' { voidptr(sec_trust_evaluate) }
+		'_SecTrustEvaluateWithError' { voidptr(sec_trust_evaluate_error) }
+		'_SecTrustGetTrustResult' { voidptr(sec_trust_evaluate) }
+		'_SecTrustSetAnchorCertificates' { voidptr(sec_trust_anchors) }
+		'_SecTrustSetAnchorCertificatesOnly' { voidptr(sec_trust_anchors_only) }
+		'_SecTrustSetVerifyDate' { voidptr(sec_trust_date) }
+		'_SecTrustSetPolicies' { voidptr(sec_trust_policies) }
+		'_SecTrustCopyPolicies' { voidptr(sec_trust_copy_policies) }
+		'_SecTrustSetNetworkFetchAllowed' { voidptr(sec_trust_network_set) }
+		'_SecTrustGetNetworkFetchAllowed' { voidptr(sec_trust_network_get) }
 		'_SecPolicyGetTypeID' { voidptr(sec_policy_type_id) }
 		'_SecPolicyCreateBasicX509' { voidptr(sec_policy_basic) }
 		'_SecPolicyCreateSSL' { voidptr(sec_policy_ssl) }

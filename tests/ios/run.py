@@ -24,6 +24,7 @@ FEATURES = (
     b"iOS PASS: native GameController typed key codes and string constants",
     b"iOS PASS: native Security certificates, public keys, constants and random bytes",
     b"iOS PASS: native Security X.509 and SSL policy ownership",
+    b"iOS PASS: native Security explicit-anchor trust evaluation and key ownership",
     b"iOS PASS: native keychain queries, ownership and persistent credentials",
     b"iOS PASS: native CommonCrypto SHA, HMAC and AES calling conventions",
     b"iOS PASS: native framework constants match installed Apple libraries",
@@ -166,7 +167,7 @@ def main() -> int:
             shutil.copy2(build / "fixtures/compression", destination / "compression")
             shutil.copytree(build / "fixtures/TextFixture.app", destination / "TextFixture.app")
             shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf", destination / "TextFixture.app/font.ttf")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "provider-images", "geometry", "game-constants", "security", "keychain", "common-crypto", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "provider-images", "geometry", "game-constants", "security", "security-trust", "keychain", "common-crypto", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")
         shutil.copytree(build / "fixtures/Modules.app", destination / "Modules.app")

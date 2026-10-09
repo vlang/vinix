@@ -40,8 +40,8 @@ fn test_security_der_bounds_curve_validation_and_unsupported_services() {
 	assert sec_random_copy(0, 0, unsafe { nil }) == 0
 	assert sec_random_copy(1, 1, unsafe { &bytes[0] }) != 0
 	assert sec_random_copy(0, ~u64(0), unsafe { &bytes[0] }) != 0
-	assert security_symbol('_SecTrustEvaluateWithError') == none
-	assert security_symbol('_SecTrustCreateWithCertificates') == none
+	assert security_symbol('_SecTrustEvaluateWithError') != none
+	assert security_symbol('_SecTrustCreateWithCertificates') != none
 	assert sec_policy_ssl(1, ios_runtime.names['NSObject']) == 0
 	assert sec_policy_properties(0) == 0
 	assert security_symbol('_SecItemAdd') != none
