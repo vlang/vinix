@@ -80,21 +80,24 @@ def call(operation, arguments, namespace, *, controller=None):
         return objects[data] if kind == "owner" else bytes.fromhex(data) if kind == "bytes" else data
 
     def exit_owner(owner, record):
-        if record is None:
-            owner.__exit__(None, None, None)
-            return False
-        error = errors[record["binding_error"]]
-        traceback = error.__traceback__
         try:
-            raise error.with_traceback(traceback)
-        except BaseException:
-            replay = error.__traceback__
-            error.__traceback__ = traceback
+            if record is None:
+                owner.__exit__(None, None, None)
+                return False
+            error = errors[record["binding_error"]]
+            traceback = error.__traceback__
             try:
-                return bool(owner.__exit__(type(error), error, traceback))
-            finally:
-                if error.__traceback__ is replay:
-                    error.__traceback__ = traceback
+                raise error.with_traceback(traceback)
+            except BaseException:
+                replay = error.__traceback__
+                error.__traceback__ = traceback
+                try:
+                    return bool(owner.__exit__(type(error), error, traceback))
+                finally:
+                    if error.__traceback__ is replay:
+                        error.__traceback__ = traceback
+        finally:
+            owner.manager = owner.method = owner.kwargs = None
 
     def library_primitive(method, row):
         if method == "checkpoint":
