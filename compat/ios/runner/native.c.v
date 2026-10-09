@@ -37,6 +37,7 @@ fn execute(image macho.Image, arguments []string) !int {
 	defer { unsafe { path.free() } }
 	modules_start(image, layout, base, path, false)
 	defer {
+		dispatch_stop()
 		if image_runtime.started { image_cxa_finalize(0) }
 		objc_stop()
 		$if ios_gles ? { gles_stop() }

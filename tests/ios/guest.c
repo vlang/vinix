@@ -130,6 +130,9 @@ int main(void) {
     run("/opt/ios/permissions", "/opt/ios/permissions-loop", NULL, NULL, 0,
         "IOS-PERMISSIONS: real file modes, unlinked descriptors, Darwin errors and eight threads");
     puts("iOS PASS: Darwin file permissions and descriptor lifetime");
+    run("/opt/ios/dispatch", NULL, NULL, NULL, 0,
+        "IOS-DISPATCH: FIFO blocks/functions, concurrent workers, serial targets, deadlines and finalizers\n");
+    puts("iOS PASS: Darwin dispatch queues, deadlines and callback ownership");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

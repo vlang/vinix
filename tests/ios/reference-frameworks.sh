@@ -78,6 +78,9 @@ test "$exit_status" = 8
     "$repo/tests/ios/permissions.c" -o "$output/permissions"
 test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permissions-loop"
 "$output/permissions" "$output/permissions-loop"
+"${IOS_CLANG:-clang}" -DIOS_DISPATCH_REFERENCE -fblocks -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/dispatch.c" -o "$output/dispatch"
+"$output/dispatch"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

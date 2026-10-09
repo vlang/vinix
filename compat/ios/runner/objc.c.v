@@ -274,6 +274,7 @@ fn objc_allocate(cls u64) u64 {
 }
 
 fn objc_retain(object u64) u64 {
+	if object != 0 && dispatch_objc_retain(object) { return object }
 	if object != 0 && is_block(object) { return block_retain(object) }
 	if object != 0 && object !in ios_runtime.classes && object !in ios_runtime.constants {
 		mut header := obj_header(object)
@@ -302,6 +303,7 @@ fn native_method(cls u64, selector string) u64 {
 
 fn objc_release(object u64) {
 	if object == 0 || object in ios_runtime.classes || object in ios_runtime.constants { return }
+	if dispatch_objc_release(object) { return }
 	if is_block(object) {
 		block_release(object)
 		return
@@ -380,11 +382,11 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	dispatch_stop()
 	audio_stop()
 	ui_context_stop()
 	$if ios_gles ? { gles_set_current(0) }
 	display_links_stop()
-	dispatch_main_stop()
 	objc_release(ios_runtime.native_touch)
 	ios_runtime.native_touch = 0
 	for timer in ios_runtime.timers {

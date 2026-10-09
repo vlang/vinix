@@ -27,7 +27,6 @@ mut:
 	page_size u64
 	task_self u32
 	main_queue [8]u64
-	main_jobs []u64
 	vm_mappings []MachMapping
 	vm_sequence u64
 	in6_any [16]u8
@@ -46,7 +45,6 @@ __global system_data = unsafe { &SystemData(nil) }
 
 fn system_data_start() ! {
 	system_data = &SystemData{page_size: u64(C.getpagesize()), task_self: 1}
-	system_data.main_jobs.flags |= .noslices
 	system_data.vm_mappings.flags |= .noslices
 	bytes := rand.bytes(8)!
 	unsafe { C.memcpy(&system_data.guard, bytes.data, 8); bytes.free() }
@@ -82,10 +80,12 @@ fn system_data_start() ! {
 		write32(base + 1084 + u64(i) * 4, u32(if i >= 65 && i <= 90 { i + 32 } else { i }))
 		write32(base + 2108 + u64(i) * 4, u32(if i >= 97 && i <= 122 { i - 32 } else { i }))
 	}
+	dispatch_start()
 }
 
 fn system_data_stop() {
 	if system_data == unsafe { nil } { return }
+	dispatch_free()
 	mach_memory_stop()
 	for _, pointer in system_data.mutexes {
 		if C.pthread_mutex_destroy(pointer) != 0 { panic('iOS: active mutex at image shutdown') }

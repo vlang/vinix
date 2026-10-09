@@ -72,7 +72,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit` termination |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
-| libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread and `dispatch_once` adapters |
+| libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread, `dispatch_once`, main/global/serial dispatch queues, delayed work and synchronous callbacks |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
@@ -524,6 +524,36 @@ after unlink, missing/closed files, symlink-loop errors and eight concurrent
 clients with independent errno. Mac reference, ASAN and the full ARM64
 C++/GLES/PPSSPP regression pass.
 
+Dispatch now schedules real function callbacks and copied blocks in V over
+native pthread synchronization. Main queue work runs on the UI thread; global
+queues have concurrent workers, while private queues and their serial target
+chains preserve FIFO exclusion. `dispatch_queue_create_with_target$V2` retains
+its target. Pending work and queue-valued block captures retain their queues;
+context finalizers run on the target after the last reference is released.
+Synchronous callbacks wait for preceding work and diagnose recursive serial
+or main-thread deadlocks. Delayed work enters its queue when the deadline
+arrives, preserving work already queued ahead of it. Monotonic and wall-clock
+tokens, overflow and underflow follow the installed Mac library's observations
+and the documented [dispatch clock encoding](https://github.com/swiftlang/swift-corelibs-libdispatch/blob/main/src/shims/time.h).
+Vinix's existing Mach timebase remains 1/1.
+
+The scheduler joins active workers and releases pending captures before C++
+destructors, framework teardown or image unmapping. Shared Mac/iOS fixtures
+check 128 mixed FIFO callbacks, actual concurrent overlap, sibling serial
+targets, queue labels and copies, finalizers, release with pending work,
+queue-valued capture helpers, timer ordering and a callback still running when
+main returns. ASAN checks two image loads/unloads, deferred main queue turns,
+wall deadlines and background synchronous calls to a main-targeted queue.
+The full ARM64 C++/GLES/PPSSPP regression passes. This resolves 19 additional
+strong imports across Fortnite and EOSSDK.
+
+This is a dispatch subset: the worker pool currently has four threads without
+adaptive overcommit or QoS scheduling. Private queues accept NULL attributes
+only; concurrent/custom attributes, target mutation, groups, semaphores,
+sources, dispatch data and `OS_dispatch_queue` Objective-C classes remain
+unsupported. Function contexts remain application-owned, and application
+threads must finish before their image is unloaded.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -537,7 +567,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _dispatch_after_f
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _fcntl
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -545,12 +575,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,254 | 904 | 81 |
-| EOSSDK | 467 | 195 | 18 |
+| Fortnite executable | 1,263 | 895 | 81 |
+| EOSSDK | 477 | 185 | 18 |
 | MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,773 | 1,223 | 122 |
+| All images | 1,792 | 1,204 | 122 |
 
-The C++/GLES/Text variant reports 1,786 resolved imports, 1,210 unresolved strong
+The C++/GLES/Text variant reports 1,805 resolved imports, 1,191 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
