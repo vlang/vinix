@@ -243,11 +243,16 @@ in eight threads, dynamic lookup and reverse destructor order. Missing strong
 libraries and ARM64e dylibs fail before app entry. An AddressSanitizer fixture
 also audits and executes the bundle twice in one host process.
 
+Additional UIKit/Foundation constants now match the installed Mac libraries,
+including scene/application notifications, error domains and keys, file and
+cookie attributes and floating-point window levels. Foundation selector/string
+conversion preserves canonical selectors, UTF-8 names and nil behavior.
+
 The actual executable, using the updated C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: framework symbol is not implemented: _UIApplicationWillResignActiveNotification
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: library is not implemented: /System/Library/Frameworks/AudioToolbox.framework/AudioToolbox (_AUGraphAddNode)
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -255,10 +260,10 @@ the executable, without mapping or executing app code. The C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,079 | 1,077 | 83 |
-| EOSSDK | 321 | 341 | 18 |
+| Fortnite executable | 1,100 | 1,057 | 82 |
+| EOSSDK | 337 | 325 | 18 |
 | MarketplaceKitWrapper | 51 | 125 | 23 |
-| All images | 1,451 | 1,543 | 124 |
+| All images | 1,488 | 1,507 | 123 |
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on

@@ -5,7 +5,37 @@ __attribute__((objc_root_class))
 - (const char *)UTF8String;
 @end
 extern int puts(const char *), strcmp(const char *, const char *);
+extern SEL NSSelectorFromString(NSString *), sel_registerName(const char *);
+extern NSString *NSStringFromSelector(SEL);
 #define STRINGS(X) \
+    X(UIApplicationWillResignActiveNotification, "UIApplicationWillResignActiveNotification") \
+    X(UISceneDidActivateNotification, "UISceneDidActivateNotification") \
+    X(UISceneWillDeactivateNotification, "UISceneWillDeactivateNotification") \
+    X(UIWindowSceneSessionRoleApplication, "UIWindowSceneSessionRoleApplication") \
+    X(NSCocoaErrorDomain, "NSCocoaErrorDomain") \
+    X(NSMachErrorDomain, "NSMachErrorDomain") \
+    X(NSPOSIXErrorDomain, "NSPOSIXErrorDomain") \
+    X(NSLocalizedDescriptionKey, "NSLocalizedDescription") \
+    X(NSLocalizedFailureReasonErrorKey, "NSLocalizedFailureReason") \
+    X(NSLocalizedRecoverySuggestionErrorKey, "NSLocalizedRecoverySuggestion") \
+    X(NSFileModificationDate, "NSFileModificationDate") \
+    X(NSFilePosixPermissions, "NSFilePosixPermissions") \
+    X(NSFileSize, "NSFileSize") \
+    X(NSFileSystemFreeSize, "NSFileSystemFreeSize") \
+    X(NSFileSystemSize, "NSFileSystemSize") \
+    X(NSKeyValueChangeNewKey, "new") \
+    X(NSKeyValueChangeOldKey, "old") \
+    X(NSKeyedArchiveRootObjectKey, "root") \
+    X(NSProcessInfoPowerStateDidChangeNotification, "NSProcessInfoPowerStateDidChangeNotification") \
+    X(NSProcessInfoThermalStateDidChangeNotification, "NSProcessInfoThermalStateDidChangeNotification") \
+    X(NSHTTPCookieExpires, "Expires") \
+    X(NSHTTPCookieName, "Name") \
+    X(NSHTTPCookieOriginURL, "OriginURL") \
+    X(NSHTTPCookiePath, "Path") \
+    X(NSHTTPCookieValue, "Value") \
+    X(NSURLAuthenticationMethodServerTrust, "NSURLAuthenticationMethodServerTrust") \
+    X(NSURLErrorFailingURLPeerTrustErrorKey, "NSURLErrorFailingURLPeerTrustErrorKey") \
+    X(NSURLErrorFailingURLStringErrorKey, "NSErrorFailingURLStringKey") \
     X(NSDocumentTypeDocumentAttribute, "DocumentType") \
     X(NSForegroundColorAttributeName, "NSColor") \
     X(NSPlainTextDocumentType, "NSPlainText") \
@@ -35,15 +65,22 @@ extern int puts(const char *), strcmp(const char *, const char *);
 #define DECLARE(name, value) extern NSString *const name;
 STRINGS(DECLARE)
 #undef DECLARE
+extern const double UIWindowLevelNormal, UIWindowLevelStatusBar, UIWindowLevelAlert;
 extern const unsigned long UIAccessibilityTraitNone, UIAccessibilityTraitButton;
 extern const unsigned long UIAccessibilityTraitLink, UIAccessibilityTraitImage;
 extern const unsigned long UIAccessibilityTraitNotEnabled, UIAccessibilityTraitAdjustable, UIBackgroundTaskInvalid;
 extern const unsigned UIAccessibilityAnnouncementNotification, UIAccessibilityLayoutChangedNotification;
 int main(void) { @autoreleasepool {
+    if (NSSelectorFromString((NSString *)0) || NSStringFromSelector((SEL)0) ||
+        NSSelectorFromString(NSStringFromSelector(@selector(sample:other:))) != @selector(sample:other:) ||
+        NSSelectorFromString(NSStringFromSelector(sel_registerName("unicode_\xf0\x9f\x98\x80:"))) != sel_registerName("unicode_\xf0\x9f\x98\x80:")) {
+        puts("IOS-CONSTANTS FAIL: selector/string conversion"); return 1;
+    }
 #define VERIFY(name, value) if (strcmp([name UTF8String], value)) { puts("IOS-CONSTANTS FAIL: " #name); return 1; }
     STRINGS(VERIFY)
 #undef VERIFY
-    if (UIAccessibilityTraitNone != 0 || UIAccessibilityTraitButton != 1 ||
+    if (UIWindowLevelNormal != 0 || UIWindowLevelStatusBar != 1000 || UIWindowLevelAlert != 2000 ||
+        UIAccessibilityTraitNone != 0 || UIAccessibilityTraitButton != 1 ||
         UIAccessibilityTraitLink != 2 || UIAccessibilityTraitImage != 4 ||
         UIAccessibilityTraitNotEnabled != 256 || UIAccessibilityTraitAdjustable != 4096 ||
         UIBackgroundTaskInvalid != 0 || UIAccessibilityAnnouncementNotification != 1008 ||
