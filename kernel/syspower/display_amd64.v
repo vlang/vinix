@@ -14,7 +14,9 @@
 // itself, and there is one adapter it knows how to do that for: the one
 // QEMU's "std" VGA and bochs-display have (PCI 1234:1111), whose mode is a
 // handful of registers of the Bochs display interface. They are read out
-// before the sleep, with a copy of every pixel, and written back after it.
+// before the sleep and written back after it; the picture itself is put away
+// and put back by the sleep sequence, as for any sleep (term/sleep.v), once
+// there is a mode to show it in again.
 //
 // Everywhere else display_survives_deep() says no, and /sys/power/mem_sleep
 // lists only s2idle -- unless the machine has no framebuffer at all, where
@@ -77,9 +79,6 @@ mut:
 	// The mode as read before the sleep.
 	saved     bool
 	registers [dispi_registers]u16
-	// A copy of the framebuffer, while the machine sleeps.
-	pixels      u64
-	pixel_pages u64
 	// How often the picture has been brought back, how often the adapter
 	// was found to have lost its mode, and how often it would not take it
 	// back.
@@ -194,8 +193,9 @@ fn display_survives_deep() bool {
 	return true
 }
 
-// Read out the mode and what is on the screen. Before the sleep, with the
-// adapter still powered.
+// Read out the mode. Before the sleep, with the adapter still powered. What
+// is on the screen has been put away already, by the sleep sequence itself
+// (term/sleep.v), and is put back by it once the mode is.
 fn display_save() {
 	mut display := &syspower_display
 	display.saved = false
@@ -206,29 +206,11 @@ fn display_save() {
 		display.registers[index] = dispi_read(index)
 	}
 	display.saved = true
-	// The pixels, if there is memory for them. Without, the console is drawn
-	// again afterwards and a program that draws on the screen itself has to
-	// do the same.
-	framebuffer, length := term.framebuffer_phys_span()
-	if length == 0 {
-		return
-	}
-	pages := (length + page_size - 1) / page_size
-	copy := memory.pmm_alloc_nozero_fallible(pages)
-	if copy == unsafe { nil } {
-		return
-	}
-	display.pixels = u64(copy)
-	display.pixel_pages = pages
-	unsafe {
-		C.memcpy(voidptr(display.pixels + higher_half), voidptr(framebuffer + higher_half), length)
-	}
 }
 
-// Set the mode again and put the picture back. After the sleep, once the
-// adapter's configuration space has been restored and its memory answers.
-// Also called when the machine did not sleep after all, to give the copy
-// back.
+// Set the mode again. After the sleep, once the adapter's configuration
+// space has been restored and its registers answer, and before the sleep
+// sequence copies the picture back into the framebuffer.
 fn display_restore() {
 	mut display := &syspower_display
 	if display.adapter == unsafe { nil } || !display.saved {
@@ -268,31 +250,18 @@ fn display_restore() {
 		C.kprintf(c'syspower: the display did not take its mode back: %llux%llu at %llu bits wanted, %llux%llu at %llu read\n',
 			u64(saved[dispi_xres]), u64(saved[dispi_yres]), u64(saved[dispi_bpp]), u64(dispi_read(dispi_xres)),
 			u64(dispi_read(dispi_yres)), u64(dispi_read(dispi_bpp)))
+		return
 	}
-	framebuffer, length := term.framebuffer_phys_span()
-	if display.pixels != 0 {
-		if took && length != 0 && length <= display.pixel_pages * page_size {
-			unsafe {
-				C.memcpy(voidptr(framebuffer + higher_half), voidptr(display.pixels + higher_half), length)
-			}
-		}
-		memory.pmm_free(voidptr(display.pixels), display.pixel_pages)
-		display.pixels = 0
-		display.pixel_pages = 0
-	} else if took {
-		// No copy was kept: at least the console can draw itself again.
+	if !screen_dark {
+		// The picture was not put away -- there was no memory for it -- and
+		// what the adapter's memory holds after a loss of power is anybody's
+		// guess. The console at least can draw itself again; a program that
+		// draws on the screen itself has to do the same.
 		term.display_hotplug(true)
 	}
 }
 
-// Give back the copy of the screen when the sleep did not happen: nothing was
-// lost, and nothing is to be written.
+// The sleep did not happen: the mode was never lost, and is not written.
 fn display_discard() {
-	mut display := &syspower_display
-	display.saved = false
-	if display.pixels != 0 {
-		memory.pmm_free(voidptr(display.pixels), display.pixel_pages)
-		display.pixels = 0
-		display.pixel_pages = 0
-	}
+	syspower_display.saved = false
 }
