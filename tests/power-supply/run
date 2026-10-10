@@ -1,0 +1,21 @@
+#!/bin/sh
+# Test the battery arithmetic on the host: the time-left estimate, the
+# percentage and the low/critical decision in kernel/psupply/estimate.v.
+#
+# That file is plain arithmetic with no kernel in it. It is copied, unchanged,
+# next to its tests in a scratch module, because the rest of its own module
+# only builds as part of the kernel.
+set -eu
+
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+. "$repo/build-support/find-v.sh"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-power-supply.XXXXXX")
+trap 'rm -rf "$work"' 0
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+mkdir "$work/psupply"
+cp "$repo/kernel/psupply/estimate.v" "$repo/tests/power-supply/estimate_test.v" "$work/psupply/"
+"$V" -cc cc test "$work/psupply"
