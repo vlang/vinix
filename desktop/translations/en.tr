@@ -4690,3 +4690,12 @@ Battery: {0}, fully charged
 tray.battery.tip_plugged_in
 Battery: {0}, plugged in
 -----
+start.sleep
+Sleep
+-----
+start.restart
+Restart
+-----
+power.sleep_failed
+This computer could not go to sleep.
+-----

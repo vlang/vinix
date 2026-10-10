@@ -24,6 +24,8 @@ const action_start_activity = 'start.activity'
 const action_start_system = 'start.system'
 const action_start_welcome = 'start.welcome'
 const action_start_shutdown = 'start.shutdown'
+const action_start_restart = 'start.restart'
+const action_start_sleep = 'start.sleep'
 const action_start_launch_prefix = 'start.launch.'
 const action_start_documents = 'start.documents'
 const action_start_recent = 'start.recent'
@@ -56,6 +58,8 @@ const start_menu_search_height = 32
 const start_menu_page_height = 30
 const start_menu_page_gap = 6
 const start_menu_max_query = 48
+// From one session button to the one above it.
+const start_menu_power_pitch = 38
 
 // A new profile has no history yet. Windows 7 seeded its recent-programs list
 // the same way; the first launches replace these.
@@ -193,7 +197,7 @@ fn (mut d Desktop) start_menu_element() ui2.Element {
 	})
 
 	if d.start_menu_recent_app != start_recent_none {
-		d.start_menu_recent_pane(mut children, right_x, 76, right_width, height - 62 - 76)
+		d.start_menu_recent_pane(mut children, right_x, 76, right_width, height - 62 - 76 - d.start_menu_power_rise())
 	} else {
 		mut right_y := 76
 		children << d.start_menu_right_button(action_start_files, tr('app.files'), 'builtin:folder', right_x, right_y, right_width)
@@ -219,16 +223,19 @@ fn (mut d Desktop) start_menu_element() ui2.Element {
 		children << d.start_menu_right_button(action_start_welcome, tr('start.help'), 'builtin:window', right_x, right_y, right_width)
 	}
 
+	// The session buttons stack upward from the corner: Shut down where it has
+	// always been, Restart above it, and above that Sleep, on a machine whose
+	// kernel can.
 	power_width := if right_width > 138 { 128 } else { right_width - 8 }
-	children << ui2.button(action_start_shutdown, tr('start.shut_down'), ui2.rect(f64(right_x + right_width - power_width), f64(height - 49), f64(power_width), 34), ui2.BoxStyle{
-		bg: if d.hover == action_start_shutdown { start_menu_power_hover } else { start_menu_power }
-		radius: 5
-	}, ui2.TextStyle{
-		color: start_menu_right_text
-		size: 12
-		bold: true
-		align: .center
-	})
+	power_x := right_x + right_width - power_width
+	mut power_y := height - 49
+	children << d.start_menu_power_button(action_start_shutdown, tr('start.shut_down'), power_x, power_y, power_width)
+	power_y -= start_menu_power_pitch
+	children << d.start_menu_power_button(action_start_restart, tr('start.restart'), power_x, power_y, power_width)
+	if d.idle.sleep_available {
+		power_y -= start_menu_power_pitch
+		children << d.start_menu_power_button(action_start_sleep, tr('start.sleep'), power_x, power_y, power_width)
+	}
 
 	// Clickable rather than a plain view so empty space in the menu consumes a
 	// click instead of activating the window visible underneath it.
@@ -236,6 +243,25 @@ fn (mut d Desktop) start_menu_element() ui2.Element {
 		bg: start_menu_shell
 		radius: 8
 	}, children)
+}
+
+// One of the session buttons in the lower right corner.
+fn (d &Desktop) start_menu_power_button(action string, title string, x int, y int, width int) ui2.Element {
+	return ui2.button(action, title, ui2.rect(f64(x), f64(y), f64(width), 34), ui2.BoxStyle{
+		bg: if d.hover == action { start_menu_power_hover } else { start_menu_power }
+		radius: 5
+	}, ui2.TextStyle{
+		color: start_menu_right_text
+		size: 12
+		bold: true
+		align: .center
+	})
+}
+
+// How far the session buttons above Shut down reach into the column over
+// them, which the list of recent items gives up.
+fn (d &Desktop) start_menu_power_rise() int {
+	return if d.idle.sleep_available { 2 * start_menu_power_pitch } else { start_menu_power_pitch }
 }
 
 fn (mut d Desktop) start_menu_program_pane(x int, y int, width int, height int) ui2.Element {
@@ -817,6 +843,16 @@ fn (mut d Desktop) handle_start_action(action string) {
 		action_start_shutdown {
 			d.close_start_menu()
 			d.request_power_off()
+		}
+		action_start_restart {
+			d.close_start_menu()
+			d.request_restart()
+		}
+		action_start_sleep {
+			// The machine sleeps after the frame that takes the menu down, so
+			// what it wakes to is the desktop and not the menu.
+			d.close_start_menu()
+			d.request_sleep()
 		}
 		else {
 			if action.starts_with(action_start_launch_prefix) {

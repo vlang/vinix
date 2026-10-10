@@ -4689,3 +4689,12 @@ tray.battery.tip_full
 tray.battery.tip_plugged_in
 バッテリー: {0}、電源接続中
 -----
+start.sleep
+スリープ
+-----
+start.restart
+再起動
+-----
+power.sleep_failed
+スリープに移行できませんでした。
+-----

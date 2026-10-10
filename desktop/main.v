@@ -253,6 +253,12 @@ fn main() {
 		desktop_publish_session_ready()
 	}
 
+	// Whether the kernel can sleep, and the lid action and performance profile
+	// that were saved: the kernel keeps those two only while it runs.
+	gpu_present_startup_stage(c'taking up power settings')
+	desktop.start_power_session()
+	gpu_present_startup_stage(c'power settings taken up')
+
 	mut stats := FrameStats{}
 	// Registration and the app picker drew into the same canvas; the desktop
 	// starts from a complete frame of its own, pointer backing included.
@@ -268,6 +274,16 @@ fn main() {
 		desktop.take_power_signal()
 		if !desktop.running {
 			break
+		}
+		// Sleep, from the menu or the idle timer, happens between two passes:
+		// the frame that took the menu down has been presented, and nothing
+		// is half done. The session goes on from here when the machine wakes.
+		if desktop.idle.sleep_requested {
+			titlebar_click = TitlebarClick{}
+			if desktop.sleep_now() {
+				desktop.drop_wake_input(mut pointer, mut keyboard)
+			}
+			continue
 		}
 		frame_started := monotonic_millis()
 		stats_started := if options.stats { desktop_monotonic_us() } else { i64(0) }
@@ -327,7 +343,25 @@ fn main() {
 		desktop.poll_version_check()
 		desktop.poll_taskbar_status()
 		desktop.tick_taskbar_marquee()
+		// After this pass's input: how long nobody has touched the machine, and
+		// whether that turns the display off or asks for sleep.
+		desktop.idle_tick()
 		other_dirty := desktop.dirty
+		// While the display is off nothing is composed or presented. Whatever
+		// changes in the meantime is repainted, whole, when it comes back on.
+		if desktop.idle.display_off {
+			if desktop.idle.blank_pending {
+				desktop.idle.blank_pending = false
+				present_black_frame(mut fb, mut desktop.canvas)
+			}
+			desktop.dirty = false
+			desktop.frame_damage = FrameDamage{}
+			desktop.drag_damage = DamageRect{}
+			elapsed := monotonic_millis() - frame_started
+			desktop_wait_for_input(pointer.fd, keyboard.fd, desktop_frame_wait_ms(elapsed,
+				desktop.idle_wait(options.idle_interval)))
+			continue
+		}
 		// A pointer that moved, where everything else the move changed has been
 		// recorded as damage. See on_pointer_move.
 		pointer_only := desktop.pointer_moved_only && desktop.drag.kind == .none_
@@ -378,7 +412,8 @@ fn main() {
 			capture_interval := desktop.capture_idle_interval(app_interval, options.frame_interval)
 			hover_interval := desktop.taskbar_hover_idle_interval(capture_interval)
 			status_interval := desktop.taskbar_status_idle_interval(hover_interval)
-			interval := desktop.taskbar_clock_idle_interval(status_interval)
+			clock_interval := desktop.taskbar_clock_idle_interval(status_interval)
+			interval := desktop.idle_wait(clock_interval)
 			wait := desktop_frame_wait_ms(elapsed, interval)
 			desktop_wait_for_input(pointer.fd, keyboard.fd, wait)
 			continue
@@ -474,20 +509,26 @@ fn main() {
 		return
 	}
 	// Power actions hand the display back to the system console.
-	desktop.canvas.clip = Clip{
-		x: 0
-		y: 0
-		w: desktop.canvas.width
-		h: desktop.canvas.height
-	}
-	desktop.canvas.clear(0x000000)
-	fb.present(&desktop.canvas, desktop_current_scale())
+	present_black_frame(mut fb, mut desktop.canvas)
 	println('vinix-desktop: ${desktop.frames} frames')
 
 	// Nothing above has to be undone afterwards: this does not return unless
 	// the kernel refuses, and it is keep_running for a session that was only
 	// closed rather than asked to take the machine with it.
 	desktop_power_apply(desktop.power)
+}
+
+// One black frame: what a display that is off shows, and what the console is
+// handed back over. Whoever goes on drawing repaints the canvas whole.
+fn present_black_frame(mut fb Framebuffer, mut canvas Canvas) {
+	canvas.clip = Clip{
+		x: 0
+		y: 0
+		w: canvas.width
+		h: canvas.height
+	}
+	canvas.clear(0x000000)
+	fb.present(canvas, desktop_current_scale())
 }
 
 // pump_pointer maps the device's own coordinate space onto the screen and
@@ -504,6 +545,11 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 		return TitlebarClick{}
 	}
 	d.pointer_present = true
+	// A packet that only turns the display back on is not also a move or a
+	// click on whatever is under the pointer.
+	if d.idle_pointer_input(packet) {
+		return TitlebarClick{}
+	}
 
 	pointer_x := int(i64(packet.x) * i64(width - 1) / i64(packet.max_x))
 	pointer_y := int(i64(packet.y) * i64(height - 1) / i64(packet.max_y))
@@ -580,6 +626,11 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 
 fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	raw := keyboard.poll()
+	// A key that only turns the display back on is not also typed.
+	if raw.len > 0 && d.idle_key_input() {
+		unsafe { raw.free() }
+		return
+	}
 	// The console types the US layout. Everything below reads what the chosen
 	// input source types instead; shortcuts arrive as they were.
 	keys := d.type_with_layout(raw, keyboard.fd)

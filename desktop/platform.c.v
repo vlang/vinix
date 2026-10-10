@@ -782,6 +782,42 @@ fn desktop_power_apply(action PowerAction) {
 	}
 }
 
+// Where the kernel takes the word that puts the machine to sleep.
+const desktop_sleep_path = '/sys/power/state'
+
+// Put the machine to sleep. The write returns when it is awake again, so this
+// does too: with 0, or with the errno the request failed with. Nothing about
+// the session is undone or has to be redone around it.
+fn desktop_system_sleep() int {
+	return desktop_sleep_through(desktop_sleep_path)
+}
+
+// One open and one write of one word. A failed write is not tried again: by
+// then the machine may have slept and woken, and a second `mem` would put it
+// back to sleep under whoever had just woken it.
+fn desktop_sleep_through(path string) int {
+	mut fd := -1
+	for _ in 0 .. 4 {
+		fd = C.open(&char(path.str), C.O_WRONLY | C.O_CLOEXEC)
+		if fd >= 0 || C.errno != C.EINTR {
+			break
+		}
+	}
+	if fd < 0 {
+		return if C.errno != 0 { C.errno } else { C.EIO }
+	}
+	word := 'mem\n'
+	written := desktop_write(fd, word.str, u64(word.len))
+	mut failure := 0
+	if written < 0 {
+		failure = if C.errno != 0 { C.errno } else { C.EIO }
+	} else if written != word.len {
+		failure = C.EIO
+	}
+	C.close(fd)
+	return failure
+}
+
 // A native application is another invocation of the desktop executable via a
 // per-app symlink. Vinix records the exec path as the process name, so these
 // are distinct `vinix-files`, `vinix-terminal`, ... processes even though the

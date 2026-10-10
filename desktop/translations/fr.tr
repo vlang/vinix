@@ -4689,3 +4689,12 @@ Batterie : {0}, charge complète
 tray.battery.tip_plugged_in
 Batterie : {0}, sur secteur
 -----
+start.sleep
+Veille
+-----
+start.restart
+Redémarrer
+-----
+power.sleep_failed
+L'ordinateur n'a pas pu se mettre en veille.
+-----

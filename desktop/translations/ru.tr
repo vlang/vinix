@@ -4690,3 +4690,12 @@ tray.battery.tip_full
 tray.battery.tip_plugged_in
 Аккумулятор: {0}, питание от сети
 -----
+start.sleep
+Сон
+-----
+start.restart
+Перезагрузка
+-----
+power.sleep_failed
+Компьютер не смог перейти в режим сна.
+-----

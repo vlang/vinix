@@ -130,6 +130,27 @@ fn test_platform_lists_a_directory_and_reads_a_files_mode() {
 	assert !writable && stat_result != .none
 }
 
+fn test_platform_sleep_request_is_one_word_or_the_reason_it_failed() {
+	assert desktop_sleep_path == '/sys/power/state'
+	root := os.join_path(os.temp_dir(), 'vinix-v-platform-sleep-${os.getpid()}')
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	state := os.join_path(root, 'state')
+	os.write_file(state, '')!
+	assert desktop_sleep_through(state) == 0
+	assert os.read_file(state)! == 'mem\n'
+	// A kernel without the file: nothing is created in its place.
+	absent := os.join_path(root, 'absent')
+	assert desktop_sleep_through(absent) == C.ENOENT
+	assert !os.exists(absent)
+	assert desktop_sleep_through(root) == C.EISDIR
+	// One that will not take the word. Root is not held to a file's mode.
+	if os.getuid() != 0 {
+		os.chmod(state, 0o444)!
+		assert desktop_sleep_through(state) == C.EACCES
+	}
+}
+
 fn test_platform_terminal_raw_mode_and_restoration() {
 	master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY)
 	assert master >= 0

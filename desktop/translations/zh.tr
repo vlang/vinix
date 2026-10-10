@@ -4689,3 +4689,12 @@ tray.battery.tip_full
 tray.battery.tip_plugged_in
 电池：{0}，已接通电源
 -----
+start.sleep
+待机
+-----
+start.restart
+重新启动
+-----
+power.sleep_failed
+计算机无法进入待机状态。
+-----

@@ -4690,3 +4690,12 @@ Batería: {0}, carga completa
 tray.battery.tip_plugged_in
 Batería: {0}, enchufada
 -----
+start.sleep
+Suspender
+-----
+start.restart
+Reiniciar
+-----
+power.sleep_failed
+El equipo no pudo entrar en reposo.
+-----

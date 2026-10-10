@@ -111,6 +111,9 @@ mut:
 	// Only init may set anything but keep_running; reload_desktop returns to the
 	// supervisor without asking the kernel to power-cycle the machine.
 	power PowerAction
+	// The idle timer, the display it turns off and the sleep that does not
+	// end the session. See idle_wm.v.
+	idle IdleSession
 	// The screen is only recomposed when something it shows has changed. An
 	// idle desktop then costs almost nothing, and — with no garbage collector
 	// on this target — stops rebuilding a tree it would only throw away.
@@ -451,7 +454,7 @@ fn (mut d Desktop) activate(id int) {
 // is rendered, and ui2 has no gradient to declare.
 fn (mut d Desktop) build_tree() ui2.Element {
 	begin_frame_elements()
-	mut children := frame_elements(available_apps.len + d.windows.len + 6)
+	mut children := frame_elements(available_apps.len + d.windows.len + 7)
 	// Shortcuts first, so every window paints over them.
 	shortcuts := d.shortcut_elements()
 	children << shortcuts
@@ -500,6 +503,9 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	}
 	if hud := d.keyboard_hud_element() {
 		children << hud
+	}
+	if notice := d.idle_notice_element() {
+		children << notice
 	}
 	if layout := d.window_layout_element() {
 		children << ui2.Element{ ...layout }
@@ -1043,6 +1049,12 @@ fn (mut d Desktop) end_session(action PowerAction) {
 // The Start menu's power button.
 fn (mut d Desktop) request_power_off() {
 	d.end_session(.power_off)
+}
+
+// Restart from the Start menu ends the session the way Shut down does:
+// every application is asked first, and one that cannot save keeps it open.
+fn (mut d Desktop) request_restart() {
+	d.end_session(.restart)
 }
 
 // A supervisor signal ends the session at a frame boundary, so applications
