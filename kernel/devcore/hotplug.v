@@ -689,10 +689,12 @@ fn bus_has_functions(bus u8) bool {
 // A port that lost power lost the events it had latched, and firmware sent
 // no notice of what it saw while the system was not running: after a sleep
 // that cut the power nothing says what came or went. So every function the
-// kernel has is asked who it is. One that no longer answers as it did is
-// gone, or is another card at the same address; either way the device the
-// kernel knew is taken away as a card pulled without warning is -- its
-// driver, which was not asked to resume it, lets go without touching it.
+// kernel has is asked who it is. One that no longer answers as it did, or
+// did not when its configuration was to be written back (it was given a
+// second), is gone, or is another card at the same address; either way the
+// device the kernel knew is taken away as a card pulled without warning is
+// -- its driver, which was not asked to resume it, lets go without touching
+// it.
 //
 // A watched slot left with nothing on its bus is then an empty one: if its
 // port shows a card, that card is brought in by the pass over the slots that
@@ -704,8 +706,8 @@ fn compare_buses() {
 	for {
 		mut record := &pci.PCIDevice(unsafe { nil })
 		for candidate in scanned_devices {
-			if candidate.present()
-				&& candidate.read[u32](0) != (u32(candidate.device_id) << 16) | u32(candidate.vendor_id) {
+			if candidate.present() && (pci_left_unrestored(candidate)
+				|| candidate.read[u32](0) != (u32(candidate.device_id) << 16) | u32(candidate.vendor_id)) {
 				record = unsafe { candidate }
 				break
 			}

@@ -77,11 +77,16 @@ const pci_express_integrated_endpoint = u16(9)
 // accept its value while the function is still coming up.
 const pci_d0_settle_ms = u64(10)
 const pci_write_attempts = 10
+// How long after the power is back a function may take to answer as itself:
+// the second PCI allows a device after its reset.
+const pci_answer_ns = second
 
 struct PciSaved {
 mut:
 	bdf   i64
 	words [pci_state_words]u32
+	// The last restore found something else at this address, or nothing.
+	unrestored bool
 }
 
 __global (
@@ -155,6 +160,7 @@ pub fn pci_save_all() bool {
 		}
 		mut record := unsafe { &devcore_pci_saved[count] }
 		record.bdf = pci_bdf(dev.pci)
+		record.unrestored = false
 		for word in 0 .. pci_state_words {
 			record.words[word] = dev.pci.read[u32](u32(word * 4))
 		}
@@ -309,9 +315,29 @@ fn pci_restore_express(p &pci.PCIDevice, saved &PciSaved) {
 	}
 }
 
+// Whether the function at `p` is the one that was saved. A function that has
+// just been given power may take up to a second to answer at all, and may
+// say "not yet" meanwhile (a vendor of 0x0001, or all ones); `patience` is
+// the time left of that second, shared by every function of one restore, so
+// that a whole dock that has gone costs one second and not one each. Any
+// other answer is another device, and is not waited for.
+fn pci_is_itself(p &pci.PCIDevice, saved &PciSaved, patience Deadline) bool {
+	for {
+		found := p.read[u32](0)
+		if found == saved.words[0] {
+			return true
+		}
+		if (found != 0xffffffff && found & 0xffff != 1) || patience.expired() {
+			return false
+		}
+		sleep_ms(pci_d0_settle_ms)
+	}
+	return false
+}
+
 // One function. False when it is not there any more, or is not what it was.
-fn pci_restore_function(p &pci.PCIDevice, saved &PciSaved) bool {
-	if p.read[u32](0) != saved.words[0] {
+fn pci_restore_function(p &pci.PCIDevice, saved &PciSaved, patience Deadline) bool {
+	if !pci_is_itself(p, saved, patience) {
 		return false
 	}
 	pci_wake_function(p, saved)
@@ -358,14 +384,18 @@ fn pci_restore_function(p &pci.PCIDevice, saved &PciSaved) bool {
 pub fn pci_restore_all() int {
 	mut missing := 0
 	devcore_pci_rewritten = 0
+	patience := deadline(pci_answer_ns)
 	for i := 0; i < devcore_device_count; i++ {
 		mut dev := devcore_devices[i]
 		if !pci_function_present(dev) {
 			continue
 		}
-		saved := pci_saved_for(pci_bdf(dev.pci))
-		if saved == unsafe { nil } || !pci_restore_function(dev.pci, saved) {
+		mut saved := pci_saved_for(pci_bdf(dev.pci))
+		if saved == unsafe { nil } || !pci_restore_function(dev.pci, saved, patience) {
 			missing++
+			if saved != unsafe { nil } {
+				saved.unrestored = true
+			}
 			// Its driver is not asked to resume it: what is at the address
 			// now, if anything, is not the device the driver stopped, and
 			// would be set up as if it were. It stays stopped until the
@@ -381,6 +411,20 @@ pub fn pci_restore_all() int {
 	// find, once it is let back onto the buses.
 	look_after_power_loss()
 	return missing
+}
+
+// Whether the last restore left this function alone, asked once: the answer
+// is acted on by taking the device away, and is not wanted again. A function
+// that was only slow, and answers as itself by now, is taken away all the
+// same: it has none of its configuration and its driver was not resumed, and
+// the scan that follows finds it and sets it up from nothing.
+fn pci_left_unrestored(p &pci.PCIDevice) bool {
+	mut saved := pci_saved_for(pci_bdf(p))
+	if saved == unsafe { nil } || !saved.unrestored {
+		return false
+	}
+	saved.unrestored = false
+	return true
 }
 
 // What the last pci_restore_all() did: how many functions it had a record
