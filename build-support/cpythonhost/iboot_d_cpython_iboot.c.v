@@ -744,6 +744,7 @@ pub fn iboot_codec_entry(operation &char, namespace voidptr, arguments voidptr, 
 	op := unsafe { operation.vstring() }
 	return match op {
 		'prepare' { s.prepare(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
+		'run' { s.run_iboot(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
  'qmp_init' { s.qmp_init(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
  'qmp_reply' { s.qmp_reply(C.PyTuple_GetItem(arguments,0)) }
  'qmp_execute' { s.qmp_execute(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1), C.PyTuple_GetItem(arguments,2)) }

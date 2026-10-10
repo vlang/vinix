@@ -72,3 +72,12 @@ Fixed global-name lookups also preserve the actual dictionary comparison error.
 A finite interned name is borrowed for lookup; builtin fallback occurs only
 when the namespace lookup has no result and no pending error. This is a
 zero-credit correction: it removes no Python policy or counted Python bytes.
+
+The main monitoring and reporting phase now also lives in V: marker polling,
+QMP memory dumps, watchdog/segment/AIC checks, screenshots and serial output.
+One native call owns preparation and monitoring so replacing a named value
+retires its previous value at the original assignment. Its actual tuple
+transfers all original named locals, the result and any actual saved error to
+the main caller before finally cleanup. The parser and work-directory cleanup
+keep their original Python body. This stage removes 3,052 original Python
+bytes across 59 lines; net Python reduction is 2,917 bytes.

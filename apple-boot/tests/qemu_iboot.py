@@ -238,7 +238,7 @@ def main() -> int:
     run(["make", "-C", str(APPLE_BOOT), "-s"])
     work = Path(tempfile.mkdtemp(prefix="vinix-apple-boot."))
     try:
-        (initramfs, image, image_base, adt_base, with_aic, provisional_adt, args_base, top_of_kernel_data, segment, adt, args, files, aic, stub, loaders, name, address, data, serial, sock, command, _preparation_error) = _iboot('prepare', work, arguments)
+        (initramfs, image, image_base, adt_base, with_aic, provisional_adt, args_base, top_of_kernel_data, segment, adt, args, files, aic, stub, loaders, name, address, data, serial, sock, command, qemu, passed, deadline, failures, dumps, qmp, length, scratch, words, masks, log, failure, _monitor_result, _preparation_error) = _iboot('run', work, arguments)
         if _preparation_error is not None:
             _preparation_context = _CODEC_CONTEXT.__get__(_preparation_error)
             try:
@@ -246,65 +246,7 @@ def main() -> int:
             finally:
                 _CODEC_CONTEXT.__set__(_preparation_error, _preparation_context)
                 _preparation_error = _preparation_context = None
-        print("==> " + " ".join(command[:12]) + " ...", flush=True)
-        qemu = subprocess.Popen(command)
-        passed = False
-        deadline = time.monotonic() + arguments.timeout
-        while time.monotonic() < deadline and qemu.poll() is None:
-            if serial.exists() and MARKER in serial.read_bytes():
-                passed = True
-                break
-            time.sleep(1)
-
-        failures = []
-        if not passed:
-            failures.append("PID 1 never printed its marker")
-        if qemu.poll() is None:
-            dumps = {"scratch": (SCRATCH, 0x400), "segment": (segment, SEGMENT_BYTES)}
-            if with_aic:
-                dumps["aic"] = (FAKE_AIC, AIC_SIZE)
-            if arguments.screenshot:
-                dumps["framebuffer"] = (FB_BASE, FB_STRIDE * FB_HEIGHT)
-            qmp = Qmp(sock)
-            for name, (address, length) in dumps.items():
-                qmp.execute("pmemsave", val=address, size=length,
-                            filename=str(work / (name + ".dump")))
-            qmp.execute("quit")
-            qemu.wait(timeout=30)
-            scratch = (work / "scratch.dump").read_bytes()
-            if not arguments.real_adt and scratch[WDT_CONTROL:WDT_CONTROL + 4] != bytes(4):
-                failures.append("the watchdog's control register was not cleared")
-            if not arguments.real_adt and scratch[0x100:0x104] != bytes(4):
-                failures.append("the watchdog's second control word was not cleared")
-            if (not arguments.real_adt and (work / "segment.dump").read_bytes()
-                    != bytes([SEGMENT_FILL]) * SEGMENT_BYTES):
-                failures.append("the reserved firmware segment was overwritten")
-            if with_aic:
-                aic = (work / "aic.dump").read_bytes()
-                words = (AIC_NR_IRQ + 31) // 32
-                masks = aic[AIC_MASK_SET:AIC_MASK_SET + 4 * words]
-                if masks != b"\xff" * len(masks):
-                    failures.append("the kernel did not mask every AIC IRQ")
-                if not aic[AIC_GLOBAL_CONFIG] & 1:
-                    failures.append("the kernel did not enable the AIC")
-                if b"aic: masked" not in serial.read_bytes():
-                    failures.append("the kernel did not take the AICv3 path")
-            if arguments.screenshot:
-                write_png(arguments.screenshot, (work / "framebuffer.dump").read_bytes())
-                print(f"framebuffer: {arguments.screenshot}")
-        else:
-            failures.append(f"QEMU exited with status {qemu.returncode}")
-        sock.unlink(missing_ok=True)
-
-        log = serial.read_bytes().decode(errors="replace") if serial.exists() else ""
-        print("---- serial (last 60 lines) ----")
-        print("\n".join(log.splitlines()[-60:]))
-        print("--------------------------------")
-        for failure in failures:
-            print(f"FAIL: {failure}")
-        if not failures:
-            print("PASS: iBoot-style hand-off reached user space")
-        return 1 if failures else 0
+        return _monitor_result
     finally:
         if arguments.keep:
             shutil.copytree(work, arguments.keep, dirs_exist_ok=True)
