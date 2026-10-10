@@ -19,6 +19,14 @@ WIDTH, HEIGHT = 2048, 1536
 GAME_RECT = (261, 94, 517, 387)
 
 
+import importlib.util as _native_loader
+import sys as _native_sys
+_spec = _native_loader.spec_from_file_location('desktop_preparation_binding', ROOT / 'tests/emulator-desktop/_native.py')
+_library = _native_loader.module_from_spec(_spec)
+_spec.loader.exec_module(_library)
+_library.install(_native_sys._getframe().f_globals)
+
+
 class QMP:
     def __init__(self, path):
         self.socket = socket.socket(socket.AF_UNIX)
@@ -106,30 +114,7 @@ def main():
     qmp_path = Path(f"/tmp/vinix-n64-desktop-{os.getpid()}.qmp")
     log_path = build / "desktop.log"
     with tempfile.TemporaryDirectory(prefix="vinix-n64-desktop-") as directory:
-        work, rootfs = Path(directory), Path(directory) / "rootfs"
-        for name in ("run", "root", "sbin", "usr/bin", "usr/share/vinix/icons", "dev", "tmp", "proc", "sys"):
-            (rootfs / name).mkdir(parents=True, exist_ok=True)
-        shutil.copy2(args.desktop, rootfs / "usr/bin/vinix-desktop")
-        shutil.copytree(build / "staging/usr", rootfs / "usr", dirs_exist_ok=True, symlinks=True)
-        sysroot = Path(os.environ.get("VINIX_N64_TEST_SYSROOT", ROOT / "build-aarch64-userland/sysroot"))
-        # Reuse the existing generic desktop test init with its app-name macro.
-        subprocess.run([os.environ.get("CC", "clang"), "--target=aarch64-linux-musl", f"--sysroot={sysroot}",
-            "-static", "-O2", "-fno-stack-protector", "-Wall", "-Wextra", "-Werror",
-            '-DIOS_TEST_APP="Nintendo 64"', str(ROOT / "tests/ios/desktop-init.c"),
-            f"-L{sysroot}/lib", "-fuse-ld=lld", "-o", str(work / "init")], check=True)
-        subprocess.run(["tar", "--format=ustar", "-cf", str(work / "rootfs.tar"), "-C", str(rootfs), "."],
-                       env={**os.environ, "COPYFILE_DISABLE": "1"}, check=True)
-        environment = {**os.environ, "VINIX_INITRAMFS": str(work / "rootfs.tar"),
-            "VINIX_BOOT_DISK": str(work / "boot.img"), "VINIX_EFIVARS": str(work / "efivars.fd"),
-            "VINIX_QEMU_PACKAGE_STORE": str(work / "packages.tar"),
-            "VINIX_QEMU_PERSIST_DISK": str(work / "root.ext2"), "VINIX_QEMU_PERSIST_SIZE_MB": "64",
-            "VINIX_QEMU_HOST_SOURCE": "0", "VINIX_QEMU_NETWORK": "0", "VINIX_QEMU_AUDIO": "off",
-            "VINIX_QEMU_CLIPBOARD": "0", "VINIX_KEEP_TEMP_BOOT_DISK": "1",
-            "VINIX_OVMF_CODE": str(ROOT / "boot-image/edk2-aarch64-code-2048x1536.fd"),
-            "VINIX_QEMU_RESOLUTION": "2048x1536x32",
-            "VINIX_QEMU_EXTRA": f"-qmp unix:{qmp_path},server,nowait"}
-        for name in ("VINIX_QEMU_PERSIST", "VINIX_QEMU_OVERLAY", "VINIX_QEMU_ROOT_DISK"):
-            environment.pop(name, None)
+        work, rootfs, name, sysroot, environment = _prepare('n64_prepare', directory, args, build, qmp_path)
         with log_path.open("wb") as log:
             process = subprocess.Popen([str(ROOT / "scripts/run-aarch64.sh"), "--no-build", "--serial",
                 "--mem=2048", f"--guest-init={work}/init"], env=environment,
