@@ -19,7 +19,12 @@ import time
 _core_path = Path(__file__).resolve().parents[1] / "qemu-core" / "run_vm.py"
 _core_spec = importlib.util.spec_from_file_location("qemu_core_run_vm", _core_path)
 _core = importlib.util.module_from_spec(_core_spec)
-_core_spec.loader.exec_module(_core)
+_core_import_path = str(_core_path.parent)
+sys.path.insert(0, _core_import_path)
+try:
+    _core_spec.loader.exec_module(_core)
+finally:
+    sys.path.remove(_core_import_path)
 available_port = _core.available_port
 exit_code = _core.exit_code
 stop_child = _core.stop_child
