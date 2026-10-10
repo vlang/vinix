@@ -109,3 +109,34 @@ pub fn find_sdt(signature string, index int) ?voidptr {
 
 	return none
 }
+
+// Firmware's tables one by one, for whoever has to tell whether they are the
+// tables a kernel was using before the machine was last switched off: where
+// the root pointer is, how many tables the root table names, and each of
+// them. A table's length is the second field of its header.
+pub fn root_address() u64 {
+	return u64(voidptr(rsdp))
+}
+
+pub fn table_count() int {
+	if rsdt == unsafe { nil } || rsdt.header.length < sizeof(SDT) {
+		return 0
+	}
+	return int((rsdt.header.length - sizeof(SDT)) / u32(if use_xsdt() { 8 } else { 4 }))
+}
+
+// The `index`th table the root table names, or nil.
+pub fn table_at(index int) voidptr {
+	if index < 0 || index >= table_count() {
+		return unsafe { nil }
+	}
+	address := if use_xsdt() {
+		unsafe { u64(&u64(&rsdt.ptrs_start)[index]) }
+	} else {
+		unsafe { u64(&u32(&rsdt.ptrs_start)[index]) }
+	}
+	if address == 0 {
+		return unsafe { nil }
+	}
+	return voidptr(address + higher_half)
+}

@@ -58,3 +58,9 @@ pub fn pmm_frames_free() u64 {
 	}
 	return free_pages
 }
+
+// Have whoever holds memory that can be had again -- the page cache's clean
+// pages -- give back up to `wanted` pages. Returns how many came back.
+pub fn pmm_reclaim(wanted u64) u64 {
+	return reclaim_pages(wanted)
+}

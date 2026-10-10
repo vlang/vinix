@@ -58,6 +58,9 @@ pub enum SleepDepth {
 	idle
 	// The platform's suspend to RAM.
 	deep
+	// Suspend to disk: an image of memory is written to a device and the
+	// machine is switched off; a later boot goes back into the image.
+	disk
 }
 
 pub enum Rehearsal {
@@ -90,8 +93,10 @@ pub mut:
 	last_sleep_ms   u64
 	last_suspend_ms u64
 	last_resume_ms  u64
-	// How many of the sleeps that worked were suspends to RAM.
+	// How many of the sleeps that worked were suspends to RAM, and how many
+	// were suspends to disk.
 	deep u64
+	disk u64
 	// Whether the CPU state checked on the way back was as it was left, and
 	// on how many processors it was last checked.
 	security_checks  u64
@@ -167,23 +172,35 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		katomic.store(mut &syspower_sleeping, u32(0))
 	}
 	started := devcore.now_ns()
+	if kind == .disk && !platform_hibernate_available() {
+		fail_sleep('platform', '', platform_hibernate_reason())
+		return false
+	}
 	if !pagecache.sync_all() {
 		fail_sleep('sync', '', '')
 		return false
 	}
 	// A rehearsal of the platform's part is one of a suspend to RAM: where
 	// `mem` means suspend to idle the platform has no part, and the devices
-	// are what is rehearsed.
+	// are what is rehearsed. So they are for a suspend to disk.
 	deep_wanted := kind == .deep && mem_is_deep()
 	rehearsing_platform := syspower_rehearsal == .platform && deep_wanted
 	rehearsing := syspower_rehearsal != .none && !rehearsing_platform
 	going_deep := deep_wanted && !rehearsing
+	going_disk := kind == .disk && !rehearsing
+	// Either way the devices come back from having had no power.
+	powering_down := going_deep || going_disk
 	sched.freeze_userspace()
 	devcore.sleep_ms(freeze_settle_ms)
-	// What userspace wrote before it stopped.
-	pagecache.sync_all()
+	// What userspace wrote before it stopped. For a suspend to disk this is
+	// the last thing any filesystem writes: see platform_hibernate_finish().
+	if !pagecache.sync_all() && going_disk {
+		fail_sleep('sync', '', '')
+		sched.thaw_userspace()
+		return false
+	}
 
-	if going_deep {
+	if powering_down {
 		// The thread that watches hot-plug slots stays off them from here
 		// until the buses are back: a port without power, or with its
 		// registers not yet written back, shows cards missing that are
@@ -196,12 +213,13 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		}
 	}
 	devcore.freeze_bindings()
-	if going_deep {
+	if powering_down {
 		// A device whose driver cannot bring it back from nothing would come
-		// out of a suspend to RAM dead, with its driver none the wiser.
+		// out of a suspend to RAM, or to disk, dead, with its driver none
+		// the wiser.
 		blocker := platform_deep_blocker()
 		if blocker != unsafe { nil } {
-			C.kprintf(c'syspower: %.*s (%.*s) cannot be powered down; no suspend to RAM\n', i32(blocker.name.len),
+			C.kprintf(c'syspower: %.*s (%.*s) cannot be powered down; no suspend to RAM or to disk\n', i32(blocker.name.len),
 				blocker.name.str, i32(blocker.driver.name.len), blocker.driver.name.str)
 			fail_sleep('devices', blocker.name, 'its driver cannot resume a device that lost power')
 			devcore.thaw_bindings()
@@ -214,7 +232,7 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	if refused != unsafe { nil } {
 		fail_sleep('devices', refused.name, 'its driver refused')
 		devcore.thaw_bindings()
-		if going_deep {
+		if powering_down {
 			devcore.resume_pci_hotplug()
 		}
 		sched.thaw_userspace()
@@ -232,10 +250,32 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	asleep := devcore.now_ns()
 
 	mut slept := true
+	mut from_disk := false
 	if rehearsing {
 		devcore.sleep_ms(test_delay_ms())
 	} else if going_deep {
 		slept = platform_deep_sleep()
+	} else if going_disk {
+		match platform_hibernate() {
+			.resumed {
+				// This kernel has been put back into memory by a later
+				// boot. From here it is a wake from a sleep that cut the
+				// power, and the write that asked for the sleep returns.
+				from_disk = true
+			}
+			.snapshotted {
+				// The machine is as it was a moment ago, and that moment is
+				// held in memory. With the devices back and userspace still
+				// frozen it is written to its device, and the machine is
+				// switched off. If this returns, neither happened.
+				devcore.resume_all()
+				platform_hibernate_finish()
+				slept = false
+			}
+			.failed {
+				slept = false
+			}
+		}
 	} else {
 		platform_idle_sleep()
 	}
@@ -256,7 +296,7 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	devcore.resume_all()
 	devcore.set_power_lost(false)
 	devcore.thaw_bindings()
-	if going_deep {
+	if powering_down {
 		// The slots are looked at again, now: a card pulled or put in while
 		// the machine slept is found by comparing each slot with its port.
 		devcore.resume_pci_hotplug()
@@ -267,6 +307,11 @@ pub fn enter_sleep(kind SleepDepth) bool {
 			woken_by = wakesrc.name(source)
 		}
 	}
+	if from_disk {
+		// Whatever a wake source reported on the way back, what ended this
+		// sleep was the machine being switched on.
+		woken_by = 'resume-from-disk'
+	}
 	sched.thaw_userspace()
 	done := devcore.now_ns()
 	// Woken by a battery about to give out: now that init runs again, ask
@@ -276,17 +321,26 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	}
 
 	if !slept {
-		fail_sleep('platform', '', platform_deep_failure())
+		fail_sleep('platform', '', if going_disk {
+			platform_hibernate_failure()
+		} else {
+			platform_deep_failure()
+		})
 		return false
 	}
 	syspower_stats.success++
 	if going_deep && !rehearsing_platform {
 		syspower_stats.deep++
 	}
+	if from_disk {
+		syspower_stats.disk++
+	}
 	syspower_stats.last_depth = if rehearsing || rehearsing_platform {
 		'rehearsal'
 	} else if going_deep {
 		'deep'
+	} else if going_disk {
+		'disk'
 	} else {
 		's2idle'
 	}
@@ -294,8 +348,13 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	syspower_stats.last_suspend_ms = (asleep - started) / devcore.millisecond
 	// What the kernel's clock saw of the sleep, and what it could not: the
 	// time a suspend to RAM kept the machine away.
-	syspower_stats.last_sleep_ms = (woke - asleep) / devcore.millisecond +
-		if going_deep { platform_deep_away_ms() } else { u64(0) }
+	syspower_stats.last_sleep_ms = (woke - asleep) / devcore.millisecond + if going_deep {
+		platform_deep_away_ms()
+	} else if going_disk {
+		platform_hibernate_away_ms()
+	} else {
+		u64(0)
+	}
 	syspower_stats.last_resume_ms = (done - woke) / devcore.millisecond
 	return true
 }

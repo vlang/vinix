@@ -101,3 +101,40 @@ fn platform_deep_report(mut _ lib.Text) {
 fn platform_deep_away_ms() u64 {
 	return 0
 }
+
+// Nor a suspend to disk.
+enum HibernateOutcome {
+	failed
+	snapshotted
+	resumed
+}
+
+fn platform_hibernate_supported() bool {
+	return false
+}
+
+fn platform_hibernate_available() bool {
+	return false
+}
+
+fn platform_hibernate_reason() string {
+	return 'no machine this kernel runs on can be put back from a disk'
+}
+
+fn platform_hibernate_failure() string {
+	return ''
+}
+
+fn platform_hibernate() HibernateOutcome {
+	return .failed
+}
+
+fn platform_hibernate_finish() {
+}
+
+fn platform_hibernate_away_ms() u64 {
+	return 0
+}
+
+fn platform_hibernate_report(mut _ lib.Text) {
+}

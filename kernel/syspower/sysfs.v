@@ -3,15 +3,21 @@
 //
 // Sleep as /sys shows it, by Linux's names where Linux has one:
 //
-//	/sys/power/state              freeze mem; write one to sleep
+//	/sys/power/state              freeze mem, and disk where an image can be
+//	                              kept; write one to sleep
 //	/sys/power/mem_sleep          what mem means: [s2idle] deep
 //	/sys/power/deep_sleep         whether deep is offered, and why not (Vinix's)
+//	/sys/power/disk               what disk does once the image is written:
+//	                              [shutdown], the only way there is
+//	/sys/power/hibernate          whether disk is offered and why not, the
+//	                              device, and what the last image and the
+//	                              last boot came to (Vinix's)
 //	/sys/power/pm_test            [none] devices platform: rehearse instead of
 //	                              sleeping
 //	/sys/power/pm_test_delay_ms   how long a rehearsal stays down (Vinix's)
 //	/sys/power/suspend_stats/     success fail last_failed_dev last_failed_step,
 //	                              and Vinix's last_failed_reason, last_wake,
-//	                              last_depth, deep, last_*_ms,
+//	                              last_depth, deep, disk, last_*_ms,
 //	                              security_checks, security_changes,
 //	                              security_cpus, and screen_dark and
 //	                              screen_lit (screen.v)
@@ -85,6 +91,12 @@ pub fn publish() {
 	fs.sysfs_attribute('power/suspend_stats/deep', 0o444, show_deep_count, unsafe { nil },
 		unsafe { nil })
 	fs.sysfs_attribute('power/deep_sleep', 0o444, show_deep_sleep, unsafe { nil }, unsafe { nil })
+	if platform_hibernate_supported() {
+		fs.sysfs_attribute('power/disk', 0o644, show_disk_mode, store_disk_mode, unsafe { nil })
+		fs.sysfs_attribute('power/hibernate', 0o444, show_hibernate, unsafe { nil }, unsafe { nil })
+		fs.sysfs_attribute('power/suspend_stats/disk', 0o444, show_disk_count, unsafe { nil },
+			unsafe { nil })
+	}
 
 	// The file's context is the source's number plus one, so that the first
 	// is not the nil a file with no context has.
@@ -134,7 +146,7 @@ fn number_line(mut text lib.Text, value u64) {
 // ── /sys/power ──────────────────────────────────────────────────────────────
 
 fn show_state(_ voidptr, mut text lib.Text) {
-	text.add('freeze mem\n')
+	text.add(if platform_hibernate_available() { 'freeze mem disk\n' } else { 'freeze mem\n' })
 }
 
 fn store_state(_ voidptr, data &u8, length u64) u64 {
@@ -143,6 +155,12 @@ fn store_state(_ voidptr, data &u8, length u64) u64 {
 		SleepDepth.idle
 	} else if word == 'mem' {
 		if mem_is_deep() { SleepDepth.deep } else { SleepDepth.idle }
+	} else if word == 'disk' {
+		// Not offered is not there: nothing is tried, and nothing written.
+		if !platform_hibernate_available() {
+			return errno.enodev
+		}
+		SleepDepth.disk
 	} else {
 		return errno.einval
 	}
@@ -281,6 +299,34 @@ fn show_deep_sleep(_ voidptr, mut text lib.Text) {
 		text.add_byte(`\n`)
 	}
 	platform_deep_report(mut text)
+}
+
+// What happens once the image is on its device: the machine is switched
+// off. Linux also offers to ask firmware for its own S4, to restart, and to
+// suspend to RAM with the image as a fallback; none of those is here.
+fn show_disk_mode(_ voidptr, mut text lib.Text) {
+	text.add('[shutdown]\n')
+}
+
+fn store_disk_mode(_ voidptr, data &u8, length u64) u64 {
+	return if fs.sysfs_word(data, length) == 'shutdown' { u64(0) } else { u64(errno.einval) }
+}
+
+fn show_disk_count(_ voidptr, mut text lib.Text) {
+	number_line(mut text, syspower_stats.disk)
+}
+
+// "available", or "unavailable: " and why suspend to disk is not offered;
+// then the device and what became of the last image.
+fn show_hibernate(_ voidptr, mut text lib.Text) {
+	if platform_hibernate_available() {
+		text.add('available\n')
+	} else {
+		text.add('unavailable: ')
+		text.add(platform_hibernate_reason())
+		text.add_byte(`\n`)
+	}
+	platform_hibernate_report(mut text)
 }
 
 // ── /sys/class/wakeup ───────────────────────────────────────────────────────

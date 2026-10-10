@@ -154,3 +154,27 @@ pub fn resume_units() {
 		dma_resume_restored++
 	}
 }
+
+// Switch every unit off, for good as far as this kernel goes: it is about
+// to be replaced by another whose image has just been loaded from a disk
+// (hibernate/resume_amd64.v), and whose own tables the units are to
+// translate through next. Those tables are in memory already, but so are
+// this kernel's, in frames about to be overwritten; a unit left translating
+// through them would be translating through whatever lands there. The
+// devices have been stopped, so nothing is asking for a translation, and the
+// kernel that takes over switches the units on again as it does after a
+// suspend to RAM. Interrupts off, one processor running.
+pub fn hand_over_units() {
+	for i in 0 .. vtd_unit_count {
+		mut unit := vtd_units[i]
+		if unit.enabled {
+			vtd_unit_disable(mut unit)
+		}
+	}
+	for i in 0 .. amdvi_unit_count {
+		unit := amdvi_units[i]
+		if unit.on {
+			amdvi_quiesce(unit)
+		}
+	}
+}

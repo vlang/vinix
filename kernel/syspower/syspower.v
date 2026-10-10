@@ -56,6 +56,13 @@ pub fn transition(action Action) bool {
 	if !pagecache.sync_all() {
 		return false
 	}
+	return carry_out(action)
+}
+
+// The transition without the flush: steps 2 and 3. For transition(), and for
+// a suspend to disk, which has flushed the filesystems before it took its
+// image of memory and must not have them written to after.
+fn carry_out(action Action) bool {
 	if !platform_prepare() {
 		return false
 	}

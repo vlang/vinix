@@ -48,6 +48,7 @@ import dev.pty
 import dev.tty
 import syscall.table
 import sysdisk
+import hibernate
 import block.verity
 import socket
 import socket.inet
@@ -120,14 +121,24 @@ fn kmain_thread() {
 	// there is one to take it. See sysdisk. IDE and SATA only: the NVMe
 	// driver is not fit for a release kernel yet.
 	verified_root := verity.requested()
-	disk_requested := sysdisk.requested() || verified_root
+	// A device named to keep an image of memory on is a disk too.
+	image_named := hibernate.device_name().len != 0
+	disk_requested := sysdisk.requested() || verified_root || image_named
 	mut outcome := sysdisk.Outcome.in_memory
 	if disk_requested {
 		ata.initialise()
 		ahci.initialise()
+		// Here and nowhere later: the disks are up, and nothing on any of
+		// them has been mounted, replayed or written. If the device named
+		// for it holds an image of this machine, taken when it was last
+		// switched off, the kernel in it is gone back into and this call
+		// does not return. That kernel has its filesystems as they were;
+		// had this one mounted them first, it would wake to disks that had
+		// moved on without it. See hibernate/resume_amd64.v.
+		hibernate.resume_at_boot()
 		if verified_root {
 			verity.mount_root()
-		} else {
+		} else if sysdisk.requested() {
 			outcome = sysdisk.mount_or_install()
 		}
 	}

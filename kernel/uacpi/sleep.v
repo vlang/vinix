@@ -150,3 +150,25 @@ pub fn set_rtc_wake(enabled bool) {
 	}
 	C.uacpi_write_register_field(field_rtc_enable, if enabled { u64(1) } else { u64(0) })
 }
+
+@[c_extern]
+fn C.uacpi_disable_all_gpes() UACPIStatus
+
+@[c_extern]
+fn C.uacpi_enable_all_runtime_gpes() UACPIStatus
+
+// The machine was switched off and started again, and this kernel was put
+// back into its memory from a disk: firmware was not asked for a sleeping
+// state and has no wake method to run, but ACPI's hardware is as a boot
+// leaves it, not as this kernel had it. Events arrive as the ACPI interrupt
+// again; the general purpose events this kernel had on are switched on from
+// its own record of them, as uACPI does on the way back from any sleep; and
+// the fixed power and sleep buttons, whose enable bits went with the power.
+// Interrupts on.
+pub fn resume_events() {
+	C.uacpi_write_register_field(field_sci_enable, 1)
+	C.uacpi_disable_all_gpes()
+	C.uacpi_enable_all_runtime_gpes()
+	C.uacpi_enable_fixed_event(fixed_event_power_button)
+	C.uacpi_enable_fixed_event(fixed_event_sleep_button)
+}

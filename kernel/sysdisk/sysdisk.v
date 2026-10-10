@@ -4,6 +4,7 @@ module sysdisk
 
 import fs
 import fs.ext2
+import hibernate
 import initramfs
 import limine
 import memory
@@ -126,6 +127,12 @@ fn whole_disks() []&fs.VFSNode {
 		// Not `name == '.'`: V3 compiles a string comparison in this loop to
 		// a C == on the structs. No device name starts with a dot anyway.
 		if name.contains('-') || name.starts_with('.') || node.resource == unsafe { nil } {
+			continue
+		}
+		// The device named to keep an image of memory on is that and nothing
+		// else, however blank it looks: a system installed on it would be
+		// written over by the first image.
+		if hibernate.is_image_device(name) {
 			continue
 		}
 		if stat.isblk(node.resource.stat.mode) {
