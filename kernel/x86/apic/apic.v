@@ -6,6 +6,7 @@ import x86.msr
 import x86.cpu.local as cpulocal
 import x86.cpu
 import x86.hpet as hpet_clock
+import klock
 
 const lapic_reg_icr0 = 0x300
 const lapic_reg_icr1 = 0x310
@@ -21,6 +22,10 @@ const lapic_reg_timer_div = 0x3e0
 __global (
 	lapic_base  = u64(0)
 	x2apic_mode = bool(false)
+	// An I/O APIC is reached through an index register and a data register:
+	// two accesses that another CPU, or an interrupt on this one, must not
+	// come between. Taken with interrupts off, which klock does.
+	io_apic_lock klock.Lock
 )
 
 fn xapic_read(reg u32) u32 {
@@ -199,6 +204,13 @@ fn io_apic_from_gsi(gsi u32) int {
 }
 
 pub fn io_apic_set_gsi_redirect(lapic_id u32, vector u8, gsi u32, flags u16, status bool) {
+	// The whole update under the lock: the line an interrupt handler masks
+	// is unmasked again by a thread, possibly on another CPU, while a driver
+	// routes a line of its own.
+	io_apic_lock.acquire()
+	defer {
+		io_apic_lock.release()
+	}
 	io_apic := io_apic_from_gsi(gsi)
 
 	mut redirect := u64(vector)
@@ -219,8 +231,10 @@ pub fn io_apic_set_gsi_redirect(lapic_id u32, vector u8, gsi u32, flags u16, sta
 
 	ioredtbl := (gsi - madt_io_apics[io_apic].gsib) * 2 + 16
 
-	io_apic_write(io_apic, ioredtbl, u32(redirect))
+	// The destination first, so that a line being unmasked already knows
+	// which CPU it goes to.
 	io_apic_write(io_apic, ioredtbl + 1, u32(redirect >> 32))
+	io_apic_write(io_apic, ioredtbl, u32(redirect))
 }
 
 @[export: 'x86__apic__io_apic_set_irq_redirect']
