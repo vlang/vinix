@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `08bd66f565841125505d202dc19c7e50207ceb4a`, Linguist 7.27.0 reports
-**Python 5.46%** (509 files, 2,428,855 bytes) and **V 79.77%** (1,963 files,
-35,453,006 bytes). The complete committed-blob inventory and reproduction
+At source `47ff6efd23a8127efa82a9b15e236e5241a83fd9`, Linguist 7.27.0 reports
+**Python 5.40%** (513 files, 2,421,538 bytes) and **V 79.86%** (2,008 files,
+35,781,305 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,777,430 Python bytes**. Roughly another
-0.21 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,784,747 Python bytes**. Roughly another
+0.18 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 147 completed stages have a gross
-scope of **3,205,800 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **428,370 bytes**
+tests, including comments and blank lines. The 158 completed stages have a gross
+scope of **3,246,740 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **461,993 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -39,7 +39,7 @@ no extra migration credit.
 | Pagefault host controller and module generation | `tests/linuxkpi/pagefault.v`, `hosttest/module.v` | 22,314 / 486 | `7764654abe4b1e7eecfe2cf1f37fc1dd45adc394` |
 | AGX firmware, fileset and PMP extraction with tests | `tools/agx-re/imageextract`, `extractionabi` | 47,310 / 1,248 | `1eb9d935609b9c7bd2e7b5f2f668dcbe612845e1` |
 | Direct kernel allocation comparison, tests and validation | `tests/alloc-bench/kernelcompare`, `compare_kernel.v`, `validate_kernel.v` | 25,002 / 478 | `5e1e3f3fc0f316ff136774faaeb2c23039a60d0b` |
-| Scalar read/store host controllers | `tests/linuxkpi/scalar_reads.v`, `scalar_store.v` | 39,169 / 841 | `98a1d2b40c86217f2589065026cb9c542162d569` |
+| Scalar read/store host controllers | `tests/linuxkpi/scalar_uaccess.v`, `scalar_store.v` | 39,169 / 841 | `98a1d2b40c86217f2589065026cb9c542162d569` |
 | Fake-G17 plan/reference encoder/source generator and tests | `tools/agx-re/g17plan`, three V entrypoints | 120,096 / 3,008 | `e7807a42eeb0d2111ba011a17462ec8b235f5c8f` |
 | Usercopy and checked-access host controllers | `tests/linuxkpi/uaccess.v`, `user_access_scope.v` | 46,230 / 1,006 | `e973e7fbb1acc808b068b74b73ea6721ef3035cc` |
 | Nocache ABI/primitive host controller | `tests/linuxkpi/nocache.v` | 26,985 / 512 | `c395bd3093a50f1a42816984d1e22dbe0626ae25` |
@@ -176,6 +176,17 @@ no extra migration credit.
 | Package-store object table and callback lifetime | `build-support/cpythonhost/package_d_cpython_package.c.v` | 10,104 / 219 | `a0ae707a325580955f427a8b3cec91b1313bcd0d` |
 | Kernel-gap ordinary object bridge | `build-support/cpythonhost/gap_d_cpython_gap.c.v` | 4,299 / 84 | `37db2e12a9e600efed40c7f12b753ae60d5face6` |
 | Sampler fixture build and execution workflow | `tests/alloc-bench/samplertest` | 5,603 / 76 | `08bd66f565841125505d202dc19c7e50207ceb4a` |
+| Android Boot object lifecycle and ordinary bindings | `build-support/cpythonhost/boot_d_cpython_boot.c.v` | 2,767 / 47 | `3db65ebbedf6543e279047a1407970bb6b6dd293` |
+| PCI ARM guest preparation | `tests/pci-config/pcivm/preparation.v` | 6,574 / 105 | `92cbbddd42234c8d4986ec34788146e4f01e78ad` |
+| iBoot alignment, ADT and boot-argument helpers | `build-support/cpythonhost/iboot_d_cpython_iboot.c.v` | 3,404 / 76 | `5fd1129ac75dbf7b992cc8d729c7fa8d12d714b8` |
+| iBoot PNG assembly | `build-support/cpythonhost/iboot_d_cpython_iboot.c.v` | 856 / 17 | `944e6aa60effcc1a60bccbd139f8d898d75b2dd9` |
+| iBoot actual QMP transport | `build-support/cpythonhost/iboot_d_cpython_iboot.c.v` | 1,170 / 32 | `791bfec2729bcce45189404afb6e3e1a524da359` |
+| iBoot guest preparation | `build-support/cpythonhost/iboot_prepare_d_cpython_iboot.c.v` | 2,569 / 48 | `9cdce31dc14ccf393592337f780230e5dc527348` |
+| Desktop measurement independent fixture controller | `build-support/cpythonhost/perftest_d_cpython_perftest.c.v` | 7,072 / 117 | `2db694f628177631e71e77e96e95339cc451e02a` |
+| iBoot monitor and report controller | `build-support/cpythonhost/iboot_monitor_d_cpython_iboot.c.v` | 3,052 / 59 | `f58d814101dac2aef225b317a595c92652699464` |
+| TLB independent host-policy generator | `tests/tlb/policy.v` | 2,290 / 48 | `ae2770a3741c1b2870b4c1a35a426cf67779da08` |
+| Android Run ordinary object bridge | `build-support/cpythonhost/run_d_cpython_android_run.c.v` | 5,540 / 126 | `8244f8fa9300ee5fca4a264fb3630dc469bceece` |
+| Dota Vulkan ordinary object and preparation policies | `build-support/cpythonhost/vulkan_d_cpython_vulkan.c.v` | 5,646 / 124 | `47ff6efd23a8127efa82a9b15e236e5241a83fd9` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -287,6 +298,32 @@ bytes between these two snapshots. The package-session error-slot retirement
 stable, finish consumes the exported per-call slots, and separately retained
 actual exception/traceback aliases retain their ownership. Historical benchmark
 snapshots remain unchanged and receive zero port credit.
+
+The next eleven stages add 40,940 bytes of active original Python algorithm
+scope. The Boot object bridge's initial 4,630-byte scope is adjusted to
+2,767 bytes/47 lines after `5ec83227` restores 1,863 bytes/42 lines of recursive
+snapshot and selection helpers to their original Python frames. Direct/contextual
+recursion thresholds and result selection remain exact. Arbitrary callbacks'
+private bridge frame and global recursion-budget contribution remain explicitly
+outside the native-boundary contract. Its combined frontend grows from 20,883
+to 21,383 bytes, a net increase of 500 bytes; that growth stays counted.
+
+The TLB generator ports 2,290 original algorithm bytes/48 lines and separately
+transfers 8,889 bytes of existing V fixture text into byte-identical V templates,
+with zero algorithm credit for that text. The full counted Python reduction is
+10,702 bytes. The desktop fixture controller's 7,072-byte scope excludes the
+retained lazy 30-byte `path.name` generator; its 117 original body-span lines
+include that partial line. Its counted adapter shrinks by 3,639 bytes. Android
+Run removes 1,330 counted bytes while recursive snapshots and result selection
+remain in their original Python frames.
+
+The fixed-name GAP correction (`77018122`), Boot allocation/exception guard
+(`f5634250`) and iBoot global-lookup/order correction (`01e83e4f`) receive zero
+new algorithm credit. They preserve finite literal identity, genuine pending
+lookup errors, checked allocation retirement and original lookup/reference
+order. Earlier actual negative controls remain recorded. All frontend bindings,
+retained syntax and concurrent committed source changes remain counted; these
+small per-stage reductions are separate from the committed graph totals.
 
 ## Validation
 
@@ -1303,6 +1340,59 @@ workloads were not weakened.
   exported list slots; scalar exception and traceback aliases remain actual
   objects. The consumed-list boundary is documented in `tools/package-sdk.md`.
 
+- Boot ordinary-object bindings pass all 27 existing client groups on ARM,
+  x86 and ASan/UBSan, with direct/contextual recursion and rich result-selection
+  controls. The later bounded guard correction adds 28 actual exception pairs
+  and six injected allocation failures per profile. Actual saved traceback and
+  incoming handled state remain observable. Both fresh cold installers pass.
+  The sampler controller also passes against the then-current 420-input Boot
+  integration snapshot on all three profiles; that integration receipt remains
+  separate from each original pinned stage.
+- PCI preparation passes its twelve groups per profile, including 212 actual
+  workflow and 344 rich writer/path comparisons, saved lifetimes, actual
+  interruption and cold installation. Previously tested guest evidence uses
+  its recorded older kernel and does not qualify a new kernel.
+- iBoot helpers pass 91 original/native pairs, rich callbacks, identity and
+  lifetime controls. PNG adds malformed/full-size bytes, CRC and saved-row
+  cases; QMP adds actual Unix-socket exchanges, pending errors and flat FDs.
+  Preparation passes 29 groups per profile with real ELF packing and ARM stub
+  assembly, parser/CLI checks, detached targets and original cleanup. The
+  subsequent global correction preserves rich key equality errors and all
+  three PHYS_BASE lookup positions. Monitor/report adds 40 groups per profile
+  and 60 paired real process/Unix-QMP workflows with exact FD baselines, saved
+  qemu/qmp lifetimes, receiver timing and BUILD_SLICE retirement. Both actual
+  cold installers pass at 0700. No fresh kernel or guest boot is claimed.
+- The desktop fixture controller passes nine groups on ARM, x86 and ASan/UBSan,
+  including all twelve original and twelve native unittest cases, real local
+  dictionary corruption/size checks and temporary-VM SIGTERM cleanup. Rich
+  formatter/comparison/target-order and saved-error controls retain the actual
+  objects; 500-call, GC-disabled and threaded controls retain their baselines.
+  Both cold installs, four CLI modes per architecture, original signatures and
+  scenario constants pass. The ASan child-launch negatives are retained; the
+  corrected copied-interpreter/runtime environment passes unchanged fixtures.
+- The TLB generator creates the same six fixture files byte for byte on all
+  profiles. Forty-one actual original-extractor comparisons, malformed UTF-8,
+  universal newlines, custom umasks and partial filesystem effects pass. The
+  unchanged original/native generated fixture assertions pass on ARM and x86,
+  and under ASan/UBSan. Actual cold CLI routes, three compiler/generator failure
+  paths and two process-group SIGINT paths per architecture retire mode-0700
+  disposable owners and reap the actual compiler children.
+- Dota Vulkan and preparation pass all eighteen original workflow cases on each
+  profile, seventeen focused groups and five additional groups, with four real
+  cold installer gates. Named local, supplied callback, finite literal, actual
+  global-lookup error and process/FD controls pass. Original recursive codec,
+  context-exit and conversion syntax remains counted Python to preserve the
+  maintained recursion thresholds. Failed earlier drafts and interrupted old
+  workflow logs remain preserved; the final complete matrices retain unchanged
+  assertions. The stage removes 960 counted Python bytes. No fresh guest/GPU
+  evidence is claimed.
+- Android Run passes eighteen groups per profile, including 239 result,
+  transport, installer, plan and actual PTY controls. Both actual cold installers
+  preserve mode 0700 and FD baselines. Twelve focused allocation failures and
+  8,400 measured table allocations/frees retain zero live tables. Actual saved
+  locals and error aliases remain owned; documented private-frame/recursion
+  and bounded OOM limits remain intact. Host checks add no fresh guest/GPU claim.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1621,6 +1711,50 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `sampler-controller-20261010` | `post-commit-final-v7.json` | `76483f4c7bd1cd22a2d00139eebe93264c954a53ce9969f38716699cd271db39` |
 | `package-errors-finish-20261010` | `qualification-v1.json` | `9932e1ff4bf6051205d50f26fb1bce5edc5ed4b77a2217e23e448fb4cedc4cfa` |
 | `package-errors-finish-20261010` | `postcommit-v1.json` | `fac245ca2742318ce240fa08c6d07199f1cdf6668776f36fc82df3ed156ea3d0` |
+| `android-boot-object-adapter-20261010` | `qualification5.json` | `553ca4242aa9724b9eda606966548b34d75ce7647817eb8101871d53d491e1a3` |
+| `android-boot-object-adapter-20261010` | `post-commit5.json` | `1e74bd606a6c6fcb82542a34fc1776cb8c0b46a1d48b99896c0744ede1ba6050` |
+| `android-boot-object-adapter-20261010` | `agx-peer-source5.json` | `aa246e7601a16534a15da7ad8f82a65d7496e77a68b691396a1860e244e09166` |
+| `android-boot-object-adapter-20261010/sampler-integration` | `qualification.json` | `a9c4974e52db3fe9835c2b76475849124f2720d5e3dac6eeaf8f16ad3b992600` |
+| `android-boot-object-adapter-20261010/sampler-integration` | `post-integration.json` | `a127ccf8599ebc7cf0eba802d5d4791f9a5f0556823186a172aa6f55317c7fe1` |
+| `android-boot-snapshot-retirement-20261010` | `qualification5.json` | `7077f76a7b67965255b34802d7cad72357d847a0c9b940602c07d9178dec1451` |
+| `android-boot-snapshot-retirement-20261010` | `post-commit5.json` | `564716985172a4a743ecca369ec32c70aa198cd2cfc4924f441f736084d0bf9e` |
+| `android-boot-snapshot-retirement-20261010` | `agx-peer-source5.json` | `14187ea7465b2d680d1c12faee8e795d087177a7f612ce66d9880dd6e833a81b` |
+| `android-boot-allocation-guards-20261010` | `qualification6.json` | `dd467e0709b4ef8f1502cee2715ab4aa8af9f89d8f2734f4b97b9c008cb33b07` |
+| `android-boot-allocation-guards-20261010` | `post-commit6.json` | `413e86e37e0e9710dcdc2bda9c596d7710d4a3cf8619af2a7799923a930ba887` |
+| `android-boot-allocation-guards-20261010` | `agx-peer-source6.json` | `54cc52ac3fa2805a8880bd5bc40d4a26bcc392dbd8fd131c063f1d4bbc70dd9c` |
+| `pci-arm-controller-20261009` | `qualification-preparation-final-v5.json` | `a1994c183e56776a216badc253c4b019a1bc0486f504e39497d4982bf388265e` |
+| `pci-arm-controller-20261009` | `postcommit-preparation-final-v5.json` | `5b13caeb94b0fc55322df31ffd1ce9b20f0780f3f07876100d7088b6f9d8d832` |
+| `gap-fixed-name-20261010` | `qualification-final-v2.json` | `f5240c505ef077b40faa31dee931304d468b95e2de796dce7e1039bd266052f9` |
+| `gap-fixed-name-20261010` | `post-commit-final-v2.json` | `82ef93dcf98ee42fd0f7802aade82645f17837f02943e247e3e143ca963ef9fe` |
+| `gap-fixed-name-20261010` | `agx-peer-v2.json` | `cf98bf8f433bdf88ca213058cedd593d2a162e3759bed56894a79b0096ad14e9` |
+| `iboot-helpers-20261010` | `qualification-final-v4.json` | `50bfebded4a8874ed6f6909b18387a05dd4e1a7fd3ee7221061dd0bf46cdecc8` |
+| `iboot-helpers-20261010` | `post-commit-final-v4.json` | `3c93e824f4fe3d9d7d2778ffff7ee3d7ceeeef1b39bd0385dbd7fd135e2385da` |
+| `iboot-helpers-20261010` | `root-peer-v4.json` | `105c4a909318b824692263ddc0e7026ae9e3533d9723fe4cebef0c31ab2dee34` |
+| `iboot-png-20261010` | `qualification-final-v3.json` | `a04f0bfed1cb0f681afa0df4730efcb23613c8c42a9262c5fd79aa0c78c91109` |
+| `iboot-png-20261010` | `post-commit-final-v3.json` | `bb2905995ed58b8d1b2bacf7c8554541f5e938cc66decf16ce86576929504521` |
+| `iboot-png-20261010` | `root-peer-final-v3.json` | `49ef94fc8a72c88e0eb6690217b3277ee2f72c361a324a36b6110349ca31ae28` |
+| `iboot-qmp-20261010` | `qualification-final-v2.json` | `a0e66cca7f02b5e28104e70a5c11ae003769355e929dd810f8821d69c9e613a6` |
+| `iboot-qmp-20261010` | `post-commit-final-v2.json` | `6daedf48461df2f2b97fd28622c4b7508cdc0ca4f66e4bf108e6486173f0aabf` |
+| `iboot-qmp-20261010` | `root-peer-final-v2.json` | `b6bf9f949290a3001461a92e82062f2aba206faf16e9295bd4982ccd760462e0` |
+| `iboot-main-prepare-20261010` | `qualification-final-v1.json` | `e20938e3971fbf591ce37efbfccead2ecf0cb5ad37b60c373833499324aafa18` |
+| `iboot-main-prepare-20261010` | `post-commit-final-v1.json` | `2be0031268bb866ab94f74b7f11d672be1d0154ee3a5da0720230ec5b51b9e06` |
+| `iboot-main-prepare-20261010` | `root-peer-final-v1.json` | `0624417d03392e7459a3a9e3ca42df100c9ffec54da9b2ff8d93110b35938ff9` |
+| `iboot-global-lookup-20261010` | `qualification-final-v3.json` | `0b4449ccb3f7277fcaf7abcd8d1377ea103655b0af1062e9a492fa6ebfe36f78` |
+| `iboot-global-lookup-20261010` | `post-commit-v3.json` | `29b56cf1f86d64bdb7e8c8df2d67f0fd03fbc520882df7a0c2950e1770318697` |
+| `iboot-global-lookup-20261010` | `root-peer-v3.json` | `2781aa767782e53de25f5836c3b189f96902c352c2d1ddac69b9812ed48fe17d` |
+| `iboot-main-monitor-20261010` | `qualification-final-v1.json` | `f437b226131c83a56c1836a574f7e12f41331bdb79e1e769ad90bbfee2a1a8d5` |
+| `iboot-main-monitor-20261010` | `post-commit-final-v1.json` | `0e3a058ef40fffda072d80f4bb96e09c9f996f97c0e51b6314a4429266758e55` |
+| `iboot-main-monitor-20261010` | `root-peer-final-v1.json` | `21f4a2a3cb13ac9c7de7932f0a377ddd1ff0eb3d027f228b22ae4dfef72ba0e5` |
+| `desktop-perf-fixtures-20261010` | `qualification-final-v3.json` | `62b8adcd5c03a310881fbffdbf83603a7ff9164d5b83c8825831d67cd7d61c67` |
+| `desktop-perf-fixtures-20261010` | `post-commit-final-v3.json` | `b9a9e22756f49b09b5d81d3fef729cce1637975e62dfe51d550bbc23d2e008b8` |
+| `desktop-perf-fixtures-20261010` | `agx-peer-final-v3.json` | `87d3ef77bfb2bab7450922b4e5aa0d35e1fc94c0b6c91d7cccaf03bf821f0769` |
+| `android-run-object-adapter-20261010` | `qualification3.json` | `4a676c99c8c562d428833e5175f759ff152e98916485575a9e1d27c1260f89b9` |
+| `android-run-object-adapter-20261010` | `post-commit3.json` | `7976aafd127a99780d2cf53f76d547b684d06f94678e7c2b32eb2107035ad326` |
+| `vulkan-object-adapter-20261010` | `qualification-v10.json` | `295cbb8feb79014fa8e6bdaf61e21e5d714ccf3eafbd9de87673c55b328dda32` |
+| `vulkan-object-adapter-20261010` | `post-commit-v10.json` | `fe85696045c5f5725d422883da7dbce18cc0478818f91e7b329f2031360068c8` |
+| `tlb-policy-generator-20261010` | `qualification-final-v1.json` | `8e34e78b90e850f890a7b16b6f9d02eb2d93e0a966ff1d09ce79358dce847066` |
+| `tlb-policy-generator-20261010` | `post-commit-final-v1.json` | `5fd1dfe62fe0776a2a4ae4fb9776ed71f260fc8e4a030a9801bcb39675c3327d` |
+| `tlb-policy-generator-20261010` | `android-peer-final-v1.json` | `b95c72b452bd4b9da33de82e5fd4c88c93d7b38916f5983fc5ca89bd2dd353fa` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
