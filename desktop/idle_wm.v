@@ -201,7 +201,8 @@ fn (mut d Desktop) request_sleep() {
 // reporting whether it slept. The session is not ended: every window and
 // every application is where it was. On the way back the whole screen is
 // repainted and the battery read again; a refusal changes nothing and raises
-// a notice.
+// a notice. The main loop turns the display off before calling this, since
+// the kernel leaves the panel showing whatever was on it.
 fn (mut d Desktop) sleep_now() bool {
 	d.idle.sleep_requested = false
 	d.idle.timer.begin_sleep()
@@ -222,6 +223,11 @@ fn (mut d Desktop) sleep_now() bool {
 		d.idle.timer.sleep_refused()
 		eprintln('vinix-desktop: the machine did not go to sleep (error ${failure})')
 		d.idle.notice_until = monotonic_millis() + idle_notice_ms
+		// A display turned off only for this sleep comes back on. One the
+		// idle timer had already turned off stays off.
+		if d.idle.timer.phase == .active {
+			d.display_turn_on()
+		}
 		d.dirty = true
 		return false
 	}

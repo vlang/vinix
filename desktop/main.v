@@ -280,6 +280,13 @@ fn main() {
 		// is half done. The session goes on from here when the machine wakes.
 		if desktop.idle.sleep_requested {
 			titlebar_click = TitlebarClick{}
+			// The kernel does not blank the panel for a sleep, so the display
+			// is turned off here first, as it is for the idle timeout.
+			desktop.display_turn_off()
+			if desktop.idle.blank_pending {
+				desktop.idle.blank_pending = false
+				present_black_frame(mut fb, mut desktop.canvas)
+			}
 			if desktop.sleep_now() {
 				desktop.drop_wake_input(mut pointer, mut keyboard)
 			}

@@ -264,8 +264,14 @@ fn test_sleep_keeps_the_session_and_repaints_when_the_machine_wakes() {
 	d.taskbar_clock_sampled = true
 	d.tray.sampled = false
 	power_test_slept_ms = 3 * 60 * 60 * 1000
+	// As the main loop does it: the kernel leaves the panel showing whatever
+	// was on it, so the display is turned off before the machine is.
+	power_test_level = 120
+	d.display_turn_off()
+	assert d.idle.display_off && d.idle.blank_pending && power_test_dims == 1
 	assert d.sleep_now()
 	assert power_test_sleeps == 1 && !d.idle.sleep_requested
+	assert !d.idle.display_off && !d.idle.blank_pending && power_test_restored == [120]
 	// Nothing about the session ended.
 	assert d.running && d.power == .keep_running && d.windows.len == 1
 	// The whole screen is repainted, the clock is read again and so is the
@@ -295,12 +301,17 @@ fn test_a_refused_sleep_is_reported_and_changes_nothing() {
 	mut d := power_test_desktop()
 	d.spawn('System', .system, 100, 100, 300, 200)
 	power_test_sleep_code = 1 // EPERM
+	power_test_level = 90
 	d.request_sleep()
+	d.display_turn_off()
 	d.dirty = false
 	assert !d.sleep_now()
 	assert power_test_sleeps == 1 && !d.idle.sleep_requested
 	assert d.running && d.power == .keep_running && d.windows.len == 1
 	assert d.idle.timer.phase == .active && d.idle.timer.refused
+	// The display that was turned off for the sleep is back, backlight and
+	// all, so the notice can be read.
+	assert !d.idle.display_off && power_test_restored == [90]
 	// The notice goes up at once and comes down by itself.
 	assert d.dirty && d.idle.notice_until != 0
 	notice := d.idle_notice_element() or { panic('no notice of the refusal') }
