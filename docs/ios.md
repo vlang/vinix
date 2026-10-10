@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _select
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _semaphore_create
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1060,17 +1060,43 @@ previously verified host harness, leaving the concurrent host-controller
 migration untouched. The actual game resolves one additional strong EOSSDK
 import and still exits before entry, now at `select`.
 
+The V `select` adapter now waits on actual native descriptors. It translates
+Darwin's 32-bit bitmap words and 16-byte timeval into private native stack
+storage, preserving the caller's timeout, padding and thread errno. Only the
+required bitmap prefix is copied back on success; errors preserve all sets.
+Descriptors are validated before waiting because the preserved native backend
+can omit invalid descriptors instead of returning EBADF. The ready count comes
+from each returned set bit, matching the Mac's count when one descriptor is both
+readable and writable. Generated C confirms the adapter uses no heap storage.
+
+The same V tests compare the installed Mac library with the adapter and run as
+a native ARM64 executable in Vinix. They cover guarded buffers, descriptor 1023,
+invalid counts/timeouts, closed descriptors, real delayed readiness, EOF, a
+20 ms wait, unchanged timeval padding and eight concurrent workers. Host
+ASAN/UBSAN and the full ARM64 C++/GLES/PPSSPP regression pass. Exception/urgent
+data, signal interruptions and concurrent descriptor replacement remain outside
+the verified subset. Infinite waits with no selected descriptors retain the
+native backend's EINVAL limitation. EOSSDK's traced calls use 32-bit bitmap
+operations, signed 32-bit counts/results and optional timeval pointers.
+
+The standalone host driver and guest PID 1 are now V. They reuse the existing
+prepared Mach-O fixtures and native compiler/library closure, boot the preserved
+verified kernel, and stage both actual Fortnite frameworks for retries and
+audits. New select tests execute in native V; the existing regression fixtures
+are unchanged. The real game resolves two more strong imports but still exits
+with status 1 before entry at `semaphore_create`.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,314 | 844 | 81 |
-| EOSSDK | 529 | 133 | 18 |
+| Fortnite executable | 1,315 | 843 | 81 |
+| EOSSDK | 530 | 132 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,903 | 1,093 | 122 |
+| All images | 1,905 | 1,091 | 122 |
 
-The C++/GLES/Text variant reports 1,916 resolved imports, 1,080 unresolved strong
+The C++/GLES/Text variant reports 1,918 resolved imports, 1,078 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1092,11 +1118,26 @@ does not establish Fortnite compatibility. Startup, rendering, input, asset
 loading and online play remain unsupported or unverified; there is no Fortnite
 desktop launcher or claim of playable support.
 
-`sh tests/ios/reference-frameworks.sh` builds and runs the reference fixtures on
-a Mac with Catalyst libraries. `python3 tests/ios/run.py --with-cxx` checks the
-same fixtures in Vinix, import auditing, native iOS tagged pointers through
-both chained and legacy relocation, and the existing UIKit, TLS and C++
-regressions. The proprietary IPA and its extracted bytes are not committed.
+On this prepared Mac checkout, the V driver uses the ARM64 userland sysroot,
+native C++ archives, private GLES closure, preserved socket kernel, existing
+fixtures and extracted IPA under `build/ios/fortnite`:
+
+```sh
+v -nocache -cc clang run tests/ios/native-checks.v build
+v -nocache -cc clang run tests/ios/native-checks.v regression
+v -nocache -cc clang run tests/ios/native-checks.v probe
+v -nocache -cc clang run tests/ios/native-checks.v audit
+v -nocache -cc clang run tests/ios/native-checks.v static-audit
+```
+
+Each mode records its own state path in `build/ios/fortnite/select-checks` and
+writes a guest `serial.log` there. Regression requires the guest PASS marker;
+probe/audit completion records the actual child exit status, which remains 1
+for Fortnite. Completion does not mean the game ran. The driver does not build
+missing dependency trees or invoke the concurrent Python controller migration.
+`tests/ios/trace-import.v` finds direct ARM64 calls and tail branches to an
+import's Mach-O stub with the installed LLVM tools. The proprietary IPA and
+its extracted bytes are not committed.
 
 ## Official PPSSPP iOS binary
 

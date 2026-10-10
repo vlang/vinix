@@ -274,6 +274,7 @@ fn sockets_symbol(symbol string) ?u64 {
 		'_recvfrom' { u64(unsafe { voidptr(darwin_recvfrom) }) }
 		'_sendmsg' { u64(unsafe { voidptr(darwin_sendmsg) }) }
 		'_recvmsg' { u64(unsafe { voidptr(darwin_recvmsg) }) }
+		'_select' { u64(unsafe { voidptr(darwin_select) }) }
 		'_setsockopt' { u64(unsafe { voidptr(darwin_setsockopt) }) }
 		'_getsockopt' { u64(unsafe { voidptr(darwin_getsockopt) }) }
 		'_inet_pton' { u64(unsafe { voidptr(darwin_inet_pton) }) }

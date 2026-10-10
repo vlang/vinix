@@ -1,0 +1,251 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Standalone V build, staging and VM orchestration for native ABI checks.
+module main
+
+import os
+import time
+import crypto.sha256
+
+const llvm = '/opt/homebrew/opt/llvm/bin/clang'
+
+fn put_be(mut bytes []u8, offset int, value u32) {
+	for i in 0 .. 4 { bytes[offset + i] = u8(value >> u32((3 - i) * 8)) }
+}
+
+fn checked(args []string) {
+	mut p := os.new_process(args[0])
+	p.set_args(args[1..])
+	p.run()
+	p.wait()
+	defer { p.close() }
+	if p.code != 0 { panic('${args[0]} exited ${p.code}') }
+}
+
+fn copy_file(source string, destination string) {
+	os.mkdir_all(os.dir(destination)) or { panic(err) }
+	os.cp(source, destination) or { panic(err) }
+}
+
+fn tree(source string, destination string) {
+	os.mkdir_all(destination) or { panic(err) }
+	checked(['cp', '-a', source + '/.', destination])
+}
+
+fn compile_c(root string, generated string, output string, gles bool) {
+	sysroot := root + '/build-aarch64-userland/staging'
+	gcc := sysroot + '/usr/lib/gcc/aarch64-alpine-linux-musl/14.2.0'
+	mesa := root + '/build-aarch64-x11/sysroot'
+	mut args := [llvm, '--target=aarch64-linux-musl', '-nostdinc', '-nostdlib', '-isystem',
+		root + '/build-support/aarch64-cc-shim', '-isystem', gcc + '/include', '-isystem',
+		sysroot + '/usr/include', '-O2', '-D_GNU_SOURCE', '-fno-stack-protector', '-w']
+	if gles {
+		args << ['-no-pie', '-isystem', mesa + '/usr/include', '-isystem',
+			mesa + '/usr/include/freetype2']
+	} else {
+		args << '-static'
+	}
+	args << [sysroot + '/usr/lib/crt1.o', sysroot + '/usr/lib/crti.o',
+		gcc + if gles { '/crtbegin.o' } else { '/crtbeginT.o' }, generated]
+	if !generated.ends_with('/native-init.c') { args << root + '/compat/ios/runner/abi/dispatch.S' }
+	args << ['-ffixed-x18', '-L' + sysroot + '/usr/lib', '-L' + gcc,
+		root + '/build/ios/cxx/libcxx-ios.a', root + '/build/ios/cxx/sysroot/usr/lib/libc++abi.a',
+		root + '/build/ios/cxx/sysroot/usr/lib/libunwind.a']
+	if gles {
+		args << ['-L' + root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles', '-lEGL', '-lGLESv2',
+			'-lfreetype', '-Wl,--dynamic-linker=/usr/lib/vinix/ios-gles/ld-musl-aarch64.so.1',
+			'-Wl,-rpath,/usr/lib/vinix/ios-gles',
+			'-Wl,-rpath-link,' + root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles']
+	}
+	args << ['-lgcc_eh', '-lc', '-lgcc', '-lm', gcc + '/crtend.o', sysroot + '/usr/lib/crtn.o',
+		'-fuse-ld=lld', '-B/opt/homebrew/opt/llvm/bin', '-o', output]
+	checked(args)
+}
+
+fn build(root string, out string, only string) {
+	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'native-init'] {
+		if only != '' && item != only { continue }
+		generated := out + '/' + item + '.c'
+		if item == 'native-init' {
+			checked(['v', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-prod', '-d', 'no_backtrace',
+				'-o', generated, root + '/tests/ios/native-init.v'])
+		} else {
+			mut args := ['v', '-os', 'linux', '-arch', 'arm64', '-enable-globals', '-gc', 'none',
+				'-prod', '-d', 'glibc', '-d', 'no_backtrace', '-d', 'ios_cxx', '-path',
+				'@vlib|' + root + '/compat/ios|@vmodules', '-o', generated]
+			if item == 'select-checks' { args = args.filter(it != '-prod') }
+			if item == 'run-ios-gles' { args << ['-d', 'ios_gles', '-d', 'ios_text'] }
+			args << root + if item == 'select-checks' {
+				'/compat/ios/runner/select_test.v'
+			} else {
+				'/compat/ios/runner'
+			}
+			checked(args)
+		}
+		compile_c(root, generated, out + '/' + item, item == 'run-ios-gles')
+		println('Built ${item}')
+	}
+}
+
+fn regression_root(root string, out string, fs string) {
+	base := root + '/build/ios/fortnite'
+	for name in ['root', 'sbin', 'proc', 'sys', 'dev', 'tmp', 'etc', 'opt/ios'] {
+		os.mkdir_all(fs + '/' + name) or { panic(err) }
+	}
+	for name, value in {
+		'hosts':     '127.0.0.1 localhost\n::1 localhost\n'
+		'services':  'domain 53/tcp\ndomain 53/udp\n'
+		'protocols': 'icmp 1 ICMP\ntcp 6 TCP\nudp 17 UDP\n'
+		'passwd':    'root:*:0:0:Vinix iOS root:/root:/bin/sh\nios-fixture:*:1001:37:' + 'G'.repeat(8192) + ':/var/empty:/bin/false\n'
+		'group':     'root:*:0:\nbase:*:37:\nfirst:*:8:ios-fixture\nunrelated:*:9:someone\nsecond:*:11:ios-fixture\n'
+	} {
+		os.write_file(fs + '/etc/' + name, value) or { panic(err) }
+	}
+	tree(base + '/fixtures', fs + '/opt/ios')
+	copy_file(out + '/run-ios-gles', fs + '/opt/ios/run-ios')
+	tree(base + '/staging/usr/lib/vinix/ios-gles', fs + '/usr/lib/vinix/ios-gles')
+	copy_file(base + '/objc/Calculator.app/Calculator', fs + '/opt/ios/UIKitCalculator')
+	copy_file(base + '/ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf', fs + '/opt/ios/TextFixture.app/font.ttf')
+	tree(base + '/ppsspp/unpacked/Payload/PPSSPP.app', fs + '/usr/share/vinix/ios/PPSSPP.app')
+	copy_file(out + '/run-ios-gles', fs + '/usr/bin/run-ios-gles')
+	os.symlink('run-ios-gles', fs + '/usr/bin/vinix-ios-ppsspp') or { panic(err) }
+	os.symlink('/usr/share/vinix/ios/PPSSPP.app/PPSSPP', fs + '/opt/ios/PPSSPP') or { panic(err) }
+	os.write_file(fs + '/opt/ios/ppsspp-muted', '') or { panic(err) }
+	os.symlink('permissions-loop', fs + '/opt/ios/permissions-loop') or { panic(err) }
+	os.write_file(fs + '/opt/ios/launch name#é%?.bin', 'native file launch fixture\n') or { panic(err) }
+	tree(fs + '/opt/ios/Modules.app', fs + '/opt/ios/ModulesMissing.app')
+	os.rm(fs + '/opt/ios/ModulesMissing.app/Frameworks/Leaf.framework/Leaf') or { panic(err) }
+	tree(fs + '/opt/ios/Modules.app', fs + '/opt/ios/ModulesArm64e.app')
+	leaf := fs + '/opt/ios/ModulesArm64e.app/Frameworks/Leaf.framework/Leaf'
+	mut bytes := os.read_bytes(leaf) or { panic(err) }
+	bytes[8] = 2
+	bytes[9] = 0
+	bytes[10] = 0
+	bytes[11] = 0
+	os.write_file_array(leaf, bytes) or { panic(err) }
+	calculator := os.read_bytes(fs + '/opt/ios/calculator') or { panic(err) }
+	mut arm := calculator.clone()
+	arm[8] = 2
+	os.write_file_array(fs + '/opt/ios/calculator-arm64e', arm) or { panic(err) }
+	second := (4096 + calculator.len + 4095) & ~4095
+	mut fat := []u8{len: second + calculator.len}
+	put_be(mut fat, 0, 0xcafebabe)
+	put_be(mut fat, 4, 2)
+	for offset in [8, 28] {
+		put_be(mut fat, offset, 0x100000c)
+		put_be(mut fat, offset + 4, if offset == 8 { u32(2) } else { u32(0) })
+		put_be(mut fat, offset + 8, u32(if offset == 8 { 4096 } else { second }))
+		put_be(mut fat, offset + 12, u32(calculator.len))
+		put_be(mut fat, offset + 16, 12)
+	}
+	copy(mut fat[4096..4096 + arm.len], arm)
+	copy(mut fat[second..], calculator)
+	os.write_file_array(fs + '/opt/ios/calculator-fat', fat) or { panic(err) }
+	os.write_file_array(fs + '/opt/ios/truncated', calculator[..31]) or { panic(err) }
+	copy_file(out + '/select-checks', fs + '/opt/ios/select-checks')
+	sysroot := root + '/build-aarch64-userland/sysroot'
+	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
+		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
+		root + '/tests/ios/uikit-guest.c', root + '/tests/ios/gles-guest.c', '-L' + sysroot + '/lib',
+		'-fuse-ld=lld', '-o', fs + '/opt/ios/regression'])
+}
+
+fn await_checks(mut p os.Process, log string, marker string) ! {
+	for _ in 0 .. 1200 {
+		text := os.read_file(log) or { '' }
+		if text.contains('iOS FAIL:') || text.contains('KERNEL PANIC') || text.contains('FATAL EXCEPTION') || text.contains('V panic:') {
+			return error(text)
+		}
+		if text.contains(marker) { return }
+		if !p.is_alive() { return error(p.stderr_slurp()) }
+		time.sleep(200 * time.millisecond)
+	}
+	return error('VM timeout: ' + log)
+}
+
+fn vm(root string, out string, mode string) {
+	if mode !in ['regression', 'probe', 'audit', 'static-audit'] {
+		panic('invalid check mode: ' + mode)
+	}
+	state := out + '/' + mode + '-' + time.sys_mono_now().str()
+	if os.exists(state) { panic('VM state already exists') }
+	os.write_file(out + '/' + mode + '-state.txt', state) or { panic(err) }
+	os.mkdir_all(state + '/rootfs') or { panic(err) }
+	fs := state + '/rootfs'
+	if mode == 'regression' {
+		regression_root(root, out, fs)
+	} else {
+		checked(['tar', '-xzf', root + '/build/ios/fortnite/probe-initramfs.tar.gz', '-C', fs])
+		tree(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks', fs + '/opt/ios/Frameworks')
+		copy_file(out + '/' + if mode == 'static-audit' { 'run-ios' } else { 'run-ios-gles' }, fs + '/opt/ios/run-ios')
+		tree(root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles', fs + '/usr/lib/vinix/ios-gles')
+	}
+	copy_file(out + '/native-init', fs + '/sbin/init')
+	os.write_file(fs + '/opt/ios/check-mode', if mode.contains('audit') { 'audit' } else { mode }) or { panic(err) }
+	archive := state + '/initramfs.tar.gz'
+	checked(['tar', '--format=ustar', '-czf', archive, '-C', fs, '.'])
+	disk := state + '/boot.img'
+	checked(['mkfile', '-n', '640m', disk])
+	checked(['mformat', '-F', '-i', disk, '::'])
+	for path in ['::/EFI', '::/EFI/BOOT', '::/boot'] { checked(['mmd', '-i', disk, path]) }
+	conf := state + '/limine.conf'
+	os.write_file(conf, 'timeout: 0\nverbose: yes\n/Vinix\n    protocol: limine\n    kernel_path: boot():/boot/vinix\n    module_path: \$boot():/boot/initramfs.tar.gz\n    resolution: 1024x768x32\n    kaslr: no\n') or { panic(err) }
+	for source, target in {
+		root + '/boot-image/limine-bin/BOOTAA64.EFI':               '::/EFI/BOOT/BOOTAA64.EFI'
+		conf:                                                       '::/boot/limine.conf'
+		root + '/build/ios/fortnite/socket-kernel-arm64/bin/vinix': '::/boot/vinix'
+		archive:                                                    '::/boot/initramfs.tar.gz'
+	} {
+		checked(['mcopy', '-i', disk, source, target])
+	}
+	vars := state + '/efivars.fd'
+	checked(['mkfile', '-n', '64m', vars])
+	log := state + '/serial.log'
+	mut p := os.new_process('/opt/homebrew/bin/qemu-system-aarch64')
+	p.set_args(['-machine', 'virt,gic-version=3', '-accel', 'hvf', '-cpu', 'host', '-m', '4096',
+		'-smp', '4', '-device', 'ramfb', '-display', 'none', '-monitor', 'none', '-serial',
+		'file:' + log, '-drive',
+		'if=pflash,format=raw,readonly=on,file=/opt/homebrew/share/qemu/edk2-aarch64-code.fd',
+		'-drive', 'if=pflash,format=raw,file=' + vars, '-drive', 'format=raw,file=' + disk, '-device',
+		'virtio-keyboard-device', '-device', 'virtio-tablet-device'])
+	p.set_redirect_stdio()
+	p.run()
+	marker := if mode == 'regression' { 'VINIX iOS GUEST: PASS' } else { 'FORTNITE PROBE COMPLETE' }
+	mut failure := ''
+	await_checks(mut p, log, marker) or { failure = err.msg() }
+	// V panics do not unwind defers. Close our VM before reporting failure.
+	if p.is_alive() {
+		p.signal_term()
+		p.wait()
+	}
+	p.close()
+	if failure != '' { panic(failure) }
+	println('${mode}: ${if mode == 'regression' {
+		'PASS'
+	} else {
+		'COMPLETE (see guest process status)'
+	}}')
+}
+
+fn main() {
+	if os.args.len < 2 {
+		panic('usage: native-checks build|build-init|build-select|regression|probe|audit|static-audit|hash FILE')
+	}
+	root := os.real_path(os.getwd())
+	out := root + '/build/ios/fortnite/select-checks'
+	os.mkdir_all(out + '/tmp') or { panic(err) }
+	os.setenv('TMPDIR', out + '/tmp', true)
+	os.setenv('COPYFILE_DISABLE', '1', true)
+	mode := os.args[1]
+	if mode == 'build' {
+		build(root, out, '')
+	} else if mode == 'build-init' {
+		build(root, out, 'native-init')
+	} else if mode == 'build-select' {
+		build(root, out, 'select-checks')
+	} else if mode == 'hash' {
+		if os.args.len != 3 { panic('usage: native-checks hash FILE') }
+		println(sha256.sum(os.read_bytes(os.args[2]) or { panic(err) }).hex())
+	} else {
+		vm(root, out, mode)
+	}
+}
