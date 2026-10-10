@@ -5,7 +5,8 @@
 All desktop preferences use **one file**, `/root/.vinix-desktop-settings`:
 window-button side, taskbar grouping, taskbar clock format, seconds, date and
 weekday, theme, system language, wallpaper colour and image, keyboard layouts,
-and scale. It is a versioned, human-readable snapshot, for example:
+the idle timeouts, lid action and power profile, and scale. It is a versioned,
+human-readable snapshot, for example:
 
 ```ini
 version=1
@@ -22,6 +23,10 @@ wallpaper_color=4
 wallpaper_image=2
 keyboard_layouts=us,ru
 keyboard_layout=ru
+display_off_after=10
+sleep_after=never
+lid_action=suspend
+power_profile=auto
 ```
 
 `scale` is `auto`, `1` (100%) or `2` (200%). The other choices are `right`/`left`,
@@ -36,6 +41,12 @@ enabled input sources in Settings' order, using `us`, `ru`, `es`, `fr`, `de`
 and `pt`, and `keyboard_layout` is the one typing uses; it must be among them.
 A record with only `keyboard_layout` enables that layout beside `us`, and one
 with only `keyboard_layouts` types with the first listed. Both default to `us`.
+`display_off_after` and `sleep_after` are `never` or one of `1`, `2`, `5`, `10`,
+`15`, `30` and `60` minutes, defaulting to `10` and `never`; when both are
+times the display's may not be the later, and a record naming only
+`sleep_after` brings the display's default down to it. `lid_action` is
+`suspend` (the default) or `ignore`, and `power_profile` is `auto` (the
+default), `performance`, `balanced` or `power_saver`. See [Power](#power).
 
 The compositor loads the snapshot before allocating its canvas or launching
 applications. After accepting Settings changes and applying any scale change,
@@ -86,7 +97,10 @@ launch. Continue to shut down writable ext2 guests cleanly.
 
 Brightness and Wi-Fi controls operate on devices; their live/pending readbacks,
 scan results and battery measurements are not desktop preferences and are not
-serialized or replayed at startup.
+serialized or replayed at startup. The lid action and the power profile are
+the exception: the kernel holds them only while it runs, so the choice made in
+Settings is saved and written back as the desktop starts, where it differs
+from what the kernel then says and the kernel would take it.
 
 To verify in QEMU, change each appearance option, switch the clock to 12-hour
 time without seconds, hide the date or weekday, choose a wallpaper and switch
@@ -267,6 +281,86 @@ write. Every action rereads status and bounds, including when an old hit target
 was clicked after device loss. Writes are one whole decimal nit command; a
 positive short write is an error and its suffix is never retried as a command.
 
+## Power
+
+Select **Power**, between Battery and Keyboard, for what the machine does when
+nobody is using it, when its lid is closed, and how hard its CPUs work.
+
+### Idle timeouts
+
+**Turn display off after** and **Sleep after** are each Never or 1, 2, 5, 10,
+15, 30 or 60 minutes. A new profile has ten minutes and Never. When both are
+times the display's is never the later: choosing a sleep sooner than the
+display turns off brings the display forward to it, and choosing a display
+timeout longer than the sleep pushes the sleep back.
+
+The compositor counts from the last key press, pointer movement, button or
+scroll. The pointer device answers every read with where the pointer is, so
+only a packet that says something new counts.
+
+A display that is **off** is one black frame, after which nothing is composed
+or presented; applications go on running. Where the panel's backlight can be
+set (`/dev/apple-panel-bl`), it is taken to its minimum and the exact level in
+nits is put back afterwards. Any input turns the display on and repaints the
+whole screen, and that input is swallowed: it is not also typed, or clicked on
+whatever was under the pointer, and a press is swallowed through its release.
+
+**Sleep** is the same request as Sleep in the Start menu: `mem` written to
+`/sys/power/state`, which returns when the machine is awake again. The session
+is not ended. On the way back the screen is repainted, the clock and the
+battery are read again, and whatever was typed or clicked to wake the machine
+is dropped. If the kernel refuses, a notice says so for a few seconds, nothing
+else changes, and the timer does not ask again until there has been input.
+**Sleep after** is disabled, with a line saying why, on a kernel whose
+`/sys/power/state` does not offer `mem`.
+
+Limits:
+
+- **Nothing can ask for the display to stay on.** There is no inhibit
+  interface, so a film watched without touching the machine is turned off
+  like anything else, and so is a game played on a controller the compositor
+  does not read. The one exception is the compositor's own screen recording,
+  which counts as use while it runs.
+- **Off is not powered off.** The panel shows black; its backlight is at its
+  minimum where it can be set and untouched where it cannot, which is every
+  machine but an M1 with the DCP backlight enabled. 0% is the panel's
+  advertised minimum, not dark.
+- **There is no lock.** A display that comes back on, and a machine that
+  wakes, show the session as it was left.
+- A silence of more than ten seconds between two passes of the compositor is
+  taken for the machine having been asleep or paused, not for idleness, and
+  restarts the count. This is what keeps a machine that the kernel put to
+  sleep itself, on a closed lid, from being turned off again the moment it
+  wakes. It also means time spent in an exclusive program such as Xorg, which
+  takes the display from the compositor, is not counted.
+- The timer does not run before a user is registered.
+
+### Lid and performance
+
+**When the lid is closed** is Sleep or Do nothing, read from and written to
+`/sys/power/lid/action` (`suspend` or `ignore`). It is shown only when
+`/sys/power/lid/state` reads `open` or `closed`: on a machine with no lid, or
+a kernel without the file, there is nothing to choose.
+
+**Performance** is Automatic, Performance, Balanced or Power saver. Automatic
+writes `auto` to `/sys/power/profile_policy`, leaving the kernel to follow the
+power source; the others write `manual` there and then the profile to
+`/sys/devices/system/cpu/cpufreq/profile`. Without a frequency driver the
+kernel publishes that file read-only and refuses a write, which is the case in
+every virtual machine. The control is then drawn disabled, showing what is in
+force, with a line saying that the profile cannot be changed; the file's mode
+is what tells, so nothing is written to find out. Should a write be refused
+all the same, the policy that was there is put back and the control goes off
+the same way. A kernel without the profile files has no Performance control.
+
+Both show what the kernel says now, reread once a second while the page is
+visible, so a change made from a shell appears here. Looking writes nothing.
+A choice is written when it is made; what the kernel then reads back is what
+is shown and what is saved. As the desktop starts, the saved lid action and
+profile are written back where they differ from the kernel's and the kernel
+would take them, so a value set by hand in `/sys` lasts until the desktop next
+starts. A refused write is reported under the control and changes no setting.
+
 ## Implementation and tests
 
 `keyboard_layout.v` owns the layout tables, dead keys, the typing
@@ -292,6 +386,17 @@ I/O. `device_io.v` is the V interface used by both the production POSIX backend
 (`platform.c.v`) and V test doubles. `wifi_client.v` owns the Wi-Fi ioctl parser
 and actions, while `settings_wifi.v` owns the corresponding pane. There are no
 handwritten C desktop client or test files.
+
+`settings_power.v` owns the Power pane and `power_client.v` the kernel's power
+files: bounded single reads, strict parsing of `[chosen] other` and of the
+profile names, one-word writes, and putting the saved choices back at start.
+`idle_timer.v` is the timer's state machine — active, display off, asleep —
+and reads no clock, device or setting, so its tests drive it with a clock of
+their own; `idle_wm.v` is the compositor's side, which notes input, presents
+the black frame, dims and restores the backlight and carries out the sleep.
+The write to `/sys/power/state` is `desktop_system_sleep` in `platform.c.v`.
+The four power settings travel in the application protocol's state like the
+rest, which took it to version 11.
 
 Dynamic brightness labels are cached and replaced only when readback changes.
 Disabled controls use `enabled=false`; event handling independently rechecks
@@ -327,6 +432,21 @@ symlink does not trigger legacy migration and that a legacy directory is not
 removed. The full UI suite additionally exercises actual Settings actions,
 clock formatting and date-line combinations, application-protocol state, and
 compositor scale application before saving and restoring the complete snapshot.
+
+For Power, the client tests cover the power files on a laptop, a virtual
+machine and a kernel without them, malformed, oversized and failing files,
+the lid action as one whole word, the policy written before the profile, a
+profile refused by the file's mode and by the write, and saved choices put
+back only where they differ; the idle timer through every transition, with
+input swallowed, timeouts changed while idle, a clock that goes backwards or
+cannot be read, a pause nobody was there for and a refused sleep; and the four
+saved keys with every pair of timeouts. The UI tests cover the Power pane's
+choices and their coupling, the lid hidden without one, the profile disabled
+when refused, the page reading without writing, its fit in every language,
+the settings crossing the process boundary and being saved, and the
+compositor's side of the timer and of Sleep against a clock and a machine the
+tests stand in for. None of it has run against a kernel: no test here writes
+to `/sys`, puts a machine to sleep or turns a panel off.
 
 Desktop scaling is independent of the DCP backlight transport and never changes
 the status of physical brightness adjustment.
