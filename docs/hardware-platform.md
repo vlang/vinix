@@ -75,6 +75,67 @@ minute. A failed device stays listed with its history in `health` and can be
 reset or bound again by hand, so one broken device costs the machine that
 device and not the boot.
 
+### PCI hotplug and rescan
+
+A PCI device can arrive and leave while the machine runs
+(`kernel/devcore/hotplug.v`, `kernel/pci/hotadd.v`, `kernel/pci/window.v`).
+One thread makes every change to which PCI functions exist, whatever asked
+for it:
+
+- **A port the kernel runs.** A PCI Express root or downstream port with a
+  hot-plug slot is looked at twice a second, as Linux's `pciehp` does in its
+  polling mode. A card that appears is given power, its link is waited for,
+  its functions are found, given addresses and handed to the device core,
+  whose drivers bind as at boot. The slot's button starts five seconds in
+  which a second press calls it off; then the drivers let go, the functions
+  are removed and the slot's power is cut. A card pulled without asking is
+  removed the same way, with its registers already reading all ones.
+- **A port firmware keeps (x86-64, `kernel/x86/acpihp`).** Each PCI host
+  bridge is asked through `_OSC` to hand over its ports. Where firmware keeps
+  them, it announces a device through a `Notify` on the device's namespace
+  node -- look here (1), wanted back (3), look behind this bridge (0). The
+  node's place on the buses is worked out from the `_ADR` of each node up to
+  the host bridge; the device is found or let go of as above, and `_EJ0` then
+  tells firmware it can leave. Such a machine's slot registers are not
+  touched. A machine with no `_OSC` is taken to have handed its ports over,
+  as Linux takes it.
+- **A rescan.** Writing 1 to `/sys/bus/pci/rescan` tries every address on
+  every known bus; a function nobody has is treated as an arrival. This is
+  how a device removed through its own `remove` file comes back.
+
+A function that arrives has nothing in its base address registers. Each is
+sized, and the sizes are placed, largest first, in the windows firmware left
+on the port: prefetchable 64-bit registers in the prefetchable window, the
+rest in the 32-bit one, after whatever functions already there occupy. A
+register that does not fit is left unset and said so; the driver finds out.
+A function found again with its addresses still inside the windows is left
+exactly as it is.
+
+The record a driver holds for a PCI function is never freed or moved: the
+list is made at boot with room for 64 more, a function that leaves has its
+record marked absent, and the next arrival at that address uses it again --
+unless the departed function's driver could not let go, in which case the
+record is retired and the arrival gets a new one.
+
+```
+/sys/bus/pci/slots/<number>/   address adapter power state events
+/sys/bus/pci/rescan            write 1
+```
+
+`power` takes 0 (take the card out of use, as the button does but without
+the wait) and 1 (bring it back).
+
+Limits: the ports are polled, not listened to, so a press or a card is
+noticed within half a second and a machine with such a port wakes twice a
+second for it; a bridge that arrives is listed and nothing behind it is
+found (no bus numbers or windows are made for it); ports are not given more
+room than firmware gave them; a device that arrives on the root bus is found
+but given no addresses; on AArch64 the ports are watched only in QEMU unless
+`vinix.pci_hotplug=1` says otherwise, because what a slot's power switch
+feeds on Apple hardware is not known here. Only the `e1000` has been taken
+through an arrival and a departure: the other PCI drivers have no `remove`
+and would be left holding a device that is gone.
+
 ## DMA and IOMMU
 
 `kernel/dma` gives a driver memory *for a device*, with the address to tell
@@ -169,11 +230,21 @@ Writing `freeze` or `mem` to `/sys/power/state` suspends to idle:
 3. devices are suspended last to first -- a driver that refuses stops the
    sleep;
 4. the CPU's protection registers are recorded (CR0, CR4, EFER; SCTLR_EL1,
-   TCR_EL1) and wake sources start being listened to;
+   TCR_EL1), the screen goes dark, and wake sources start being listened to;
 5. the machine waits for a wake source;
-6. the registers are compared with what was recorded -- a difference is
-   restored, and a failure to restore panics -- devices are resumed first to
-   last, and userspace thaws.
+6. the screen comes back; the registers are compared with what was recorded
+   -- a difference is restored, and a failure to restore panics -- devices
+   are resumed first to last, and userspace thaws.
+
+The screen (`kernel/term/sleep.v`): where it is the boot loader's
+framebuffer -- a PC with no display driver, a virtual machine -- its picture
+is copied away page by page, the framebuffer is painted black, and the
+picture is copied back on waking, so the console or the compositor finds
+what it drew. Console text that arrives meanwhile is not drawn (it still
+reaches the serial port); a panic is. If there is no memory for the picture
+the screen stays lit, and `suspend_stats/screen_lit` counts it
+(`screen_dark` counts the others). A panel with a driver of its own --
+Apple's, through DCP -- is not reached by this, and its backlight stays on.
 
 Wake sources (`kernel/wakesrc`, `/sys/class/wakeup/wakeupN/`): power button,
 sleep button, lid, keyboard, pointer, alarm, network, USB, battery. Each can
@@ -199,8 +270,9 @@ What this is not:
   and would not be for anything deeper.
 - The protection registers are checked on the CPU that carries out the sleep,
   not on every CPU.
-- **No screen sleep.** The framebuffer is not blanked for a sleep and there is
-  no backlight class; the desktop has no idle timer.
+- The dark screen is a black picture, not a display switched off: there is
+  no backlight class and no display power control (DPMS), so a panel's
+  backlight stays lit behind it, and Apple's panel is not darkened at all.
 
 ## Power supplies
 
@@ -271,18 +343,20 @@ thermal zones, no fan control, and no Apple (SMC) sensors.
 | `vinix.cpufreq=off\|simulate` | no frequency driver, or one with memory for registers |
 | `vinix.apple_idle=wfi`, `vinix.apple_cpufreq=1` | Apple hardware only; untried |
 | `vinix.thermal_sensors=0`, `vinix.tjmax=N` | skip the x86 sensor drivers; state TjMax |
+| `vinix.pci_hotplug=0\|1` | leave PCI Express hot-plug ports alone, or watch them where the kernel would not by itself |
 
 ## What is not done
 
 Beyond the limits stated in each section:
 
-- PCI hotplug and rescan: `/sys/bus/pci/rescan` exists and nothing is
-  registered behind it; the PCI scan is still a boot-time snapshot. A device
-  can be removed from the kernel's view (`remove`) but not found again.
+- PCI hotplug beyond what its section states: no interrupt-driven ports, no
+  bridges behind a slot, no resizing of a port's windows, no SHPC or
+  conventional PCI slots except through ACPI, and no driver but `e1000` that
+  can let go of a device.
 - USB: no core, no hubs, no hotplug; xHCI drives boot keyboards and pointers
   on AArch64 PCI only.
 - Device power states (D3), runtime power management, wake-on-LAN.
-- Suspend to RAM, hibernation, screen sleep, backlight control.
+- Suspend to RAM, hibernation, backlight and display power control.
 - Restoring an IOMMU, or any driver but `e1000` and `ahci`, after a sleep
   that powers devices down.
 - The desktop: Settings and the taskbar still read `/dev/battery`; there is
@@ -312,16 +386,21 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `cpu-power`, `cpu-power-simulated` | pass | pass |
 | `thermal` | pass | pass |
 | `firmware` | pass | pass |
+| `screen-sleep`: pictures of the screen lit before, dark during and lit after a sleep and a rehearsal | pass | pass |
+| `pci-hotplug`: a card put into a port the kernel watches and taken out, twice; 100 remove/rescan cycles | pass | pass |
+| `pci-hotplug-acpi`: the same, announced and asked back by firmware | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
 
 Host unit tests: `tests/hardware-platform/hwhost` (7 files),
-`tests/power-supply/run`, `sh tests/cpu-power/run.sh`, `sh tests/thermal/run.sh`.
+`tests/power-supply/run`, `sh tests/cpu-power/run.sh`, `sh tests/thermal/run.sh`,
+`tests/pci-hotplug/run`.
 See [the suite's README](../tests/hardware-platform/README.md) for what each
 scenario checks and for its recorded output.
 
 Measured for retention, after the kernel's grace period for deferred frees:
-100 unbind/bind cycles of the e1000 and 50 load/drop cycles of a 100 KiB
+100 unbind/bind cycles of the e1000, 100 cycles of removing a hot-added
+e1000 and finding it again by a rescan, and 50 load/drop cycles of a 100 KiB
 firmware image leave the kernel heap's live objects and large pages where
 they were, on both architectures.
 
