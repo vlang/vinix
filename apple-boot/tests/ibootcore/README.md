@@ -54,3 +54,16 @@ calls and 500 actual Unix-socket exchanges with an exact FD baseline. This
 controller stage does not claim a new QEMU boot. It removes 1170 original Python
 bytes across 32 lines; counted frontend overhead leaves a net reduction of 703
 Python bytes.
+
+The main workflow's preparation phase now also lives in V: packed image and
+memory layout, ADT selection, boot arguments, loader files, synthetic AIC state
+and the QEMU command. An actual tuple transfers the original named values to
+the existing caller in its original fast-local order. Failed preparation transfers the actual error with
+those named values before the original main function raises it. The caller
+preserves its original error context and owns the values through cleanup and
+saved traceback retirement. The main
+parser, process monitoring, diagnostic reporting and finally cleanup remain in
+their original Python body. Independent plans and error controls compare the
+original block and whole main workflow; this stage makes no new guest claim.
+It removes 2,569 original Python bytes across 48 lines; net Python reduction is
+1,925 bytes.

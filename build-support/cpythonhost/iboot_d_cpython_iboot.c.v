@@ -729,7 +729,8 @@ pub fn iboot_codec_entry(operation &char, namespace voidptr, arguments voidptr, 
 	s := IbootCodec{ namespace: namespace, pins: unsafe { C.PyDict_GetItemString(syntax, c'pins') }, pair: unsafe { C.PyDict_GetItemString(syntax, c'pair') }, single: unsafe { C.PyDict_GetItemString(syntax, c'single') }, raise_: unsafe { C.PyDict_GetItemString(syntax, c'raise') } }
 	op := unsafe { operation.vstring() }
 	return match op {
-		'qmp_init' { s.qmp_init(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
+		'prepare' { s.prepare(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
+ 'qmp_init' { s.qmp_init(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
  'qmp_reply' { s.qmp_reply(C.PyTuple_GetItem(arguments,0)) }
  'qmp_execute' { s.qmp_execute(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1), C.PyTuple_GetItem(arguments,2)) }
  'png_chunk' { s.png_chunk(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }

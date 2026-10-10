@@ -77,6 +77,7 @@ AIC_MASK_SET = AIC_CONFIG + 4 * AIC_MAX_IRQ + 8 * (AIC_MAX_IRQ // 32)
 _CODEC_NAMESPACE = globals()
 _CODEC_PLATFORM, _CODEC_PYTHON = sys.platform, sys.executable
 _CODEC_REGISTER, _CODEC_ERROR = atexit.register, BaseException
+_CODEC_CONTEXT = BaseException.__context__
 _CODEC_API = runpy.run_path(str(REPO / "build-support/cpython_host.py"))
 _CODEC_PATH, _CODEC_ENV, _CODEC_FSPATH = Path, os.environ, os.fspath
 _CODEC_RUN, _CODEC_TEMP = subprocess.run, tempfile.TemporaryDirectory
@@ -237,54 +238,14 @@ def main() -> int:
     run(["make", "-C", str(APPLE_BOOT), "-s"])
     work = Path(tempfile.mkdtemp(prefix="vinix-apple-boot."))
     try:
-        initramfs = arguments.initramfs or build.build_initramfs(work)
-        image = pack.pack(
-            (APPLE_BOOT / "build/vinix-apple-loader.bin").read_bytes(),
-            pack.elf_symbol(APPLE_BOOT / "build/vinix-apple-loader.elf", "loader_end"),
-            arguments.kernel.read_bytes(), initramfs.read_bytes(), arguments.cmdline,
-            pack.FLAG_MAP_LOW_4G, int(time.time()))
-
-        image_base = PHYS_BASE
-        adt_base = align(image_base + len(image), 0x4000)
-        # The segment goes after the loader's data, where its allocator would
-        # otherwise start: it has to move past it.
-        with_aic = not arguments.no_aic and not arguments.real_adt
-        provisional_adt = real_adt() if arguments.real_adt else build_adt(0, with_aic)
-        args_base = align(adt_base + len(provisional_adt), 0x4000)
-        top_of_kernel_data = args_base + 0x4000
-        segment = align(top_of_kernel_data, 0x200000) + 0x100000
-        adt = provisional_adt if arguments.real_adt else build_adt(segment, with_aic)
-        assert len(adt) == len(provisional_adt)
-        args = boot_args(adt_base, len(adt), top_of_kernel_data)
-
-        files = {
-            "image.bin": (image_base, image),
-            "adt.bin": (adt_base, adt),
-            "boot_args.bin": (args_base, args),
-            "scratch.bin": (SCRATCH, b"\xff" * 0x400),
-            "segment.bin": (segment, bytes([SEGMENT_FILL]) * SEGMENT_BYTES),
-        }
-        if with_aic:
-            aic = bytearray(AIC_SIZE)
-            struct.pack_into("<I", aic, 4, AIC_NR_IRQ)  # cap0: one die
-            struct.pack_into("<I", aic, 0xC, AIC_MAX_IRQ)
-            files["aic.bin"] = (FAKE_AIC, bytes(aic))
-        stub = build_stub(work, args_base, image_base + 0x800)
-        loaders = ["-device", f"loader,file={stub},addr={STUB:#x},cpu-num=0,force-raw=on"]
-        for name, (address, data) in files.items():
-            (work / name).write_bytes(data)
-            loaders += ["-device", f"loader,file={work / name},addr={address:#x},force-raw=on"]
-
-        serial = work / "serial.log"
-        sock = Path(tempfile.gettempdir()) / f"vinix-apple-boot-{os.getpid()}.sock"
-        command = [
-            "qemu-system-aarch64", "-machine", "virt,gic-version=3,virtualization=on",
-            "-cpu", "max", "-accel", arguments.accel, "-smp", "1",
-            "-m", f"{RAM_BYTES >> 20}M", "-display", "none", "-nodefaults",
-            "-serial", f"file:{serial}",
-            "-qmp", f"unix:{sock},server=on,wait=off",
-            "-device", "virtio-keyboard-device", *loaders,
-        ]
+        (initramfs, image, image_base, adt_base, with_aic, provisional_adt, args_base, top_of_kernel_data, segment, adt, args, files, aic, stub, loaders, name, address, data, serial, sock, command, _preparation_error) = _iboot('prepare', work, arguments)
+        if _preparation_error is not None:
+            _preparation_context = _CODEC_CONTEXT.__get__(_preparation_error)
+            try:
+                raise _preparation_error
+            finally:
+                _CODEC_CONTEXT.__set__(_preparation_error, _preparation_context)
+                _preparation_error = _preparation_context = None
         print("==> " + " ".join(command[:12]) + " ...", flush=True)
         qemu = subprocess.Popen(command)
         passed = False
