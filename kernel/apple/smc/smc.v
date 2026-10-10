@@ -28,11 +28,17 @@ struct Snapshot {
 mut:
 	bytes  [128]u8
 	length int
+	// How much of it this open has been given.
+	taken int
 }
 
 // One Resource is shared by all opens. Each Handle gets its own small text
 // snapshot, retained across short reads and freed on the last close (including
 // dup/fork). A status bar should reopen the device for each new sample.
+//
+// The place in the snapshot is kept here, with the snapshot: the kernel hands
+// a character device no file offset (every read arrives with 0), so going by
+// the offset gave the same text again for ever and never the end of it.
 struct Battery {
 mut:
 	stat      stat.Stat
@@ -259,8 +265,8 @@ fn service() {
 	sched.dequeue_and_die()
 }
 
-fn (mut this Battery) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	if count == 0 || loc >= u64(if this.power_only { 128 } else { 4 }) {
+fn (mut this Battery) read(handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
+	if count == 0 {
 		return 0
 	}
 	if handle == unsafe { nil } {
@@ -293,12 +299,14 @@ fn (mut this Battery) read(handle voidptr, buf voidptr, loc u64, count u64) ?i64
 		this.snapshots[key] = value
 		value
 	}
-	if loc >= u64(sample.length) {
+	if sample.taken >= sample.length {
 		return 0
 	}
-	remaining := u64(sample.length) - loc
+	remaining := u64(sample.length - sample.taken)
 	n := if count < remaining { count } else { remaining }
-	unsafe { C.memcpy(buf, voidptr(&sample.bytes[int(loc)]), n) }
+	unsafe { C.memcpy(buf, voidptr(&sample.bytes[sample.taken]), n) }
+	sample.taken += int(n)
+	this.snapshots[key] = sample
 	return i64(n)
 }
 
