@@ -1,5 +1,12 @@
 # Repository Rules
 
+## Language and tooling
+
+- Always use V for implementation, generators, build and test tooling, and
+  one-off helper or analysis scripts. Do not write, modify, or run Python.
+- When existing Python tooling is needed, implement or invoke a V replacement
+  instead. This rule also applies to Python wrappers around V code.
+
 ## Feature completion
 
 - Always commit when you implement a feature or fix in this repository; do not
