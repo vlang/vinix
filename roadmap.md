@@ -207,8 +207,11 @@ consistent filesystem; backup restoration preserves content and metadata.
   - [x] [ACPI thermal zones and the fans their active trips
     drive](docs/hardware-platform.md#thermal), tested against a scripted zone in
     QEMU.
-  - [ ] An embedded controller driver, Apple's SMC battery and sensors in the
-    same interfaces, a charge limit.
+  - [x] [An ACPI embedded controller
+    driver](docs/hardware-platform.md#the-embedded-controller), tested against a
+    simulated controller on the host and in QEMU. No physical controller has
+    been tried.
+  - [ ] Apple's SMC battery and sensors in the same interfaces, a charge limit.
 - [ ] Add reliable suspend/resume, lid behavior, wake sources, screen sleep,
   hibernation and shutdown/reboot that flushes storage and quiesces devices.
   - [x] [Suspend to idle with wake sources, an alarm and a rehearsal mode; lid

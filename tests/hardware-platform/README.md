@@ -27,6 +27,9 @@ here runs any.
 | `firmware` | aarch64, x86_64 | The firmware loader, driven through `/sys/firmware/loader`: a 100 KiB image under `/lib/firmware` is read whole and unchanged (name, size, checksum and holder count in `loaded`); keeping it twice changes nothing; a copy under `updates/` is the one read; names that leave the directory, are absolute, have an empty component or an odd character are refused, as are an image that is not there, a link to a device, and one over the 64 MiB limit; fifty load/drop cycles leave the kernel heap's live objects and large pages where they were. |
 | `acpi-power` | x86_64 | QEMU's PC has no battery, charger or lid, so the controller writes an ACPI table describing all three (`hwhost/acpi_bench.v`, assembled by `hwhost/aml.v`) and QEMU loads it with `-acpitable`. They act out a script, advanced each time the battery is asked for its state: charging, the charger pulled, a steady 12 W drain to 2%, the lid shut and opened on the way. The guest checks what the battery is (capacities, voltage, chemistry, maker, cycle count), `Charging` with the charger online then `Discharging` with it offline, a charge that only falls, `time_to_empty_now` within 2% of charge over rate, a sleep when the lid shuts (ended by the wake alarm), `capacity_level` `Low`, and finally the request to power off that a critical battery makes of init. |
 | `acpi-thermal` | x86_64 | The controller writes a table with a thermal zone and four fans (`hwhost/thermal_bench.v`): one fan that takes any level, one that takes the levels it lists, one switched by its own `_PS0`/`_PS3` and one by a power resource. The zone's temperature follows a script as the kernel reads it -- 40, 55, 75, 85, 60, 40 and finally 105 degrees, against active trips at 50 and 70, a passive trip at 80 and a critical one at 100 -- and it stays at 75 until both switched fans really run, and does not leave the last 40 while either still does. The guest, which never reads the temperature, must see in order: every fan off; the two with levels at half (level 50, and 60 as the nearest listed level, read back as 2000 and 2400 rpm); every fan flat out; the limit on CPU performance below 100 with the fans still flat out; half again with the switched fans off; everything off and the limit back at 100. It then reports, the script passes the critical trip, and the kernel must turn the machine off by itself. |
+| `acpi-ec-absent` | x86_64 | An ordinary kernel and a table (`ec-absent` in `hwhost/acpi_bench.v`) that describes an embedded controller at ports 0x62 and 0x66, where QEMU has nothing and every read is 0xff, with two batteries, a charger, a lid and a thermal zone whose methods read it. The kernel must find the controller (its ports, its `_UID`, and a `_GPE` given as a package that names a block of events this kernel does not drive, so `events` says `polled`); give it up after one exchange (`failed` 1, `failure` `output buffer would not empty`) and mark the device `failed`; and go on. The battery that shows itself without asking the controller is listed, not present, and `Unknown`; the battery and the thermal zone that ask the controller are not taken on; no read in `/sys` takes half a second; writing 1 to the device's `reset` tries exactly one more exchange and leaves it failed; and the machine powers off. |
+| `acpi-ec-off` | x86_64 | The same table with `vinix.ec=off`: there is no controller device and no `ec` driver, and the battery never shows itself, because `_REG` never ran. |
+| `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` | x86_64 | Need a kernel built with `-d acpiec_selftest`, in which a simulated controller answers in place of the two ports; see [below](#the-embedded-controller-self-test). |
 | `qmp-powerdown` | aarch64, x86_64 | The guest waits, with no handler for the power-off request; the controller sends `system_powerdown`; the kernel powers the machine off within 30 s. |
 | `power-button-init` | aarch64, x86_64 | The guest is an init that handles the power-off request (`SIGUSR2`). The controller sends `system_powerdown`; the press must reach init as that signal instead of turning the machine off under it, and init then powers off. |
 | `restart` | aarch64, x86_64 | `reboot(2)` with the restart command resets the machine: QEMU's `SHUTDOWN` event must say `guest-reset`. |
@@ -199,7 +202,8 @@ Two further limits:
 ## Scenarios that need a kernel built for them
 
 Three scenarios read the verdict of a self-test compiled into the kernel, and
-are left out of a default run with the reason. Build such a kernel beside the
+two more need a kernel with a simulated embedded controller in it (the next
+section). All are left out of a default run with the reason. Build such a kernel beside the
 ordinary one and name the scenario:
 
 ```sh
@@ -230,3 +234,104 @@ PASS x86_64 iommu-amd-selftest (14.9s)
 PASS aarch64 thermal-selftest (20.9s)
   heating gave limits [90, 80, 70, 60]; hot gave 10; a failed sensor held 90
 ```
+
+### The embedded controller self-test
+
+No machine QEMU has an embedded controller, so what stands in for one is
+stated here exactly.
+
+A kernel built with `-d acpiec_selftest` never reads or writes the
+controller's two ports. The simulated controller of
+`kernel/x86/acpiec/sim_d_acpiec_selftest.v` -- 256 bytes of memory, the read,
+write and query commands, a queue of events -- answers instead, on the real
+clock. Everything above the two port instructions is the code an ordinary
+kernel runs: uACPI's region handler, the lock and the global lock, the
+exchanges and their timeouts, the queries, the methods. The controller is
+described to the kernel by tables the host writes (`ec-bench` in
+`hwhost/acpi_bench.v`, and an ECDT): a `PNP0C09` device with `_CRS`, `_GPE`,
+`_GLK` 1, `_REG`, an EmbeddedControl region with byte, word and four-byte
+fields, `_Q20` to `_Q24`, and a battery, a charger and a lid whose methods
+read the fields. The guest sets the controller's memory, queues its events
+and makes it misbehave through `/sys/bus/acpi/devices/PNP0C09:00/ec/selftest`.
+
+**Who raises the general purpose event.** For three events (the steps
+`controller event 1` to `3`) the host adds a processor to the running machine
+over QMP, which makes QEMU's emulated chipset set general purpose event 2 and
+raise the SCI; the tables give the controller that event, so the interrupt,
+uACPI's dispatch and the driver's handler run as they would for a controller's
+own line. The added processor is never started. For every other event the
+self-test calls the driver's handler itself (`raise`, `later`, `storm`). In no
+case does a controller raise anything: there is none.
+
+`acpi-ec-selftest` (with an ECDT) checks:
+
+- what was found: ports, `source` `ECDT and namespace`, `_UID`, the event,
+  `events` `gpe`, `global_lock` 1; and what was read while booting -- the
+  battery's state, charge, capacities, voltage and rate, the charger and the
+  lid, with the design voltage read while the table loaded and the cycle
+  count read in an `_INI`, which only an early handler makes possible;
+- a value with no event: memory, field, method, `/sys/class/power_supply`;
+- three events raised by the chipset: a Notify that has the battery's
+  capacities read again, and the lid shut and opened, with `gpe_count`,
+  `queries` and `methods` each one higher every time -- so the event is
+  switched on, and on again after each;
+- fields a word and four bytes wide read and written by a method; two events
+  behind one raise both taken; an event firmware has no method for counted;
+- sleep: the lid shuts, the machine sleeps, the lid opens 2.5 s later and
+  wakes it, attributed to `lid`; an event nothing claims does not end a sleep
+  and does once the `embedded-controller` source is enabled; with the
+  device's `power/wakeup` disabled the event is held until resume;
+- 300 events, each with a battery read, leave the kernel heap's live objects
+  where they were;
+- 150 reads of the battery while a second thread sends the reader signals
+  all return an answer;
+- a byte left in the output buffer is not an answer; a controller that never
+  runs out of events is asked 32 times; an event bit stuck up is asked about
+  once; a line raised 66 times at once is switched off and the event bit
+  polled, which still finds the lid;
+- a controller that stops answering: the battery read takes the two
+  exchanges' five seconds, the charger's the third exchange's two and a half,
+  then `failed` is 1, every read answers within half a second with `Unknown`,
+  and the device is `failed`; made to answer again and `reset`, it is in use
+  again;
+- and that the simulated controller saw no breach of the protocol.
+
+`acpi-ec-selftest-dsdt` is the same with no ECDT (`source` `namespace`) and
+`vinix.ec=clear,dsdt-gpe`: the controller must be queried once at start and
+once after each of four sleeps whatever its event bit says.
+
+```sh
+mkdir -p build-amd64-selftest/obj
+rsync -a --delete --exclude /bin/ --exclude /obj/ --exclude /cc-runtime-x86_64/ \
+    --exclude /cc-runtime-aarch64/ kernel/ build-amd64-selftest/
+make -C build-amd64-selftest ARCH=x86_64 CC=clang AR=llvm-ar LD_X86_64="$(command -v ld.lld)" V="$V" \
+    "VFLAGS=-d acpiec_selftest" -j8
+tests/hardware-platform/run --arch x86_64 --kernel build-amd64-selftest/bin/vinix \
+    --scenario acpi-ec-selftest --scenario acpi-ec-selftest-dsdt
+```
+
+```
+PASS x86_64 acpi-ec-selftest (51.6s)
+  boot: init 191 ms after the clock started, 36 exchanges, source ECDT and namespace
+  events raised by the chipset: 3, queries 3, methods 3
+  lid: shut, slept 2446 ms, woken by lid
+  unclaimed event: ignored asleep, then ended a sleep after 1008 ms once allowed
+  300 events and 3736 exchanges: live heap objects 8018 -> 8021, large pages 157 -> 157
+  under signals: 150 reads of the battery, 0 without an answer, 45 signals taken
+  the global lock was given up on 6 times while the controller was silent
+  silent: battery read 5041 ms, then at most 60 ms a read; device failed
+  in all: 5776 exchanges, 508 events, 3 timeouts, 1 stale bytes, protocol violations 0
+PASS x86_64 acpi-ec-selftest-dsdt (51.2s)
+  boot: init 193 ms after the clock started, 37 exchanges, source namespace
+  ...
+PASS x86_64 acpi-ec-absent (8.7s)
+  init 271 ms after the clock started; slowest read 17 ms; 2 exchanges, 2 failed, 14 callers turned away; reset took under 503 ms
+```
+
+What these do not show: anything about a real controller. The simulated one
+is this repository's reading of the specification; a pass says the kernel
+agrees with that reading from the region handler down to the port functions,
+and that ports with nothing behind them do it no harm. The protocol's own
+tests, on the host with a simulated clock, are `sh tests/acpi-ec/run.sh`.
+A scenario that needs longer than a run's `--timeout` says so in its record
+(`timeout`); these two take about 50 s of a 240 s allowance.

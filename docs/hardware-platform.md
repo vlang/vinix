@@ -290,6 +290,19 @@ the battery gauge does not. With `power/wakeup` of the device `disabled` its
 event is off for the sleep. On resume, and at start, a controller whose
 event bit is already up is asked.
 
+**Thermal zones.** A laptop's thermal zone usually reads its temperature
+from the controller (`_TMP` is a field of its region) and hears of a trip
+through a query whose method sends the zone a Notify. Such a zone goes
+through the same region handler as a battery's `_BST`, and zones are looked
+for after the controller has started. What has been tried of the pair is one
+side only: with a controller nothing answers for, a zone whose `_TMP` reads
+it is not taken on and delays nothing (`acpi-ec-absent`). A zone read through
+a controller that works -- polled once a second beside the battery, tripped
+by a query, or losing its controller while it is being polled, where five
+failed readings switch the zone off -- has not been run, simulated or real:
+the thermal scenario's zone computes its temperature in AML, and the
+controller scenarios' working tables have no zone.
+
 **`/sys`** shows the ports, the event, how events are heard, the global
 lock, whether the controller has been given up on and why, and counts of
 exchanges, timeouts, restarts, stale bytes, queries and methods, in
@@ -339,8 +352,11 @@ What this is not:
   I2C bus as hardware-reduced machines have it -- is not driven.
 - `_GPE` naming a block of events (`ACPI0006`) is understood and falls back
   to polling: this kernel serves only the FADT's two blocks.
-- No per-model quirks. Linux applies its three by a table of machines; here
-  they are boot options.
+- No per-model quirks. Linux applies its by a table of machines. Here two
+  are boot options (`clear`, `dsdt-gpe`); believing the ECDT's event is the
+  default, as it is Linux's; and an ECDT whose ports disagree with the
+  device's -- the swapped ports Linux corrects on some MSI machines -- loses
+  to the device, but only once the namespace has been read.
 
 ## Sleep
 
@@ -558,6 +574,7 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `suspend`: rehearsal, alarm, key, power button, a source not allowed to wake | pass | pass |
 | `acpi-power`: scripted battery, charger and lid | pass | -- |
 | `acpi-thermal`: a scripted thermal zone, four fans of every kind, the passive limit, critical power-off | pass | -- |
+| `acpi-ec-absent`, `acpi-ec-off`: a described embedded controller that nothing answers for; the driver switched off | pass | -- |
 | `iommu-intel`, `iommu-amd`, `iommu-off` | pass | -- |
 | `cpu-power`, `cpu-power-simulated` | pass | pass |
 | `thermal` | pass | pass |
@@ -568,10 +585,12 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `pci-hotplug-iommu`: the same behind Intel VT-d, the card isolated each time it arrives | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
+| `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` (kernel built with `-d acpiec_selftest`: a simulated embedded controller) | pass | -- |
 
-Host unit tests: `tests/hardware-platform/hwhost` (7 files),
+Host unit tests: `tests/hardware-platform/hwhost` (8 files),
 `tests/power-supply/run`, `sh tests/cpu-power/run.sh`, `sh tests/thermal/run.sh`,
-`tests/pci-hotplug/run`.
+`tests/pci-hotplug/run`, `sh tests/acpi-ec/run.sh` (40 tests of the embedded
+controller's protocol against a simulated controller).
 See [the suite's README](../tests/hardware-platform/README.md) for what each
 scenario checks and for its recorded output.
 

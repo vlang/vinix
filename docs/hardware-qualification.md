@@ -52,15 +52,16 @@ State and evidence for the capabilities of [hardware-platform](hardware-platform
 | Firmware loader | implemented (VM) | implemented (VM) | untried | open: Wi-Fi firmware still comes from userspace |
 | Power off, restart with devices stopped | implemented (VM) | implemented (VM) | untried | partial: restart through the watchdog untried; power off needs the SMC and ends halted |
 | Power button | implemented (VM) | implemented (VM, polled) | untried | open |
-| Lid | implemented (VM: scripted ACPI lid) | open | untried; needs an EC driver on most laptops | open |
+| Embedded controller | implemented (VM: a simulated controller in a self-test kernel; an ordinary kernel only against ports nothing answers at) | -- (no ACPI on this kernel) | host: the protocol against a simulated controller; untried | -- (Apple's is the SMC) |
+| Lid | implemented (VM: scripted ACPI lid, and one read through the simulated embedded controller) | open | untried; read through the embedded controller on most laptops, and that driver has met only a simulated one | open |
 | Suspend to idle, wake sources, alarm | implemented (VM) | implemented (VM) | untried | open: untried, and the idle loop polls |
 | Suspend to RAM, hibernation | open | open | open | open |
 | Screen sleep, backlight | partial (VM: the boot framebuffer is dark during a sleep; no backlight or display power control) | partial (VM: the same) | untried | partial: brightness through DCP, opt-in ([M1 AGX](m1-agx-bringup.md)); the panel is not darkened for a sleep |
-| Battery, charger, time left | implemented (VM: scripted ACPI battery) | open | untried; needs an EC driver on most laptops | partial: percentage, voltage, current, power in `/dev` ([M1 battery](m1-battery.md)); not in `/sys`, no status or time |
+| Battery, charger, time left | implemented (VM: scripted ACPI battery, and one read through the simulated embedded controller) | open | untried; read through the embedded controller on most laptops, and that driver has met only a simulated one | partial: percentage, voltage, current, power in `/dev` ([M1 battery](m1-battery.md)); not in `/sys`, no status or time |
 | Charge limit | open | open | open | open |
 | CPU idle states | implemented (VM: HLT) | implemented (VM: WFI) | host: MWAIT tables; untried | open by default (polls); `vinix.apple_idle=wfi` untried |
 | CPU frequency | implemented (VM: simulated driver) | implemented (VM: simulated driver) | host: HWP, SpeedStep, CPPC encodings; untried | host: cluster DVFS sequence; off by default, untried |
-| Temperature, thermal limit | implemented (VM: made-up zone, and a scripted ACPI thermal zone) | implemented (VM: made-up zone) | host: coretemp, k10temp, RAPL decoding; ACPI thermal zones untried | open: no SMC sensors |
+| Temperature, thermal limit | implemented (VM: made-up zone, and a scripted ACPI thermal zone) | implemented (VM: made-up zone) | host: coretemp, k10temp, RAPL decoding; ACPI thermal zones untried, and none has been read through an embedded controller, simulated or real | open: no SMC sensors |
 | Fans | implemented (VM: scripted ACPI fans of each kind, driven by a zone's active trips) | open | untried; a laptop's fans are usually its embedded controller's and not in ACPI | open |
 
 ## Device families, by machine
@@ -87,7 +88,7 @@ driver has none, that is said.
 | Audio | Intel HD Audio | `dev/hda` | partial | binds in QEMU; no test plays or records through it, and no document records that it works |
 | Input | PS/2 keyboard and mouse | `dev/console`, `dev/mouse` | implemented (VM) | ISO checks; hardware-platform `suspend` (wake by key) |
 | Input | USB (xHCI) | none on x86 | open | most PC keyboards and all external ones |
-| Platform | ACPI (uACPI), LAPIC, IOAPIC, HPET | `uacpi`, `x86/*` | implemented (VM) | events, power button, sleep states S5; no EC driver |
+| Platform | ACPI (uACPI), LAPIC, IOAPIC, HPET | `uacpi`, `x86/*` | implemented (VM) | events, power button, sleep states S5; embedded controller (`x86/acpiec`): host tests of the protocol, and hardware-platform `acpi-ec-selftest` with a simulated controller behind uACPI; no physical controller tried |
 
 ### AArch64 VM
 
@@ -134,7 +135,7 @@ What the reference set needs that Vinix cannot write for itself.
 | Intel graphics DMC, GuC, HuC | i915 display power states and media | `linux-firmware`; redistributable | no consumer yet; the firmware loader is where it would come from |
 | Intel, Realtek, MediaTek Wi-Fi firmware | PC wireless | `linux-firmware`; redistributable | no driver |
 | NVIDIA | NVIDIA graphics | proprietary, or nouveau with signed firmware | open; not planned in this workstream |
-| ACPI tables and the embedded controller's behaviour | PC battery, lid, keys, thermal | each machine's firmware; per-model quirks | uACPI interprets the tables; no EC driver |
+| ACPI tables and the embedded controller's behaviour | PC battery, lid, keys, thermal | each machine's firmware; per-model quirks | uACPI interprets the tables and `x86/acpiec` drives the controller by the specification and Linux's defaults; no machine's quirks are known, and two of Linux's per-model ones are boot options (`vinix.ec=`) |
 | USB-IF, PCI-SIG, NVMe, AHCI, Intel VT-d, AMD-Vi specifications | everything on a bus | public | followed; Linux 6.6 is the reference for behaviour firmware gets wrong |
 
 ## The physical checklist
