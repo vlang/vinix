@@ -153,6 +153,8 @@ fn keyboard_handler() {
 	if ps2_config & (1 << 5) != 0 {
 		write_ps2(0x64, 0xa8)
 	}
+	// Kept for the day the controller has to be told again: resume_amd64.v.
+	remember_ps2_config(ps2_config)
 
 	console_convtab_numpad_numlock = {
 		u8(0x37): u8(`*`)
@@ -173,7 +175,13 @@ fn keyboard_handler() {
 
 	for {
 		event.await_one(mut int_events[vect], true) or {}
-		input_byte := read_ps2()
+		// The byte the interrupt announced may be gone: whoever set the
+		// controller up again after a sleep emptied its buffer. Waiting for
+		// one that is not coming would hold this CPU until the next key.
+		if kio.port_in[u8](0x64) & 1 == 0 {
+			continue
+		}
+		input_byte := kio.port_in[u8](0x60)
 		// A key going down ends a sleep, if keys are allowed to. Its release
 		// does not: the release of the key that asked for the sleep arrives
 		// just as the machine has gone down. Break codes have the top bit
@@ -468,6 +476,7 @@ pub fn initialise() {
 
 	setup_console()
 
+	register_keyboard_controller()
 	spawn keyboard_handler()
 }
 

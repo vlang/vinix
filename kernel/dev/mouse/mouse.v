@@ -11,6 +11,8 @@ import klock
 import katomic
 import errno
 import wakesrc
+import devcore
+import dev.console
 import x86.kio
 import x86.apic
 import x86.idt
@@ -246,6 +248,9 @@ __global (
 	mouse_res        Mouse
 	pointer_res      Pointer
 	ps2_mouse_vector u8
+	// Set when the mouse has been set up again after a loss of power: the
+	// next byte it sends is the first of a packet, wherever the handler was.
+	ps2_mouse_restart u32
 )
 
 fn clamp_pointer_axis(value int, maximum int) int {
@@ -274,6 +279,10 @@ fn handler() {
 		// the first 250 milliseconds after boot
 		if monotonic_clock.tv_sec == 0 && monotonic_clock.tv_nsec < 250000000 {
 			kio.port_in[u8](0x60)
+		}
+		if katomic.cas(mut &ps2_mouse_restart, u32(1), u32(0)) {
+			handler_cycle = 0
+			discard_packet = false
 		}
 
 		match handler_cycle {
@@ -363,6 +372,49 @@ pub fn initialise() {
 	mouse_res.pointer_y = 383
 	mouse_res.pointer_max_x = 1023
 	mouse_res.pointer_max_y = 767
+	negotiate()
+
+	mouse_res.stat.size = 0
+	mouse_res.stat.blocks = 0
+	mouse_res.stat.blksize = 512
+	mouse_res.stat.rdev = resource.create_dev_id()
+	mouse_res.stat.mode = 0o644 | stat.ifchr
+
+	mouse_res.status |= file.pollout
+
+	fs.devtmpfs_add_device(&mouse_res, 'mouse')
+
+	pointer_res.stat.size = u64(sizeof(PointerPacket))
+	pointer_res.stat.blocks = 0
+	pointer_res.stat.blksize = u64(sizeof(PointerPacket))
+	pointer_res.stat.rdev = resource.create_dev_id()
+	pointer_res.stat.mode = 0o666 | stat.ifchr
+	// Reads return the current absolute state immediately. POLLIN is raised by
+	// the PS/2 handler only when a fresh packet makes the snapshot change.
+	pointer_res.status |= file.pollout
+	fs.devtmpfs_add_device(&pointer_res, 'pointer')
+
+	ps2_mouse_vector = idt.allocate_vector()
+	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, ps2_mouse_vector, 12, true)
+
+	// Resumed with the other devices, after the keyboard controller it is
+	// reached through: that one is registered first.
+	if _ := devcore.register_driver(devcore.Driver{
+		name:    'psmouse'
+		bus:     .platform
+		suspend: mouse_suspend
+		resume:  mouse_resume
+	})
+	{
+		devcore.claim_platform('i8042-aux', 'pnp0f13', 'psmouse')
+	}
+
+	spawn handler()
+}
+
+// Tell the mouse what it is to be: defaults, the packet format it can do, and
+// to start reporting. At boot, and again when it has been without power.
+fn negotiate() {
 	mouse_res.packet_bytes = 3
 	mouse_res.five_buttons = false
 
@@ -388,29 +440,35 @@ pub fn initialise() {
 
 	write(0xf4)
 	read()
+}
 
-	mouse_res.stat.size = 0
-	mouse_res.stat.blocks = 0
-	mouse_res.stat.blksize = 512
-	mouse_res.stat.rdev = resource.create_dev_id()
-	mouse_res.stat.mode = 0o644 | stat.ifchr
+fn mouse_suspend(mut _ devcore.Device) bool {
+	return true
+}
 
-	mouse_res.status |= file.pollout
-
-	fs.devtmpfs_add_device(&mouse_res, 'mouse')
-
-	pointer_res.stat.size = u64(sizeof(PointerPacket))
-	pointer_res.stat.blocks = 0
-	pointer_res.stat.blksize = u64(sizeof(PointerPacket))
-	pointer_res.stat.rdev = resource.create_dev_id()
-	pointer_res.stat.mode = 0o666 | stat.ifchr
-	// Reads return the current absolute state immediately. POLLIN is raised by
-	// the PS/2 handler only when a fresh packet makes the snapshot change.
-	pointer_res.status |= file.pollout
-	fs.devtmpfs_add_device(&pointer_res, 'pointer')
-
-	ps2_mouse_vector = idt.allocate_vector()
-	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, ps2_mouse_vector, 12, true)
-
-	spawn handler()
+// After a suspend to RAM the mouse is as it is after power-on: not
+// reporting, in the three-byte format. It is set up as at boot, with its
+// interrupt held off in the controller meanwhile: the answers to the commands
+// are read here, and the handler would take them for movement. After a
+// suspend to idle it lost nothing and is left alone.
+fn mouse_resume(mut _ devcore.Device) bool {
+	if !devcore.power_lost() {
+		return true
+	}
+	// All ones is a machine with no keyboard controller, and so no mouse on
+	// it.
+	if kio.port_in[u8](0x64) == 0xff {
+		return true
+	}
+	// Off already if the keyboard controller was resumed first, as it is.
+	console.pointer_interrupt(false)
+	negotiate()
+	for _ in 0 .. 64 {
+		if kio.port_in[u8](0x64) & 1 == 0 {
+			break
+		}
+		kio.port_in[u8](0x60)
+	}
+	katomic.store(mut &ps2_mouse_restart, u32(1))
+	return console.pointer_interrupt(true)
 }
