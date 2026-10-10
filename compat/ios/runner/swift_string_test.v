@@ -276,10 +276,10 @@ fn test_swift_string_and_buffer_ownership() {
 		assert api.unique(array) && read64(array + 8) == 3
 		api.release(array)
 		if _ := runtime_symbol(library, '_swift_allocObject') { assert false, 'unmeasured generic allocation must remain unresolved' }
-		if _ := runtime_symbol(library, '_$sSSN') { assert false, 'unsupported type metadata must remain unresolved' }
+		assert read64(runtime_symbol(library, '_$sSSN') or { panic(err) }) == 0x200
 		assert ios_runtime.swift_buffers.len == 0 && ios_runtime.objects.len == 0 && ios_runtime.live == 0
 		objc_stop()
-		assert ios_runtime.swift_buffers.len == 0 && ios_runtime.swift_arc_code == 0 && ios_runtime.objects.len == 0 && ios_runtime.live == 0
+		assert ios_runtime.swift_buffers.len == 0 && ios_runtime.swift_arc_code == 0 && ios_runtime.swift_metadata_arena == 0 && ios_runtime.objects.len == 0 && ios_runtime.live == 0
 	}
-	println('IOS-SWIFT: measured String/Int8 payload ABI, consuming interpolation transfer, owned copies, synchronized ARC, batch release widths, bridge ownership, rejected shared/foreign storage and application metadata, overflow/underflow and two empty runtime teardowns')
+	println('IOS-SWIFT: measured String/Int8 payload ABI, consuming interpolation transfer, owned copies, synchronized ARC, batch release widths, bridge ownership, rejected shared/foreign storage and generic allocation, overflow/underflow and two empty runtime teardowns')
 }

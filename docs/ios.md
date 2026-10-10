@@ -102,7 +102,8 @@ total reserved image space.
 
 ARM64e/PAC, encrypted images, non-PIE binaries, custom stack sizes, threaded dyld
 binding opcodes, TLS pointer/initializer sections and multiple chain starts
-per page are rejected. Objective-C exceptions and Swift metadata are unsupported.
+per page are rejected. Objective-C exceptions and general Swift metadata are
+unsupported; the String metadata and value witnesses described below are available.
 Blocks support object/block captures, but not
 `__block` by-reference captures. ARC and weak tables are synchronized; UIKit
 view operations run on the main thread. Mach IPC services,
@@ -1508,8 +1509,8 @@ and unmapped at quiescent shutdown. Register-seeding probes against native and
 V entries verify nil and owned-buffer calls.
 
 This is a bounded String/byte-buffer implementation. Its buffer header points
-to a private V descriptor, not Swift class/type metadata. Reflection, casts,
-value witnesses, generic allocation, weak/unowned ownership and ARC for
+to a private V descriptor, not Swift class/type metadata. Generic array
+reflection, casts, value witnesses, allocation, weak/unowned ownership and ARC for
 application Swift heap objects still fail explicitly. Returning this buffer
 does not establish compatibility with generic Swift array operations.
 
@@ -1529,22 +1530,75 @@ errno, directory close or a missing/duplicate created entry; the cause is
 not established. Its serial log and VM hashes are retained, and the identical
 suite passes on retry.
 
-Thirty more strong imports resolve. Fortnite still exits with status 1 before
-entry, now at String type metadata `_$sSSN` in EOSSDK. The installed Mac
-library's String metadata kind, relative descriptor name and value-witness
-table layout are measured; V metadata and witness callbacks remain incomplete.
+Thirty more strong imports resolved. That Fortnite probe exited with status 1
+before entry at String type metadata `_$sSSN` in EOSSDK.
+
+String metadata, its nominal descriptor and accessor now resolve in V, with
+all eight value witnesses. Measurements against this Mac's installed library
+verify struct kind `0x200`, the header's witness pointer, size/stride 16,
+8-byte alignment and the sole field offset zero. The descriptor identifies
+`Swift.String` through relative pointers and returns the same complete metadata
+through its accessor for blocking and nonblocking requests. The
+[Swift metadata ABI](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/include/swift/ABI/Metadata.h)
+and [value-witness definitions](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/include/swift/ABI/ValueWitness.def)
+provide the layouts and callback signatures.
+
+Copies acquire their bridge owner before writing the destination. Assignments
+publish the new words before releasing the previous owner; takes transfer the
+reference without acquiring it. Destruction releases the owner without clearing
+the now-uninitialized words. Supported ownership paths cover inline/immortal
+Strings and registered Cocoa bridge objects. ARC for application Swift heaps
+still fails explicitly; native owned String measurements exercise native
+witnesses only. Foreign String ownership does not add foreign UTF-8 conversion.
+
+The two enum witnesses encode Optional and other single-payload enum cases.
+The advertised extra-inhabitant count is `INT32_MAX`; the native raw reader
+recognizes low 32-bit bridge-pointer patterns. Enums with more empty cases use
+one trailing tag byte and a case index in the first four payload bytes.
+Tests allocate exactly 16 or 17 bytes and compare encodings through `UINT32_MAX`.
+An initial boundary assertion incorrectly equated the advertised count with
+the raw reader's range; additional native measurements corrected that assumption.
+
+One mapping holds adjacent accessor and metadata pages, keeping relative
+pointers in signed 32-bit range. V emits the ARM64 accessor, seals its page RX
+and the data page read-only, then publishes the metadata under the runtime lock.
+Quiescent teardown unmaps both pages. The nominal descriptor has no reflection
+field record; generic reflection and mangled type lookup remain unresolved.
+The UTF-8 arrays still use their separate private buffer descriptor.
+
+Native Mac/V ASAN/UBSAN checks cover all eight callbacks, descriptor/accessor
+responses, buffer guards, enum boundaries, copy self-assignment, assignments
+between owners and eight concurrent copy/destroy workers. V deallocation
+callbacks verify the replacement owner is already published and wait for a
+second thread to copy it, checking that callbacks hold no witness lock.
+Two runtime teardown cycles leave objects, owned buffers and metadata mappings
+empty. Native captures, fixed-version primary sources, installed SDK interfaces
+and generated bodies are retained under `swift-metadata-checks`.
+
+All seventeen native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. Two earlier runs failed at the unchanged timestamp fixture's
+successful-`utime` assertion before reaching the new check. A separate diagnostic
+copy and then the unchanged final build both pass; the failures' cause remains
+unestablished. Serial logs and VM hashes for both failures and the diagnostic
+run are retained, along with matching generated timestamp helper bodies from
+the prior passing build.
+
+Two more strong imports resolve. Fortnite still exits with status 1 before
+entry, now at String's `TextOutputStreamable` protocol witness table
+`_$sSSs20TextOutputStreamablesWP` in EOSSDK. Protocol conformances and generic
+interpolation remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,359 | 799 | 81 |
-| EOSSDK | 570 | 92 | 18 |
+| Fortnite executable | 1,360 | 798 | 81 |
+| EOSSDK | 571 | 91 | 18 |
 | MarketplaceKitWrapper | 69 | 107 | 23 |
-| All images | 1,998 | 998 | 122 |
+| All images | 2,000 | 996 | 122 |
 
-The C++/GLES/Text variant reports 2,011 resolved imports, 985 unresolved strong
+The C++/GLES/Text variant reports 2,013 resolved imports, 983 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1585,13 +1639,14 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 CoreFoundation dictionaries use `cf-dictionary-checks`, supplied Objective-C
 storage uses `objc-storage-checks`, associated objects use
 `objc-associated-checks`, property access uses `objc-property-checks`,
-object monitors use `objc-sync-checks`, and Swift strings/buffers use
-`swift-string-checks`). Each
+object monitors use `objc-sync-checks`, Swift strings/buffers use
+`swift-string-checks`, and String metadata/witnesses use
+`swift-metadata-checks`). Each
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant and
 CoreFoundation dictionary, supplied Objective-C storage, associated-object,
-property, object-monitor and Swift string/buffer checks before the
+property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

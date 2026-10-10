@@ -11,8 +11,8 @@ mut:
 }
 
 // A private descriptor for buffers owned by this implementation. It is NOT
-// Swift class/type metadata: reflection, casts, value witnesses and generic
-// allocation remain unsupported exports. The measured array body and ARC
+// Swift class/type metadata: generic array reflection, casts, value witnesses
+// and allocation remain unsupported exports. The measured array body and ARC
 // entry points below are the supported operations on these buffers.
 struct SwiftUTF8BufferDescriptor {
 	name &char = c'Vinix Swift UTF-8 buffer'
@@ -180,10 +180,14 @@ fn swift_buffers_stop() {
 	if ios_runtime.swift_buffers.len != 0 { panic('iOS: Swift UTF-8 arrays still owned at shutdown') }
 	unsafe { ios_runtime.swift_buffers.free() }
 	swift_arc_stop()
+	swift_metadata_stop()
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_$sSSN' { swift_string_metadata() }
+		'_$sSSMn' { read64(swift_string_metadata() + 8) }
+		'_$sSSMa' { swift_string_metadata(); ios_runtime.swift_metadata_arena }
 		'_$sSS19stringInterpolationSSs013DefaultStringB0V_tcfC' { u64(unsafe { voidptr(swift_string_interpolation) }) }
 		'_$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC' { u64(unsafe { voidptr(swift_string_literal) }) }
 		'_$sSS11utf8CStrings15ContiguousArrayVys4Int8VGvg' { u64(unsafe { voidptr(swift_string_utf8_cstring) }) }

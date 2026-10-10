@@ -128,6 +128,7 @@ mut:
 	monitors map[u64]&ObjMonitor
 	swift_buffers map[u64]u64 // Owned UTF-8 array allocation -> element count, under the runtime lock.
 	swift_arc_code u64 // Sealed ARM64 preserve-most entry points, released at quiescent teardown.
+	swift_metadata_arena u64 // Adjacent sealed String metadata/accessor pages, under the runtime lock.
 	names        map[string]u64
 	pool_key u64
 	graphics_key u64
