@@ -83,6 +83,8 @@ __global (
 	// it was away the last time.
 	syspower_deep_cycles  u64
 	syspower_deep_away_ns u64
+	// What is done for the devices that may end the sleep; see on_deep_sleep().
+	syspower_deep_wake DeepWake
 )
 
 // Suspend to RAM is offered when firmware has an S3 to ask for, the kernel
@@ -219,6 +221,32 @@ fn wake_cause() int {
 	return no_source
 }
 
+struct DeepWake {
+mut:
+	arm    fn (state int) = unsafe { nil }
+	disarm fn ()          = unsafe { nil }
+}
+
+// What a device that may end a suspend to RAM needs done before firmware is
+// told of the sleep, and undone once firmware has been told the machine is
+// back: who knows such devices says so here (x86/acpipm/wake.v).
+pub fn on_deep_sleep(arm fn (state int), disarm fn ()) {
+	syspower_deep_wake.arm = arm
+	syspower_deep_wake.disarm = disarm
+}
+
+fn deep_arm_wake() {
+	if syspower_deep_wake.arm != unsafe { nil } {
+		syspower_deep_wake.arm(uacpi.sleep_state_s3)
+	}
+}
+
+fn deep_disarm_wake() {
+	if syspower_deep_wake.disarm != unsafe { nil } {
+		syspower_deep_wake.disarm()
+	}
+}
+
 // In a rehearsal firmware is not asked: the processor is saved, and carries
 // straight on.
 fn enter_nothing() {
@@ -231,8 +259,10 @@ fn enter_nothing() {
 fn deep_sleep_here(rehearse bool) bool {
 	mut alarm := u64(0)
 	if !rehearse {
+		deep_arm_wake()
 		status := uacpi.prepare_sleep(uacpi.sleep_state_s3)
 		if status != .ok {
+			deep_disarm_wake()
 			C.kprintf(c'syspower: firmware would not prepare for S3: %s\n', C.uacpi_status_to_string(status))
 			return deep_failed('firmware would not prepare')
 		}
@@ -346,6 +376,7 @@ fn deep_sleep_here(rehearse bool) bool {
 	}
 	if !rehearse {
 		uacpi.leave_sleep(uacpi.sleep_state_s3)
+		deep_disarm_wake()
 	}
 	if alarm_armed {
 		disarm_clock_alarm(cause == int(wakesrc.Source.alarm))

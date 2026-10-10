@@ -84,12 +84,19 @@ pub fn initialise() {
 	acpipm_started = true
 	mut battery_driver := register('battery')
 	mut adapter_driver := register('ac')
-	mut button_driver := register('button')
+	mut button_driver := devcore.register_driver(devcore.Driver{
+		name:    'button'
+		bus:     .acpi
+		suspend: button_suspend
+		resume:  button_resume
+	}) or { panic('acpipm: driver table full') }
+	wake_decide()
 	uacpi.for_each_device('PNP0C0A', battery_found, voidptr(battery_driver))
 	uacpi.for_each_device('ACPI0003', adapter_found, voidptr(adapter_driver))
 	uacpi.for_each_device('PNP0C0D', lid_found, voidptr(button_driver))
 	uacpi.for_each_device('PNP0C0C', power_button_found, voidptr(button_driver))
 	uacpi.for_each_device('PNP0C0E', sleep_button_found, voidptr(button_driver))
+	initialise_wake()
 	if acpipm_batteries + acpipm_adapters + acpipm_lids + acpipm_buttons != 0 {
 		C.kprintf(c'acpipm: %lld batteries, %lld chargers, %lld lids, %lld buttons\n', i64(acpipm_batteries),
 			i64(acpipm_adapters), i64(acpipm_lids), i64(acpipm_buttons))
