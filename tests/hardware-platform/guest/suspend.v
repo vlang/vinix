@@ -109,6 +109,9 @@ fn scenario_suspend(mut t Test) {
 	t.check(stat_word('fail') == '0', 'fail is ${stat_word('fail')}')
 	t.check(stat_word('security_checks') == '5', 'security_checks is ${stat_word('security_checks')}')
 	t.check(stat_word('security_changes') == '0', 'CPU protections changed across a sleep')
+	// QEMU's 82540EM has no power management capability, so it stays in D0;
+	// pci-d3 is where a card is put down.
+	t.info('sleeps the network card spent in D3hot: ${sleeps_in_d3('e1000')} of 5')
 }
 
 fn counted() u64 {
