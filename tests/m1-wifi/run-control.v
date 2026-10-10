@@ -133,7 +133,7 @@ fn (c Config) core(name string, arch string) ! {
 }
 
 fn (c Config) fixture(name string, arch string, guest bool) ! {
-	mut argv := ['python3', c.path('tests/m1-wifi/compile-fixture.py'), c.output(name + '.c'), '--kind', 'ctl', '--entry']
+	mut argv := [c.path('tests/m1-wifi/compile-fixture'), c.output(name + '.c'), '--kind', 'ctl', '--entry']
 	if guest { argv << '--guest' }
 	argv << ['--arch', arch]
 	c.inherited(argv)!

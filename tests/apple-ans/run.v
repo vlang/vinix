@@ -149,7 +149,7 @@ fn calls(text string, mut counts map[string]json2.Any) {
 }
 
 fn (c Config) fixture(output string, kind string, features []string) ! {
-	c.inherited(join(['python3', c.path('tests/apple-ans/compile-fixture.py'), '--kind', kind], features, [output]))!
+	c.inherited(join([c.path('tests/apple-ans/compile-fixture'), '--kind', kind], features, [output]))!
 }
 
 // Keep the producer's actual interpreter output leaves and descriptor behavior.

@@ -169,7 +169,7 @@ fn allocation_counts(text string) map[string]json2.Any {
 }
 
 fn (c Config) fixture(name string, arch string, guest bool) ! {
-	mut argv := ['python3', c.path('tests/m1-wifi/compile-fixture.py'), '--entry']
+	mut argv := [c.path('tests/m1-wifi/compile-fixture'), '--entry']
 	if guest { argv << '--guest' }
 	argv << ['--arch', arch, c.output(name + '.c')]
 	c.inherited(argv)!

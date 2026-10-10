@@ -144,7 +144,7 @@ fn (c Config) provider(name string, arch string) ! {
 }
 
 fn (c Config) fixture(name string, arch string, guest bool) ! {
-	mut argv := ['python3', c.path('tests/m1-wifi/compile-fixture.py'), '--entry']
+	mut argv := [c.path('tests/m1-wifi/compile-fixture'), '--entry']
 	if guest { argv << '--guest' }
 	argv << ['--kind', 'platform', '--arch', arch]
 	argv << c.output(name + '.c')

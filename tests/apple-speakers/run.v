@@ -130,7 +130,7 @@ fn text_read(path string) !string {
 }
 
 fn (c Config) fixture(output string, arch string, guest bool) ! {
-	mut argv := ['python3', c.path('tests/apple-speakers/compile-fixture.py'), '--entry']
+	mut argv := [c.path('tests/apple-speakers/compile-fixture'), '--entry']
 	if guest { argv << '--guest' }
 	argv << ['--arch', arch, output]
 	c.inherited(argv)!
@@ -233,7 +233,7 @@ fn (c Config) execute() ! {
 	receipt['host_provider'] = applehost.copy_provider(c.root, c.output('spkcore'), 'speaker', false, c.host_arch == 'arm64')!
 	hosttest.generate_module(c.output('spkcore'), c.output('core.c'), c.host_arch, ['nofloat'])!
 	c.fixture(c.output('fixture.c'), c.host_arch, false)!
-	c.inherited(['python3', c.path('tests/apple-ans/compile-fixture.py'), '--kind', 'platform',
+	c.inherited([c.path('tests/apple-ans/compile-fixture'), '--kind', 'platform',
 		'--arch', c.host_arch, c.output('platform.c')])!
 	quotes := ['-iquote', c.path('kernel/c'), '-iquote', here]
 	mut common := [hosttest.env_default('CC', 'clang')]
@@ -290,7 +290,7 @@ fn (c Config) execute() ! {
 	json_write(c.output('native-provider.json'), json2.Any(native_provider))!
 	hosttest.generate_module(c.output('native/spkcore'), c.output('core-native.c'), native_arch, ['nofloat'])!
 	c.fixture(c.output('fixture-native.c'), native_arch, true)!
-	c.inherited(['python3', c.path('tests/apple-ans/compile-fixture.py'), '--kind', 'platform',
+	c.inherited([c.path('tests/apple-ans/compile-fixture'), '--kind', 'platform',
 		'--arch', native_arch, c.output('platform-native.c')])!
 	mut cc := []string{}
 	if c.arch == 'aarch64' {

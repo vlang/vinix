@@ -47,7 +47,7 @@ with context as directory:
     if re.search(r"\b_?(?:malloc|calloc|realloc|free|memdup|new_array\w*)\b", imports):
         raise RuntimeError("unexpected allocator import in SMC core:\n" + imports)
     source = work / "fixture.c"
-    subprocess.run(["python3", str(HERE / "compile-fixture.py"), str(source)], check=True)
+    subprocess.run([str(HERE / "compile-fixture"), str(source)], check=True)
     subprocess.run(common + ["-Wno-unused-function", "-Wno-unused-parameter", "-Wno-unused-label",
                     "-fwrapv", "-fno-strict-aliasing", "-iquote", str(ROOT / "kernel/c"),
                     "-iquote", str(HERE), "-c", str(source), "-o", str(work / "fixture.o")], check=True)
@@ -73,7 +73,7 @@ with context as directory:
     print("PASS V SMC fixture C/V goldens, C ABI, ASan/UBSan and no implicit allocator imports")
     if a.arch:
         native = work / "native.c"
-        subprocess.run(["python3", str(HERE / "compile-fixture.py"), "--guest", "--arch",
+        subprocess.run([str(HERE / "compile-fixture"), "--guest", "--arch",
                         "arm64" if a.arch == "aarch64" else "amd64", str(native)], check=True)
         if a.arch == "aarch64":
             sysroot = ROOT / "build-aarch64-userland/sysroot"

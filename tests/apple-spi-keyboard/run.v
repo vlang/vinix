@@ -142,7 +142,7 @@ fn (c Config) audit(path string, nm string) !json2.Any {
 }
 
 fn (c Config) fixture(kind string, output string, arch string, features []string) ! {
-	mut argv := ['python3', c.path('tests/apple-spi-keyboard/compile-fixture.py'), '--kind', kind,
+	mut argv := [c.path('tests/apple-spi-keyboard/compile-fixture'), '--kind', kind,
 		'--arch', arch, '--entry']
 	argv << features
 	argv << output
@@ -213,7 +213,7 @@ fn (c Config) execute() ! {
 	receipt['source_hashes'] = source_hashes
 	receipt['host_provider'] = applehost.copy_provider(c.root, c.output('spicore'), 'spi', false, c.host_arch == 'arm64')!
 	hosttest.generate_module(c.output('spicore'), c.output('core.c'), c.host_arch, ['nofloat'])!
-	c.inherited(['python3', c.path('tests/apple-ans/compile-fixture.py'), '--kind', 'platform',
+	c.inherited([c.path('tests/apple-ans/compile-fixture'), '--kind', 'platform',
 		'--arch', c.host_arch, c.output('platform.c')])!
 	quotes := ['-iquote', here, '-iquote', c.path('kernel/c'), '-iquote', c.path('tests/apple-ans'),
 		'-iquote', c.path('tests/apple-spi-touchpad')]
@@ -276,7 +276,7 @@ fn (c Config) execute() ! {
 	hosttest.generate_module(c.output('native/spicore'), c.output('core-native.c'), arch, ['nofloat'])!
 	c.fixture(c.suite, c.output('fixture-native.c'), arch, ['--guest'])!
 	c.fixture(c.suite, c.output('reference-entry.c'), arch, ['--guest', '--reference'])!
-	c.inherited(['python3', c.path('tests/apple-ans/compile-fixture.py'), '--kind', 'platform',
+	c.inherited([c.path('tests/apple-ans/compile-fixture'), '--kind', 'platform',
 		'--arch', arch, c.output('platform-native.c')])!
 	mut cc := []string{}
 	if c.arch == 'aarch64' {
