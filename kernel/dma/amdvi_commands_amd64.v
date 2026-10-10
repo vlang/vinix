@@ -63,6 +63,7 @@ fn amdvi_queue_locked(mut unit AmdviUnit, w0 u32, w1 u32, w2 u32, w3 u32) bool {
 		words[3] = w3
 	}
 	unit.command_tail = next
+	unit.commands_queued++
 	amdvi_write32(unit, amdvi_reg_command_tail, next)
 	return true
 }

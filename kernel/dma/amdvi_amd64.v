@@ -10,6 +10,7 @@
 //	amdvi_unit_amd64.v      a unit's registers and tables, and switching it on
 //	amdvi_commands_amd64.v  the command buffer: making a unit forget
 //	amdvi_domain_amd64.v    page tables for a device, and the DMA layer's six calls
+//	amdvi_events_amd64.v    the event log, and /sys/class/iommu
 module dma
 
 import acpi
@@ -81,6 +82,9 @@ fn amdvi_initialise() {
 		}
 		amdvi_units[amdvi_unit_count] = unit
 		amdvi_unit_count++
+	}
+	if amdvi_unit_count != 0 {
+		amdvi_start_poller()
 	}
 }
 

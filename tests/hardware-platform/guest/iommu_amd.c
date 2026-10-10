@@ -133,6 +133,7 @@ static int dns_answer(int seconds) {
 // A second proof that needs nothing beyond QEMU itself: nothing listens on
 // the host's discard port, so the connection is refused -- by a reset that
 // has to arrive through the receive ring. A dead receive path times out.
+static int tcp_errno;
 static int tcp_refused(void) {
     struct sockaddr_in host = {0};
     host.sin_family = AF_INET;
@@ -143,13 +144,16 @@ static int tcp_refused(void) {
     int r = connect(fd, (struct sockaddr *)&host, sizeof host);
     int e = errno;
     close(fd);
-    return r < 0 && e == ECONNREFUSED;
+    tcp_errno = r < 0 ? e : 0;
+    // The reset reaches a program as "refused" or, here, as "reset".
+    return r < 0 && (e == ECONNREFUSED || e == ECONNRESET);
 }
 
 static void network(const char *when) {
     int n = dns_answer(20);
-    say("IOMMU-AMD network %s: dns %s (%d bytes), tcp-reset %s\n", when,
-        n ? "answered" : "NO ANSWER", n, tcp_refused() ? "received" : "NOT RECEIVED");
+    int refused = tcp_refused();
+    say("IOMMU-AMD network %s: dns %s (%d bytes), tcp-reset %s (errno %d)\n", when,
+        n ? "answered" : "NO ANSWER", n, refused ? "received" : "NOT RECEIVED", tcp_errno);
 }
 
 int main(void) {
@@ -159,6 +163,12 @@ int main(void) {
 
     char unit[64] = "";
     DIR *d = opendir("/sys/class/iommu");
+    // The kernel publishes its units from a thread, moments after /sys is
+    // mounted; give it those moments.
+    for (int i = 0; !d && i < 20; i++) {
+        usleep(100000);
+        d = opendir("/sys/class/iommu");
+    }
     if (d) {
         struct dirent *e;
         while ((e = readdir(d)))

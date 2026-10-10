@@ -173,6 +173,17 @@ mut:
 	command_head     u32
 	command_sequence u64
 	command_timeouts u64
+	commands_queued  u64
+
+	// What the event log has held; under event_lock. See amdvi_events_amd64.v.
+	event_lock      klock.Lock
+	event_stalled   u32
+	events_seen     u64
+	events_by_kind  [amdvi_event_kinds]u64
+	events_unshown  u64
+	event_overflows u64
+	has_fault       bool
+	last_fault      AmdviEvent
 
 	// How many levels a device's page tables have here.
 	levels u8
