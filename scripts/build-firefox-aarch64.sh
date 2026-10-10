@@ -40,7 +40,9 @@ CACHE_ARGS=(
     --metadata "$DOWNLOADS"
     --source "$SCRIPT_DIR/scripts/build-firefox-aarch64.sh"
     --source "$SCRIPT_DIR/build-support/staging-cache.py"
-    --source "$SCRIPT_DIR/build-support/alpine-resolve.py"
+    --source "$SCRIPT_DIR/build-support/alpine-resolve.v"
+    --source "$SCRIPT_DIR/build-support/alpinecore/main.v"
+    --source "$SCRIPT_DIR/build-support/alpinecore/parse.v"
     --source "$SCRIPT_DIR/build-support/firefox"
     --source "$SCRIPT_DIR/tests/browsers/firefox-smoke.html"
     --executable usr/bin/run-firefox
@@ -92,7 +94,7 @@ fetch_index community
 # Firefox itself does not depend on a font package or the system TLS bundle,
 # although a useful browser needs both. The resolver follows the full runtime
 # closure, including GTK/X11, media codecs and their shared-library providers.
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$DOWNLOADS/${BRANCH_KEY}_main_APKINDEX" \
     --index community "$DOWNLOADS/${BRANCH_KEY}_community_APKINDEX" \
     "$FIREFOX_PACKAGE" ca-certificates font-dejavu > "$RESOLVED"

@@ -12,7 +12,7 @@ IMAGE_ROOT="$BUILD_DIR/image-root"
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.21}"
 ALPINE_ARCH=aarch64
 
-for tool in curl python3 tar; do
+for tool in curl tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1
@@ -38,7 +38,7 @@ done
 stage_packages() {
     local destination="$1" list="$2" repository filename archive
     shift 2
-    python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+    "$SCRIPT_DIR/build-support/alpine-resolve" \
         --index main "$DOWNLOADS/main_APKINDEX" \
         --index community "$DOWNLOADS/community_APKINDEX" \
         "$@" > "$list"

@@ -46,8 +46,7 @@ fn (e Engine) make_lock(downloads ah.Value, mirror ah.Value) !ah.Value {
 			object(digest),
 		])!
 	}
-	mut command := [ordinary(ah.Value('python3')),
-		ordinary(ah.Value(str(e.root_path('build-support/alpine-resolve.py')!)!))]
+	mut command := [ordinary(ah.Value(str(e.root_path('build-support/alpine-resolve')!)!))]
 	for item in e.c('REPOSITORIES').items() {
 		command << ordinary(ah.Value('--index'))
 		command << ordinary(item)

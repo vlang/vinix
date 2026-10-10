@@ -53,7 +53,7 @@ ROOT_PACKAGES=(
 )
 
 echo "=== resolving network developer tools for $ALPINE_ARCH ==="
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$DOWNLOADS/main_APKINDEX" \
     --index community "$DOWNLOADS/community_APKINDEX" \
     "${ROOT_PACKAGES[@]}" > "$BUILD_DIR/packages"

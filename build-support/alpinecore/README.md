@@ -1,4 +1,37 @@
-The native Alpine core owns APKINDEX fields, Python-compatible Unicode whitespace and line splitting, dependency key parsing, FIFO closure, provider preference, ignored dependency policy, sorting and output. The public Python entry retains argparse and the immutable Package API; standard library primitives and caller-owned objects use the shared runtimebuild bindings. Public parse_index, dependency_key and print replacements retain their original exception objects. Repository objects retain their original identity.
+The maintained command is now `build-support/alpine-resolve`, which compiles
+`alpine-resolve.v` and invokes this module directly. It has no Python runtime,
+JSON controller or borrowed-object dependency. All maintained shell and V build
+callers use it; staging cache keys include the entrypoint and both policy files.
+
+The parser preserves strict UTF-8 reads, universal newlines, Unicode whitespace
+and line splitting, repeated-field behavior and empty package names. The resolver
+preserves repository order, real-name preference over virtual providers, first
+provider selection, FIFO traversal, cycle/name deduplication, ignored shell and
+conflict dependencies, Unicode name sorting and tab-separated APK manifests.
+Version constraints remain stripped rather than evaluated. Errors produce no
+partial manifest. CLI help and syntax/read diagnostics are native text; statuses
+remain 0 for success, 1 for resolution/read errors and 2 for argument errors.
+
+Run the native checks with:
+
+```sh
+v -cc cc -o /tmp/alpine-resolve build-support/alpine-resolve.v
+VINIX_ALPINE_TOOL=/tmp/alpine-resolve v -cc cc test build-support/alpinecore
+```
+
+`VINIX_ALPINE_REPO=/path/to/vinix` additionally checks the cached Java, Go and
+QEMU package manifests against their unpacked indexes without downloading or
+changing anything. Qualification passed on ARM and Rosetta x86 hosts and with
+ARM ASan/UBSan, including all three cached manifests and a 1,000-package closure.
+The Debian controller still compiles against the shared whitespace/line helpers.
+No Python was run for this standalone stage, and no guest or full-image build is
+claimed. The frozen benchmark runner remains historical source at its recorded
+revision; it is not a maintained caller.
+
+The earlier callback-controller qualification below describes the superseded
+entrypoint. At that stage, the public Python entry retained argparse and the
+immutable Package API, and standard-library primitives and caller-owned objects
+used the shared runtimebuild bindings.
 
 Frozen source at 8aaf12979e5d2c704e34782921cd82c30250ab83 was 2,946 bytes/97 lines. This stage replaces 2,174 original policy bytes/56 lines; after the additional generic bindings, the net Python reduction is 606 bytes/22 lines. Third-party libraries and independent fixtures remain unchanged.
 

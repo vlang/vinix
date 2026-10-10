@@ -38,7 +38,7 @@ for repository in main community; do
 done
 
 echo "=== resolving $OPENJDK_PACKAGE for $ALPINE_ARCH ==="
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$DOWNLOADS/main_APKINDEX" \
     --index community "$DOWNLOADS/community_APKINDEX" \
     "$OPENJDK_PACKAGE" ca-certificates-bundle > "$BUILD_DIR/packages"

@@ -27,7 +27,7 @@ for repository in main community; do
     fi
 done
 
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$DOWNLOADS/main_APKINDEX" \
     --index community "$DOWNLOADS/community_APKINDEX" \
     qemu-system-aarch64 libx11 > "$BUILD_DIR/packages"

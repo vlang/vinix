@@ -64,7 +64,7 @@ download_index() {
 resolve_closure() {
     local output="$1"
     shift
-    python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+    "$SCRIPT_DIR/build-support/alpine-resolve" \
         --index main "$DOWNLOADS/main_APKINDEX" \
         --index community "$DOWNLOADS/community_APKINDEX" \
         "$@" > "$output"

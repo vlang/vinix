@@ -39,7 +39,9 @@ CACHE_ARGS=(
     --metadata "$DOWNLOADS"
     --source "$SCRIPT_DIR/scripts/build-libreoffice-aarch64.sh"
     --source "$SCRIPT_DIR/build-support/staging-cache.py"
-    --source "$SCRIPT_DIR/build-support/alpine-resolve.py"
+    --source "$SCRIPT_DIR/build-support/alpine-resolve.v"
+    --source "$SCRIPT_DIR/build-support/alpinecore/main.v"
+    --source "$SCRIPT_DIR/build-support/alpinecore/parse.v"
     --source "$SCRIPT_DIR/build-support/libreoffice"
     --executable usr/lib/libreoffice/program/soffice.bin
     --executable usr/bin/run-libreoffice
@@ -81,7 +83,7 @@ ROOT_PACKAGES=(
 )
 
 echo "=== resolving LibreOffice for Vinix/$ALPINE_ARCH ($ALPINE_BRANCH) ==="
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$DOWNLOADS/main_APKINDEX" \
     --index community "$DOWNLOADS/community_APKINDEX" \
     "${ROOT_PACKAGES[@]}" > "$BUILD_DIR/packages"

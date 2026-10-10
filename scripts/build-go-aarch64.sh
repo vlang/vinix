@@ -10,7 +10,7 @@ STAGING="$BUILD_DIR/staging"
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.21}"
 ALPINE_ARCH=aarch64
 
-for tool in curl python3 tar; do
+for tool in curl tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1
@@ -33,7 +33,7 @@ for repository in main community; do
 done
 
 echo "=== resolving Go for $ALPINE_ARCH ==="
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$DOWNLOADS/main_APKINDEX" \
     --index community "$DOWNLOADS/community_APKINDEX" \
     go ca-certificates-bundle > "$BUILD_DIR/packages"

@@ -1,104 +1,122 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
 module alpinecore
 
-import androidhost as ah
-import boothost
-import runtimebuild as rb
-
-fn key(specification ah.Value) !ah.Value {
-	native := rb.callback('function_is', {
-		'name':      ah.Value('dependency_key')
-		'reference': ah.Value('_native_dependency_key')
-	})! == ah.Value(true)
-	if native { return dependency_key(specification)! }
-	return rb.api('dependency_key', [rb.object(specification)], {}, true)!
+pub struct Package {
+pub:
+	name         string
+	version      string
+	dependencies []string
+	provides     []string
+	repository   string
 }
 
-fn contains(container ah.Value, value ah.Value) !bool {
-	return rb.bool_object(rb.call('acquire', 'operator', 'contains', [
-		rb.object(container),
-		rb.object(value),
-	], {})!)!
+pub struct Index {
+pub:
+	repository string
+	path       string
 }
 
-fn defaults(dictionary ah.Value, name ah.Value, value ah.Value) ! {
-	rb.method('invoke', dictionary, 'setdefault', [rb.object(name), rb.object(value)], {})!
-}
-
-fn resolve_main(args ah.Value) !ah.Value {
-	packages := rb.call('acquire', 'builtins', 'list', [], {})!
-	indexes := rb.iter_object(rb.attribute(args, 'index', true)!)!
-	for {
-		row := rb.next(indexes)!
-		if row == rb.null() { break }
-		pair := rb.callback('unpack_pair', {
-			'id': row
-		})!.items()
-		repository := pair[0]
-		path := rb.api('Path', [rb.object(pair[1])], {}, true)!
-		parsed := rb.api('parse_index', [rb.object(path), rb.object(repository)], {}, true)!
-		rb.method('invoke', packages, 'extend', [rb.object(parsed)], {})!
-	}
-	by_name := rb.call('acquire', 'builtins', 'dict', [], {})!
-	providers := rb.call('acquire', 'builtins', 'dict', [], {})!
-	iter := rb.iter_object(packages)!
-	for {
-		package := rb.next(iter)!
-		if package == rb.null() { break }
-		defaults(by_name, rb.attribute(package, 'name', true)!, package)!
-		defaults(providers, rb.attribute(package, 'name', true)!, package)!
-		provisions := rb.iter_object(rb.attribute(package, 'provides', true)!)!
-		for {
-			provision := rb.next(provisions)!
-			if provision == rb.null() { break }
-			defaults(providers, key(provision)!, package)!
+// Repository order wins, real names take precedence over virtual provisions,
+// and conflicts and the shell's built-in provisions are ignored.
+pub fn resolve(packages []Package, requests []string) ![]Package {
+	mut by_name := map[string]int{}
+	mut providers := map[string]int{}
+	for index, package in packages {
+		if package.name !in by_name { by_name[package.name] = index }
+		if package.name !in providers { providers[package.name] = index }
+		for provision in package.provides {
+			key := dependency_key(provision)
+			if key !in providers { providers[key] = index }
 		}
 	}
-	ignored := rb.call('acquire', 'builtins', 'set', [rb.ordinary(rb.strings(['/bin/sh', 'cmd:sh',
-		'cmd:busybox']))], {})!
-	queue := rb.call('acquire', 'collections', 'deque', [rb.object(rb.attribute(args, 'packages', true)!)], {})!
-	selected := rb.call('acquire', 'builtins', 'dict', [], {})!
-	for rb.bool_object(queue)! {
-		requested := key(rb.method('acquire', queue, 'popleft', [], {})!)!
-		if !rb.bool_object(requested)! || rb.bool_object(rb.method('acquire', requested, 'startswith', [rb.ordinary(ah.Value('!'))], {})!)! || contains(ignored, requested)! {
+	mut queue := requests.clone()
+	mut selected := map[string]bool{}
+	mut result := []Package{}
+	mut next := 0
+	for next < queue.len {
+		requested := dependency_key(queue[next])
+		next++
+		if requested == '' || requested.starts_with('!') || requested in ['/bin/sh', 'cmd:sh',
+			'cmd:busybox'] {
 			continue
 		}
-		mut package := rb.method('acquire', by_name, 'get', [rb.object(requested)], {})!
-		if !rb.bool_object(package)! {
-			package = rb.method('acquire', providers, 'get', [rb.object(requested)], {})!
+		index := by_name[requested] or {
+			providers[requested] or { return error('unresolved Alpine dependency: ${requested}') }
 		}
-		if rb.call('invoke', 'operator', 'is_', [rb.object(package), rb.ordinary(rb.null())], {})! == ah.Value(true) {
-			return boothost.PolicyError{'SystemExit', 'unresolved Alpine dependency: ' + rb.format_object(requested)!}
-		}
-		if contains(selected, rb.attribute(package, 'name', true)!)! { continue }
-		rb.method('invoke', selected, '__setitem__', [
-			rb.object(rb.attribute(package, 'name', true)!),
-			rb.object(package),
-		], {})!
-		rb.method('invoke', queue, 'extend', [rb.object(rb.attribute(package, 'dependencies', true)!)], {})!
+		package := packages[index]
+		if package.name in selected { continue }
+		selected[package.name] = true
+		result << package
+		queue << package.dependencies
 	}
-	values := rb.method('acquire', selected, 'values', [], {})!
-	// Attribute lookup is selected by V; the binding is the generic sorter.
-	sorted := rb.callback('sort_attribute', {
-		'id':   values
-		'name': ah.Value('name')
-	})!
-	ordered := rb.iter_object(sorted)!
-	for {
-		package := rb.next(ordered)!
-		if package == rb.null() { break }
-		text := rb.format_object(rb.attribute(package, 'repository', true)!)! + '\t' + rb.format_object(rb.attribute(package, 'name', true)!)! + '-' + rb.format_object(rb.attribute(package, 'version', true)!)! + '.apk'
-		rb.callback('print', {
-			'data': ah.Value(text)
-		})!
-	}
-	return ah.Value(0)
+	result.sort(a.name < b.name)
+	return result
 }
 
-pub fn dispatch(row map[string]ah.Value) !ah.Value {
-	return match ah.field(row, 'operation').text() {
-		'parse_index' { parse_index(rb.borrow('path')!)! }
-		'dependency_key' { rb.result_object(dependency_key(rb.borrow('specification')!)!) }
-		'main' { resolve_main(rb.borrow('args')!)! }
-		else { return error('Unknown Alpine resolver operation') }
+pub fn manifest(indexes []Index, requests []string) !string {
+	mut packages := []Package{}
+	for index in indexes { packages << parse_index(index.path, index.repository)! }
+	selected := resolve(packages, requests)!
+	mut result := ''
+	for package in selected {
+		result += '${package.repository}\t${package.name}-${package.version}.apk\n'
 	}
+	return result
+}
+
+fn usage() {
+	println('Usage: alpine-resolve --index REPOSITORY APKINDEX [--index REPOSITORY APKINDEX ...] PACKAGE ...')
+	println('Resolve an Alpine runtime dependency closure from unpacked APKINDEX files.')
+}
+
+pub fn run(args []string) int {
+	mut indexes := []Index{}
+	mut requests := []string{}
+	mut position := 0
+	mut positional := false
+	for position < args.len {
+		arg := args[position]
+		position++
+		if !positional && arg == '--' {
+			positional = true
+			continue
+		}
+		if !positional && arg in ['-h', '--help'] {
+			usage()
+			return 0
+		}
+		if !positional && (arg == '--index' || arg.starts_with('--index=')) {
+			count := if arg == '--index' { 2 } else { 1 }
+			if args.len - position < count {
+				eprintln('--index requires REPOSITORY and APKINDEX')
+				return 2
+			}
+			values := args[position..position + count]
+			if values.any(it.starts_with('-')) {
+				eprintln('--index requires REPOSITORY and APKINDEX')
+				return 2
+			}
+			indexes << Index{
+				repository: if count == 2 { values[0] } else { arg.all_after('=') }
+				path:       values.last()
+			}
+			position += count
+			continue
+		}
+		if !positional && arg.starts_with('-') {
+			eprintln('unknown argument: ${arg}')
+			return 2
+		}
+		requests << arg
+	}
+	if indexes.len == 0 || requests.len == 0 {
+		eprintln('alpine-resolve requires at least one --index and one package')
+		return 2
+	}
+	output := manifest(indexes, requests) or {
+		eprintln(err)
+		return 1
+	}
+	print(output)
+	return 0
 }

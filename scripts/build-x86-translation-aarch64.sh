@@ -170,7 +170,7 @@ GUEST32_MAIN="$(fetch_index "$GUEST32_ARCH" main)"
 GUEST32_COMMUNITY="$(fetch_index "$GUEST32_ARCH" community)"
 
 echo "=== staging the $NATIVE_ARCH x86 translators ==="
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$NATIVE_MAIN" \
     --index community "$NATIVE_COMMUNITY" \
     qemu-x86_64 qemu-i386 samba-winbind-clients > "$BUILD_DIR/native-packages"
@@ -206,7 +206,7 @@ if [ "$WITH_WINE" -eq 1 ]; then
 fi
 
 echo "=== staging the $GUEST_ARCH musl runtime ==="
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$GUEST_MAIN" \
     --index community "$GUEST_COMMUNITY" \
     "${guest_packages[@]}" > "$BUILD_DIR/guest-packages"
@@ -217,7 +217,7 @@ done < "$BUILD_DIR/guest-packages"
 
 if [ "$WITH_WINE" -eq 1 ]; then
     echo "=== staging the $GUEST32_ARCH Wine32 runtime ==="
-    python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+    "$SCRIPT_DIR/build-support/alpine-resolve" \
         --index main "$GUEST32_MAIN" \
         --index community "$GUEST32_COMMUNITY" \
         busybox font-liberation gnutls libxcomposite libxinerama \

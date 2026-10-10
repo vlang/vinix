@@ -60,7 +60,7 @@ echo "=== resolving the Minecraft runtime for $ALPINE_ARCH ==="
 # software rasteriser here that reaches the OpenGL 3.2 core profile the modern
 # client requires. wayland-libs-server is a server-side edge of Mesa's gbm
 # loader that Alpine's dependency graph does not record.
-python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+"$SCRIPT_DIR/build-support/alpine-resolve" \
     --index main "$DOWNLOADS/main_APKINDEX" \
     --index community "$DOWNLOADS/community_APKINDEX" \
     gcompat jemalloc openal-soft-libs glfw freetype harfbuzz \

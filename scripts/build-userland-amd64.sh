@@ -59,7 +59,7 @@ stage_alpine_packages() {
     local repository filename package_archive
 
     fetch_alpine_indexes
-    python3 "$SCRIPT_DIR/build-support/alpine-resolve.py" \
+    "$SCRIPT_DIR/build-support/alpine-resolve" \
         --index main "$DOWNLOADS/main_APKINDEX" \
         --index community "$DOWNLOADS/community_APKINDEX" \
         "$@" > "$BUILD_DIR/packages"

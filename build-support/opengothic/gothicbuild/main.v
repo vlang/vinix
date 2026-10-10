@@ -98,8 +98,7 @@ fn main_policy() ! {
 		public('apply_patch', [tempest, patch.value], {})!
 	}
 	public('apply_patch', [source, lit('worker-count.patch')!], {})!
-	command_args := collection('list', [lit('python3')!,
-		call('str', o(join(global('ROOT')!, 'build-support/alpine-resolve.py')!))!])!
+	command_args := collection('list', [call('str', o(join(global('ROOT')!, 'build-support/alpine-resolve')!))!])!
 	indexes := call('builtins.dict')!
 	for repo in ['main', 'community'] {
 		archive := join(downloads, '${repo}-index.tar.gz')!

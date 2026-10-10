@@ -105,7 +105,7 @@ fn main_workflow() ! {
 	if !test(join(global('X11')!, 'sysroot/usr/include/GL/gl.h')!, 'is_file')! {
 		return failure('Build the X11 layer first with scripts/build-x11-aarch64.sh')
 	}
-	mut command := ['python3', py_str(join(global('ROOT')!, 'build-support/alpine-resolve.py')!)!]
+	mut command := [py_str(join(global('ROOT')!, 'build-support/alpine-resolve')!)!]
 	for repo in ['main', 'community'] {
 		archive := join(downloads, repo + '_APKINDEX.tar.gz')!
 		pinned_download(literal(text(global('MIRROR')!)! + '/' + repo + '/aarch64/APKINDEX.tar.gz')!, archive)!
