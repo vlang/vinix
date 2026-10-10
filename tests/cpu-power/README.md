@@ -52,8 +52,17 @@ Kernel command lines worth a run each:
 | --- | --- |
 | (none) | x86-64: `halt` under QEMU's emulation, whatever `-cpu`; arm64: `wfi` |
 | `vinix.cpuidle=mwait` | x86-64 with `-cpu max`: the MWAIT driver, in its `sti; mwait` form. QEMU's MWAIT does not wait on a machine with several CPUs, so `usage` grows by hundreds of thousands a second; that is the emulator, and why it is not the default |
+| `vinix.cpuidle=halt` | x86-64: HLT even where MWAIT would be used |
 | `vinix.cpuidle=off` | no idle driver: the scheduler's original loop |
+| `vinix.max_cstate=N` | x86-64: offer only the first N idle states |
 | `vinix.cpufreq=simulate` | a frequency driver with memory in place of registers, so that the policies, the worker and each driver's own path run in a guest: SpeedStep's on x86-64, Apple's cluster DVFS on arm64 |
+| `vinix.cpufreq=off` | x86-64: no frequency driver even where the processor has one |
+
+Two more are for hardware and do nothing in a guest: `vinix.apple_idle=wfi`
+(WFI in the idle loop of a physical Apple machine, which otherwise polls) and
+`vinix.apple_cpufreq=1` (Apple's cluster DVFS). Both are off by default and
+neither has been run on a machine; `kernel/cpuidle/driver_arm64.v` and
+`kernel/cpufreq/driver_arm64.v` say why.
 
 ## What no test here reaches
 
