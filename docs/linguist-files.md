@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `5a189a86fc98dd978c8215448022030cbc7ace0a`,
+at source commit `52f93ab8e1e0373deb705181788fb3ab54c29754`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,398 | 6.90% |
-| Python | 509 | 2,311,631 | 6.80% |
-| Shell | 339 | 1,338,104 | 3.94% |
+| C | 563 | 2,343,398 | 6.87% |
+| Python | 503 | 2,291,893 | 6.72% |
+| Shell | 345 | 1,339,552 | 3.93% |
 
-All `.v` files are classified as V. The resulting V share is 73.23%, with no
+All `.v` files are classified as V. The resulting V share is 73.38%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,311,631 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,291,893 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 5a189a86fc98dd978c8215448022030cbc7ace0a --breakdown --json
+github-linguist --rev 52f93ab8e1e0373deb705181788fb3ab54c29754 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -635,7 +635,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/qemu_iboot.py` | 9,857 |
 | `apple-boot/tests/run-v-core.py` | 3,889 |
 | `build-support/_cache_native.py` | 2,147 |
-| `build-support/alpine-resolve.py` | 1,830 |
 | `build-support/android/_boot_native.py` | 20,549 |
 | `build-support/android/_native.py` | 5,749 |
 | `build-support/android/art-bootclasspath.py` | 4,172 |
@@ -691,11 +690,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/venus/prepare-qemu.py` | 3,270 |
 | `build-support/venus/tests/run.py` | 6,197 |
 | `build-support/x86-translation/compile-v-office.py` | 1,516 |
-| `build-support/x86-translation/patch-msxml-unicode.py` | 4,979 |
-| `build-support/x86-translation/patch-wine-i386-qemu.py` | 2,899 |
-| `build-support/x86-translation/patch-wine-service-timeout.py` | 2,218 |
-| `build-support/x86-translation/patch-wine-x86_64-context.py` | 4,549 |
-| `build-support/x86-translation/patch-wine-x86_64-qemu.py` | 3,263 |
 | `build-support/xorg-server/compile-v-host.py` | 1,972 |
 | `desktop/tools/_font_native.py` | 9,708 |
 | `desktop/tools/_input_native.py` | 792 |
@@ -1143,6 +1137,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/compile-v` | 181 |
 | `apple-boot/tests/compile-fixture` | 190 |
 | `base-files/etc/profile` | 1,023 |
+| `build-support/alpine-resolve` | 169 |
 | `build-support/android/build-art.sh` | 9,004 |
 | `build-support/android/build-atl.sh` | 14,783 |
 | `build-support/android/build-bionic.sh` | 7,890 |
@@ -1180,7 +1175,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/qemu-system/vinix-qemu-desktop` | 851 |
 | `build-support/roblox/run-roblox` | 1,318 |
 | `build-support/roblox/run-roblox-client` | 182 |
-| `build-support/run-v-tool.sh` | 1,449 |
+| `build-support/run-v-tool.sh` | 1,617 |
 | `build-support/security-audit/run-collector` | 396 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
 | `build-support/stage-uname.sh` | 656 |
@@ -1203,6 +1198,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/vinix-pkg-wrapper` | 616 |
 | `build-support/vinix-version-check` | 1,591 |
 | `build-support/virglrenderer/build-host.sh` | 3,251 |
+| `build-support/x86-translation/patch-msxml-unicode` | 177 |
+| `build-support/x86-translation/patch-wine-i386-qemu` | 178 |
+| `build-support/x86-translation/patch-wine-service-timeout` | 184 |
+| `build-support/x86-translation/patch-wine-x86_64-context` | 183 |
+| `build-support/x86-translation/patch-wine-x86_64-qemu` | 180 |
 | `build-support/x86-translation/reexec-wine-preloader-x86-32` | 315 |
 | `build-support/x86-translation/reexec-wine-x86-32` | 231 |
 | `build-support/x86-translation/run-native-ntlm-auth` | 556 |
@@ -1236,30 +1236,30 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-android-aarch64.sh` | 207 |
 | `scripts/build-asahi-aarch64.sh` | 11,755 |
 | `scripts/build-blender-native-aarch64.sh` | 7,179 |
-| `scripts/build-chromium-aarch64.sh` | 5,506 |
+| `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 92,790 |
-| `scripts/build-desktop-amd64.sh` | 14,951 |
-| `scripts/build-developer-tools-aarch64.sh` | 4,338 |
+| `scripts/build-desktop-aarch64.sh` | 92,823 |
+| `scripts/build-desktop-amd64.sh` | 14,984 |
+| `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
-| `scripts/build-docker-aarch64.sh` | 4,115 |
+| `scripts/build-docker-aarch64.sh` | 4,096 |
 | `scripts/build-doom-aarch64.sh` | 3,151 |
 | `scripts/build-dota2-aarch64.sh` | 1,600 |
-| `scripts/build-firefox-aarch64.sh` | 6,258 |
+| `scripts/build-firefox-aarch64.sh` | 6,365 |
 | `scripts/build-firefox-amd64.sh` | 178 |
-| `scripts/build-go-aarch64.sh` | 3,057 |
-| `scripts/build-hyprland-aarch64.sh` | 10,899 |
+| `scripts/build-go-aarch64.sh` | 3,038 |
+| `scripts/build-hyprland-aarch64.sh` | 10,888 |
 | `scripts/build-ios-aarch64.sh` | 5,136 |
-| `scripts/build-java-aarch64.sh` | 4,704 |
-| `scripts/build-libreoffice-aarch64.sh` | 6,474 |
+| `scripts/build-java-aarch64.sh` | 4,693 |
+| `scripts/build-libreoffice-aarch64.sh` | 6,581 |
 | `scripts/build-limine-aarch64.sh` | 4,779 |
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
 | `scripts/build-macos-installer.sh` | 3,383 |
-| `scripts/build-minecraft-aarch64.sh` | 7,943 |
+| `scripts/build-minecraft-aarch64.sh` | 7,932 |
 | `scripts/build-n64-aarch64.sh` | 2,907 |
 | `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
-| `scripts/build-network-tools-aarch64.sh` | 8,938 |
+| `scripts/build-network-tools-aarch64.sh` | 8,927 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
 | `scripts/build-ps1-aarch64.sh` | 3,170 |
 | `scripts/build-ps2-aarch64.sh` | 2,901 |
@@ -1267,13 +1267,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-python-amd64.sh` | 175 |
 | `scripts/build-qemu-input.sh` | 3,417 |
 | `scripts/build-qemu-ovmf-aarch64.sh` | 4,720 |
-| `scripts/build-qemu-system-aarch64.sh` | 5,236 |
+| `scripts/build-qemu-system-aarch64.sh` | 5,225 |
 | `scripts/build-roblox-aarch64.sh` | 139 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
 | `scripts/build-steam-aarch64.sh` | 13,716 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
-| `scripts/build-userland-aarch64.sh` | 24,965 |
-| `scripts/build-userland-amd64.sh` | 5,997 |
+| `scripts/build-userland-aarch64.sh` | 24,987 |
+| `scripts/build-userland-amd64.sh` | 6,019 |
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
 | `scripts/build-venus-aarch64.sh` | 5,339 |
@@ -1281,7 +1281,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-voffice-aarch64.sh` | 6,899 |
 | `scripts/build-x11-aarch64.sh` | 20,713 |
 | `scripts/build-x11-amd64.sh` | 197 |
-| `scripts/build-x86-translation-aarch64.sh` | 22,942 |
+| `scripts/build-x86-translation-aarch64.sh` | 22,832 |
 | `scripts/cross-compile-activity.sh` | 227 |
 | `scripts/cross-compile-app.sh` | 4,139 |
 | `scripts/cross-compile-files.sh` | 212 |

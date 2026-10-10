@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `5a189a86fc98dd978c8215448022030cbc7ace0a`,
-Linguist 7.27.0 reports **Python 6.80%** (509 files, 2,311,631 bytes) and
-**V 73.23%** (2,166 files, 24,879,675 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `52f93ab8e1e0373deb705181788fb3ab54c29754`,
+Linguist 7.27.0 reports **Python 6.72%** (503 files, 2,291,893 bytes) and
+**V 73.38%** (2,192 files, 25,019,606 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,894,654 Python bytes**. All remaining
-2,311,631 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **2,914,392 Python bytes**. All remaining
+2,291,893 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The eleven stages below remove **23 Python files / 49,717 original bytes** and
+The thirteen stages below remove **29 Python files / 69,455 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -42,6 +42,8 @@ changes remain separate from this per-stage scope and the measured graph.
 | Offline Docker rootfs archive generator | `build-support/dockerimage`, `tarcore`, `make-docker-image.v` | 2,796 / 81 | `ab508446` |
 | Initramfs archive duplicate-file linking | `build-support/tarlink`, `tarstream`, `link-duplicate-files.v` | 4,475 / 127 | `ab00fde3` |
 | Allocation and user-access log symbolizers | `tests/kernel-symbols/symbolcore`, two `sites.v` entrypoints | 5,395 / 147 | `5a189a86` |
+| Standalone Alpine dependency resolver | `build-support/alpinecore`, `alpine-resolve.v` | 1,830 / 63 | `5b750ff8` |
+| Wine binary patch commands | `build-support/x86-translation/winepatch`, five V entrypoints | 17,908 / 508 | `52f93ab8` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -97,16 +99,47 @@ Their commands invoke V directly, and existing ISO/Docker shell callers and
 kernel-diagnostic documentation use the native entrypoints. Qualification
 artifacts are under `/tmp/vinix-python-zero-20261010/continuation`.
 
-Between the previous `29ccceb7` inventory and this snapshot, counted Python
+Between the `29ccceb7` and `5a189a86` inventories, counted Python
 declined by 16,895 bytes. That graph delta includes concurrent source changes;
 it is separate from these four stages' 18,048-byte translation scope.
+
+The following two stages remove six Python files / 19,738 original bytes.
+The standalone Alpine resolver retires its Python entrypoint and callback
+controller, retaining strict UTF-8 reads, universal newlines, Unicode splitting,
+repository and provider preference, FIFO traversal, ignored dependencies,
+deduplication and sorted manifests. All maintained shell and V build callers
+invoke it directly, and staging cache keys include its native policy sources.
+ARM, Rosetta x86 and ARM ASan/UBSan checks passed, including a 1,000-package
+closure and exact cached Java, Go and QEMU manifests. The Debian controller still
+compiles against the shared whitespace helpers. No Python was run.
+
+The five Wine patchers retain their pinned Alpine 9.17 bytes and offsets.
+System tar independently extracts seven original PE/ELF payloads; all native
+outputs match the pre-existing patched images byte for byte and remain stable
+on a second run. Input and reference hashes are committed. Both host
+architectures and ARM ASan/UBSan passed the native fixtures, CLI checks,
+malformed/truncated inputs, pointer overflow, mode/link behavior, failed
+publication and 100 repeated success/already-patched/error resource cycles.
+This establishes host patching behavior, without new guest or Office runs.
+
+Follow-up `ba45ee8c` routes compiler messages to stderr in the shared V launcher.
+Cold compiler cache-status text could otherwise enter a tool's stdout and corrupt
+its first package manifest. A native compiler fixture verifies stream routing,
+literal arguments, working directories, exit statuses and temporary cleanup on
+ARM and x86. All five Wine launchers and fourteen caller shell syntax checks
+passed. This fix adds no Python translation credit. Native qualification logs
+remain under `/tmp/vinix-python-zero-20261010/continuation`.
+
+Between `5a189a86` and this snapshot, counted Python declined by exactly 19,738
+bytes, matching these two stages. Other sessions also committed V changes;
+their bytes affect the language shares independently.
 
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these eleven stages.
+or hidden in these thirteen stages.
 
 ## Earlier completed stages
 
