@@ -201,6 +201,9 @@ fn vtd_publish() {
 		vtd_publish_file(unit, 'domains', vtd_show_domains)
 		vtd_publish_file(unit, 'pages', vtd_show_pages)
 		vtd_publish_file(unit, 'faults', vtd_show_faults)
+		$if vtd_selftest ? {
+			vtd_selftest_publish(unit)
+		}
 	}
 }
 

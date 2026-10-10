@@ -574,7 +574,12 @@ fn vtd_firmware_new() &VtdFirmware {
 // when the command line has vinix.iommu=1, after PCI has been enumerated and
 // before the first driver that does DMA registers.
 fn vtd_initialise() {
-	table := acpi.find_sdt('DMAR', 0) or { return }
+	table := acpi.find_sdt('DMAR', 0) or {
+		$if vtd_selftest ? {
+			vtd_selftest_run()
+		}
+		return
+	}
 	// Kept for the life of the machine: what each unit covers is asked of it
 	// for every device.
 	mut firmware := vtd_firmware_new()
@@ -594,5 +599,8 @@ fn vtd_initialise() {
 	}
 	if vtd_unit_count != 0 {
 		vtd_start_poller()
+	}
+	$if vtd_selftest ? {
+		vtd_selftest_run()
 	}
 }
