@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `1eb8dcc829fa812dc5b222964f74a0320ce0ca1d`,
-Linguist 7.27.0 reports **Python 5.76%** (449 files, 2,092,608 bytes) and
-**V 75.50%** (2,546 files, 27,443,046 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `2a66331756cfec82ab8de0a3983234554dcccf15`,
+Linguist 7.27.0 reports **Python 5.66%** (439 files, 2,072,242 bytes) and
+**V 75.72%** (2,579 files, 27,709,314 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,113,677 Python bytes**. All remaining
-2,092,608 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,134,043 Python bytes**. All remaining
+2,072,242 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 28 stages below remove **83 Python files / 268,740 original bytes** and
+The 31 stages below remove **93 Python files / 289,106 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -59,6 +59,9 @@ changes remain separate from this per-stage scope and the measured graph.
 | QEMU/desktop archive splitting, module ISO construction and independent tests | `tools/archivehost`, three native commands, `tests/archive-tools/archivetest` | 24,812 / 639 | `fd303029` |
 | Build archive pruning and desktop launcher bootstrap tests | `tools/prunehost`, `tests/build-cache/test_prune_build_artifacts.v`, `tests/desktop-bootstrap/test_runner.v` | 19,696 / 446 | `52b0601a` |
 | Desktop image preparation and disk-root recovery suites | `tests/desktop-bootstrap/bootstraptest`, two native tests and `run.sh` | 18,412 / 412 | `1eb8dcc8` |
+| Wi-Fi firmware packaging, C producers and linked-artifact verifier | `tools/m1-wifi/wifihost`, five native commands and `tests/m1-wifi/test-tools.v` | 14,627 / 321 | `d2036214` |
+| QEMU firmware test launcher | `tests/qemu-ovmf/test-patch`, existing `ovmffixture` | 1,565 / 49 | `170f9cf6` |
+| Scheduler, TLB and CPU policy host launchers | `tests/host-policy/policyhost`, four native commands | 4,174 / 93 | `6a533e64` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -444,12 +447,53 @@ Between `e89a298a` and `1eb8dcc8`, counted Python declines by exactly 62,920 byt
 and 11 files, matching these stages. Concurrent source changes affect the relative
 language shares separately.
 
+The next three batches retire **10 Python files / 20,366 bytes**. Native Wi-Fi
+packaging preserves all 128 manifest bytes, payload bytes, ordered provenance,
+size and identity validation, and exclusive output creation. Its tests cover
+failure cleanup and independent SHA-256 checks. Both native C producers retain
+compiler arguments, staging metadata and exact source transformations. Six real
+generator profiles compile into ARM/x86 target objects, and both control profiles
+link statically. An independently linked AArch64 ELF exercises the verifier and
+all eleven malformed-copy regressions. ARM, Rosetta x86 and ARM ASan/UBSan host
+products and suites pass, together with cold native launchers.
+See [the Wi-Fi host tools](../tools/m1-wifi/wifihost/README.md).
+
+The Wi-Fi verifier retains the original nineteen-symbol policy. Available cached
+kernels fail that policy: the current V providers use module-prefixed symbols and
+inline entrypoints, while the older production artifact lacks five required
+symbols. The verifier correctly rejects both; a fresh full kernel build, guest
+boot and hardware validation are not claimed. The remaining driver build callers
+need a separate update for the current providers.
+
+The QEMU firmware suite retires its Python launcher and runs all twelve existing
+real-Git cases directly from V, including single-case selection and the
+Git-unavailable skip. All three host profiles and the cold launcher pass.
+See [the firmware fixtures](../tests/qemu-ovmf/ovmffixture/README.md).
+
+Scheduler preemption, QoS and TLB commands now create, compile and run their own
+private fixtures. Their generator overrides remain supported. The CPU command
+uses native process capture and retains all 12,288 C ABI/hardware-adapter cases.
+All four commands pass on the three host profiles; sanitizer runs also instrument
+the generated fixtures. Native checks cover twelve compiler-failure owners,
+three generator failures, successful overrides and private-work cleanup. A V
+constructor records absent and empty caller `VEXE` before V's startup supplies a
+default, preserving compiler precedence without the retired Python bridge.
+See [the policy host commands](../tests/host-policy/README.md).
+
+Follow-up `2a663317` fingerprints the complete Wi-Fi V core and shared producer
+helpers in the desktop cache. All three cache test files pass, including
+independent producer-dependency invalidation checks. This repair receives no
+Python translation credit. No Python was run in these three batches.
+Between `1eb8dcc8` and `2a663317`, counted Python declines by exactly 20,366 bytes
+and ten files, matching the retired commands. Concurrent V changes affect the
+relative language shares separately.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 28 stages.
+or hidden in these 31 stages.
 
 ## Earlier completed stages
 

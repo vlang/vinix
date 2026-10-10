@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `1eb8dcc829fa812dc5b222964f74a0320ce0ca1d`,
+at source commit `2a66331756cfec82ab8de0a3983234554dcccf15`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 564 | 2,344,457 | 6.45% |
-| Python | 449 | 2,092,608 | 5.76% |
-| Shell | 395 | 1,351,117 | 3.72% |
+| C | 564 | 2,344,457 | 6.41% |
+| Python | 439 | 2,072,242 | 5.66% |
+| Shell | 406 | 1,352,818 | 3.70% |
 
-All `.v` files are classified as V. The resulting V share is 75.50%, with no
+All `.v` files are classified as V. The resulting V share is 75.72%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,092,608 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,072,242 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 1eb8dcc829fa812dc5b222964f74a0320ce0ca1d --breakdown --json
+github-linguist --rev 2a66331756cfec82ab8de0a3983234554dcccf15 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -863,7 +863,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/codex/smoke.py` | 4,944 |
 | `tests/cpu-mitigations/check-assembly.py` | 569 |
 | `tests/cpu-mitigations/check-linked.py` | 1,476 |
-| `tests/cpu-mitigations/check-policy.py` | 1,598 |
 | `tests/cpu-mitigations/run.py` | 4,795 |
 | `tests/desktop-perf/_native_report.py` | 2,681 |
 | `tests/desktop-perf/_runner_native.py` | 11,681 |
@@ -950,7 +949,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/host_suite.py` | 1,162 |
 | `tests/linuxkpi/run_vm.py` | 1,671 |
 | `tests/listen-backlog/run.py` | 3,971 |
-| `tests/m1-wifi/compile-provider.py` | 2,106 |
 | `tests/m1-wifi/run-control.py` | 1,826 |
 | `tests/m1-wifi/run-ctl-vm.py` | 811 |
 | `tests/m1-wifi/run-ctl.py` | 300 |
@@ -958,8 +956,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/m1-wifi/run-platform.py` | 3,097 |
 | `tests/m1-wifi/run-protocol.py` | 3,267 |
 | `tests/m1-wifi/run.py` | 426 |
-| `tests/m1-wifi/verify_build.py` | 5,663 |
-| `tests/m1-wifi/verify_test.py` | 2,428 |
 | `tests/mapped-writeback/run.py` | 8,691 |
 | `tests/memlock/run_vm.py` | 1,113 |
 | `tests/memory-retention/run.py` | 449 |
@@ -1010,7 +1006,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/qemu-core/_vm_native.py` | 674 |
 | `tests/qemu-core/run_vm.py` | 6,725 |
-| `tests/qemu-ovmf/test_patch.py` | 1,565 |
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tests/reboot-persistence/_native.py` | 959 |
 | `tests/reboot-persistence/run_vm.py` | 5,086 |
@@ -1021,8 +1016,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/roblox-windows/run.py` | 7,180 |
 | `tests/roblox/build-test.py` | 8,453 |
 | `tests/roblox/launcher-test.py` | 6,516 |
-| `tests/scheduler-preemption/policy.py` | 996 |
-| `tests/scheduler-qos/policy.py` | 741 |
 | `tests/scheduler-qos/run.py` | 515 |
 | `tests/securelevel-boot/attribute_faults.py` | 3,599 |
 | `tests/securelevel-boot/dispatch.py` | 2,342 |
@@ -1048,7 +1041,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/syscall-policy/run-host.py` | 937 |
 | `tests/syscall-policy/run.py` | 3,864 |
 | `tests/terminal-jobs/run.py` | 4,434 |
-| `tests/tlb/policy.py` | 839 |
 | `tests/tlb/run.py` | 483 |
 | `tests/uname/run.py` | 2,859 |
 | `tests/userland-demo/run.py` | 3,723 |
@@ -1067,8 +1059,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/dota2/_ext2_native.py` | 8,261 |
 | `tools/dota2/ext2_export.py` | 6,288 |
 | `tools/host_clipboard.py` | 1,332 |
-| `tools/m1-wifi/compile-v.py` | 1,430 |
-| `tools/m1-wifi/package.py` | 3,000 |
 | `tools/qemu-package-store.py` | 4,917 |
 | `tools/verified-boot/_native.py` | 2,322 |
 | `tools/verified-boot/build.py` | 7,139 |
@@ -1171,7 +1161,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/test-settings.sh` | 5,252 |
 | `desktop/tools/test-utilities.sh` | 10,641 |
 | `desktop/tools/test-utility-parity.sh` | 2,891 |
-| `desktop/tools/test-window-experience.sh` | 2,116 |
+| `desktop/tools/test-window-experience.sh` | 2,122 |
 | `gl-triangle/run-gl-triangle` | 2,400 |
 | `gl-triangle/run-gl-triangle-agx` | 1,255 |
 | `gl-triangle/run-m1-agx-smoke` | 820 |
@@ -1189,7 +1179,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 92,873 |
+| `scripts/build-desktop-aarch64.sh` | 92,879 |
 | `scripts/build-desktop-amd64.sh` | 14,984 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
@@ -1291,6 +1281,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
 | `tests/compiler-selection/test-kernel-ar` | 145 |
+| `tests/cpu-mitigations/check-policy` | 158 |
 | `tests/cpu-power/run.sh` | 638 |
 | `tests/desktop-bootstrap/run-runner.sh` | 169 |
 | `tests/desktop-bootstrap/run.sh` | 224 |
@@ -1341,9 +1332,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/limine-aarch64/test-patch` | 111 |
 | `tests/linuxkpi/run.sh` | 11,272 |
 | `tests/m1-deploy/run.sh` | 2,686 |
-| `tests/m1-wifi/build.sh` | 2,625 |
+| `tests/m1-wifi/build.sh` | 2,603 |
 | `tests/m1-wifi/compile-fixture` | 177 |
+| `tests/m1-wifi/compile-provider` | 162 |
+| `tests/m1-wifi/run-tools.sh` | 156 |
 | `tests/m1-wifi/run.sh` | 100 |
+| `tests/m1-wifi/verify-build` | 158 |
+| `tests/m1-wifi/verify-test` | 157 |
 | `tests/mapped-writeback/run-host.sh` | 3,848 |
 | `tests/memlock/run.sh` | 2,089 |
 | `tests/memory-pressure/run.sh` | 3,124 |
@@ -1410,11 +1405,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-module-iso/run.sh` | 164 |
 | `tests/qemu-nested/outer-init.sh` | 309 |
 | `tests/qemu-nested/run.sh` | 3,182 |
+| `tests/qemu-ovmf/test-patch` | 156 |
 | `tests/realtime/run.sh` | 1,513 |
 | `tests/reboot-persistence/run.sh` | 2,604 |
 | `tests/resource-accounting/check-generated` | 146 |
 | `tests/resource-groups/run-host.sh` | 801 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
+| `tests/scheduler-preemption/policy` | 152 |
+| `tests/scheduler-qos/policy` | 152 |
 | `tests/security-audit/collector-run.sh` | 5,601 |
 | `tests/security-mac/host-run.sh` | 4,937 |
 | `tests/security-mac/run.sh` | 952 |
@@ -1430,6 +1428,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/storage/run.sh` | 210 |
 | `tests/storage/test-qemu-storage.sh` | 3,030 |
 | `tests/thermal/run.sh` | 502 |
+| `tests/tlb/policy` | 152 |
 | `tests/uname/guest-init.sh` | 1,886 |
 | `tests/user-access/sites` | 180 |
 | `tests/virtio-gpu-virgl/desktop-guest-init.sh` | 1,941 |
@@ -1471,7 +1470,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/apple-backlight/test.sh` | 415 |
 | `tools/build-qemu-module-iso` | 164 |
 | `tools/hwcheck/build` | 1,429 |
+| `tools/m1-wifi/compile-v` | 155 |
 | `tools/m1-wifi/get-v.sh` | 2,538 |
+| `tools/m1-wifi/package` | 153 |
 | `tools/prune-build-artifacts` | 164 |
 | `tools/split-desktop-initramfs` | 166 |
 | `tools/split-qemu-initramfs` | 163 |
