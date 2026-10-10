@@ -1475,22 +1475,76 @@ preserved kernel's `fs.reduce_node_on_mount` or `stubs.memcmp` during the
 unchanged concurrent timestamp check, before reaching the monitor check.
 Their serial logs, VM hashes and kernel debug-symbol locations are retained.
 
-Four more strong imports resolve. The actual Fortnite probe still exits with
+Four more strong imports resolve. The following Fortnite probe exited with
 status 1 before entry, at Swift's string-to-UTF-8 array getter
 `_$sSS11utf8CStrings15ContiguousArrayVys4Int8VGvg` in EOSSDK.
-The Darwin Swift core runtime remains unsupported.
+
+The first Swift core exports now implement the builtin string-literal
+initializer, consuming interpolation initializer and `String.utf8CString`
+in V. Their two-register String ABI,
+15-byte inline storage, immortal literal bias and borrowed native tail storage
+match calls into this Mac's installed Swift library. UTF-8 conversion copies
+all code units, including embedded NULs, into independently owned byte arrays
+with a trailing NUL, count at byte 16, capacity/flags at byte 24 and elements
+at byte 32. Shared and foreign String forms fail before their pointers are read.
+The frozen interpolation builder holds one String field; its consuming
+initializer transfers both words with no extra retain or release. Native
+owned-string measurements verify that the reference count stays unchanged.
+
+Swift retain/release, batch releases and uniqueness checks operate on these
+V-owned buffers. The reference-count word starts at three and stores extra
+strong references above bit 32. The runtime lock guards count changes and
+removal before final free; overflow and underflow fail without changing the
+buffer. Bridge ARC preserves native spare bits, ignores immortal/tagged values
+and routes Objective-C bridge objects through their existing ownership APIs.
+Unknown-object ARC distinguishes these buffers from registered Objective-C
+objects. The batch signatures follow Swift's
+[runtime declarations](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/include/swift/Runtime/HeapObject.h):
+plain release uses unsigned 32-bit counts, bridge release signed 32-bit counts.
+On ARM64, plain retain/release also follow Swift's preserve-most convention.
+Two entry thunks emitted in V preserve registers x9–x15 in addition to the
+ordinary C callee saves. Their page is written once, made executable/read-only
+and unmapped at quiescent shutdown. Register-seeding probes against native and
+V entries verify nil and owned-buffer calls.
+
+This is a bounded String/byte-buffer implementation. Its buffer header points
+to a private V descriptor, not Swift class/type metadata. Reflection, casts,
+value witnesses, generic allocation, weak/unowned ownership and ARC for
+application Swift heap objects still fail explicitly. Returning this buffer
+does not establish compatibility with generic Swift array operations.
+
+Native Mac ASAN/UBSAN checks compare literal register pairs and array bodies,
+nil/tagged/Objective-C ownership, native owned String input, batch releases,
+unique references and eight concurrent ARC workers. Exact-size inputs cover
+each small-string length, and returned arrays survive releasing their source.
+Repeated conversions and two V runtime teardowns leave the owned-buffer and
+Objective-C object registries empty. Measurements, installed Swift interfaces
+and headers, EOSSDK call traces and generated bodies are retained under
+`swift-string-checks`.
+
+All sixteen native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. One final-build attempt passed the Swift check but exited 73
+in the unchanged stdio directory-enumeration fixture. That return covers
+errno, directory close or a missing/duplicate created entry; the cause is
+not established. Its serial log and VM hashes are retained, and the identical
+suite passes on retry.
+
+Thirty more strong imports resolve. Fortnite still exits with status 1 before
+entry, now at String type metadata `_$sSSN` in EOSSDK. The installed Mac
+library's String metadata kind, relative descriptor name and value-witness
+table layout are measured; V metadata and witness callbacks remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,347 | 811 | 81 |
-| EOSSDK | 561 | 101 | 18 |
-| MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,968 | 1,028 | 122 |
+| Fortnite executable | 1,359 | 799 | 81 |
+| EOSSDK | 570 | 92 | 18 |
+| MarketplaceKitWrapper | 69 | 107 | 23 |
+| All images | 1,998 | 998 | 122 |
 
-The C++/GLES/Text variant reports 1,981 resolved imports, 1,015 unresolved strong
+The C++/GLES/Text variant reports 2,011 resolved imports, 985 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1530,13 +1584,14 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `file-time-checks`, the audio constants use `audio-session-checks`, and
 CoreFoundation dictionaries use `cf-dictionary-checks`, supplied Objective-C
 storage uses `objc-storage-checks`, associated objects use
-`objc-associated-checks`, property access uses `objc-property-checks`, and
-object monitors use `objc-sync-checks`). Each
+`objc-associated-checks`, property access uses `objc-property-checks`,
+object monitors use `objc-sync-checks`, and Swift strings/buffers use
+`swift-string-checks`). Each
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant and
 CoreFoundation dictionary, supplied Objective-C storage, associated-object,
-property and object-monitor checks before the
+property, object-monitor and Swift string/buffer checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

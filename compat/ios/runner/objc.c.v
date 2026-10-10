@@ -126,6 +126,8 @@ mut:
 	objects map[u64]&ObjHeader // Object address -> owned metadata; protected by the recursive runtime lock.
 	associations map[u64]&ObjAssociations // Object -> key/value table, under the same recursive lock.
 	monitors map[u64]&ObjMonitor
+	swift_buffers map[u64]u64 // Owned UTF-8 array allocation -> element count, under the runtime lock.
+	swift_arc_code u64 // Sealed ARM64 preserve-most entry points, released at quiescent teardown.
 	names        map[string]u64
 	pool_key u64
 	graphics_key u64
@@ -391,6 +393,7 @@ fn objc_stop() {
 	if ios_runtime.objects.len == 0 { unsafe { ios_runtime.objects.free() } }
 	unsafe { ios_runtime.associations.free() }
 	objc_monitors_stop()
+	swift_buffers_stop()
 	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
 	for _, text in ios_runtime.constant_utf8 { unsafe { text.free() } }
 	for address, info in ios_runtime.classes {
@@ -410,6 +413,10 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	if library == '/usr/lib/swift/libswiftCore.dylib' {
+		if address := swift_core_symbol(symbol) { return address }
+		return error('iOS: Swift core symbol is not implemented: ${symbol}')
+	}
 	$if ios_text ? {
 		if library in ['/System/Library/Frameworks/CoreText.framework/CoreText', '/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics'] {
 			if address := text_symbol(symbol) { return address }
