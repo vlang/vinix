@@ -17,16 +17,20 @@
 // it its root table and switch translation on, and the two commands that
 // make it forget what it has cached.
 //
-// Limits, all of which leave a unit off rather than half working:
+// Limits. The first three leave a unit off rather than half working:
 //
 //   - PCI segment 0 only, as the PCI layer itself.
-//   - Legacy tables: no scalable mode, no PASIDs, no first-level translation.
 //   - The register interface for invalidation, which is the one every unit
 //     before architecture version 6 has. Version 6 and later only take
 //     invalidations through a queue, which is not written; such a unit is
-//     left alone, as is one whose firmware handed it over with the queue or
-//     interrupt remapping already running.
+//     left alone.
+//   - So is one that firmware handed over with the queue or interrupt
+//     remapping already running: taking those over is not written either.
+//   - Legacy tables: no scalable mode, no PASIDs, no first-level translation.
 //   - No interrupt remapping. Faults are polled (vtd_fault_amd64.v).
+//   - Nothing brings a unit back after a sleep that cuts the chipset's power
+//     (ACPI S3): its registers come back cleared and translation off, with
+//     every device reaching all of memory again. Suspend to idle keeps them.
 @[has_globals]
 module dma
 
@@ -302,11 +306,16 @@ fn vtd_flush_range(mut unit VtdUnit, did u32, iova u64, bytes u64) {
 	unit.lock.release()
 }
 
-// A mapping was added to domain `did`. A real unit caches only what it found
-// present, so there is nothing for it to forget; one that is emulated for a
-// virtual machine may cache absences as well (CAP.CM) and is told.
-fn vtd_after_map(mut unit VtdUnit, did u32) {
+// `bytes` at `iova` were mapped in domain `did`, or, with `bytes` zero, all
+// of RAM. A real unit caches only what it found present, so there is nothing
+// for it to forget; one that is emulated for a virtual machine may cache
+// absences as well (CAP.CM) and is told which.
+fn vtd_after_map(mut unit VtdUnit, did u32, iova u64, bytes u64) {
 	if unit.cap & ((u64(1) << 7) | (u64(1) << 4)) == 0 {
+		return
+	}
+	if unit.cap & (u64(1) << 7) != 0 && bytes != 0 {
+		vtd_flush_range(mut unit, did, iova, bytes)
 		return
 	}
 	unit.lock.acquire()

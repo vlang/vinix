@@ -641,7 +641,7 @@ fn vtd_map(cookie voidptr, iova u64, phys u64, bytes u64) bool {
 		vtd_unmap(cookie, iova, bytes)
 		return false
 	}
-	vtd_after_map(mut unit, domain.did)
+	vtd_after_map(mut unit, domain.did, iova, bytes)
 	return true
 }
 
@@ -690,6 +690,6 @@ fn vtd_map_all(cookie voidptr) bool {
 		}
 	}
 	domain.identity = true
-	vtd_after_map(mut unit, domain.did)
+	vtd_after_map(mut unit, domain.did, 0, 0)
 	return true
 }
