@@ -548,16 +548,15 @@ fn hex_digit(value u8) u8 {
 	return if value < 10 { `0` + value } else { `A` + (value - 10) }
 }
 
-// The name of the method firmware gives event `number`: _Q and the number in
-// two capital hexadecimal digits, with the terminator a C string needs.
-pub fn query_method(number u8) [5]u8 {
-	mut name := [5]u8{}
-	name[0] = `_`
-	name[1] = `Q`
-	name[2] = hex_digit(number >> 4)
-	name[3] = hex_digit(number & 0xf)
-	name[4] = 0
-	return name
+// Character `index`, of four, of the name of the method firmware gives event
+// `number`: _Q and the number in two capital hexadecimal digits.
+pub fn query_method_char(number u8, index u32) u8 {
+	return match index {
+		0 { `_` }
+		1 { `Q` }
+		2 { hex_digit(number >> 4) }
+		else { hex_digit(number & 0xf) }
+	}
 }
 
 // Where firmware says a controller is: its two ports and the general purpose

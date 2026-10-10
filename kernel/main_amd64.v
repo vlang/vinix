@@ -22,6 +22,7 @@ import userland
 import syspower
 import x86.acpihp
 import x86.acpipm
+import x86.acpiec
 import pipe
 import futex
 import pci
@@ -187,6 +188,9 @@ fn kmain_thread() {
 	// first, which the signal code -- above syspower -- does for it.
 	syspower.set_init_signal(userland.signal_init_if_handled)
 	syspower.start()
+	// The embedded controller's events, now that there are threads to take
+	// them; and before the devices whose methods read the controller.
+	acpiec.start()
 	// The batteries, charger, lid and buttons firmware describes.
 	acpipm.initialise()
 	// Its thermal zones and fans.
@@ -246,6 +250,10 @@ fn kmain() {
 		panic('uacpi_initialize(): ${C.uacpi_status_to_string(uacpi_status)}')
 	}
 
+	// An embedded controller that firmware describes in a table of its own
+	// is there for the tables about to be loaded to use.
+	acpiec.early()
+
 	uacpi_status = C.uacpi_namespace_load()
 	if uacpi_status != uacpi.UACPIStatus.ok {
 		panic('uacpi_namespace_load(): ${C.uacpi_status_to_string(uacpi_status)}')
@@ -260,6 +268,10 @@ fn kmain() {
 	if uacpi_status != uacpi.UACPIStatus.ok {
 		panic('uacpi_namespace_initialize(): ${C.uacpi_status_to_string(uacpi_status)}')
 	}
+
+	// The embedded controller the namespace describes: from here on the
+	// methods that read a battery or a lid through it work.
+	acpiec.discover()
 
 	// The machine's memory topology, read after ACPI has located the tables that
 	// describe it and before smp hands out the logical CPU numbers its nodes are

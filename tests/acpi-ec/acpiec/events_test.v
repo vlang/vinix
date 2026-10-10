@@ -218,10 +218,18 @@ fn test_a_stuck_line_is_noticed_and_a_busy_one_is_not() {
 	assert b.accesses + b2.accesses + b3.accesses == 0
 }
 
+fn method_name(number u8) string {
+	mut name := []u8{}
+	for i in u32(0) .. 4 {
+		name << query_method_char(number, i)
+	}
+	return name.bytestr()
+}
+
 fn test_event_methods_are_named_in_capital_hex() {
-	assert query_method(0x20)[..4].bytestr() == '_Q20'
-	assert query_method(0x0a)[..4].bytestr() == '_Q0A'
-	assert query_method(0xff)[..4].bytestr() == '_QFF'
-	assert query_method(0x01)[..4].bytestr() == '_Q01'
-	assert query_method(0xff)[4] == 0
+	assert method_name(0x20) == '_Q20'
+	assert method_name(0x0a) == '_Q0A'
+	assert method_name(0xff) == '_QFF'
+	assert method_name(0x01) == '_Q01'
+	assert method_name(0x9c) == '_Q9C'
 }
