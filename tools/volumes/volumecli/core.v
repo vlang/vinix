@@ -56,12 +56,16 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
-	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n')
+	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n       vinix-volume save DEVICE PLAN\n       vinix-volume restore DEVICE PLAN\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	if argc < 3 { return usage() }
+	unsafe {
+		if C.strcmp(argv[1], c'save') == 0 && argc == 4 { return save_plan(argv[2], argv[3]) }
+		if C.strcmp(argv[1], c'restore') == 0 && argc == 4 { return restore_plan(argv[2], argv[3]) }
+	}
 	mut request := u64(0)
 	mut data := Request{}
 	mut range := [2]u64{}

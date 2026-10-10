@@ -317,7 +317,9 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	}
 
 	// `name` may point into a longer path; the node keeps a copy.
-	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, name.clone(), true)
+	// Mounts instantiate their own filesystem. Children must use that same
+	// instance so later namespace checks recognize them as part of this mount.
+	mut new_node := create_node(parent.filesystem, parent, name.clone(), true)
 	mut new_resource := &DevTmpFSResource{
 		storage: unsafe { nil }
 		refcount: 1

@@ -1333,7 +1333,7 @@ done
 # source.
 # Refresh security utilities even with cached staging or a compact root.
 python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch aarch64 --staging "$STAGING"
-python3 "$SCRIPT_DIR/build-support/storage-tools/stage.py" --arch aarch64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/storage-tools/stage.v" --arch aarch64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 mkdir -p "$STAGING/usr/libexec/vinix-minecraft"

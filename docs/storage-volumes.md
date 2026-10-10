@@ -4,8 +4,8 @@ Vinix can expose up to 64 linear views of physical AHCI, NVMe and ARM VirtIO
 block devices (including their partitions). A view maps a sector-aligned byte
 range to `/dev/mapper/vinix0` through `/dev/mapper/vinix63`. Creating, growing or
 removing a view changes kernel mappings only; it does not format the device or
-move its contents. Configurations last until reboot. Boot scripts can replay
-`vinix-volume create` commands against known device paths.
+move its contents. Kernel mappings last until reboot. Saved volume plans retain
+their geometry and disk identity for explicit restore after boot.
 
 The native V utility is installed as `/usr/sbin/vinix-volume` by both userland
 and desktop image builders. Commands require a trusted MAC domain,
@@ -50,6 +50,57 @@ A reused slot gets a new generation, and old descriptors cannot remove its
 replacement. Object, interface, parent and node ownership drain through the
 normal VFS grace period. Metadata is charged to the creating process, including
 retired objects, and dynamic policy rows are recycled with a fixed bound.
+
+## Saved volume plans
+
+```sh
+# Use a whole physical disk with a nonzero MBR signature or GPT disk GUID.
+# Store the plan on a persistent filesystem available before restoration.
+vinix-volume save /dev/vda /root/volumes.vmap
+vinix-volume restore /dev/vda /root/volumes.vmap
+```
+
+`save` records every managed mapping on the selected physical disk, including
+views created through its partitions. The plan stores absolute physical byte
+offsets, lengths, slots and read-only flags. It verifies the disk size, logical
+sector size and either a nonzero MBR disk signature or the GUID from a
+CRC-checked primary GPT header. A protective MBR cannot substitute for an
+unreadable GPT header. Supported sector sizes are powers of two from 512 through
+4096 bytes. Saving never stamps or changes partition-table identity.
+
+`restore` requires an explicit whole physical device path and verifies its
+identity and geometry before creating mappings. Runtime disk numbers and paths
+are absent from the saved format. All records are checked for corruption,
+bounds, alignment, duplicate slots and overlapping extents. Every occupied
+requested slot must already match the selected disk, offset, length and
+read-only mode; a conflict fails before creating any missing mapping. Matching
+views retain their generation and open descriptors, making repeated restore
+idempotent. Creates retain the kernel's ordinary management privileges, extent
+protection and resource limits.
+
+Plans use a bounded little-endian format: a 64-byte `VINIXVM1` version-1 header
+with geometry, identity, record count, CRC32 and zero reserved bytes, followed
+by up to 64 32-byte version-1 create records. CRC32 detects accidental
+corruption; it does not authenticate a plan. MBR signatures and GPT GUIDs also
+cannot distinguish cloned disks with duplicated identity. Choose the physical
+device explicitly and retain backups of both the plan and its data.
+
+Publication creates an exclusive mode-0600 temporary file in the destination
+directory, writes and fsyncs it, renames it over the previous plan and fsyncs
+the directory. Directory operations share one opened directory descriptor.
+Failure before rename preserves the previous plan. A directory flush failure
+after rename reports that publication occurred without confirmed durability.
+Loading requires a bounded regular file and rejects a final symlink. These
+flushes use the filesystem and device's existing guarantees; ext2 has no journal.
+
+Save and restore are intended for serialized administration. Their status scans
+do not lock out other management processes. Kernel creation rechecks each new
+extent, but a later quota, I/O or concurrent-change failure can leave a created
+prefix. Restore reports the error and keeps those mappings; applying the plan
+again resumes from matching entries. It never removes unlisted mappings.
+Automatic disk discovery, boot-service integration and filesystem mounting are
+still separate work. A plan stored inside a managed view must be made available
+before that view can be restored.
 
 ## Status ABI
 
@@ -137,6 +188,14 @@ cycles. `tests/block-storage` injects
 controller completion/flush errors; `tests/mounted-disk-policy` checks
 mount/write/swap interleavings.
 
+The native V saved-plan controller also runs host ASan/UBSan checks and two
+ordinary-kernel boots on each architecture. Plans stay on a disposable ext2
+system disk across an abrupt QEMU stop; the second boot restores mappings and
+checks persisted data and read-only policy without a host-supplied plan. The
+first boot rejects corrupt files, a different disk and conflicting slots,
+checks repeated and partial restore, and measures retained heap across 200
+save/restore cycles after warming the same paths.
+
 NVMe discard is qualified with the production command/completion code and
 mocked MMIO on the host, including 200 successful operations and failed-reset
 DMA ownership. An attempted NVMe development guest panicked during device
@@ -144,7 +203,7 @@ initialization before reaching userspace. Native NVMe boot qualification and
 its production initialization policy remain open; host results do not establish
 real-controller or guest readiness.
 
-The encompassing roadmap item stays open: persistent volume discovery,
+The encompassing roadmap item stays open: automatic persistent volume discovery,
 storage pools/RAID, full-disk encryption and recovery, online filesystem resize,
 filesystem-aware trimming and controller-specific health data are not
 implemented by this increment. The anonymous pager's encrypted swap remains a

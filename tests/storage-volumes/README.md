@@ -1,5 +1,49 @@
 # Storage-volume qualification
 
+Saved volume plans have a native V controller with no Python dependency:
+
+```sh
+V=/path/to/v build-support/run-v-tool.sh tests/storage-volumes/plan_run.v \
+  --host --work /tmp/volume-plan-host
+V=/path/to/v build-support/run-v-tool.sh tests/storage-volumes/plan_run.v \
+  --arch aarch64 --kernel /path/to/arm-worktree/kernel/bin/vinix \
+  --work /tmp/volume-plan-arm
+V=/path/to/v build-support/run-v-tool.sh tests/storage-volumes/plan_run.v \
+  --arch amd64 --kernel /path/to/x86-worktree/kernel/bin/vinix \
+  --work /tmp/volume-plan-x86
+```
+
+Each work directory must be new. Host checks cover format bounds, every
+truncated prefix and single-bit corruption, checksummed invalid records,
+512/4096-byte identity parsing, GPT header CRC, changed identity/geometry and
+atomic file publication with ASan/UBSan. Generated utility and guest C are
+checked for unexpected heap or V runtime dependencies.
+
+Guest runs need target musl compilers, QEMU, `mke2fs`, and the cached Limine
+and firmware files from the image builders. ARM also needs mtools; AMD64 needs
+`xorriso`. `VINIX_OVMF_CODE` and `VINIX_OVMF_CODE_AMD64` override firmware paths.
+The controller boots QEMU directly with disposable disk files, drains serial
+output, limits each boot to 360 seconds and terminates only its own process.
+It preserves logs and a copy of the saved plan in the work directory.
+
+The fixture boots from an ext2 system disk. A separate raw disk holds managed
+views, and a third disk with different MBR identity tests wrong-target rejection.
+The first boot saves writable/read-only mappings, rejects corrupt plans and
+conflicting slots before creation, checks idempotence and restoration with an
+already matching slot, and measures slab/large retention over 200 save/restore
+cycles after 200 warmup cycles. A flushed phase marker and plan stay on ext2
+across an abrupt VM stop. The second boot begins with no mappings and restores
+the actual disk-resident plan, persisted view data and read-only mode. The host
+does not inject the plan or phase marker between boots.
+
+The fixture touches its readable ELF load pages before sampling. This keeps
+cold faults in the long-lived test program's diagnostic code from appearing as
+workload retention. Allocation tracking is started when available, and a
+failed retention check dumps the remaining sites for diagnosis.
+
+The older block-volume and controller qualification commands below remain
+listed as historical tooling; the saved-plan checks above use V throughout.
+
 Run the unchanged production volume, metrics and security code with mocked
 host allocation/I/O boundaries:
 
@@ -44,6 +88,6 @@ before the fixture started. Native NVMe qualification remains open.
 
 Controller timeout/short-completion faults run separately in `block-storage`;
 physical mounted/swap extent admission runs in `mounted-disk-policy`. These are
-not a claim of RAID, full-disk encryption, persistent mapping tables, live
+not a claim of RAID, full-disk encryption, automatic mapping discovery, live
 filesystem resizing, filesystem-aware free-space trimming or hardware SMART
 qualification.
