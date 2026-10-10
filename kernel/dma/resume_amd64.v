@@ -20,11 +20,37 @@
 // A unit that does not come back cannot be worked around: the devices behind
 // it would run unconfined. That is not survivable silently, and stops the
 // machine, as losing a CPU's protections across a sleep does.
+@[has_globals]
 module dma
 
 import devcore
 
+__global (
+	// Units the kernel had switched on and found not translating on the way
+	// back from a sleep, and units it brought back, over the machine's life.
+	dma_resume_found_off u64
+	dma_resume_restored  u64
+)
+
+fn vtd_translating(unit &VtdUnit) bool {
+	status := vtd_read32(unit, vtd_reg_gsts)
+	wanted := vtd_g_translation | vtd_g_root_pointer
+	// All ones is a unit that is not there; and it must be translating
+	// through the kernel's table, not one firmware left.
+	return status != 0xffffffff && status & wanted == wanted
+		&& vtd_read64(unit, vtd_reg_rtaddr) & ~u64(0xfff) == unit.root
+}
+
+fn amdvi_translating(unit &AmdviUnit) bool {
+	control := amdvi_read64(unit, amdvi_reg_control)
+	return control != ~u64(0) && control & amdvi_control_enable != 0
+		&& amdvi_read64(unit, amdvi_reg_device_table) & ~u64(0xfff) == unit.device_table
+}
+
 fn vtd_unit_resume(mut unit VtdUnit) bool {
+	if !vtd_translating(unit) {
+		dma_resume_found_off++
+	}
 	unit.lock.acquire()
 	// Firmware that guards memory on the way back hands the unit over
 	// translating through tables of its own, as it may at boot; the root
@@ -47,6 +73,9 @@ fn amdvi_unit_resume(mut unit AmdviUnit) bool {
 	if amdvi_read64(unit, amdvi_reg_control) == ~u64(0) {
 		return false
 	}
+	if !amdvi_translating(unit) {
+		dma_resume_found_off++
+	}
 	// Both rings start again from their first entry, under the locks their
 	// users take: the thread that reads the event log is running.
 	unit.event_lock.acquire()
@@ -59,7 +88,30 @@ fn amdvi_unit_resume(mut unit AmdviUnit) bool {
 	return amdvi_flush_everything(mut unit)
 }
 
-// How many units are translating.
+// How many of the units the kernel switched on say, in their own registers,
+// that they are translating through the kernel's tables now.
+pub fn units_translating() int {
+	mut translating := 0
+	for i in 0 .. vtd_unit_count {
+		if vtd_units[i].enabled && vtd_translating(vtd_units[i]) {
+			translating++
+		}
+	}
+	for i in 0 .. amdvi_unit_count {
+		if amdvi_units[i].on && amdvi_translating(amdvi_units[i]) {
+			translating++
+		}
+	}
+	return translating
+}
+
+// How many units have been found off on the way back from a sleep, and how
+// many brought back, since the machine started.
+pub fn resume_report() (u64, u64) {
+	return dma_resume_found_off, dma_resume_restored
+}
+
+// How many units the kernel has switched on.
 pub fn units_on() int {
 	mut on := 0
 	for i in 0 .. vtd_unit_count {
@@ -88,6 +140,7 @@ pub fn resume_units() {
 			C.kprintf(c'vtd: %.*s did not come back from the sleep\n', i32(unit.name.len), unit.name.str)
 			panic('dma: an IOMMU did not come back from a sleep; the devices behind it are no longer confined')
 		}
+		dma_resume_restored++
 	}
 	for i in 0 .. amdvi_unit_count {
 		mut unit := amdvi_units[i]
@@ -98,5 +151,6 @@ pub fn resume_units() {
 			C.kprintf(c'amdvi: %.*s did not come back from the sleep\n', i32(unit.name.len), unit.name.str)
 			panic('dma: an IOMMU did not come back from a sleep; the devices behind it are no longer confined')
 		}
+		dma_resume_restored++
 	}
 }

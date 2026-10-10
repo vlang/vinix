@@ -227,7 +227,7 @@ mut:
 	drawn      bool
 	sleeps     int // suspends to RAM that worked
 	checks     int // times check_machine() has run after one
-	iommu      bool
+	unit       string // the IOMMU unit in front of the devices, or ''
 	card       string
 	controller string
 	keyboard   int // /dev/console, to read what is typed
@@ -298,11 +298,15 @@ fn (mut run DeepRun) check_machine(mut t Test, when string) {
 		wrong := run.screen.pattern_errors()
 		t.check(wrong == 0, '${when}: ${wrong} pixels of what was drawn on the screen are gone; ${run.screen.first_error()}; ${run.screen.error_map()}')
 	}
-	if run.iommu {
-		t.check(dma_line(run.card) == 'domain: dmar0 isolated', '${when}: the card says "${dma_line(run.card)}"')
-		t.check(dma_line(run.controller) == 'domain: dmar0 isolated', '${when}: the disk controller says "${dma_line(run.controller)}"')
-		state := read_text('/sys/class/iommu/dmar0/state') or { '' }
-		t.check(state.contains('on'), '${when}: dmar0 is not on: "${state.replace('\n', ' | ')}"')
+	if run.unit != '' {
+		// Confined as before, by a unit that says in its own registers that
+		// it is translating through the kernel's tables -- which it was not
+		// when the machine came back, each time.
+		expected := 'domain: ${run.unit} isolated'
+		t.check(dma_line(run.card) == expected, '${when}: the card says "${dma_line(run.card)}"')
+		t.check(dma_line(run.controller) == expected, '${when}: the disk controller says "${dma_line(run.controller)}"')
+		t.check(deep_report('iommu units') == 1 && deep_report('iommu units translating') == 1, '${when}: ${deep_report('iommu units')} units are on and ${deep_report('iommu units translating')} translating')
+		t.check(deep_report('iommu units found off') == run.sleeps && deep_report('iommu units brought back') == run.sleeps, '${when}: after ${run.sleeps} sleeps the unit was found off ${deep_report('iommu units found off')} times and brought back ${deep_report('iommu units brought back')} times')
 	}
 	damaged := memory_damage(run.memory)
 	t.check(damaged < 0, '${when}: memory differs from what was written at word ${damaged} of ${run.memory.len}')
@@ -410,11 +414,15 @@ fn (mut run DeepRun) rehearse(mut t Test) {
 	write_text('/sys/power/pm_test', 'none') or { t.check(false, 'pm_test: ${err.msg()}') }
 }
 
-fn deep_scenario(mut t Test, iommu bool) {
+// `unit` is the IOMMU unit the machine is to have switched on, dmar0 or
+// ivhd0, or '' for none; `apic` the mode its local APICs are to be in.
+fn deep_scenario(mut t Test, unit string, apic string) {
 	mut run := DeepRun{
-		cpus:  cpu_count()
-		iommu: iommu
+		cpus: cpu_count()
+		unit: unit
 	}
+	mode := read_text('/sys/power/deep_sleep') or { '' }
+	t.check(mode.contains('apic mode: ${apic}\n'), 'the local APICs are not in ${apic} mode: "${mode.replace('\n', ' | ')}"')
 	t.check(run.cpus == 4, 'the machine has ${run.cpus} CPUs, not the 4 the scenario asks QEMU for')
 	if run.cpus > deep_max_cpus {
 		run.cpus = deep_max_cpus
@@ -428,10 +436,11 @@ fn deep_scenario(mut t Test, iommu bool) {
 	write_text('/sys/power/mem_sleep', 'deep') or { t.check(false, 'selecting deep: ${err.msg()}') }
 	t.check(read_word('/sys/power/mem_sleep') == 's2idle [deep]', 'deep did not stick: "${read_word('/sys/power/mem_sleep')}"')
 
-	if iommu {
+	if unit != '' {
 		run.card = bound_device('e1000')
 		run.controller = bound_device('ahci')
 		t.check(run.card != '' && run.controller != '', 'the card or the disk controller is not bound')
+		t.check(deep_report('iommu units') == 1 && deep_report('iommu units translating') == 1, 'before any sleep ${deep_report('iommu units')} units are on and ${deep_report('iommu units translating')} translating')
 	}
 	os.signal_opt(.usr2, on_power_off_request) or {
 		t.check(false, 'could not install a SIGUSR2 handler: ${err}')
@@ -524,11 +533,13 @@ fn deep_scenario(mut t Test, iommu bool) {
 	t.check(deep_stat('success') == (run.sleeps + 1).str(), 'success is ${deep_stat('success')}, not ${run.sleeps + 1}')
 	t.check(deep_stat('fail') == '1', 'fail is ${deep_stat('fail')}, not the one rehearsal a key interrupted')
 	t.check(deep_stat('security_changes') == '0', 'CPU protections changed across a sleep')
-	if iommu {
-		caught := read_text('/sys/class/iommu/dmar0/faults') or { 'unreadable' }
-		t.check(caught.contains('count: 0'), 'dmar0 recorded a fault: "${caught.replace('\n', ' | ')}"')
-		t.check(deep_report('iommu units') == 1, 'deep_sleep counts ${deep_report('iommu units')} IOMMU units on')
-		t.info('dmar0: card and disk controller isolated after ${run.sleeps} suspends to RAM; faults says count: 0')
+	if unit != '' {
+		// A device reaching for memory it was not given is what a fault is.
+		quiet_file := if unit.starts_with('dmar') { 'faults' } else { 'events' }
+		quiet_text := if unit.starts_with('dmar') { 'count: 0' } else { 'total: 0' }
+		caught := read_text('/sys/class/iommu/${unit}/${quiet_file}') or { 'unreadable' }
+		t.check(caught.contains(quiet_text), '${unit} recorded a fault: "${caught.replace('\n', ' | ')}"')
+		t.info('${unit}: found off and brought back ${deep_report('iommu units brought back')} times; card and disk controller isolated; ${quiet_file} says ${quiet_text}')
 	}
 	t.step('screen after the sleeps')
 	sleep_ms(1500)
@@ -543,9 +554,17 @@ fn deep_scenario(mut t Test, iommu bool) {
 }
 
 fn scenario_suspend_deep(mut t Test) {
-	deep_scenario(mut t, false)
+	deep_scenario(mut t, '', 'x2apic')
+}
+
+fn scenario_suspend_deep_xapic(mut t Test) {
+	deep_scenario(mut t, '', 'xapic')
 }
 
 fn scenario_suspend_deep_iommu(mut t Test) {
-	deep_scenario(mut t, true)
+	deep_scenario(mut t, 'dmar0', 'x2apic')
+}
+
+fn scenario_suspend_deep_iommu_amd(mut t Test) {
+	deep_scenario(mut t, 'ivhd0', 'x2apic')
 }

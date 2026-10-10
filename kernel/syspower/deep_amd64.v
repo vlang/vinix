@@ -429,5 +429,10 @@ fn platform_deep_report(mut text lib.Text) {
 	report_line(mut text, 'display restored', syspower_display.restores)
 	report_line(mut text, 'display found off', syspower_display.found_off)
 	report_line(mut text, 'display failures', syspower_display.failures)
+	found_off, restored := dma.resume_report()
 	report_line(mut text, 'iommu units', u64(dma.units_on()))
+	report_line(mut text, 'iommu units translating', u64(dma.units_translating()))
+	report_line(mut text, 'iommu units found off', found_off)
+	report_line(mut text, 'iommu units brought back', restored)
+	text.add(if x2apic_mode { 'apic mode: x2apic\n' } else { 'apic mode: xapic\n' })
 }

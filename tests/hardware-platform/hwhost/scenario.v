@@ -584,9 +584,42 @@ pub const scenarios = [
 		screens:  deep_screens
 		timeout:  240
 	},
+	Scenario{
+		name:     'suspend-deep-iommu-amd'
+		about:    'the same behind AMD-Vi'
+		arches:   ['x86_64']
+		cmdline:  'vinix.iommu=1'
+		qemu:     ['-smp', '4', '-device', 'amd-iommu,dma-remap=on', '-nic', 'user,model=e1000,tftp={state}/tftp',
+			'-drive', 'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [deep_disk]
+		files:    [tftp_probe]
+		required: ['HWTEST START suspend-deep-iommu-amd', 'HWTEST PASS suspend-deep-iommu-amd']
+		actions:  deep_actions
+		ending:   .poweroff
+		patterns: deep_patterns
+		events:   deep_events
+		screens:  deep_screens
+		timeout:  240
+	},
+	Scenario{
+		name:     'suspend-deep-xapic'
+		about:    'the same on processors without x2APIC: the local APICs are driven through memory'
+		arches:   ['x86_64']
+		qemu:     ['-cpu', 'max,-x2apic', '-smp', '4', '-nic', 'user,model=e1000,tftp={state}/tftp',
+			'-drive', 'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [deep_disk]
+		files:    [tftp_probe]
+		required: ['HWTEST START suspend-deep-xapic', 'HWTEST PASS suspend-deep-xapic']
+		actions:  deep_actions
+		ending:   .poweroff
+		patterns: deep_patterns
+		events:   deep_events
+		screens:  deep_screens
+		timeout:  240
+	},
 ]
 
-// What the two suspend-to-RAM scenarios share. guest/suspend_deep.v reads the
+// What the suspend-to-RAM scenarios share. guest/suspend_deep.v reads the
 // parts of the disk filled here, each once, and writes the patterns looked
 // for afterwards.
 const deep_disk = Disk{

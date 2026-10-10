@@ -46,6 +46,8 @@ fn run_scenario(name string, mut t Test) bool {
 		'suspend' { scenario_suspend(mut t) }
 		'suspend-deep' { scenario_suspend_deep(mut t) }
 		'suspend-deep-iommu' { scenario_suspend_deep_iommu(mut t) }
+		'suspend-deep-iommu-amd' { scenario_suspend_deep_iommu_amd(mut t) }
+		'suspend-deep-xapic' { scenario_suspend_deep_xapic(mut t) }
 		'thermal' { scenario_thermal(mut t) }
 		'thermal-selftest' { scenario_thermal_selftest(mut t) }
 		else { return false }
