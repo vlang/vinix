@@ -19,6 +19,7 @@ import proc
 import stat
 import dev.console
 import userland
+import syspower
 import pipe
 import futex
 import pci
@@ -161,6 +162,11 @@ fn kmain_thread() {
 
 	sched.new_kernel_thread(voidptr(maintenance_thread), unsafe { nil }, true)
 	sched.new_kernel_thread(voidptr(writeback_thread), unsafe { nil }, true)
+
+	// Firmware's events and the buttons they report. A power button asks init
+	// first, which the signal code -- above syspower -- does for it.
+	syspower.set_init_signal(userland.signal_init_if_handled)
+	syspower.start()
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',
 		'/dev/console', '/dev/console') or { panic('Could not start init process') }

@@ -62,6 +62,7 @@ import dev.random
 import dev.streams
 import time
 import userland
+import syspower
 import security
 
 #include "pci_config_arm_test.h"
@@ -383,6 +384,11 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 
 	print('\n*** aarch64: Kernel initialisation complete ***\n')
 	print('*** Starting /sbin/init ***\n')
+
+	// The buttons the platform reports. A power button asks init first, which
+	// the signal code -- above syspower -- does for it.
+	syspower.set_init_signal(userland.signal_init_if_handled)
+	syspower.start()
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console', '/dev/console', '/dev/console') or { panic('Could not start init process') }
 

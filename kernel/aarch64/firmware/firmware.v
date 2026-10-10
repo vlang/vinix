@@ -326,3 +326,51 @@ pub fn pcie_ecam() ?Ecam {
 	}
 	return none
 }
+
+fn dsdt_has(table u64, length u64, text string) bool {
+	for offset := u64(36); offset + u64(text.len) <= length; offset++ {
+		mut matched := true
+		for i := 0; i < text.len; i++ {
+			if read_u8(table, offset + u64(i)) != text[i] {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+// Where QEMU's generic event device (ACPI0013) reports its events: a 32-bit
+// register that reads as the set of events raised since it was last read --
+// bit 1 is the power button -- and is cleared by the read. The DSDT declares
+// it as the operation region EREG in system memory, at an address given as a
+// 32-bit constant; as for the UART above, that declaration is looked for
+// rather than the AML run. None on a machine without the device.
+pub fn qemu_event_register() ?u64 {
+	if !is_qemu() {
+		return none
+	}
+	table := dsdt()?
+	length := u64(read_u32(table, 4))
+	if !dsdt_has(table, length, 'ACPI0013') {
+		return none
+	}
+	// OpRegionOp (5b 80), the name, the address space (0 is memory), then a
+	// DWordConst (0c) holding the address.
+	for offset := u64(36); offset + 12 <= length; offset++ {
+		if read_u8(table, offset) != 0x5b || read_u8(table, offset + 1) != 0x80
+			|| read_u8(table, offset + 2) != `E` || read_u8(table, offset + 3) != `R`
+			|| read_u8(table, offset + 4) != `E` || read_u8(table, offset + 5) != `G`
+			|| read_u8(table, offset + 6) != 0 || read_u8(table, offset + 7) != 0x0c {
+			continue
+		}
+		base := u64(read_u32(table, offset + 8))
+		if base != 0 {
+			return base
+		}
+	}
+	return none
+}

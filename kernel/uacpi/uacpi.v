@@ -200,24 +200,25 @@ pub fn uacpi_kernel_free(ptr voidptr) {
 }
 
 @[export: 'uacpi_kernel_schedule_work']
-pub fn uacpi_kernel_schedule_work(work_type int, work_handler voidptr, handle voidptr) UACPIStatus {
-	return UACPIStatus.unimplemented
+pub fn uacpi_kernel_schedule_work(work_type int, work_handler fn (voidptr), handle voidptr) UACPIStatus {
+	// One thread serves both kinds, in order: see events.v.
+	return schedule_work(work_handler, handle)
 }
 
 @[export: 'uacpi_kernel_wait_for_work_completion']
 pub fn uacpi_kernel_wait_for_work_completion() UACPIStatus {
-	return UACPIStatus.unimplemented
+	return wait_for_work()
 }
 
 @[export: 'uacpi_kernel_install_interrupt_handler']
-pub fn uacpi_kernel_install_interrupt_handler(irq u32, interrupt_handler voidptr,
+pub fn uacpi_kernel_install_interrupt_handler(irq u32, interrupt_handler fn (voidptr) u32,
 	ctx voidptr, out_irq_handle &voidptr) UACPIStatus {
-	return UACPIStatus.ok
+	return install_interrupt(irq, interrupt_handler, ctx, out_irq_handle)
 }
 
 @[export: 'uacpi_kernel_uninstall_interrupt_handler']
 pub fn uacpi_kernel_uninstall_interrupt_handler(interrupt_handler voidptr, irq_handle voidptr) UACPIStatus {
-	return UACPIStatus.ok
+	return uninstall_interrupt(irq_handle)
 }
 
 @[export: 'uacpi_kernel_handle_firmware_request']

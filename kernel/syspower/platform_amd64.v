@@ -54,3 +54,17 @@ fn platform_halt() {
 		}
 	}
 }
+
+fn fixed_button(event int) {
+	if event == uacpi.fixed_event_power_button {
+		button(.power)
+	} else if event == uacpi.fixed_event_sleep_button {
+		button(.sleep)
+	}
+}
+
+// ACPI is where a PC's buttons are heard.
+fn platform_start() {
+	uacpi.on_fixed_button(fixed_button)
+	uacpi.start_events()
+}

@@ -1,10 +1,26 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
+@[has_globals]
 module syspower
 
 import aarch64.cpu
+import aarch64.firmware
+import aarch64.kio
 import aarch64.wdt
 import apple.ans
+import devcore
+import memory
+import sched
+
+// The power button bit of QEMU's event register.
+const qemu_event_power_down = u32(2)
+// How often the register is looked at. No device on this architecture has an
+// interrupt of its own yet, and a button need not be answered faster.
+const qemu_event_poll_ms = u64(200)
+
+__global (
+	syspower_qemu_events u64
+)
 
 // Apple's NVMe is not a device-core driver. Its orderly shutdown marks the
 // data volume clean as well, so it is done first, and a controller that will
@@ -34,4 +50,25 @@ fn platform_halt() {
 	for {
 		cpu.wfi()
 	}
+}
+
+// A virtual machine's power button: what the host's "shut down" presses.
+fn qemu_events() {
+	for {
+		devcore.sleep_ms(qemu_event_poll_ms)
+		raised := kio.mmin32(unsafe { &u32(syspower_qemu_events) })
+		if raised & qemu_event_power_down != 0 {
+			button(.power)
+		}
+	}
+}
+
+fn platform_start() {
+	base := firmware.qemu_event_register() or { return }
+	syspower_qemu_events = memory.map_mmio(base, 0x1000)
+	if syspower_qemu_events == 0 {
+		return
+	}
+	sched.new_kernel_thread(voidptr(qemu_events), unsafe { nil }, true)
+	C.kprintf(c'syspower: power button through the event device at 0x%llx\n', base)
 }
