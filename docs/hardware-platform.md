@@ -8,8 +8,10 @@ Everything described here was built for both architectures and exercised in
 QEMU guests (x86-64 under TCG, AArch64 under HVF). **None of it has run on a
 physical machine.** The hardware-specific paths that no emulator has -- the
 Intel, AMD and Apple frequency registers, processor temperature sensors,
-MWAIT idle states, a real embedded controller -- are covered by host unit
-tests of their arithmetic and are otherwise unverified. Which machine is
+MWAIT idle states -- are covered by host unit tests of their arithmetic and
+are otherwise unverified. The embedded controller driver has run only
+against a simulated controller: its protocol on the host, and the whole of
+it but the two port instructions in a guest. Which machine is
 qualified for what is kept in [the qualification matrix](hardware-qualification.md);
 this document does not qualify anything.
 
@@ -53,6 +55,7 @@ pointed at.
 | `xhci` | PCI | yes | no | no | no | no | all of memory |
 | `virtio_*` (AArch64 MMIO) | platform | listed from the device's own status | no | no | no | no | not behind an IOMMU |
 | `battery`, `ac`, `button` | ACPI | listed as claimed | no | -- | -- | -- | -- |
+| `ec` | ACPI | listed as claimed | no | holds its events back when it may not wake | stops taking events | asks a failed controller one question | -- |
 
 A driver without `remove` cannot be unbound and `/sys` has no `unbind` file
 for it. Apple's platform drivers (SMC, ANS, DART, DCP, AGX, Wi-Fi, speakers,
@@ -216,9 +219,128 @@ and sleep buttons, and listens to each through Notify. Closing the lid
 sleeps unless `/sys/power/lid/action` is `ignore`; opening it is a wake
 source.
 
-**There is no embedded controller driver.** On most laptops the battery, lid
-and charger methods read the EC, so on real hardware they will fail until one
-is written; in QEMU they are exercised against a table with no EC.
+On most laptops those methods read the embedded controller, and the Notify
+comes from an event of the controller's; see the next section.
+
+## The embedded controller
+
+A laptop's battery, charger, lid, thermal zones and hotkeys are behind a
+microcontroller, reached through two I/O ports. Firmware's methods read it
+through fields of an EmbeddedControl operation region, which the interpreter
+cannot reach by itself, and it reports a change by raising a general purpose
+event and then naming, when asked, a method to run (`_Qxx`).
+`kernel/x86/acpiec` is the driver; `protocol.v` in it is the exchange of
+bytes, kept free of the kernel so that it runs on the build machine.
+
+**Found** in three steps. If firmware has an ECDT, the handler for the
+controller's address space is installed before the namespace is loaded, so
+that tables which touch the controller while loading, and `_INI` methods
+after them, find it. After the namespace is initialised the `PNP0C09` device
+gives the ports (`_CRS`), the event (`_GPE`, a number or a package), whether
+the ACPI global lock is needed (`_GLK`) and `_UID`; a machine with no ECDT
+gets its handler here; then `_REG` runs. That is Linux's order and Windows':
+with no ECDT, `_INI` runs before the controller is there. Where the ECDT and
+the device agree about the ports, the ECDT's event number is used; where
+they do not, the device is believed. The handler is installed on the root of
+the namespace, since firmware declares such regions outside the device's
+scope. Once ACPI's event threads run, the controller becomes a device
+(`/sys/bus/acpi/devices/PNP0C09:00`), its event gets a handler and is marked
+as able to end a sleep, and whatever it had been waiting to say is asked for.
+All of this is before the battery, charger and lid are looked for.
+
+**Exchanges** are read (0x80), write (0x81) and query (0x84); the burst
+commands are not used. Every wait ends by the clock: an exchange gets five
+attempts of 500 ms, Linux's budget. An attempt that wrote everything and ran
+out of time is followed by one that only waits, before the command is
+written again -- a query asked twice loses an event. A byte found in the
+output buffer before anything was asked is taken out instead of being read
+as the answer; an output buffer that cannot be emptied fails the exchange at
+once, which is what ports with nothing behind them look like.
+
+**Giving up.** A controller that has never answered is given up on after its
+first failed exchange, and one that has after three in a row. From then on
+every caller is told at once, the methods that needed it fail, and the
+battery reads `Unknown`. The device is marked `failed`; writing 1 to its
+`reset` file asks the controller one question and puts it back in use if it
+answers.
+
+**Locking.** Exchanges are entered from the boot thread, from ACPI's work
+thread and from system calls (a read in `/sys` evaluates `_BST`), never from
+an interrupt, and are kept apart by a sleeping mutex that is held across
+port I/O and waiting only. Where `_GLK` is 1 the global lock is taken
+outside it, with a one-second limit, unless the calling thread already has
+it through a field declared `Lock`.
+
+**Events.** The general purpose event's handler queues a query on ACPI's
+work queue and does nothing else. The work takes events out of the
+controller until it has none -- at most 32 in one go -- and runs `_Qxx` for
+each with nothing held. An exchange that sees the event bit up queues the
+same work. An event bit that stays up while the controller names nothing is
+not asked about again until it has been seen down. Where the event cannot be
+used -- no `_GPE`, one in a block of events this kernel does not drive, or a
+line raised more than 64 times a second for nothing -- a thread looks at the
+event bit four times a second instead.
+
+**Sleep.** Suspend to idle leaves the controller working: its event stays
+on, and a lid that opens or a battery that runs out is attributed by the
+driver that hears the Notify. What the controller reports is also counted
+under a wake source of its own, `embedded-controller`, which is off unless
+asked for, so that a hotkey or the charger can end a sleep on request and
+the battery gauge does not. With `power/wakeup` of the device `disabled` its
+event is off for the sleep. On resume, and at start, a controller whose
+event bit is already up is asked.
+
+**`/sys`** shows the ports, the event, how events are heard, the global
+lock, whether the controller has been given up on and why, and counts of
+exchanges, timeouts, restarts, stale bytes, queries and methods, in
+`ec/` under the device. There is no file that reads or writes the
+controller's memory.
+
+**Three faults in the glue between uACPI and the kernel's mutexes**
+(`kernel/acpisync`, `kernel/uacpi/uacpi.v`) came out of testing this and are
+fixed. None was the controller's, and each affects every method evaluation,
+with or without a controller:
+
+- uACPI's reader-writer lock takes a mutex in the first reader and gives it
+  back in the last. With two threads reading the namespace at once those are
+  different threads, and the kernel refused the release as one by a
+  non-owner: the mutex stayed taken and every later evaluation waited for
+  ever.
+- The same first reader, coming back to write while another thread still
+  read, was refused as a thread waiting for a mutex it held: the method it
+  was about to run failed with nothing wrong, and a battery read `Unknown`
+  about once in ten boots.
+- A thread with a signal waiting for it may not sleep, and a read in `/sys`
+  evaluates a method in the reader's context: its wait for a mutex another
+  thread held ended at once with an error, and the method failed. Such a
+  thread now takes turns with the others until the mutex is free.
+
+The first two took two threads using ACPI at once, which a battery's polling
+thread and a read in `/sys` are. uACPI 2.0.0 also refuses the number its own
+`uacpi_acquire_global_lock()` returns when the lock is given back with it
+(it hands out its counter and then advances it); the binding tries that
+number and then the next.
+
+What this is not:
+
+- **Not run against hardware.** The protocol runs against a simulated
+  controller on the host (`tests/acpi-ec`). In a guest, a kernel built with
+  `-d acpiec_selftest` runs everything above the two port instructions
+  against the same simulation, with tables that describe a controller; an
+  ordinary kernel has only been shown ports where nothing answers. How a
+  particular laptop's controller behaves -- how long it takes, what it does
+  when asked twice, whether it wants the queries Linux gives Samsung's
+  (`vinix.ec=clear`) -- is unknown until one is tried.
+- One controller is driven. A second `PNP0C09` device gets a handler that
+  refuses its regions.
+- Not the SMBus host controller some firmware puts behind the embedded
+  controller (`ACPI0001`), so a Smart Battery (`ACPI0002`) is not read.
+- A controller reached other than through I/O ports -- in memory, or on an
+  I2C bus as hardware-reduced machines have it -- is not driven.
+- `_GPE` naming a block of events (`ACPI0006`) is understood and falls back
+  to polling: this kernel serves only the FADT's two blocks.
+- No per-model quirks. Linux applies its three by a table of machines; here
+  they are boot options.
 
 ## Sleep
 
@@ -247,8 +369,9 @@ the screen stays lit, and `suspend_stats/screen_lit` counts it
 Apple's, through DCP -- is not reached by this, and its backlight stays on.
 
 Wake sources (`kernel/wakesrc`, `/sys/class/wakeup/wakeupN/`): power button,
-sleep button, lid, keyboard, pointer, alarm, network, USB, battery. Each can
-be allowed or not; a pointer and the network are not by default. A key going
+sleep button, lid, keyboard, pointer, alarm, network, USB, battery, embedded
+controller. Each can be allowed or not; a pointer, the network and the
+embedded controller are not by default. A key going
 down wakes and its release does not. `/sys/class/rtc/rtc0/wakealarm` sets an
 alarm. `/sys/power/suspend_stats/` reports successes, failures, what failed,
 what woke the machine and how long each phase took.
@@ -367,6 +490,9 @@ telling ACPI (most laptops), and Apple's sensors and fans (SMC).
 | `vinix.apple_idle=wfi`, `vinix.apple_cpufreq=1` | Apple hardware only; untried |
 | `vinix.thermal_sensors=0`, `vinix.tjmax=N` | skip the x86 sensor drivers; state TjMax |
 | `vinix.pci_hotplug=0\|1` | leave PCI Express hot-plug ports alone, or watch them where the kernel would not by itself |
+| `vinix.ec=off` | do not drive the embedded controller |
+| `vinix.ec=clear` | at start and on resume, query the controller until it names no event, whatever its event bit says (Linux's `EC_FLAGS_CLEAR_ON_RESUME`); untried |
+| `vinix.ec=dsdt-gpe` | where the ECDT and `_GPE` name different events, use `_GPE` (Linux's `EC_FLAGS_TRUST_DSDT_GPE`); untried. The three combine with commas |
 
 ## What is not done
 
@@ -379,6 +505,9 @@ Beyond the limits stated in each section:
 - USB: no core, no hubs, no hotplug; xHCI drives boot keyboards and pointers
   on AArch64 PCI only.
 - Device power states (D3), runtime power management, wake-on-LAN.
+- Behind the embedded controller: a second controller, the SMBus host and
+  Smart Batteries, controllers not on I/O ports, events in a block of their
+  own. And the controller itself on any real laptop.
 - Suspend to RAM, hibernation, backlight and display power control.
 - Restoring an IOMMU, or any driver but `e1000` and `ahci`, after a sleep
   that powers devices down.
