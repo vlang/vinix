@@ -81,6 +81,9 @@ test "$exit_status" = 8
     "$repo/tests/ios/poll.c" -o "$output/poll"
 "$output/poll" --native-darwin
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/readlink.c" -o "$output/readlink"
+"$output/readlink"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/permissions.c" -o "$output/permissions"
 test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permissions-loop"
 "$output/permissions" "$output/permissions-loop"

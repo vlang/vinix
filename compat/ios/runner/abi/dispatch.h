@@ -177,6 +177,9 @@ static int ios_vsscanf(const char *input, const char *format, void *stack) {
     ios_check_format(format); IOS_STACK_VA(arguments, stack); return vsscanf(input, format, arguments);
 }
 static int *ios_errno_address(void) { return &errno; }
+// vlib declares readlink's result as int; keep the native ssize_t width here.
+static ssize_t ios_readlink(const char *path, char *buffer, size_t size) { return readlink(path, buffer, size); }
+static ssize_t ios_readlinkat(int fd, const char *path, char *buffer, size_t size) { return readlinkat(fd, path, buffer, size); }
 static size_t ios_sizeof_mutex(void) { return sizeof(pthread_mutex_t); }
 static size_t ios_sizeof_rwlock(void) { return sizeof(pthread_rwlock_t); }
 static size_t ios_sizeof_cond(void) { return sizeof(pthread_cond_t); }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "readlink.h"
 extern int chmod(const char *, unsigned short), fchmod(int, unsigned short);
 extern int open(const char *, int, ...), close(int), unlink(const char *), getpid(void);
 extern int stat(const char *, void *), fstat(int, void *);
@@ -40,6 +41,8 @@ static void *worker(void *argument) {
     return 0;
 }
 int main(int argc, char **argv) {
+    int links = ios_readlink_check();
+    if (links) return links;
     if (argc > 1) CHECK(chmod(argv[1], 0600) == -1 && *__error() == 62, 1);
     int error = check(0);
     if (error) return error;

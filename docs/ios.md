@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _readlink
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _recvmsg
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -998,17 +998,41 @@ the installed QEMU after a separate custom-QEMU ROM lookup failure. These APIs
 resolve 19 strong imports across the three Fortnite images. The actual game
 still exits before entry, now at `readlink`.
 
+The V `readlink` adapter now reads real native symlink contents with a signed
+64-bit result, guarded truncation and no null terminator. The installed Mac
+reference accepts zero bytes while still validating the link and rejects counts
+above INT_MAX before pathname validation. A one-byte stack read preserves the
+zero-count behavior on Linux; successful calls preserve the thread's errno.
+Native errors translate immediately to Darwin values. `symlink` creates actual
+filesystem links rather than keeping a separate compatibility namespace.
+
+The preserved guest kernel can lose absolute parent symlinks during native
+lookup. On ENOENT, the V adapter resolves only the parent with the existing
+native libc's component-by-component `realpath`, opens it with O_PATH, and
+retries native `readlinkat` through that descriptor. The final link remains
+unfollowed, including a self-referential link. The descriptor closes before
+returning, and the generated C confirms all adapter scratch buffers stay on
+the stack. The fallback uses native libc's symlink-chain limit; exact Darwin
+chain limits and concurrent path replacement are outside the verified subset.
+
+Shared Mac/iOS fixtures check missing and ordinary files, dangling targets,
+absolute parent aliases and loops, null pointers, count limits, untouched buffer
+guards and eight concurrent callers. The checks also run inside the permissions
+guest fixture. ASAN/UBSAN checks two image loads/unloads, and the full ARM64
+C++/GLES/PPSSPP regression passes. The actual game gets past two more strong
+imports but still exits before entry, now at `recvmsg`.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,313 | 845 | 81 |
-| EOSSDK | 527 | 135 | 18 |
+| Fortnite executable | 1,314 | 844 | 81 |
+| EOSSDK | 528 | 134 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,900 | 1,096 | 122 |
+| All images | 1,902 | 1,094 | 122 |
 
-The C++/GLES/Text variant reports 1,913 resolved imports, 1,083 unresolved strong
+The C++/GLES/Text variant reports 1,915 resolved imports, 1,081 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
