@@ -125,8 +125,13 @@ mut:
 	root u64
 	// One bit per domain number, set while it is in use.
 	domain_bits &u64 = unsafe { nil }
-	// Pages of root and context table: one, and one more for each bus that
-	// ever had a domain.
+	// The domains devices have now; see vtd_domain_amd64.v.
+	domains      &VtdDomain = unsafe { nil }
+	domain_count u32
+	// Pages of page table the domains hold, which goes back to what it was
+	// when a domain goes, and of root and context table: one, and one more
+	// for each bus that ever had a domain.
+	table_pages   u64
 	context_pages u64
 	enabled       bool
 	// Commands the unit did not answer in time, or refused.
@@ -487,9 +492,8 @@ fn vtd_unit_disable(mut unit VtdUnit) {
 	unit.lock.release()
 }
 
-// Find out what one unit is. It is not switched on yet: a unit that is on
-// blocks every device behind it that has no domain, and domains are not
-// written.
+// Bring one unit all the way up: its tables, the domains firmware's own DMA
+// needs, translation, and its entry in the DMA layer.
 fn vtd_unit_start(drhd_index u32) {
 	drhd := unsafe { &vtd_firmware.drhds[drhd_index] }
 	if drhd.segment != 0 {
@@ -513,7 +517,34 @@ fn vtd_unit_start(drhd_index u32) {
 	name := unit.name
 	vtd_units[vtd_unit_count] = unit
 	vtd_unit_count++
-	C.kprintf(c'vtd: %.*s at 0x%llx: version %llu.%llu, %llu-bit addresses, %llu domains, cap 0x%llx ecap 0x%llx; not switched on\n',
+	if !vtd_unit_prepare(mut unit) {
+		return
+	}
+	// Before translation is on, so that a device firmware is using -- a USB
+	// keyboard it emulates a PS/2 one with, a management controller -- never
+	// sees a moment in which its memory is gone.
+	vtd_firmware_domains(mut unit)
+	if !vtd_unit_enable(mut unit) {
+		return
+	}
+	mut record := Iommu{}
+	record.name = unit.name
+	record.covers = vtd_covers
+	record.attach = vtd_attach
+	record.detach = vtd_detach
+	record.map = vtd_map
+	record.unmap = vtd_unmap
+	record.map_all = vtd_map_all
+	record.data = voidptr(unit)
+	register_iommu(record) or {
+		// A unit that is on and that nothing can ask for a domain would block
+		// its devices for good.
+		vtd_unit_disable(mut unit)
+		C.kprintf(c'vtd: no room to register %.*s; switched off again\n', i32(name.len),
+			name.str)
+		return
+	}
+	C.kprintf(c'vtd: %.*s at 0x%llx on: version %llu.%llu, %llu-bit addresses, %llu domains, cap 0x%llx ecap 0x%llx\n',
 		i32(name.len), name.str, drhd.address, u64((unit.version >> 4) & 0xf), u64(unit.version & 0xf),
 		u64(unit.address_bits), u64(unit.domain_limit), unit.cap, unit.ecap)
 }
@@ -527,9 +558,9 @@ fn vtd_firmware_new() &VtdFirmware {
 	return unsafe { &VtdFirmware(firmware) }
 }
 
-// Find the machine's VT-d units. Called by dma.initialise() when the command
-// line has vinix.iommu=1, after PCI has been enumerated and before the first
-// driver that does DMA registers.
+// Find the machine's VT-d units and switch them on. Called by dma.initialise()
+// when the command line has vinix.iommu=1, after PCI has been enumerated and
+// before the first driver that does DMA registers.
 fn vtd_initialise() {
 	table := acpi.find_sdt('DMAR', 0) or { return }
 	// Kept for the life of the machine: what each unit covers is asked of it
