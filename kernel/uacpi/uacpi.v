@@ -127,6 +127,7 @@ pub fn uacpi_kernel_unlock_spinlock(handle voidptr, cpu_flags u64) {
 
 @[export: 'uacpi_kernel_acquire_mutex']
 pub fn uacpi_kernel_acquire_mutex(handle voidptr, timeout u16) UACPIStatus {
+	note_mutex(handle)
 	return unsafe { UACPIStatus(acpisync.wait(handle, timeout)) }
 }
 

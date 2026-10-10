@@ -48,6 +48,8 @@ fn C.uacpi_object_unref(object voidptr)
 fn C.uacpi_namespace_node_generate_absolute_path(node voidptr) &char
 @[c_extern]
 fn C.uacpi_free_absolute_path(path &char)
+@[c_extern]
+fn C.uacpi_for_each_device_resource(node voidptr, method &char, callback voidptr, user voidptr) UACPIStatus
 
 struct DeviceSearch {
 mut:
@@ -199,4 +201,76 @@ pub fn node_name(node Node, buffer &u8, capacity int) int {
 		length++
 	}
 	return length
+}
+
+// The node at `path`, which starts at the root: '\\_SB.PCI0.LPCB.EC0', as a
+// table names a device. `path` ends in a zero byte.
+pub fn find_node(path &u8) ?Node {
+	mut found := unsafe { nil }
+	if C.uacpi_namespace_node_find(unsafe { nil }, &char(path), unsafe { &found }) != .ok
+		|| found == unsafe { nil } {
+		return none
+	}
+	return Node(found)
+}
+
+// execute() for a method whose name is made at run time and whose failure
+// has to be told from its absence: run the method `name` of `node`, which
+// takes nothing, and say how that went. `name` ends in a zero byte.
+// .not_found when the node has no such method.
+pub fn execute_by_name(node Node, name &u8) UACPIStatus {
+	return C.uacpi_execute_simple(voidptr(node), &char(name))
+}
+
+// uACPI's resource types, by its numbers, and where it puts an I/O port
+// range's first port (uacpi_resource, uacpi_resource_io, _fixed_io).
+const resource_io = u32(4)
+const resource_fixed_io = u32(5)
+
+struct ResourceIo {
+	kind    u32
+	length  u32
+	decode  u8
+	minimum u16
+}
+
+struct ResourceFixedIo {
+	kind    u32
+	length  u32
+	address u16
+}
+
+// The first ports of the I/O ranges a device's _CRS lists, in its order.
+pub struct IoPorts {
+pub mut:
+	count int
+	port  [4]u16
+}
+
+// uACPI's iteration callback: 0 is "continue".
+fn io_port_found(user voidptr, resource voidptr) int {
+	mut ports := unsafe { &IoPorts(user) }
+	kind := unsafe { &ResourceIo(resource) }.kind
+	mut port := u16(0)
+	if kind == resource_io {
+		port = unsafe { &ResourceIo(resource) }.minimum
+	} else if kind == resource_fixed_io {
+		port = unsafe { &ResourceFixedIo(resource) }.address
+	} else {
+		return 0
+	}
+	if ports.count < 4 {
+		ports.port[ports.count] = port
+		ports.count++
+	}
+	return 0
+}
+
+// Evaluate _CRS of `node` and note the I/O ports in it. `ports` is the
+// caller's and is filled in; false when the device has no _CRS that can be
+// read.
+pub fn io_ports(node Node, mut ports IoPorts) bool {
+	ports.count = 0
+	return C.uacpi_for_each_device_resource(voidptr(node), c'_CRS', voidptr(io_port_found),
+		voidptr(ports)) == .ok
 }

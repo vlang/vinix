@@ -209,6 +209,18 @@ fn wait_for_work() UACPIStatus {
 	return UACPIStatus.ok
 }
 
+// Run `handler(context)` on the event work thread, after what is queued
+// there already: for a driver whose event needs methods evaluated, which the
+// thread that hears of it must not do. False when the queue is full.
+pub fn defer_work(handler fn (voidptr), context voidptr) bool {
+	return schedule_work(handler, context) == .ok
+}
+
+// Whether the SCI is routed and the work thread runs.
+pub fn events_started() bool {
+	return uacpi_events_up
+}
+
 // A fixed-feature button. uACPI calls this from the SCI thread.
 fn power_button_event(_ voidptr) u32 {
 	if uacpi_button_hook.pressed != unsafe { nil } {

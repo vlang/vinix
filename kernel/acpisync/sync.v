@@ -215,6 +215,20 @@ pub fn signal(handle voidptr) bool {
 	return true
 }
 
+// Whether the calling thread holds the mutex `handle`: for a caller that may
+// be reached both with and without it, and must not wait for itself.
+pub fn held_by_caller(handle voidptr) bool {
+	if handle == unsafe { nil } {
+		return false
+	}
+	mut gate := unsafe { &Gate(handle) }
+	identity := thread_id()
+	gate.lock.acquire()
+	held := gate.mutex && gate.owner == identity
+	gate.lock.release()
+	return held
+}
+
 @[export: 'vinix_acpi_sync_reset']
 pub fn reset(handle voidptr) {
 	if handle == unsafe { nil } {
