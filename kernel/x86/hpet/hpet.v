@@ -72,10 +72,11 @@ pub fn nanoseconds() u64 {
 // The machine is back from a sleep that cut the power: the HPET is switched
 // off and its counter is wherever firmware left it, and a TSC has started
 // again from nothing. Set the counter going and have nanoseconds() carry on
-// from `continue_at_ns` -- what it said when the machine went down, plus
-// however long whoever calls this found the machine to have been away -- so
-// that the clock every wait in the kernel is measured against neither stops
-// nor runs backwards. The counter's rate is taken to be what it was.
+// from `continue_at_ns` -- what it said when the machine went down -- so
+// that the clock every wait in the kernel is measured against neither runs
+// backwards nor leaps: the time the machine was away is not time anything
+// waited or ran for, and is added to the wall clock by whoever measured it
+// (time.advance_realtime()). The counter's rate is taken to be what it was.
 //
 // On the processor that slept, with interrupts off and no other running.
 pub fn resume(continue_at_ns u64) {

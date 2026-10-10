@@ -21,10 +21,12 @@
 // When the machine wakes, firmware runs first, then the trampoline, and the
 // processor continues after step 5 as if a call had returned. Everything is
 // then put back in the order it is needed: the interrupt controllers, the
-// timer chip, the counter time is kept with -- moved on by as long as the
-// battery-backed clock says the machine was away -- the other processors,
-// interrupts, firmware's wake method, the IOMMUs, PCI configuration space,
-// the display. The devices' own drivers resume after that, back in suspend.v.
+// timer chip, the counter time is kept with -- which carries on from where
+// it stopped -- the IOMMUs, the other processors, interrupts; then the wall
+// clock is moved on by as long as the battery-backed clock says the machine
+// was away, PCI configuration space and the display's mode are written back,
+// and firmware's wake method is run. The devices' own drivers resume after
+// that, back in suspend.v.
 //
 // A sleep that firmware does not carry out -- it returns from the request, or
 // a wake source reported before it could be made -- takes the same way back,
@@ -32,6 +34,7 @@
 @[has_globals]
 module syspower
 
+import acpisync
 import devcore
 import dev.serial
 import dma
@@ -63,6 +66,10 @@ const i8042_from_pointer = u8(0x20)
 
 const no_source = -1
 
+// The least the clock's alarm is set ahead, in seconds: one that is due
+// within the second may go off before the machine is down.
+const clock_alarm_margin = u64(2)
+
 __global (
 	// Whether deep sleep is offered, worked out once, and why not.
 	syspower_deep_decided bool
@@ -72,8 +79,10 @@ __global (
 	syspower_deep_failure string
 	// How uACPI answered the last request for S3.
 	syspower_deep_status uacpi.UACPIStatus
-	// How many times the machine has been through S3 and back.
-	syspower_deep_cycles u64
+	// How many times the machine has been through S3 and back, and how long
+	// it was away the last time.
+	syspower_deep_cycles  u64
+	syspower_deep_away_ns u64
 )
 
 // Suspend to RAM is offered when firmware has an S3 to ask for, the kernel
@@ -146,6 +155,7 @@ fn enter_s3() {
 
 fn platform_deep_sleep() bool {
 	syspower_deep_failure = ''
+	syspower_deep_away_ns = 0
 	// Firmware resumes the processor the machine boots on, so that is the
 	// one that has to ask.
 	mut me := proc.current_thread()
@@ -231,6 +241,8 @@ fn deep_sleep_here(rehearse bool) bool {
 		uacpi.set_waking_vector(wake.entry_address())
 		alarm = arm_clock_alarm()
 	}
+	alarm_armed := alarm != 0
+	mut alarm_lost := false
 
 	mut slept := false
 	mut why := ''
@@ -252,24 +264,36 @@ fn deep_sleep_here(rehearse bool) bool {
 		}
 		ints := cpu.interrupt_toggle(false)
 		before_clock := rtc.now() or { u64(0) }
+		if alarm != 0 && before_clock + 1 >= alarm {
+			// Getting here used up what the alarm had left to run, or all
+			// but a moment of it. An alarm that goes off before the machine
+			// is down wakes nothing, and not again for a day: it is set
+			// anew, a little later than asked for.
+			alarm = rtc.set_alarm(clock_alarm_margin)
+			alarm_lost = alarm == 0
+		}
 		if !uacpi.events_idle() {
 			why = 'firmware events would not fall quiet'
 		} else if wakesrc.pending() {
 			why = 'a wake source reported before the machine was down'
-		} else if alarm != 0 && before_clock >= alarm {
-			// Getting here took longer than the alarm had to run. It has
-			// gone off unheard, and would not again for a day.
-			why = 'the alarm went off before the machine was down'
+		} else if alarm_lost {
+			why = 'the clock would not take the alarm again'
 		} else if !apic.io_apic_save() {
 			why = 'no memory for the interrupt routes'
 		} else {
 			before_ns := hpet_clock.nanoseconds()
 			wake.trace('asking for S3', before_clock)
+			// Firmware's code takes locks that are waited for by giving up
+			// the processor. Nobody else is running to let go of one, and
+			// giving up the processor here would switch interrupts back on:
+			// a lock that is not free fails the sleep instead.
+			acpisync.forbid_waiting()
 			slept = wake.sleep_processor(if rehearse { enter_nothing } else { enter_s3 })
 			wake.trace('processor back, slept', if slept { u64(1) } else { u64(0) })
 			if !rehearse {
 				uacpi.leave_sleep_early(uacpi.sleep_state_s3)
 			}
+			acpisync.allow_waiting()
 			if slept {
 				apic.io_apic_restore()
 				time.pit_resume()
@@ -277,14 +301,22 @@ fn deep_sleep_here(rehearse bool) bool {
 				if before_clock != 0 && after_clock > before_clock {
 					away_seconds = after_clock - before_clock
 				}
-				hpet_clock.resume(before_ns + away_seconds * devcore.second)
-				// The stretch just added to the clock is not time anything
-				// ran for.
-				sched.skip_sleep_time()
+				// The counter carries on from where it stopped: the time
+				// the machine was away is nobody's running time and no
+				// wait's timeout. The wall clock is moved on below.
+				hpet_clock.resume(before_ns)
 				cause = wake_cause()
 				wake.trace('woken by', u64(cause))
+				// Before anything on the bus may move: a device's addresses
+				// are addresses in its domain, and mean something else with
+				// the unit off.
+				dma.resume_units()
 			} else if !rehearse {
-				why = 'firmware did not put the machine to sleep'
+				why = if syspower_deep_status == .ok {
+					'firmware did not put the machine to sleep'
+				} else {
+					'firmware could not be asked for the sleep'
+				}
 			}
 		}
 		// Every wait from here on is against a clock that runs again. The
@@ -299,24 +331,31 @@ fn deep_sleep_here(rehearse bool) bool {
 	// The boot processor's timer was stopped with the rest of its APIC; its
 	// next pass through the scheduler arms it.
 	sched.wake_cpu(0)
+	if slept {
+		syspower_deep_cycles++
+		syspower_deep_away_ns = away_seconds * devcore.second
+		time.advance_realtime(syspower_deep_away_ns)
+		// For the drivers that resume next: their devices are blank.
+		devcore.set_power_lost(true)
+		// Before firmware's wake method, which may reach for devices behind
+		// bridges: their buses are numbered again first.
+		deep_restore_devices()
+		wake.trace('devices restored', 0)
+	} else {
+		display_discard()
+	}
 	if !rehearse {
 		uacpi.leave_sleep(uacpi.sleep_state_s3)
 	}
-	if alarm != 0 {
+	if alarm_armed {
 		disarm_clock_alarm(cause == int(wakesrc.Source.alarm))
 	}
 	if slept {
-		syspower_deep_cycles++
-		// For the drivers that resume next: their devices are blank.
-		devcore.set_power_lost(true)
-		deep_restore_devices()
-		wake.trace('devices restored', 0)
+		alarm_skipped(syspower_deep_away_ns)
 		if cause != no_source {
 			wakesrc.woke(unsafe { wakesrc.Source(cause) })
 		}
 		C.kprintf(c'syspower: back from S3 after about %llu s\n', away_seconds)
-	} else {
-		display_discard()
 	}
 	if wake.lost_processors() != 0 {
 		C.kprintf(c'syspower: %llu processors have not come back from a sleep\n', wake.lost_processors())
@@ -338,14 +377,37 @@ fn deep_save_devices() bool {
 	return true
 }
 
-// And put back before any driver's resume runs: the IOMMUs first, so that no
-// device can reach memory until each has been told again what it may reach;
-// then the configuration space the drivers find their devices by; then the
-// screen, which needs its adapter's memory to answer.
+// And put back before any driver's resume runs, and before firmware's wake
+// method: the configuration space the drivers find their devices by, then
+// the display's mode, which needs its adapter's registers to answer. The
+// IOMMUs are back already: they were told again what each device may reach
+// before interrupts were on.
 fn deep_restore_devices() {
-	dma.resume_units()
 	devcore.pci_restore_all()
 	display_restore()
+}
+
+// How long the last suspend to RAM kept the machine away, in milliseconds,
+// by the battery-backed clock: time no counter of the kernel's counted.
+fn platform_deep_away_ms() u64 {
+	return syspower_deep_away_ns / devcore.millisecond
+}
+
+// The machine was away for `away_ns` that the kernel's own clock did not
+// count, and an alarm still set is that much nearer than its timer thinks.
+fn alarm_skipped(away_ns u64) {
+	for {
+		deadline := katomic.load(&syspower_alarm_ns)
+		if deadline == 0 || away_ns == 0 {
+			return
+		}
+		now := devcore.now_ns()
+		moved := if deadline > now + away_ns { deadline - away_ns } else { now }
+		if katomic.cas(mut &syspower_alarm_ns, deadline, moved) {
+			break
+		}
+	}
+	event.trigger(mut syspower_alarm_changed, false)
 }
 
 // Hand a set alarm to the battery-backed clock. Returns the moment it is set
@@ -367,8 +429,8 @@ fn arm_clock_alarm() u64 {
 	} else {
 		u64(0)
 	}
-	if seconds < 2 {
-		seconds = 2
+	if seconds < clock_alarm_margin {
+		seconds = clock_alarm_margin
 	}
 	if seconds > rtc.alarm_limit_seconds {
 		// Further off than the clock can be set. The machine sleeps until

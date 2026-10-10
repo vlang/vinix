@@ -372,9 +372,15 @@ fn (mut run DeepRun) sleep(mut t Test, what string, wake string, least_ms i64, m
 	// little of it: the time the machine was away is nobody's processor time.
 	t.check(billed_before >= 0 && billed < real / 2, '${what}: the program was billed ${billed} ms of processor time for a sleep of ${real} ms')
 	t.check(real >= least_ms && real <= most_ms, '${what}: the wall clock moved on ${real} ms; between ${least_ms} and ${most_ms} was expected')
-	// Both clocks are moved on by the same amount; they are read a moment
-	// apart.
-	t.check(real - mono > -200 && real - mono < 200, '${what}: the wall clock moved ${real} ms and the monotonic clock ${mono} ms')
+	// The time the machine was away is added to the wall clock, as the
+	// battery-backed clock counted it: in whole seconds. The monotonic clock
+	// carries on from where it stopped, so that no wait in the kernel finds
+	// the whole sleep gone by at once; it counts the way down and the way
+	// back, which this program was in the kernel for.
+	moved_on := real - mono
+	t.check(moved_on >= 900, '${what}: the wall clock moved ${real} ms and the monotonic clock ${mono} ms: no time away was added to the wall clock')
+	t.check((moved_on + 100) % 1000 < 200, '${what}: the wall clock was moved on ${moved_on} ms more than the monotonic clock, which is not a whole number of seconds')
+	t.check(mono < 30000, '${what}: the monotonic clock moved ${mono} ms across a sleep the wall clock puts at ${real} ms')
 	t.check(deep_stat('last_depth') == 'deep', '${what}: last_depth is ${deep_stat('last_depth')}, not deep')
 	t.check(deep_stat('last_wake') == wake, '${what}: last_wake is ${deep_stat('last_wake')}, not ${wake}')
 	t.check(deep_stat('deep') == run.sleeps.str(), '${what}: ${deep_stat('deep')} suspends to RAM counted, not ${run.sleeps}')
@@ -391,6 +397,9 @@ fn (mut run DeepRun) sleep(mut t Test, what string, wake string, least_ms i64, m
 			&& deep_report('display failures') == 0, '${what}: the display was found off ${deep_report('display found off')} times, restored ${deep_report('display restored')} times, and would not take its mode ${deep_report('display failures')} times, after ${run.sleeps} sleeps')
 	}
 	asleep := deep_stat('last_sleep_ms').i64()
+	// The kernel's account of the sleep includes the time away, and is part of
+	// what the wall clock saw this program wait.
+	t.check(asleep >= moved_on - 100 && asleep <= real + 100, '${what}: last_sleep_ms is ${asleep}, with ${moved_on} ms away and ${real} ms on the wall clock')
 	// Awake, the free thread counts about this much in the time the machine
 	// was down; frozen and then powered off, a small part of it.
 	rate := free_rate()

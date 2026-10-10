@@ -25,7 +25,23 @@ mut:
 
 __global (
 	scheduler_available = u32(0)
+	// Nonzero while a wait must not wait: see forbid_waiting().
+	acpisync_no_waiting u32
 )
+
+// From here until allow_waiting(), a wait that would have to wait gives up
+// at once, as one with no time allowed does. For the moment a caller is on
+// the only running processor with interrupts off and calls into ACPI code
+// that takes its sleeping locks: nobody is there to let go of one, and
+// waiting for it means giving up the processor, which turns interrupts back
+// on under the caller. A lock that is free is taken as ever.
+pub fn forbid_waiting() {
+	katomic.store(mut &acpisync_no_waiting, u32(1))
+}
+
+pub fn allow_waiting() {
+	katomic.store(mut &acpisync_no_waiting, u32(0))
+}
 
 pub fn scheduler_ready() {
 	katomic.store(mut &scheduler_available, u32(1))
@@ -126,7 +142,7 @@ fn wait_for(handle voidptr, timeout u16, strict bool) int {
 		gate.lock.release()
 		return 0
 	}
-	if timeout == 0 {
+	if timeout == 0 || katomic.load(&acpisync_no_waiting) != 0 {
 		gate.lock.release()
 		return 18
 	}

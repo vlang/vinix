@@ -97,3 +97,7 @@ fn platform_deep_blocker() &devcore.Device {
 
 fn platform_deep_report(mut _ lib.Text) {
 }
+
+fn platform_deep_away_ms() u64 {
+	return 0
+}

@@ -290,7 +290,10 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	}
 	syspower_stats.last_wake = woken_by
 	syspower_stats.last_suspend_ms = (asleep - started) / devcore.millisecond
-	syspower_stats.last_sleep_ms = (woke - asleep) / devcore.millisecond
+	// What the kernel's clock saw of the sleep, and what it could not: the
+	// time a suspend to RAM kept the machine away.
+	syspower_stats.last_sleep_ms = (woke - asleep) / devcore.millisecond +
+		if going_deep { platform_deep_away_ms() } else { u64(0) }
 	syspower_stats.last_resume_ms = (done - woke) / devcore.millisecond
 	return true
 }

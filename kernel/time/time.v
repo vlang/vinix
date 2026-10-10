@@ -113,6 +113,27 @@ pub fn set_realtime(value TimeSpec, forbid_backwards bool) bool {
 	return true
 }
 
+// The machine was away for `ns` that no counter of the kernel's counted: it
+// was suspended to RAM. The wall clock is moved on by that much. The
+// monotonic clock is not: nothing ran and no wait was waiting, so a timeout
+// measured on it must not find the whole sleep gone by at once -- and it is
+// the clock CPU time is billed by. Timers set for a time of day are looked
+// at straight away.
+pub fn advance_realtime(ns u64) {
+	if ns == 0 {
+		return
+	}
+	clock_lock.acquire()
+	clock_control.sample(raw_clock_now())
+	add_signed_ns(mut clock_control.realtime, i64(ns))
+	realtime_clock = clock_control.realtime
+	clock_generation++
+	clock_lock.release()
+	expire_timers()
+	run_tick_hooks()
+	deadline_changed()
+}
+
 pub fn realtime_generation() u64 {
 	clock_lock.acquire()
 	value := clock_generation
