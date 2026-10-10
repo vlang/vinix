@@ -29,7 +29,7 @@ rounding, separate virtual/prof CPU bases, unlimited/zero limits, soft signal
 rate, and hard-limit precedence:
 
 ```sh
-V=/path/to/v python3 tests/kernel-cpu/logic.py
+V=/path/to/v tests/kernel-cpu/logic
 ```
 
 CPU timers are inline process state and add no per-tick allocation or retained

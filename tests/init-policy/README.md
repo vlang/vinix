@@ -16,8 +16,8 @@ producer. The storage guest tests boot the packaged ARM native init and AMD64
 desktop script with an invalid plan, then reboot with an enrolled plan and
 reordered devices. See [the storage fixture](../storage-volumes/README.md).
 
-The older Python commands below describe historical controls and fixtures;
-the current combined host and storage-boot checks above use V throughout.
+The native host command below tests the init policy independently. The guest
+runner still has a Python transport pending its separate port.
 
 `run-vm.py` boots the production ARM shell, full and desktop init policies
 with independent native applications from `guestfixture/core.v`. The shell
@@ -68,9 +68,9 @@ exceeded the monitor socket limit; that receipt is retained. The successful
 controls used fresh short paths and the immutable ARM kernel SHA-256
 `05ce36f10282f9ed7263d560fc60b5a4b057e3fdf0158fb07d3fa41a27f048ed`.
 These are fixture checks with a reused kernel. The separate host policy suite
-in `run.py` has its own validation.
+in `run` has its own validation.
 
-`python3 tests/init-policy/run.py` tests the raw syscall policy against the
+`tests/init-policy/run` tests the raw syscall policy against the
 independent recorder in `hostfixture/core.v`, with AddressSanitizer and
 UndefinedBehaviorSanitizer for both normal and busybox echo variants. On
 macOS, `--arch=arm64` and `--arch=amd64` select the native host executable

@@ -25,7 +25,7 @@ Serial diagnostics are implemented in `kernel/lib/stack_diagnostics*.v`.
 The naked probes and x86 idle-stack entry live in each architecture's
 `kernel/asm/*/stack_guards.S`, preserving the original instruction bytes and
 fault/recovery label offsets. The build discovers these assembly files
-automatically. `tests/stack-protector/diagnostic.py` checks the diagnostic C ABI
+automatically. `tests/stack-protector/diagnostic` checks the diagnostic C ABI
 and exact serial output with both adapters under host sanitizers.
 
 ## Build and run

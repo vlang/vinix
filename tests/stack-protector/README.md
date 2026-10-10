@@ -17,7 +17,7 @@ guest boots; host tests cannot access ARM privileged identification registers.
 compiler on an ARM host. The original 57-line C caller is recoverable at
 `27aaf760fd4cc92fd3641984718e43d9e923404f:tests/stack-protector/host.c`.
 
-`python3 diagnostic.py` tests both real V serial adapters through mocked byte
+`./diagnostic` tests both real V serial adapters through mocked byte
 outputs under ASan/UBSan. Independent V callers check borrowed NUL-terminated
 messages and 2,003 hexadecimal fault records against `snprintf`, including
 zero, all-one and high-bit values. Allocator imports are rejected. The actual

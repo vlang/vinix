@@ -1,43 +1,4 @@
-#!/usr/bin/env python3
-"""Exercise production timer/limit arithmetic with synthetic CPU counters."""
-from pathlib import Path
-import os
-import subprocess
-import tempfile
 
-root = Path(__file__).resolve().parents[2]
-source = (root / "kernel/proc/cpu_account.v").read_text()
-
-
-def function(name):
-    begin = source.index(f"fn {name}(")
-    brace = source.index("{", begin)
-    depth = 1
-    end = brace + 1
-    while depth:
-        depth += (source[end] == "{") - (source[end] == "}")
-        end += 1
-    return source[begin:end] + "\n"
-
-
-program = """
-module main
-const rlim_infinity = u64(-1)
-struct RLimit { mut: cur u64 max u64 }
-struct CPUIntervalTimer { mut: deadline_ns u64 interval_ns u64 }
-struct Process {
-mut:
-    cpu_timers [2]CPUIntervalTimer
-    cpu_user_ns u64
-    cpu_time_ns u64
-    cpu_limit RLimit = RLimit{cur: rlim_infinity, max: rlim_infinity}
-    cpu_xcpu_next_second u64
-    cpu_kill_sent bool
-}
-"""
-for name in ("expire_cpu_timer", "cpu_signals_locked", "cpu_timer_value"):
-    program += function(name)
-program += """
 fn main() {
     mut once := CPUIntervalTimer{deadline_ns: 100}
     assert !expire_cpu_timer(mut once, 99)
@@ -85,8 +46,3 @@ fn main() {
     assert cpu_signals_locked(mut separate) == u64(1) << 25
     println('CPU timer/limit arithmetic: PASS')
 }
-"""
-with tempfile.TemporaryDirectory(prefix="vinix-cpu-logic-") as directory:
-    path = Path(directory) / "cpu.v"
-    path.write_text(program)
-    subprocess.run([os.environ.get("V", "v"), "run", str(path)], check=True)
