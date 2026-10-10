@@ -1132,6 +1132,27 @@ pub const scenarios = [
 		timeout:    300
 	},
 	Scenario{
+		name:       'hibernate-xapic'
+		about:      'the same on processors without x2APIC or 57-bit addresses: page tables four levels deep'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       ['-cpu', 'max,-x2apic,-la57', '-smp', '4', '-nic', 'user,model=e1000,tftp={state}/tftp',
+			'-drive', 'if=ide,format=raw,file={state}/disk.raw', '-drive',
+			'if=ide,format=raw,file={state}/image.raw']
+		disks:      [hibernate_data_disk, hibernate_image_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-xapic', 'HWTEST PASS hibernate-xapic']
+		actions:    hibernate_actions
+		reboots:    [Reboot{}, Reboot{}]
+		ending:     .poweroff
+		patterns:   hibernate_patterns
+		disk_bytes: hibernate_no_image
+		screens:    [Screen{
+			file: 'after.ppm'
+		}]
+		timeout:    300
+	},
+	Scenario{
 		name:       'hibernate-iommu'
 		about:      'the same behind Intel VT-d, which the kernel that loads the image has switched on too'
 		arches:     ['x86_64']
@@ -1258,6 +1279,28 @@ pub const scenarios = [
 		patterns:   hibernate_refusal_patterns
 		disk_bytes: hibernate_no_image
 		timeout:    180
+	},
+	Scenario{
+		name:     'hibernate-foreign'
+		about:    'a named device that holds something else is not written to, and there is no disk state'
+		arches:   ['x86_64']
+		cmdline:  'vinix.hibernate=sd1'
+		qemu:     hibernate_machine
+		disks:    [
+			Disk{
+				...hibernate_data_disk
+				untouched: true
+			},
+			Disk{
+				name:      'image.raw'
+				size_mib:  64
+				header:    'somebody else\'s data, named by mistake'
+				untouched: true
+			},
+		]
+		files:    [tftp_probe]
+		required: ['HWTEST START hibernate-foreign', 'HWTEST PASS hibernate-foreign']
+		ending:   .poweroff
 	},
 	Scenario{
 		name:     'hibernate-unnamed'

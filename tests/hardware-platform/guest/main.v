@@ -41,6 +41,8 @@ fn run_scenario(name string, mut t Test) bool {
 		'hibernate' { scenario_hibernate(mut t) }
 		'hibernate-cycles' { scenario_hibernate_cycles(mut t) }
 		'hibernate-damaged-header' { scenario_hibernate_damaged_header(mut t) }
+		'hibernate-foreign' { scenario_hibernate_foreign(mut t) }
+		'hibernate-xapic' { scenario_hibernate_xapic(mut t) }
 		'hibernate-damaged-pages' { scenario_hibernate_damaged_pages(mut t) }
 		'hibernate-iommu' { scenario_hibernate_iommu(mut t) }
 		'hibernate-iommu-amd' { scenario_hibernate_iommu_amd(mut t) }

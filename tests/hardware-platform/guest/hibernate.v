@@ -392,6 +392,15 @@ fn scenario_hibernate(mut t Test) {
 	hibernate_twice(mut t, '')
 }
 
+// The same on processors without x2APIC and without 57-bit addresses: the
+// local APICs driven through memory, and page tables four levels deep, which
+// is what the page table an image is entered through has to match.
+fn scenario_hibernate_xapic(mut t Test) {
+	mode := read_text('/sys/power/deep_sleep') or { '' }
+	t.check(mode.contains('apic mode: xapic\n'), 'the local APICs are not in xapic mode: "${mode.replace('\n', ' | ')}"')
+	hibernate_twice(mut t, '')
+}
+
 fn scenario_hibernate_iommu(mut t Test) {
 	hibernate_twice(mut t, 'dmar0')
 }
@@ -540,4 +549,27 @@ fn scenario_hibernate_unnamed(mut t Test) {
 	write_text(hib_state, 'freeze') or { t.check(false, 'freeze: ${err.msg()}') }
 	t.check(deep_stat('success') == '1' && deep_stat('last_depth') == 's2idle', 'a suspend to idle afterwards: success ${deep_stat('success')}, depth ${deep_stat('last_depth')}')
 	t.info('state: ${state}; hibernate: ${hib_offer()}; disk writes since boot: ${hib_number('disk writes since boot')}')
+}
+
+// A device is named, and it holds something that is not an image and is not
+// nothing: somebody's data. It is not the kernel's to write to. `disk` is
+// not offered, the reason is given, and the controller finds the device as
+// it made it.
+fn scenario_hibernate_foreign(mut t Test) {
+	state := read_word(hib_state)
+	t.check(state == 'freeze mem', 'state offers "${state}" with the named device holding something else')
+	t.check(hib_offer().starts_with('unavailable: ') && hib_offer().contains('holds something else'), 'hibernate says "${hib_offer()}"')
+	t.check(hib_line('device') == 'sd1' && hib_line('boot') == 'no image', 'the device is "${hib_line('device')}" and the boot found "${hib_line('boot')}"')
+	mut refused := false
+	write_text(hib_state, 'disk') or { refused = true }
+	t.check(refused, 'writing disk to state worked with the named device holding something else')
+	t.check(deep_stat('success') == '0' && hib_number('images written') == 0, 'a sleep or an image is counted: success ${deep_stat('success')}, images ${hib_number('images written')}')
+	t.check(hib_number('disk writes since boot') == 0, '${hib_number('disk writes since boot')} writes went to a disk')
+	// Named or not, nobody but root reads it.
+	if attributes := os.stat(hib_image_disk) {
+		t.check(attributes.mode & 0o777 == 0o600, '${hib_image_disk} has mode 0${attributes.mode & 0o777:o}, not 0600')
+	} else {
+		t.check(false, '${hib_image_disk} cannot be looked at')
+	}
+	t.info('state: ${state}; hibernate: ${hib_offer()}')
 }
