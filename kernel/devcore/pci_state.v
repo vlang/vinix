@@ -27,10 +27,12 @@
 // PCI Express capability are restored as well: a hot-plug port's slot power
 // and lights are among them.
 //
-// A function that left the machine before the sleep is not saved, and one
-// that left during it is found not to be what it was and is left alone: its
-// driver's resume fails and recovery deals with it, or the hot-plug thread
-// notices the empty slot.
+// A function that left the machine before the sleep is not saved. One that
+// left during it, or was changed for another, is found not to be what it was
+// and is left alone: nothing is written to it, its driver is not asked to
+// resume it, and the hot-plug thread, which compares the buses with what the
+// kernel has after every such sleep (hotplug.v), takes it away and brings in
+// what it finds instead.
 //
 // A driver that has no suspend and resume leaves its device running through
 // a sleep, which is right for suspend to idle. Through a loss of power it is
@@ -282,7 +284,19 @@ fn pci_restore_express(p &pci.PCIDevice, saved &PciSaved) {
 		p.write[u16](express + pci_express_link_control, saved.word_at(express + pci_express_link_control))
 	}
 	if has_slot {
-		p.write[u16](express + pci.express_slot_control, saved.word_at(express + pci.express_slot_control))
+		mut control := saved.word_at(express + pci.express_slot_control)
+		// A slot whose card came or went while the machine was down is not
+		// given back the power it had: that was decided for what was in it
+		// then, and switching off a slot that now holds a card takes the card
+		// off the bus. Its switch and lights stay as they are found, for the
+		// hot-plug thread to set once it has seen the change.
+		was := saved.word_at(express + pci.express_slot_status) & pci.status_present
+		now := p.read[u16](express + pci.express_slot_status) & pci.status_present
+		if was != now {
+			keep := pci.control_power_off | (pci.control_light_mask << pci.control_power_light_shift) | (pci.control_light_mask << pci.control_attention_light_shift)
+			control = (control & ~keep) | (p.read[u16](express + pci.express_slot_control) & keep)
+		}
+		p.write[u16](express + pci.express_slot_control, control)
 	}
 	if kind == pci.express_type_root_port {
 		p.write[u16](express + pci_express_root_control, saved.word_at(express + pci_express_root_control))
@@ -345,18 +359,27 @@ pub fn pci_restore_all() int {
 	mut missing := 0
 	devcore_pci_rewritten = 0
 	for i := 0; i < devcore_device_count; i++ {
-		dev := devcore_devices[i]
+		mut dev := devcore_devices[i]
 		if !pci_function_present(dev) {
 			continue
 		}
 		saved := pci_saved_for(pci_bdf(dev.pci))
 		if saved == unsafe { nil } || !pci_restore_function(dev.pci, saved) {
 			missing++
-			C.kprintf(c'devcore: %.*s was not restored after the sleep\n', i32(dev.name.len), dev.name.str)
+			// Its driver is not asked to resume it: what is at the address
+			// now, if anything, is not the device the driver stopped, and
+			// would be set up as if it were. It stays stopped until the
+			// hot-plug thread takes it away.
+			dev.suspended = false
+			C.kprintf(c'devcore: %.*s is gone or is not what it was; not restored after the sleep\n',
+				i32(dev.name.len), dev.name.str)
 		}
 	}
 	devcore_pci_restores++
 	devcore_pci_missing += u64(missing)
+	// What came or went while the power was off is for the hot-plug thread to
+	// find, once it is let back onto the buses.
+	look_after_power_loss()
 	return missing
 }
 

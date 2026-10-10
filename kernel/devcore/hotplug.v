@@ -135,6 +135,9 @@ __global (
 	// seen that and is waiting between passes.
 	devcore_hotplug_paused  u32
 	devcore_hotplug_resting u32
+	// Nonzero when the buses have been without power since the thread last
+	// looked: see compare_buses().
+	devcore_hotplug_look u32
 )
 
 fn (slot &Slot) status() u16 {
@@ -618,6 +621,10 @@ fn hotplug_thread() {
 			continue
 		}
 		katomic.store(mut &devcore_hotplug_resting, u32(0))
+		if katomic.cas(mut &devcore_hotplug_look, u32(1), u32(0)) {
+			compare_buses()
+			katomic.store(mut &devcore_rescan_wanted, u32(1))
+		}
 		if katomic.cas(mut &devcore_rescan_wanted, u32(1), u32(0)) {
 			rescan_buses()
 		}
@@ -661,10 +668,81 @@ pub fn pause_pci_hotplug() bool {
 	return false
 }
 
+// The buses have been without power, and are back with their configuration
+// written to them again: whatever happened on them meanwhile was reported to
+// nobody. Have the thread compare them with what the kernel has, on its next
+// pass. Called by what restores the configuration space (pci_state.v), while
+// the thread is still kept off.
+fn look_after_power_loss() {
+	katomic.store(mut &devcore_hotplug_look, u32(1))
+}
+
+fn bus_has_functions(bus u8) bool {
+	for candidate in scanned_devices {
+		if candidate.bus == bus && candidate.present() {
+			return true
+		}
+	}
+	return false
+}
+
+// A port that lost power lost the events it had latched, and firmware sent
+// no notice of what it saw while the system was not running: after a sleep
+// that cut the power nothing says what came or went. So every function the
+// kernel has is asked who it is. One that no longer answers as it did is
+// gone, or is another card at the same address; either way the device the
+// kernel knew is taken away as a card pulled without warning is -- its
+// driver, which was not asked to resume it, lets go without touching it.
+//
+// A watched slot left with nothing on its bus is then an empty one: if its
+// port shows a card, that card is brought in by the pass over the slots that
+// follows, like any that arrives. So is a card put into a slot that was
+// empty before the sleep, which that pass finds by itself. What appeared
+// anywhere else is found by the rescan the caller asks for next.
+fn compare_buses() {
+	mut gone := 0
+	for {
+		mut record := &pci.PCIDevice(unsafe { nil })
+		for candidate in scanned_devices {
+			if candidate.present()
+				&& candidate.read[u32](0) != (u32(candidate.device_id) << 16) | u32(candidate.vendor_id) {
+				record = unsafe { candidate }
+				break
+			}
+		}
+		if record == unsafe { nil } {
+			break
+		}
+		C.kprintf(c'devcore: %02llx:%02llx.%llx did not come back from the sleep as it was; removed\n',
+			u64(record.bus), u64(record.slot), u64(record.function))
+		drop_function(mut record, false)
+		gone++
+	}
+	if gone == 0 {
+		return
+	}
+	for i in 0 .. devcore_slot_count {
+		mut slot := &devcore_slots[i]
+		if (slot.state != .occupied && slot.state != .leaving) || !slot.port.present() {
+			continue
+		}
+		secondary := slot.port.secondary_bus()
+		if secondary == 0 || bus_has_functions(secondary) {
+			continue
+		}
+		slot.set_power(false)
+		slot.power_light(pci.light_off)
+		slot.departures++
+		slot.state = .empty
+		C.kprintf(c'devcore: slot %.*s: its card went while the machine slept\n', i32(slot.label.len),
+			slot.label.str)
+	}
+}
+
 // Let the thread look again, and have it do so now. Each slot is compared
 // with what its port says on every pass, so a card that was pulled or put in
-// while the machine slept is found by the first one: nothing has to be
-// remembered for it.
+// while the machine slept is found by the first one; and after a sleep that
+// cut the power every function is asked who it is first (compare_buses()).
 pub fn resume_pci_hotplug() {
 	if !devcore_hotplug_alive {
 		return
