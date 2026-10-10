@@ -21,12 +21,14 @@ fn C.GC_unregister_my_thread() i32
 
 fn C.PyEval_GetBuiltins() voidptr
 fn C.PyUnicode_InternFromString(&char) voidptr
+fn C.PyDict_GetItemWithError(voidptr, voidptr) voidptr
 
 // Literal operands have the lifetime of the loaded implementation, matching
 // the constants held by the original Python function objects.
 __global boot_literals = map[string]voidptr{}
 
 fn boot_literal(value string) voidptr {
+	if pending_error() { return unsafe { nil } }
 	if result := boot_literals[value] { return own(result) }
 	result := unsafe { C.PyUnicode_InternFromString(value.str) }
 	if result != unsafe { nil } { boot_literals[value] = own(result) }
@@ -64,12 +66,18 @@ fn boot_pin(c &BootContext, names []string, values []voidptr) {
 }
 
 fn (c &BootContext) resolve(name string) voidptr {
-    mut result := unsafe { C.PyDict_GetItemString(c.namespace, name.str) }
-    if result == unsafe { nil } {
-        result = unsafe { C.PyDict_GetItemString(c.builtins, name.str) }
+    if pending_error() { return unsafe { nil } }
+    key := boot_literal(name)
+    if key == unsafe { nil } { return key }
+    mut result := C.PyDict_GetItemWithError(c.namespace, key)
+    if result == unsafe { nil } && !pending_error() {
+        result = C.PyDict_GetItemWithError(c.builtins, key)
     }
+    drop(key)
+    if pending_error() { return unsafe { nil } }
     if result == unsafe { nil } {
         message := py_string("name '" + name + "' is not defined")
+        if message == unsafe { nil } { return message }
         C.PyErr_SetObject(unsafe { voidptr(C.PyExc_NameError) }, message)
         drop(message)
         return unsafe { nil }
@@ -78,20 +86,31 @@ fn (c &BootContext) resolve(name string) voidptr {
 }
 
 fn boot_tuple(values []voidptr) voidptr {
+	if pending_error() { return unsafe { nil } }
 	result := C.PyTuple_New(values.len)
-	for i, value in values { C.PyTuple_SetItem(result, i, own(value)) }
+	if result == unsafe { nil } { return result }
+	for i, value in values {
+		if C.PyTuple_SetItem(result, i, own(value)) != 0 {
+			drop(result)
+			return unsafe { nil }
+		}
+	}
 	return result
 }
 
 fn boot_call(target voidptr, values []voidptr) voidptr {
+	if pending_error() { return unsafe { nil } }
 	args := boot_tuple(values)
+	if args == unsafe { nil } { return args }
 	result := C.PyObject_Call(target, args, unsafe { nil })
 	drop(args)
 	return result
 }
 
 fn boot_method(value voidptr, name string, args []voidptr) voidptr {
+	if pending_error() { return unsafe { nil } }
 	key := boot_literal(name)
+	if key == unsafe { nil } { return key }
 	target := C.PyObject_GetAttr(value, key)
 	drop(key)
 	if target == unsafe { nil } { return target }
@@ -101,21 +120,27 @@ fn boot_method(value voidptr, name string, args []voidptr) voidptr {
 }
 
 fn boot_field(value voidptr, name string) voidptr {
+	if pending_error() { return unsafe { nil } }
 	key := boot_literal(name)
+	if key == unsafe { nil } { return key }
 	result := C.PyObject_GetItem(value, key)
 	drop(key)
 	return result
 }
 
 fn boot_default(value voidptr, name string, default_ voidptr) voidptr {
+	if pending_error() { return unsafe { nil } }
 	key := boot_literal(name)
+	if key == unsafe { nil } { return key }
 	result := boot_method(value, 'get', [key, default_])
 	drop(key)
 	return result
 }
 
 fn boot_has(value voidptr, name string) i32 {
+	if pending_error() { return -1 }
 	key := boot_literal(name)
+	if key == unsafe { nil } { return -1 }
 	result := C.PySequence_Contains(value, key)
 	drop(key)
 	return result
@@ -640,8 +665,51 @@ fn boot_primitive(c &BootContext, name string, row voidptr, namespace voidptr, r
 			drop(getter)
 			getter = unsafe { nil }
 			if item == unsafe { nil } {
+				mut error_kind := voidptr(0)
+				mut error_value := voidptr(0)
+				mut error_traceback := voidptr(0)
+				C.PyErr_Fetch(&error_kind, &error_value, &error_traceback)
+				C.PyErr_NormalizeException(&error_kind, &error_value, &error_traceback)
+				if pending_error() {
+					drop(error_kind)
+					drop(error_value)
+					drop(error_traceback)
+					return unsafe { nil }
+				}
+				if error_traceback != unsafe { nil } { C.PyException_SetTraceback(error_value, error_traceback) }
+				incoming := handled()
+				C.PyErr_SetExcInfo(own(error_kind), own(error_value), own(error_traceback))
 				stop := c.resolve('StopIteration')
-				if stop == unsafe { nil } { return stop }
+				if stop != unsafe { nil } {
+					mut valid := true
+					if C.PyTuple_Check(stop) != 0 {
+						for i in 0 .. int(C.PyTuple_Size(stop)) {
+							if C.PyExceptionClass_Check(C.PyTuple_GetItem(stop, i)) == 0 {
+								valid = false
+								break
+							}
+						}
+					} else {
+						valid = C.PyExceptionClass_Check(stop) != 0
+					}
+					if !valid {
+						message := py_string('catching classes that do not inherit from BaseException is not allowed')
+						if message != unsafe { nil } {
+							C.PyErr_SetObject(unsafe { voidptr(C.PyExc_TypeError) }, message)
+							drop(message)
+						}
+					}
+				}
+				incoming.activate()
+				incoming.discard()
+				if stop == unsafe { nil } || pending_error() {
+					drop(stop)
+					drop(error_kind)
+					drop(error_value)
+					drop(error_traceback)
+					return unsafe { nil }
+				}
+				C.PyErr_Restore(error_kind, error_value, error_traceback)
 				matches := C.PyErr_GivenExceptionMatches(C.PyErr_Occurred(), stop)
 				drop(stop)
 				if matches == 0 { return item }
