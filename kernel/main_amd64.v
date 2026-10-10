@@ -11,6 +11,7 @@ import x86.gdt
 import x86.idt
 import x86.isr
 import x86.smp
+import x86.wake
 import initramfs
 import numa
 import fs
@@ -212,6 +213,11 @@ fn kmain() {
 
 	// Initialize the memory allocator.
 	memory.pmm_init()
+	// Before anything allocates: the pages under 1 MiB that a processor
+	// starts on after a suspend to RAM are the first the allocator would
+	// hand out. The count is x86.wake's low_pages_wanted, which like every
+	// constant is not set until the runtime is.
+	memory.reserve_low_pages(8)
 
 	// Call Vinit to initialise the runtime
 	C._vinit(0, 0)
@@ -233,6 +239,8 @@ fn kmain() {
 	_ := stubs.toupper(0)
 
 	memory.vmm_init()
+	// The real-mode entry a suspend to RAM comes back through, in its page.
+	wake.install()
 
 	// ACPI init
 	acpi.initialise()
@@ -282,6 +290,8 @@ fn kmain() {
 
 	// Every logical CPU now exists, so each can be told which node it sits on.
 	numa.attach_cpus()
+	// And room can be made for what each loses in a suspend to RAM.
+	wake.initialise()
 
 	time.initialise()
 

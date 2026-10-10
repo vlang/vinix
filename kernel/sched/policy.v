@@ -18,6 +18,10 @@ import time
 // CPU: an affinity change while a thread is running has to take effect, so a CPU
 // it may no longer use puts it down even with nothing to replace it.
 fn may_run_here(t &proc.Thread, cpu_number u64) bool {
+	// A processor being taken out for a deep sleep runs nothing: park_amd64.v.
+	if parking(cpu_number) {
+		return false
+	}
 	if cpu_number >= 64 {
 		return true
 	}

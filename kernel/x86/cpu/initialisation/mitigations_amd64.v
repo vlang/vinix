@@ -145,3 +145,17 @@ fn mitigation_initialise(number u64) bool {
 		caps.leaf7_edx, caps.leaf7_2_edx, caps.amd_ebx, caps.arch_caps)
 	return true
 }
+
+// Write this CPU's speculation control register again, from the policy it
+// was given at boot: a CPU that was powered down in a sleep comes back with
+// the register cleared, and the policy -- which the entry and return paths
+// go on reading -- says it is set. False if the register will not take it.
+fn mitigation_restore(number u64) bool {
+	if number >= mitigation_cpu_count { return false }
+	control := unsafe { mitigation_policies[number].kernel_control }
+	if control != 0 {
+		mitigation_wrmsr(0x48, control)
+		if mitigation_rdmsr(0x48) & control != control { return false }
+	}
+	return true
+}

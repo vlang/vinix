@@ -48,6 +48,51 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 
 	cpu_local.lapic_id = smp_info.lapic_id
 
+	program(mut cpu_local, true)
+
+	apic.lapic_enable(0xff)
+
+	apic.lapic_timer_calibrate(mut cpu_local)
+
+	// MOVDIRI/MOVDIR64B have no extended-register-state prerequisite. Record
+	// only their actual hardware bits, including zero for an absent leaf.
+	// Other leaf-seven ECX bits can require separately enabled OS state.
+	// IF is still clear and the online acknowledgement below publishes this
+	// CPU's immutable observation to the boot compatibility policy.
+	directstore_available, _, _, directstore_ecx, _ := cpu.cpuid(7, 0)
+	cpu_local.directstore_ecx = if directstore_available {
+		directstore_ecx & ((u32(1) << 27) | (u32(1) << 28))
+	} else { u32(0) }
+
+	C.kprintf(c'smp: CPU %llu online!\n', u64(cpu_local.cpu_number))
+
+	katomic.inc(mut &cpu_local.online)
+
+	if cpu_number != 0 {
+		for katomic.load(&scheduler_vector) == 0 {}
+		sched.enter_idle()
+	}
+}
+
+// Give a processor that has lost everything -- it was powered down in a
+// suspend to RAM, or reset to be started again -- what initialise() gave it
+// at boot, from the same record: its descriptor tables and task state, the
+// kernel's page table, SYSCALL, the PAT, its GS, write protection, SMEP,
+// SMAP and UMIP, the extended state it may use, its speculation controls and
+// VMX operation. The stacks it was given at boot are still its own, and its
+// local APIC and timer are the caller's to restore: they were read out before
+// the processor stopped. Interrupts off; the processor is not yet online.
+pub fn reinitialise(mut cpu_local cpulocal.Local) {
+	asm volatile amd64 { cli; ; ; memory }
+	cpu_local.maskable_irq_depth = 0
+	program(mut cpu_local, false)
+}
+
+// Everything a processor is told once: at boot (`first`), when its stacks are
+// allocated as well, and each time it comes back from a loss of power.
+fn program(mut cpu_local cpulocal.Local, first bool) {
+	cpu_number := cpu_local.cpu_number
+
 	gdt.install(&cpu_local.gdt[0])
 	cpu_local.ldt = unsafe { nil }
 	cpu_local.ldt_process = unsafe { nil }
@@ -65,19 +110,25 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	kernel_pagemap.switch_to()
 	memory.enable_pcid()
 
-	unsafe {
-		stack_size := u64(0x200000)
-		cpu_local.idle_int_stack = cpu_stack_top(stack_size)
-		cpu_local.tss.rsp0 = cpu_local.idle_int_stack
-		cpu_local.tss.ist1 = cpu_stack_top(stack_size)
-		// A fault while the page-fault stack itself is exhausted must still
-		// have an independent stack for the fatal double-fault report.
-		cpu_local.tss.ist2 = cpu_stack_top(0x10000)
-		cpu_local.tss.ist4 = cpu_stack_top(0x10000)
+	if first {
+		unsafe {
+			stack_size := u64(0x200000)
+			cpu_local.idle_int_stack = cpu_stack_top(stack_size)
+			cpu_local.tss.rsp0 = cpu_local.idle_int_stack
+			cpu_local.tss.ist1 = cpu_stack_top(stack_size)
+			// A fault while the page-fault stack itself is exhausted must still
+			// have an independent stack for the fatal double-fault report.
+			cpu_local.tss.ist2 = cpu_stack_top(0x10000)
+			cpu_local.tss.ist4 = cpu_stack_top(0x10000)
 
-		// Every thread brings its own page fault stack; this one is for the
-		// CPU between threads.
-		cpu_local.idle_pf_stack = cpu_stack_top(stack_size)
+			// Every thread brings its own page fault stack; this one is for the
+			// CPU between threads.
+			cpu_local.idle_pf_stack = cpu_stack_top(stack_size)
+			cpu_local.tss.ist3 = cpu_local.idle_pf_stack
+		}
+	} else {
+		// The processor runs no thread: the stacks it has between threads.
+		cpu_local.tss.rsp0 = cpu_local.idle_int_stack
 		cpu_local.tss.ist3 = cpu_local.idle_pf_stack
 	}
 	// Enable syscall
@@ -225,36 +276,21 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	}
 
 	// Program this logical CPU before it can run any user instruction.
-	if !C.vinix_x86_mitigations_initialise(cpu_number) {
-		panic('CPU speculation controls did not take effect')
+	if first {
+		if !C.vinix_x86_mitigations_initialise(cpu_number) {
+			panic('CPU speculation controls did not take effect')
+		}
+	} else if !mitigation_restore(cpu_number) {
+		panic('CPU speculation controls did not take effect after a sleep')
 	}
 
 	// VMXON is local to each logical CPU. Failure is deliberately non-fatal:
 	// Vinix must still boot when firmware disables VT-x or a host does not
 	// expose nested virtualisation.
-	hypervisor.initialise_cpu(cpu_number)
-
-	apic.lapic_enable(0xff)
-
-	apic.lapic_timer_calibrate(mut cpu_local)
-
-	// MOVDIRI/MOVDIR64B have no extended-register-state prerequisite. Record
-	// only their actual hardware bits, including zero for an absent leaf.
-	// Other leaf-seven ECX bits can require separately enabled OS state.
-	// IF is still clear and the online acknowledgement below publishes this
-	// CPU's immutable observation to the boot compatibility policy.
-	directstore_available, _, _, directstore_ecx, _ := cpu.cpuid(7, 0)
-	cpu_local.directstore_ecx = if directstore_available {
-		directstore_ecx & ((u32(1) << 27) | (u32(1) << 28))
-	} else { u32(0) }
-
-	C.kprintf(c'smp: CPU %llu online!\n', u64(cpu_local.cpu_number))
-
-	katomic.inc(mut &cpu_local.online)
-
-	if cpu_number != 0 {
-		for katomic.load(&scheduler_vector) == 0 {}
-		sched.enter_idle()
+	if first {
+		hypervisor.initialise_cpu(cpu_number)
+	} else {
+		hypervisor.enter_cpu(cpu_number)
 	}
 }
 

@@ -221,6 +221,32 @@ fn cpu_setup(mut me CpuControl) {
 	katomic.store(mut &me.ready, u32(1))
 }
 
+// This CPU has been through a suspend to RAM: what cpu_setup() switched on
+// is off again and its request register is as power-on leaves it. Switch the
+// interface on once more, and have the next pass through the scheduler's
+// interrupt write the value the policy wants, as if it had just changed.
+// Called on the CPU itself with interrupts off, before it runs a thread.
+//
+// Like the rest of this file's register writes it has run only against the
+// simulated driver's memory.
+pub fn cpu_lost_power(cpu_number u64) {
+	if cpufreq_x86_control == .absent || cpu_number >= max_cpus {
+		return
+	}
+	mut me := unsafe { &cpufreq_x86_cpus[cpu_number] }
+	if me.ready == 0 {
+		// Never set up: its first pass does it all.
+		return
+	}
+	cpu_setup(mut me)
+	generation := katomic.load(&me.generation)
+	if generation != 0 {
+		// Nothing was ever asked for at generation 0, so there is nothing
+		// to write again; anything later is behind by one.
+		me.applied = generation - 1
+	}
+}
+
 fn speedstep_of(me &CpuControl) SpeedStep {
 	return speedstep(me.platform_info, me.turbo_limit, me.misc_enable, cpufreq_x86_turbo)
 }

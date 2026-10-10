@@ -851,6 +851,11 @@ pub fn await() {
 	}
 	require_task_context()
 	mut cpu_local := cpulocal.current()
+	// Nothing to run and not meant to run anything: this processor is being
+	// taken out of the scheduler for a sleep that powers it down.
+	if parking(cpu_local.cpu_number) {
+		park_here(mut cpu_local)
+	}
 	wakeup := if device_poll_callback != voidptr(0) && cpu_local.cpu_number == 0 {
 		idle_poll_wakeup_us
 	} else {
