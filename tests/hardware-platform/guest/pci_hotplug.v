@@ -133,7 +133,11 @@ fn hot_arrival(mut t Test, round string, own_ports bool) bool {
 		t.check(read_word(slot + '/adapter') == '1', 'the slot reports no card')
 		t.check(read_word(slot + '/power') == '1', 'the slot reports no power')
 	}
-	return t.check(network_works(10), 'the network does not work through the card that arrived')
+	// Time for an address as well as an answer: the card's link comes up half
+	// a second after it is started, the first request for an address is lost
+	// to that, and the next ones are two and four seconds apart -- more on a
+	// host that is busy with other machines.
+	return t.check(network_works(30), 'the network does not work through the card that arrived')
 }
 
 // One departure: asked back, let go of, gone.
@@ -244,7 +248,7 @@ fn pci_hotplug(mut t Test, own_ports bool) {
 	t.info('${found_again_cycles} remove/rescan cycles: live heap objects ${before.objects} -> ${after.objects}, large pages ${before.large_pages} -> ${after.large_pages}')
 	t.check(after.objects - before.objects <= heap_noise_objects, '${found_again_cycles} remove/rescan cycles left ${after.objects - before.objects} more heap objects allocated (limit ${heap_noise_objects})')
 	t.check(after.large_pages <= before.large_pages, '${found_again_cycles} remove/rescan cycles left ${after.large_pages - before.large_pages} more large-allocation pages')
-	t.check(network_works(10), 'the network does not work after the remove/rescan cycles')
+	t.check(network_works(30), 'the network does not work after the remove/rescan cycles')
 
 	if !hot_departure(mut t, '', own_ports) {
 		return
