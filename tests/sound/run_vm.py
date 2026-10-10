@@ -48,68 +48,80 @@ GUEST_MARKERS = (
 )
 
 
+_LITERAL_CACHE = {}
+_SLOT_KEYS = {name: sys.intern(name) for name in ('close', 'join', 'environ', 'copy', 'pop', 'setdefault', 'system', 'insert', 'waitpid', 'WNOHANG', 'select', 'read', 'errno', 'EIO', 'extend', 'stdout', 'buffer', 'write', 'flush', 'monotonic', 'stderr')}
+_ATTRIBUTE, _TRUTH, _SLICE = getattr, bool, slice
+_namespace = globals
+_frame = sys._getframe
+
+import importlib.util as _loader
+_spec = _loader.spec_from_file_location("sound_guest_binding", Path(__file__).with_name("_native.py"))
+_library = _loader.module_from_spec(_spec)
+_spec.loader.exec_module(_library)
+
+
+def _native(operation, *arguments):
+    try:
+        return _library.call(operation, _namespace(), _frame(1).f_builtins, *arguments)
+    finally:
+        arguments = None
+
+
+def _list(*items):
+    return [*items]
+
+
+def _tuple(*items):
+    return (*items,)
+
+
+def _triple(value):
+    try:
+        first, second, third = value
+        return first, second, third
+    except:
+        value = None
+        raise
+
+
+def _FORMAT(value):
+    try:
+        return f"{value}"
+    finally:
+        value = None
+
+
+def _failure_cell(state, key, value):
+    cells = state.setdefault("_failure_cells", {})
+    cell = cells.setdefault(key, [None])
+    cell[0] = value
+    return cell
+
+
+def _failure_candidates(cell, markers):
+    try:
+        return (_native("contains_marker", cell[0], marker) for marker in markers)
+    finally:
+        markers = None
+
 def boot(root: Path, guest_init: Path, initramfs: Path, state: Path, wav: Path,
          timeout: int, no_build: bool) -> bytes | None:
-    environment = os.environ.copy()
-    environment["VINIX_INITRAMFS"] = str(initramfs)
-    environment["VINIX_BOOT_DISK"] = str(state / "boot.img")
-    environment["VINIX_EFIVARS"] = str(state / "efivars.fd")
-    environment["VINIX_QEMU_PACKAGE_STORE"] = str(state / "packages.tar")
-    environment["VINIX_QEMU_PERSIST_DISK"] = str(state / "root.ext2")
-    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = "64"
-    environment.pop("VINIX_QEMU_PERSIST", None)
-    environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
-    environment["VINIX_QEMU_AUDIO"] = f"wav:{wav}"
-    environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
-    if platform.system() != "Darwin":
-        environment.setdefault("USE_TCG", "1")
-
-    command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--mem=2048",
-               f"--guest-init={guest_init}"]
-    if no_build:
-        command.insert(1, "--no-build")
-
+    _state = _native('scope', root, guest_init, initramfs, state, wav, timeout, no_build)
+    _native('prepare', _state)
+    environment, command = _state['environment'], _state['command']
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(root)
         os.execve(command[0], command, environment)
 
-    transcript = bytearray()
-    status: int | None = None
-    shutdown_deadline: float | None = None
-    deadline = time.monotonic() + timeout
+    _state.update(pid=pid, master=master)
+    del environment, command, pid, master
+    _native('initialize', _state)
     try:
-        while time.monotonic() < deadline:
-            waited, child_status = os.waitpid(pid, os.WNOHANG)
-            if waited == pid:
-                status = child_status
-                break
-            readable, _, _ = select.select([master], [], [], 0.25)
-            if readable:
-                try:
-                    chunk = os.read(master, 65536)
-                except OSError as error:
-                    if error.errno == errno.EIO:
-                        continue
-                    raise
-                transcript.extend(chunk)
-                sys.stdout.buffer.write(chunk)
-                sys.stdout.buffer.flush()
-            recent = bytes(transcript[-65536:])
-            finished = DONE_MARKER in recent or any(m in recent for m in FAIL_MARKERS)
-            if finished and shutdown_deadline is None:
-                # Quitting through the monitor lets QEMU finish the WAV header.
-                os.write(master, b"\x01x")
-                shutdown_deadline = time.monotonic() + 10
-            if shutdown_deadline is not None and time.monotonic() >= shutdown_deadline:
-                break
+        _native('capture', _state)
     finally:
-        if status is None:
-            stop_child(pid, master)
-        os.close(master)
-    if status is not None and exit_code(status) != 0:
-        print(f"ERROR: VM runner exited with {exit_code(status)}", file=sys.stderr)
-    return bytes(transcript)
+        _native('retire', _state)
+    return _native('report', _state)
 
 
 def read_wav(path: Path) -> tuple[int, int, list[int]]:
