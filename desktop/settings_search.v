@@ -74,6 +74,14 @@ const settings_search_entries = [
 		'settings.theme.macos',
 		'settings.theme.default_note_1',
 		'settings.theme.macos_note_1',
+		'settings.theme.windows7',
+	]!},
+	SettingsSearchEntry{.theme, 'settings.theme.glass_color', [
+		'settings.theme.glass_color_note',
+		'settings.theme.windows7',
+		'settings.theme.windows7_note_1',
+		'settings.theme.windows7_note_2',
+		'',
 		'',
 	]!},
 	SettingsSearchEntry{.wallpaper, 'settings.wallpaper.colour', [

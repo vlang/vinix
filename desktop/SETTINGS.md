@@ -14,6 +14,7 @@ scale=2
 button_side=left
 taskbar_mode=combined
 theme=macos
+glass_color=0
 language=ru
 clock_24_hour=false
 clock_show_seconds=false
@@ -30,7 +31,9 @@ power_profile=auto
 ```
 
 `scale` is `auto`, `1` (100%) or `2` (200%). The other choices are `right`/`left`,
-`standard`/`combined` and `default`/`macos`. `language` is `en` (the default),
+`standard`/`combined` and `default`/`macos`/`windows7`. `glass_color` is the
+zero-based index of one of the sixteen Windows 7 glass colours, from Sky (0)
+to Frost (15); it is kept whichever theme is worn. `language` is `en` (the default),
 `ru` or `es`; see [the system language](#system-language) below. Clock choices are `true`/`false`;
 all four default to `true`, preserving the historical 24-hour clock with
 seconds, date and weekday when an older version-1 snapshot omits the new keys.

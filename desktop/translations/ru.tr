@@ -1135,6 +1135,12 @@ settings.theme.default_note_1
 settings.theme.default_note_2
 и панель задач вдоль нижнего края.
 -----
+settings.theme.glass_color
+Цвет стекла
+-----
+settings.theme.glass_color_note
+Цвет рамок окон и панели задач.
+-----
 settings.theme.heading
 Тема
 -----
@@ -1149,6 +1155,15 @@ settings.theme.macos_note_2
 -----
 settings.theme.note
 Как выглядят окна и панель задач.
+-----
+settings.theme.windows7
+Windows 7
+-----
+settings.theme.windows7_note_1
+Стеклянные рамки окон с размытием фона,
+-----
+settings.theme.windows7_note_2
+кнопки у верхнего края и стеклянная панель задач.
 -----
 settings.wallpaper.colour
 Цвет

@@ -1135,6 +1135,12 @@ settings.theme.default_note_1
 settings.theme.default_note_2
 画面下部のタスクバー。
 -----
+settings.theme.glass_color
+ガラスの色
+-----
+settings.theme.glass_color_note
+ウィンドウの枠とタスクバーの色。
+-----
 settings.theme.heading
 テーマ
 -----
@@ -1149,6 +1155,15 @@ settings.theme.macos_note_2
 -----
 settings.theme.note
 ウィンドウとタスクバーの表示方法。
+-----
+settings.theme.windows7
+Windows 7
+-----
+settings.theme.windows7_note_1
+向こう側が見えるガラスのウィンドウ枠、
+-----
+settings.theme.windows7_note_2
+上端のボタンとガラスのタスクバー。
 -----
 settings.wallpaper.colour
 色

@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// What the desktop looks like and how its chrome behaves, and the two themes
+// What the desktop looks like and how its chrome behaves, and the three themes
 // it can wear.
 //
 // The preference model lives in settings_model.v. The window manager
@@ -18,13 +18,17 @@ module main
 // only shows a background under the pointer. `traffic` is the three coloured
 // discs macOS puts at the leading edge, which are grey until the window is
 // focused and show their glyphs only while the pointer is over the set.
+// `aero` is Windows 7's caption group: three glass buttons hanging from the
+// window's top edge, the close button wider than the other two and red while
+// its window is focused. glass.v draws them.
 enum ButtonLook {
 	flat
 	traffic
+	aero
 }
 
 // Theme is every colour and measurement that changes between looks. Anything
-// the same in both stays a plain constant in theme.v.
+// the same in all of them stays a plain constant in theme.v.
 struct Theme {
 	name string
 	// Windows
@@ -32,6 +36,16 @@ struct Theme {
 	window_edge   u32
 	window_radius int
 	shadow_alpha  u32
+	// How far the drop shadow reaches, at most shadow_max_spread.
+	shadow_spread int = 7
+	// Aero glass: the window frame, the taskbar and the Start menu show what
+	// is behind them, blurred and tinted with Settings.glass_color. glass.v.
+	glass bool
+	// The frame around a window's body on its left, right and bottom. Zero is a
+	// body that reaches the window's edges; Windows 7's glass is 8 pixels.
+	frame_border int
+	// The window's icon leads its title.
+	title_icon bool
 	// Title bar
 	title_height             int
 	title_active_bg          u32
@@ -226,9 +240,78 @@ const theme_macos = Theme{
 	shortcut_panel: 0x000000
 }
 
+// Windows 7 with Aero. The frame, the taskbar and the Start menu are glass
+// (glass.v), so the title and taskbar colours below are only what marks a
+// state for that renderer, or what a surface without glass falls back to.
+// The measurements are Windows 7's at 96 DPI: an 8-pixel frame around the
+// body and a 22-pixel caption above it, 30 pixels from the window's top edge.
+const theme_windows7 = Theme{
+	name: 'Windows 7'
+	window_body: 0xf0f0f0
+	window_edge: 0x6f7b8c
+	window_radius: 7
+	shadow_alpha: 64
+	shadow_spread: 12
+	glass: true
+	frame_border: 8
+	title_icon: true
+	title_height: 30
+	title_active_bg: 0xb9d1ea
+	title_active_bg2: 0xb9d1ea
+	title_inactive_bg: 0xd7e4f2
+	title_inactive_bg2: 0xd7e4f2
+	title_highlight: 0
+	title_inactive_highlight: 0
+	title_divider: 0x8c98a8
+	title_inactive_divider: 0xa9b3c0
+	// Windows 7 keeps the title black on an unfocused window; the glass and the
+	// caption buttons are what fade.
+	title_text_active: 0x000000
+	title_text_inactive: 0x000000
+	title_centered: false
+	title_bold: false
+	title_size: 12
+	button_look: .aero
+	button_size: aero_caption_maximize_width
+	button_gap: 0
+	button_inset: aero_caption_inset
+	button_hover: 0x3a8ee6
+	button_close_hover: 0xe0432d
+	button_face: 0xdfe9f5
+	button_edge: 0x535a66
+	glyph_color: 0xffffff
+	glyph_on_close: 0xffffff
+	dock: false
+	taskbar_icon_only: true
+	dock_bg: 0x3d5a80
+	dock_radius: 12
+	dock_padding: 8
+	taskbar_bg: 0x3d5a80
+	taskbar_edge: 0x1c2a3d
+	taskbar_text: 0xffffff
+	taskbar_text_active: 0xffffff
+	taskbar_muted: 0xe1eaf4
+	taskbar_item_bg: 0x4f6f97
+	taskbar_item_hover: 0x7396c0
+	taskbar_item_active: 0x8fb0d8
+	accent: 0x3399ff
+	accent_dim: 0x2a66ad
+	shortcut_label: 0xffffff
+	shortcut_hover: 0xffffff
+	shortcut_panel: 0x000000
+}
+
 fn (d &Desktop) theme() Theme {
 	return match d.settings.theme {
 		.default_ { theme_default }
 		.macos { theme_macos }
+		.windows7 { theme_windows7 }
 	}
+}
+
+// window_border is the frame around this window's body on its left, right and
+// bottom. A maximized window has none: Windows 7 pushes that part of the
+// frame off the screen.
+fn (d &Desktop) window_border(window &Window) int {
+	return if window.maximized { 0 } else { d.theme().frame_border }
 }

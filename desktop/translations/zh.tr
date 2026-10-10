@@ -1135,6 +1135,12 @@ settings.theme.default_note_1
 settings.theme.default_note_2
 任务栏位于屏幕底部。
 -----
+settings.theme.glass_color
+窗口颜色
+-----
+settings.theme.glass_color_note
+窗口边框和任务栏的颜色。
+-----
 settings.theme.heading
 主题
 -----
@@ -1149,6 +1155,15 @@ settings.theme.macos_note_2
 -----
 settings.theme.note
 窗口和任务栏的绘制样式。
+-----
+settings.theme.windows7
+Windows 7
+-----
+settings.theme.windows7_note_1
+Aero 窗口边框，能看到后面的内容，
+-----
+settings.theme.windows7_note_2
+按钮位于窗口上边缘，任务栏也一样。
 -----
 settings.wallpaper.colour
 颜色

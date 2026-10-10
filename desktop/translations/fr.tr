@@ -1135,6 +1135,12 @@ Fenêtres arrondies avec ombres et couleur unie,
 settings.theme.default_note_2
 et une barre des tâches en bas de l'écran.
 -----
+settings.theme.glass_color
+Couleur du verre
+-----
+settings.theme.glass_color_note
+La couleur des cadres des fenêtres et de la barre des tâches.
+-----
 settings.theme.heading
 Thème
 -----
@@ -1149,6 +1155,15 @@ pastilles colorées sur le bord gauche et un dock.
 -----
 settings.theme.note
 Aspect des fenêtres et de la barre des tâches.
+-----
+settings.theme.windows7
+Windows 7
+-----
+settings.theme.windows7_note_1
+Cadres de verre qui floutent ce qui est derrière,
+-----
+settings.theme.windows7_note_2
+boutons au bord supérieur et barre des tâches en verre.
 -----
 settings.wallpaper.colour
 Couleur

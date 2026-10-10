@@ -57,6 +57,14 @@ const settings_action_clock_date = 'settings.clock.date.'
 const settings_action_clock_weekday = 'settings.clock.weekday.'
 const settings_action_language = 'settings.language.'
 const settings_action_theme = 'settings.theme.'
+// One swatch per entry of glass_colors.
+const settings_action_glass = 'settings.glass.'
+const settings_glass_actions = ['settings.glass.0', 'settings.glass.1', 'settings.glass.2',
+	'settings.glass.3', 'settings.glass.4', 'settings.glass.5', 'settings.glass.6', 'settings.glass.7',
+	'settings.glass.8', 'settings.glass.9', 'settings.glass.10', 'settings.glass.11', 'settings.glass.12',
+	'settings.glass.13', 'settings.glass.14', 'settings.glass.15']!
+// Windows 7 lays its sixteen colours out in two rows.
+const settings_glass_columns = 8
 const settings_action_color = 'settings.color.'
 const settings_action_image = 'settings.image.'
 const settings_language_actions = ['settings.language.0', 'settings.language.1', 'settings.language.2',
@@ -373,31 +381,78 @@ fn (a &SettingsApp) date_time_pane(width int) []ui2.Element {
 	return out
 }
 
+// settings_glass_offered says whether the compositor showing this window has
+// the Windows 7 theme.
+fn settings_glass_offered() bool {
+	return app_compositor_features & app_feature_glass != 0
+}
+
 fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	settings := a.desktop.settings
 	inner := width - 2 * settings_padding
-	half := (inner - settings_row_gap) / 2
+	// Settings published to a running desktop on its own offers only the
+	// themes that desktop can draw.
+	columns := if settings_glass_offered() { 3 } else { 2 }
+	choice := (inner - (columns - 1) * settings_row_gap) / columns
 
-	mut out := frame_elements(8)
+	mut out := frame_elements(9 + glass_colors.len)
 	mut y := settings_padding
 
 	out << settings_heading(tr('settings.theme.heading'), y, width)
 	y += 22
 	out << settings_note(tr('settings.theme.note'), y, width)
 	y += 22
-	out << settings_choice('settings.theme.0', tr('settings.theme.default'), settings_padding, y, half, settings.theme == .default_)
-	out << settings_choice('settings.theme.1', tr('settings.theme.macos'), settings_padding + half + settings_row_gap, y, half, settings.theme == .macos)
+	out << settings_choice('settings.theme.0', tr('settings.theme.default'), settings_padding, y, choice, settings.theme == .default_)
+	out << settings_choice('settings.theme.1', tr('settings.theme.macos'), settings_padding + choice + settings_row_gap, y, choice, settings.theme == .macos)
+	if columns == 3 {
+		out << settings_choice('settings.theme.2', tr('settings.theme.windows7'), settings_padding + 2 * (choice + settings_row_gap), y, choice, settings.theme == .windows7)
+	}
 	y += 28 + 10
 
 	// Each description is two lines, broken where the translation breaks it.
-	if settings.theme == .macos {
-		out << settings_note(tr('settings.theme.macos_note_1'), y, width)
-		y += 16
-		out << settings_note(tr('settings.theme.macos_note_2'), y, width)
-	} else {
-		out << settings_note(tr('settings.theme.default_note_1'), y, width)
-		y += 16
-		out << settings_note(tr('settings.theme.default_note_2'), y, width)
+	match settings.theme {
+		.default_ {
+			out << settings_note(tr('settings.theme.default_note_1'), y, width)
+			y += 16
+			out << settings_note(tr('settings.theme.default_note_2'), y, width)
+		}
+		.macos {
+			out << settings_note(tr('settings.theme.macos_note_1'), y, width)
+			y += 16
+			out << settings_note(tr('settings.theme.macos_note_2'), y, width)
+		}
+		.windows7 {
+			out << settings_note(tr('settings.theme.windows7_note_1'), y, width)
+			y += 16
+			out << settings_note(tr('settings.theme.windows7_note_2'), y, width)
+		}
+	}
+	if settings.theme != .windows7 {
+		return out
+	}
+	y += 16 + 22
+
+	// The colour of the glass: Windows 7's own sixteen, in its two rows.
+	out << settings_heading(tr('settings.theme.glass_color'), y, width)
+	y += 22
+	out << settings_note(tr('settings.theme.glass_color_note'), y, width)
+	y += 24
+	swatch := (inner - (settings_glass_columns - 1) * settings_row_gap) / settings_glass_columns
+	for index, color in glass_colors {
+		column := index % settings_glass_columns
+		row := index / settings_glass_columns
+		selected := settings.glass_color == index
+		out << ui2.clickable_view(settings_glass_actions[index], ui2.rect(f64(settings_padding +
+			column * (swatch + settings_row_gap)), f64(y + row * (swatch + settings_row_gap)), f64(swatch),
+			f64(swatch)), ui2.BoxStyle{
+			bg:     if selected { app_accent } else { settings_choice_bg }
+			radius: 6
+		}, frame_child(
+		// The swatch proper, inset so the selected ring shows around it.
+		ui2.view('', ui2.rect(3, 3, f64(swatch - 6), f64(swatch - 6)), ui2.BoxStyle{
+			bg:     color.color
+			radius: 4
+		}, [])))
 	}
 
 	return out
@@ -569,8 +624,25 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 		}
 		return
 	}
+	if event_id.starts_with(settings_action_glass) {
+		for index, action in settings_glass_actions {
+			if event_id == action && index < glass_colors.len && settings_glass_offered() {
+				a.desktop.settings.glass_color = index
+				break
+			}
+		}
+		return
+	}
 	if event_id.starts_with(settings_action_theme) {
-		if event_id.ends_with('1') {
+		if event_id.ends_with('2') {
+			if !settings_glass_offered() {
+				return
+			}
+			a.desktop.settings.theme = .windows7
+			// Windows 7's caption buttons are at the right, and a theme chosen
+			// afresh starts with its own geometry, as Catalina's does below.
+			a.desktop.settings.button_side = .right
+		} else if event_id.ends_with('1') {
 			a.desktop.settings.theme = .macos
 			// A freshly selected Catalina theme starts with Catalina geometry.
 			// Appearance remains independent, so the user can deliberately move

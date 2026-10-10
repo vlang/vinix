@@ -256,6 +256,7 @@ fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip, desktop_overlays 
 	// preceding remote tree before collecting this frame's targets.
 	d.clear_hit_targets()
 	d.canvas.clip = clip
+	d.glass_begin_pass(clip)
 	d.paint_wallpaper()
 	d.render_element(&root, 0, 0, 0)
 	// Only a complete frame shows every window as it is now.
@@ -290,10 +291,12 @@ fn (mut d Desktop) render_element(el &ui2.Element, off_x int, off_y int, depth i
 
 	// A view clips its children to itself, so one that is wholly outside the
 	// clip draws nothing, shadow included. A partial frame skips it and only
-	// collects the hit targets inside it.
+	// collects the hit targets inside it. Glass reaches further than a shadow:
+	// what the clip repaints near a glass surface shows in its blur.
+	paint_margin := if depth == 1 && d.glass.active { glass_reach } else { view_paint_margin }
 	if (el.kind == .view || el.kind == .scroll)
-		&& !d.canvas.clip_touches(x - view_paint_margin, y - view_paint_margin, w +
-		2 * view_paint_margin, h + 2 * view_paint_margin + 2) {
+		&& !d.canvas.clip_touches(x - paint_margin, y - paint_margin, w + 2 * paint_margin, h +
+		2 * paint_margin + 2) {
 		d.record_subtree_targets(el, x, y, w, h)
 		return
 	}
@@ -359,6 +362,23 @@ fn (mut d Desktop) render_element(el &ui2.Element, off_x int, off_y int, depth i
 	if depth == 1 && el.kind == .view && el.id.starts_with('win.') {
 		d.inactive_window = !el.focused
 	}
+	// The taskbar's controls know from this that they sit on glass.
+	was_on_bar := d.glass.on_bar
+	if depth == 1 && el.id == taskbar_id {
+		d.glass.on_bar = d.glass.active
+	}
+	// A glass title bar's icon is told what is under it rather than reading
+	// the canvas. See surface_under.
+	was_on_title := d.glass.on_title
+	d.glass.on_title = d.glass.active && depth == 2 && el.id.ends_with('.titlebar')
+	// So do the Start menu's own controls, but not those of the opaque
+	// program pane inside it.
+	was_on_menu := d.glass.on_menu
+	if depth == 1 && el.id == action_start_panel {
+		d.glass.on_menu = d.glass.active
+	} else if depth > 1 {
+		d.glass.on_menu = false
+	}
 
 	// By reference: an Element is several hundred bytes, and copying each one
 	// into every call on every pass was a large part of a frame.
@@ -367,6 +387,9 @@ fn (mut d Desktop) render_element(el &ui2.Element, off_x int, off_y int, depth i
 	}
 
 	d.inactive_window = was_inactive
+	d.glass.on_bar = was_on_bar
+	d.glass.on_menu = was_on_menu
+	d.glass.on_title = was_on_title
 	if pushed {
 		d.canvas.restore_clip(saved)
 	}
@@ -481,6 +504,26 @@ fn (mut d Desktop) clear_hit_targets() {
 fn (mut d Desktop) draw_surface(el &ui2.Element, x int, y int, w int, h int, depth int) {
 	if el.box.transparent {
 		return
+	}
+	// Aero glass: a window's frame and the taskbar are painted from what is
+	// behind them. See glass.v.
+	if d.glass.active {
+		if depth == 1 && el.id.starts_with('win.') {
+			d.draw_glass_window(el, x, y, w, h)
+			return
+		}
+		if depth == 1 && el.id == taskbar_id {
+			d.draw_glass_taskbar(el, x, y, w, h)
+			return
+		}
+		if depth == 1 && el.id == action_start_panel {
+			d.draw_glass_menu(el, x, y, w, h)
+			return
+		}
+		if el.id == taskbar_edge_id {
+			// The glass bar draws its own top lines.
+			return
+		}
 	}
 	radius := int(el.box.radius)
 	if el.id == window_placement_preview_id {
@@ -683,7 +726,12 @@ fn (mut d Desktop) draw_label(el &ui2.Element, x int, y int, w int, h int) {
 		// Padded, so the run is not touched by whatever it is sitting on.
 		d.canvas.fill_rect(text_x - 6, y + 2, text_width + 12, h - 4, el.text_style.background_color)
 	}
-	if el.text_style.shadow {
+	if d.glass.active && el.id.starts_with('win.') && el.id.ends_with('.title') {
+		d.draw_aero_title_glow(text_x, y, text_width, h)
+	}
+	// Text on the glass taskbar is backed like a shortcut's label, for the
+	// same reason: what shows through behind it could be anything.
+	if el.text_style.shadow || d.glass.on_bar || d.glass.on_menu {
 		// A shortcut's label sits on a wallpaper that could be any photograph,
 		// so it cannot rely on contrast with what is behind it. The shadow's
 		// colour comes from the text's own: dark text is backed with light and
@@ -1124,6 +1172,10 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	// backing-store resolution instead.
 	is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
 		|| el.id.ends_with('.maximize')
+	if is_title_button && el.id.starts_with('win.') && d.theme().button_look == .aero {
+		d.draw_aero_caption_button(el, x, y, w, h)
+		return
+	}
 	is_traffic_light := d.theme().button_look == .traffic && is_title_button
 	mut text_color := if el.kind == .toggle_button && el.checked {
 		el.toggle_down_text_style.color
@@ -1133,6 +1185,13 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	if (el.kind == .button || el.kind == .toggle_button) && el.native_style
 		&& d.settings.theme == .macos {
 		text_color = d.draw_catalina_button(el, x, y, w, h)
+	} else if !el.box.transparent && (d.glass.on_bar || d.glass.on_menu) {
+		control_box := if el.kind == .toggle_button && el.checked {
+			el.toggle_down_box
+		} else {
+			el.box
+		}
+		d.draw_glass_bar_box(el, x, y, w, h, control_box.bg, int(control_box.radius))
 	} else if !el.box.transparent {
 		control_box := if el.kind == .toggle_button && el.checked {
 			el.toggle_down_box
@@ -1922,8 +1981,14 @@ fn (mut d Desktop) draw_battery_glyph(name string, cx int, cy int, w int, h int,
 }
 
 // surface_under samples the canvas so the restore glyph's front square can
-// mask the back one without knowing which title bar shade is behind it.
+// mask the back one without knowing which title bar shade is behind it. On a
+// glass title bar there is no one shade, and the canvas outside a partial
+// frame's clip is not what is behind anything: the window's own glass is
+// what its backdrop makes it.
 fn (d &Desktop) surface_under(x int, y int) u32 {
+	if d.glass.on_title {
+		return d.glass.title_under
+	}
 	if x < 0 || y < 0 || x >= d.canvas.width || y >= d.canvas.height {
 		return d.theme().title_active_bg
 	}
@@ -1971,8 +2036,10 @@ fn (mut d Desktop) draw_cursor() {
 			|| d.pointer_y < window.y || d.pointer_y >= window.y + window.height {
 			continue
 		}
+		border := d.window_border(&window)
 		if window.hide_body_cursor && d.pointer_y >= window.y + d.theme().title_height
-			&& !d.window_overlay_active() {
+			&& d.pointer_y < window.y + window.height - border && d.pointer_x >= window.x + border
+			&& d.pointer_x < window.x + window.width - border && !d.window_overlay_active() {
 			return
 		}
 		break

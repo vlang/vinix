@@ -31,6 +31,10 @@ What it does:
   network, battery, display and Capture icons and an overflow panel, and
   progress bars, badges and attention flashes on buttons
 - windows with a title bar, a close, a maximise/restore and a minimise button
+- a **Windows 7 Aero theme**: glass window frames that blur and tint what is
+  behind them, the caption buttons hanging from the top edge with a red close
+  on the focused window, a glass taskbar and Start menu, and Windows 7's
+  sixteen glass colours
 - dragging a window by its title bar, with top-edge maximize, side halves,
   corner quarters and a translucent placement preview; shake the title bar to
   hide other windows on its workspace, and shake again to restore them
@@ -221,6 +225,7 @@ typing any word with a q in it drop the user back to the console.
     input.v        /dev/pointer, and the terminal in raw mode
     clock.v        CLOCK_REALTIME and the calendar arithmetic on top of it
     theme.v        every colour and measurement in one place
+    glass.v        Aero glass for the Windows 7 theme: blur, tint, caption buttons
 
 The interesting part is the split between `wm.v` and `render.v`. The window
 manager never draws: it describes the whole screen as a `ui2.Element` tree —
@@ -787,12 +792,32 @@ as Windows does, left as macOS does, with the inner two swapping order to match
 each convention — and switches the taskbar between one entry per window, as
 Windows XP had, and one per application with a count, as Windows 7 had.
 
-**Theme** chooses between the desktop's own look and *macOS*, matched to a
+**Theme** chooses between the desktop's own look, *macOS* and *Windows 7*.
+macOS is matched to a
 native 1x AppKit window from macOS Catalina 10.15.7 (19H2): a 22-pixel light
 grey title bar, centred title, 12-pixel traffic lights on 20-pixel centres, and
 a dock — a rounded panel sized to its contents and centred clear of the bottom
 edge — in place of the full-width taskbar. The QEMU captures and measurements
 used as the reference live in `docs/catalina-reference/`.
+
+*Windows 7* is Aero. A window's frame is glass: 8 pixels around the body and
+30 above it, with the 16-pixel icon and the title in black over a white glow,
+and the three caption buttons as one group hanging from the top edge — 28, 27
+and 48 pixels wide, six in from the frame's edge, the close button red while
+its window is focused. The frame shows what is behind it, blurred, through
+Windows 7's colourisation (for its own Sky: 8% colour, 43% afterglow that
+follows the backdrop's brightness, 49% blur), under the diagonal reflection
+bands. The taskbar and the Start menu's shell are the same glass under a
+shade, the Start button is an orb, and a maximized window keeps only the glass
+along its top. **Glass colour** offers the sixteen colours of Windows 7's
+Window Color page.
+
+Glass is painted by `glass.v` from the canvas itself. When a surface is
+reached the pixels under it are what is behind it; they are averaged into
+4-pixel cells, blurred, and kept. A partial frame refreshes only the cells
+that lie inside its clip, so a ticking clock or one redrawing application
+costs the glass around it and nothing else, and when a change behind glass
+shows through past the damaged area the next frame repaints that fringe.
 
 The discs are grey until a window is focused and show their glyphs only while
 the pointer is over the set, as macOS does. They also keep red-yellow-green

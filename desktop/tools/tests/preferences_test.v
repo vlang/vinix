@@ -67,7 +67,7 @@ fn test_preferences_round_trip_every_field_and_both_scale_overrides() {
 	}
 	assert os.ls(home)! == [desktop_preferences_name]
 	record := os.read_file(desktop_preferences_path(home))!
-	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nlanguage=ru\nclock_24_hour=false\nclock_show_seconds=false\nclock_show_date=false\nclock_show_weekday=false\nwallpaper_color=4\nwallpaper_image=2\nkeyboard_layouts=us,ru,de\nkeyboard_layout=de\ndisplay_off_after=never\nsleep_after=never\nlid_action=suspend\npower_profile=auto\n'
+	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nglass_color=0\nlanguage=ru\nclock_24_hour=false\nclock_show_seconds=false\nclock_show_date=false\nclock_show_weekday=false\nwallpaper_color=4\nwallpaper_image=2\nkeyboard_layouts=us,ru,de\nkeyboard_layout=de\ndisplay_off_after=never\nsleep_after=never\nlid_action=suspend\npower_profile=auto\n'
 }
 
 fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
@@ -104,6 +104,41 @@ fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {
 	// Returning to defaults is a real change too, not an omitted record.
 	assert p.save_changes(Settings{}, desktop_scale_200, home)
 	assert desktop_load_preferences(home) == DesktopPreferences{}
+}
+
+fn test_preferences_keep_the_windows7_theme_and_its_glass_colour() {
+	home := preference_test_home('glass')
+	defer { os.rmdir_all(home) or {} }
+	mut p := desktop_load_preferences(home)
+	p.configure_scale(1920, 1080)
+	settings := Settings{
+		theme:       .windows7
+		glass_color: 7
+	}
+	assert p.save_changes(settings, desktop_current_scale(), home)
+	loaded := desktop_load_preferences(home)
+	assert loaded.settings.theme == .windows7
+	assert loaded.settings.glass_color == 7
+	record := os.read_file(desktop_preferences_path(home))!
+	assert record.contains('\ntheme=windows7\nglass_color=7\n')
+	// A record written before the colour existed reads as the first one, and
+	// the colour is kept whichever theme is worn.
+	old := desktop_parse_preferences('version=1\ntheme=windows7')?
+	assert old.settings.theme == .windows7 && old.settings.glass_color == 0
+	other := desktop_parse_preferences('version=1\ntheme=macos\nglass_color=15')?
+	assert other.settings.theme == .macos && other.settings.glass_color == 15
+	// Only the sixteen colours Settings offers.
+	for record_text in ['version=1\nglass_color=16', 'version=1\nglass_color=-1',
+		'version=1\nglass_color=sky', 'version=1\nglass_color=1\nglass_color=2'] {
+		if _ := desktop_parse_preferences(record_text) {
+			assert false, 'accepted ${record_text}'
+		}
+	}
+	assert !desktop_preferences_valid(DesktopPreferences{
+		settings: Settings{
+			glass_color: glass_colors.len
+		}
+	})
 }
 
 fn test_preferences_optional_keys_comments_and_unknown_keys() {

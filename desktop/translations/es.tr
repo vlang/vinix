@@ -1135,6 +1135,12 @@ Ventanas redondeadas con sombras y color plano,
 settings.theme.default_note_2
 y una barra de tareas a lo largo de la parte inferior.
 -----
+settings.theme.glass_color
+Color del cristal
+-----
+settings.theme.glass_color_note
+El color de los marcos de las ventanas y la barra de tareas.
+-----
 settings.theme.heading
 Tema
 -----
@@ -1149,6 +1155,15 @@ discos de color en el borde inicial y un dock.
 -----
 settings.theme.note
 Cómo se dibujan las ventanas y la barra de tareas.
+-----
+settings.theme.windows7
+Windows 7
+-----
+settings.theme.windows7_note_1
+Marcos de cristal que desenfocan lo que hay detrás,
+-----
+settings.theme.windows7_note_2
+botones en el borde superior y barra de tareas de cristal.
 -----
 settings.wallpaper.colour
 Color

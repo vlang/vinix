@@ -237,7 +237,7 @@ fn (mut d Desktop) step_window_action_geometry(dx int, dy int, precise bool) {
 		d.windows[index].y += dy * step
 		d.clamp_drag_to_screen(index)
 	} else if d.window_actions.mode == .resize {
-		min_height := d.theme().title_height + window_min_body_height
+		min_height := d.theme().title_height + window_min_body_height + d.theme().frame_border
 		mut width := d.windows[index].width + dx * step
 		mut height := d.windows[index].height + dy * step
 		if width < window_min_width { width = window_min_width }

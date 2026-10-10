@@ -24,6 +24,26 @@ const window_min_body_height = 96
 
 // ── Windows ────────────────────────────────────────────────────────
 
+// Windows 7's caption buttons hang from the window's top edge as one group:
+// minimise, maximise, then a wider close, six pixels in from the frame's outer
+// edge. A width includes the dividing line on the button's left, and the
+// group's last column is its right edge. The 19 rows start under the frame's
+// outer line and end with the group's own lower edge, whose two outer corners
+// are rounded.
+const aero_caption_minimize_width = 28
+const aero_caption_maximize_width = 27
+const aero_caption_close_width = 48
+const aero_caption_width = aero_caption_minimize_width + aero_caption_maximize_width +
+	aero_caption_close_width
+const aero_caption_height = 19
+const aero_caption_inset = 6
+const aero_caption_radius = 4
+// The title's 16-pixel icon: how far in from the body's left edge it starts,
+// and the gap between it and the text.
+const aero_title_icon_size = 16
+const aero_title_icon_inset = 8
+const aero_title_icon_gap = 6
+
 // ── Window contents ────────────────────────────────────────────────
 // ── Application interiors ──────────────────────────────────────────
 // Declared custom controls do not follow the chrome's theme. A button that

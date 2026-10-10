@@ -47,7 +47,9 @@ const app_feature_desktop_services = u8(4)
 const app_feature_text_copy = u8(8)
 const app_feature_capture_cursor = u8(16)
 const app_feature_horizontal_scroll = u8(32)
-const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy | app_feature_capture_cursor | app_feature_horizontal_scroll
+// The Windows 7 theme, and its glass colour above the theme in the state.
+const app_feature_glass = u8(64)
+const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy | app_feature_capture_cursor | app_feature_horizontal_scroll | app_feature_glass
 // Header byte 7 was reserved and zero in version 10. Bit 0 now requests a
 // cursor-free Capture frame, with the unchanged header/state sizes. Older
 // compositors do not advertise the feature, so new Capture clients send zero.
@@ -231,10 +233,69 @@ fn (mut r WireReader) take_string() !string {
 	return value
 }
 
+// The theme travels with the Windows 7 glass colour above it in the same
+// field. A desktop and an application built before that colour existed only
+// ever say 0 or 1 there, which reads back as that theme with the first
+// colour, and reject anything else: app_state_for_peer keeps it from them.
+const wire_theme_kind_mask = 0xff
+const wire_theme_glass_shift = 8
+
+fn wire_theme(settings Settings) int {
+	return int(settings.theme) | (settings.glass_color << wire_theme_glass_shift)
+}
+
+fn wire_theme_valid(value int) bool {
+	kind := value & wire_theme_kind_mask
+	glass := value >> wire_theme_glass_shift
+	return value >= 0 && kind <= int(ThemeKind.windows7) && glass < glass_colors.len
+}
+
+// app_state_for_peer is the state as a program without app_feature_glass can
+// read it: it knows neither the Windows 7 theme nor a glass colour, and is
+// told the desktop wears its own look.
+fn app_state_for_peer(state AppWireState, peer_features u8) AppWireState {
+	if peer_features & app_feature_glass != 0 {
+		return state
+	}
+	return AppWireState{
+		...state
+		settings: Settings{
+			...state.settings
+			theme:       if state.settings.theme == .windows7 {
+				ThemeKind.default_
+			} else {
+				state.settings.theme
+			}
+			glass_color: 0
+		}
+	}
+}
+
+// app_state_from_peer undoes that in what such a program answers: the theme
+// it was told is not a choice it made, and the glass colour was never its to
+// change. `current` is what the desktop has.
+fn app_state_from_peer(state AppWireState, peer_features u8, current Settings) AppWireState {
+	if peer_features & app_feature_glass != 0 {
+		return state
+	}
+	return AppWireState{
+		...state
+		settings: Settings{
+			...state.settings
+			theme:       if current.theme == .windows7 && state.settings.theme == .default_ {
+				ThemeKind.windows7
+			} else {
+				state.settings.theme
+			}
+			glass_color: current.glass_color
+		}
+	}
+}
+
 fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_i32(mut out, int(state.settings.button_side))
 	wire_put_i32(mut out, int(state.settings.taskbar_mode))
-	wire_put_i32(mut out, int(state.settings.theme))
+	wire_put_i32(mut out, wire_theme(state.settings))
 	wire_put_i32(mut out, if state.settings.clock_24_hour { 1 } else { 0 })
 	wire_put_i32(mut out, if state.settings.clock_show_seconds { 1 } else { 0 })
 	wire_put_i32(mut out, if state.settings.clock_show_date { 1 } else { 0 })
@@ -301,7 +362,7 @@ fn wire_take_state_flags(mut reader WireReader, state_flags u8) !AppWireState {
 	capture_report_fps := reader.take_i32()!
 	if button_side < int(ButtonSide.right) || button_side > int(ButtonSide.left)
 		|| taskbar_mode < int(TaskbarMode.standard) || taskbar_mode > int(TaskbarMode.combined)
-		|| theme < int(ThemeKind.default_) || theme > int(ThemeKind.macos)
+		|| !wire_theme_valid(theme)
 		|| clock_24_hour < 0 || clock_24_hour > 1
 		|| clock_show_seconds < 0 || clock_show_seconds > 1
 		|| clock_show_date < 0 || clock_show_date > 1
@@ -327,7 +388,8 @@ fn wire_take_state_flags(mut reader WireReader, state_flags u8) !AppWireState {
 		settings:        Settings{
 			button_side:        unsafe { ButtonSide(button_side) }
 			taskbar_mode:       unsafe { TaskbarMode(taskbar_mode) }
-			theme:              unsafe { ThemeKind(theme) }
+			theme:              unsafe { ThemeKind(theme & wire_theme_kind_mask) }
+			glass_color:        theme >> wire_theme_glass_shift
 			language:           unsafe { DesktopLanguage(language) }
 			clock_24_hour:      clock_24_hour == 1
 			clock_show_seconds: clock_show_seconds == 1
@@ -785,10 +847,16 @@ fn apply_app_state(mut desktop Desktop, state AppWireState) {
 		desktop.keyboard.dead = 0
 	}
 	language_changed := desktop.settings.language != state.settings.language
+	// Every window's frame, the taskbar and their glass follow the theme.
+	theme_changed := desktop.settings.theme != state.settings.theme
+		|| desktop.settings.glass_color != state.settings.glass_color
 	desktop.settings = state.settings
 	desktop.accept_capture_request(state.capture_request)
 	if wallpaper_changed {
 		desktop.invalidate_wallpaper()
+	}
+	if theme_changed {
+		desktop.dirty = true
 	}
 	if clock_changed {
 		desktop.taskbar_clock_sampled = false
@@ -1327,7 +1395,8 @@ fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload
 		AppWireState{}
 	}
 	started := desktop_monotonic_ms()
-	if !send_app_request(a.request_fd, command, width, height, state, payload) {
+	if !send_app_request(a.request_fd, command, width, height, app_state_for_peer(state, a.peer_features),
+		payload) {
 		a.remember_transport_failure('application request pipe closed')
 		a.abort_transport()
 		return error(a.failure_reason)
@@ -1342,7 +1411,7 @@ fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload
 		return error(a.failure_reason)
 	}
 	if unsafe { a.desktop != nil } {
-		apply_app_state(mut a.desktop, reply.state)
+		apply_app_state(mut a.desktop, app_state_from_peer(reply.state, a.peer_features, a.desktop.settings))
 	}
 	return reply
 }

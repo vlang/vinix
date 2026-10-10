@@ -163,6 +163,69 @@ fn test_window_chrome_borrows_strings_when_toolbars_move_between_themes() {
 	assert live == 0, 'window chrome theme redraws retained ${live} bytes'
 }
 
+// Whole frames and partial ones, the glass colour changing and a window
+// moving.
+fn glass_memory_frames(mut desktop Desktop) {
+	for iteration in 0 .. 24 {
+		desktop.settings.glass_color = iteration % glass_colors.len
+		desktop.windows[0].x = 150 + iteration % 3
+		render_and_release(mut desktop)
+		tree := desktop.build_tree()
+		desktop.render_clipped(tree, desktop.damage_clip(DamageRect{
+			x:     120
+			y:     96
+			w:     480
+			h:     304
+			valid: true
+		}), false)
+		free_tree(tree)
+	}
+}
+
+fn test_glass_redraws_keep_only_their_backdrops() {
+	mut desktop := memory_fixture_desktop()
+	desktop.settings.theme = .windows7
+	// The first pass allocates what glass keeps: each surface's backdrop at
+	// the largest size it reaches, the blur's work space, and the frame
+	// pool's capacity for these layouts. None of it is a reason to allocate
+	// again.
+	glass_memory_frames(mut desktop)
+	assert desktop.glass.allocated
+	C.vinix_heap_begin()
+	glass_memory_frames(mut desktop)
+	live := C.vinix_heap_end()
+	if live != 0 { print_heap_sizes('glass allocations by size') }
+	assert live == 0, 'glass redraws retained ${live} bytes'
+	// A surface that goes away gives its backdrop back: the Start menu's
+	// once the menu has been shut for a whole frame, a window's once it is
+	// minimized.
+	backdrops := glass_memory_backdrops(&desktop)
+	assert backdrops == desktop.windows.len + 1
+	desktop.start_menu_open = true
+	render_and_release(mut desktop)
+	assert glass_memory_backdrops(&desktop) == backdrops + 1
+	desktop.start_menu_open = false
+	desktop.windows[1].minimized = true
+	render_and_release(mut desktop)
+	render_and_release(mut desktop)
+	assert glass_memory_backdrops(&desktop) == backdrops - 1
+	// And another theme has no use for any of them.
+	desktop.settings.theme = .default_
+	render_and_release(mut desktop)
+	assert !desktop.glass.allocated
+	assert glass_memory_backdrops(&desktop) == 0
+}
+
+fn glass_memory_backdrops(desktop &Desktop) int {
+	mut count := 0
+	for slot in desktop.glass.slots {
+		if slot.raw != unsafe { nil } {
+			count++
+		}
+	}
+	return count
+}
+
 fn test_files_child_paths_preserve_root_and_trailing_separator_semantics() {
 	for index, directory in ['/', '/home/user', '/home/user/']! {
 		path := files_child_path(directory, 'café 日本語.txt')

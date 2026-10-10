@@ -131,6 +131,8 @@ mut:
 	// Set while rendering paints a window that is not focused, whose default
 	// button and focus ring the macOS theme leaves out.
 	inactive_window bool
+	// What is behind each glass surface of the Windows 7 theme. See glass.v.
+	glass GlassCache
 	// The pixels under the software pointer, so a pointer that only moved can
 	// be redrawn without recomposing anything else.
 	cursor_backing CursorBacking
@@ -534,7 +536,10 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	window := &d.windows[window_index]
 	theme := d.theme()
 	active := window.id == d.focus
-	body_height := window.height - theme.title_height
+	// A glass frame also runs down both sides of the body and under it.
+	border := d.window_border(window)
+	body_width := window.width - 2 * border
+	body_height := window.height - theme.title_height - border
 
 	title_text_color := if active { theme.title_text_active } else { theme.title_text_inactive }
 	title_bg := if active { theme.title_active_bg } else { theme.title_inactive_bg }
@@ -542,7 +547,8 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	// Close, then zoom, then minimise, laid out from whichever end the setting
 	// puts them at. Ordering close outermost is what both conventions do.
 	buttons_left := d.settings.button_side == .left
-	span := 3 * theme.button_size + 2 * theme.button_gap
+	aero := theme.button_look == .aero
+	span := if aero { aero_caption_width } else { 3 * theme.button_size + 2 * theme.button_gap }
 	mut button_x := if buttons_left {
 		theme.button_inset
 	} else {
@@ -598,11 +604,45 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	} else {
 		'builtin:close'
 	}
-	close := d.title_button(window.id_close, close_glyph, close_x, active, set_hovered)
-	maximize := d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
-	minimize := d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
+	mut close := ui2.Element{}
+	mut maximize := ui2.Element{}
+	mut minimize := ui2.Element{}
+	// Windows 7's three buttons are one group hanging from the frame's top
+	// line, six pixels in from its outer edge. A maximized window has neither
+	// the line nor the edge, and the group moves up and out to the screen's.
+	caption_top := if window.maximized { 0 } else { 1 }
+	caption_inset := if window.maximized { 2 } else { aero_caption_inset }
+	caption_x := if buttons_left {
+		caption_inset
+	} else {
+		window.width - caption_inset - aero_caption_width
+	}
+	if aero {
+		// Minimise, maximise, close, with close outermost at either end.
+		if buttons_left {
+			close = aero_caption_button(window.id_close, close_glyph, caption_x, aero_caption_close_width,
+				caption_top)
+			maximize = aero_caption_button(window.id_maximize, maximize_glyph, caption_x +
+				aero_caption_close_width, aero_caption_maximize_width, caption_top)
+			minimize = aero_caption_button(window.id_minimize, 'builtin:minimize', caption_x +
+				aero_caption_close_width + aero_caption_maximize_width, aero_caption_minimize_width,
+				caption_top)
+		} else {
+			minimize = aero_caption_button(window.id_minimize, 'builtin:minimize', caption_x,
+				aero_caption_minimize_width, caption_top)
+			maximize = aero_caption_button(window.id_maximize, maximize_glyph, caption_x +
+				aero_caption_minimize_width, aero_caption_maximize_width, caption_top)
+			close = aero_caption_button(window.id_close, close_glyph, caption_x +
+				aero_caption_minimize_width + aero_caption_maximize_width, aero_caption_close_width,
+				caption_top)
+		}
+	} else {
+		close = d.title_button(window.id_close, close_glyph, close_x, active, set_hovered)
+		maximize = d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
+		minimize = d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
+	}
 
-	background, mut contents := d.window_contents(window_index, body_height)
+	background, mut contents := d.window_contents(window_index, body_width, body_height)
 	// Catalina draws a window's toolbar in its title bar, under one gradient,
 	// and Finder titles the window after the folder it shows. An application
 	// asks for both by leading with an app_toolbar_id view: it moves here, out
@@ -631,8 +671,22 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	}
 
 	// The title takes what the buttons leave. Centred themes centre it over the
-	// whole bar and simply accept a shorter run.
-	text_inset_left := if buttons_left { theme.button_inset + span + 10 } else { 14 }
+	// whole bar and simply accept a shorter run. Windows 7 leads it with the
+	// window's icon, a little in from the body's left edge.
+	title_lead := if buttons_left {
+		theme.button_inset + span + 10
+	} else if theme.title_icon {
+		border + aero_title_icon_inset
+	} else {
+		14
+	}
+	text_inset_left := if theme.title_icon {
+		title_lead + aero_title_icon_size + aero_title_icon_gap
+	} else {
+		title_lead
+	}
+	// The frame's top line is not part of what the title is centred in.
+	title_top := if theme.glass { 1 } else { 0 }
 	title_limit := window.width - span - theme.button_inset - text_inset_left - 10
 	// A folder's title carries its icon, as Finder's does, the two centred as one.
 	title_icon_width := if toolbar.image_path.len > 0 && theme.title_centered && d.fonts.len > 0 {
@@ -644,13 +698,23 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		title_icon_width / 2
 	} else {
 		text_inset_left
-	}), 0, f64(if theme.title_centered { window.width } else { title_limit }), f64(theme.title_height)),
-		title_style)
+	}), f64(title_top), f64(if theme.title_centered { window.width } else { title_limit }),
+		f64(theme.title_height - title_top)), title_style)
 
-	mut title_children := frame_elements(6)
+	mut title_children := frame_elements(7)
 	// These controls borrow persistent window ids, model strings and frame
 	// arrays. V3 deep-clones a named Element on append; transfer its fields.
 	title_children << ui2.Element{ ...title }
+	if theme.title_icon {
+		title_children << ui2.Element{
+			...ui2.image('', window.icon, ui2.rect(f64(title_lead), f64(title_top +
+				(theme.title_height - title_top - aero_title_icon_size) / 2), aero_title_icon_size,
+				aero_title_icon_size))
+			text_style: ui2.TextStyle{
+				color: aero_title_icon_color
+			}
+		}
+	}
 	if title_icon_width > 0 {
 		text_width := d.face_for(title_style).text_width(title_text)
 		title_children << ui2.Element{
@@ -673,23 +737,28 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 			}
 		}
 	}
+	// A glass frame is painted whole by the window's own surface, so the bar
+	// and its divider are only there to be dragged and found.
 	title_bar := ui2.draggable_view(window.id_titlebar, ui2.rect(0, 0, f64(window.width), f64(theme.title_height +
 		toolbar_height)), ui2.BoxStyle{
-		bg: title_bg
+		bg:          title_bg
+		transparent: theme.glass
 	}, title_children)
 
 	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height + toolbar_height - 1),
 		f64(window.width), 1), ui2.BoxStyle{
-		bg: if active { theme.title_divider } else { theme.title_inactive_divider }
+		bg:          if active { theme.title_divider } else { theme.title_inactive_divider }
+		transparent: theme.glass
 	}, [])
 
 	// Clickable so that touching a window anywhere brings it to the front,
 	// not only its title bar.
-	body := ui2.clickable_view(window.id_body, ui2.rect(0, f64(theme.title_height), f64(window.width), f64(body_height)), ui2.BoxStyle{
+	body := ui2.clickable_view(window.id_body, ui2.rect(f64(border), f64(theme.title_height),
+		f64(body_width), f64(body_height)), ui2.BoxStyle{
 		bg: background
 	}, contents)
 
-	mut window_children := frame_elements(13)
+	mut window_children := frame_elements(16)
 	// The body goes first: a toolbar's title bar reaches down over its top.
 	// Transfer the app tree without cloning its borrowed text and pooled arrays.
 	window_children << ui2.Element{ ...body }
@@ -700,11 +769,33 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	// adding chrome over the application's surface.
 	if !window.maximized && window.snap == .none_ {
 		grip := window_resize_grip_size
-		edge := window_resize_edge_size
+		// All of a glass frame's width resizes, as it does in Windows 7.
+		edge := if border > window_resize_edge_size { border } else { window_resize_edge_size }
 		right := window.width - grip
 		bottom := window.height - grip
-		window_children << resize_grip(window.id_resize_n, grip, 0, window.width - 2 * grip,
-			edge, ui2.cursor_resize_ns)
+		// The caption group hangs from the top edge. Over it only the frame's
+		// outer line resizes, and beside it the corner keeps the gap.
+		caption_from := if aero { caption_x } else { window.width }
+		caption_to := if aero { caption_x + aero_caption_width } else { window.width }
+		nw_reach := if aero && buttons_left { caption_inset } else { grip }
+		ne_reach := if aero && !buttons_left { caption_inset } else { grip }
+		nw_side := if aero && buttons_left { caption_inset } else { edge }
+		ne_side := if aero && !buttons_left { caption_inset } else { edge }
+		if aero {
+			window_children << resize_grip(window.id_resize_n, nw_reach, 0, window.width -
+				nw_reach - ne_reach, 1, ui2.cursor_resize_ns)
+			if caption_from > grip {
+				window_children << resize_grip(window.id_resize_n, grip, 0, caption_from - grip,
+					edge, ui2.cursor_resize_ns)
+			}
+			if right > caption_to {
+				window_children << resize_grip(window.id_resize_n, caption_to, 0, right - caption_to,
+					edge, ui2.cursor_resize_ns)
+			}
+		} else {
+			window_children << resize_grip(window.id_resize_n, grip, 0, window.width - 2 * grip,
+				edge, ui2.cursor_resize_ns)
+		}
 		window_children << resize_grip(window.id_resize_s, grip, window.height - edge,
 			window.width - 2 * grip, edge, ui2.cursor_resize_ns)
 		window_children << resize_grip(window.id_resize_w, 0, grip, edge,
@@ -716,18 +807,20 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 		// The upper corners are the title bar's, whose buttons sit a few pixels
 		// in from them. There the grip is an L along the two outer edges, so
 		// the buttons and the bar's own drag keep the rest.
-		window_children << resize_grip(window.id_resize_nw, 0, 0, grip, edge, ui2.cursor_resize_nwse)
-		window_children << resize_grip(window.id_resize_nw, 0, 0, edge, grip, ui2.cursor_resize_nwse)
-		window_children << resize_grip(window.id_resize_ne, right, 0, grip, edge, ui2.cursor_resize_nesw)
-		window_children << resize_grip(window.id_resize_ne, window.width - edge, 0, edge, grip,
+		window_children << resize_grip(window.id_resize_nw, 0, 0, nw_reach, edge, ui2.cursor_resize_nwse)
+		window_children << resize_grip(window.id_resize_nw, 0, 0, nw_side, grip, ui2.cursor_resize_nwse)
+		window_children << resize_grip(window.id_resize_ne, window.width - ne_reach, 0, ne_reach,
+			edge, ui2.cursor_resize_nesw)
+		window_children << resize_grip(window.id_resize_ne, window.width - ne_side, 0, ne_side, grip,
 			ui2.cursor_resize_nesw)
 	}
 	// `focused` tells the renderer which window's controls are drawn as the
-	// key window's.
+	// key window's. A maximized glass window is square: its corners are the
+	// screen's.
 	return ui2.Element{
 		...ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
 			bg:     background
-			radius: theme.window_radius
+			radius: if theme.glass && window.maximized { 0 } else { theme.window_radius }
 		}, window_children)
 		focused: active
 	}
@@ -754,12 +847,12 @@ fn window_resize_action(action string) bool {
 // application supplies both: what it returns is its QML `Screen`, which inside
 // someone else's window is a content area rather than a display, so its
 // background becomes the body's and its children are placed straight into it.
-fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui2.Element) {
+fn (mut d Desktop) window_contents(window_index int, body_width int, body_height int) (u32, []ui2.Element) {
 	window := &d.windows[window_index]
 	if window.app_index < 0 || window.app_index >= d.apps.len {
-		return d.theme().window_body, window.content(window.width, body_height, d)
+		return d.theme().window_body, window.content(body_width, body_height, d)
 	}
-	size := ui2.rect(0, 0, f64(window.width), f64(body_height))
+	size := ui2.rect(0, 0, f64(body_width), f64(body_height))
 	// V3 promotes this dispatch wrapper because the returned tree escapes.
 	// Own the wrapper explicitly; the application and its strings stay in apps.
 	mut app := &NativeApp(d.apps[window.app_index])
@@ -771,8 +864,8 @@ fn (mut d Desktop) window_contents(window_index int, body_height int) (u32, []ui
 		// An application that cannot lay itself out should say so in its own
 		// window rather than take the desktop down with it.
 		mut error_children := frame_elements(2)
-		error_children << body_line(tr('wm.app_failed'), 18, 18, window.width - 36)
-		error_children << muted_line(err.msg(), 18, 40, window.width - 36)
+		error_children << body_line(tr('wm.app_failed'), 18, 18, body_width - 36)
+		error_children << muted_line(err.msg(), 18, 40, body_width - 36)
 		return d.theme().window_body, error_children
 	}
 	return root.box.bg, root.children
@@ -1182,11 +1275,12 @@ fn (mut d Desktop) forward_pointer_to_window(x int, y int, phase AppPointerPhase
 	} else {
 		for i := d.windows.len - 1; i >= 0; i-- {
 			window := &d.windows[i]
+			border := d.window_border(window)
 			body_top := window.y + d.theme().title_height
 			if window.workspace == d.current_workspace && !window.minimized
-				&& window.app_index >= 0 && x >= window.x
-				&& x < window.x + window.width && y >= body_top
-				&& y < window.y + window.height {
+				&& window.app_index >= 0 && x >= window.x + border
+				&& x < window.x + window.width - border && y >= body_top
+				&& y < window.y + window.height - border {
 				selected = i
 				break
 			}
@@ -1208,8 +1302,10 @@ fn (mut d Desktop) forward_pointer_to_window(x int, y int, phase AppPointerPhase
 			return -1
 		}
 		window_id := window.id
-		body_height := window.height - d.theme().title_height
-		mut local_x := x - window.x
+		border := d.window_border(window)
+		body_width := window.width - 2 * border
+		body_height := window.height - d.theme().title_height - border
+		mut local_x := x - window.x - border
 		mut local_y := y - window.y - d.theme().title_height
 		if local_x < 0 {
 			local_x = 0
@@ -1217,13 +1313,13 @@ fn (mut d Desktop) forward_pointer_to_window(x int, y int, phase AppPointerPhase
 		if local_y < 0 {
 			local_y = 0
 		}
-		if local_x >= window.width {
-			local_x = window.width - 1
+		if local_x >= body_width {
+			local_x = body_width - 1
 		}
 		if local_y >= body_height {
 			local_y = body_height - 1
 		}
-		app.pointer_event(phase, button, scroll, local_x, local_y, window.width, body_height)
+		app.pointer_event(phase, button, scroll, local_x, local_y, body_width, body_height)
 		if phase == .down {
 			d.pointer_capture = window_id
 			// A foreign surface has no ui2 action id to focus through the
@@ -1321,6 +1417,18 @@ fn desktop_owns(action string) bool {
 	return false
 }
 
+// aero_caption_button is one of Windows 7's three caption buttons. It
+// declares only where it is and which mark it carries: the glass, the colour
+// its state gives it and the mark are painted by draw_aero_caption_button.
+fn aero_caption_button(id string, glyph string, x int, width int, top int) ui2.Element {
+	return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), f64(top), f64(width), aero_caption_height),
+		ui2.BoxStyle{
+		transparent: true
+	}, ui2.TextStyle{
+		color: 0xffffff
+	})
+}
+
 fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_hovered bool) ui2.Element {
 	theme := d.theme()
 	y := (theme.title_height - theme.button_size) / 2
@@ -1385,6 +1493,11 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 		color: if hovered && is_close { theme.glyph_on_close } else { theme.glyph_color }
 	})
 }
+
+// The taskbar's own id and its top hairline's: the renderer paints a glass
+// bar from the first and leaves the second out.
+const taskbar_id = 'taskbar'
+const taskbar_edge_id = 'taskbar.edge'
 
 fn (d &Desktop) taskbar_element() ui2.Element {
 	theme := d.theme()
@@ -1540,7 +1653,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// wallpaper without a shadow, which would read as heavy at this size. A
 	// dock has its own rounded outline instead.
 	if !dock {
-		children << ui2.view('taskbar.edge', ui2.rect(0, 0, f64(width), 1), ui2.BoxStyle{
+		children << ui2.view(taskbar_edge_id, ui2.rect(0, 0, f64(width), 1), ui2.BoxStyle{
 			bg: theme.taskbar_edge
 		}, [])
 		// Show Desktop fills the lower-right corner, where a pointer pushed
@@ -1560,13 +1673,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		panel_x := (width - panel_width) / 2
 		// Clear of the bottom edge, the way a dock sits.
 		panel_y := d.canvas.height - taskbar_height - dock_bottom_gap
-		return ui2.view('taskbar', ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width), f64(taskbar_height)), ui2.BoxStyle{
+		return ui2.view(taskbar_id, ui2.rect(f64(panel_x), f64(panel_y), f64(panel_width), f64(taskbar_height)), ui2.BoxStyle{
 			bg:     theme.dock_bg
 			radius: theme.dock_radius
 		}, children)
 	}
 
-	return ui2.view('taskbar', ui2.rect(0, f64(d.canvas.height - taskbar_height), f64(width), f64(taskbar_height)), ui2.BoxStyle{
+	return ui2.view(taskbar_id, ui2.rect(0, f64(d.canvas.height - taskbar_height), f64(width), f64(taskbar_height)), ui2.BoxStyle{
 		bg: theme.taskbar_bg
 	}, children)
 }
@@ -1675,6 +1788,9 @@ fn (d &Desktop) taskbar_entry_elements(mut children []ui2.Element, entry Taskbar
 	button_style := ui2.BoxStyle{
 		bg:     bg
 		radius: radius
+		// On a glass bar a program that is only pinned is its icon alone, as
+		// it is in Windows 7; one that is running sits in a pane.
+		transparent: theme.glass && entry.window_count == 0 && bg == theme.taskbar_item_bg
 	}
 	if icon_only {
 		// An icon consumes the full button when it has no label, making an
@@ -2060,7 +2176,7 @@ fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
 	} else {
 		d.drag.start_height + dy
 	}
-	min_height := d.theme().title_height + window_min_body_height
+	min_height := d.theme().title_height + window_min_body_height + d.theme().frame_border
 	if d.drag.resize_horizontal && width < window_min_width {
 		width = window_min_width
 	}
@@ -2104,8 +2220,17 @@ fn (mut d Desktop) finish_window_resize() {
 // negative here.
 fn (mut d Desktop) add_drag_damage(old_x int, old_y int, new_x int, new_y int,
 	old_pointer_x int, old_pointer_y int, pointer_x int, pointer_y int, width int, height int) {
-	d.add_damage_rect(old_x - 7, old_y - 5, width + 14, height + 14)
-	d.add_damage_rect(new_x - 7, new_y - 5, width + 14, height + 14)
+	if d.theme().glass {
+		// Glass shows what is around the window as well as what is under it,
+		// which is further out than its shadow reaches. See glass.v.
+		d.add_damage_rect(old_x - glass_reach, old_y - glass_reach, width + 2 * glass_reach,
+			height + 2 * glass_reach)
+		d.add_damage_rect(new_x - glass_reach, new_y - glass_reach, width + 2 * glass_reach,
+			height + 2 * glass_reach)
+	} else {
+		d.add_damage_rect(old_x - 7, old_y - 5, width + 14, height + 14)
+		d.add_damage_rect(new_x - 7, new_y - 5, width + 14, height + 14)
+	}
 	// The Catalina pointer includes a soft shadow to the right and below; this
 	// rectangle also covers the default pointer's one-pixel halo.
 	d.add_damage_rect(old_pointer_x - cursor_backing_inset, old_pointer_y - cursor_backing_inset,

@@ -1135,6 +1135,12 @@ Rounded windows with shadows and flat colour,
 settings.theme.default_note_2
 and a taskbar across the bottom.
 -----
+settings.theme.glass_color
+Glass colour
+-----
+settings.theme.glass_color_note
+The colour of window frames and the taskbar.
+-----
 settings.theme.heading
 Theme
 -----
@@ -1149,6 +1155,15 @@ coloured discs at the leading edge, and a dock.
 -----
 settings.theme.note
 How windows and the taskbar are drawn.
+-----
+settings.theme.windows7
+Windows 7
+-----
+settings.theme.windows7_note_1
+Glass window frames that show what is behind them,
+-----
+settings.theme.windows7_note_2
+caption buttons at the top edge, and a glass taskbar.
 -----
 settings.wallpaper.colour
 Colour

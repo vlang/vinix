@@ -1241,9 +1241,12 @@ fn (mut d Desktop) open_create_context_menu(x int, y int) bool {
 			|| y >= window.y + window.height {
 			continue
 		}
+		// The frame around the body is the window's, not the folder's.
+		border := d.window_border(window)
 		body_top := window.y + d.theme().title_height
 		if window.title == 'Files' && window.app_index >= 0 && window.app_index < d.apps.len
-			&& y >= body_top {
+			&& y >= body_top && y < window.y + window.height - border && x >= window.x + border
+			&& x < window.x + window.width - border {
 			app_index := window.app_index
 			window_id := window.id
 			has_item := world == .application && files_context_row_action(underlying)

@@ -25,7 +25,38 @@ enum TaskbarMode {
 enum ThemeKind {
 	default_
 	macos
+	windows7
 }
+
+// GlassColor is one of the colours Windows 7 offers for its window borders,
+// Start menu and taskbar. `intensity` is that preset's own strength, 0..255:
+// how much of the glass is the colour rather than what is behind it.
+struct GlassColor {
+	name      string
+	color     u32
+	intensity u32
+}
+
+// The sixteen presets of Windows 7's Window Color and Appearance page, in its
+// order. The first, Sky, is what a new installation wears.
+const glass_colors = [
+	GlassColor{'Sky', 0x74b8fc, 0x6b},
+	GlassColor{'Twilight', 0x0045ac, 0xa8},
+	GlassColor{'Sea', 0x31cece, 0x80},
+	GlassColor{'Leaf', 0x15a600, 0x66},
+	GlassColor{'Lime', 0x98d937, 0x66},
+	GlassColor{'Sun', 0xfadc0e, 0x54},
+	GlassColor{'Pumpkin', 0xff9900, 0x80},
+	GlassColor{'Ruby', 0xce0f0f, 0xa8},
+	GlassColor{'Fuchsia', 0xff0099, 0x66},
+	GlassColor{'Blush', 0xfcc7f8, 0x70},
+	GlassColor{'Violet', 0x6f3ca2, 0x85},
+	GlassColor{'Lavender', 0x8c5a94, 0x52},
+	GlassColor{'Taupe', 0x95814a, 0x66},
+	GlassColor{'Chocolate', 0x501b1b, 0xa8},
+	GlassColor{'Slate', 0x555555, 0x80},
+	GlassColor{'Frost', 0xfbfbfb, 0x54},
+]
 
 // The language the desktop and its own applications speak. Each has a
 // translations/<code>.tr file; translations.v looks text up in it.
@@ -80,7 +111,9 @@ mut:
 	button_side  ButtonSide
 	taskbar_mode TaskbarMode
 	theme        ThemeKind
-	language     DesktopLanguage
+	// Index into glass_colors: what the Windows 7 theme tints its glass with.
+	glass_color int
+	language    DesktopLanguage
 	// Clock defaults preserve the desktop's existing taskbar presentation.
 	clock_24_hour      bool = true
 	clock_show_seconds bool = true

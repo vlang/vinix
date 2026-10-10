@@ -36,7 +36,8 @@ fn desktop_preferences_valid(p DesktopPreferences) bool {
 		&& int(p.settings.taskbar_mode) >= int(TaskbarMode.standard)
 		&& int(p.settings.taskbar_mode) <= int(TaskbarMode.combined)
 		&& int(p.settings.theme) >= int(ThemeKind.default_)
-		&& int(p.settings.theme) <= int(ThemeKind.macos)
+		&& int(p.settings.theme) <= int(ThemeKind.windows7)
+		&& p.settings.glass_color >= 0 && p.settings.glass_color < glass_colors.len
 		&& int(p.settings.language) >= 0 && int(p.settings.language) < desktop_languages.len
 		&& p.settings.wallpaper_color >= 0
 		&& p.settings.wallpaper_color < wallpaper_colors.len
@@ -110,7 +111,11 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 	}
 	side := if p.settings.button_side == .left { 'left' } else { 'right' }
 	taskbar := if p.settings.taskbar_mode == .combined { 'combined' } else { 'standard' }
-	theme := if p.settings.theme == .macos { 'macos' } else { 'default' }
+	theme := match p.settings.theme {
+		.default_ { 'default' }
+		.macos { 'macos' }
+		.windows7 { 'windows7' }
+	}
 	language := p.settings.language.code()
 	clock_24_hour := if p.settings.clock_24_hour { 'true' } else { 'false' }
 	clock_show_seconds := if p.settings.clock_show_seconds { 'true' } else { 'false' }
@@ -122,7 +127,7 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 	sleep := desktop_encode_idle_timeout(p.settings.sleep_minutes)
 	lid_action := p.settings.lid_action.code()
 	power_profile := p.settings.power_profile.code()
-	record := 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nlanguage=${language}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\nkeyboard_layouts=${keyboard_sources}\nkeyboard_layout=${keyboard_layout}\ndisplay_off_after=${display_off}\nsleep_after=${sleep}\nlid_action=${lid_action}\npower_profile=${power_profile}\n'
+	record := 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nglass_color=${p.settings.glass_color}\nlanguage=${language}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\nkeyboard_layouts=${keyboard_sources}\nkeyboard_layout=${keyboard_layout}\ndisplay_off_after=${display_off}\nsleep_after=${sleep}\nlid_action=${lid_action}\npower_profile=${power_profile}\n'
 	unsafe {
 		display_off.free()
 		sleep.free()
@@ -200,6 +205,7 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 			'sleep_after' { u32(32768) }
 			'lid_action' { u32(65536) }
 			'power_profile' { u32(131072) }
+			'glass_color' { u32(262144) }
 			else { u32(0) }
 		}
 		if seen & bit != 0 {
@@ -236,6 +242,7 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 				p.settings.theme = match value {
 					'default' { ThemeKind.default_ }
 					'macos' { ThemeKind.macos }
+					'windows7' { ThemeKind.windows7 }
 					else { return none }
 				}
 			}
@@ -270,6 +277,7 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 					else { return none }
 				}
 			}
+			'glass_color' { p.settings.glass_color = desktop_preference_index(value)? }
 			'wallpaper_color' { p.settings.wallpaper_color = desktop_preference_index(value)? }
 			'wallpaper_image' { p.settings.wallpaper_image = desktop_preference_index(value)? }
 			'keyboard_layouts' { p.settings.keyboard_layouts = desktop_parse_keyboard_layouts(value)? }

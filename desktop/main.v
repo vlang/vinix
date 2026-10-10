@@ -441,6 +441,10 @@ fn main() {
 				damage.add(desktop.drag_damage)
 			}
 			desktop.damage_frame_counters(mut damage)
+			if desktop.theme().glass {
+				// Glass keeps what is behind it in cells. See glass.v.
+				damage.align_to_glass()
+			}
 		}
 		desktop.paint_full = full_frame
 

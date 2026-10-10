@@ -858,6 +858,157 @@ fn test_selecting_catalina_theme_starts_with_controls_on_left() {
 	assert desktop.settings.button_side == .left
 }
 
+fn test_selecting_windows7_theme_puts_controls_on_right_and_offers_its_colours() {
+	mut desktop := Desktop{
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+		}
+	}
+	mut app := &SettingsApp{
+		category: .theme
+		desktop:  &desktop
+	}
+	// The colours belong to the glass: no other theme shows them.
+	begin_frame_elements()
+	plain := app.theme_pane(480)
+	mut swatches := 0
+	for element in plain {
+		if element.id.starts_with(settings_action_glass) {
+			swatches++
+		}
+	}
+	assert swatches == 0
+	app.handle('${settings_action_theme}2') or { panic(err) }
+	assert desktop.settings.theme == .windows7
+	assert desktop.settings.button_side == .right
+	assert desktop.settings.glass_color == 0
+	begin_frame_elements()
+	pane := app.theme_pane(480)
+	mut selected := 0
+	swatches = 0
+	for element in pane {
+		if element.id.starts_with(settings_action_glass) {
+			// Sixteen swatches in two rows of eight, each showing its colour.
+			index := swatches
+			assert element.id == settings_glass_actions[index]
+			assert element.children[0].box.bg == glass_colors[index].color
+			assert int(element.frame.x + element.frame.width) <= 480 - settings_padding
+			if index >= settings_glass_columns {
+				assert element.frame.y > pane[pane.len - glass_colors.len].frame.y
+			}
+			if element.box.bg == app_accent {
+				selected++
+				assert index == 0
+			}
+			swatches++
+		}
+	}
+	assert swatches == glass_colors.len && swatches == settings_glass_actions.len
+	assert selected == 1
+	app.handle('${settings_action_glass}7') or { panic(err) }
+	assert desktop.settings.glass_color == 7
+	assert desktop.settings.theme == .windows7
+	app.handle('${settings_action_glass}15') or { panic(err) }
+	assert desktop.settings.glass_color == 15
+	// A swatch that does not exist chooses nothing.
+	app.handle('${settings_action_glass}16') or { panic(err) }
+	app.handle('${settings_action_glass}x') or { panic(err) }
+	assert desktop.settings.glass_color == 15
+	// Going back keeps the colour for the next time the glass is worn.
+	app.handle('${settings_action_theme}0') or { panic(err) }
+	assert desktop.settings.theme == .default_
+	assert desktop.settings.glass_color == 15
+}
+
+fn test_windows7_theme_is_kept_from_programs_built_before_it() {
+	glass := AppWireState{
+		settings:        Settings{
+			theme:       .windows7
+			glass_color: 11
+			language:    .ru
+		}
+		requested_scale: desktop_scale_100
+	}
+	// A program that knows the theme is told all of it, and believed.
+	assert app_state_for_peer(glass, app_features) == glass
+	assert app_state_from_peer(glass, app_features, Settings{}) == glass
+	// One that does not is told the desktop wears its own look, which it can
+	// read, and its answer does not undo the theme or the colour.
+	old := app_features & ~app_feature_glass
+	plain := app_state_for_peer(glass, old)
+	assert plain.settings.theme == .default_ && plain.settings.glass_color == 0
+	assert plain.settings.language == .ru
+	assert wire_theme(plain.settings) == 0
+	assert app_state_from_peer(plain, old, glass.settings) == glass
+	// Its own choice of theme still counts.
+	chosen := AppWireState{
+		...plain
+		settings: Settings{
+			...plain.settings
+			theme: .macos
+		}
+	}
+	answered := app_state_from_peer(chosen, old, glass.settings)
+	assert answered.settings.theme == .macos && answered.settings.glass_color == 11
+	macos := AppWireState{
+		settings:        Settings{
+			theme:       .macos
+			glass_color: 3
+		}
+		requested_scale: desktop_scale_100
+	}
+	assert app_state_for_peer(macos, old).settings.theme == .macos
+	assert app_state_from_peer(app_state_for_peer(macos, old), old, macos.settings) == macos
+
+	// Settings shown by a compositor without the glass does not offer it.
+	mut desktop := Desktop{}
+	mut app := &SettingsApp{
+		category: .theme
+		desktop:  &desktop
+	}
+	app_compositor_features = old
+	begin_frame_elements()
+	pane := app.theme_pane(480)
+	for element in pane {
+		assert element.id != 'settings.theme.2'
+		assert !element.id.starts_with(settings_action_glass)
+	}
+	app.handle('${settings_action_theme}2') or { panic(err) }
+	app.handle('${settings_action_glass}5') or { panic(err) }
+	assert desktop.settings.theme == .default_ && desktop.settings.glass_color == 0
+	app_compositor_features = app_features
+	app.handle('${settings_action_theme}2') or { panic(err) }
+	assert desktop.settings.theme == .windows7
+}
+
+fn test_theme_and_glass_colour_share_one_wire_field() {
+	for theme in [ThemeKind.default_, ThemeKind.macos, ThemeKind.windows7]! {
+		for glass in [0, 7, 15]! {
+			state := AppWireState{
+				settings:        Settings{
+					theme:       theme
+					glass_color: glass
+				}
+				requested_scale: desktop_scale_100
+			}
+			mut encoded := []u8{}
+			wire_put_state(mut encoded, state)
+			mut reader := WireReader{
+				data: encoded
+			}
+			decoded := wire_take_state(mut reader) or { panic(err) }
+			assert reader.index == encoded.len
+			assert decoded.settings.theme == theme
+			assert decoded.settings.glass_color == glass
+		}
+	}
+	// What a desktop built before the colour existed sends is still a theme.
+	assert wire_theme(Settings{ theme: .macos }) == 1
+	assert wire_theme_valid(0) && wire_theme_valid(1) && wire_theme_valid(2 | (15 << 8))
+	assert !wire_theme_valid(3) && !wire_theme_valid(-1) && !wire_theme_valid(16 << 8)
+}
+
 fn test_settings_missing_offline_readonly_and_stale_hits() {
 	for failure in 0 .. 3 {
 		mut app := fixture_app()
