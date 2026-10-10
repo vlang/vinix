@@ -23,6 +23,7 @@ import pipe
 import futex
 import pci
 import devcore
+import dma
 import dev.ata
 import dev.fbdev
 import dev.fbdev.simple
@@ -80,6 +81,9 @@ fn kmain_thread() {
 	socket.initialise()
 	// Failure reports and removals are carried out by a thread of the core's.
 	devcore.start_worker()
+	// IOMMUs come before the first driver that does DMA: a unit that is on
+	// decides what every device behind it may reach.
+	dma.initialise()
 	if e1000.initialise() {
 		sched.set_device_poll_callback(voidptr(poll_network))
 	}
