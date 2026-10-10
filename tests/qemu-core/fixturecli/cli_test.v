@@ -52,6 +52,19 @@ fn test_actions_are_rejected_before_help_or_staging_and_defaults_stay_distinct()
 	assert parse_options('generate', ['out', '--arch=arm64'])!.arch == 'arm64'
 }
 
+fn test_pending_cli_preserves_distinct_defaults_and_arguments() {
+	assert parse_options('base-generate', ['out'])!.arch == 'arm64'
+	assert parse_options('base-generate', ['out', '--mod', '--arch=amd64'])!.module_only
+	assert parse_options('base', ['out', '--native-headers=./headers//'])!.headers == 'headers'
+	assert parse_options('base', ['out'])!.headers.ends_with('/sysroot/include')
+	assert parse_options('base', ['out', '--cc=clang'])!.cc == 'clang'
+	assert parse_error('base', ['out', '--arch=amd64']).contains('unrecognized arguments')
+	assert parse_error('base-generate', ['out', '--native-build']).contains('unrecognized arguments')
+	assert parse_options('futex', ['out', '--prepare-only', '--guest'])!.guest
+	assert parse_error('futex', ['out', '--native-build']) == '--native-build requires --arch'
+	assert parse_error('futex', ['out', '--prepare-only', '--native-build', '--help']).contains('not allowed with')
+}
+
 fn test_native_commands_reject_bad_modes_and_protected_output_without_staging() {
 	tool := os.getenv('VINIX_QEMU_FIXTURE_TOOL')
 	generator := os.getenv('VINIX_QEMU_FIXTURE_GENERATOR')

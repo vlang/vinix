@@ -106,6 +106,10 @@ oracle checks, source ranges, compiler flags, allocator guards and receipts all
 use the native implementation. The eight comparison commands and fixture
 generator invoke V directly through `fixturecli`, retaining the original CLI
 modes and architecture defaults. Their Python entry points are retired.
+`compile-basefixture`, `test-basefixture` and `test-futexfixture` also invoke V
+directly. Their generator, host comparison and paired futex guest build preserve
+the pending fixture policies; the shared Python import bridge is retired.
+The base receipt identifies the native host through `uname -srm`.
 The independent `test.c`, fixture assertions and guest deadlines are unchanged.
 Controller qualification compares generated sources, headers, objects and
 logs against frozen Python controls on ARM64 and x86-64, and links both SDK
@@ -122,6 +126,17 @@ the corresponding bodies remain in `test.c`. These scopes receive **zero
 completed migration credit** until their native comparisons and normal-runner
 integration are complete. Original checks, workloads and deadlines remain
 unchanged. Their oracle is the same immutable `bbf1e243` source described above.
+
+The comparison tools are maintained native commands even while these fixture
+bodies await integration. Use `tests/qemu-core/test-basefixture /tmp/base-check`
+for the base/memory host comparison, or
+`tests/qemu-core/test-futexfixture /tmp/futex-check --arch=arm64` for futex.
+The latter retains `--prepare-only`, `--guest` and `--native-build` modes.
+`tests/qemu-core/compile-basefixture /tmp/base-sources --module-only --arch=amd64`
+generates only the V module/header; omitting `--module-only` additionally recovers
+the pinned C oracle, original declarations and full comparison source.
+Recovered originals remain outside the checkout. `VINIX_QEMU_BASE_GENERATOR`
+may select a prebuilt native generator for qualification.
 
 The base/memory scope covers 270 original lines and preserves all 76 `CHECK`
 expressions and logical lines. Its current inputs match the cached ARM host

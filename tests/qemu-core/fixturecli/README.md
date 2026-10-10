@@ -12,6 +12,23 @@ Recovered C remains outside the checkout. Normal generation stages only the
 eight maintained V fixtures and does not recover the C oracle. The independent
 fixture assertions and source ranges remain unchanged.
 
+The base/memory generator and comparison and the futex comparison also use this
+layer. Base generation defaults to ARM64 and retains `--module-only`; the base
+host comparison uses the compiled host architecture and `--native-headers`.
+Futex retains prepare/guest/native modes and derives its syscall number from the
+selected target SDK. Its seven paired diagnostic rows must match exactly before
+publishing the host verdict. These commands supersede the pending Python tools
+and the last callers of `oracle_support.py`/`_fixture_native.py`.
+The fixture bodies remain pending integration into the normal guest runner.
+The six command/controller test files passed on ARM64, Rosetta x86-64 and
+ASan/UBSan after this extension. Fresh base/memory and futex host comparisons
+passed on both host ABIs and in a sanitized command process; both futex guest
+targets linked. Oracle sources, declarations, source receipts and host logs
+matched the saved independent controls, accounting only for the prior base
+header-placement fix. All three cold entries passed help, protected-output and
+cleanup checks; both standalone host commands passed. No new guest boot is
+claimed for these pending fixture bodies.
+
 Run `v -cc cc test tests/qemu-core/fixturecli tests/qemu-core/fixturehost`.
 Set `VINIX_QEMU_FIXTURE_TOOL` to a prebuilt `test-intfixture` and
 `VINIX_QEMU_FIXTURE_GENERATOR` to a prebuilt `compile-fixtures` to include command

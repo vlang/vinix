@@ -6,6 +6,9 @@ import json2
 
 fn source_schema(kind string) json2.Any {
 	return hosttest.decode_json(match kind {
+		'futex' {
+			'{"revision":"bbf1e243e21ab58b46a4853c0e88383ff45b290a","path":"tests/qemu-core/test.c","blob":"f6868d5ad82b92c66d62ac8cedfe37892b121b3a","sha256":"3430d064beaef7fde111162176c7fe360def3cd3c8161cfc0898dfdd745cbedb","futex_ranges":[[1681,1698]],"futex_lines":18,"support_translation_credit":0,"adaptation":"Only function linkage/names and exact original #line directives"}'
+		}
 		'signal' {
 			'{"revision":"bbf1e243e21ab58b46a4853c0e88383ff45b290a","path":"tests/qemu-core/test.c","blob":"f6868d5ad82b92c66d62ac8cedfe37892b121b3a","sha256":"3430d064beaef7fde111162176c7fe360def3cd3c8161cfc0898dfdd745cbedb","signal_range":[543,619],"signal_lines":77,"reference_support_range":[88,95],"support_translation_credit":0,"adaptation":"Only function linkage/names and exact original #line directives"}'
 		}
@@ -36,6 +39,9 @@ fn source_schema(kind string) json2.Any {
 
 fn host_schema(kind string) json2.Any {
 	return hosttest.decode_json(match kind {
+		'futex' {
+			'{"result":"PASS","cases":7,"futex_lines":18,"host_arch":"<arch>","native_OS_calls":"real fork/pipe/reap and native variadic capture; atomic word input provider on host","host_only_provider":"Host-only provider uses native atomic ADD3/OR0/EFAULT inputs; SYS_futex number imported from actual target SDK. Guests call actual native syscall.","failure_inputs":"EIO on each syscall, word corruption after each valid-address call and invalid-address unexpected success; exact return/errno/count/word/argument hash compared","implicit_allocator_imports":[],"executable_sha256":"<executable_sha256>"}'
+		}
 		'signal' {
 			'{"result":"PASS","cases":6,"signal_lines":77,"host_arch":"<arch>","native_OS_calls":"real fork, signals, busy loop, nanosleep, wait/reap","fork_failure_input":"EAGAIN at first or second native fork; exact return/count/errno compared","original_helper_boundary":"Shared immutable original status helper; maintained driver retains exact body","implicit_allocator_imports":[],"executable_sha256":"<executable_sha256>"}'
 		}
@@ -66,6 +72,9 @@ fn host_schema(kind string) json2.Any {
 
 fn native_schema(kind string) json2.Any {
 	return hosttest.decode_json(match kind {
+		'futex' {
+			'{"result":"PASS","arch":"<arch>","commands":[],"executable_sha256":"<executable_sha256>","comparison":"Exact original futex wake-op body and five original checksites, actual native syscall calls","implicit_allocator_imports":[]}'
+		}
 		'signal' {
 			'{"result":"PASS","arch":"<arch>","commands":[],"executable_sha256":"<executable_sha256>","reference_helper":"Exact original retained reap body, no translation credit","implicit_allocator_imports":[]}'
 		}
@@ -104,6 +113,7 @@ fn missing_marker(kind string) string {
 		'poll' { 'Missing native poll differential verdict' }
 		'epoll' { 'Missing native epoll differential verdict' }
 		'int' { 'Missing native int differential verdict' }
+		'futex' { 'Missing native futex differential verdict' }
 		else { 'Missing differential verdict' }
 	}
 }

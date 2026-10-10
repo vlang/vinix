@@ -83,6 +83,7 @@ fn original_reference(kind string, source string, guest bool) string {
 		'poll' { [LineRange{2404, 2425}] }
 		'epoll' { [LineRange{2501, 2530}] }
 		'int' { [LineRange{2535, 2544}] }
+		'futex' { [LineRange{1681, 1698}] }
 		else { []LineRange{} }
 	}
 	for span in ranges {
@@ -99,6 +100,7 @@ fn original_reference(kind string, source string, guest bool) string {
 		'poll' { ['test_pollfd_abi'] }
 		'epoll' { ['test_epoll_abi_and_count'] }
 		'int' { ['test_syscall_int_truncation'] }
+		'futex' { ['test_futex_wake_op'] }
 		else { []string{} }
 	}
 	for name in functions {

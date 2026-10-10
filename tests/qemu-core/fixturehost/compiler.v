@@ -28,6 +28,7 @@ fn input_prefix(kind string) string {
 		'int' {
 			'#define syscall(...) vqt_host_syscall(__VA_ARGS__)\n#define close(...) vqt_host_close(__VA_ARGS__)\n'
 		}
+		'futex' { '#define syscall(...) vqw_host_syscall(__VA_ARGS__)\n' }
 		'touch' {
 			'#define sysinfo(...) vqt_host_sysinfo(__VA_ARGS__)\n#define mmap(...) vqt_host_mmap(__VA_ARGS__)\n#define munmap(...) vqt_host_munmap(__VA_ARGS__)\n#define mprotect(...) vqt_host_mprotect(__VA_ARGS__)\n#define pthread_barrier_init(...) vqt_host_barrier_init(__VA_ARGS__)\n#define pthread_barrier_wait(...) vqt_host_barrier_wait(__VA_ARGS__)\n#define pthread_barrier_destroy(...) vqt_host_barrier_destroy(__VA_ARGS__)\n'
 		}
@@ -74,6 +75,9 @@ pub fn host(kind string, output string, cc string, arch string) ! {
 	prepare(kind, output, arch, false)!
 	target := target_flags(arch, kind == 'touch')
 	mut flags := [cc, ...target, '-O2', '-g', '-Wall', '-Wextra', '-Werror']
+	if kind == 'futex' {
+		flags << ['-DSYS_futex=' + futex_number(output, arch)!]
+	}
 	unconditional_warnings := kind in ['signal', 'restart', 'nanosleep', 'touch']
 	if unconditional_warnings { flags << ignored_warnings }
 	flags << ['-fno-strict-aliasing', '-fsanitize=address,undefined']
@@ -108,9 +112,9 @@ pub fn host(kind string, output string, cc string, arch string) ! {
 		objects << object
 		check_imports(name, output)!
 	}
-	if kind == 'int' {
+	if kind in ['int', 'futex'] {
 		object := output + '/syscall-abi.o'
-		command([cc, ...target, '-c', output + '/intoracle/syscall_abi.S', '-o', object], output + '/syscall-abi-compile.log')!
+		command([cc, ...target, '-c', output + '/' + kind + 'oracle/syscall_abi.S', '-o', object], output + '/syscall-abi-compile.log')!
 		objects << object
 	}
 	program := output + '/' + kind + '-differential'
@@ -122,6 +126,7 @@ pub fn host(kind string, output string, cc string, arch string) ! {
 		' DIFFERENTIAL PASS'
 	}
 	if !result.contains(marker) { return error(missing_marker(kind)) }
+	if kind == 'futex' { validate_futex_observations(result)! }
 	mut receipt := host_schema(kind).as_map()
 	receipt['host_arch'] = arch
 	receipt['executable_sha256'] = hosttest.sha(program)!
@@ -184,9 +189,9 @@ fn native_build_core(kind string, output string, arch string, reference string, 
 		}
 		objects << object
 	}
-	if kind == 'int' && !helper {
+	if kind in ['int', 'futex'] && !helper {
 		object := output + '/syscall-abi.o'
-		command([...cc, '-c', output + '/intoracle/syscall_abi.S', '-o', object], output + '/syscall-abi-compile.log')!
+		command([...cc, '-c', output + '/' + kind + 'oracle/syscall_abi.S', '-o', object], output + '/syscall-abi-compile.log')!
 		objects << object
 	}
 	program := output + '/' + kind + '-init'

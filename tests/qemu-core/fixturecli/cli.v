@@ -2,18 +2,21 @@
 module fixturecli
 
 import fixturehost
+import hosttest
 
 pub const kinds = ['signal', 'touch', 'restart', 'nanosleep', 'blocked', 'poll', 'epoll', 'int']
 
 pub struct Options {
 pub mut:
-	output  string
-	arch    string
-	cc      string = 'clang'
-	prepare bool
-	native  bool
-	guest   bool
-	help    bool
+	output      string
+	arch        string
+	cc          string = 'clang'
+	headers     string
+	module_only bool
+	prepare     bool
+	native      bool
+	guest       bool
+	help        bool
 }
 
 fn host_arch() string {
@@ -25,6 +28,10 @@ fn host_arch() string {
 }
 
 fn usage(kind string) string {
+	if kind == 'base-generate' {
+		return 'usage: compile-basefixture OUTPUT [--arch {arm64,amd64}] [--module-only]'
+	}
+	if kind == 'base' { return 'usage: test-basefixture OUTPUT [--cc CC] [--native-headers PATH]' }
 	if kind == 'generate' { return 'usage: compile-fixtures OUTPUT --arch {arm64,amd64}' }
 	return 'usage: test-${kind}fixture OUTPUT [--cc CC] [--arch {arm64,amd64}]\n' +
 		'       [--prepare-only | --native-build] [--guest]'
@@ -56,8 +63,16 @@ pub fn parse_options(kind string, args []string) !Options {
 	mut options := Options{ arch: if kind == 'touch' { host_arch() } else { '' } }
 	allowed := if kind == 'generate' {
 		['--help', '--arch']
+	} else if kind == 'base-generate' {
+		['--help', '--arch', '--module-only']
+	} else if kind == 'base' {
+		['--help', '--cc', '--native-headers']
 	} else {
 		['--help', '--cc', '--arch', '--prepare-only', '--native-build', '--guest']
+	}
+	if kind == 'base-generate' { options.arch = 'arm64' }
+	if kind == 'base' {
+		options.headers = hosttest.root() + '/build-aarch64-userland/sysroot/include'
 	}
 	mut unknown := []string{}
 	mut have_output := false
@@ -87,7 +102,7 @@ pub fn parse_options(kind string, args []string) !Options {
 		if matches.len > 1 { return error('ambiguous option: ${name}') }
 		if matches.len == 1 {
 			option := matches[0]
-			if option in ['--help', '--prepare-only', '--native-build', '--guest'] {
+			if option in ['--help', '--prepare-only', '--native-build', '--guest', '--module-only'] {
 				if argument.contains('=') {
 					return error('argument ${option}: ignored explicit argument')
 				}
@@ -108,6 +123,7 @@ pub fn parse_options(kind string, args []string) !Options {
 						}
 						options.native = true
 					}
+					'--module-only' { options.module_only = true }
 					else { options.guest = true }
 				}
 				continue
@@ -125,6 +141,8 @@ pub fn parse_options(kind string, args []string) !Options {
 					return error('argument --arch: invalid choice: ${value}')
 				}
 				options.arch = value
+			} else if option == '--native-headers' {
+				options.headers = path_value(value)
 			} else {
 				options.cc = value
 			}
@@ -147,7 +165,15 @@ pub fn parse_options(kind string, args []string) !Options {
 }
 
 pub fn execute(kind string, options Options) ! {
-	if kind == 'generate' {
+	if kind == 'base-generate' {
+		if options.module_only {
+			fixturehost.generate_base(options.output, options.arch)!
+		} else {
+			fixturehost.prepare_base(options.output, options.arch)!
+		}
+	} else if kind == 'base' {
+		fixturehost.host_base(options.output, options.cc, host_arch(), options.headers)!
+	} else if kind == 'generate' {
 		fixturehost.generate(options.output, options.arch)!
 	} else if options.native {
 		fixturehost.prepare(kind, options.output, options.arch, true)!
