@@ -46,7 +46,7 @@ git apply --check /path/to/vinix-m1-ans-rw-root.patch
 git apply /path/to/vinix-m1-ans-rw-root.patch
 CC=clang SANITIZE=1 ./tests/apple-ans/run.sh
 CC=gcc ./tests/apple-ans/run.sh
-python3 tools/apple-ans/test_verify_reads.py
+tools/apple-ans/test-verify-reads
 make -C kernel ARCH=aarch64 CC=clang
 ```
 
@@ -249,18 +249,19 @@ device, regular file or symlink cannot be truncated.
 On a known-working OS, with the selected partition **unmounted and unchanged**:
 
 ```sh
-python3 tools/apple-ans/verify_reads.py record /path/to/reference-partition ans-reference.json \
+tools/apple-ans/verify-reads record /path/to/reference-partition ans-reference.json \
     --label 'Known-working OS; unmounted dedicated ext2 test partition' \
     --range 0:1048576 --range 1048577:65536
 ```
 
 Choose additional disjoint ranges near the middle and end using that
-partition's known geometry. Copy the manifest and utility into your bootstrap
-userland. With Python 3 available under Vinix, target the same partition view
-(offsets are relative to the partition, not the namespace):
+partition's known geometry. Build `tools/apple-ans/verify-reads.v` as a native
+executable for your guest's architecture and bootstrap userland, then copy that
+executable and the manifest into it. Target the same partition view (offsets
+are relative to the partition, not the namespace):
 
 ```sh
-python3 tools/apple-ans/verify_reads.py check /dev/ans0n1pN ans-reference.json --passes 3
+./verify-reads check /dev/ans0n1pN ans-reference.json --passes 3
 ```
 
 The utility reports a **reference comparison**, not independent proof that a
