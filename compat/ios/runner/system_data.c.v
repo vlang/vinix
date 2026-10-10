@@ -39,6 +39,7 @@ mut:
 	streams map[u64]voidptr
 	runes voidptr
 	mutexes map[u64]voidptr
+	rwlocks map[u64]&DarwinRwlock
 	conditions map[u64]voidptr
 	once map[u64]voidptr
 	dl_error string
@@ -96,6 +97,7 @@ fn system_data_stop() {
 	system_queries_stop()
 	mach_memory_stop()
 	mach_threads_stop()
+	pthread_rwlocks_stop()
 	for _, pointer in system_data.mutexes {
 		if C.pthread_mutex_destroy(pointer) != 0 { panic('iOS: active mutex at image shutdown') }
 		C.free(pointer)
@@ -115,7 +117,7 @@ fn system_data_stop() {
 	}
 	C.free(system_data.runes)
 	unsafe { system_data.dl_error.free() }
-	unsafe { system_data.streams.free(); system_data.mutexes.free(); system_data.conditions.free(); system_data.once.free(); system_data.dispatch_once.free(); free(system_data) }
+	unsafe { system_data.streams.free(); system_data.mutexes.free(); system_data.rwlocks.free(); system_data.conditions.free(); system_data.once.free(); system_data.dispatch_once.free(); free(system_data) }
 	system_data = unsafe { nil }
 }
 

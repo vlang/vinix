@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_rwlock_destroy
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _readlink
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -961,20 +961,54 @@ preserved guards, invalid policies and ceiling boundaries, all four static
 initializers, timed condition waits and three rounds of eight workers for each
 mutex type. It also runs inside the existing condition-attribute guest fixture.
 ASAN/UBSAN checks two Mach-O loads/unloads and rejection before native allocation.
-The full ARM64 C++/GLES/PPSSPP regression passes. The actual game gets past the
-mutex-policy import but still exits before entry at `pthread_rwlock_destroy`.
+The full ARM64 C++/GLES/PPSSPP regression passes. That game probe got past the
+mutex-policy import but still exited before entry at `pthread_rwlock_destroy`.
+
+The V read/write-lock adapters now provide initialization, destruction, blocking
+and try acquisition, unlock and sharing attributes. Darwin's 200-byte lock and
+24-byte attribute layouts stay separate from native pthread storage. Attributes
+preserve their unused bytes, copy by value and use guarded 32-bit sharing outputs.
+The measured native attribute destruction accepts invalid/already-cleared values
+and clears the signature and sharing field. Shared-process requests return
+Darwin ENOTSUP before modifying the caller's lock.
+
+Native rwlocks provide concurrent shared reads and exclusive writes. A V gate
+uses a native mutex and condition variable to preserve the Mac's queued-writer
+preference. Try-read returns busy after a writer queues, including for an existing
+reader. Writer identity follows the real native pthread handle; uncontended
+recursive acquisition reports EDEADLK, while try acquisition after a contended
+writer handoff reports EBUSY as measured on the Mac. The adapter also diagnoses
+blocking recursive write ownership with EDEADLK; the contended native-Mac
+reference stalled on that path. Writer FIFO ordering and cancellation are
+outside the verified subset.
+
+Each operation pins the registry entry before accessing native state. Destruction
+returns EBUSY while ownership or another caller exists, including waiters. The
+last quiescent destruction frees the native lock, guard, condition and V state.
+Image shutdown reclaims quiescent entries and rejects active ownership/callers.
+The generated C confirms the state guard unlocks before the call reference drops.
+
+Shared Mac/iOS checks exercise eight readers holding one lock concurrently,
+eight queued-writer/read-waiter handoffs, three rounds of eight mixed workers,
+copied attributes, lazy initialization, busy destruction, guards and errno.
+The checks also run inside the condition-attribute guest fixture. ASAN/UBSAN
+checks two image loads/unloads, 32 init/destroy cycles, pinned-entry destruction
+and shutdown reclamation. The full ARM64 C++/GLES/PPSSPP regression passes using
+the installed QEMU after a separate custom-QEMU ROM lookup failure. These APIs
+resolve 19 strong imports across the three Fortnite images. The actual game
+still exits before entry, now at `readlink`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,306 | 852 | 81 |
-| EOSSDK | 522 | 140 | 18 |
-| MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,881 | 1,115 | 122 |
+| Fortnite executable | 1,313 | 845 | 81 |
+| EOSSDK | 527 | 135 | 18 |
+| MarketplaceKitWrapper | 60 | 116 | 23 |
+| All images | 1,900 | 1,096 | 122 |
 
-The C++/GLES/Text variant reports 1,894 resolved imports, 1,102 unresolved strong
+The C++/GLES/Text variant reports 1,913 resolved imports, 1,083 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

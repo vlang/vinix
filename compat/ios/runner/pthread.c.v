@@ -200,6 +200,7 @@ fn darwin_thread_name(name &char) int { return pthread_error(C.ios_thread_name(n
 fn pthread_symbol(symbol string) ?u64 {
 	if address := pthread_attr_symbol(symbol) { return address }
 	if address := pthread_mutexattr_symbol(symbol) { return address }
+	if address := pthread_rwlock_symbol(symbol) { return address }
 	if address := pthread_condattr_symbol(symbol) { return address }
 	if address := pthread_identity_symbol(symbol) { return address }
 	if address := pthread_sched_symbol(symbol) { return address }

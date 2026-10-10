@@ -178,6 +178,7 @@ static int ios_vsscanf(const char *input, const char *format, void *stack) {
 }
 static int *ios_errno_address(void) { return &errno; }
 static size_t ios_sizeof_mutex(void) { return sizeof(pthread_mutex_t); }
+static size_t ios_sizeof_rwlock(void) { return sizeof(pthread_rwlock_t); }
 static size_t ios_sizeof_cond(void) { return sizeof(pthread_cond_t); }
 static size_t ios_sizeof_once(void) { return sizeof(pthread_once_t); }
 /* Construct/destroy the actual native object on the stack. Darwin attribute

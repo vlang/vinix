@@ -119,6 +119,9 @@ test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permission
     "$repo/tests/ios/pthread-mutexattr.c" -o "$output/pthread-mutexattr"
 "$output/pthread-mutexattr"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/pthread-rwlock.c" -o "$output/pthread-rwlock"
+"$output/pthread-rwlock"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/pthread-identity.c" -o "$output/pthread-identity"
 "$output/pthread-identity"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
