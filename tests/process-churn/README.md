@@ -46,7 +46,7 @@ tests/kernel-allocs/sites /path/to/arm-kernel/bin/vinix \
   < /tmp/exec-cohorts.log
 
 # Generated-C check on each actual tracked build.
-python3 tests/process-churn/check-generated.py /path/to/blob.c
+tests/process-churn/check-generated /path/to/blob.c
 
 # Standalone controls and operations. Also run these with --arch amd64.
 # Allow the complete 900-fork x86 TCG workload to finish under host load.
@@ -72,7 +72,7 @@ python3 tests/process-churn/check-results.py /tmp/select-fixed.log \
   --mode select --expect-flat-small
 python3 tests/process-churn/check-results.py /tmp/churn-waits.log \
   --mode waits --expect-flat-small
-python3 tests/process-churn/check-generated.py /path/to/blob.c --operations
+tests/process-churn/check-generated /path/to/blob.c --operations
 ```
 
 The slabinfo control uses three cohorts of 300 complete reads without execing
@@ -253,7 +253,7 @@ physical-memory fluctuations as leaked operation objects.
 the lifetime/ABI semantic marker. It allows the idle control's two startup
 objects in the first cohort and requires zero positive growth afterwards; it
 does not assert that every physical-memory total or unrelated allocation is
-flat. `check-generated.py --operations` requires one stack slot and no memdup
+flat. `check-generated --operations` requires one stack slot and no memdup
 in the actual `do_select` C, preserves poll/index frees, and checks exactly one
 inherited executable-path clone with no clone-caller overwrite on either
 architecture.

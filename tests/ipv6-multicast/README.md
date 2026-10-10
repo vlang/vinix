@@ -34,8 +34,8 @@ the existing keyed RFC 6528 generator.
 ```sh
 ./tests/net-random/run.sh
 ./tests/ipv6-multicast/run-host.sh
-python3 tests/ipv6-multicast/check-generated.py kernel/obj/blob.c
-python3 tests/ipv6-multicast/check-generated.py build-amd64-kernel/obj/blob.c
+tests/ipv6-multicast/check-generated kernel/obj/blob.c
+tests/ipv6-multicast/check-generated build-amd64-kernel/obj/blob.c
 ```
 
 The second command compiles the production bridge and all native lwIP core

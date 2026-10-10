@@ -37,7 +37,7 @@ matching generated C before cleaning to switch architectures.
 
 ```sh
 make -C kernel ARCH=aarch64 LIMINE_MP=1 ALLOC_TRACK=1 V=/path/to/v CC=clang
-python3 tests/posix-timer/check-generated.py kernel/obj/blob.c
+tests/posix-timer/check-generated kernel/obj/blob.c
 VINIX_VM_RUNNER_ROOT=/path/to/prepared/vinix \
 VINIX_AARCH64_SYSROOT=/path/to/vinix/build-aarch64-userland/sysroot \
 VINIX_KERNEL_DIR=/path/to/saved-arm-kernel VINIX_QEMU_RT_NO_BUILD=1 \
@@ -46,7 +46,7 @@ python3 tests/posix-timer/run.py --arch=aarch64
 make -C kernel clean
 make -C kernel ARCH=x86_64 LIMINE_MP=1 ALLOC_TRACK=1 V=/path/to/v CC=clang \
   LD_X86_64=/path/to/ld.lld
-python3 tests/posix-timer/check-generated.py kernel/obj/blob.c
+tests/posix-timer/check-generated kernel/obj/blob.c
 VINIX_VM_RUNNER_ROOT=/path/to/prepared/vinix \
 VINIX_AMD64_KERNEL=/path/to/saved-amd64-kernel/bin/vinix \
 python3 tests/posix-timer/run.py --arch=amd64

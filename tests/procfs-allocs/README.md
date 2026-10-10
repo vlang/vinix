@@ -8,7 +8,7 @@ VINIX_KERNEL_DIR=/path/to/worktree/kernel VINIX_QEMU_RT_NO_BUILD=1 \
   python3 tests/procfs-allocs/run.py
 VINIX_AMD64_KERNEL=/path/to/worktree/kernel/bin/vinix \
   python3 tests/procfs-allocs/run.py --arch amd64
-python3 tests/procfs-allocs/check-generated.py kernel/obj/blob.c
+tests/procfs-allocs/check-generated kernel/obj/blob.c
 ```
 
 `VINIX_VM_RUNNER_ROOT` can point at a checkout with the prepared boot inputs.
