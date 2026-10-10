@@ -44,7 +44,7 @@ the machine's used memory for good. Find leaks by measuring, not by reading.
    slab allocation and its call chain (`kernel/c/alloc_track.c`). Reading
    `/proc/allocstart` starts over and `/proc/allocsites` lists what is still
    live. The harness prints them as `PERF-SITE` lines on such a kernel;
-   `tests/kernel-allocs/sites.py kernel/bin/vinix < run.log` names the
+   `tests/kernel-allocs/sites kernel/bin/vinix < run.log` names the
    functions.
 4. Read the generated C (`kernel/obj/blob.c`) for the function at fault. V
    allocates where the source shows nothing (`memdup`,

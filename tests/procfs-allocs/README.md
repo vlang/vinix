@@ -24,7 +24,7 @@ last supported record with its terminator intact.
 
 After warm-up it measures every heap size class and large pages for 200 cycles
 of six proc files, 200 proc listings, and 40 listings of the large directory.
-Live allocation sites are printed as `PERF-SITE` for `kernel-allocs/sites.py`.
+Live allocation sites are printed as `PERF-SITE` for `kernel-allocs/sites`.
 The generated-C check detects heap promotion of the measured Text, Dirent and
 record scratch, including allocation accidentally moved inside an entry loop.
 

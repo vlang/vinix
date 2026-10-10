@@ -17,6 +17,6 @@ stay flat.
 
 With a kernel built using `ALLOC_TRACK=1`, set `VINIX_VENUS_ALLOC_TRACK=1`
 inside the guest to print live allocation sites as `PERF-SITE` lines. Resolve
-them using `tests/kernel-allocs/sites.py kernel/bin/vinix < run.log`.
+them using `tests/kernel-allocs/sites kernel/bin/vinix < run.log`.
 Use the regular kernel for FPS measurements. See
 [../opengothic/README.md](../opengothic/README.md) for the full gameplay test.

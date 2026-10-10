@@ -57,7 +57,7 @@ VEXE=/Users/alex/code/v/v V=/Users/alex/code/v/v python3 tests/ext2-xattr/run.py
 ```
 
 For named allocation sites, rebuild with `ALLOC_TRACK=1`, run the same native
-suite, and pass its serial log to `tests/kernel-allocs/sites.py` with the exact
+suite, and pass its serial log to `tests/kernel-allocs/sites` with the exact
 kernel binary. `PERF-ACL` measures 200 repeated set/get/access/chmod/remove
 cycles after warmup. `PERF-ACL-FAILURE` measures 200 repeated failed directory
 creations after warmup and node retirement. Both require exactly zero change

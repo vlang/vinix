@@ -42,7 +42,7 @@ python3 tests/process-churn/run.py --runner-root /path/to/main-checkout \
   --kernel /path/to/arm-kernel --image /path/to/initramfs-desktop.tar \
   --module-iso /path/to/initramfs-desktop.iso > /tmp/exec-cohorts.log 2>&1
 python3 tests/process-churn/check-results.py /tmp/exec-cohorts.log
-python3 tests/kernel-allocs/sites.py /path/to/arm-kernel/bin/vinix \
+tests/kernel-allocs/sites /path/to/arm-kernel/bin/vinix \
   < /tmp/exec-cohorts.log
 
 # Generated-C check on each actual tracked build.

@@ -434,7 +434,7 @@ does:
 
 An audit is how the conversion was done, and how to find a path it missed. The
 log has a `user-access:` line for each one, and
-`tests/user-access/sites.py kernel/bin/vinix < serial.log` names the function
+`tests/user-access/sites kernel/bin/vinix < serial.log` names the function
 and what called it:
 
 ```

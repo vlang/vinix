@@ -38,7 +38,7 @@ sends to the host, 10.0.2.2, once DHCP has given it an address.
 The kernel runs with SMAP or PAN enforcing, its default, so a kernel path the
 test reaches that still touches user memory directly stops the run.
 `VINIX_CMDLINE=vinix.user_access=audit` has it logged instead, for
-[`tests/user-access/sites.py`](../user-access/sites.py) to name.
+[`tests/user-access/sites`](../user-access/sites) to name.
 
 On aarch64 the runner also expects the kernel's report of a violation on
 serial. amd64 production kernels print only to the framebuffer, so that check

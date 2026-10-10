@@ -17,7 +17,7 @@ module memory
 //   strict  the fault is a kernel fault, as on OpenBSD
 //   audit   the access is let through, and the kernel address is logged once
 //   off     the bit stays clear
-// tests/user-access/sites.py names the paths an audit logged.
+// tests/user-access/sites names the paths an audit logged.
 import katomic
 import limine
 
