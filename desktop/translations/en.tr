@@ -4663,3 +4663,30 @@ Note imported; final storage synchronization failed.
 notes.import_enlarge
 Enlarge this window to import text. Escape cancels.
 -----
+battery.state.on_battery
+On battery
+-----
+battery.state.not_charging
+Not charging
+-----
+battery.state.plugged_in
+Power adapter connected
+-----
+battery.until_full.about_hours
+About {0} hour until full|About {0} hours until full
+-----
+battery.until_full.less_than_hour
+Less than 1 hour until full
+-----
+settings.battery.time_to_full
+Time until full
+-----
+settings.battery.footer_supply
+Read-only · /sys/class/power_supply · every 5 seconds.
+-----
+tray.battery.tip_full
+Battery: {0}, fully charged
+-----
+tray.battery.tip_plugged_in
+Battery: {0}, plugged in
+-----

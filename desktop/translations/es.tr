@@ -4663,3 +4663,30 @@ Nota importada; falló la sincronización final.
 notes.import_enlarge
 Amplíe la ventana. Escape cancela la importación.
 -----
+battery.state.on_battery
+Con batería
+-----
+battery.state.not_charging
+No se está cargando
+-----
+battery.state.plugged_in
+Adaptador de corriente conectado
+-----
+battery.until_full.about_hours
+Cerca de {0} hora para cargarse|Cerca de {0} horas para cargarse
+-----
+battery.until_full.less_than_hour
+Menos de una hora para cargarse
+-----
+settings.battery.time_to_full
+Tiempo de carga restante
+-----
+settings.battery.footer_supply
+Solo lectura · /sys/class/power_supply · cada 5 segundos.
+-----
+tray.battery.tip_full
+Batería: {0}, carga completa
+-----
+tray.battery.tip_plugged_in
+Batería: {0}, enchufada
+-----

@@ -79,6 +79,7 @@ mut:
 	// it. The reads are injectable so host tests can drive them.
 	battery_read       fn (bool) int = read_battery
 	battery_history    fn () BatteryHistory = battery_history_snapshot
+	battery_reading    fn () BatteryReading = battery_reading_snapshot
 	state              BacklightState
 	read_result        BacklightResult = .unavailable
 	write_result       BacklightResult

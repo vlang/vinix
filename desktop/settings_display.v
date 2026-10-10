@@ -330,7 +330,16 @@ fn (a &SettingsApp) battery_pane(width int, height int) []ui2.Element {
 	}
 	percent := a.battery_read(false)
 	history := a.battery_history()
-	return battery_settings_elements(percent, &history, settings_padding, inner)
+	mut reading := a.battery_reading()
+	// What else the last poll learned describes this percentage only if it is
+	// the same sample. A reader that gives a percentage alone is shown as one.
+	if reading.percent != percent {
+		reading = BatteryReading{
+			percent: percent
+			source:  .device
+		}
+	}
+	return battery_reading_elements(reading, &history, settings_padding, inner)
 }
 
 // The Display and Battery actions. The sidebar has already dealt with choosing

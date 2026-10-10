@@ -4663,3 +4663,30 @@ notes.import_durability
 notes.import_enlarge
 Увеличьте окно для импорта. Escape — отмена.
 -----
+battery.state.on_battery
+От аккумулятора
+-----
+battery.state.not_charging
+Не заряжается
+-----
+battery.state.plugged_in
+Подключён адаптер питания
+-----
+battery.until_full.about_hours
+Около {0} часа до полной зарядки|Около {0} часов до полной зарядки|Около {0} часов до полной зарядки
+-----
+battery.until_full.less_than_hour
+Меньше часа до полной зарядки
+-----
+settings.battery.time_to_full
+До полной зарядки
+-----
+settings.battery.footer_supply
+Только чтение · /sys/class/power_supply · каждые 5 с.
+-----
+tray.battery.tip_full
+Аккумулятор: {0}, полностью заряжен
+-----
+tray.battery.tip_plugged_in
+Аккумулятор: {0}, питание от сети
+-----

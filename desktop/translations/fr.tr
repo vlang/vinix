@@ -4662,3 +4662,30 @@ Note importée, mais la synchronisation a échoué.
 notes.import_enlarge
 Agrandissez la fenêtre. Échap annule l’importation.
 -----
+battery.state.on_battery
+Sur batterie
+-----
+battery.state.not_charging
+Pas en charge
+-----
+battery.state.plugged_in
+Adaptateur secteur branché
+-----
+battery.until_full.about_hours
+Chargée dans environ {0} heure|Chargée dans environ {0} heures
+-----
+battery.until_full.less_than_hour
+Chargée dans moins d'une heure
+-----
+settings.battery.time_to_full
+Temps de charge restant
+-----
+settings.battery.footer_supply
+Lecture seule · /sys/class/power_supply · toutes les 5 s.
+-----
+tray.battery.tip_full
+Batterie : {0}, charge complète
+-----
+tray.battery.tip_plugged_in
+Batterie : {0}, sur secteur
+-----

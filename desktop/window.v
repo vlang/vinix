@@ -214,8 +214,13 @@ fn system_page(width int, height int, desktop &Desktop) []ui2.Element {
 	frame_count := desktop.frames.str()
 	frames := tr_fill('window.system.frames', frame_count)
 	unsafe { frame_count.free() }
-	battery := device_line('/dev/battery', tr('window.system.battery_absent'),
-		tr('window.system.battery_present'))
+	// A battery the kernel lists as a power supply is in /sys; Apple's is
+	// still the device. The taskbar's last poll says which, without a read.
+	battery := if battery_reading_snapshot().source == .supply {
+		tr_substitute(tr('window.system.battery_present'), power_supply_directory, '', '')
+	} else {
+		device_line('/dev/battery', tr('window.system.battery_absent'), tr('window.system.battery_present'))
+	}
 	backlight := device_line('/dev/apple-panel-bl', tr('window.system.backlight_absent'),
 		tr('window.system.backlight_present'))
 	mut panel_children := frame_elements(7)

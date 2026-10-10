@@ -147,12 +147,49 @@ fn battery_status_text(percent int) string {
 	}
 }
 
+// battery_power_text is how the machine is powered, in the kernel's terms.
+// Only a power supply says; for anything else this is the empty string.
+fn battery_power_text(power BatteryPower) string {
+	return match power {
+		.unknown { '' }
+		.on_battery { tr('battery.state.on_battery') }
+		.charging { tr('battery.remaining.charging') }
+		.full { tr('battery.remaining.full') }
+		.not_charging { tr('battery.state.not_charging') }
+		.plugged_in { tr('battery.state.plugged_in') }
+	}
+}
+
+// battery_state_text is the line under the level bar: what failed, how the
+// machine is powered when the kernel has said, and otherwise only where the
+// percentage came from.
+fn battery_state_text(reading BatteryReading) string {
+	power := battery_power(reading)
+	if power != .unknown {
+		return battery_power_text(power)
+	}
+	return battery_status_text(reading.percent)
+}
+
+// battery_outlook_line is the estimate where it has one line to itself and so
+// has to say which way the hours count. The text belongs to the caller.
+fn battery_outlook_line(outlook BatteryOutlook) string {
+	if outlook.to_full && outlook.estimate == 0 {
+		return tr('battery.until_full.less_than_hour').clone()
+	}
+	if outlook.to_full && outlook.estimate > 0 {
+		return tr_count('battery.until_full.about_hours', outlook.estimate)
+	}
+	return battery_remaining_text(outlook.estimate).clone()
+}
+
 fn battery_remaining_text(estimate int) string {
 	return match estimate {
 		battery_estimate_unavailable { tr('battery.remaining.unavailable') }
 		battery_estimate_calculating { tr('battery.remaining.calculating') }
 		battery_estimate_charging { tr('battery.remaining.charging') }
 		battery_estimate_full { tr('battery.remaining.full') }
+		battery_estimate_not_charging { tr('battery.state.not_charging') }
 		else {
 			if estimate == 0 {
 				tr('battery.remaining.less_than_hour')
@@ -279,9 +316,29 @@ fn battery_graph(history &BatteryHistory, x int, y int, width int, height int) u
 	}, lines)
 }
 
+// settings_label with a name, for the lines that say different things for
+// different sources.
+fn battery_named_label(id string, text string, x int, y int, width int, color u32) ui2.Element {
+	return ui2.label(id, text, ui2.rect(f64(x), f64(y), f64(width), 22), ui2.TextStyle{
+		color: color
+		size:  13
+	})
+}
+
+// A percentage with nothing else known about it draws as one /dev/battery
+// reported.
 fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner int) []ui2.Element {
+	return battery_reading_elements(BatteryReading{
+		percent: percent
+		source:  .device
+	}, history, x, inner)
+}
+
+fn battery_reading_elements(reading BatteryReading, history &BatteryHistory, x int, inner int) []ui2.Element {
+	percent := reading.percent
 	available := percent >= 0 && percent <= 100
-	estimate := history.remaining_hours(percent)
+	outlook := battery_outlook(reading, history)
+	estimate := outlook.estimate
 	stat_width := (inner - 16) / 2
 	mut children := frame_elements(16)
 	children << ui2.label('settings.battery.title', tr('settings.category.battery'), ui2.rect(f64(x), 16, f64(inner), 28), ui2.TextStyle{ color: body_heading, size: 20, bold: true })
@@ -299,14 +356,20 @@ fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner 
 		size: 28
 		bold: true
 	})
-	children << settings_label(tr('settings.battery.estimated_remaining'), x + stat_width + 16, 88, stat_width, body_heading)
+	// While the kernel counts the hours to full, the heading says so and the
+	// hours beneath it are worded as they always are.
+	children << battery_named_label('settings.battery.estimate.heading', if outlook.to_full {
+		tr('settings.battery.time_to_full')
+	} else {
+		tr('settings.battery.estimated_remaining')
+	}, x + stat_width + 16, 88, stat_width, body_heading)
 	children << ui2.label('settings.battery.estimate', battery_remaining_text(estimate), ui2.rect(f64(x + stat_width + 16), 110, f64(stat_width), 30), ui2.TextStyle{
 		color: if estimate == battery_estimate_unavailable { body_muted } else { body_heading }
 		size: 19
 		bold: true
 	})
 	children << ui2.view('settings.battery.track', ui2.rect(f64(x), 148, f64(inner), 10), ui2.BoxStyle{ bg: body_rule, radius: 4 }, [])
-	children << settings_label(battery_status_text(percent), x, 164, inner, if available {
+	children << battery_named_label('settings.battery.state', battery_state_text(reading), x, 164, inner, if available {
 		body_muted
 	} else {
 		files_error
@@ -319,10 +382,12 @@ fn battery_settings_elements(percent int, history &BatteryHistory, x int, inner 
 	if available && percent > 0 {
 		children << ui2.view('settings.battery.fill', ui2.rect(f64(x), 148, f64(inner * percent / 100), 10), ui2.BoxStyle{ bg: battery_level, radius: 4 }, [])
 	}
-	if percent == battery_unavailable {
-		children << settings_label(tr('settings.battery.check_smc'), x + 96, 333, inner - 96, body_muted)
+	children << battery_named_label('settings.battery.footer', if reading.source == .supply {
+		tr('settings.battery.footer_supply')
+	} else if percent == battery_unavailable {
+		tr('settings.battery.check_smc')
 	} else {
-		children << settings_label(tr('settings.battery.footer'), x + 96, 333, inner - 96, body_muted)
-	}
+		tr('settings.battery.footer')
+	}, x + 96, 333, inner - 96, body_muted)
 	return children
 }

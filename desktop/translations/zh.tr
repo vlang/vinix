@@ -4662,3 +4662,30 @@ notes.import_durability
 notes.import_enlarge
 放大窗口以导入文本。Escape 取消。
 -----
+battery.state.on_battery
+使用电池
+-----
+battery.state.not_charging
+未充电
+-----
+battery.state.plugged_in
+已连接电源适配器
+-----
+battery.until_full.about_hours
+约 {0} 小时后充满
+-----
+battery.until_full.less_than_hour
+不足 1 小时后充满
+-----
+settings.battery.time_to_full
+充满所需时间
+-----
+settings.battery.footer_supply
+只读 · /sys/class/power_supply · 每 5 秒更新。
+-----
+tray.battery.tip_full
+电池：{0}，已充满
+-----
+tray.battery.tip_plugged_in
+电池：{0}，已接通电源
+-----

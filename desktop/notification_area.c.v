@@ -83,6 +83,10 @@ struct TraySample {
 	wifi_networks     int
 	battery           int = battery_unavailable
 	charging          bool
+	// How the machine is powered and how long that lasts, when the kernel
+	// lists the battery as a power supply and so says.
+	power             BatteryPower
+	outlook           BatteryOutlook
 	backlight_present bool
 	backlight_percent int
 }
@@ -90,7 +94,8 @@ struct TraySample {
 fn (a &TraySample) same(b &TraySample) bool {
 	return a.ethernet == b.ethernet && a.address == b.address && a.wifi_present == b.wifi_present
 		&& a.wifi_radio == b.wifi_radio && a.wifi_networks == b.wifi_networks
-		&& a.battery == b.battery && a.charging == b.charging
+		&& a.battery == b.battery && a.charging == b.charging && a.power == b.power
+		&& a.outlook == b.outlook
 		&& a.backlight_present == b.backlight_present
 		&& a.backlight_percent == b.backlight_percent
 }
@@ -293,6 +298,8 @@ fn (mut d Desktop) update_tray_at(now i64, force bool) {
 		}
 	}
 	battery := battery_get(force)
+	reading := battery_reading_snapshot()
+	power := battery_power(reading)
 	mut backlight := BacklightState{}
 	mut backlight_present := false
 	mut brightness := 0
@@ -310,7 +317,15 @@ fn (mut d Desktop) update_tray_at(now i64, force bool) {
 		wifi_radio:        wifi_radio
 		wifi_networks:     wifi_networks
 		battery:           battery
-		charging:          desktop_battery_cache.history.trend == .charging
+		// A power supply's status is the kernel's word. /dev/battery has only
+		// its percentage, where a rise is taken for charging.
+		charging:          if reading.source == .supply {
+			power == .charging
+		} else {
+			desktop_battery_cache.history.trend == .charging
+		}
+		power:             power
+		outlook:           battery_outlook(reading, &desktop_battery_cache.history)
 		backlight_present: backlight_present
 		backlight_percent: brightness
 	})
@@ -377,11 +392,14 @@ fn (mut d Desktop) format_tray_text() {
 	percent := battery_percentage_text(sample.battery)
 	d.tray.battery_tip = set_owned_text(d.tray.battery_tip, if sample.charging {
 		tr_fill('tray.battery.tip_charging', percent)
+	} else if sample.power == .full {
+		tr_fill('tray.battery.tip_full', percent)
+	} else if sample.power == .not_charging || sample.power == .plugged_in {
+		tr_fill('tray.battery.tip_plugged_in', percent)
 	} else {
 		tr_fill('tray.battery.tip_remaining', percent)
 	})
-	estimate := desktop_battery_cache.history.remaining_hours(sample.battery)
-	d.tray.battery_line = set_owned_text(d.tray.battery_line, battery_remaining_text(estimate).clone())
+	d.tray.battery_line = set_owned_text(d.tray.battery_line, battery_outlook_line(sample.outlook))
 	brightness := if sample.backlight_present { sample.backlight_percent.str() } else { '' }
 	d.tray.display_tip = set_owned_text(d.tray.display_tip, if sample.backlight_present {
 		tr_fill('tray.display.tip_brightness', brightness)
@@ -754,7 +772,9 @@ fn (mut d Desktop) tray_flyout_element() ?ui2.Element {
 				size:  26
 				bold:  true
 			})
-			children << tray_flyout_line(if d.tray.sample.charging {
+			// The hours to full when the kernel counts them; a battery that is
+			// only seen to be rising has nothing to say but that it charges.
+			children << tray_flyout_line(if d.tray.sample.charging && !d.tray.sample.outlook.to_full {
 				tr('tray.battery.charging')
 			} else {
 				d.tray.battery_line

@@ -4662,3 +4662,30 @@ notes.import_durability
 notes.import_enlarge
 読み込むにはウィンドウを拡大。Escape で中止。
 -----
+battery.state.on_battery
+バッテリー使用中
+-----
+battery.state.not_charging
+充電していません
+-----
+battery.state.plugged_in
+電源アダプタ接続中
+-----
+battery.until_full.about_hours
+充電完了まで約{0}時間
+-----
+battery.until_full.less_than_hour
+充電完了まで1時間未満
+-----
+settings.battery.time_to_full
+充電完了までの時間
+-----
+settings.battery.footer_supply
+読み取り専用 · /sys/class/power_supply · 5秒ごとに更新。
+-----
+tray.battery.tip_full
+バッテリー: {0}、充電完了
+-----
+tray.battery.tip_plugged_in
+バッテリー: {0}、電源接続中
+-----
