@@ -573,3 +573,161 @@ fn scenario_hibernate_foreign(mut t Test) {
 	}
 	t.info('state: ${state}; hibernate: ${hib_offer()}')
 }
+
+// ── A system that lives on a disk ───────────────────────────────────────────
+//
+// The scenarios above run from memory: the machine's root is the initial
+// filesystem unpacked into RAM, and no filesystem on a disk is mounted when
+// the image is taken. That is not what a suspend to disk is for. In the two
+// below the machine has a third disk, blank and large enough for the kernel
+// to install the system onto at its first start (vinix.disk=auto, which the
+// boot medium always asks for), so that the root is an ext2 volume on sd2
+// and the image holds that filesystem's state.
+
+const hib_proof_a = '/hibernate-proof-a'
+const hib_proof_b = '/hibernate-proof-b'
+const hib_proof_bytes = 1 << 20
+
+// Write a megabyte of a pattern to a file on the root, and have it reach the
+// disk.
+fn hib_write_proof(path string, seed u8) ! {
+	os.write_file_array(path, pattern_bytes(seed, hib_proof_bytes))!
+	fd := C.open(&char(path.str), C.O_RDONLY)
+	if fd < 0 {
+		return errno_error(path)
+	}
+	defer {
+		C.close(fd)
+	}
+	if C.fsync(fd) != 0 {
+		return errno_error(path)
+	}
+	C.sync()
+}
+
+// What is wrong with such a file, or ''.
+fn hib_proof_problem(path string, seed u8) string {
+	found := os.read_bytes(path) or { return '${path} cannot be read: ${err.msg()}' }
+	if found.len != hib_proof_bytes {
+		return '${path} is ${found.len} bytes long, not ${hib_proof_bytes}'
+	}
+	expected := pattern_bytes(seed, hib_proof_bytes)
+	for i in 0 .. hib_proof_bytes {
+		if found[i] != expected[i] {
+			return '${path}: byte ${i} is 0x${found[i].hex()}, not 0x${expected[i].hex()}'
+		}
+	}
+	return ''
+}
+
+// The machine was put back from its image, as the process that asked sees it.
+fn hib_check_back(mut t Test) {
+	t.check(hib_number('resumes') == 1 && deep_stat('last_wake') == 'resume-from-disk' && deep_stat('disk') == '1', 'the kernel counts ${hib_number('resumes')} resumes; last_wake is ${deep_stat('last_wake')}')
+	t.check(hib_number('writes before the image was looked for') == 0, 'the boot that loaded the image had written to a disk first')
+	t.check(deep_stat('security_changes') == '0' && deep_report('processors lost') == 0 && deep_report('pci functions not restored') == 0, 'the machine did not come back whole: ${deep_stat('security_changes')} protection changes, ${deep_report('processors lost')} processors lost, ${deep_report('pci functions not restored')} PCI functions not restored')
+	hib_check_no_image(mut t, 'after the resume')
+}
+
+// hibernate-root: the system is on a disk when the image is taken, the same
+// kernel goes on using that disk after it has been put back, and a third
+// kernel, started afresh from the disk, finds on it what both of them wrote.
+fn scenario_hibernate_root(mut t Test) {
+	note := hib_note()
+	if note == '' {
+		if !hib_offered(mut t) {
+			return
+		}
+		hib_write_proof(hib_proof_a, 0x71) or {
+			t.check(false, 'a file on the root: ${err.msg()}')
+			return
+		}
+		hib_leave_note('root: put away') or { t.check(false, 'leaving a note: ${err.msg()}') }
+		if t.failures != 0 {
+			return
+		}
+		t.step('hibernating')
+		write_text(hib_state, 'disk') or {
+			t.check(false, 'writing disk to state: ${err.msg()} (${deep_stat('last_failed_reason')})')
+			return
+		}
+		// The same process, a boot later.
+		hib_check_back(mut t)
+		problem := hib_proof_problem(hib_proof_a, 0x71)
+		t.check(problem == '', 'after the resume: ${problem}')
+		// The filesystem the image held is used again: by the kernel whose
+		// memory it is in, on a disk nothing has touched in between.
+		hib_write_proof(hib_proof_b, 0x72) or { t.check(false, 'a second file on the root: ${err.msg()}') }
+		t.check(network_works(20), 'the network does not work after the resume')
+		hib_leave_note('root: back') or { t.check(false, 'leaving a note: ${err.msg()}') }
+		t.info('resumed with the root on a disk: image of ${hib_number('image pages')} pages, loaded in ${hib_number('load ms')} ms')
+		return
+	}
+	if !t.check(note == 'root: back', 'the machine started afresh after "${note}" instead of going back into its image: ${hib_line('boot')}') {
+		return
+	}
+	// Started afresh from the disk, by a kernel that has seen none of it.
+	t.step('read back from the disk')
+	t.check(hib_line('boot') == 'no image' && hib_line('waiting') == 'none', 'the third boot found "${hib_line('boot')}", waiting "${hib_line('waiting')}"')
+	first := hib_proof_problem(hib_proof_a, 0x71)
+	second := hib_proof_problem(hib_proof_b, 0x72)
+	t.check(first == '', 'what was written before the image was taken: ${first}')
+	t.check(second == '', 'what was written after the resume: ${second}')
+	hib_write_proof('/hibernate-proof-c', 0x73) or { t.check(false, 'a third file on the root: ${err.msg()}') }
+	hib_leave_note('') or { t.check(false, 'clearing the note: ${err.msg()}') }
+	t.info('started afresh from the disk: both files as written')
+}
+
+// hibernate-waiting: between the suspend to disk and the resume the machine
+// is started once without the option that names the image's device. That
+// kernel is not told of any image; it must find it all the same, leave it
+// exactly as it is, and keep its hands off the system's disk, whose state
+// the image holds: it runs from memory. The next start, with the option
+// again, goes back into the image and finds the disk as the image knew it.
+fn scenario_hibernate_waiting(mut t Test) {
+	note := hib_note()
+	if note == '' {
+		if !hib_offered(mut t) {
+			return
+		}
+		hib_write_proof(hib_proof_a, 0x75) or {
+			t.check(false, 'a file on the root: ${err.msg()}')
+			return
+		}
+		hib_leave_note('waiting: put away') or { t.check(false, 'leaving a note: ${err.msg()}') }
+		if t.failures != 0 {
+			return
+		}
+		t.step('hibernating')
+		write_text(hib_state, 'disk') or {
+			t.check(false, 'writing disk to state: ${err.msg()} (${deep_stat('last_failed_reason')})')
+			return
+		}
+		// The same process, two boots later.
+		t.step('back in the image')
+		hib_check_back(mut t)
+		problem := hib_proof_problem(hib_proof_a, 0x75)
+		t.check(problem == '', 'after the resume: ${problem}')
+		hib_write_proof(hib_proof_b, 0x76) or { t.check(false, 'a second file on the root: ${err.msg()}') }
+		second := hib_proof_problem(hib_proof_b, 0x76)
+		t.check(second == '', 'after the resume: ${second}')
+		t.check(network_works(20), 'the network does not work after the resume')
+		hib_leave_note('') or { t.check(false, 'clearing the note: ${err.msg()}') }
+		t.info('resumed after a boot that left the image and the disks alone')
+		return
+	}
+	if !t.check(note == 'waiting: put away', 'the note on the disk reads "${note}"') {
+		return
+	}
+	if !t.check(hib_line('device') == 'none', 'the machine started afresh, with the device named, instead of going back into its image: ${hib_line('boot')}') {
+		return
+	}
+	// The boot in between. Nothing here writes to a disk: not even the note.
+	state := read_word(hib_state)
+	t.check(state == 'freeze mem', 'state offers "${state}" with no device named')
+	t.check(hib_line('waiting') == 'sd1', 'the kernel says an image is waiting on "${hib_line('waiting')}"; one is, on sd1')
+	t.check(!os.exists(hib_proof_a), 'the file on the system\'s disk is there: the disk was mounted by a kernel that had not gone back into the image')
+	t.check(hib_number('disk writes since boot') == 0, '${hib_number('disk writes since boot')} writes went to a disk')
+	signature, pages := hib_image_header()
+	t.check(signature == 'VINIXHIB' && pages > 0, 'the image device says "${signature}" with ${pages} pages: the image was to be left as it was')
+	t.info('started without the option: an image of ${pages} pages found waiting on ${hib_line('waiting')}; running from memory, ${hib_number('disk writes since boot')} writes to disks')
+}

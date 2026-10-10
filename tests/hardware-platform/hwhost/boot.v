@@ -110,7 +110,12 @@ fn boot_media_x86_64(host Host, kernel string, initramfs string, cmdline string,
 	cache := environment_or('VINIX_AMD64_LIMINE_DIR', shared_path(host.root, os.join_path('build-amd64-iso',
 		'limine')))
 	os.mkdir_all(cache)!
-	os.symlink(cache, os.join_path(build, 'limine'))!
+	// Made once: a scenario that boots again with another command line
+	// comes through here again.
+	link := os.join_path(build, 'limine')
+	if !os.is_link(link) {
+		os.symlink(cache, link)!
+	}
 	iso := os.join_path(state, 'test.iso')
 	run_tool([os.join_path(host.root, 'build-support', 'build-amd64-iso.sh')], {
 		'VINIX_AMD64_KERNEL':        kernel

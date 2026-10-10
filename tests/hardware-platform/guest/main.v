@@ -47,6 +47,8 @@ fn run_scenario(name string, mut t Test) bool {
 		'hibernate-iommu' { scenario_hibernate_iommu(mut t) }
 		'hibernate-iommu-amd' { scenario_hibernate_iommu_amd(mut t) }
 		'hibernate-memory' { scenario_hibernate_memory(mut t) }
+		'hibernate-root' { scenario_hibernate_root(mut t) }
+		'hibernate-waiting' { scenario_hibernate_waiting(mut t) }
 		'hibernate-unnamed' { scenario_hibernate_unnamed(mut t) }
 		'iommu-amd' { scenario_iommu_amd(mut t) }
 		'iommu-intel' { scenario_iommu_intel(mut t) }

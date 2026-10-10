@@ -88,6 +88,11 @@ pub:
 	qemu []string
 	// What the controller does to the disks before it.
 	damage []DiskDamage
+	// With own_cmdline, this boot alone has `cmdline` as its extra kernel
+	// command line instead of the scenario's, and the boot medium is made
+	// again for it: the same kernel and the same guest, started another way.
+	own_cmdline bool
+	cmdline     string
 }
 
 // Bytes the guest is expected to have left on a disk, checked on the host
@@ -1281,6 +1286,39 @@ pub const scenarios = [
 		timeout:    180
 	},
 	Scenario{
+		name:       'hibernate-root'
+		about:      'suspend to disk with the system on a disk: resumed, used again, and found whole by a third start'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       hibernate_root_machine
+		disks:      [hibernate_data_disk, hibernate_image_disk, hibernate_system_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-root', 'HWTEST STEP read back from the disk',
+			'HWTEST PASS hibernate-root']
+		reboots:    [Reboot{}, Reboot{}]
+		ending:     .poweroff
+		disk_bytes: hibernate_no_image
+		timeout:    420
+	},
+	Scenario{
+		name:       'hibernate-waiting'
+		about:      'a start without the option, between the suspend to disk and the resume, leaves the image and the system\'s disk alone'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       hibernate_root_machine
+		disks:      [hibernate_data_disk, hibernate_image_disk, hibernate_system_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-waiting', 'HWTEST STEP back in the image',
+			'HWTEST PASS hibernate-waiting']
+		// The second start is told of no device for an image.
+		reboots:    [Reboot{
+			own_cmdline: true
+		}, Reboot{}]
+		ending:     .poweroff
+		disk_bytes: hibernate_no_image
+		timeout:    420
+	},
+	Scenario{
 		name:     'hibernate-foreign'
 		about:    'a named device that holds something else is not written to, and there is no disk state'
 		arches:   ['x86_64']
@@ -1332,6 +1370,18 @@ const hibernate_machine = ['-smp', '4', '-nic', 'user,model=e1000,tftp={state}/t
 const hibernate_machine_isolated = ['-smp', '4', '-device', 'intel-iommu', '-nic',
 	'user,model=e1000,tftp={state}/tftp', '-drive', 'if=ide,format=raw,file={state}/disk.raw',
 	'-drive', 'if=ide,format=raw,file={state}/image.raw']
+
+// The same with a third disk, sd2: blank, and of the least size the kernel
+// installs a system onto, which it does at the machine's first start.
+const hibernate_root_machine = ['-smp', '4', '-nic', 'user,model=e1000,tftp={state}/tftp', '-drive',
+	'if=ide,format=raw,file={state}/disk.raw', '-drive', 'if=ide,format=raw,file={state}/image.raw',
+	'-drive', 'if=ide,format=raw,file={state}/system.raw']
+
+const hibernate_system_disk = Disk{
+	name:     'system.raw'
+	size_mib: 4096
+	bulky:    true
+}
 
 const hibernate_data_disk = Disk{
 	name:     'disk.raw'
@@ -1744,6 +1794,14 @@ pub fn (s &Scenario) boot_arguments(arch string, boot int) []string {
 		extra << s.reboots[boot - 1].qemu
 	}
 	return extra
+}
+
+// The extra kernel command line of boot `boot`.
+pub fn (s &Scenario) boot_cmdline(boot int) string {
+	if boot > 0 && boot <= s.reboots.len && s.reboots[boot - 1].own_cmdline {
+		return s.reboots[boot - 1].cmdline
+	}
+	return s.cmdline
 }
 
 // The serial log of boot `boot`: serial.log, then serial-2.log and so on,

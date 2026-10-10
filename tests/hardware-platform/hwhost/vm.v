@@ -177,7 +177,8 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	}
 	os.mkdir_all(state)!
 	initramfs := build_initramfs(run.guest, scenario.name, state)!
-	media := boot_media(host, run.kernel, initramfs, scenario.cmdline, state)!
+	mut media := boot_media(host, run.kernel, initramfs, scenario.cmdline, state)!
+	mut media_cmdline := scenario.cmdline
 	for disk in scenario.disks {
 		create_disk(disk, state)!
 	}
@@ -206,6 +207,12 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 			}
 			os.rm(socket) or {}
 			m.serial.text.lines << boot_separator(boot)
+		}
+		// A boot with a command line of its own, or the first after one,
+		// needs the boot medium made for it.
+		if scenario.boot_cmdline(boot) != media_cmdline {
+			media_cmdline = scenario.boot_cmdline(boot)
+			media = boot_media(host, run.kernel, initramfs, media_cmdline, state)!
 		}
 		command := qemu_command(host, scenario, media, state, boot)!
 		mut log := os.open_append(qemu_log)!
