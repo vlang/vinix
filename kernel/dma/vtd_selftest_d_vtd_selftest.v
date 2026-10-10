@@ -50,7 +50,14 @@ __global (
 	vtd_test_failures u32
 	// Why the hardware half did not run, if it did not.
 	vtd_test_skipped string
-	vtd_test_done    bool
+	vtd_test_done bool
+	// Figures worth seeing next to the verdict: how many pages of page table
+	// all of RAM took, the most the fifty rounds held, and free memory before
+	// and after them.
+	vtd_test_identity_tables u64
+	vtd_test_round_tables    u64
+	vtd_test_free_before     u64
+	vtd_test_free_after      u64
 )
 
 // Record one check. `name` is a literal: it is kept, not copied.
@@ -508,16 +515,16 @@ fn vtd_selftest_card() {
 	vtd_card_write(regs, vtd_card_tctl, vtd_card_tctl_on)
 
 	// A driver's domain: one page for the rings, one to receive into.
-	mut ready := looping
-	ring := alloc_buffer(mut dev, 0x1000) or {
-		ready = false
-		Buffer{}
-	}
-	inside := alloc_buffer(mut dev, 0x1000) or {
-		ready = false
-		Buffer{}
-	}
-	if ready {
+	ring := alloc_buffer(mut dev, 0x1000) or { Buffer{} }
+	inside := alloc_buffer(mut dev, 0x1000) or { Buffer{} }
+	attached := ring.bus != 0 && inside.bus != 0
+	mut ready := attached && looping
+	if !attached {
+		// A card behind a conventional PCI bridge, for one.
+		vtd_test_skipped = 'the unit gives the network card no domain'
+	} else if !looping {
+		vtd_test_skipped = 'the network card has no PHY to put in loopback'
+	} else {
 		before := vtd_test_faults(mut unit)
 		ready = vtd_test_reaches(mut unit, regs, ring.virt, ring.bus, inside.bus, 0xa1)
 		if !ready && vtd_test_faults(mut unit) == before {
@@ -527,8 +534,6 @@ fn vtd_selftest_card() {
 		} else {
 			vtd_check('isolation: a frame is received into a page of the domain', ready)
 		}
-	} else {
-		vtd_test_skipped = 'the network card could not be set up for the test'
 	}
 
 	if ready {
@@ -560,8 +565,10 @@ fn vtd_selftest_card() {
 	free_buffer(mut dev, ring)
 	free_buffer(mut dev, inside)
 	release(mut dev)
-	vtd_check('domains: detach frees every page of the page table', unit.table_pages == tables_start
-		&& unit.domain_count == domains_start)
+	if attached {
+		vtd_check('domains: detach frees every page of the page table', unit.table_pages == tables_start
+			&& unit.domain_count == domains_start)
+	}
 
 	if ready {
 		// A domain holding all of RAM: the page nobody mapped is reachable,
@@ -570,7 +577,7 @@ fn vtd_selftest_card() {
 		all := whole.bus != 0 && allow_all(mut dev)
 		vtd_check('identity: a domain holding all of RAM reaches any page', all
 			&& vtd_test_reaches(mut unit, regs, whole.virt, whole.bus, outside, 0xe5))
-		C.kprintf(c'vtd selftest: all of RAM took %llu pages of page table\n', unit.table_pages - tables_start)
+		vtd_test_identity_tables = unit.table_pages - tables_start
 		release(mut dev)
 		vtd_check('identity: and is freed whole', unit.table_pages == tables_start)
 
@@ -584,34 +591,33 @@ fn vtd_selftest_card() {
 	}
 	dev.pci.write[u16](0x4, command)
 
-	// Fifty drivers come and go, half of them without cleaning up.
-	free_start := memory.free_bytes()
-	mut peak := u64(0)
-	mut attached := 0
-	for round := 0; round < 50; round++ {
-		buffer := alloc_buffer(mut dev, 16 * 0x1000) or { break }
-		map_memory(mut dev, outside, 0x1000) or { break }
-		attached++
-		if unit.table_pages > peak {
-			peak = unit.table_pages
+	if attached {
+		// Fifty drivers come and go, half of them without cleaning up.
+		vtd_test_free_before = memory.free_bytes()
+		mut rounds := 0
+		for round := 0; round < 50; round++ {
+			buffer := alloc_buffer(mut dev, 16 * 0x1000) or { break }
+			map_memory(mut dev, outside, 0x1000) or { break }
+			rounds++
+			if unit.table_pages > vtd_test_round_tables {
+				vtd_test_round_tables = unit.table_pages
+			}
+			if round % 2 == 0 {
+				unmap_memory(mut dev, outside)
+				free_buffer(mut dev, buffer)
+			}
+			release(mut dev)
 		}
-		if round % 2 == 0 {
-			unmap_memory(mut dev, outside)
-			free_buffer(mut dev, buffer)
-		}
+		// A round that stopped half way still has its domain.
 		release(mut dev)
+		vtd_test_free_after = memory.free_bytes()
+		vtd_check('domains: fifty attach and detach rounds leave no page of page table',
+			rounds == 50 && vtd_test_round_tables > tables_start && unit.table_pages == tables_start
+			&& unit.domain_count == domains_start)
+		// Other threads allocate while this runs; sixteen pages is their
+		// noise, and far less than fifty leaked tables would be.
+		vtd_check('domains: nor any other memory', vtd_test_free_after + 16 * 0x1000 >= vtd_test_free_before)
 	}
-	// A round that stopped half way still has its domain.
-	release(mut dev)
-	free_end := memory.free_bytes()
-	vtd_check('domains: fifty attach and detach rounds leave no page of page table', attached == 50
-		&& peak > tables_start && unit.table_pages == tables_start
-		&& unit.domain_count == domains_start)
-	// Other threads allocate while this runs; sixteen pages is their noise,
-	// and far less than fifty leaked tables would be.
-	vtd_check('domains: nor any other memory', free_end + 16 * 0x1000 >= free_start)
-	C.kprintf(c'vtd selftest: page-table pages %llu at rest, %llu at most; free memory %llu -> %llu bytes\n',
-		tables_start, peak, free_start, free_end)
 
 	memory.pmm_free(voidptr(outside), 1)
 	memory.pmm_free(voidptr(reserved), 2)
@@ -731,6 +737,20 @@ fn vtd_selftest_show(_ voidptr, mut text lib.Text) {
 		text.add('skipped: ')
 		text.add(vtd_test_skipped)
 		text.add_byte(`\n`)
+	}
+	if vtd_test_identity_tables != 0 {
+		text.add('note: all of RAM was mapped with ')
+		text.add_unsigned(vtd_test_identity_tables)
+		text.add(' pages of page table\n')
+	}
+	if vtd_test_free_before != 0 {
+		text.add('note: fifty rounds held at most ')
+		text.add_unsigned(vtd_test_round_tables)
+		text.add(' pages of page table; free memory ')
+		text.add_unsigned(vtd_test_free_before / 1024)
+		text.add(' -> ')
+		text.add_unsigned(vtd_test_free_after / 1024)
+		text.add(' kB\n')
 	}
 	for i := u32(0); i < vtd_test_count; i++ {
 		text.add(if vtd_test_lines[i].ok { 'pass  ' } else { 'FAIL  ' })
