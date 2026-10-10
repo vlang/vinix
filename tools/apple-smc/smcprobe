@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Read the keys the Vinix SMC driver uses from the SMC of this Mac, under
+# macOS. Reads only; see smcprobe.v and README.md.
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$here/../../build-support/run-v-tool.sh" "$here/smcprobe.v" "$@"
