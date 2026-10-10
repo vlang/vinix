@@ -115,6 +115,11 @@ fn check_idle(mut t Test) {
 	// A state that is switched off is not used.
 	state_dir := '${cpu_root}/cpu0/cpuidle/state${deepest}/'
 	write_text(state_dir + 'disable', '1') or { t.check(false, 'disabling state${deepest}: ${err.msg()}') }
+	// A wait is counted when it ends. CPU 0 may be in the state as it is
+	// switched off -- this thread runs where the scheduler put it -- and
+	// that wait, which began while the state was allowed, is over long
+	// before a tenth of a second is.
+	sleep_ms(100)
 	before := idle_number(0, deepest, 'usage')
 	sleep_ms(500)
 	t.check(idle_number(0, deepest, 'usage') == before, 'a disabled state was entered ${idle_number(0,
