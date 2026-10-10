@@ -28,6 +28,7 @@ import apple.ans
 import apple.typec
 import apple.speakers
 import devicetree
+import devcore
 import pci
 import initramfs
 import numa
@@ -195,6 +196,8 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 
 	socket.initialise()
 	print('kmain_thread: socket done\n')
+	// Failure reports and removals are carried out by a thread of the core's.
+	devcore.start_worker()
 	if qemu_platform {
 		virtio_net.initialise(memory.get_hhdm_offset())
 	}
@@ -259,6 +262,8 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	// one has nothing in it that the block device was read through.
 	fs.create(vfs_root, '/sys', 0o555 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/sys', 'sysfs') or {}
+	// Devices and drivers so far, and every change from here on.
+	devcore.publish()
 	print('kmain_thread: sysfs done\n')
 
 	if enable_fake_g17 {
@@ -410,6 +415,8 @@ fn start_pci() {
 		C.kprintf(c'pci: ARM checked config widths, bounds and interrupt masks passed\n')
 	}
 	pci.initialise()
+	// What the scan found becomes devices for drivers to be offered.
+	devcore.enumerate_pci()
 	if !xhci.initialise() {
 		print('xhci: no USB controller\n')
 	}

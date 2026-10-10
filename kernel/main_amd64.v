@@ -22,6 +22,7 @@ import userland
 import pipe
 import futex
 import pci
+import devcore
 import dev.ata
 import dev.fbdev
 import dev.fbdev.simple
@@ -77,6 +78,8 @@ fn kmain_thread() {
 	table.init_mmap_aslr_syscalls()
 	table.init_security_syscalls()
 	socket.initialise()
+	// Failure reports and removals are carried out by a thread of the core's.
+	devcore.start_worker()
 	if e1000.initialise() {
 		sched.set_device_poll_callback(voidptr(poll_network))
 	}
@@ -129,6 +132,8 @@ fn kmain_thread() {
 	// not one of the directories that unpack creates.
 	fs.create(vfs_root, '/sys', 0o555 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/sys', 'sysfs') or {}
+	// Devices and drivers so far, and every change from here on.
+	devcore.publish()
 
 	streams.initialise()
 	random.initialise()
@@ -197,6 +202,8 @@ fn kmain() {
 	acpisync.test_boot()
 
 	pci.initialise()
+	// What the scan found becomes devices for drivers to be offered.
+	devcore.enumerate_pci()
 
 	mut uacpi_status := uacpi.UACPIStatus.ok
 
