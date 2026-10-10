@@ -1,6 +1,7 @@
 """Synchronous stdlib bindings for the native Android runner policy."""
 import atexit
 import builtins
+import ctypes
 import operator
 import importlib
 import importlib.util
@@ -26,6 +27,80 @@ _spec.loader.exec_module(_wire)
 _host_spec = importlib.util.spec_from_file_location('android_runner_transport', _HERE.parents[1] / 'build-support/native_host.py')
 _host = importlib.util.module_from_spec(_host_spec)
 _host_spec.loader.exec_module(_host)
+
+
+_LIBRARY = None
+_TAKE = None
+_LIBRARY_LOCK = threading.Lock()
+_boot_pair = _wire._boot_pair
+_LIBRARY_SUPPORT = (os.environ, Path, str, tempfile.mkdtemp, shutil.rmtree,
+                    subprocess.run, subprocess.DEVNULL, sys.executable,
+                    sys.platform, ctypes.PyDLL, atexit.register, ctypes.c_char_p,
+                    ctypes.py_object, ctypes.c_int, globals, BaseException)
+
+
+def _entry(operation, *arguments):
+    global _LIBRARY, _TAKE
+    (environ, library_Path, text, make, remove, run, quiet, executable, platform,
+     load, retire, char_pointer, python_object, c_int, namespace, error_type) = _LIBRARY_SUPPORT
+    with _LIBRARY_LOCK:
+        if _LIBRARY is None:
+            library_path = environ.get('VINIX_ANDROID_RUN_LIBRARY')
+            if library_path is None:
+                directory = make(prefix='vinix-android-run-sdk-')
+                try:
+                    library_path = text(library_Path(directory) / ('library.dylib' if platform == 'darwin' else 'library.so'))
+                    run([text(_HERE.parents[1] / 'build-support/build-v-host-library.sh'),
+                                    text(_HERE / 'run_sdk_library.v'), library_path,
+                                    '-d', 'cpython_boot', '-d', 'cpython_android_run', '-d', 'use_bundled_libgc'],
+                                   check=True, stdout=quiet,
+                                   env={**environ, 'VINIX_HOST_PYTHON': executable})
+                    library = load(library_path)
+                except error_type:
+                    remove(directory)
+                    raise
+                retire(remove, directory)
+            else:
+                library = load(library_path)
+            target = library.vinix_android_run_sdk
+            target.argtypes = (char_pointer, python_object, python_object, python_object)
+            target.restype = python_object
+            take = library.vinix_android_run_take
+            take.argtypes = (python_object, c_int)
+            take.restype = python_object
+            _TAKE = take
+            _LIBRARY = target
+    pins = []
+    try:
+        return _LIBRARY(operation, namespace(), arguments, pins)
+    finally:
+        arguments = None
+
+
+def _run_take(token, index):
+    try:
+        return _TAKE(token, index)
+    finally:
+        token = None
+
+
+def _run_apply(token):
+    try:
+        return _run_take(token, 0)(*_run_take(token, 1), **_run_take(token, 2))
+    finally:
+        token = None
+
+
+def _run_print(token):
+    try:
+        return _run_take(token, 0)(_run_take(token, 1), file=_run_take(token, 2), **_run_take(token, 3))
+    finally:
+        token = None
+
+
+def _run_callback(operation, context, resources):
+    return lambda operation=operation: call(operation, {}, context, args=resources['args'], group=resources['group'])
+
 
 
 class _Controller(subprocess.Popen):
@@ -130,21 +205,11 @@ def _exit(owner, exception):
 
 
 def _arguments(items, context, resources):
-    return [Path(value) if kind == 'path' else bytes.fromhex(value) if kind == 'bytes'
-            else (lambda operation=value: call(operation, {}, context, args=resources['args'], group=resources['group'])) if kind == 'callback'
-            else getattr(context[value[0]], value[1]) if kind == 'constant' else value
-            for kind, value in items]
+    return _entry(b"arguments", items, context, resources)
 
 
 def _invoke(row, context, resources):
-    if 'id' in row:
-        provider = resources['contexts'][row['id']][1]
-    else:
-        provider = resources['modules'].get(row['module']) or context.get(row['module'])
-        if provider is None:
-            provider = importlib.import_module(row['module'])
-    return getattr(provider, row['name'])(*_arguments(row.get('arguments', []), context, resources),
-                                         **row.get('options', {}))
+    return _entry(b"invoke", row, context, resources)
 
 
 def _retire_contexts(contexts):
@@ -159,200 +224,123 @@ def _retire_contexts(contexts):
 
 def _primitive(operation, row, context, resources):
     path = Path(row['path']) if 'path' in row else None
-    if operation == 'invoke':
+    selected, native = _entry(b"select", operation)
+    if selected == 'invoke':
         return _snapshot(_invoke(row, context, resources))
-    if operation == 'invoke_bytes':
-        return _invoke(row, context, resources).hex()
-    if operation == 'error_attribute':
+    if selected == 'error_attribute':
         return _snapshot(getattr(resources['errors'][row['error']['binding_error']], row['name']))
-    if operation == 'group_get':
+    if selected == 'group_get':
         return _snapshot(resources['group'][row['name']])
-    if operation == 'group_set':
-        resources['group'][row['name']] = row['value']
-        return None
-    if operation == 'group_truth':
-        return bool(resources['group'][row['name']])
-    if operation == 'group_method':
+    if selected == 'group_method':
         return _snapshot(getattr(resources['group'][row['name']], row['method'])(*_arguments(row.get('arguments', []), context, resources), **row.get('options', {})))
-    if operation == 'group_bytes':
-        return bytes(resources['group'][row['name']][slice(*row.get('slice', [None, None]))]).hex()
-    if operation == 'stream_method':
-        return getattr(getattr(getattr(context['sys'], row['stream']), row['field']), row['name'])(*_arguments(row.get('arguments', []), context, resources))
-    if operation == 'thread_start':
-        worker = context['threading'].Thread(target=resources['workers'][row['worker']], daemon=True)
-        resources['group'][row['name']] = worker
-        return worker.start()
-    if operation == 'enter_context':
-        manager = _invoke(row, context, resources)
-        entered = manager.__enter__()
-        ident = len(resources['contexts'])
-        resources['contexts'].append((manager, entered))
-        return ident
-    if operation == 'exit_context':
-        manager, _ = resources['contexts'][row['id']]
-        resources['contexts'][row['id']] = None
-        return _exit(manager, _exception(row.get('error'), context, resources))
-    if operation == 'load_source':
-        spec = context['importlib'].util.spec_from_file_location(row['module'], Path(row['source']))
-        module = context['importlib'].util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        resources['modules'][row['module']] = module
-        return None
-    if operation == 'characters':
-        return list(row['value'])
-    if operation == 'slice':
-        return _snapshot(row['value'][row['start']:row['stop']])
-    if operation == 'item':
-        return row['value'][row['key']]
-    if operation == 'contains':
-        return row['key'] in row['value']
-    if operation == 'constant':
-        return getattr(context[row['module']], row['name'])
-    if operation == 'constant_bytes':
-        return [value.hex() for value in context[row['name']]]
-    if operation == 'python_version':
-        return list(sys.version_info[:2])
-    if operation == 'builtin':
-        return getattr(builtins, row['name'])(*row['arguments'])
-    if operation == 'numeric':
-        return getattr(operator, row['name'])(*row['arguments'])
-    if operation == 'raise':
-        raise getattr(builtins, row['kind'])(*row['arguments'])
-    if operation == 'exception_is':
-        return isinstance(resources['errors'][row['error']['binding_error']],
-                          tuple(getattr(builtins, name) for name in row['kinds']))
-    if operation == 'observed':
-        return resources['observed']()
-    if operation == 'path':
+    if selected == 'path':
         method = row['method']
         if method in ('name', 'parent', 'suffix', 'parts'):
             result = getattr(path, method)
         else:
             result = getattr(path, method)(*row.get('arguments', []), **row.get('options', {}))
         return _snapshot(result)
-    if operation in ('iterdir', 'glob', 'rglob'):
-        return [str(item) for item in getattr(path, operation)(*row.get('arguments', []))]
-    if operation == 'join':
+    if selected == 'attribute':
+        return _snapshot(getattr(resources['args'], row['name']))
+    if selected == 'function':
+        result = context[row['name']](*_arguments(row.get('arguments', []), context, resources),
+                                     *(getattr(resources['args'], row['star_attribute']) if 'star_attribute' in row else []),
+                                     **row.get('options', {}))
+        return _snapshot(result)
+    if selected == 'api':
+        result = context[row['name']](resources['args'], *[Path(item) if kind == 'path' else item
+                                                         for kind, item in row.get('arguments', [])])
+        return {'value': _snapshot(result), 'args': _snapshot(vars(resources['args']))}
+    if native:
+        return _entry(b"primitive", selected, operation, row, context, resources, path)
+    if selected == 'group_bytes':
+        return bytes(resources['group'][row['name']][slice(*row.get('slice', [None, None]))]).hex()
+    if selected == 'thread_start':
+        worker = context['threading'].Thread(target=resources['workers'][row['worker']], daemon=True)
+        resources['group'][row['name']] = worker
+        return worker.start()
+    if selected == 'enter_context':
+        manager = _invoke(row, context, resources)
+        entered = manager.__enter__()
+        ident = len(resources['contexts'])
+        resources['contexts'].append((manager, entered))
+        return ident
+    if selected == 'exit_context':
+        manager, _ = resources['contexts'][row['id']]
+        resources['contexts'][row['id']] = None
+        return _exit(manager, _exception(row.get('error'), context, resources))
+    if selected == 'load_source':
+        spec = context['importlib'].util.spec_from_file_location(row['module'], Path(row['source']))
+        module = context['importlib'].util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        resources['modules'][row['module']] = module
+        return None
+    if selected == 'slice':
+        return _snapshot(row['value'][row['start']:row['stop']])
+    if selected == 'python_version':
+        return list(sys.version_info[:2])
+    if selected == 'raise':
+        raise getattr(builtins, row['kind'])(*row['arguments'])
+    if selected == 'exception_is':
+        return isinstance(resources['errors'][row['error']['binding_error']],
+                          tuple(getattr(builtins, name) for name in row['kinds']))
+    if selected == 'join':
         result = Path(row['parts'][0])
         for item in row['parts'][1:]:
             result /= item
         return str(result)
-    if operation == 'stat':
+    if selected == 'stat':
         result = path.stat()
         return {name: getattr(result, name) for name in row['fields']}
-    if operation in ('rmtree', 'copy2'):
+    if selected in ('rmtree', 'copy2'):
         return _snapshot(getattr(context['shutil'], operation)(*[Path(item) for item in row['arguments']]))
-    if operation in ('link', 'readlink'):
+    if selected in ('link', 'readlink'):
         return getattr(context['os'], operation)(*[Path(item) for item in row['arguments']])
-    if operation == 'inode_contains':
+    if selected == 'inode_contains':
         return tuple(row['key']) in resources['inodes']
-    if operation == 'inode_reset':
+    if selected == 'inode_reset':
         resources['inodes'] = {}
         return None
-    if operation == 'inode_link':
+    if selected == 'inode_link':
         return context['os'].link(resources['inodes'][tuple(row['key'])], path)
-    if operation == 'inode_set':
+    if selected == 'inode_set':
         resources['inodes'][tuple(row['key'])] = path
         return None
-    if operation == 'length':
-        return len(row['data'])
-    if operation == 'read_bytes':
-        return path.read_bytes().hex()
-    if operation == 'open_read':
+    if selected == 'open_read':
         stream = path.open('rb')
         entered = stream.__enter__()
         ident = len(resources['handles'])
         resources['handles'].append((stream, entered))
         return ident
-    if operation == 'read_handle':
-        return resources['handles'][row['id']][1].read(row['limit']).hex()
-    if operation == 'exit_handle':
+    if selected == 'exit_handle':
         stream, _ = resources['handles'][row['id']]
         resources['handles'][row['id']] = None
         return _exit(stream, _exception(row.get('error'), context, resources))
-    if operation == 'json_loads':
-        return context['json'].loads(row['data'])
-    if operation == 'json_dumps':
-        return context['json'].dumps(row['data'], **row.get('options', {}))
-    if operation == 'bytes_decode':
-        return bytes.fromhex(row['data']).decode(**row.get('options', {}))
-    if operation == 'bytes_int':
-        return int(bytes.fromhex(row['data']))
-    if operation == 'type_name':
-        return type(row['value']).__name__
-    if operation == 'attribute':
-        return _snapshot(getattr(resources['args'], row['name']))
-    if operation == 'attribute_bytes':
-        return getattr(resources['args'], row['name']).read_bytes().hex()
-    if operation == 'str_attribute':
-        value = getattr(resources['args'], row['name'])
-        return str(value[row['index']] if 'index' in row else value)
-    if operation == 'function':
-        result = context[row['name']](*_arguments(row.get('arguments', []), context, resources),
-                                     *(getattr(resources['args'], row['star_attribute']) if 'star_attribute' in row else []),
-                                     **row.get('options', {}))
-        return _snapshot(result)
-    if operation == 'run':
-        return context['subprocess'].run(row['arguments'], check=True)
-    if operation == 'which':
-        return context['shutil'].which(row['name'])
-    if operation == 'environ':
-        return context['os'].environ.copy()
-    if operation == 'platform':
-        return context['platform'].system()
-    if operation == 'strip':
-        return row['data'].strip()
-    if operation == 'import':
-        importlib.import_module(row['name'])
-        return None
-    if operation == 'api':
-        result = context[row['name']](resources['args'], *[Path(item) if kind == 'path' else item
-                                                         for kind, item in row.get('arguments', [])])
-        return {'value': _snapshot(result), 'args': _snapshot(vars(resources['args']))}
-    if operation == 'args_set':
-        value = row['value']
-        if row['kind'] == 'path':
-            value = Path(value) if value is not None else None
-        elif row['kind'] == 'paths':
-            value = [Path(item) for item in value]
-        setattr(resources['args'], row['name'], value)
-        return None
-    if operation == 'args_item':
-        getattr(resources['args'], row['name'])[row['key']] = row['value']
-        return None
-    if operation == 'args_append':
-        getattr(resources['args'], row['name']).append(row['value'])
-        return None
-    if operation == 'parser_error':
-        return resources['parser'].error(row['message'])
-    if operation == 'print':
-        print(row['data'], file=context['sys'].stderr if row.get('stderr') else context['sys'].stdout, **row.get('options', {}))
-        return None
-    if operation == 'roblox_validate':
+    if selected == 'roblox_validate':
         spec = context['importlib'].util.spec_from_file_location('vinix_roblox_builder', Path(row['source']))
         assert spec and spec.loader
         module = context['importlib'].util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module.validate_stage(Path(row['staging']), Path(row['runtime']))
-    if operation == 'tar_open':
+    if selected == 'tar_open':
         archive = context['tarfile'].open(path, row['mode'], **row.get('options', {}))
         entered = archive.__enter__()
         ident = len(resources['archives'])
         resources['archives'].append((archive, entered))
         resources['iterators'][ident] = iter(entered)
         return ident
-    if operation == 'tar_next':
+    if selected == 'tar_next':
         member = next(resources['iterators'][row['id']], None)
         return None if member is None else member.name
-    if operation == 'tar_extract':
+    if selected == 'tar_extract':
         resources['archives'][row['id']][1].extractall(path)
         return None
-    if operation == 'tar_info':
+    if selected == 'tar_info':
         info = resources['archives'][row['id']][1].gettarinfo(str(path), arcname=row['name'])
         ident = len(resources['infos'])
         resources['infos'].append(info)
         return {'id': ident, 'regular': info.isreg(), 'size': info.size, 'mode': info.mode}
-    if operation == 'tar_add':
+    if selected == 'tar_add':
         archive, info = resources['archives'][row['id']][1], resources['infos'][row['info']]
         for key, value in row.get('fields', {}).items():
             setattr(info, key, value.encode('ascii') if key == 'type' else value)
@@ -362,7 +350,7 @@ def _primitive(operation, row, context, resources):
             with path.open('rb') as stream:
                 archive.addfile(info, stream)
         return None
-    if operation == 'tar_exit':
+    if selected == 'tar_exit':
         archive, _ = resources['archives'][row['id']]
         resources['archives'][row['id']] = None
         resources['iterators'].pop(row['id'])
