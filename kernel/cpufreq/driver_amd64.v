@@ -374,7 +374,28 @@ fn driver_start(cpus int) {
 	C.kprintf(c'cpufreq: driver %s, base %llu kHz\n', cpufreq_driver.name.str, cpufreq_x86_base_khz)
 	// Last: from here every CPU's next scheduler interrupt sets it up.
 	cpufreq_x86_control = control
+	// Give them a moment to: the files published next would otherwise show
+	// the one frequency each policy starts with until its CPU has come
+	// round, and a program started at once read a range with no width. A
+	// CPU that takes longer is adopted by the worker, as before.
+	settled := devcore.deadline(settle_ns)
+	for !settled.expired() {
+		mut waiting := false
+		for cpu_number in 0 .. cpus {
+			if katomic.load(&cpufreq_x86_cpus[cpu_number].ready) == 0 {
+				waiting = true
+				break
+			}
+		}
+		if !waiting {
+			break
+		}
+		devcore.sleep_ms(2)
+	}
 }
+
+// How long the start waits for every CPU to have read its own range.
+const settle_ns = 250 * devcore.millisecond
 
 // Which interface this processor has, by the conditions at the top of the
 // file. Read on the CPU that publishes /sys and taken to hold for all.
