@@ -107,20 +107,31 @@ fn (mut this EXT2Resource) write_mapped_page_locked(mut inode EXT2Inode,
 		return
 	}
 	count := if page_size < file_size - page_offset { page_size } else { file_size - page_offset }
+	this.filesystem.begin_transaction()?
+	old_inode := unsafe { *inode }
+	mut committed := false
+	defer {
+		if !committed && this.filesystem.journal != unsafe { nil } { unsafe { *inode = old_inode } }
+		this.filesystem.abort_transaction()
+	}
 	written := inode.write(mut this.filesystem, voidptr(u64(mapped.physical) + higher_half), u32(this.stat.ino), page_offset, count)?
 	if written != i64(count) {
 		errno.set(errno.eio)
 		return none
 	}
+	this.filesystem.commit_transaction()?
+	committed = true
 }
 
 // Revoke shared writes and collect dirty evidence from every alias before
 // writing a snapshot. A later write faults and makes the next sync eligible.
 fn (mut this EXT2Resource) sync_mapping(_handle voidptr, offset u64, length u64) ? {
+	if !this.filesystem.journal_healthy() { errno.set(errno.eio); return none }
 	if length == 0 || this.filesystem.read_only {
 		return
 	}
 	this.write_mapped_pages(offset, length)?
+	if !this.filesystem.journal_healthy() { errno.set(errno.eio); return none }
 	// msync(MS_SYNC) must reach the backing resource, not merely the block
 	// cache. The syscall epilogue flushes after all vnode locks are released.
 	// Failed or short device writeback remains dirty there for retry.

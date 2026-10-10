@@ -158,6 +158,13 @@ fn (mut this EXT2Resource) write_acl(name string, value []u8, flags int) ? {
 	defer { this.l.release() }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	old_stat := this.stat
+	mut committed := false
+	defer {
+		if !committed && this.filesystem.journal != unsafe { nil } { this.stat = old_stat }
+		this.filesystem.abort_transaction()
+	}
 	mut desired_mode := u32(0xffffffff)
 	mut removing := value.len <= 4
 	if !removing && name == posix_acl.access_name {
@@ -170,6 +177,8 @@ fn (mut this EXT2Resource) write_acl(name string, value []u8, flags int) ? {
 	defer { unsafe { disk.free() } }
 	if !removing && !posix_acl.to_disk(value, mut disk) { errno.set(errno.einval); return none }
 	this.ea_change_locked(name, disk, flags & 3, removing, desired_mode, false)?
+	this.filesystem.commit_transaction()?
+	committed = true
 }
 
 fn (mut this EXT2Resource) delete_xattr(name string) ? {
@@ -183,7 +192,16 @@ fn (mut this EXT2Resource) ea_change(name string, value []u8, flags int, removin
 	defer { this.l.release() }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	old_stat := this.stat
+	mut committed := false
+	defer {
+		if !committed && this.filesystem.journal != unsafe { nil } { this.stat = old_stat }
+		this.filesystem.abort_transaction()
+	}
 	this.ea_change_locked(name, value, flags, removing, u32(0xffffffff), false)?
+	this.filesystem.commit_transaction()?
+	committed = true
 }
 
 // ACL permission changes use a private EA block even when the old block is

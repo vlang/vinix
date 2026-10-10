@@ -143,8 +143,10 @@ does not panic the machine, and the desktop remains usable during pressure.
 
 ### 3. Filesystems, storage and data protection
 
-- [ ] Ship a crash-safe primary filesystem with journaled or copy-on-write
+- [x] Ship a crash-safe primary filesystem with journaled or copy-on-write
   recovery; cover metadata ordering, rename/replace and mapped write durability.
+  See [VJFS recovery guarantees and limits](docs/primary-filesystem.md) and
+  [crash and lifetime acceptance tests](tests/fs-journal/README.md).
 - [ ] Add volume management, storage pools/RAID, full-disk encryption, key recovery,
   online capacity management, TRIM/discard and storage health/error reporting.
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and

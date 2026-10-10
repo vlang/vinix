@@ -89,6 +89,25 @@ fn write_bytes(mut cache Cache, d &Device, loc int, bytes []u8) {
 	assert got == bytes.len
 }
 
+fn test_journal_publication_refreshes_clean_residency_without_writeback() {
+	mut d := device(8192)
+	mut cache := &Cache{capacity: 2}
+	_ := read_bytes(mut cache, d, 0, 4096)
+	mut replacement := [4096]u8{}
+	unsafe { C.memset(&replacement[0], 0xb3, replacement.len) }
+	assert store(d, &replacement[0], 0, 4096) or { -1 } == 4096
+	assert cache.publish_durable(&replacement[0], 0, 4096)
+	assert read_bytes(mut cache, d, 0, 8) == [u8(0xb3), 0xb3, 0xb3, 0xb3, 0xb3, 0xb3, 0xb3, 0xb3]
+	assert cache.dirty_pages == 0 && cache.resident == 1
+	assert cache.publish_durable(&replacement[0], 4096, 4096)
+	assert cache.resident == 1
+	assert !cache.publish_durable(&replacement[0], 1, 4096)
+	write_bytes(mut cache, d, 0, [u8(0x42)])
+	assert !cache.publish_durable(&replacement[0], 0, 4096)
+	assert read_bytes(mut cache, d, 0, 1) == [u8(0x42)]
+	cache.release(d, store) or { assert false }
+}
+
 // The cache keeps residency as an intrusive list, so a test that cares about
 // eviction order walks it rather than indexing an array.
 fn resident_pages(cache &Cache) []&Page {

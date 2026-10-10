@@ -114,6 +114,9 @@ fn (mut filesystem EXT2Filesystem) enable_large_files() ? {
 		filesystem.superblock.non_supported_features &= ~ext2_feature_ro_compat_large_file
 		return none
 	}
+	// A journaled transaction publishes the capability with the inode and
+	// its data, under one durable commit rather than a separate cache flush.
+	if filesystem.journal != unsafe { nil } { return }
 	// Publish the format capability durably before publishing an inode that
 	// needs it. This is a one-time transition, not a barrier per file write.
 	filesystem.cache.sync(voidptr(filesystem.backing_device), device_write) or {
@@ -127,6 +130,9 @@ fn (mut filesystem EXT2Filesystem) enable_large_files() ? {
 }
 
 fn (mut filesystem EXT2Filesystem) raw_device_read(buf voidptr, loc u64, count u64) ?i64 {
+	if filesystem.journal != unsafe { nil } {
+		return filesystem.journal.read(journal_base_load, buf, loc, count)
+	}
 	ret := filesystem.cache.read(voidptr(filesystem.backing_device), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
 		return none
 	}
@@ -145,6 +151,9 @@ fn (mut filesystem EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count 
 		errno.set(errno.erofs)
 		return none
 	}
+	if filesystem.journal != unsafe { nil } {
+		return filesystem.journal.write(journal_base_load, buf, loc, count)
+	}
 	ret := filesystem.cache.write(voidptr(filesystem.backing_device), device_read, device_write, buf, loc, count, u64(filesystem.backing_device.resource.stat.size)) or {
 		return none
 	}
@@ -156,6 +165,7 @@ fn (mut filesystem EXT2Filesystem) raw_device_write(buf voidptr, loc u64, count 
 }
 
 fn (mut this EXT2Resource) sync(_handle voidptr) ? {
+	if !this.filesystem.journal_healthy() { errno.set(errno.eio); return none }
 	// Shared mmap pages sit above the common backing-device cache. Fold them
 	// into the inode first, then flush metadata and data through the same cache.
 	this.write_mapped_pages(0, u64(-1))?
@@ -165,6 +175,7 @@ fn (mut this EXT2Resource) sync(_handle voidptr) ? {
 	// Without one, success means completion at the backing Resource, not a
 	// promise that volatile controller caches survive loss of power.
 	resource_mod.sync_resource(mut device, unsafe { nil }) or { return none }
+	if !this.filesystem.journal_healthy() { errno.set(errno.eio); return none }
 }
 
 fn (mut this EXT2Resource) advise(_handle voidptr, offset u64, length u64, advice int) ? {

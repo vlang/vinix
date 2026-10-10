@@ -8,6 +8,7 @@ import event
 import event.eventstruct
 import memory
 import fs as vfs
+import fs.journal
 import pagecache
 import katomic
 import time
@@ -137,6 +138,8 @@ fn (mut this EXT2Resource) set_attribute_bits(bits u32) ? {
 	new_bits := bits & resource_mod.attributes_kept
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	defer { this.filesystem.abort_transaction() }
 	mut inode := unsafe { &EXT2Inode(C.__builtin_alloca(sizeof(EXT2Inode))) }
 	unsafe { C.memset(inode, 0, sizeof(EXT2Inode)) }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
@@ -147,6 +150,7 @@ fn (mut this EXT2Resource) set_attribute_bits(bits u32) ? {
 		katomic.store(mut &this.attr_bits, this.attr_bits | new_bits)
 		return none
 	}
+	this.filesystem.commit_transaction()?
 	katomic.store(mut &this.attr_bits, new_bits)
 	flush_on_return()
 }
@@ -155,6 +159,7 @@ fn (mut this EXT2Resource) retain_mapping_range(_handle voidptr, _offset u64, _l
 	if flags & mmap_mod.map_shared == 0 { return true }
 	this.l.acquire()
 	defer { this.l.release() }
+	if !this.filesystem.journal_healthy() { errno.set(errno.eio); return false }
 	if this.attr_bits & resource_mod.attributes_kept != 0 {
 		errno.set(errno.eperm)
 		return false
@@ -189,6 +194,10 @@ fn (mut this EXT2Resource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	defer { this.l.release() }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	if this.filesystem.journal != unsafe { nil } && this.filesystem.journal.failed {
+		errno.set(errno.eio)
+		return unsafe { nil }
+	}
 
 	offset := page * page_size
 	file_size := u64(this.stat.size)
@@ -333,11 +342,17 @@ fn (mut this EXT2Resource) write_locked(_handle voidptr, buf voidptr, loc u64, c
 	if count == 0 { return 0 }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	defer { this.filesystem.abort_transaction() }
 	mut current_inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *current_inode = EXT2Inode{} }
 
 	current_inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
-	written := current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), write_at, count)?
+	if this.filesystem.journal != unsafe { nil } && current_inode.oss1 == truncate_pending {
+		this.filesystem.cleanup_inode(mut current_inode, u32(this.stat.ino))?
+	}
+	written := current_inode.write(mut this.filesystem, buf, u32(this.stat.ino), write_at, if this.filesystem.journal != unsafe { nil } && count > 1024 * 1024 { u64(1024 * 1024) } else { count })?
+	this.filesystem.commit_transaction()?
 	// A writer far enough ahead of the device catches up before its call
 	// returns, but not here, with EXT2's lock held.
 	if this.filesystem.cache.over_dirty_limit() {
@@ -368,6 +383,18 @@ fn (mut this EXT2Resource) write_locked(_handle voidptr, buf voidptr, loc u64, c
 }
 
 fn (mut this EXT2Resource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	$if journalcut ? {
+		if request == 0x564a0002 { return journal_test_mode() }
+		if request == 0x564a0003 { return journal_test_sites() }
+		if request == 0x564a0001 {
+			this.filesystem.l.acquire()
+			defer { this.filesystem.l.release() }
+			if this.filesystem.journal == unsafe { nil } || u64(argp) > 5 { errno.set(errno.einval); return none }
+			this.filesystem.journal.cut_stage = int(u64(argp))
+			this.filesystem.journal.phase = journal_test_phase
+			return 0
+		}
+	}
 	return resource_mod.default_ioctl(handle, request, argp)
 }
 
@@ -387,23 +414,17 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 		}
 		return
 	}
+	mut cleanup_failed := false
 	if this.stat.nlink == 0 {
-		this.filesystem.l.acquire()
-		mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
-		unsafe { *inode = EXT2Inode{} }
-		inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or {
-			this.refcount = 1
-			this.filesystem.l.release()
-			return none
+		this.release_orphan() or {
+			if this.filesystem.journal == unsafe { nil } { this.refcount = 1; return none }
+			// A journaled orphan remains durably owned by its allocated inode.
+			// There is no live caller left to retry this Resource; mount recovery
+			// finishes cleanup. Do not invent a reference and leak its RAM.
+			cleanup_failed = true
 		}
-		inode.free_entry(mut this.filesystem, u32(this.stat.ino)) or {
-			this.refcount = 1
-			this.filesystem.l.release()
-			return none
-		}
-		flush_on_return()
-		this.filesystem.l.release()
 	}
+
 	for mapped in this.mapped_pages {
 		memory.pmm_free(mapped.physical, 1)
 		unsafe { free(mapped) }
@@ -411,6 +432,19 @@ fn (mut this EXT2Resource) unref(handle voidptr) ? {
 	unsafe { this.mapped_pages.free() }
 	memory.free(voidptr(this.box))
 	memory.free(voidptr(this))
+	if cleanup_failed { errno.set(errno.eio); return none }
+}
+
+fn (mut this EXT2Resource) release_orphan() ? {
+	this.filesystem.l.acquire()
+	defer { this.filesystem.abort_transaction(); this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+	unsafe { *inode = EXT2Inode{} }
+	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
+	this.filesystem.cleanup_inode(mut inode, u32(this.stat.ino))?
+	this.filesystem.commit_transaction()?
+	flush_on_return()
 }
 
 fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
@@ -432,8 +466,39 @@ fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 
 	current_inode.read_entry(mut this.filesystem, u32(this.stat.ino)) or { return none }
 
+	this.filesystem.begin_transaction()?
+	defer { this.filesystem.abort_transaction() }
 	old_size := current_inode.size()
-	current_inode.resize(mut this.filesystem, u32(this.stat.ino), 0, new_size) or { return none }
+	if this.filesystem.journal != unsafe { nil } {
+		this.resize_journaled_locked(mut current_inode, new_size)?
+	} else { current_inode.resize(mut this.filesystem, u32(this.stat.ino), 0, new_size)? }
+	this.filesystem.commit_transaction()?
+
+	this.publish_size_locked(current_inode, old_size)
+}
+
+fn (mut this EXT2Resource) resize_journaled_locked(mut inode EXT2Inode, new_size u64) ? {
+	index := u32(this.stat.ino)
+	if inode.oss1 == truncate_pending { this.filesystem.cleanup_inode(mut inode, index)? }
+	old_size := inode.size()
+	if new_size >= old_size { inode.resize(mut this.filesystem, index, 0, new_size)?; return }
+	inode.prepare_size(mut this.filesystem, new_size)?
+	inode.zero_tail(mut this.filesystem, new_size)?
+	inode.set_size(new_size)
+	inode.oss1 = truncate_pending
+	inode.mod_time = ext2_now()
+	inode.creation_time = inode.mod_time
+	inode.write_entry(mut this.filesystem, index)?
+	this.filesystem.commit_transaction()?
+	// Publish the durable EOF immediately. Subsequent cleanup failures need
+	// no fallible reread to keep live mappings and append positions correct.
+	this.publish_size_locked(inode, old_size)
+	this.filesystem.begin_transaction()?
+	this.filesystem.cleanup_inode(mut inode, index)?
+}
+
+fn (mut this EXT2Resource) publish_size_locked(inode &EXT2Inode, old_size u64) {
+	new_size := inode.size()
 	if new_size != old_size {
 		// Truncation clears cached bytes after EOF; growth clears newly
 		// exposed bytes, including old stores made while outside EOF.
@@ -450,16 +515,16 @@ fn (mut this EXT2Resource) grow(handle voidptr, new_size u64) ? {
 	}
 
 	this.stat.size = i64(new_size)
-	this.stat.blocks = current_inode.sector_cnt
-	this.stat.mtim = time.TimeSpec{i64(current_inode.mod_time), 0}
-	this.stat.ctim = time.TimeSpec{i64(current_inode.creation_time), 0}
+	this.stat.blocks = inode.sector_cnt
+	this.stat.mtim = time.TimeSpec{i64(inode.mod_time), 0}
+	this.stat.ctim = time.TimeSpec{i64(inode.creation_time), 0}
 }
 
 struct EXT2Filesystem {
 pub mut:
 	stat     stat.Stat
 	refcount int
-	l        klock.Lock
+	l        &klock.Lock = unsafe { nil }
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
@@ -475,6 +540,11 @@ pub mut:
 
 	backing_device &vfs.VFSNode
 	cache          &pagecache.Cache = unsafe { nil }
+	journal        &journal.Log = unsafe { nil }
+	saved_superblock EXT2Superblock
+	transaction_pending bool
+	cleanup_in_progress bool
+	cleanup_inode_index u32
 	// An immutable backing Resource cannot become writable through remount,
 	// a second mount, or an inherited descriptor.
 	read_only bool
@@ -496,6 +566,12 @@ fn (mut this EXT2Filesystem) populate(node &vfs.VFSNode) {
 }
 
 fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
+	this.l.acquire()
+	defer { this.l.release() }
+	this.populate_checked_locked(node)?
+}
+
+fn (mut this EXT2Filesystem) populate_checked_locked(node &vfs.VFSNode) ? {
 	mut parent := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *parent = EXT2Inode{} }
 	parent.read_entry(mut this, u32(node.resource.stat.ino))?
@@ -623,7 +699,7 @@ fn (mut this EXT2Filesystem) populate_checked(node &vfs.VFSNode) ? {
 		}
 		if stat.isdir(mode) && name != '.' && name != '..' {
 			vfs_node.create_dotentries(node)
-			this.populate_checked(vfs_node)?
+			this.populate_checked_locked(vfs_node)?
 		}
 		i += dir_entry.entry_size
 	}
@@ -641,6 +717,8 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 		superblock: bro.superblock
 		root_inode: bro.root_inode
 		cache: bro.cache
+		l: bro.l
+		journal: bro.journal
 		read_only: bro.read_only
 	}
 
@@ -658,10 +736,13 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 	C.kprintf(c'ext2: block size: %llx\n', u64(this.block_size))
 	C.kprintf(c'ext2: bgd count: %llx\n', u64(this.bgd_cnt))
 
+	this.l.acquire()
 	this.root_inode.read_entry(mut this, 2) or {
+		this.l.release()
 		print('ext2: unable to read root inode\n')
 		return this
 	}
+	this.l.release()
 
 	return this
 }
@@ -904,7 +985,7 @@ fn (mut inode EXT2Inode) free_entry(mut filesystem EXT2Filesystem, inode_index u
 		inode.truncate_blocks(mut filesystem, inode_index, 0)?
 	}
 	if stat.isdir(u32(inode.permissions)) {
-		filesystem.count_directory(inode_index, false)
+		filesystem.count_directory(inode_index, false)?
 	}
 	inode.delete_ea(mut filesystem, inode_index)?
 	inode.size32l = 0
@@ -923,9 +1004,10 @@ fn (mut filesystem EXT2Filesystem) allocate_block() ?u32 {
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 
 	for i := u32(0); i < filesystem.bgd_cnt; i++ {
-		bgd.read_entry(mut filesystem, i)
+		if bgd.read_entry(mut filesystem, i) < 0 { return none }
 
-		block_index := bgd.allocate_block(mut filesystem, i) or { continue }
+		if bgd.unallocated_blocks == 0 { continue }
+		block_index := bgd.allocate_block(mut filesystem, i)?
 
 		absolute := u32(block_index + i * filesystem.superblock.blocks_per_group + filesystem.superblock.sb_block)
 		zero := memory.calloc(filesystem.block_size, 1)
@@ -951,9 +1033,10 @@ fn (mut filesystem EXT2Filesystem) allocate_inode() ?u64 {
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
 
 	for i := u32(0); i < filesystem.bgd_cnt; i++ {
-		bgd.read_entry(mut filesystem, i)
+		if bgd.read_entry(mut filesystem, i) < 0 { return none }
 
-		inode_index := bgd.allocate_inode(mut filesystem, i) or { continue }
+		if bgd.unallocated_inodes == 0 { continue }
+		inode_index := bgd.allocate_inode(mut filesystem, i)?
 
 		return inode_index + i * filesystem.superblock.inodes_per_group + 1
 	}
@@ -962,7 +1045,7 @@ fn (mut filesystem EXT2Filesystem) allocate_inode() ?u64 {
 }
 
 fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
-	if block < filesystem.superblock.sb_block {
+	if block < filesystem.superblock.sb_block || block >= filesystem.superblock.block_cnt {
 		errno.set(errno.eio)
 		return none
 	}
@@ -975,7 +1058,7 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 
 	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.vinix_stack_alloc(sizeof(EXT2BlockGroupDescriptor))) }
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
-	bgd.read_entry(mut filesystem, bgd_index)
+	if bgd.read_entry(mut filesystem, bgd_index) < 0 { return none }
 
 	filesystem.raw_device_read(bitmap, bgd.block_addr_bitmap * filesystem.block_size, filesystem.block_size) or {
 		print('ext2: unable to read bgd bitmap\n')
@@ -994,7 +1077,7 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 	}
 
 	bgd.unallocated_blocks++
-	bgd.write_entry(mut filesystem, bgd_index)
+	if bgd.write_entry(mut filesystem, bgd_index) < 0 { return none }
 	filesystem.superblock.unallocated_blocks++
 	filesystem.write_superblock()?
 
@@ -1004,21 +1087,21 @@ fn (mut filesystem EXT2Filesystem) free_block(block u32) ?int {
 
 // Each group counts the directories among its inodes. Nothing here reads the
 // count, but e2fsck checks it and Linux places new directories by it.
-fn (mut filesystem EXT2Filesystem) count_directory(inode_index u32, added bool) {
+fn (mut filesystem EXT2Filesystem) count_directory(inode_index u32, added bool) ? {
 	bgd_index := (inode_index - 1) / filesystem.superblock.inodes_per_group
 	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.vinix_stack_alloc(sizeof(EXT2BlockGroupDescriptor))) }
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
-	bgd.read_entry(mut filesystem, bgd_index)
+	if bgd.read_entry(mut filesystem, bgd_index) < 0 { return none }
 	if added {
 		bgd.dir_cnt++
 	} else if bgd.dir_cnt > 0 {
 		bgd.dir_cnt--
 	}
-	bgd.write_entry(mut filesystem, bgd_index)
+	if bgd.write_entry(mut filesystem, bgd_index) < 0 { return none }
 }
 
 fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
-	if inode == 0 {
+	if inode == 0 || inode > filesystem.superblock.inode_cnt {
 		errno.set(errno.eio)
 		return none
 	}
@@ -1030,7 +1113,7 @@ fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
 
 	mut bgd := unsafe { &EXT2BlockGroupDescriptor(C.vinix_stack_alloc(sizeof(EXT2BlockGroupDescriptor))) }
 	unsafe { *bgd = EXT2BlockGroupDescriptor{} }
-	bgd.read_entry(mut filesystem, bgd_index)
+	if bgd.read_entry(mut filesystem, bgd_index) < 0 { return none }
 
 	filesystem.raw_device_read(bitmap, bgd.block_addr_inode * filesystem.block_size, filesystem.block_size) or {
 		print('ext2: unable to read inode bitmap\n')
@@ -1049,7 +1132,7 @@ fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
 	}
 
 	bgd.unallocated_inodes++
-	bgd.write_entry(mut filesystem, bgd_index)
+	if bgd.write_entry(mut filesystem, bgd_index) < 0 { return none }
 	filesystem.superblock.unallocated_inodes++
 	filesystem.write_superblock()?
 
@@ -1096,7 +1179,9 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_block(mut filesystem EXT2Filesyst
 		return none
 	}
 
-	bitmap := memory.calloc(filesystem.block_size, 1)
+	bitmap := memory.calloc(filesystem.block_size, 1) @[freed]
+	if bitmap == unsafe { nil } { errno.set(errno.enomem); return none }
+	defer { memory.free(bitmap) }
 
 	filesystem.raw_device_read(bitmap, bgd.block_addr_bitmap * filesystem.block_size, filesystem.block_size) or {
 		print('ext2: unable to read bgd bitmap\n')
@@ -1118,17 +1203,15 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_block(mut filesystem EXT2Filesyst
 			}
 
 			bgd.unallocated_blocks--
-			bgd.write_entry(mut filesystem, bgd_index)
+			if bgd.write_entry(mut filesystem, bgd_index) < 0 { return none }
 			filesystem.superblock.unallocated_blocks--
 			filesystem.write_superblock()?
 
-			memory.free(bitmap)
 
 			return i
 		}
 	}
 
-	memory.free(bitmap)
 
 	return none
 }
@@ -1138,7 +1221,9 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_inode(mut filesystem EXT2Filesyst
 		return none
 	}
 
-	bitmap := memory.calloc(filesystem.block_size, 1)
+	bitmap := memory.calloc(filesystem.block_size, 1) @[freed]
+	if bitmap == unsafe { nil } { errno.set(errno.enomem); return none }
+	defer { memory.free(bitmap) }
 
 	filesystem.raw_device_read(bitmap, bgd.block_addr_inode * filesystem.block_size, filesystem.block_size) or {
 		print('ext2: unable to read inode bitmap\n')
@@ -1160,17 +1245,15 @@ fn (mut bgd EXT2BlockGroupDescriptor) allocate_inode(mut filesystem EXT2Filesyst
 			}
 
 			bgd.unallocated_inodes--
-			bgd.write_entry(mut filesystem, bgd_index)
+			if bgd.write_entry(mut filesystem, bgd_index) < 0 { return none }
 			filesystem.superblock.unallocated_inodes--
 			filesystem.write_superblock()?
 
-			memory.free(bitmap)
 
 			return i
 		}
 	}
 
-	memory.free(bitmap)
 
 	return none
 }
@@ -1244,37 +1327,53 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 		cache: pagecache.new_cache(u64(backing_device.resource.stat.size))
 		read_only: resource_mod.backend_is_read_only(mut backend)
 	}
-
-	// The EXT2 superblock is at byte 1024, regardless of device sector size.
-	new_filesystem.raw_device_read(new_filesystem.superblock, 1024, sizeof(EXT2Superblock)) or {
-		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
-		return 0, false
+	mut ready := false
+	defer {
+		if !ready {
+			if new_filesystem.journal != unsafe { nil } { new_filesystem.journal.release() }
+			new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
+			memory.free(new_filesystem.cache)
+			memory.free(new_filesystem.superblock)
+			memory.free(new_filesystem.root_inode)
+			memory.free(new_filesystem.l)
+			memory.free(new_filesystem)
+		}
 	}
-
-	if new_filesystem.superblock.signature != 0xef53 {
-		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
-		return 0, false
-	}
-	// Pointer entries, inode headers and a data block must fit one software
-	// cache page. A failed cache acquisition then cannot expose a half inode
-	// or half pointer while the caller rolls back detached allocations.
-	if new_filesystem.superblock.block_size > 2 {
-		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
-		return 0, false
-	}
+	// The fixed tail locator is independent of possibly torn home metadata.
+	// Replay must precede even the first superblock/cache read.
+	volume_lock := memory.calloc(sizeof(klock.Lock), 1) @[freed]
+	if volume_lock == unsafe { nil } { return 0, false }
+	new_filesystem.l = unsafe { &klock.Lock(volume_lock) }
+	new_filesystem.journal = journal.open(voidptr(new_filesystem), journal_load,
+		journal_store, journal_barrier, journal_publish,
+		u64(backing_device.resource.stat.size), !new_filesystem.read_only) or { return 0, false }
+	new_filesystem.raw_device_read(new_filesystem.superblock, 1024, sizeof(EXT2Superblock)) or { return 0, false }
+	signature := new_filesystem.superblock.signature
+	if (signature != 0xef53 && signature != journaled_signature)
+		|| (signature == journaled_signature) != (new_filesystem.journal != unsafe { nil })
+		|| new_filesystem.superblock.req_features & ~u32(2) != 0
+		|| new_filesystem.superblock.opt_features & u32(4) != 0 { return 0, false }
+	if new_filesystem.superblock.block_size > 2 { return 0, false }
 	block_bytes := u64(1024) << new_filesystem.superblock.block_size
 	if new_filesystem.superblock.version_maj == 0 { new_filesystem.superblock.inode_size = 128 }
 	inode_bytes := u64(new_filesystem.superblock.inode_size)
 	if inode_bytes < sizeof(EXT2Inode) || inode_bytes > block_bytes
-		|| inode_bytes & (inode_bytes - 1) != 0 {
-		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
-		return 0, false
+		|| inode_bytes & (inode_bytes - 1) != 0
+		|| new_filesystem.superblock.blocks_per_group == 0
+		|| new_filesystem.superblock.blocks_per_group > block_bytes * 8
+		|| new_filesystem.superblock.inodes_per_group == 0
+		|| new_filesystem.superblock.inodes_per_group > block_bytes * 8
+		|| u64(new_filesystem.superblock.block_cnt) * block_bytes > u64(backing_device.resource.stat.size) { return 0, false }
+	new_filesystem.block_size = block_bytes
+	new_filesystem.frag_size = block_bytes
+	new_filesystem.bgd_cnt = lib.div_roundup(new_filesystem.superblock.block_cnt, new_filesystem.superblock.blocks_per_group)
+	if new_filesystem.journal != unsafe { nil } {
+		if new_filesystem.journal.volume_bytes != u64(new_filesystem.superblock.block_cnt) * block_bytes
+			|| new_filesystem.journal.uuid != new_filesystem.superblock.uuid { return 0, false }
+		new_filesystem.recover_orphans() or { return 0, false }
 	}
 	if !register_mapped_writeback()
-		|| !pagecache.register_cache(new_filesystem.cache, voidptr(backing_device), device_write, device_flush) {
-		new_filesystem.cache.release(voidptr(backing_device), device_write) or {}
-		return 0, false
-	}
-
+		|| !new_filesystem.register_volume_cache() { return 0, false }
+	ready = true
 	return new_filesystem, true
 }

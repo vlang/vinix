@@ -716,6 +716,21 @@ pub fn (mut this Cache) discard(loc u64, count u64) {
 	}
 }
 
+// A journal has already made this complete page durable. Refresh existing
+// clean residency without creating dirty writeback or allocating on commit.
+// The filesystem serializes all home reads against its journal checkpoint.
+pub fn (mut this Cache) publish_durable(buffer voidptr, loc u64, count u64) bool {
+	this.l.acquire()
+	defer { this.l.release() }
+	if loc % page_bytes != 0 || count != page_bytes || !valid_range(loc, count, this.size) { return false }
+	mut page := this.resident_page(loc / page_bytes)
+	if page == unsafe { nil } { return true }
+	if page.dirty || page.writeback { return false }
+	unsafe { C.memcpy(page.data, buffer, count) }
+	page.valid = count
+	return true
+}
+
 // Drop up to `budget` clean LRU pages without performing I/O. This is the
 // cache's memory-pressure path: dirty pages remain resident and retryable, and
 // failure to acquire the cache lock simply lets another reclaimer be tried.

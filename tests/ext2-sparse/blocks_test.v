@@ -22,6 +22,7 @@ mut:
 	block_size u64
 	superblock &EXT2Superblock = &EXT2Superblock{}
 	cache TestCache
+	journal voidptr
 	backing_device voidptr
 	disk []u8
 	allocated [256]bool
@@ -49,6 +50,7 @@ fn fixture(block_size u64) &EXT2Filesystem {
 	fs.backing_device = fs
 	return fs
 }
+fn (mut fs EXT2Filesystem) checkpoint_cleanup(mut _inode EXT2Inode) ? {}
 fn (mut fs EXT2Filesystem) allocate_block() ?u32 {
 	fs.allocations++
 	if fs.allocations == fs.alloc_fail_at { return none }

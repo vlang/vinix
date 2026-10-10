@@ -53,9 +53,11 @@ struct Superblock { mut: sb_block u32 block_cnt u32 opt_features u32 non_support
 struct EXT2BlockGroupDescriptor { mut: block_addr_bitmap u32 = 60 block_addr_inode u32 = 61 inode_table_block u32 = 62 }
 fn (mut bgd EXT2BlockGroupDescriptor) read_entry(mut fs EXT2Filesystem, _ u32) int { return 0 }
 struct EXT2Inode { mut: eab u32 sector_cnt u32 creation_time u32 permissions u16 user_id u16 group_id u16 access_time u32 mod_time u32 flags u32 }
+struct Journal {}
 struct EXT2Filesystem {
 mut:
  l Lock
+ journal &Journal = unsafe { nil }
  block_size u64
  bgd_cnt u64 = 1
  superblock Superblock
@@ -97,6 +99,11 @@ fn (mut fs EXT2Filesystem) allocate_block() ?u32 {
 }
 fn (mut fs EXT2Filesystem) free_block(block u32) ?int { fs.allocated[int(block)] = false; return 0 }
 fn (mut fs EXT2Filesystem) write_superblock() ? {}
+// This fixture models legacy EXT2. Journal ownership and recovery are
+// exercised separately against the production engine in tests/fs-journal.
+fn (mut fs EXT2Filesystem) begin_transaction() ? {}
+fn (mut fs EXT2Filesystem) commit_transaction() ? {}
+fn (mut fs EXT2Filesystem) abort_transaction() {}
 fn ext2_now() u32 { return 1 }
 fn stat_seconds(value time.TimeSpec) u32 { return u32(value.tv_sec) }
 fn flush_on_return() {}

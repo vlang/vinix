@@ -35,13 +35,9 @@ fn stat_seconds(value time.TimeSpec) u32 {
 	return u32(value.tv_sec)
 }
 
-// A change to the namespace is on the device before the program that made it
-// sees it made, but it is not flushed here. The callers hold EXT2's lock, and
-// creating, linking and renaming hold the VFS's too; every other access to
-// the filesystem waits for those with interrupts off, and flushing the cache
-// with them held stopped the machine for seconds while a download filled it.
-// The thread flushes on its way back to userspace instead, holding nothing. A
-// kernel thread's change goes out with the next writeback pass.
+// Legacy EXT2 changes flush on the syscall epilogue, outside vnode locks.
+// VJFS has already committed its bounded transaction before publication;
+// this also requests writeback of any remaining shared mapped pages.
 fn flush_on_return() {
 	mut thr := proc.current_thread()
 	if thr != unsafe { nil } {
@@ -58,7 +54,14 @@ fn (mut this EXT2Resource) persist_metadata() ? {
 	defer { this.l.release() }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	old_stat := this.stat
+	mut committed := false
+	defer { if !committed && this.filesystem.journal != unsafe { nil } { this.stat = old_stat } }
+	defer { this.filesystem.abort_transaction() }
 	this.persist_metadata_locked(this.stat.mode)?
+	this.filesystem.commit_transaction()?
+	committed = true
 }
 
 fn (mut this EXT2Resource) chmod_mode(mode u32) ? {
@@ -66,8 +69,15 @@ fn (mut this EXT2Resource) chmod_mode(mode u32) ? {
 	defer { this.l.release() }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	old_stat := this.stat
+	mut committed := false
+	defer { if !committed && this.filesystem.journal != unsafe { nil } { this.stat = old_stat } }
+	defer { this.filesystem.abort_transaction() }
 	desired := (this.stat.mode & stat.ifmt) | (mode & 0o7777)
 	this.persist_metadata_locked(desired)?
+	this.filesystem.commit_transaction()?
+	committed = true
 	this.stat.mode = desired
 }
 
@@ -116,7 +126,7 @@ fn (mut this EXT2Resource) persist_metadata_locked(mode u32) ? {
 
 fn (mut this EXT2Resource) filesystem_stat() resource_mod.FileSystemStat {
 	return resource_mod.FileSystemStat{
-		@type:   0xef53
+		@type:   this.filesystem.superblock.signature
 		bsize:   this.filesystem.block_size
 		blocks:  this.filesystem.superblock.block_cnt
 		bfree:   this.filesystem.superblock.unallocated_blocks
@@ -317,6 +327,8 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 	name string, mode u32, symlink_target string) &vfs.VFSNode {
 	filesystem.l.acquire()
 	defer { filesystem.l.release() }
+	filesystem.begin_transaction() or { return unsafe { nil } }
+	defer { filesystem.abort_transaction() }
 	uid := proc.current_thread().process.euid
 	gid := if parent.resource.stat.mode & 0o2000 != 0 {
 		parent.resource.stat.gid
@@ -348,7 +360,10 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 	}
 	if stat.isdir(mode) {
 		// Counted from here on: freeing the inode uncounts it.
-		filesystem.count_directory(inode_index, true)
+		filesystem.count_directory(inode_index, true) or {
+			inode.free_entry(mut filesystem, inode_index) or {}
+			return unsafe { nil }
+		}
 		filesystem.initialize_directory(mut inode, inode_index,
 			u32(parent.resource.stat.ino)) or {
 			inode.free_entry(mut filesystem, inode_index) or {}
@@ -394,6 +409,7 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 		inode.free_entry(mut filesystem, inode_index) or {}
 		return unsafe { nil }
 	}
+	filesystem.commit_transaction() or { return unsafe { nil } }
 	flush_on_return()
 
 	mut node := vfs.create_node(filesystem.as_filesystem(), parent, name, stat.isdir(mode))
@@ -410,6 +426,8 @@ fn (mut filesystem EXT2Filesystem) create_persistent(parent &vfs.VFSNode,
 fn (mut this EXT2Resource) link(_handle voidptr) ? {
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	defer { this.filesystem.abort_transaction() }
 	mut inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
@@ -420,6 +438,7 @@ fn (mut this EXT2Resource) link(_handle voidptr) ? {
 	inode.hard_link_cnt++
 	inode.creation_time = ext2_now()
 	inode.write_entry(mut this.filesystem, u32(this.stat.ino))?
+	this.filesystem.commit_transaction()?
 	flush_on_return()
 	this.stat.nlink++
 }
@@ -430,6 +449,8 @@ fn (mut this EXT2Resource) unlink(handle voidptr) ? {
 	if unsafe { node.parent == nil } { errno.set(errno.einval); return none }
 	this.filesystem.l.acquire()
 	defer { this.filesystem.l.release() }
+	this.filesystem.begin_transaction()?
+	defer { this.filesystem.abort_transaction() }
 	mut parent_inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *parent_inode = EXT2Inode{} }
 	parent_index := u32(node.parent.resource.stat.ino)
@@ -440,7 +461,7 @@ fn (mut this EXT2Resource) unlink(handle voidptr) ? {
 	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut this.filesystem, u32(this.stat.ino))?
 	if inode.hard_link_cnt == 0 { errno.set(errno.eio); return none }
-	inode.hard_link_cnt--
+	inode.hard_link_cnt = if stat.isdir(this.stat.mode) { u16(0) } else { inode.hard_link_cnt - 1 }
 	inode.creation_time = ext2_now()
 	if inode.hard_link_cnt == 0 { inode.del_time = ext2_now() }
 	inode.write_entry(mut this.filesystem, u32(this.stat.ino))?
@@ -448,6 +469,7 @@ fn (mut this EXT2Resource) unlink(handle voidptr) ? {
 		parent_inode.hard_link_cnt--
 		parent_inode.write_entry(mut this.filesystem, parent_index)?
 	}
+	this.filesystem.commit_transaction()?
 	flush_on_return()
 	this.stat.nlink = inode.hard_link_cnt
 	if stat.isdir(this.stat.mode) && node.parent.resource.stat.nlink > 0 {
@@ -459,6 +481,8 @@ fn (mut this EXT2Filesystem) link_persistent(parent &vfs.VFSNode, name string,
 	mut old_node vfs.VFSNode) ?&vfs.VFSNode {
 	this.l.acquire()
 	defer { this.l.release() }
+	this.begin_transaction()?
+	defer { this.abort_transaction() }
 	mut parent_inode := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
 	unsafe { *parent_inode = EXT2Inode{} }
 	parent_inode.read_entry(mut this, u32(parent.resource.stat.ino))?
@@ -479,6 +503,7 @@ fn (mut this EXT2Filesystem) link_persistent(parent &vfs.VFSNode, name string,
 		inode.write_entry(mut this, inode_index) or {}
 		return none
 	}
+	this.commit_transaction()?
 	flush_on_return()
 	mut node := vfs.create_node(this.as_filesystem(), parent, name, false)
 	katomic.inc(mut &old_node.resource.refcount)
@@ -493,7 +518,7 @@ fn (mut filesystem EXT2Filesystem) decrement_replaced_inode(inode_index u32) ? {
 	unsafe { *inode = EXT2Inode{} }
 	inode.read_entry(mut filesystem, inode_index)?
 	if inode.hard_link_cnt == 0 { errno.set(errno.eio); return none }
-	inode.hard_link_cnt--
+	inode.hard_link_cnt = if stat.isdir(u32(inode.permissions)) { u16(0) } else { inode.hard_link_cnt - 1 }
 	inode.creation_time = ext2_now()
 	if inode.hard_link_cnt == 0 { inode.del_time = ext2_now() }
 	inode.write_entry(mut filesystem, inode_index)?
@@ -511,6 +536,8 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 	old_name string, new_parent &vfs.VFSNode, new_name string, flags int) ? {
 	filesystem.l.acquire()
 	defer { filesystem.l.release() }
+	filesystem.begin_transaction()?
+	defer { filesystem.abort_transaction() }
 	old_node := unsafe { old_parent.children[old_name] }
 	if unsafe { old_node == nil } { errno.set(errno.enoent); return none }
 	mut old_dir := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
@@ -547,6 +574,7 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 			old_dir.write_entry(mut filesystem, old_parent_index)?
 			new_dir.write_entry(mut filesystem, new_parent_index)?
 		}
+		filesystem.commit_transaction()?
 		flush_on_return()
 		return
 	}
@@ -573,5 +601,6 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 		old_dir.write_entry(mut filesystem, old_parent_index)?
 		new_dir.write_entry(mut filesystem, new_parent_index)?
 	}
+	filesystem.commit_transaction()?
 	flush_on_return()
 }

@@ -73,6 +73,7 @@ fn (mut inode EXT2Inode) free_accounted_block(mut filesystem EXT2Filesystem, blo
 	filesystem.free_block(block)?
 	sectors := u32(filesystem.block_size / 512)
 	inode.sector_cnt = if inode.sector_cnt >= sectors { inode.sector_cnt - sectors } else { 0 }
+	filesystem.checkpoint_cleanup(mut inode)?
 }
 
 // Build missing tables while detached. No published pointer may name a block

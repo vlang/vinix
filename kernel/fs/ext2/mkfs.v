@@ -3,12 +3,13 @@
 module ext2
 
 import fs as vfs
+import fs.journal
 import memory
 import time
 
-// Making an empty ext2 filesystem, for a machine that boots from an installer
-// image and is given a blank disk to keep its system on. The layout is what
-// `mke2fs -t ext2 -b 4096 -I 128` makes and what this driver reads: 4 KiB
+// Making the journaled primary filesystem for a machine given a blank disk.
+// VJFS uses EXT2 allocation and directory layouts with a distinct signature
+// and a private full-data redo journal. Its home region has 4 KiB
 // blocks, 128-byte inodes, one inode per 16 KiB, backups of the superblock and
 // the group descriptors in groups 0 and 1 and the powers of 3, 5 and 7, a root
 // directory and lost+found.
@@ -150,7 +151,7 @@ fn mkfs_dir_inode(mode u16, links u16, block u64, now u32) EXT2Inode {
 	return inode
 }
 
-// Make an empty ext2 filesystem on the whole of `device`. Everything the
+// Make an empty VJFS filesystem on the whole of `device`. Everything the
 // filesystem uses is written, inode tables included, so a disk that was not
 // zeroed comes out the same as one that was. Returns false on an I/O error or
 // a device too small to hold a filesystem.
@@ -158,7 +159,9 @@ pub fn format(device &vfs.VFSNode, label string) bool {
 	if device.resource == unsafe { nil } {
 		return false
 	}
-	layout := mkfs_plan(u64(device.resource.stat.size)) or { return false }
+	// The journal is outside the block allocator's addressable home volume.
+	home_bytes := journal.location(u64(device.resource.stat.size)) or { return false }
+	layout := mkfs_plan(home_bytes) or { return false }
 	defer {
 		unsafe {
 			layout.free_blocks.free()
@@ -187,6 +190,12 @@ pub fn format(device &vfs.VFSNode, label string) bool {
 		memory.free(block)
 		memory.free(gdt)
 	}
+	// Invalidate the old home signature durably before discarding any old
+	// committed redo transaction, then begin destructive metadata writes.
+	if !mkfs_write(device, block, 0, mkfs_block_size) { return false }
+	format_journal_barrier(voidptr(device)) or { return false }
+	if !mkfs_write(device, block, home_bytes + journal.page_bytes, journal.page_bytes) { return false }
+	format_journal_barrier(voidptr(device)) or { return false }
 
 	mut total_free := u64(0)
 	for group in 0 .. layout.groups {
@@ -298,7 +307,7 @@ pub fn format(device &vfs.VFSNode, label string) bool {
 	superblock.inodes_per_group = u32(mkfs_inodes_per_group)
 	superblock.last_written_time = now
 	superblock.mnt_allowed = 0xffff
-	superblock.signature = 0xef53
+	superblock.signature = journaled_signature
 	superblock.fs_state = 1 // clean
 	superblock.error_response = 1 // continue
 	superblock.last_fsck = now
@@ -324,6 +333,9 @@ pub fn format(device &vfs.VFSNode, label string) bool {
 		unsafe { C.memset(block, 0, mkfs_block_size) }
 		sb_offset := if group == 0 { u64(1024) } else { u64(0) }
 		unsafe { C.memcpy(voidptr(u64(block) + sb_offset), &superblock, sizeof(EXT2Superblock)) }
+		// Publish the primary signature only after all initial metadata and
+		// the empty journal have reached the device's persistence barrier.
+		if group == 0 { unsafe { C.memset(block, 0, mkfs_block_size) } }
 		if !mkfs_write(device, block, start * mkfs_block_size, mkfs_block_size) {
 			return false
 		}
@@ -332,5 +344,15 @@ pub fn format(device &vfs.VFSNode, label string) bool {
 			return false
 		}
 	}
+	format_journal_barrier(voidptr(device)) or { return false }
+	journal.format(voidptr(device), format_journal_store, format_journal_barrier,
+		u64(device.resource.stat.size), layout.blocks * mkfs_block_size, superblock.uuid) or { return false }
+	superblock.sb_bgd = 0
+	unsafe {
+		C.memset(block, 0, mkfs_block_size)
+		C.memcpy(voidptr(u64(block) + 1024), &superblock, sizeof(EXT2Superblock))
+	}
+	if !mkfs_write(device, block, 0, mkfs_block_size) { return false }
+	format_journal_barrier(voidptr(device)) or { return false }
 	return true
 }
