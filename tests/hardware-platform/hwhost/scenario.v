@@ -1,0 +1,265 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
+//
+// The scenario table: what each hardware test boots, what it must print, and
+// what the host does to the machine while it runs.
+//
+// A scenario is data. Its guest half is the function of the same name in
+// ../guest (scenario_<name>), and the two halves meet only through the lines
+// the guest prints on the serial port. Nothing here knows what a scenario
+// checks inside the guest, so a new one is a record below and a function
+// there, with no change to the controller.
+module hwhost
+
+pub const architectures = ['aarch64', 'x86_64']
+
+// What no scenario may print. The first two are the kernel's own words for
+// dying; the third is the guest saying a check did not hold.
+pub const always_forbidden = ['KERNEL PANIC', 'FATAL EXCEPTION', 'HWTEST FAIL']
+
+// How the machine is expected to end.
+pub enum Ending {
+	// QEMU exits by itself because the guest powered the machine off.
+	poweroff
+	// The guest stays up: the controller stops QEMU once every marker is seen.
+	running
+}
+
+// A raw disk the controller creates in the state directory before the boot.
+pub struct Disk {
+pub:
+	name     string // file name inside the state directory
+	size_mib int
+	// Written at offset 0. The kernel installs the system onto a disk that is
+	// blank, so a test disk that must be left alone starts with something.
+	header string
+}
+
+// Bytes the guest is expected to have left on a disk, checked on the host
+// after the machine is gone: byte i of the run is seed + 7 * i (mod 256), the
+// pattern the guest writes with pattern_bytes().
+pub struct DiskPattern {
+pub:
+	disk   string
+	offset u64
+	length int
+	seed   u8
+}
+
+// One thing the host does to the machine. Actions run in the order listed,
+// and each waits for its own marker on a line printed after the previous
+// action's, so a guest can ask for the same thing twice.
+pub struct Action {
+pub:
+	after    string // the serial marker that triggers it
+	delay_ms int    // how long after the marker the command is sent
+	qmp      string // the command, as QMP JSON text; may contain {state}
+	// With a value, the machine must end the way the scenario expects within
+	// this many seconds of the command, rather than by the scenario timeout.
+	end_within int
+}
+
+pub struct Scenario {
+pub:
+	name   string
+	about  string
+	arches []string
+	// A reason the scenario cannot pass yet. Such a scenario runs only when it
+	// is named, so the default run stays a statement about what works.
+	pending string
+	cmdline string // extra kernel command line
+	// Extra QEMU arguments, for every architecture and for one. `{state}`
+	// stands for the scenario's state directory.
+	qemu         []string
+	qemu_aarch64 []string
+	qemu_x86_64  []string
+	disks        []Disk
+	required     []string // every one must appear on some serial line
+	forbidden    []string // besides always_forbidden
+	actions      []Action
+	ending       Ending
+	patterns     []DiskPattern
+}
+
+pub const scenarios = [
+	Scenario{
+		name:         'devices'
+		about:        'PCI devices in sysfs; unbind, bind, reset and remove an e1000'
+		arches:       ['aarch64', 'x86_64']
+		qemu_aarch64: ['-device', 'e1000,netdev=hwn0', '-netdev', 'user,id=hwn0']
+		qemu_x86_64:  ['-nic', 'user,model=e1000']
+		required:     ['HWTEST START devices', 'HWTEST PASS devices']
+		ending:       .poweroff
+	},
+	Scenario{
+		name:     'ahci'
+		about:    'SATA disk I/O before and after a controller reset'
+		arches:   ['x86_64']
+		qemu:     ['-drive', 'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [
+			Disk{
+				name:     'disk.raw'
+				size_mib: 32
+				header:   'vinix hardware test disk: not blank'
+			},
+		]
+		required: ['HWTEST START ahci', 'HWTEST PASS ahci']
+		ending:   .poweroff
+		patterns: [
+			DiskPattern{
+				disk:   'disk.raw'
+				offset: 1 << 20
+				length: 65536
+				seed:   0x11
+			},
+			DiskPattern{
+				disk:   'disk.raw'
+				offset: 2 << 20
+				length: 65536
+				seed:   0x55
+			},
+		]
+	},
+	Scenario{
+		name:     'qmp-powerdown'
+		about:    'the power button powers the machine off'
+		arches:   ['aarch64', 'x86_64']
+		pending:  'the kernel does not handle the power button yet'
+		required: ['HWTEST START qmp-powerdown', 'HWTEST STEP waiting for power button']
+		actions:  [
+			Action{
+				after:      'HWTEST STEP waiting for power button'
+				qmp:        '{"execute":"system_powerdown"}'
+				end_within: 30
+			},
+		]
+		ending:   .poweroff
+	},
+]
+
+// The scenarios one invocation deals with: those it boots, and those it names
+// in the summary as left out.
+pub struct Selection {
+pub:
+	run     []Scenario
+	skipped []Scenario
+}
+
+pub fn find_scenario(all []Scenario, name string) ?Scenario {
+	for scenario in all {
+		if scenario.name == name {
+			return scenario
+		}
+	}
+	return none
+}
+
+// With no names, everything that applies to the architecture runs except what
+// is pending. A name is a request: it runs even when pending, and it is an
+// error rather than a silent skip when it cannot run on this architecture.
+pub fn select_scenarios(all []Scenario, arch string, names []string) !Selection {
+	if arch !in architectures {
+		return error('unknown architecture ${arch} (expected ${architectures.join(' or ')})')
+	}
+	mut chosen := []Scenario{}
+	mut skipped := []Scenario{}
+	if names.len == 0 {
+		for scenario in all {
+			if arch !in scenario.arches {
+				continue
+			}
+			if scenario.pending != '' {
+				skipped << scenario
+			} else {
+				chosen << scenario
+			}
+		}
+		return Selection{
+			run:     chosen
+			skipped: skipped
+		}
+	}
+	for name in names {
+		scenario := find_scenario(all, name) or {
+			return error('unknown scenario ${name} (known: ${all.map(it.name).join(', ')})')
+		}
+		if arch !in scenario.arches {
+			return error('scenario ${name} does not run on ${arch} (only on ${scenario.arches.join(', ')})')
+		}
+		if !chosen.any(it.name == name) {
+			chosen << scenario
+		}
+	}
+	return Selection{
+		run: chosen
+	}
+}
+
+// The extra QEMU arguments of a scenario on one architecture, before
+// substitution.
+pub fn (s &Scenario) qemu_arguments(arch string) []string {
+	mut extra := s.qemu.clone()
+	if arch == 'aarch64' {
+		extra << s.qemu_aarch64
+	} else {
+		extra << s.qemu_x86_64
+	}
+	return extra
+}
+
+pub fn (s &Scenario) forbidden_markers() []string {
+	mut markers := always_forbidden.clone()
+	markers << s.forbidden
+	return markers
+}
+
+// What a table must satisfy for the controller to run it. Checked before
+// anything is booted, so a mistake in a new record is reported as one.
+pub fn validate_scenarios(all []Scenario) ! {
+	mut names := map[string]bool{}
+	for scenario in all {
+		if scenario.name == '' {
+			return error('a scenario has no name')
+		}
+		if scenario.name in names {
+			return error('scenario ${scenario.name} is listed twice')
+		}
+		names[scenario.name] = true
+		for letter in scenario.name {
+			if !(letter.is_letter() || letter.is_digit() || letter == `-`) {
+				return error('scenario ${scenario.name}: a name is letters, digits and dashes')
+			}
+		}
+		if scenario.arches.len == 0 {
+			return error('scenario ${scenario.name} runs on no architecture')
+		}
+		for arch in scenario.arches {
+			if arch !in architectures {
+				return error('scenario ${scenario.name}: unknown architecture ${arch}')
+			}
+		}
+		if 'HWTEST START ${scenario.name}' !in scenario.required {
+			return error('scenario ${scenario.name} must require its HWTEST START line')
+		}
+		for marker in scenario.required {
+			for forbidden in scenario.forbidden_markers() {
+				if marker.contains(forbidden) {
+					return error('scenario ${scenario.name} requires "${marker}", which contains the forbidden "${forbidden}"')
+				}
+			}
+		}
+		for action in scenario.actions {
+			if action.after == '' || action.qmp == '' {
+				return error('scenario ${scenario.name}: an action needs a marker and a command')
+			}
+			qmp_frame(action.qmp) or {
+				return error('scenario ${scenario.name}: ${err.msg()}')
+			}
+		}
+		for pattern in scenario.patterns {
+			if !scenario.disks.any(it.name == pattern.disk) {
+				return error('scenario ${scenario.name}: pattern on ${pattern.disk}, which is not one of its disks')
+			}
+		}
+	}
+}
