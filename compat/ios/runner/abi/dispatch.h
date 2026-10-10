@@ -18,6 +18,41 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sched.h>
+#ifdef __APPLE__
+#include <mach/mach.h>
+#endif
+/* Native object access only; the thread-port namespace and reference
+ * ownership on Vinix are implemented in V. Never inspect pthread internals. */
+static pthread_mutex_t ios_mach_threads_mutex = PTHREAD_MUTEX_INITIALIZER;
+static void ios_mach_threads_lock(void) { if (pthread_mutex_lock(&ios_mach_threads_mutex)) abort(); }
+static void ios_mach_threads_unlock(void) { if (pthread_mutex_unlock(&ios_mach_threads_mutex)) abort(); }
+#ifdef __linux__
+static int ios_thread_lifetime_init(void *object) {
+    pthread_mutexattr_t attributes;
+    int result = pthread_mutexattr_init(&attributes);
+    if (result) return result;
+    result = pthread_mutexattr_setrobust(&attributes, PTHREAD_MUTEX_ROBUST);
+    if (!result) result = pthread_mutex_init(object, &attributes);
+    pthread_mutexattr_destroy(&attributes);
+    return result;
+}
+static int ios_thread_lifetime_status(void *object) {
+    int result = pthread_mutex_trylock(object);
+    if (!result || result == EOWNERDEAD) {
+        if (pthread_mutex_unlock(object)) abort();
+    }
+    return result;
+}
+#endif
+#ifdef __APPLE__
+static uint32_t ios_native_thread_port(uint64_t handle) { return pthread_mach_thread_np((pthread_t)(uintptr_t)handle); }
+static uint64_t ios_native_port_thread(uint32_t port) { return (uintptr_t)pthread_from_mach_thread_np(port); }
+static uint32_t ios_native_thread_self(void) { return mach_thread_self(); }
+static int ios_native_port_type(uint32_t port, uint32_t *output) { return mach_port_type(mach_task_self(), port, output); }
+static int ios_native_port_refs(uint32_t port, int right, uint32_t *output) { return mach_port_get_refs(mach_task_self(), port, right, output); }
+static int ios_native_port_mod_refs(uint32_t port, int right, int delta) { return mach_port_mod_refs(mach_task_self(), port, right, delta); }
+static int ios_native_port_deallocate(uint32_t port) { return mach_port_deallocate(mach_task_self(), port); }
+#endif
 /* Only permanent runner dispatchers are registered with native libc. Handler
  * ownership, ordering and removal before image unmapping are implemented in V.
  * A normal mutex can be unlocked by the fork child, as for POSIX atfork locks. */

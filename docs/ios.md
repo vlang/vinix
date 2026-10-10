@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_mach_thread_np
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_mutexattr_setpolicy_np
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -890,19 +890,63 @@ with every worker joined and condition/mutex destroyed. The full ARM64
 C++/GLES/PPSSPP regression passes; the existing permission fixture again needed
 a retry after `ENOENT`. These entries resolve eight more strong imports across
 Fortnite and EOSSDK; the actual game still exits before entry at
-`pthread_mach_thread_np`.
+`pthread_mach_thread_np` at that revision.
+
+The installed Mac library returns a borrowed thread port from
+`pthread_mach_thread_np`, while `mach_thread_self` adds an owned send reference.
+Repeated borrowed queries leave the count unchanged. After native key destructors
+and thread termination, owned references become dead-name references; a port with
+only the borrowed reference disappears. Mac thread exit can destroy its port
+asynchronously after joining. Send-reference overflow saturates at 65,535 and
+pins reference counts; saturated dead names can still be removed in full. Native probes
+also measured null/dead names, invalid rights, underflow and guarded outputs.
+
+V now assigns a port namespace to adapter-created threads and to native threads
+that query themselves. Each registered Vinix thread holds a real native robust
+mutex for its lifetime. Native libc reports owner death after its key destructors,
+so a freed pthread object or recycled thread ID cannot revive an old port. A V
+start adapter publishes the native handle before entering the app callback;
+return and explicit exit retain the native join result and destructor behavior.
+Port lookup reverses to the actual native pthread handle. Owned references keep
+dead names until released; lifetime objects are freed after native owner death.
+The namespace has one cached borrowed reference per thread and preserves caller
+errno. The native Mac main thread can have additional system-cached references,
+so shared fixtures verify changes relative to its initial count.
+
+The normal namespace mutex is pinned across fork. Prepare removes the caller's
+lifetime mutex from its native robust list, the parent restores ownership, and
+the child discards the inherited namespace before registering its surviving
+thread. Shutdown releases the entry thread's lifetime, reaps terminated workers
+and rejects active registered workers before unmapping callbacks. Port names are
+not reused across image executions. Foreign native threads must query themselves
+before remote lookup; unregistered remote handles return a null port. This subset
+provides thread-port identity, type and reference operations. Mach IPC, task
+thread enumeration, suspension, register state and thread policy RPCs remain
+unimplemented.
+
+The shared Mac/iOS fixture uses eight rounds of eight joined workers plus eight
+detached workers, mixed normal/explicit exit and three rearmed key-destructor
+passes. It checks borrowed/owned counts, guarded outputs, live and dead reference
+operations, saturation, lookup to real native workers, native FIFO changes and a
+worker fork. Detached termination is observed before their callback image unloads.
+The Vinix guest also checks 64 failed native creations, unchanged output guards
+and errno. ASAN/UBSAN exercises two Mach-O loads/unloads, a native fork after
+unload and the V namespace's allocation/retirement paths; native robust owner
+tracking is exercised in the ARM64 guest. The full C++/GLES/PPSSPP regression
+passes. These entries resolve five strong imports across Fortnite and EOSSDK.
+The actual game still exits before entry at `pthread_mutexattr_setpolicy_np`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,302 | 856 | 81 |
-| EOSSDK | 520 | 142 | 18 |
+| Fortnite executable | 1,306 | 852 | 81 |
+| EOSSDK | 521 | 141 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,875 | 1,121 | 122 |
+| All images | 1,880 | 1,116 | 122 |
 
-The C++/GLES/Text variant reports 1,888 resolved imports, 1,108 unresolved strong
+The C++/GLES/Text variant reports 1,893 resolved imports, 1,103 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

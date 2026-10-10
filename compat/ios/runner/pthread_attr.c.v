@@ -110,7 +110,7 @@ fn darwin_pthread_create(thread_id voidptr, attributes voidptr, start voidptr, a
 		if size & 16383 != 0 || (top != 0 && (top < size || top & 16383 != 0)) || guard & 16383 != 0 { return 22 }
 		detached = if flags & 0xff == 2 { i32(1) } else { i32(0) }
 	}
-	return i32(darwin_native_error(int(C.ios_thread_create(thread_id, usize(size), top, usize(guard), detached, start, argument))))
+	return i32(darwin_native_error(int(mach_thread_create(thread_id, usize(size), top, usize(guard), detached, start, argument))))
 }
 
 fn darwin_pthread_join(handle u64, output voidptr) i32 {
@@ -124,7 +124,10 @@ fn darwin_pthread_join(handle u64, output voidptr) i32 {
 		if result != 0 { return i32(pthread_error(int(result))) }
 		if detached != 0 { return 22 }
 	}
-	return i32(pthread_error(int(C.ios_thread_join(handle, output))))
+	port := mach_threads_join_begin(handle)
+	result := C.ios_thread_join(handle, output)
+	if result == 0 { mach_threads_join_end(port) }
+	return i32(pthread_error(int(result)))
 }
 
 fn pthread_attr_symbol(symbol string) ?u64 {

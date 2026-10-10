@@ -26,6 +26,7 @@ mut:
 	guard u64
 	page_size u64
 	task_self u32
+	thread_ports &MachThreadPort = unsafe { nil }
 	main_queue [8]u64
 	vm_mappings []MachMapping
 	vm_sequence u64
@@ -94,6 +95,7 @@ fn system_data_stop() {
 	dispatch_free()
 	system_queries_stop()
 	mach_memory_stop()
+	mach_threads_stop()
 	for _, pointer in system_data.mutexes {
 		if C.pthread_mutex_destroy(pointer) != 0 { panic('iOS: active mutex at image shutdown') }
 		C.free(pointer)

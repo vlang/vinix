@@ -56,9 +56,15 @@ fn image_atfork_prepare() {
 		if handler.prepare != unsafe { nil } { handler.prepare() }
 		handler = handler.previous
 	}
+	// Pin the native-thread namespace across the actual fork. A normal native
+	// mutex can be released by the surviving caller in either process.
+	C.ios_mach_threads_lock()
+	mach_threads_fork_prepare()
 }
 
 fn image_atfork_complete(child bool) {
+	if child { mach_threads_fork_child() } else { mach_threads_fork_parent() }
+	C.ios_mach_threads_unlock()
 	mut handler := image_fork_state.head
 	for handler != unsafe { nil } {
 		callback := if child { handler.child } else { handler.parent }

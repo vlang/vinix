@@ -239,6 +239,13 @@ int main(void) {
     run("/opt/ios/pthread-sched","--adapter","--unsupported-native",NULL,0,
         "IOS-PTHREAD-SCHED: unsupported inherited native policy preserves outputs and restores ordinary scheduling\n");
     puts("iOS PASS: native thread scheduling, guarded Darwin parameters and privilege enforcement");
+    run("/opt/ios/pthread-mach",NULL,NULL,NULL,0,
+        "IOS-PTHREAD-MACH: real thread identities, borrowed ports, owned send references, native scheduling, fork isolation and destructor lifetime in eight threads\n");
+    run("/opt/ios/pthread-mach","--saturated",NULL,NULL,0,
+        "IOS-PTHREAD-MACH: native send references saturate and remain pinned\n");
+    run("/opt/ios/pthread-mach","--create-failure",NULL,NULL,0,
+        "IOS-PTHREAD-MACH: failed native creation preserves outputs and releases unpublished lifetime objects\n");
+    puts("iOS PASS: native Mach thread ports, send references and namespace lifetime");
     run("/opt/ios/ioctl", NULL, NULL, NULL, 0,
         "IOS-IOCTL: descriptor flags, shared nonblocking I/O, queued bytes, native interfaces and eight threads\n");
     puts("iOS PASS: Darwin ioctl controls, socket bytes and interface queries");

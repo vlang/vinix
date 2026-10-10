@@ -121,6 +121,10 @@ test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permission
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/pthread-sched.c" -o "$output/pthread-sched"
 "$output/pthread-sched"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/pthread-mach.c" -o "$output/pthread-mach"
+"$output/pthread-mach"
+"$output/pthread-mach" --saturated
 python3 - "$output/process" <<'PY'
 import subprocess, sys
 for mode, number in [("usr1", 30), ("usr2", 31), ("bus", 10)]:

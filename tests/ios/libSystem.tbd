@@ -51,6 +51,8 @@ exports:
                    ___exp10, ___exp10f, ___sincos_stret, ___sincosf_stret,
                    _setjmp, _longjmp, __setjmp, __longjmp,
                    _mach_task_self_, _vm_page_size, _vm_allocate, _vm_remap, _vm_deallocate,
+                   _pthread_mach_thread_np, _pthread_from_mach_thread_np, _mach_thread_self,
+                   _mach_port_type, _mach_port_get_refs, _mach_port_mod_refs, _mach_port_deallocate,
                    _memset_pattern4, _memset_pattern8, _memset_pattern16,
                    _wmemchr, _wmemcmp, _wmemcpy, _wmemmove, _wmemset, _wcslen ]
 ...
