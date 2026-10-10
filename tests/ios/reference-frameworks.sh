@@ -106,6 +106,9 @@ PY
 "${IOS_CLANG:-clang}" -DIOS_IOCTL_REFERENCE -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/ioctl.c" -o "$output/ioctl"
 "$output/ioctl"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/calendar.c" -o "$output/calendar"
+"$output/calendar" --native-darwin
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

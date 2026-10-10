@@ -663,6 +663,26 @@ before reporting failures, including partial thread creation. The full ARM64
 C++/GLES/PPSSPP regression passes. These eight entries resolve 13 additional
 strong imports across Fortnite and its bundled frameworks.
 
+V adapters for `mktime`, `tzset`, `tzname` and `clock` use native calendar
+conversion, timezone configuration and process CPU accounting. Compile-time
+checks verify the shared 56-byte calendar layout, 64-bit timestamp/clock values
+and one-million-ticks-per-second clock units. Successful conversions preserve
+errno, including the valid timestamp `-1` just before the epoch. Conversion
+failures translate native errors; NULL input reports `EFAULT`. Linux reports
+`EOVERFLOW` for normalization beyond the signed calendar-year range, while
+the measured Mac returns `-1` without changing errno in that case.
+
+The timezone-name array belongs to native libc and updates after `tzset`;
+its names and rules come from the guest's `TZ` setting and timezone files.
+The unused daylight name can differ between libc implementations. Exact Mac
+normalization of ambiguous/nonexistent local times remains unverified.
+Shared Mac/iOS fixtures check signed and post-2038 timestamps, leap days,
+normalized fields, positive offsets, winter/summer DST rules, buffer guards,
+advancing native CPU clocks and eight concurrent callers. They restore the
+previous timezone before returning. ASAN checks two loads/unloads. The full
+ARM64 C++/GLES/PPSSPP regression passes. These four entries resolve five
+additional strong imports across Fortnite and EOSSDK.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -676,7 +696,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _mktime
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _nan
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -684,12 +704,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,285 | 873 | 81 |
-| EOSSDK | 499 | 163 | 18 |
+| Fortnite executable | 1,289 | 869 | 81 |
+| EOSSDK | 500 | 162 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,837 | 1,159 | 122 |
+| All images | 1,842 | 1,154 | 122 |
 
-The C++/GLES/Text variant reports 1,850 resolved imports, 1,146 unresolved strong
+The C++/GLES/Text variant reports 1,855 resolved imports, 1,141 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

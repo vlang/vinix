@@ -157,6 +157,9 @@ int main(void) {
     run("/opt/ios/ioctl", NULL, NULL, NULL, 0,
         "IOS-IOCTL: descriptor flags, shared nonblocking I/O, queued bytes, native interfaces and eight threads\n");
     puts("iOS PASS: Darwin ioctl controls, socket bytes and interface queries");
+    run("/opt/ios/calendar", NULL, NULL, NULL, 0,
+        "IOS-CALENDAR: signed timestamps, normalization, timezone names, DST, guarded layouts, process clocks and eight threads\n");
+    puts("iOS PASS: Darwin calendars, timezone configuration and native process clocks");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

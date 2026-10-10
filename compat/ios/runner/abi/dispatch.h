@@ -4,6 +4,7 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <string.h>
@@ -60,6 +61,13 @@ static int ios_clock_getres(int clock, void *time) { return clock_getres(clock, 
 static int ios_nanosleep(void *request, void *remainder) { return nanosleep(request, remainder); }
 /* ARM64 Darwin and musl tm both use nine 32-bit fields, a 64-bit GMT offset
  * and a zone pointer (56 bytes). Native libc handles the calendar/timezone. */
+_Static_assert(sizeof(struct tm) == 56 && offsetof(struct tm, tm_gmtoff) == 40 &&
+               offsetof(struct tm, tm_zone) == 48, "Darwin calendar layout");
+_Static_assert(sizeof(time_t) == 8 && sizeof(clock_t) == 8 && CLOCKS_PER_SEC == 1000000,
+               "Darwin time and process clock units");
+static int64_t ios_mktime(void *value) { return mktime(value); }
+static int64_t ios_clock_ticks(void) { return clock(); }
+static void *ios_tzname(void) { return tzname; }
 static void *ios_localtime_r(void *value, void *output) { return localtime_r(value, output); }
 static void *ios_gmtime_r(void *value, void *output) { return gmtime_r(value, output); }
 static void *ios_localtime(void *value) { return localtime(value); }
