@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `ad94fe98fbb4939bbede7b41e86141f63fa66812`,
-Linguist 7.27.0 reports **Python 6.02%** (465 files, 2,180,975 bytes) and
-**V 75.20%** (2,513 files, 27,262,825 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `e89a298a35be958500a57bc91f275e6f8156a0df`,
+Linguist 7.27.0 reports **Python 5.94%** (460 files, 2,155,528 bytes) and
+**V 75.31%** (2,525 files, 27,336,831 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,025,310 Python bytes**. All remaining
-2,180,975 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,050,757 Python bytes**. All remaining
+2,155,528 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 24 stages below remove **67 Python files / 180,373 original bytes** and
+The 25 stages below remove **72 Python files / 205,820 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -55,6 +55,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | ANS read-only reference verifier and independent tests | `tools/apple-ans/ansreads`, two V entrypoints | 10,400 / 252 | `a99c83e8` |
 | Complete AGX extraction/recovery command and trace boundaries | `tools/agx-re/recoverycli`, native extraction modules and trace entrypoints | 36,385 / 959 | `3b2c914d` |
 | Eight QEMU syscall comparison commands and fixture generator | `tests/qemu-core/fixturecli`, nine V entrypoints | 22,028 / 593 | `ad94fe98` |
+| Base/memory and futex comparison tools and final fixture import bridge | `tests/qemu-core/fixturehost`, three V entrypoints | 25,447 / 517 | `e89a298a` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -368,12 +369,43 @@ Between `a99c83e8` and `ad94fe98`, counted Python declined by exactly 58,413
 bytes and 21 files, matching these two batches. Concurrent V changes affect
 the language shares independently.
 
+The next batch replaces the pending base/memory generator and host comparison,
+the futex host/guest comparison and the final shared fixture import bridge.
+Five Python files / 25,447 bytes are retired. Native commands preserve compiler
+profiles, original line ranges, exact assertion text, function-only ABI call
+remapping, target-SDK syscall numbers, allocator guards, evidence hashes and
+seven paired futex diagnostics. Base generation retains module-only output and
+full immutable-C reconstruction. The original full source and all generated
+comparison artifacts remain outside the checkout. The base host receipt now
+uses native `uname -srm` identification; native failures use native diagnostics.
+
+All six QEMU command/controller test files passed on ARM64, Rosetta x86-64 and
+ASan/UBSan, including the new range, CHECK-count, target-number and diagnostic
+pair checks. Fresh base/memory and futex sanitizer comparisons passed on both
+actual host ABIs and in a sanitized command process. Reconstructed originals,
+API headers and host logs matched saved independent controls; the full base
+reconstruction accounts only for the header-placement fix already present in
+the committed Python source. Source-hash receipts were verified against every
+generated input. Both futex guest targets linked with their allocator guards.
+All three cold shell entries passed help, protected-output and temporary cleanup
+checks, and both complete standalone host commands passed. No Python was run.
+Logs are `/tmp/vinix-qemu-pending-{arm,x86,asan}-tests.log`,
+`/tmp/vinix-qemu-pending-final-{arm,x86,asan}-tests.log`,
+`/tmp/vinix-qemu-pending-qualified-{arm,x86,asan}.log` and
+`/tmp/vinix-qemu-pending-cold.log`. The fixture bodies still await normal guest
+runner integration and receive zero completed C-implementation migration credit.
+These host-tool ports establish no new kernel or guest-boot result.
+
+Between `ad94fe98` and `e89a298a`, counted Python declined by exactly 25,447
+bytes and five files. The three larger batches together retire 26 Python files
+and 83,860 bytes. Concurrent source changes affect the relative graph separately.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 24 stages.
+or hidden in these 25 stages.
 
 ## Earlier completed stages
 

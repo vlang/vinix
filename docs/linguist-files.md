@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `ad94fe98fbb4939bbede7b41e86141f63fa66812`,
+at source commit `e89a298a35be958500a57bc91f275e6f8156a0df`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,778 | 6.47% |
-| Python | 465 | 2,180,975 | 6.02% |
-| Shell | 382 | 1,348,719 | 3.72% |
+| C | 563 | 2,343,778 | 6.46% |
+| Python | 460 | 2,155,528 | 5.94% |
+| Shell | 385 | 1,349,209 | 3.72% |
 
-All `.v` files are classified as V. The resulting V share is 75.20%, with no
+All `.v` files are classified as V. The resulting V share is 75.31%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,180,975 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,155,528 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev ad94fe98fbb4939bbede7b41e86141f63fa66812 --breakdown --json
+github-linguist --rev e89a298a35be958500a57bc91f275e6f8156a0df --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -1011,13 +1011,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ps2/desktop.py` | 8,979 |
 | `tests/ps2/run.py` | 6,648 |
 | `tests/python3/smoke.py` | 9,112 |
-| `tests/qemu-core/_fixture_native.py` | 3,251 |
 | `tests/qemu-core/_vm_native.py` | 674 |
-| `tests/qemu-core/compile-basefixture.py.pending` | 5,488 |
-| `tests/qemu-core/oracle_support.py` | 1,086 |
 | `tests/qemu-core/run_vm.py` | 6,725 |
-| `tests/qemu-core/test-basefixture.py.pending` | 5,726 |
-| `tests/qemu-core/test-futexfixture.py.pending` | 9,896 |
 | `tests/qemu-initramfs-split/test_split.py` | 6,018 |
 | `tests/qemu-module-iso/test_iso.py` | 1,677 |
 | `tests/qemu-ovmf/test_patch.py` | 1,565 |
@@ -1404,10 +1399,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/procfs-mount/check-generated` | 146 |
 | `tests/ps1/frame` | 180 |
 | `tests/ps2/frame` | 180 |
+| `tests/qemu-core/compile-basefixture` | 165 |
 | `tests/qemu-core/compile-fixtures` | 162 |
 | `tests/qemu-core/run.sh` | 3,987 |
+| `tests/qemu-core/test-basefixture` | 162 |
 | `tests/qemu-core/test-blockedfixture` | 165 |
 | `tests/qemu-core/test-epollfixture` | 163 |
+| `tests/qemu-core/test-futexfixture` | 163 |
 | `tests/qemu-core/test-intfixture` | 161 |
 | `tests/qemu-core/test-nanosleepfixture` | 167 |
 | `tests/qemu-core/test-pollfixture` | 162 |
