@@ -81,6 +81,12 @@ pub mut:
 	read_rpm    ReadRpm    = unsafe { nil }
 	set_percent SetPercent = unsafe { nil }
 	context     voidptr
+	// fanN_min and fanN_max, in revolutions a minute, where the fan's maker
+	// says how slow and how fast it runs.
+	has_minimum bool
+	minimum     u64
+	has_maximum bool
+	maximum     u64
 mut:
 	// What pwmN was last set to, for reading it back.
 	percent     u32

@@ -20,7 +20,7 @@
 //	    name
 //	    temp1_input _label _max _crit _crit_alarm    the zone itself
 //	    tempM_...                                    its other sensors
-//	    fanM_input _label, pwmM                      its fans
+//	    fanM_input _label _min _max, pwmM            its fans
 //
 // A temperature that cannot be read reads as an empty file: there is no number
 // that means "no reading", and the last one is not the temperature now.
@@ -189,6 +189,14 @@ fn publish_zone(mut record ZoneRecord) {
 		}
 		if fan.label.len != 0 {
 			attribute(numbered(hwmon_base, n, '/fan', m, '_label'), 0o444, show_fan_label,
+				unsafe { nil }, voidptr(fan))
+		}
+		if fan.has_minimum {
+			attribute(numbered(hwmon_base, n, '/fan', m, '_min'), 0o444, show_fan_min,
+				unsafe { nil }, voidptr(fan))
+		}
+		if fan.has_maximum {
+			attribute(numbered(hwmon_base, n, '/fan', m, '_max'), 0o444, show_fan_max,
 				unsafe { nil }, voidptr(fan))
 		}
 		if fan.set_percent != unsafe { nil } {
@@ -370,6 +378,16 @@ fn show_fan_label(context voidptr, mut text lib.Text) {
 	fan := unsafe { &Fan(context) }
 	text.add(fan.label)
 	text.add_byte(`\n`)
+}
+
+fn show_fan_min(context voidptr, mut text lib.Text) {
+	fan := unsafe { &Fan(context) }
+	add_line(mut text, i64(fan.minimum))
+}
+
+fn show_fan_max(context voidptr, mut text lib.Text) {
+	fan := unsafe { &Fan(context) }
+	add_line(mut text, i64(fan.maximum))
 }
 
 // pwmN is hwmon's 0 to 255; the fan takes percent.
