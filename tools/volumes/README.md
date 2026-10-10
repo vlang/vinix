@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`vinix-volume health DEVICE` queries whole AHCI ATA disks without changing
+SMART settings. It prints sanitized identity, the drive's threshold status
+and vendor-specific raw attributes. Exit 3 means the threshold is exceeded;
+4 means ATA status is unavailable. Unsupported backends return an error.
+See [the health ABI and limits](../../docs/storage-volumes.md#ata-smart-health).
+
 `vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES` deallocates a range
 through supported block backends. The offset and length are decimal bytes.
 See the storage documentation for extent protection and interruption behavior.

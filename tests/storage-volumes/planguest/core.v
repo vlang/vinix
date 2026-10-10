@@ -406,9 +406,12 @@ fn first_boot(parent &char) {
 		view_data()
 		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0, c'alias fixture cleanup')
 		multiple_plans(parent, wrong)
+		health_check(parent)
+		health_cycles(parent)
 		allocation_trace(c'/proc/allocstart', false)
 		cycles(parent, 200)
 		mut before := Heap{}; heap_snapshot(mut before)
+		health_cycles(parent)
 		cycles(parent, 200)
 		mut after := Heap{}; heap_snapshot(mut after)
 		mut retained := before.count != after.count || after.large > before.large

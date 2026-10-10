@@ -226,6 +226,7 @@ fn guest(root string, work string, arch string, kernel string) ! {
 	first := boot(args, work + '/first-boot.log')!
 	if !first.contains('init: volume restore failed; continuing') { return error('Production init did not report its invalid boot plan and continue') }
 	if !first.contains('PLAN SET PREFLIGHT PASSED') { return error('Missing multi-disk plan-set qualification') }
+	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	mut encoded := ''
 	for line in first.split_into_lines() { if line.starts_with('PLAN FILE ') { encoded = line.all_after('PLAN FILE ').trim_space() } }
 	if encoded.len < 256 || encoded.len > 4224 { return error('Missing saved plan bytes in first boot') }

@@ -290,6 +290,7 @@ fn storage_request(request u64) bool {
 		|| request == resource.block_status_ioctl || request == 0x80081272 || request == 0x1260
 		|| request == 0x1268 || request == 0x125e
 		|| request == resource.block_discard_ioctl
+		|| request == resource.block_health_ioctl
 }
 
 fn storage_admin() bool {
@@ -299,6 +300,7 @@ fn storage_admin() bool {
 }
 
 fn storage_ioctl(mut descriptor file.FD, request u64, argument voidptr) ?int {
+	if request == resource.block_health_ioctl { return storage_health(mut descriptor, argument) }
 	if request == resource.block_discard_ioctl { return storage_discard(mut descriptor, argument) }
 	if request != volume_create && request != volume_resize && request != volume_remove {
 		snapshot := resource.block_status(mut descriptor.handle.resource)?

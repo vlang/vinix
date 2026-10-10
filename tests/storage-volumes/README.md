@@ -66,6 +66,12 @@ cold faults in the long-lived test program's diagnostic code from appearing as
 workload retention. Allocation tracking is started when available, and a
 failed retention check dumps the remaining sites for diagnosis.
 
+The same first-boot fixture now qualifies the read-only health ABI: actual
+QEMU AHCI SMART identity, data/checksum and threshold status on AMD64;
+unsupported VirtIO on ARM; invalid pointers and descriptor/resource rejection;
+the packaged `health` command; and 200 additional health queries within the
+retention measurement. See [the health tests](../storage-health/README.md).
+
 The older block-volume and controller qualification commands below remain
 listed as historical tooling; the saved-plan checks above use V throughout.
 

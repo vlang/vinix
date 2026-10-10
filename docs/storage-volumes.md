@@ -211,11 +211,59 @@ volume counters unchanged. These are request failure counters, not a hardware
 diagnostic classification. A partition reports parent counters with flag 16;
 a logical view tracks its own forwarded operations and inherits parent
 offline/flush/discard capability. Large syscalls can comprise several backend
-operations. Health here means I/O error
-and availability reporting; SMART wear, temperature, predictive failure and
-real-hardware qualification remain future work. Unsupported backends return
+operations. AHCI also provides the SMART query below. NVMe/ANS health logs,
+vendor-specific wear and temperature interpretation, predictive monitoring and
+real-hardware qualification remain future work. Unsupported status backends return
 `ENOTTY`. Geometry also supports `BLKGETSIZE64`, `BLKGETSIZE`, `BLKSSZGET`, and
 `BLKROGET` without allowing destructive ioctl passthrough.
+
+## ATA SMART health
+
+```sh
+vinix-volume health /dev/sd0
+```
+
+Whole AHCI ATA disks expose a read-only SMART query through ioctl `0x56560005`.
+It requires a readable descriptor and ordinary MAC read/ioctl access; it does
+not require volume-management privileges. Partitions, logical views and other
+backends return `ENOTTY`; write-only and `O_PATH` descriptors return `EBADF`.
+Mounted disks can be queried. This interface accepts no command passthrough.
+
+Each query refreshes IDENTIFY, validates its command-set support/enabled words,
+then reads SMART data and RETURN STATUS when SMART is available and enabled.
+It never enables SMART, starts self-tests, changes attributes or reads sectors
+from the disk's data area. A disabled/unsupported ATA device returns its identity
+with unavailable health bits. Invalid IDENTIFY capability words also leave the
+corresponding bit unavailable. Short transfers, bad SMART checksums, missing or
+invalid status FIS replies and driver failures return an error without copying
+a partial report. The port uses its existing permanent DMA buffer under its
+normal lock and timeout/quarantine policy; report copying occurs after unlock.
+
+The output ABI is 1088 bytes: eight little-endian `uint64_t` words (version 1,
+protocol 1 for ATA, flags, runtime physical disk ID and four reserved zero words),
+then the 512-byte IDENTIFY response and 512-byte SMART READ DATA response. Flags
+are support available (1), enabled (2), SMART data valid (4), threshold status
+valid (8) and threshold exceeded (16). Unavailable SMART data is zeroed. Headers
+and payload offsets are checked when compiling the packaged utility on both
+architectures. There is no cached health state or per-query kernel allocation.
+
+The command prints model, serial and firmware with control bytes sanitized,
+the drive's threshold status, and up to 30 raw attributes with ID, flags,
+current/worst values and six raw bytes rendered as hexadecimal. Raw layouts,
+units and attribute IDs are vendor specific; the utility does not label them
+as temperatures, wear percentages or sector counts. A not-exceeded threshold
+is the drive's current assessment, not a prediction or a durability guarantee.
+Exit status is 0 for a valid not-exceeded status, 3 for exceeded, 4 when the
+ATA threshold status is unavailable, 1 for an error and 2 for invalid usage.
+SMART queries do not change completed data-read/write/flush counters; failed
+backend queries increment the existing error counter. Bad output pointers and
+descriptor-policy failures do not increment hardware errors.
+
+Protocol layout references are the
+[SMART data definitions maintained by smartmontools](https://github.com/smartmontools/smartmontools/blob/main/include/smartmon/ata.h),
+[AHCI received-FIS and transfer-count specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/serial-ata-ahci-spec-rev1-3-1.pdf)
+and [QEMU's ATA SMART implementation](https://github.com/qemu/qemu/blob/master/hw/ide/core.c).
+See [native host and guest qualification](../tests/storage-health/README.md).
 
 ## TRIM/discard
 
@@ -297,6 +345,6 @@ real-controller or guest readiness.
 
 The encompassing roadmap item stays open: storage pools/RAID, full-disk
 encryption and recovery, online filesystem resize,
-filesystem-aware trimming and controller-specific health data are not
+filesystem-aware trimming, NVMe/ANS health logs and predictive health monitoring are not
 implemented by this increment. The anonymous pager's encrypted swap remains a
 separate feature.

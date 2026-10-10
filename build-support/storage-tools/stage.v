@@ -49,7 +49,7 @@ fn stage(arch string, staging string, cc string) ! {
 	command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
 		root + '/tools/volumes/volumecli', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }])!
 	generated := os.read_file(source)!
-	os.write_file(source, generated + '\n_Static_assert(sizeof(volumecli__Request)==32, "V request ABI");\n_Static_assert(sizeof(volumecli__Status)==128, "V status ABI");\n')!
+	os.write_file(source, generated + '\n_Static_assert(sizeof(volumecli__Request)==32, "V request ABI");\n_Static_assert(sizeof(volumecli__Status)==128, "V status ABI");\n_Static_assert(sizeof(volumecli__Health)==1088, "V health ABI");\n_Static_assert(offsetof(volumecli__Health,data)==576, "V health data ABI");\n')!
 	binary := os.join_path(work, 'vinix-volume')
 	command([cc, '-static', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
 		'-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-label', '-D_GNU_SOURCE',

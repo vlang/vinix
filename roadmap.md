@@ -154,6 +154,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Checksummed saved volume plans with verified disk identity and idempotent restore](docs/storage-volumes.md#saved-volume-plans).
   - [x] [Identity-based disk discovery and opt-in volume-plan restore before boot applications](docs/storage-volumes.md#discovery-and-boot-restore).
   - [x] [Multi-disk plan sets with global slot/extent preflight and boot replay](docs/storage-volumes.md#multi-disk-plan-sets).
+  - [x] [Read-only AHCI ATA SMART identity, raw attributes and threshold health queries](docs/storage-volumes.md#ata-smart-health).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,
