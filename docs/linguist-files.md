@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `a99c83e8ba1d5b9f236327f3a18d4f4da180da68`,
+at source commit `ad94fe98fbb4939bbede7b41e86141f63fa66812`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,778 | 6.53% |
-| Python | 486 | 2,239,388 | 6.24% |
-| Shell | 368 | 1,346,419 | 3.75% |
+| C | 563 | 2,343,778 | 6.47% |
+| Python | 465 | 2,180,975 | 6.02% |
+| Shell | 382 | 1,348,719 | 3.72% |
 
-All `.v` files are classified as V. The resulting V share is 74.84%, with no
+All `.v` files are classified as V. The resulting V share is 75.20%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,239,388 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,180,975 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev a99c83e8ba1d5b9f236327f3a18d4f4da180da68 --breakdown --json
+github-linguist --rev ad94fe98fbb4939bbede7b41e86141f63fa66812 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -720,7 +720,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/run.py` | 1,075 |
 | `tests/agx-fake-g17/run_encode_native.py` | 1,278 |
 | `tests/agx-fake-g17/run_vm.py` | 4,186 |
-| `tests/agx-trace/run.py` | 711 |
 | `tests/alloc-bench/_kernel_vinix_native.py` | 1,002 |
 | `tests/alloc-bench/_vinix_native.py` | 982 |
 | `tests/alloc-bench/build-macos-kext.py` | 6,112 |
@@ -1015,19 +1014,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-core/_fixture_native.py` | 3,251 |
 | `tests/qemu-core/_vm_native.py` | 674 |
 | `tests/qemu-core/compile-basefixture.py.pending` | 5,488 |
-| `tests/qemu-core/compile-fixtures.py` | 1,119 |
 | `tests/qemu-core/oracle_support.py` | 1,086 |
 | `tests/qemu-core/run_vm.py` | 6,725 |
 | `tests/qemu-core/test-basefixture.py.pending` | 5,726 |
-| `tests/qemu-core/test-blockedfixture.py` | 2,743 |
-| `tests/qemu-core/test-epollfixture.py` | 2,556 |
 | `tests/qemu-core/test-futexfixture.py.pending` | 9,896 |
-| `tests/qemu-core/test-intfixture.py` | 2,554 |
-| `tests/qemu-core/test-nanosleepfixture.py` | 2,578 |
-| `tests/qemu-core/test-pollfixture.py` | 2,554 |
-| `tests/qemu-core/test-restartfixture.py` | 2,676 |
-| `tests/qemu-core/test-signalfixture.py` | 2,664 |
-| `tests/qemu-core/test-touchfixture.py` | 2,584 |
 | `tests/qemu-initramfs-split/test_split.py` | 6,018 |
 | `tests/qemu-module-iso/test_iso.py` | 1,677 |
 | `tests/qemu-ovmf/test_patch.py` | 1,565 |
@@ -1085,17 +1075,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x11-input/run-vm.py` | 2,597 |
 | `tests/x11-input/run.py` | 3,372 |
 | `tools/_package_store_native.py` | 4,314 |
-| `tools/agx-re/_native_adt.py` | 1,968 |
-| `tools/agx-re/_native_extract.py` | 5,441 |
-| `tools/agx-re/_native_g17.py` | 9,448 |
-| `tools/agx-re/_native_t6050.py` | 3,221 |
-| `tools/agx-re/compile-v-trace.py` | 737 |
-| `tools/agx-re/extract_fileset.py` | 2,339 |
-| `tools/agx-re/extract_firmware.py` | 1,432 |
-| `tools/agx-re/extract_pmp_firmware.py` | 949 |
-| `tools/agx-re/recover_g17_abi.py` | 2,516 |
-| `tools/agx-re/recover_t6050_power.py` | 7,411 |
-| `tools/agx-re/test_extract_firmware.py` | 212 |
 | `tools/build-qemu-module-iso.py` | 3,021 |
 | `tools/dota2/_ext2_native.py` | 8,261 |
 | `tools/dota2/ext2_export.py` | 6,288 |
@@ -1132,6 +1111,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/check-m1-gpu-image.sh` | 6,323 |
 | `build-support/check-screenshot` | 171 |
 | `build-support/chromium/run-chromium` | 8,032 |
+| `build-support/compile-v-module` | 168 |
 | `build-support/dhewm3/run-dhewm3` | 571 |
 | `build-support/docker/vinix-dockerd` | 1,499 |
 | `build-support/doom/run-doom` | 656 |
@@ -1289,6 +1269,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-g13-layouts/run.sh` | 796 |
 | `tests/agx-m1-image/run.sh` | 3,165 |
 | `tests/agx-t8103-opp/run.sh` | 791 |
+| `tests/agx-trace/run` | 172 |
 | `tests/agx-vm/run.sh` | 159 |
 | `tests/alloc-bench/compare` | 141 |
 | `tests/alloc-bench/compare-kernel` | 148 |
@@ -1423,7 +1404,16 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/procfs-mount/check-generated` | 146 |
 | `tests/ps1/frame` | 180 |
 | `tests/ps2/frame` | 180 |
-| `tests/qemu-core/run.sh` | 4,009 |
+| `tests/qemu-core/compile-fixtures` | 162 |
+| `tests/qemu-core/run.sh` | 3,987 |
+| `tests/qemu-core/test-blockedfixture` | 165 |
+| `tests/qemu-core/test-epollfixture` | 163 |
+| `tests/qemu-core/test-intfixture` | 161 |
+| `tests/qemu-core/test-nanosleepfixture` | 167 |
+| `tests/qemu-core/test-pollfixture` | 162 |
+| `tests/qemu-core/test-restartfixture` | 165 |
+| `tests/qemu-core/test-signalfixture` | 164 |
+| `tests/qemu-core/test-touchfixture` | 163 |
 | `tests/qemu-nested/outer-init.sh` | 309 |
 | `tests/qemu-nested/run.sh` | 3,182 |
 | `tests/realtime/run.sh` | 1,513 |
@@ -1467,6 +1457,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/x86-translation/smoke.sh` | 657 |
 | `tests/zsh/smoke.sh` | 561 |
 | `tools/agx-re/check_g13_reference_contract` | 180 |
+| `tools/agx-re/compile-v-trace` | 184 |
 | `tools/agx-re/compile_fake_g17_plan` | 167 |
 | `tools/agx-re/encode_fake_g17_3d` | 164 |
 | `tools/agx-re/extract_fileset` | 161 |
@@ -1477,6 +1468,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/generate_g17_power_model` | 170 |
 | `tools/agx-re/inspect_macos` | 174 |
 | `tools/agx-re/map_g17_resource_descriptors` | 174 |
+| `tools/agx-re/recover_g17_abi` | 161 |
+| `tools/agx-re/recover_t6050_power` | 165 |
 | `tools/agx-re/recover_t8103_adt` | 163 |
 | `tools/agx-re/trace_diff` | 156 |
 | `tools/apple-ans/test-verify-reads` | 118 |
