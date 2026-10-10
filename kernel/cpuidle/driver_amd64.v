@@ -227,6 +227,21 @@ fn measure_tick_hz() u64 {
 	return ticks * 1000000000 / elapsed
 }
 
+// The TSC's rate in Hz, measured when it is first asked for. cpufreq reports
+// it as the frequency of a processor that names none.
+pub fn tsc_hz() u64 {
+	if cpuidle_tick_hz == 0 {
+		mut hz := measure_tick_hz()
+		if hz < 1000000 {
+			// No TSC this slow exists. Counts stay right; times are a guess.
+			C.kprintf(c'cpuidle: implausible TSC rate %llu Hz; assuming 1 GHz\n', hz)
+			hz = 1000000000
+		}
+		cpuidle_tick_hz = hz
+	}
+	return cpuidle_tick_hz
+}
+
 // Find this machine's states and put them to use. Once, from publish().
 fn driver_start() {
 	if cpuidle_started {
@@ -240,13 +255,7 @@ fn driver_start() {
 			return
 		}
 	}
-	mut hz := measure_tick_hz()
-	if hz < 1000000 {
-		// No TSC this slow exists. Counts stay right; times are a guess.
-		C.kprintf(c'cpuidle: implausible TSC rate %llu Hz; assuming 1 GHz\n', hz)
-		hz = 1000000000
-	}
-	cpuidle_tick_hz = hz
+	hz := tsc_hz()
 
 	mut described := describe_cpu()
 	if choice := devcore.boot_option('vinix.cpuidle=') {

@@ -27,6 +27,7 @@ import pci
 import devcore
 import fwload
 import cpuidle
+import cpufreq
 import dma
 import dev.ata
 import dev.fbdev
@@ -146,6 +147,8 @@ fn kmain_thread() {
 	fwload.publish()
 	// The idle states of this machine's CPUs, which they use from here on.
 	cpuidle.publish()
+	// And how fast they run.
+	cpufreq.publish()
 
 	streams.initialise()
 	random.initialise()

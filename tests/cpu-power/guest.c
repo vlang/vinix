@@ -418,21 +418,121 @@ static void idle_states(void) {
 
 // ── /proc/cpuinfo ───────────────────────────────────────────────────────────
 
+// "cpu MHz" of the first CPU, or 0 where /proc/cpuinfo has no such line.
+static long long cpuinfo_mhz;
+
 static void cpuinfo(void) {
     static char text[65536];
     int n = readfile("/proc/cpuinfo", text, sizeof text);
     if (n <= 0) { sayf("CPUTEST cpuinfo: unreadable (%d)\n", n); return; }
+    char *mhz = strstr(text, "cpu MHz");
+    if (mhz && (mhz = strchr(mhz, ':'))) cpuinfo_mhz = atoll(mhz + 1);
     char *flags = strstr(text, "flags\t");
-    if (!flags) flags = strstr(text, "Features");
     int monitor = 0;
     if (flags) {
         char *end = strchr(flags, '\n');
         if (end) *end = 0;
         monitor = strstr(flags, " monitor") != NULL;
     }
-    char *model = strstr(text, "model name");
-    if (model) { char *end = strchr(model, '\n'); if (end && end < (flags ? flags : text + n)) *end = 0; }
-    sayf("CPUTEST cpuinfo: monitor flag %s\n", monitor ? "present" : "absent");
+    sayf("CPUTEST cpuinfo: monitor flag %s, cpu MHz %lld\n", monitor ? "present" : "absent", cpuinfo_mhz);
+}
+
+// ── Frequency policies ──────────────────────────────────────────────────────
+
+static void freq_path(char *p, int cap, int cpu, const char *file) {
+    snprintf(p, cap, CPU_DIR "/cpu%d/cpufreq/%s", cpu, file);
+}
+
+// A write that must not be taken: it has to fail, and change nothing.
+static void refused(const char *p, const char *text) {
+    char before[128] = "", after[128] = "";
+    readfile(p, before, sizeof before);
+    int r = writefile(p, text);
+    readfile(p, after, sizeof after);
+    sayf("CPUTEST   write \"%.*s\" to %s: %d, reads \"%s\"\n", (int)strcspn(text, "\n"), text, p + strlen(CPU_DIR) + 1, r, after);
+    if (r >= 0) fail("%s took \"%.*s\"", p, (int)strcspn(text, "\n"), text);
+    if (strcmp(before, after) != 0) fail("%s changed from \"%s\" to \"%s\" by a refused write", p, before, after);
+}
+
+static void cpufreq(void) {
+    static const char *files[] = {"scaling_driver", "scaling_governor", "scaling_available_governors", "scaling_min_freq",
+                                  "scaling_max_freq", "scaling_cur_freq", "cpuinfo_min_freq", "cpuinfo_max_freq",
+                                  "energy_performance_preference", "energy_performance_available_preferences"};
+    char p[200], b[256], driver[64] = "?";
+    freq_path(p, sizeof p, 0, "scaling_driver");
+    if (readfile(p, driver, sizeof driver) < 0) { fail("no cpufreq/scaling_driver"); return; }
+    sayf("CPUTEST freq: driver=%s\n", driver);
+    for (unsigned f = 0; f < sizeof files / sizeof files[0]; f++) {
+        freq_path(p, sizeof p, 0, files[f]);
+        show(p);
+        for (int c = 0; c < ncpus; c++) {
+            freq_path(p, sizeof p, c, files[f]);
+            if (readfile(p, b, sizeof b) <= 0) fail("%s cannot be read", p);
+        }
+    }
+    show(CPU_DIR "/cpufreq/thermal_limit");
+    show(CPU_DIR "/cpufreq/profile");
+    long long limit = readnum(CPU_DIR "/cpufreq/thermal_limit");
+    if (limit < 1 || limit > 100) fail("thermal_limit is %lld", limit);
+    refused(CPU_DIR "/cpufreq/thermal_limit", "50\n");
+
+    for (int c = 0; c < ncpus; c++) {
+        freq_path(p, sizeof p, c, "cpuinfo_min_freq"); long long hw_min = readnum(p);
+        freq_path(p, sizeof p, c, "cpuinfo_max_freq"); long long hw_max = readnum(p);
+        freq_path(p, sizeof p, c, "scaling_min_freq"); long long lo = readnum(p);
+        freq_path(p, sizeof p, c, "scaling_max_freq"); long long hi = readnum(p);
+        freq_path(p, sizeof p, c, "scaling_cur_freq"); char cur[64] = ""; readfile(p, cur, sizeof cur);
+        if (hw_min < 0 || hw_max < hw_min) fail("cpu%d: cpuinfo range %lld..%lld", c, hw_min, hw_max);
+        if (lo < hw_min || hi > hw_max || lo > hi) fail("cpu%d: scaling range %lld..%lld outside %lld..%lld", c, lo, hi, hw_min, hw_max);
+        if (strcmp(cur, "<unknown>") != 0 && hw_max > 0 && (atoll(cur) < hw_min * 9 / 10 || atoll(cur) > hw_max * 11 / 10))
+            fail("cpu%d: runs at %s kHz, outside %lld..%lld", c, cur, hw_min, hw_max);
+        if (strcmp(driver, "none") != 0) continue;
+        // No driver: one frequency, and it is the one /proc/cpuinfo gives,
+        // or unknown where nothing gives one.
+        if (hw_min != hw_max || lo != hw_max || hi != hw_max) fail("cpu%d: driver none with a range %lld..%lld", c, hw_min, hw_max);
+        if (hw_max == 0 && strcmp(cur, "<unknown>") != 0) fail("cpu%d: no frequency known, yet runs at %s", c, cur);
+        if (hw_max > 0 && atoll(cur) != hw_max) fail("cpu%d: runs at %s, not its one frequency %lld", c, cur, hw_max);
+        if (cpuinfo_mhz > 0 && (hw_max < cpuinfo_mhz * 980 || hw_max > cpuinfo_mhz * 1020))
+            fail("cpu%d: %lld kHz, but /proc/cpuinfo says %lld MHz", c, hw_max, cpuinfo_mhz);
+        if (cpuinfo_mhz == 0 && hw_max != 0) fail("cpu%d: %lld kHz from nowhere", c, hw_max);
+    }
+    if (strcmp(driver, "none") == 0) {
+        // Nothing can be set, so nothing may appear to be.
+        int last = ncpus - 1;
+        freq_path(p, sizeof p, last, "scaling_governor"); refused(p, "powersave\n");
+        freq_path(p, sizeof p, last, "scaling_max_freq"); refused(p, "800000\n");
+        freq_path(p, sizeof p, last, "scaling_min_freq"); refused(p, "800000\n");
+        freq_path(p, sizeof p, last, "energy_performance_preference"); refused(p, "power\n");
+        freq_path(p, sizeof p, last, "cpuinfo_max_freq"); refused(p, "1\n");
+        freq_path(p, sizeof p, last, "scaling_cur_freq"); refused(p, "1\n");
+        refused(CPU_DIR "/cpufreq/profile", "power_saver\n");
+        return;
+    }
+    // With a driver: the governors and profiles can be set and read back,
+    // and nonsense is refused.
+    freq_path(p, sizeof p, 0, "scaling_governor");
+    refused(p, "warp\n");
+    static const char *governors[] = {"powersave", "performance", "ondemand"};
+    for (unsigned g = 0; g < 3; g++) {
+        snprintf(b, sizeof b, "%s\n", governors[g]);
+        int r = writefile(p, b);
+        char now[64] = "";
+        readfile(p, now, sizeof now);
+        sayf("CPUTEST   governor %s: write %d, reads %s\n", governors[g], r, now);
+        if (r < 0 || strcmp(now, governors[g]) != 0) fail("governor %s was not taken", governors[g]);
+    }
+    freq_path(p, sizeof p, 0, "scaling_max_freq");
+    refused(p, "fast\n");
+    static const char *profiles[] = {"power_saver", "performance", "balanced"};
+    for (unsigned g = 0; g < 3; g++) {
+        snprintf(b, sizeof b, "%s\n", profiles[g]);
+        int r = writefile(CPU_DIR "/cpufreq/profile", b);
+        char now[64] = "";
+        readfile(CPU_DIR "/cpufreq/profile", now, sizeof now);
+        sayf("CPUTEST   profile %s: write %d, reads %s\n", profiles[g], r, now);
+        if (r < 0 || strcmp(now, profiles[g]) != 0) fail("profile %s was not taken", profiles[g]);
+    }
+    refused(CPU_DIR "/cpufreq/profile", "ludicrous\n");
 }
 
 int main(void) {
@@ -442,9 +542,7 @@ int main(void) {
     cpuinfo();
     workloads();
     idle_states();
-#ifdef CPUFREQ_TEST
     cpufreq();
-#endif
     // Once more after the files were written to: the idle path still wakes.
     workloads();
     sayf("CPUTEST DONE failures=%d\n", failures);
