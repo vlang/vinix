@@ -287,23 +287,19 @@ fn dim_backlight_with(mut io DeviceIO) int {
 }
 
 fn read_backlight(mut out BacklightState) BacklightResult {
-	mut io := PosixDeviceIO{}
-	return read_backlight_with(mut io, mut out)
+	return read_backlight_with(mut posix_device_io, mut out)
 }
 
 fn set_backlight_percent(percent int) BacklightResult {
-	mut io := PosixDeviceIO{}
-	return set_backlight_percent_with(mut io, percent)
+	return set_backlight_percent_with(mut posix_device_io, percent)
 }
 
 fn set_backlight_nits(nits int) BacklightResult {
-	mut io := PosixDeviceIO{}
-	return set_backlight_nits_with(mut io, nits)
+	return set_backlight_nits_with(mut posix_device_io, nits)
 }
 
 fn dim_backlight() int {
-	mut io := PosixDeviceIO{}
-	return dim_backlight_with(mut io)
+	return dim_backlight_with(mut posix_device_io)
 }
 
 // One step of the bar in Settings, so the two agree.

@@ -1425,6 +1425,11 @@ fn (mut io PosixDeviceIO) is_character(fd int) (bool, DeviceError) {
 	return (u32(info.st_mode) & u32(C.S_IFMT)) == u32(C.S_IFCHR), DeviceError.none
 }
 
+// The DeviceIO for real files. A PosixDeviceIO handed to a function that
+// takes the interface is boxed on the heap at each call, and nothing frees
+// the box; this one is made once and passed as it is.
+__global posix_device_io = DeviceIO(PosixDeviceIO{})
+
 fn (mut io PosixDeviceIO) is_writable(fd int) (bool, DeviceError) {
 	mut info := C.stat{}
 	if C.fstat(fd, &info) < 0 {

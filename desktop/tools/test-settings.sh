@@ -83,3 +83,8 @@ done
 cp "$root/desktop/tools/tests/i18n_japanese_memory_test.v" "$work/ui/"
 "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/i18n_japanese_memory_test.v"
+
+# What the desktop does for power for as long as it runs keeps nothing.
+cp "$root/desktop/tools/tests/power_memory_test.v" "$work/ui/"
+"$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless -d track_heap \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/power_memory_test.v"

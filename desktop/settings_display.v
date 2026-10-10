@@ -329,7 +329,12 @@ fn (a &SettingsApp) battery_pane(width int, height int) []ui2.Element {
 		return narrow
 	}
 	percent := a.battery_read(false)
-	history := a.battery_history()
+	// The history is copied into the application rather than into a local. A
+	// local whose address goes to something that returns elements is moved to
+	// the heap by V and never freed: 1.6 KiB on every frame the pane is drawn.
+	// This changes nothing but this application's own copy.
+	mut app := unsafe { &SettingsApp(a) }
+	app.battery_shown = a.battery_history()
 	mut reading := a.battery_reading()
 	// What else the last poll learned describes this percentage only if it is
 	// the same sample. A reader that gives a percentage alone is shown as one.
@@ -339,7 +344,9 @@ fn (a &SettingsApp) battery_pane(width int, height int) []ui2.Element {
 			source:  .device
 		}
 	}
-	return battery_reading_elements(reading, &history, settings_padding, inner)
+	elements := battery_reading_elements(reading, &app.battery_shown, settings_padding,
+		inner)
+	return elements
 }
 
 // The Display and Battery actions. The sidebar has already dealt with choosing

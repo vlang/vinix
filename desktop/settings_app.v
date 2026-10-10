@@ -85,6 +85,8 @@ mut:
 	battery_read       fn (bool) int = read_battery
 	battery_history    fn () BatteryHistory = battery_history_snapshot
 	battery_reading    fn () BatteryReading = battery_reading_snapshot
+	// The history the Battery pane last drew. See battery_pane.
+	battery_shown      BatteryHistory
 	state              BacklightState
 	read_result        BacklightResult = .unavailable
 	write_result       BacklightResult

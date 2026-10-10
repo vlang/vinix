@@ -467,29 +467,44 @@ fn read_supply_full(mut io DeviceIO, mut path SupplyPath, names &DeviceNames, in
 // the sample, and /dev/battery is not asked instead. A charger is noted on
 // the way, whichever battery is used.
 fn read_supply_battery_with(mut io DeviceIO, mut reading BatteryReading) bool {
-	mut names := DeviceNames{}
-	if io.list(power_supply_directory, mut names) != .none {
+	return read_supply_battery_in(mut io, mut battery_supply_scratch, mut reading)
+}
+
+// What a poll of the power supplies holds while it runs: the directory's
+// names and the path being read. It is static rather than a pair of locals
+// in the reader, because V moves locals of this shape to the heap each time
+// the function is entered and nothing frees them. Polls happen on the one
+// compositor thread, and an application process has a copy of its own.
+struct SupplyScratch {
+mut:
+	names DeviceNames
+	path  SupplyPath
+}
+
+__global battery_supply_scratch = SupplyScratch{}
+
+fn read_supply_battery_in(mut io DeviceIO, mut scratch SupplyScratch, mut reading BatteryReading) bool {
+	if io.list(power_supply_directory, mut scratch.names) != .none {
 		return false
 	}
-	mut path := SupplyPath{}
 	mut text := [power_supply_text_capacity]u8{}
 	mut buffer := unsafe { (&text[0]).vbytes(text.len) }
 	mut battery := -1
-	for index in 0 .. names.count {
+	for index in 0 .. scratch.names.count {
 		// A directory that is not a supply, such as the kernel's `policy`, has
 		// no `type` and is passed over; so is a kind this does not know.
-		if !path.set(&names, index, 'type') {
+		if !scratch.path.set(&scratch.names, index, 'type') {
 			continue
 		}
-		mut length := read_supply_text(mut io, path.text(), mut buffer)
+		mut length := read_supply_text(mut io, scratch.path.text(), mut buffer)
 		if length < 0 {
 			continue
 		}
 		if bytes_equal_text(buffer[..length], 'Mains\n') {
-			if !path.set(&names, index, 'online') {
+			if !scratch.path.set(&scratch.names, index, 'online') {
 				continue
 			}
-			length = read_supply_text(mut io, path.text(), mut buffer)
+			length = read_supply_text(mut io, scratch.path.text(), mut buffer)
 			if length < 0 {
 				continue
 			}
@@ -499,10 +514,10 @@ fn read_supply_battery_with(mut io DeviceIO, mut reading BatteryReading) bool {
 				reading.mains_online = true
 			}
 		} else if battery < 0 && bytes_equal_text(buffer[..length], 'Battery\n') {
-			if !path.set(&names, index, 'present') {
+			if !scratch.path.set(&scratch.names, index, 'present') {
 				continue
 			}
-			length = read_supply_text(mut io, path.text(), mut buffer)
+			length = read_supply_text(mut io, scratch.path.text(), mut buffer)
 			if length < 0 {
 				continue
 			}
@@ -516,8 +531,8 @@ fn read_supply_battery_with(mut io DeviceIO, mut reading BatteryReading) bool {
 		return false
 	}
 	reading.source = .supply
-	reading.percent = read_supply_values(mut io, mut path, &names, battery, mut buffer, mut
-		reading)
+	reading.percent = read_supply_values(mut io, mut scratch.path, &scratch.names, battery, mut
+		buffer, mut reading)
 	return true
 }
 
@@ -776,8 +791,7 @@ fn (mut cache BatteryCache) poll_reading(now_ms u64, force bool, reader fn () Ba
 __global desktop_battery_cache = BatteryCache{}
 
 fn read_battery_sources() BatteryReading {
-	mut io := PosixDeviceIO{}
-	return read_battery_reading_with(mut io)
+	return read_battery_reading_with(mut posix_device_io)
 }
 
 fn battery_get(force bool) int {

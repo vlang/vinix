@@ -295,26 +295,21 @@ fn read_suspend_successes_with(mut io DeviceIO) ?u64 {
 }
 
 fn read_power_controls(mut out PowerControls) {
-	mut io := PosixDeviceIO{}
-	out = read_power_controls_with(mut io)
+	out = read_power_controls_with(mut posix_device_io)
 }
 
 fn set_lid_action(action LidAction) PowerResult {
-	mut io := PosixDeviceIO{}
-	return set_lid_action_with(mut io, action)
+	return set_lid_action_with(mut posix_device_io, action)
 }
 
 fn set_power_profile(profile PowerProfile) PowerResult {
-	mut io := PosixDeviceIO{}
-	return set_power_profile_with(mut io, profile)
+	return set_power_profile_with(mut posix_device_io, profile)
 }
 
 fn apply_power_settings(settings &Settings) {
-	mut io := PosixDeviceIO{}
-	apply_power_settings_with(mut io, settings)
+	apply_power_settings_with(mut posix_device_io, settings)
 }
 
 fn read_suspend_successes() ?u64 {
-	mut io := PosixDeviceIO{}
-	return read_suspend_successes_with(mut io)
+	return read_suspend_successes_with(mut posix_device_io)
 }
