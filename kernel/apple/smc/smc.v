@@ -1,5 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0-only
 // Copyright (c) 2026 Alexander Medvednikov
+//
+// Apple's System Management Controller: the battery, the charger, the
+// temperatures and the fans of an Apple Silicon machine.
+//
+// One thread talks to the SMC. Ten times a second it takes what the firmware
+// has sent unasked, and once a second it reads: the charge percentage and
+// the telemetry the two device nodes are made of (/dev/battery,
+// /dev/battery-power; docs/m1-battery.md), and then the keys of class.v --
+// the battery and the charger for /sys/class/power_supply, the temperatures
+// and fans for /sys/class/thermal and /sys/class/hwmon. Everybody else reads
+// what that thread last published. Nothing is ever written to the SMC but
+// the charge limit, and that only when a program writes it.
+//
+// The mailbox words, the keys and what they mean are in core/, which has no
+// kernel in it and is tested on the build machine (tests/apple_smc/core).
+// In a kernel built with -d applesmc_selftest a simulated SMC answers in
+// place of the mailbox, on any machine, and a real one is never touched.
 @[has_globals]
 module smc
 
@@ -109,6 +126,11 @@ pub fn initialise() {
 	if battery_device != unsafe { nil } {
 		return
 	}
+	$if applesmc_selftest ? {
+		// The SMC of this kernel is its own; see the top of this file.
+		selftest_initialise()
+		return
+	}
 	if !devicetree.is_available() {
 		println('apple-smc: no device tree; battery not registered')
 		return
@@ -171,10 +193,16 @@ pub fn initialise() {
 		state: memory.malloc(u64(smccore.vinix_smc_state_size()))
 		snapshots: map[u64]Snapshot{}
 	}
-	result := smccore.vinix_smc_boot(dev.state, voidptr(dev), send, recv, clock, relax,
-		cpu.read_cntfrq_el0(), sram.base, sram.size)
+	start(mut dev, send, recv, sram.base, sram.size, false)
+}
+
+// Start the client on a transport and publish what its SMC has. `dev` is
+// freed here when the SMC does not answer.
+fn start(mut dev Battery, to_smc smccore.Vinix_smc_send_fn, from_smc smccore.Vinix_smc_recv_fn, sram_base u64, sram_size u64, simulated bool) {
+	result := smccore.vinix_smc_boot(dev.state, voidptr(dev), to_smc, from_smc, clock, relax,
+		cpu.read_cntfrq_el0(), sram_base, sram_size)
 	if result < 0 {
-		C.printf(c'apple-smc: probe failed: %s\n', smccore.vinix_smc_error(result))
+		C.kprintf(c'apple-smc: probe failed: %s\n', smccore.vinix_smc_error(result))
 		// No DMA allocations were made and no firmware buffer points at dev.
 		unsafe {
 			free(dev.state)
@@ -188,8 +216,12 @@ pub fn initialise() {
 	dev.sampled_at = smccore.vinix_smc_sample_time(dev.state)
 	dev.frequency = cpu.read_cntfrq_el0()
 	battery_device = dev
+	// The keys behind the power supply and thermal classes, before anything
+	// can ask for them and before the thread that reads them exists.
+	class_probe(mut dev, simulated, initial)
 	if initial == -4 { // VINIX_SMC_NO_KEY: no supported battery on this machine.
 		println('apple-smc: BUIC/BRSC unavailable; battery not registered')
+		class_register(false)
 		spawn service()
 		return
 	}
@@ -210,37 +242,45 @@ pub fn initialise() {
 	power.status = file.pollin
 	battery_power_device = power
 	fs.devtmpfs_add_device(power, 'battery-power')
+	class_register(true)
 	// Publish all Resource fields before starting the polling worker.
 	// System endpoint traffic must be serviced even without userspace readers.
 	spawn service()
 	if initial >= 0 {
-		C.printf(c'apple-smc: /dev/battery: %d%%\n', initial)
+		C.kprintf(c'apple-smc: /dev/battery: %d%%\n', initial)
 	} else {
-		C.printf(c'apple-smc: /dev/battery: %s\n', smccore.vinix_smc_error(initial))
+		C.kprintf(c'apple-smc: /dev/battery: %s\n', smccore.vinix_smc_error(initial))
 	}
 }
 
 fn service() {
 	mut dev := battery_device
+	mut c := smc_class
 	// Reuse the timer rather than allocating one ten times per second.
 	// event.await consumes a pending timer event before sleep.
 	mut timer := time.new_timer(time.TimeSpec{tv_nsec: 100_000_000})
 	for {
 		event.await_one(mut timer.event, true) or {}
 		timer.disarm()
+		// While the machine's devices are suspended the SMC is left alone.
+		if c.stay_parked() {
+			timer.when = time.TimeSpec{tv_nsec: 100_000_000}
+			timer.arm()
+			continue
+		}
 		// No Resource spinlock during firmware waits: Vinix spinlocks mask
 		// interrupts. This worker alone owns the mutable protocol state.
-		result := smccore.vinix_smc_poll(dev.state, 64)
+		mut result := smccore.vinix_smc_poll(dev.state, 64)
 		capacity := if result >= 0 { smccore.vinix_smc_refresh(dev.state) } else { result }
 		sampled_at := smccore.vinix_smc_sample_time(dev.state)
 		dev.l.acquire()
 		dev.sample = capacity
 		dev.sampled_at = sampled_at
 		dev.l.release()
+		mut flags := u32(0)
+		mut voltage := i32(0)
+		mut current := i32(0)
 		if battery_power_device != unsafe { nil } && result >= 0 {
-			mut flags := u32(0)
-			mut voltage := i32(0)
-			mut current := i32(0)
 			mut watts := i32(0)
 			power_result := smccore.vinix_smc_refresh_power(dev.state, &flags, &voltage, &current, &watts)
 			power_at := smccore.vinix_smc_power_time(dev.state)
@@ -253,14 +293,21 @@ fn service() {
 			power.current_ma = current
 			power.power_mw = watts
 			power.l.release()
+			if power_result < 0 {
+				flags = 0
+			}
+		}
+		if result >= 0 {
+			result = c.round(dev.state, capacity, flags, voltage, current)
 		}
 		if result < 0 {
-			C.printf(c'apple-smc: battery service stopped: %s\n', smccore.vinix_smc_error(result))
+			C.kprintf(c'apple-smc: battery service stopped: %s\n', smccore.vinix_smc_error(result))
 			break
 		}
 		timer.when = time.TimeSpec{tv_nsec: 100_000_000}
 		timer.arm()
 	}
+	c.gone()
 	unsafe { free(timer) }
 	sched.dequeue_and_die()
 }
