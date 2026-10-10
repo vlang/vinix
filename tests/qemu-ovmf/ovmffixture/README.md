@@ -1,13 +1,14 @@
 The V fixture owns all twelve original firmware test groups: real Git patch
 checks with LF/CRLF inputs, shallow direct-submodule cloning, interrupted-clone
-recovery, toolchain discovery, and edk2 setup/strict-shell failures. The existing
-Python entry preserves unittest case IDs, filters and Git-unavailable skips:
+recovery, toolchain discovery, and edk2 setup/strict-shell failures. The native
+entry runs the complete suite or one original case name and skips if Git is unavailable:
 
 ```sh
-python3 tests/qemu-ovmf/test_patch.py
+tests/qemu-ovmf/test-patch
+tests/qemu-ovmf/test-patch test_fresh_and_already_patched_checkouts
 ```
 
-The direct native entry is:
+The source can also be compiled directly:
 
 ```sh
 build-support/run-v-tool.sh tests/qemu-ovmf/test_patch.v
@@ -27,3 +28,7 @@ harness. Additional tests force constructor and assertion failures and check
 directory and descriptor retirement. The upstream mode-table bytes and
 production shell builder/patch remain unchanged. No edk2 build, firmware image
 publication or guest execution is claimed.
+
+The Python unittest launcher has been retired. ARM, x86 and ASan/UBSan checks
+exercise all twelve real Git fixtures through the standalone entry; a cold
+launch from outside the checkout verifies compiler selection and cleanup.
