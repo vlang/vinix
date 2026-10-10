@@ -2,6 +2,11 @@
 """A partial or failed guest measurement must never become a passing report."""
 
 import contextlib
+import atexit
+import ctypes
+import os
+import subprocess
+import sys
 import importlib.util
 import io
 import json
@@ -28,41 +33,93 @@ FILE_OPS = ("file", "rename", "unlink_open", "rename_over", "hardlink", "mkdir",
 PROGRAMS = ("/bin/true", "/bin/sleep 0", "/usr/bin/curl --version", "/bin/busybox awk BEGIN{}")
 
 
+_ROOT = Path(__file__).resolve().parents[2]
+_LIBRARY = None
+_LIBRARY_LOCK = threading.Lock()
+_LIBRARY_DIRECTORY = tempfile.TemporaryDirectory
+_LIBRARY_RUN = subprocess.run
+_LIBRARY_PATH, _LIBRARY_STR = Path, str
+_LIBRARY_ENV, _LIBRARY_PLATFORM, _LIBRARY_EXECUTABLE = os.environ, sys.platform, sys.executable
+_LIBRARY_DLL, _LIBRARY_CHAR, _LIBRARY_OBJECT = ctypes.PyDLL, ctypes.c_char_p, ctypes.py_object
+_LIBRARY_REGISTER, _LIBRARY_ERROR, _LIBRARY_DEVNULL = atexit.register, BaseException, subprocess.DEVNULL
+_LIBRARY_GLOBALS = globals
+_LIBRARY_SOURCE = Path(__file__).with_name("fixture_library.v")
+
+
+def _fixture(operation, *arguments):
+    global _LIBRARY
+    with _LIBRARY_LOCK:
+        if _LIBRARY is None:
+            path = _LIBRARY_ENV.get("VINIX_PERF_FIXTURE_LIBRARY")
+            if path is None:
+                owner = _LIBRARY_DIRECTORY(prefix="vinix-perf-fixture-")
+                try:
+                    path = _LIBRARY_STR(_LIBRARY_PATH(owner.name) / ("library.dylib" if _LIBRARY_PLATFORM == "darwin" else "library.so"))
+                    _LIBRARY_RUN([_LIBRARY_STR(_ROOT / "build-support/build-v-host-library.sh"),
+                                  _LIBRARY_STR(_LIBRARY_SOURCE), path,
+                                  "-d", "cpython_perftest", "-d", "use_bundled_libgc"],
+                                 check=True, stdout=_LIBRARY_DEVNULL,
+                                 env={**_LIBRARY_ENV, "VINIX_HOST_PYTHON": _LIBRARY_EXECUTABLE})
+                    library = _LIBRARY_DLL(path)
+                except _LIBRARY_ERROR:
+                    owner.cleanup()
+                    raise
+                _LIBRARY_REGISTER(owner.cleanup)
+            else:
+                library = _LIBRARY_DLL(path)
+            target = library.vinix_perf_fixture
+            target.argtypes = (_LIBRARY_CHAR, _LIBRARY_OBJECT, _LIBRARY_OBJECT, _LIBRARY_OBJECT)
+            target.restype = _LIBRARY_OBJECT
+            _LIBRARY = target
+    pins = []
+    return _LIBRARY(operation.encode(), _LIBRARY_GLOBALS(), arguments,
+                    {"pins": pins, "pair": _pair, "triple": _triple, "names": _asset_names, "raise": _fixture_raise})
+
+
+def _pair(value):
+    try:
+        first, second = value
+        return first, second
+    except BaseException:
+        value = None
+        raise
+
+
+def _triple(value):
+    try:
+        first, second, third = value
+        return first, second, third
+    except BaseException:
+        value = None
+        raise
+
+
+def _asset_names(value):
+    try:
+        return (path.name for path in value)
+    except BaseException:
+        value = None
+        raise
+
+
+def _fixture_raise(error):
+    try:
+        raise error
+    finally:
+        error = None
+
+
 def prepared_dictionary(directory):
     """One valid offline headword in the documented portable data format."""
-    directory.mkdir()
-    key, definition = b"computer", b"An electronic machine."
-    data = (b"VNXDICT1" + struct.pack("<IIII", 1, len(key), len(definition), 0)
-            + struct.pack("<IIII", 0, len(key), 0, len(definition)) + key + definition)
-    (directory / "dictionary.vnd").write_bytes(data)
-    (directory / "LICENSE.WordNet").write_bytes(b"Local test fixture license\n")
-    return data
+    return _fixture('dictionary', directory)
 
 
 def case_lines(variant, scenario, round_number):
-    label = f"variant={variant} scenario={scenario} round={round_number}"
-    if scenario == "ops":
-        operations = [(op, "/tmp") for op in GENERAL_OPS]
-        operations += [(op, directory) for directory in ("/tmp", "/root") for op in FILE_OPS]
-        return [f"PERF-OPS {label} op={op} dir={directory} count=200 bytes_per_op=0"
-                for op, directory in operations]
-    if scenario == "churn":
-        return [f'PERF-CHURN {label} program="{program}" runs=300 retained_kb=0 per_run_bytes=0'
-                for program in PROGRAMS]
-    if scenario == "wakeups":
-        return [f"PERF-WAKEUPS {label} via={via} interval_ms=16 wakeups=100 "
-                "per_second=62.5 cpu=0.10 us_per_wakeup=16" for via in ("nanosleep", "poll")]
-    if scenario == "cache":
-        return [f"PERF-CACHE {label} written_mb=32 used_mb=33 cached_kb=32768 slab_kb=1024"]
-    processes = (5 if scenario == "workflows" else
-                 4 if scenario in ("utilities", "storage", "productivity", "tools") else 1)
-    return [f"PERF-RESULT {label} seconds=1.0 processes={processes} desktop_cpu=1.0 apps_cpu=0.0 "
-            "total_cpu=1.0 desktop_mb=2.0 apps_mb=0.0 total_mb=2.0 system_used_mb=20.0 physical_mb=2.0"]
+    return _fixture('case_lines', variant, scenario, round_number)
 
 
 def complete_lines(variants, scenarios, rounds):
-    return [line for number in range(1, rounds + 1) for scenario in scenarios for variant in variants
-            for line in case_lines(variant, scenario, number)] + [runner.DONE.decode()]
+    return _fixture('complete_lines', variants, scenarios, rounds)
 
 
 
@@ -117,38 +174,19 @@ class MainTests(unittest.TestCase):
             return result, json.loads(output.read_text()), (work / "serial.log").read_bytes()
 
     def test_main_drains_done_already_queued_at_eof(self):
-        result, rows, log = self.main_verdict(complete_lines(["new"], ["ops"], 1))
-        self.assertEqual(result, 0)
-        self.assertEqual(len(rows), 36)
-        self.assertIn(runner.DONE, log)
+        return _fixture('done', self)
 
     def test_main_timeout_preserves_partial_log_and_json(self):
-        lines = case_lines("new", "ops", 1)[:2]
-        result, rows, log = self.main_verdict(lines, expired=True)
-        self.assertEqual(result, 1)
-        self.assertEqual(len(rows), 2)
-        self.assertIn(lines[0].encode(), log)
+        return _fixture('timeout', self)
 
     def test_main_checks_failure_in_final_transcript_after_done(self):
-        lines = complete_lines(["new"], ["ops"], 1)
-        result, rows, log = self.main_verdict(lines, transcript=lines + ["KERNEL PANIC: late"])
-        self.assertEqual(result, 1)
-        self.assertEqual(len(rows), 36)
-        self.assertIn(b"KERNEL PANIC", log)
+        return _fixture('late_failure', self)
 
     def test_main_cannot_pass_before_console_finishes_draining(self):
-        result, rows, log = self.main_verdict(complete_lines(["new"], ["ops"], 1), closed=False)
-        self.assertEqual(result, 1)
-        self.assertEqual(len(rows), 36)
-        self.assertIn(runner.DONE, log)
+        return _fixture('closed', self)
 
     def test_workflows_overlay_both_local_assets_before_guest_launch_and_cleanup(self):
-        result, rows, log = self.main_verdict(complete_lines(["new"], ["workflows"], 1),
-                                             scenario="workflows", dictionary=True)
-        self.assertEqual(result, 0)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["processes"], "5")
-        self.assertIn(runner.DONE, log)
+        return _fixture('workflows', self)
 
     def test_workflows_require_local_dictionary_before_building_or_booting(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -171,84 +209,24 @@ class MainTests(unittest.TestCase):
 
 class DictionaryAssetsTests(unittest.TestCase):
     def test_prepared_data_and_unchanged_license_are_accepted(self):
-        with tempfile.TemporaryDirectory() as directory:
-            source = Path(directory) / "prepared"
-            data = prepared_dictionary(source)
-            assets = runner.dictionary_assets(source)
-            self.assertEqual(tuple(path.name for path in assets), ("dictionary.vnd", "LICENSE.WordNet"))
-            self.assertEqual(assets[0].read_bytes(), data)
-            self.assertEqual(assets[1].read_bytes(), b"Local test fixture license\n")
+        return _fixture('dictionary_accepted', self)
 
     def test_missing_license_nonregular_or_empty_assets_fail(self):
-        for broken in ("missing_license", "empty_license", "data_directory", "empty_data"):
-            with self.subTest(broken=broken), tempfile.TemporaryDirectory() as directory:
-                source = Path(directory) / "prepared"
-                prepared_dictionary(source)
-                if broken == "missing_license":
-                    (source / "LICENSE.WordNet").unlink()
-                elif broken == "empty_license":
-                    (source / "LICENSE.WordNet").write_bytes(b"")
-                elif broken == "data_directory":
-                    (source / "dictionary.vnd").unlink()
-                    (source / "dictionary.vnd").mkdir()
-                else:
-                    (source / "dictionary.vnd").write_bytes(b"")
-                with self.assertRaises(ValueError):
-                    runner.dictionary_assets(source)
+        return _fixture('dictionary_missing', self)
 
     def test_damaged_header_invalid_bounds_and_trailing_data_fail(self):
-        for broken in ("magic", "count", "reserved", "key_size", "definition_size", "trailing"):
-            with self.subTest(broken=broken), tempfile.TemporaryDirectory() as directory:
-                source = Path(directory) / "prepared"
-                data = bytearray(prepared_dictionary(source))
-                if broken == "magic":
-                    data[0] = 0
-                elif broken == "trailing":
-                    data += b"unexpected"
-                else:
-                    at, value = {"count": (8, 0), "reserved": (20, 1),
-                                 "key_size": (12, 129), "definition_size": (16, 0)}[broken]
-                    struct.pack_into("<I", data, at, value)
-                (source / "dictionary.vnd").write_bytes(data)
-                with self.assertRaises(ValueError):
-                    runner.dictionary_assets(source)
+        return _fixture('dictionary_damaged', self)
 
     def test_oversized_local_data_and_license_fail_before_copy(self):
-        for oversized in ("dictionary.vnd", "LICENSE.WordNet"):
-            with self.subTest(oversized=oversized), tempfile.TemporaryDirectory() as directory:
-                source = Path(directory) / "prepared"
-                prepared_dictionary(source)
-                with (source / oversized).open("wb") as stream:
-                    stream.truncate(64 * 1024 * 1024 + 1 if oversized == "dictionary.vnd" else 16385)
-                with self.assertRaises(ValueError):
-                    runner.dictionary_assets(source)
+        return _fixture('dictionary_oversized', self)
 
 
 class TemporaryVMTests(unittest.TestCase):
     def test_interruption_and_setup_failures_remove_images_and_preserve_reports(self):
-        for failure in (RuntimeError("compiler failed"), KeyboardInterrupt()):
-            with self.subTest(failure=type(failure).__name__), tempfile.TemporaryDirectory() as directory:
-                work = Path(directory)
-                log = work / "serial.log"
-                log.write_text("partial report")
-                with self.assertRaises(type(failure)):
-                    with runner.temporary_vm(work) as runtime:
-                        (runtime / "root.ext2").write_bytes(b"temporary VM image")
-                        raise failure
-                self.assertFalse((work / "vm").exists())
-                self.assertEqual(log.read_text(), "partial report")
+        return _fixture('temporary_failures', self)
 
     def test_sigterm_releases_images_and_restores_signal_handler(self):
-        previous = runner.signal.getsignal(runner.signal.SIGTERM)
-        with tempfile.TemporaryDirectory() as directory:
-            work = Path(directory)
-            with self.assertRaises(SystemExit) as stopped:
-                with runner.temporary_vm(work) as runtime:
-                    (runtime / "boot.img").write_bytes(b"temporary VM image")
-                    runner.signal.raise_signal(runner.signal.SIGTERM)
-            self.assertEqual(stopped.exception.code, 128 + runner.signal.SIGTERM)
-            self.assertFalse((work / "vm").exists())
-        self.assertEqual(runner.signal.getsignal(runner.signal.SIGTERM), previous)
+        return _fixture('temporary_signal', self)
 
 
 if __name__ == "__main__":
