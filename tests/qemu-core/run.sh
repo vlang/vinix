@@ -16,7 +16,7 @@ trap cleanup EXIT INT TERM
 # under TCG, there being no persistent volume for a second boot to check.
 if [ "${1:-}" = amd64 ]; then
 	mkdir -p "$work/rootfs/root" "$work/rootfs/sbin" "$work/rootfs/tmp" "$work/rootfs/dev"
-	python3 "$repo/tests/qemu-core/compile-fixtures.py" "$work/v" --arch amd64
+	"$repo/tests/qemu-core/compile-fixtures" "$work/v" --arch amd64
 	for module in signalfixture touchfixture restartfixture nanosleepfixture blockedfixture pollfixture epollfixture intfixture; do
 		"${CC_AMD64:-x86_64-linux-musl-gcc}" -O2 -Wall -Wextra -Werror \
 			-Wno-unused-function -Wno-unused-variable -Wno-unused-parameter -fno-strict-aliasing \
@@ -59,7 +59,7 @@ for command_name in "$cc" python3 tar; do
 done
 
 echo "==> Building static AArch64 core-test init..."
-python3 "$repo/tests/qemu-core/compile-fixtures.py" "$work/v" --arch arm64
+"$repo/tests/qemu-core/compile-fixtures" "$work/v" --arch arm64
 for module in signalfixture touchfixture restartfixture nanosleepfixture blockedfixture pollfixture epollfixture intfixture; do
 	"$cc" --target=aarch64-linux-musl --sysroot="$sysroot" \
 		-O2 -fno-stack-protector -Wall -Wextra -Werror \

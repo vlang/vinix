@@ -48,14 +48,14 @@ materialize it only outside the checkout. Run the host sanitizer comparisons
 with the actual host architecture, or `--arch amd64` on a Mac with Rosetta:
 
 ```sh
-python3 tests/qemu-core/test-signalfixture.py /tmp/qemu-signal --arch arm64
-python3 tests/qemu-core/test-touchfixture.py /tmp/qemu-touch --arch arm64
-python3 tests/qemu-core/test-restartfixture.py /tmp/qemu-restart --arch arm64
-python3 tests/qemu-core/test-nanosleepfixture.py /tmp/qemu-nanosleep --arch arm64
-python3 tests/qemu-core/test-blockedfixture.py /tmp/qemu-blocked --arch arm64
-python3 tests/qemu-core/test-pollfixture.py /tmp/qemu-poll --arch arm64
-python3 tests/qemu-core/test-epollfixture.py /tmp/qemu-epoll --arch arm64
-python3 tests/qemu-core/test-intfixture.py /tmp/qemu-int --arch arm64
+tests/qemu-core/test-signalfixture /tmp/qemu-signal --arch arm64
+tests/qemu-core/test-touchfixture /tmp/qemu-touch --arch arm64
+tests/qemu-core/test-restartfixture /tmp/qemu-restart --arch arm64
+tests/qemu-core/test-nanosleepfixture /tmp/qemu-nanosleep --arch arm64
+tests/qemu-core/test-blockedfixture /tmp/qemu-blocked --arch arm64
+tests/qemu-core/test-pollfixture /tmp/qemu-poll --arch arm64
+tests/qemu-core/test-epollfixture /tmp/qemu-epoll --arch arm64
+tests/qemu-core/test-intfixture /tmp/qemu-int --arch arm64
 ```
 
 The host touch comparison uses real mappings, forks, pipes, protection and
@@ -69,7 +69,7 @@ amd64` to compile its paired original/V guest. Set `VINIX_AARCH64_SYSROOT` and
 compiler. For example, after building the native signal comparison:
 
 ```sh
-python3 tests/qemu-core/test-signalfixture.py /tmp/qemu-signal-native \
+tests/qemu-core/test-signalfixture /tmp/qemu-signal-native \
   --native-build --arch arm64
 python3 tests/kernel-gaps/run.py --arch aarch64 \
   --prebuilt-init /tmp/qemu-signal-native/signal-init \
@@ -103,8 +103,9 @@ These bounded comparisons supplement the full feature and persistence runner.
 
 The build controllers run in `fixturehost` V code: input staging, immutable
 oracle checks, source ranges, compiler flags, allocator guards and receipts all
-use the native implementation. The existing Python entry points retain their
-argparse interfaces and narrow import, subprocess and exception bindings.
+use the native implementation. The eight comparison commands and fixture
+generator invoke V directly through `fixturecli`, retaining the original CLI
+modes and architecture defaults. Their Python entry points are retired.
 The independent `test.c`, fixture assertions and guest deadlines are unchanged.
 Controller qualification compares generated sources, headers, objects and
 logs against frozen Python controls on ARM64 and x86-64, and links both SDK
