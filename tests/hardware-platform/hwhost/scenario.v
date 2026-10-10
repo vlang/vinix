@@ -617,7 +617,37 @@ pub const scenarios = [
 		screens:  deep_screens
 		timeout:  240
 	},
+	Scenario{
+		name:     'suspend-deep-undrawable'
+		about:    'a display the kernel cannot bring back: suspend to RAM is not offered'
+		arches:   ['x86_64']
+		qemu:     ['-vga', 'virtio']
+		required: ['HWTEST START suspend-deep-undrawable', 'HWTEST PASS suspend-deep-undrawable']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'suspend-deep-forced'
+		about:    'the same display with vinix.deep_sleep=force: offered, and the machine comes back'
+		arches:   ['x86_64']
+		cmdline:  'vinix.deep_sleep=force'
+		qemu:     ['-vga', 'virtio']
+		required: ['HWTEST START suspend-deep-forced', 'HWTEST PASS suspend-deep-forced']
+		ending:   .poweroff
+		events:   deep_once
+	},
+	Scenario{
+		name:     'suspend-deep-headless'
+		about:    'no display at all: suspend to RAM is offered, and the machine comes back'
+		arches:   ['x86_64']
+		qemu:     ['-vga', 'none']
+		required: ['HWTEST START suspend-deep-headless', 'HWTEST PASS suspend-deep-headless']
+		ending:   .poweroff
+		events:   deep_once
+	},
 ]
+
+// One sleep that QEMU must have seen begin and end.
+const deep_once = ['SUSPEND', 'WAKEUP']
 
 // What the suspend-to-RAM scenarios share. guest/suspend_deep.v reads the
 // parts of the disk filled here, each once, and writes the patterns looked
