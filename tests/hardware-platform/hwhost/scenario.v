@@ -668,6 +668,31 @@ pub const scenarios = [
 		timeout:  180
 	},
 	Scenario{
+		name:     'suspend-deep-ec'
+		about:    'the embedded controller driver through a suspend to RAM: exchanges, and the chipset\'s event heard again'
+		arches:   ['x86_64']
+		define:   'acpiec_selftest'
+		tables:   ['ec-bench', 'ec-ecdt']
+		qemu:     ec_selftest_qemu('ec-bench', true)
+		required: ['HWTEST START suspend-deep-ec', 'HWTEST PASS suspend-deep-ec']
+		actions:  [
+			Action{
+				after: 'HWTEST STEP controller event before the sleep'
+				qmp:   ec_raise(2)
+			},
+			Action{
+				after: 'HWTEST STEP controller event after the sleep'
+				qmp:   ec_raise(3)
+			},
+			Action{
+				after: 'HWTEST STEP controller event after the second sleep'
+				qmp:   ec_raise(4)
+			},
+		]
+		events:   ['SUSPEND', 'WAKEUP', 'SUSPEND', 'WAKEUP']
+		ending:   .poweroff
+	},
+	Scenario{
 		name:     'suspend-deep-undrawable'
 		about:    'a display the kernel cannot bring back: suspend to RAM is not offered'
 		arches:   ['x86_64']

@@ -47,6 +47,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'suspend-deep' { scenario_suspend_deep(mut t) }
 		'suspend-deep-arrival' { scenario_suspend_deep_arrival(mut t) }
 		'suspend-deep-departure' { scenario_suspend_deep_departure(mut t) }
+		'suspend-deep-ec' { scenario_suspend_deep_ec(mut t) }
 		'suspend-deep-bridge' { scenario_suspend_deep_bridge(mut t) }
 		'suspend-deep-forced' { scenario_suspend_deep_forced(mut t) }
 		'suspend-deep-headless' { scenario_suspend_deep_headless(mut t) }
