@@ -133,6 +133,7 @@ fn power_bench() []u8 {
 //	0x08 BVOL 16   present voltage, mV    0x0e BCYC 16   cycles
 //	0x10 SCRT  8   a counter the table writes
 //	0x12 BDVL 16   design voltage, mV
+//	0x14 TEMP 16   a temperature, in tenths of a kelvin
 //	0x20 WIDE 16   reached a word at a time
 //	0x24 QUAD 32   reached four bytes at a time
 //
@@ -194,6 +195,7 @@ fn ec_region() [][]u8 {
 			aml_field_unit('SCRT', 8),
 			aml_field_gap(8),
 			aml_field_unit('BDVL', 16),
+			aml_field_unit('TEMP', 16),
 		]),
 		aml_field('ERAM', aml_word_access, [
 			aml_field_gap(0x20 * 8),
@@ -336,7 +338,9 @@ fn ec_bench(early bool) []u8 {
 //   - BAT0 shows itself as soon as _REG has run, without asking the
 //     controller, so the kernel takes it on and then cannot read it;
 //   - BAT1 asks the controller whether it is there, cannot be answered, and
-//     is never taken on.
+//     is never taken on;
+//   - a thermal zone, \_TZ.TZEC, reads its temperature from the controller,
+//     as a laptop's does, cannot be answered either, and is not taken on.
 fn ec_absent() []u8 {
 	mut controller := [
 		aml_named('_HID', aml_string('PNP0C09')),
@@ -364,7 +368,16 @@ fn ec_absent() []u8 {
 		]),
 	]
 	scope << ec_power_devices(false, sta)
-	return aml_table('SSDT', 'HWTESTEC', [aml_scope('\\_SB', scope)])
+	return aml_table('SSDT', 'HWTESTEC', [
+		aml_scope('\\_SB', scope),
+		aml_scope('\\_TZ', [
+			aml_thermal_zone('TZEC', [
+				aml_method('_TMP', [aml_return(ec_value('TEMP'))]),
+				// 105 degrees Celsius.
+				aml_method('_CRT', [aml_return(aml_integer(3782))]),
+			]),
+		]),
+	])
 }
 
 // The table called `name`, or an error for a name no scenario should use.

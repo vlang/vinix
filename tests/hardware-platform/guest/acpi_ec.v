@@ -618,6 +618,13 @@ fn scenario_acpi_ec_absent(mut t Test) {
 	// and cannot be read; the one that asks is not there.
 	t.check(os.exists(ec_battery + 'status'), 'BAT0 is not in /sys/class/power_supply')
 	t.check(!os.exists('/sys/class/power_supply/BAT1'), 'BAT1 is in /sys/class/power_supply')
+	// Nor is the thermal zone whose temperature is a field of the controller.
+	for name in list_dir('/sys/class/thermal') or { []string{} } {
+		if name.starts_with('thermal_zone') {
+			kind := read_word('/sys/class/thermal/${name}/type')
+			t.check(kind != 'acpitz', '${name} is an ACPI thermal zone although its temperature cannot be read')
+		}
+	}
 	mut slowest := i64(0)
 	for _ in 0 .. 3 {
 		sleep_ms(ec_stale_ms)
