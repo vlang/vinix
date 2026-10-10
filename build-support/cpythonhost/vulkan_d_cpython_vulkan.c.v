@@ -245,6 +245,7 @@ pub fn vulkan_entry(operation &char, sdk voidptr, arguments voidptr, pins voidpt
 		}
 		return vulkan_literal('unknown')
 	}
+	if name == 'fixture' { return vulkan_fixture(arguments, pins) }
 	if name == 'preparation' { return vulkan_preparation(arguments, pins) }
 	if name in ['received', 'contains', 'value', 'failed', 'send'] {
 		c := VulkanContext{ sdk: sdk, builtins: C.PyEval_GetBuiltins(), pins: pins }

@@ -14,13 +14,20 @@ pub fn dispatch(row map[string]json2.Any) !json2.Any {
 		'constant' { return exported_constant(repo, text(args, 'name'))! }
 		'policy_sources' {
 			mut sources := [repo + '/build-support/dota2/_vulkan_native.py',
-				repo + '/build-support/dota2/vulkan_query.v']
+				repo + '/build-support/dota2/vulkan_query.v',
+				repo + '/build-support/dota2/vulkan_sdk_library.v',
+				repo + '/build-support/build-v-host-library.sh']
 			for directory in ['build-support/dota2/vulkanbuild', 'build-support/dota2/qemubuild',
-				'build-support/cachekey', 'tests/qemu-core/fixturehost'] {
+				'build-support/cachekey', 'tests/qemu-core/fixturehost',
+				'build-support/cpythonhost', 'build-support/android/androidhost'] {
 				mut names := os.ls(repo + '/' + directory)!
 				names = names.filter(it.ends_with('.v') || it.ends_with('.h'))
 				names.sort()
-				for name in names { sources << repo + '/' + directory + '/' + name }
+				for name in names {
+					if directory == 'build-support/cpythonhost' && name.contains('_d_')
+						&& !name.ends_with('_d_cpython_host.c.v') && !name.ends_with('_d_cpython_vulkan.c.v') { continue }
+					sources << repo + '/' + directory + '/' + name
+				}
 			}
 			return words(sources)
 		}

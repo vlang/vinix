@@ -29,6 +29,13 @@ def _module(name, path):
 _transport = _module("vulkan_fixture_transport", ROOT / "build-support/dota2/_vulkan_native.py")
 
 
+_FIXTURE_NAMESPACE = globals()
+
+
+def _native(operation, *arguments):
+    return _transport._entry(b"fixture", _FIXTURE_NAMESPACE, operation, arguments)
+
+
 _host = _module("vulkan_fixture_host", ROOT / "build-support/native_host.py")
 _controller = _host.Controller(ROOT / "tests/dota2/vulkan_fixture.v", "VINIX_DOTA_VULKAN_FIXTURE_QUERY")
 
@@ -55,18 +62,11 @@ def query(operation, arguments, namespace, case=None):
 
     class Owner:
         def __init__(self, manager):
-            self.manager = manager
-            self.active = False
+            _native("init", self, manager)
         def __enter__(self):
-            entered = self.manager.__enter__()
-            self.active = True
-            contexts.push(self)
-            return entered
+            return _native("enter", self, contexts)
         def __exit__(self, *error):
-            if not self.active:
-                return False
-            self.active = False
-            return self.manager.__exit__(*error)
+            return _native("exit", self, error)
 
     def unit(name, values):
         return getattr(case, name)(*_view(values))
@@ -95,17 +95,17 @@ def query(operation, arguments, namespace, case=None):
             def invoke(*args, **kwargs):
                 record = query("effect", {"name": descriptor["name"], "context": descriptor["context"],
                                           "args": list(args), "keywords": kwargs}, namespace, case)
-                if "observation" in record:
-                    observations.append(record["observation"])
+                _native("observe", record, observations)
                 value = record["result"]
                 conversion = descriptor.get("result")
-                if conversion in ("completed", "completed_stdout"):
-                    options = {} if value is None else {"stdout": value}
-                    completed = stage.subprocess.CompletedProcess(args[0], 0, **options)
-                    return completed.stdout if conversion == "completed_stdout" else completed
-                if conversion == "path":
-                    return Path(value)
-                if conversion == "paths":
+                selected = _native("conversion", conversion)
+                if selected == "completed":
+                    options = _native("completed_options", value)
+                    completed = _native("completed", stage, args, options)
+                    return _native("completed_result", completed, conversion)
+                if selected == "path":
+                    return _native("path", value)
+                if selected == "paths":
                     return tuple(Path(item) for item in value)
                 return value
             return invoke
@@ -121,7 +121,7 @@ def query(operation, arguments, namespace, case=None):
                 for component in location[1:-1]:
                     target = getattr(target, component)
                 value = binding(descriptor, observations)
-                options = {"wraps": value} if descriptor["kind"] == "wrap" else {"side_effect": value} if descriptor["kind"] == "callback" else {"return_value": value} if descriptor["kind"] in ("return", "member") else {"new": value}
+                options = _native("options", descriptor, value)
                 mocks.append(stack.enter_context(patch.object(target, location[-1], **options)))
             stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
             if error:
@@ -139,7 +139,7 @@ def query(operation, arguments, namespace, case=None):
     def patch_one(name, descriptor):
         observations = []
         value = binding(descriptor, observations)
-        options = {"wraps": value} if descriptor["kind"] == "wrap" else {"side_effect": value} if descriptor["kind"] == "callback" else {"return_value": value} if descriptor["kind"] in ("return", "member") else {"new": value}
+        options = _native("options", descriptor, value)
         return Owner(patch.object(stage, name, **options))
 
     context = {"REPO": namespace["REPO"], "__file__": namespace["__file__"], "sys": sys,

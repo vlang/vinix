@@ -39,3 +39,20 @@ Validation compares the original helper and whole staging fixture with actual
 ARM64, x86-64 and ASan libraries, weak-object/error controls, references, process
 retirement and cold builds. This host adapter makes no new kernel, QEMU guest,
 physical Vulkan or rendering claim.
+
+The fixture adapter also delegates nonrecursive callback conversion selection,
+patch-option policy, observation publication and its instance-based Owner methods
+to the same native entry. Its original recursive `_view`, namespace dictionary
+comprehension and its original binding selector/member/wrap bodies, paths generator,
+imported-module bootstrap, query supervision and
+with/patch cleanup remain counted Python. Entered values on failed activation or
+ExitStack publication remain owned by the saved Python traceback. Temporary
+manager and CompletedProcess-provider receivers retire after attribute lookup
+and before detached callable invocation.
+
+Staging generation inputs include the selected native CPython SDK V sources,
+the host-library entry/build helper and their Android-host transport inputs.
+Changing a native policy implementation invalidates the private staged-root
+generation even when its Python adapter is unchanged. This cache-scope correction
+receives no additional translation credit. Fixture evidence is retained under
+`/Users/alex/.cache/vinix-python-to-v/vulkan-fixture-object-adapter-20261010/`.
