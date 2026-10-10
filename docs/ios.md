@@ -78,7 +78,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases, 144-byte stat records and native `utime` timestamps; version-4 UUIDs from native entropy; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread, `dispatch_once`, main/global/serial dispatch queues, delayed work and synchronous callbacks |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
-| CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
+| CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, dictionary add-if-absent and raw null entries, exported immutable empty dictionary, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
 | Bitmap graphics | Owned RGB/gray colors with full-precision components and equality, RGB/RGBA/BGRA storage, bitmap/image dimensions and data providers, premultiplied source-over fills, clear/clip, saved state and fill color space, axis-aligned translation/scale, nearest/bilinear image drawing; independent image storage and real PNG/JPEG codecs from the V installation's existing stb library |
 | AudioToolbox PCM | Same-rate, same-channel Int16/Int32/Float32/Float64 conversion between packed little-endian interleaved and planar buffers; complex input callbacks, partial output/error recovery, EOF/reset and converter ownership |
@@ -1335,17 +1335,41 @@ The actual Fortnite probe still exits with status 1 before entry, now at
 CoreFoundation's `CFDictionaryAddValue` in EOSSDK. Audio-session configuration
 and output remain unsupported.
 
+`CFDictionaryAddValue` now keeps the first key/value pair for an equal key,
+without retaining discarded entries or changing the mutation count. Type
+callbacks compare owned keys by value; null callbacks compare raw pointers.
+Native CoreFoundation measurements also confirm that raw null keys and values
+are valid, and both AddValue and SetValue now support them.
+
+CoreFoundation's `__NSDictionary0__struct` export now resolves to the immutable
+empty dictionary object itself. Its address is stable across concurrent first
+lookups and the existing empty-dictionary alias. Native retain/release calls
+leave this constant alive; the V runtime does the same, then frees its cache
+reference after containing collections and the root autorelease pool finish.
+Native Mac ASAN/UBSAN checks cover all four supported callback combinations,
+duplicate-key ownership, 258-entry growth, eight independent dictionary workers,
+eight concurrent singleton lookups and two clean teardowns per new check.
+
+All eleven native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass with these dictionary changes. The intermediate AddValue-only
+run and its next-blocker probe at the empty-dictionary export are retained
+with VM and runner hashes under `cf-dictionary-checks/before-empty`.
+Three more strong imports now resolve. The actual Fortnite probe still exits
+with status 1 before entry, now at Objective-C's `objc_constructInstance` in
+EOSSDK. That API initializes caller-provided storage; the current runtime
+allocates its own object headers and does not yet support that storage path.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,337 | 821 | 81 |
-| EOSSDK | 550 | 112 | 18 |
+| Fortnite executable | 1,338 | 820 | 81 |
+| EOSSDK | 552 | 110 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,947 | 1,049 | 122 |
+| All images | 1,950 | 1,046 | 122 |
 
-The C++/GLES/Text variant reports 1,960 resolved imports, 1,036 unresolved strong
+The C++/GLES/Text variant reports 1,963 resolved imports, 1,033 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1382,10 +1406,12 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
-`file-time-checks`, and the audio constants use `audio-session-checks`). Each
+`file-time-checks`, the audio constants use `audio-session-checks`, and
+CoreFoundation dictionaries use `cf-dictionary-checks`). Each
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
-terminal, thread-policy, file timestamp, UUID and audio-session constant checks before the
+terminal, thread-policy, file timestamp, UUID, audio-session constant and
+CoreFoundation dictionary checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

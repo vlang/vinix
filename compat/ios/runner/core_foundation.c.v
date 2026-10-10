@@ -200,14 +200,37 @@ fn cf_dictionary_value(object u64, key u64) u64 {
 
 fn cf_dictionary_set(object u64, key u64, value u64) {
 	if !objc_is_kind(object, ios_runtime.names['NSMutableDictionary']) { panic('iOS: CFDictionarySetValue requires a mutable dictionary') }
-	if key == 0 || value == 0 { panic('iOS: nil CFDictionary entry') }
 	mut header := obj_header(object)
+	cf_dictionary_check_entry(header, key, value)
 	index := dictionary_index(header, key)
 	if index >= 0 {
 		if header.cf_raw_values { header.items[index] = value } else { objc_store_strong(unsafe { &header.items[index] }, value) }
 		header.mutation++
 	} else {
-		header.keys << if header.cf_raw_keys { key } else { objc_retain(key) }
+		cf_dictionary_insert(mut header, key, value)
+	}
+}
+
+fn cf_dictionary_add(object u64, key u64, value u64) {
+	if !objc_is_kind(object, ios_runtime.names['NSMutableDictionary']) { panic('iOS: CFDictionaryAddValue requires a mutable dictionary') }
+	mut header := obj_header(object)
+	// An equal key leaves the original key/value, retains and mutation count
+	// untouched. In particular, a present raw null value is still present.
+	if dictionary_index(header, key) >= 0 { return }
+	cf_dictionary_check_entry(header, key, value)
+	cf_dictionary_insert(mut header, key, value)
+}
+
+fn cf_dictionary_check_entry(header &ObjHeader, key u64, value u64) {
+	if (key == 0 && !header.cf_raw_keys) || (value == 0 && !header.cf_raw_values) { panic('iOS: nil owned CFDictionary entry') }
+}
+
+fn cf_dictionary_insert(mut header ObjHeader, key u64, value u64) {
+	header.keys << if header.cf_raw_keys { key } else { objc_retain(key) }
+	if header.cf_raw_values {
+		header.items << value
+		header.mutation++
+	} else {
 		array_append(mut header, value)
 	}
 }
@@ -349,6 +372,7 @@ fn core_foundation_symbol(symbol string) ?u64 {
 		'_CFDictionaryGetValue' { u64(unsafe { voidptr(cf_dictionary_value) }) }
 		'_CFDictionaryGetCount' { u64(unsafe { voidptr(cf_array_count) }) }
 		'_CFDictionarySetValue' { u64(unsafe { voidptr(cf_dictionary_set) }) }
+		'_CFDictionaryAddValue' { u64(unsafe { voidptr(cf_dictionary_add) }) }
 		'_CFDictionaryGetTypeID' { u64(unsafe { voidptr(cf_dictionary_id) }) }
 		'_CFDataCreate' { u64(unsafe { voidptr(cf_data_create) }) }
 		'_CFDataCreateMutable' { u64(unsafe { voidptr(cf_data_mutable) }) }

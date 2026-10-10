@@ -405,13 +405,20 @@ fn objc_stop() {
 	objc_release(ios_runtime.defaults)
 	objc_release(ios_runtime.locale)
 	objc_release(ios_runtime.run_loop)
-	for object in ios_runtime.framework_objects { objc_release(object) }
+	// Keep the immortal empty dictionary available through all collection and
+	// autorelease teardown. Release its cache reference after those users stop.
+	for object in ios_runtime.framework_objects { if object != ios_runtime.empty_dictionary { objc_release(object) } }
 	for _, address in ios_runtime.framework_data { C.free(unsafe { voidptr(address) }) }
 	objc_pool_pop(1)
 	objc_pool_free(C.pthread_getspecific(ios_runtime.pool_key))
 	$if ios_text ? { text_stop() }
 	C.pthread_setspecific(ios_runtime.pool_key, unsafe { nil })
 	C.pthread_key_delete(ios_runtime.pool_key)
+	if ios_runtime.empty_dictionary != 0 {
+		ios_runtime.constants.delete(ios_runtime.empty_dictionary)
+		objc_release(ios_runtime.empty_dictionary)
+		ios_runtime.empty_dictionary = 0
+	}
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}

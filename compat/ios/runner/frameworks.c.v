@@ -48,19 +48,28 @@ fn framework_symbol(library string, symbol string) ?u64 {
 		return framework_object(if symbol == '___kCFBooleanTrue' { '_kCFBooleanTrue' } else { '_kCFBooleanFalse' })
 	}
 	if address := framework_scalar(symbol) { return address }
-	if symbol in ['___NSDictionary0__', '_kCFAllocatorDefault'] {
-		if symbol == '___NSDictionary0__' && ios_runtime.empty_dictionary != 0 { return ios_runtime.empty_dictionary }
+	if symbol in ['___NSDictionary0__', '___NSDictionary0__struct'] { return framework_empty_dictionary() }
+	if symbol == '_kCFAllocatorDefault' {
 		if address := ios_runtime.framework_data[symbol] { return address }
-		object := if symbol == '___NSDictionary0__' { objc_allocate(ios_runtime.names['NSDictionary']) } else { u64(0) }
-		if object != 0 { ios_runtime.framework_objects << object }
-		if symbol == '___NSDictionary0__' { ios_runtime.empty_dictionary = object; return object }
 		cell := C.calloc(1, 8)
 		if cell == unsafe { nil } { panic('iOS: cannot allocate CF constant') }
-		unsafe { *(&u64(cell)) = object }
 		ios_runtime.framework_data[symbol] = u64(cell)
 		return u64(cell)
 	}
 	return framework_constant(symbol)
+}
+
+fn framework_empty_dictionary() u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	if ios_runtime.empty_dictionary != 0 { return ios_runtime.empty_dictionary }
+	// Apple's __NSDictionary0__struct export addresses the immutable object
+	// directly. It is immortal to callers, but belongs to this runtime's cache.
+	object := objc_allocate(ios_runtime.names['NSDictionary'])
+	ios_runtime.constants[object] = true
+	ios_runtime.framework_objects << object
+	ios_runtime.empty_dictionary = object
+	return object
 }
 
 fn framework_object(symbol string) u64 {

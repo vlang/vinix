@@ -64,7 +64,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn build(root string, out string, only string) {
 	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'signal-checks',
-		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'native-init'] {
+		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -95,6 +95,8 @@ fn build(root string, out string, only string) {
 					'uuid_test.v'
 				} else if item == 'audio-session-checks' {
 					'audio_session_test.v'
+				} else if item == 'cf-dictionary-checks' {
+					'core_foundation_test.v'
 				} else {
 					'thread_policy_test.v'
 				}
@@ -195,6 +197,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/file-time-checks', fs + '/opt/ios/file-time-checks')
 	copy_file(out + '/uuid-checks', fs + '/opt/ios/uuid-checks')
 	copy_file(out + '/audio-session-checks', fs + '/opt/ios/audio-session-checks')
+	copy_file(out + '/cf-dictionary-checks', fs + '/opt/ios/cf-dictionary-checks')
 	sysroot := root + '/build-aarch64-userland/sysroot'
 	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
 		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
@@ -313,7 +316,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|verify-monitor|regression|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|verify-monitor|regression|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -350,6 +353,8 @@ fn main() {
 		build(root, out, 'uuid-checks')
 	} else if mode == 'build-audio-session' {
 		build(root, out, 'audio-session-checks')
+	} else if mode == 'build-cf-dictionary' {
+		build(root, out, 'cf-dictionary-checks')
 	} else if mode == 'verify-monitor' {
 		verify_monitor(out)
 	} else if mode == 'hash' {
