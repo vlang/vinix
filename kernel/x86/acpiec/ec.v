@@ -67,9 +67,9 @@
 // event bit four times a second instead.
 //
 // A controller that stops answering is given up on by the protocol, and
-// reported to the device core, which tries once to revive it (`reset`) and
-// otherwise marks the device failed; writing 1 to the device's `reset` file
-// tries again.
+// reported to the device core, which marks the device failed; writing 1 to
+// the device's `reset` file asks it one question, and if it answers it is in
+// use again.
 //
 // Sleep. Suspend to idle leaves the controller alone: its event stays on,
 // the threads above keep running, and a lid that opens or a battery that
@@ -183,8 +183,10 @@ mut:
 	poll_wake  eventstruct.Event
 
 	device &devcore.Device = unsafe { nil }
-	// The controller's failure has been announced.
+	// The controller's failure has been announced, and the device core has
+	// not yet been told what to do about it.
 	reported u32
+	fresh    u32
 
 	methods         u64
 	methods_missing u64
@@ -273,6 +275,7 @@ fn announce_failure() {
 	if !katomic.cas(mut &acpiec_wiring.reported, u32(0), u32(1)) {
 		return
 	}
+	katomic.store(mut &acpiec_wiring.fresh, u32(1))
 	reason := outcome_name(acpiec_controller.failure)
 	C.kprintf(c'acpiec: the controller at ports 0x%llx/0x%llx does not answer (%.*s); given up on\n',
 		u64(acpiec_wiring.data_port), u64(acpiec_wiring.command_port), i32(reason.len),
@@ -755,8 +758,16 @@ fn ec_shutdown(mut _dev devcore.Device) {
 	katomic.store(mut &acpiec_wiring.events_on, u32(0))
 }
 
-// The device core's way of trying a failed device again.
+// The device core's way of trying a failed device again. Its first call
+// after a failure is its own, made at once, and is declined: the exchanges
+// that have just run out of time were the try, and another one now would
+// hold the lock, and the global lock with it, for as long again. Declined,
+// the device is marked failed. After that a call is somebody asking, through
+// the device's `reset` file.
 fn ec_reset(mut _dev devcore.Device) bool {
+	if katomic.cas(mut &acpiec_wiring.fresh, u32(1), u32(0)) {
+		return false
+	}
 	outcome, number := acpiec_controller.probe()
 	if outcome != .ok {
 		return false

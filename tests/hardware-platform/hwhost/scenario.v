@@ -163,34 +163,36 @@ fn screen_picture(name string) string {
 }
 
 // The machine of the embedded controller self-test: the tables that describe
-// the controller, and a generation id device, whose only part here is that
-// changing the id makes QEMU's chipset raise general purpose event 5 -- the
-// event the tables give the controller.
+// the controller, and room for three more processors. Their only part here
+// is that adding one makes QEMU's chipset raise general purpose event 2 --
+// the event the tables give the controller.
 fn ec_selftest_qemu(table string, early bool) []string {
 	mut extra := ['-acpitable', 'file={state}/' + table + '.aml']
 	if early {
 		extra << ['-acpitable', 'file={state}/ec-ecdt.aml']
 	}
-	extra << ['-device', 'vmgenid,guid=auto,id=hwgen']
+	extra << ['-smp', '2,maxcpus=5']
 	return extra
 }
 
-const ec_raise = '{"execute":"qom-set","arguments":{"path":"/machine/peripheral/hwgen","property":"guid","value":"auto"}}'
+fn ec_raise(core int) string {
+	return '{"execute":"device_add","arguments":{"driver":"max-x86_64-cpu","id":"hwcpu${core}","socket-id":0,"core-id":${core},"thread-id":0}}'
+}
 
 // Each time the guest has put an event into the simulated controller and
 // says so, the host has the chipset raise the controller's event.
 const ec_selftest_actions = [
 	Action{
 		after: 'HWTEST STEP controller event 1'
-		qmp:   ec_raise
+		qmp:   ec_raise(2)
 	},
 	Action{
 		after: 'HWTEST STEP controller event 2'
-		qmp:   ec_raise
+		qmp:   ec_raise(3)
 	},
 	Action{
 		after: 'HWTEST STEP controller event 3'
-		qmp:   ec_raise
+		qmp:   ec_raise(4)
 	},
 ]
 

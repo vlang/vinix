@@ -135,7 +135,7 @@ fn scenario_acpi_ec_selftest(mut t Test) {
 	ec_check_word(mut t, ec + 'command_port', '0x66')
 	ec_check_word(mut t, ec + 'source', if early { 'ECDT and namespace' } else { 'namespace' })
 	ec_check_word(mut t, ec + 'uid', '7')
-	ec_check_word(mut t, ec + 'gpe', '0x5')
+	ec_check_word(mut t, ec + 'gpe', '0x2')
 	ec_check_word(mut t, ec + 'events', 'gpe')
 	ec_check_word(mut t, ec + 'global_lock', '1')
 	ec_check_word(mut t, ec + 'failed', '0')
@@ -237,10 +237,12 @@ fn scenario_acpi_ec_selftest(mut t Test) {
 	t.check(ec_count('methods_missing') == missing + 1, 'methods_missing went from ${missing} to ${ec_count('methods_missing')}')
 
 	ec_selftest_sleep(mut t)
+	// With a controller that works nobody has ever waited a second for the
+	// global lock.
+	t.check(ec_sim_count('lock_failures') == 0, 'the lock failed ${ec_sim_count('lock_failures')} times')
 	ec_selftest_faults(mut t)
 
 	t.check(ec_sim_count('violations') == 0, 'the protocol was broken ${ec_sim_count('violations')} times')
-	t.check(ec_sim_count('lock_failures') == 0, 'the lock failed ${ec_sim_count('lock_failures')} times')
 	t.check(ec_sim_count('dropped') == 0, '${ec_sim_count('dropped')} queries could not be queued')
 	t.check(ec_sim_count('methods_failed') == 0, '${ec_sim_count('methods_failed')} methods failed')
 	t.info('in all: ${ec_count('transactions')} exchanges, ${ec_count('queries')} events, ${ec_count('timeouts')} timeouts, ${ec_count('stale_bytes')} stale bytes, protocol violations ${ec_sim_count('violations')}')
@@ -381,9 +383,7 @@ fn ec_selftest_faults(mut t Test) {
 	t.check(took >= 2300 && took < 5000, 'reading its charger took ${took} ms')
 	ec_check_word(mut t, ec + 'failed', '1')
 	ec_check_word(mut t, ec + 'failure', 'no answer in time')
-	t.check(ec_count('timeouts') >= timeouts + 3, 'timeouts went from ${timeouts} to ${ec_count('timeouts')}')
-	// From now on nobody waits -- not even behind the device core, which is
-	// trying the controller once more as this goes on.
+	// From now on nobody waits.
 	refused := ec_count('refused')
 	mut slowest := i64(0)
 	for _ in 0 .. 3 {
@@ -397,11 +397,15 @@ fn ec_selftest_faults(mut t Test) {
 	}
 	t.check(slowest < 500, 'a read took ${slowest} ms after the controller was given up on')
 	t.check(ec_count('refused') > refused, 'no caller was turned away')
-	// The device core's one try failed, and it gave the device up too.
-	t.check(ec_wait_word(ec_device + 'state', 'failed', 15000), 'the device is ${read_word(ec_device + 'state')}')
+	// The device core was told, and has marked the device failed.
+	t.check(ec_wait_word(ec_device + 'state', 'failed', 5000), 'the device is ${read_word(ec_device + 'state')}')
 	health := read_text(ec_device + 'health') or { '' }
-	t.check(health.contains('resets: 1'), 'health is ${health.replace('\n', ', ')}')
-	t.check(ec_count('timeouts') == timeouts + 4, 'timeouts went from ${timeouts} to ${ec_count('timeouts')}')
+	t.check(health.contains('failures: 1'), 'health is ${health.replace('\n', ', ')}')
+	t.check(ec_count('timeouts') == timeouts + 3, 'timeouts went from ${timeouts} to ${ec_count('timeouts')}')
+	// While the simulated controller waited, a thread polling its event bit
+	// gave up on the global lock after a second, each time, rather than
+	// wait for it without limit.
+	t.info('the global lock was given up on ${ec_sim_count('lock_failures')} times while the controller was silent')
 	t.info('silent: battery read ${first_read} ms, then at most ${slowest} ms a read; device ${read_word(ec_device + 'state')}')
 
 	// It answers again, and is told to try.
@@ -432,7 +436,7 @@ fn scenario_acpi_ec_absent(mut t Test) {
 	ec_check_word(mut t, ec + 'failed', '1')
 	ec_check_word(mut t, ec + 'failure', 'output buffer would not empty')
 	t.check(ec_wait_word(ec_device + 'state', 'failed', 10000), 'the device is ${read_word(ec_device + 'state')}')
-	t.check(ec_count('transactions') <= 2, '${ec_count('transactions')} exchanges were tried')
+	t.check(ec_count('transactions') == 1, '${ec_count('transactions')} exchanges were tried')
 	t.check(ec_count('queries') == 0, 'the controller named ${ec_count('queries')} events')
 
 	// The battery that shows itself without asking the controller is there

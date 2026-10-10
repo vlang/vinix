@@ -160,10 +160,11 @@ fn power_bench() []u8 {
 pub const bench_ec_data = u16(0x62)
 pub const bench_ec_command = u16(0x66)
 pub const bench_ec_uid = 7
-// The general purpose event QEMU's chipset raises when the machine's
-// generation id is changed (-device vmgenid): the one event of a PC's that a
-// test can have raised from outside at a moment of its choosing.
-pub const bench_ec_gpe = 5
+// The general purpose event QEMU's chipset raises when a processor is added
+// to the running machine: one a test can have raised from outside at a
+// moment of its choosing. The controller's handler takes the place of the
+// method firmware has for it, so the new processor goes unnoticed.
+pub const bench_ec_gpe = 2
 pub const bench_ec_path = '\\_SB.EC0'
 
 fn ec_field(name string) []u8 {
