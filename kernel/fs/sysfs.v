@@ -11,10 +11,12 @@
 // and the same formats, so a program that already knows how to read them needs
 // no special case for Vinix.
 //
-// Everything here is decided at boot and never changes afterwards, apart from
-// the per-node free-memory figures, which are generated when they are read. The
-// tree is therefore built once at mount and left alone -- unlike procfs, which
-// has to track a process table that moves under it.
+// The CPU and node trees are decided at boot and never change afterwards, apart
+// from the per-node free-memory figures, which are generated when they are
+// read, so they are built once at mount and left alone. The devices, buses and
+// power state other modules describe do change -- a card is unplugged, a
+// driver is unbound -- and those parts come and go through the calls in
+// sysfs_dynamic.v.
 @[has_globals]
 module fs
 
@@ -38,6 +40,9 @@ enum SysFSKind {
 	text
 	node_meminfo
 	node_numastat
+	// A file another module answers for; see sysfs_dynamic.v.
+	attribute
+	link
 }
 
 @[heap]
@@ -54,6 +59,19 @@ pub mut:
 	// Which node this file describes, for the generated ones.
 	node int
 	text string
+
+	// What sysfs_dynamic.v needs for an entry that can be taken away again:
+	// the interface box its node and descriptors hold, freed with it, and for
+	// an attribute who answers for it. `gone` is set when the name is removed
+	// and `busy` counts the calls into show or store that have not returned;
+	// see sysfs_remove().
+	dynamic bool
+	box     &resource.Resource = unsafe { nil }
+	show    SysfsShow          = unsafe { nil }
+	store   SysfsStore         = unsafe { nil }
+	context voidptr
+	gone    u32
+	busy    u32
 }
 
 struct SysFS {}
@@ -62,7 +80,23 @@ __global (
 	sysfs_dev_id        u64
 	sysfs_inode_counter u64
 	sysfs_root          &VFSNode
+	sysfs_mounted       bool
 )
+
+// The root directory, made when it is first needed: by the mount, or by a
+// module that has something to publish before /sys is mounted.
+fn sysfs_make_root(filesystem &FileSystem) &VFSNode {
+	if unsafe { sysfs_root != 0 } {
+		return sysfs_root
+	}
+	if sysfs_dev_id == 0 {
+		sysfs_dev_id = resource.create_dev_id()
+	}
+	mut root := create_node(filesystem, &VFSNode(unsafe { nil }), '', true)
+	root.resource = new_sysfs_resource(.directory, stat.ifdir | 0o555, 0)
+	sysfs_root = root
+	return root
+}
 
 fn (this SysFS) instantiate() &FileSystem {
 	return &SysFS{}
@@ -71,16 +105,14 @@ fn (this SysFS) instantiate() &FileSystem {
 fn (this SysFS) populate(_node &VFSNode) {}
 
 fn (mut this SysFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSNode {
-	if sysfs_dev_id == 0 {
-		sysfs_dev_id = resource.create_dev_id()
-	}
-	if unsafe { sysfs_root != 0 } {
+	if sysfs_mounted {
 		return sysfs_root
 	}
-
-	mut root := create_node(this, parent, name, true)
-	root.resource = new_sysfs_resource(.directory, stat.ifdir | 0o555, 0)
-	sysfs_root = root
+	// The root may already hold what drivers published before /sys existed.
+	mut root := sysfs_make_root(this)
+	root.parent = unsafe { parent }
+	root.name = name
+	sysfs_mounted = true
 
 	mut devices_dir := add_sysfs_directory(mut root, 'devices')
 	mut system := add_sysfs_directory(mut devices_dir, 'system')
@@ -135,7 +167,12 @@ fn new_sysfs_resource(kind SysFSKind, mode u32, node int) &SysFSResource {
 	return new_resource
 }
 
+// The directory `name` in `parent`, made if it is not there: the CPU tree and
+// a driver publishing a CPU's frequency both want cpu0, in either order.
 fn add_sysfs_directory(mut parent VFSNode, name string) &VFSNode {
+	if name in parent.children {
+		return unsafe { parent.children[name] }
+	}
 	mut node := create_node(parent.filesystem, parent, name, true)
 	node.resource = new_sysfs_resource(.directory, stat.ifdir | 0o555, 0)
 	node.create_dotentries(parent)
@@ -356,7 +393,13 @@ fn (mut this SysFSResource) read(_handle voidptr, buf voidptr, loc u64, count u6
 		return none
 	}
 
-	text := this.contents()
+	// An attribute's owner is asked for it; a file that has been removed has
+	// nobody left to ask.
+	text := if this.kind == .attribute {
+		this.attribute_text() or { return none }
+	} else {
+		this.contents()
+	}
 	// The generated kinds make their text afresh for every read.
 	defer {
 		if this.kind != .text {
@@ -374,9 +417,12 @@ fn (mut this SysFSResource) read(_handle voidptr, buf voidptr, loc u64, count u6
 	return i64(actual_count)
 }
 
-fn (mut this SysFSResource) write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
-	errno.set(errno.eperm)
-	return none
+fn (mut this SysFSResource) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
+	if this.kind != .attribute || this.store == unsafe { nil } {
+		errno.set(errno.eperm)
+		return none
+	}
+	return this.attribute_store(buf, count)
 }
 
 fn (mut this SysFSResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -388,12 +434,28 @@ fn (mut this SysFSResource) mmap(_handle voidptr, _page u64, _flags int) voidptr
 }
 
 fn (mut this SysFSResource) grow(_handle voidptr, _new_size u64) ? {
+	// `echo mem > /sys/power/state` opens with O_TRUNC first. There is nothing
+	// to resize; the write that follows is the request.
+	if this.kind == .attribute && this.store != unsafe { nil } {
+		return
+	}
 	errno.set(errno.eperm)
 	return none
 }
 
 fn (mut this SysFSResource) unref(_handle voidptr) ? {
-	katomic.dec(mut &this.refcount)
+	if katomic.dec(mut &this.refcount) || !this.dynamic {
+		return
+	}
+	// The name is gone and so is the last descriptor. A text attribute owns
+	// its text; the rest borrowed what they point at.
+	unsafe {
+		if this.kind == .text {
+			this.text.free()
+		}
+		free(voidptr(this.box))
+		free(this)
+	}
 }
 
 fn (mut this SysFSResource) link(_handle voidptr) ? {

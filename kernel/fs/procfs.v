@@ -1448,6 +1448,10 @@ fn procfs_lookup_refresh_locked(node &VFSNode, name string) {
 // its nodes without freeing them, so the copied node remains safe to reduce
 // after unlocking, including when reduction recursively follows a symlink.
 fn lookup_child(node &VFSNode, name string) &VFSNode {
+	// /sys loses entries too, under a lock of its own.
+	if is_sysfs_resource(node.resource) {
+		return sysfs_lookup_child(node, name)
+	}
 	protected := is_procfs_resource(node.resource)
 	if protected { procfs_lock.acquire() }
 	defer { if protected { procfs_lock.release() } }
@@ -1461,6 +1465,9 @@ fn lookup_child(node &VFSNode, name string) &VFSNode {
 // Other filesystems keep their existing owned-key listing. Resolving redirects
 // and mounts happens after unlocking, never while holding procfs_lock.
 fn directory_snapshot(node &VFSNode) ([]string, []&VFSNode) {
+	if is_sysfs_resource(node.resource) {
+		return sysfs_directory_snapshot(node)
+	}
 	if !is_procfs_resource(node.resource) {
 		return node.children.keys(), []&VFSNode{}
 	}
