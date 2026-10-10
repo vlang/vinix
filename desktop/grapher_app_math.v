@@ -211,7 +211,11 @@ fn (mut p GrapherParser) expression(minimum int) bool {
 
 fn grapher_parse(source string) ?GrapherProgram {
 	if source.len == 0 || source.len > grapher_expression_limit { return none }
-	mut parser := GrapherParser{ source: source }
+	// Mutable parsing promotes scratch state to the heap. Own that allocation
+	// explicitly and release it after copying the bytecode, including failures.
+	// The source string is borrowed and must not be freed with the parser.
+	mut parser := &GrapherParser{ source: source }
+	defer { unsafe { free(parser) } }
 	if !parser.expression(0) { return none }
 	parser.space()
 	if parser.at != source.len { return none }
@@ -291,7 +295,7 @@ fn (program &GrapherProgram) evaluate(x f64) GrapherValue {
 fn grapher_constant(source string) ?f64 {
 	program := grapher_parse(source) or { return none }
 	if program.uses_x { return none }
-	value := program.evaluate(0)
+	value := (unsafe { &program }).evaluate(0)
 	if !value.valid { return none }
 	return value.value
 }

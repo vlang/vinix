@@ -130,11 +130,11 @@ fn (mut app GrapherApp) plot() bool {
 	step := (range[1] - range[0]) / f64(grapher_sample_count - 1)
 	mut valid := 0
 	for index in 0 .. grapher_sample_count {
-		app.values[index] = program.evaluate(range[0] + f64(index) * step)
+		app.values[index] = app.program.evaluate(range[0] + f64(index) * step)
 		app.connect[index] = false
 		if app.values[index].valid { valid++ }
 		if index > 0 {
-			app.connect[index] = grapher_connect(&program, app.values[index - 1], app.values[index],
+			app.connect[index] = grapher_connect(&app.program, app.values[index - 1], app.values[index],
 				range[0] + f64(index - 1) * step, step, range[3] - range[2])
 		}
 	}
@@ -410,7 +410,7 @@ fn (mut app GrapherApp) export_csv() {
 		return
 	}
 	mut identity := C.stat{}
-	identified := C.fstat(fd, &identity) == 0
+	identified := desktop_fill_fstat(fd, unsafe { &identity })
 	bytes := app.csv()
 	written := identified && desktop_write_all(fd, bytes.data, u64(bytes.len)) && desktop_preferences_fsync(fd) && archive_sync_parent(parent, fd)
 	unsafe { bytes.free() }
@@ -418,7 +418,7 @@ fn (mut app GrapherApp) export_csv() {
 	if !written || !closed {
 		mut current := C.stat{}
 		// A replacement at this name belongs to someone else; retain it.
-		if identified && C.fstatat(parent, &char(leaf.str), &current, C.AT_SYMLINK_NOFOLLOW) == 0
+		if identified && desktop_fill_fstatat(parent, leaf, unsafe { &current }, C.AT_SYMLINK_NOFOLLOW)
 			&& current.st_dev == identity.st_dev && current.st_ino == identity.st_ino {
 			C.unlinkat(parent, &char(leaf.str), 0)
 		}

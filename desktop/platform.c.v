@@ -1295,6 +1295,14 @@ fn desktop_fill_stat(path string, info &C.stat) bool {
 	return unsafe { C.stat(&char(path.str), info) } == 0
 }
 
+fn desktop_fill_fstat(fd int, info &C.stat) bool {
+	return unsafe { C.fstat(fd, info) } == 0
+}
+
+fn desktop_fill_fstatat(dirfd int, path string, info &C.stat, flags int) bool {
+	return unsafe { C.fstatat(dirfd, &char(path.str), info, flags) } == 0
+}
+
 // lstat, so a symbolic link is reported as the link and not as whatever it
 // points at. An inventory that followed one would count the target's bytes
 // again under a second name, and a link into an ancestor would never finish.

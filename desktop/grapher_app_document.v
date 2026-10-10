@@ -71,6 +71,12 @@ fn grapher_document_path_valid(path string) bool {
 	return path.len <= grapher_field_limit && grapher_valid_utf8(path) && archive_absolute_valid(path)
 }
 
+// Keep both caller-owned stat buffers borrowed across the C accessor.
+fn grapher_document_metadata_same(before &C.stat, after &C.stat) bool {
+	return before.st_size == after.st_size && before.st_mtime == after.st_mtime
+		&& unsafe { C.vinix_archive_mtime_nsec(before) } == unsafe { C.vinix_archive_mtime_nsec(after) }
+}
+
 fn (mut app GrapherApp) open_graph_document() {
 	app.export_status = ''
 	path := app.field_text(6)
@@ -85,7 +91,7 @@ fn (mut app GrapherApp) open_graph_document() {
 	}
 	defer { desktop_close(fd) }
 	mut info := C.stat{}
-	if unsafe { C.fstat(fd, &info) } != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG) {
+	if !desktop_fill_fstat(fd, unsafe { &info }) || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG) {
 		app.document_status = 'grapher.document_open_failed'
 		return
 	}
@@ -107,8 +113,8 @@ fn (mut app GrapherApp) open_graph_document() {
 	mut extra := u8(0)
 	if desktop_read(fd, unsafe { &extra }, 1) != 0 { return }
 	mut after := C.stat{}
-	if unsafe { C.fstat(fd, &after) } != 0 || after.st_size != info.st_size || after.st_mtime != info.st_mtime
-		|| unsafe { C.vinix_archive_mtime_nsec(&after) } != unsafe { C.vinix_archive_mtime_nsec(&info) } { return }
+	if !desktop_fill_fstat(fd, unsafe { &after })
+		|| !grapher_document_metadata_same(unsafe { &info }, unsafe { &after }) { return }
 	document := grapher_document_parse(editor_bytes_text(bytes)) or { return }
 	// No model state changes until every record and all math fields validate.
 	for index, text in document.fields { app.set_field(index, text) }
@@ -148,7 +154,7 @@ fn (mut app GrapherApp) save_graph_document() {
 		return
 	}
 	mut identity := C.stat{}
-	identified := unsafe { C.fstat(fd, &identity) } == 0
+	identified := desktop_fill_fstat(fd, unsafe { &identity })
 	bytes := grapher_document_bytes(fields)
 	written := identified && desktop_write_all(fd, bytes.data, u64(bytes.len)) && desktop_preferences_fsync(fd) && archive_sync_parent(parent, fd)
 	unsafe { bytes.free() }
@@ -156,7 +162,7 @@ fn (mut app GrapherApp) save_graph_document() {
 	if !written || !closed {
 		mut current := C.stat{}
 		// Preserve a concurrently replaced name; remove only our failed creation.
-		if identified && unsafe { C.fstatat(parent, &char(leaf.str), &current, C.AT_SYMLINK_NOFOLLOW) } == 0
+		if identified && desktop_fill_fstatat(parent, leaf, unsafe { &current }, C.AT_SYMLINK_NOFOLLOW)
 			&& current.st_dev == identity.st_dev && current.st_ino == identity.st_ino {
 			C.unlinkat(parent, &char(leaf.str), 0)
 		}

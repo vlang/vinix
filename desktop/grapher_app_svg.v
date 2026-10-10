@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Standalone vector output uses only a fixed stack buffer and borrowed labels.
+// Standalone vector output uses a fixed-size buffer and borrowed labels.
 module main
 
 import math
@@ -177,7 +177,8 @@ fn (app &GrapherApp) svg_model_valid() bool {
 
 fn (app &GrapherApp) write_graph_svg(fd int) bool {
 	if !app.svg_model_valid() { return false }
-	mut stream := GrapherSvgStream{fd: fd}
+	mut stream := &GrapherSvgStream{fd: fd}
+	defer { unsafe { free(stream) } }
 	stream.append('<?xml version="1.0" encoding="UTF-8"?>\n')
 	stream.append('<svg xmlns="http://www.w3.org/2000/svg" width="960" height="640" viewBox="0 0 960 640">\n')
 	stream.append('<title>')
@@ -279,14 +280,14 @@ fn (mut app GrapherApp) export_svg() {
 		return
 	}
 	mut identity := C.stat{}
-	identified := unsafe { C.fstat(fd, &identity) } == 0
+	identified := desktop_fill_fstat(fd, unsafe { &identity })
 	written := identified && app.write_graph_svg(fd) && desktop_preferences_fsync(fd)
 		&& archive_sync_parent(parent, fd)
 	closed := desktop_close(fd) == 0
 	if !written || !closed {
 		mut current := C.stat{}
 		// Only unlink our failed creation; retain a concurrently replaced name.
-		if identified && unsafe { C.fstatat(parent, &char(leaf.str), &current, C.AT_SYMLINK_NOFOLLOW) } == 0
+		if identified && desktop_fill_fstatat(parent, leaf, unsafe { &current }, C.AT_SYMLINK_NOFOLLOW)
 			&& current.st_dev == identity.st_dev && current.st_ino == identity.st_ino {
 			C.unlinkat(parent, &char(leaf.str), 0)
 		}

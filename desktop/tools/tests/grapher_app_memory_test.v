@@ -13,6 +13,30 @@ fn C.vinix_heap_end() u64
 fn C.vinix_grapher_heap_require_tracking()
 fn C.vinix_grapher_heap_require_clean()
 
+fn test_grapher_parser_success_rejection_and_constant_evaluation_release_scratch_storage() {
+	deep := '('.repeat(grapher_depth_limit + 1) + 'x' + ')'.repeat(grapher_depth_limit + 1)
+	defer { unsafe { deep.free() } }
+	C.vinix_heap_begin()
+	witness := []u8{len: 16}
+	C.vinix_grapher_heap_require_tracking()
+	unsafe { witness.free() }
+	for _ in 0 .. 1000 {
+		program := grapher_parse('sin(x)+x^2') or { panic('expected expression') }
+		value := (unsafe { &program }).evaluate(0)
+		assert value.valid && value.value == 0
+		assert grapher_parse('sin(') == none
+		assert grapher_parse('x trailing') == none
+		assert grapher_parse(deep) == none
+		constant := grapher_constant('2^3^2') or { panic('expected constant') }
+		assert constant == 512
+		assert grapher_constant('x+1') == none
+		assert grapher_constant('sqrt(-1)') == none
+		assert grapher_constant('sin(') == none
+	}
+	C.vinix_grapher_heap_require_clean()
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_grapher_repeated_parse_evaluation_and_plot_release_owned_memory() {
 	mut app := GrapherApp{}
 	app.initialize()
@@ -320,10 +344,11 @@ fn test_grapher_repeated_svg_stream_failure_escaping_and_nonfinite_model_retain_
 			assert app.plot()
 			assert !app.write_graph_svg(-1)
 		}
-		mut stream := GrapherSvgStream{fd: -1}
+		mut stream := &GrapherSvgStream{fd: -1}
 		stream.text('& < > " \' Ж 日本語')
 		stream.text('\xef\xbf\xbf')
 		assert !stream.ok
+		unsafe { free(stream) }
 		app.values[0] = GrapherValue{valid: true, value: math.inf(1)}
 		assert !app.write_graph_svg(-1)
 		app.set_field(0, 'x+1')

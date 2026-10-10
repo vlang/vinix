@@ -132,13 +132,13 @@ fn (mut app GrapherApp) export_png() {
 		return
 	}
 	mut identity := C.stat{}
-	identified := unsafe { C.fstat(fd, &identity) } == 0
+	identified := desktop_fill_fstat(fd, unsafe { &identity })
 	written := identified && app.write_graph_png(fd) && desktop_preferences_fsync(fd)
 		&& archive_sync_parent(parent, fd)
 	closed := desktop_close(fd) == 0
 	if !written || !closed {
 		mut current := C.stat{}
-		if identified && unsafe { C.fstatat(parent, &char(leaf.str), &current, C.AT_SYMLINK_NOFOLLOW) } == 0
+		if identified && desktop_fill_fstatat(parent, leaf, unsafe { &current }, C.AT_SYMLINK_NOFOLLOW)
 			&& current.st_dev == identity.st_dev && current.st_ino == identity.st_ino {
 			C.unlinkat(parent, &char(leaf.str), 0)
 		}
