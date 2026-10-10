@@ -209,6 +209,7 @@ pub fn remove_images(scenario Scenario, state string) {
 	mut files := ['initramfs.tar', 'boot.img', 'vars.fd', 'test.iso', 'limine.conf', 'qmp.sock']
 	files << scenario.disks.map(it.name)
 	files << scenario.tables.map(it + '.aml')
+	files << scenario.files.map(it.path)
 	for name in files {
 		os.rm(os.join_path(state, name)) or {}
 	}

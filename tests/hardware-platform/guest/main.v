@@ -26,6 +26,9 @@ fn run_scenario(name string, mut t Test) bool {
 		'ahci' { scenario_ahci(mut t) }
 		'devices' { scenario_devices(mut t) }
 		'firmware' { scenario_firmware(mut t) }
+		'iommu-amd' { scenario_iommu_amd(mut t) }
+		'iommu-intel' { scenario_iommu_intel(mut t) }
+		'iommu-off' { scenario_iommu_off(mut t) }
 		'power-button-init' { scenario_power_button_init(mut t) }
 		'qmp-powerdown' { scenario_qmp_powerdown(mut t) }
 		'restart' { scenario_restart(mut t) }

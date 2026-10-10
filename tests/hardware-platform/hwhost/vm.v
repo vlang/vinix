@@ -144,6 +144,11 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	for disk in scenario.disks {
 		create_disk(disk, state)!
 	}
+	for file in scenario.files {
+		path := os.join_path(state, file.path)
+		os.mkdir_all(os.dir(path))!
+		os.write_file(path, file.text)!
+	}
 	for table in scenario.tables {
 		os.write_file_array(os.join_path(state, table + '.aml'), acpi_table(table)!)!
 	}

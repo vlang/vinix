@@ -28,6 +28,13 @@ pub enum Ending {
 	running
 }
 
+// A file the controller writes in the state directory before the boot.
+pub struct StateFile {
+pub:
+	path string // relative to the state directory; directories are made
+	text string
+}
+
 // A raw disk the controller creates in the state directory before the boot.
 pub struct Disk {
 pub:
@@ -80,11 +87,26 @@ pub:
 	// ACPI tables to give the machine, by the names acpi_table() knows. Each is
 	// written to {state}/<name>.aml; the scenario's own QEMU arguments load it.
 	tables       []string
+	// Small files to put in the state directory before the boot, such as what
+	// QEMU's TFTP server is to serve.
+	files        []StateFile
 	required     []string // every one must appear on some serial line
 	forbidden    []string // besides always_forbidden
 	actions      []Action
 	ending       Ending
 	patterns     []DiskPattern
+}
+
+// What QEMU's TFTP server serves the guest's network probe; see guest/network.v.
+const tftp_probe = StateFile{
+	path: 'tftp/hwtest-probe'
+	text: 'hwtest-okay'
+}
+
+const iommu_disk = Disk{
+	name:     'disk.raw'
+	size_mib: 32
+	header:   'vinix hardware test disk: not blank'
 }
 
 pub const scenarios = [
@@ -151,6 +173,42 @@ pub const scenarios = [
 				qmp:   '{"execute":"system_powerdown"}'
 			},
 		]
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'iommu-intel'
+		about:    'network card and disk controller isolated behind Intel VT-d'
+		arches:   ['x86_64']
+		cmdline:  'vinix.iommu=1'
+		qemu:     ['-device', 'intel-iommu', '-nic', 'user,model=e1000,tftp={state}/tftp', '-drive',
+			'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [iommu_disk]
+		files:    [tftp_probe]
+		required: ['HWTEST START iommu-intel', 'HWTEST PASS iommu-intel']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'iommu-amd'
+		about:    'network card and disk controller isolated behind AMD-Vi'
+		arches:   ['x86_64']
+		cmdline:  'vinix.iommu=1'
+		// QEMU's AMD unit translates nothing unless it is told to.
+		qemu:     ['-device', 'amd-iommu,dma-remap=on', '-nic', 'user,model=e1000,tftp={state}/tftp',
+			'-drive', 'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [iommu_disk]
+		files:    [tftp_probe]
+		required: ['HWTEST START iommu-amd', 'HWTEST PASS iommu-amd']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'iommu-off'
+		about:    'an IOMMU the command line did not ask for is left off'
+		arches:   ['x86_64']
+		qemu:     ['-device', 'intel-iommu', '-nic', 'user,model=e1000,tftp={state}/tftp', '-drive',
+			'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [iommu_disk]
+		files:    [tftp_probe]
+		required: ['HWTEST START iommu-off', 'HWTEST PASS iommu-off']
 		ending:   .poweroff
 	},
 	Scenario{
