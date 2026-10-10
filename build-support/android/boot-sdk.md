@@ -41,3 +41,24 @@ VINIX_ANDROID_BOOT_LIBRARY=/tmp/boot-sdk.dylib python3 tests/alloc-bench/test_v_
 
 This host adapter does not establish a new kernel build, guest boot, hardware
 result or benchmark measurement.
+
+The standard-library primitive dispatcher is native V in
+`cpythonhost/boot_stdlib_d_cpython_boot.c.v`. It evaluates the original rich
+operation comparisons in order and calls the caller's actual Path, archive,
+subprocess and module objects. Fixed operand names have a finite strong literal
+pool; dynamic arguments are not cached. The original named locals remain owned
+through a saved error, and unnamed receivers retire before detached methods run.
+
+Python retains the actual keyword expansion, comprehensions, conditional tuple
+selection, archive context managers, deterministic ZipInfo construction and
+import-loader syntax in `_boot_stdlib_syntax`. Those leaves and the independent
+fixtures receive zero translation credit. Qualification compares actual files,
+archive contents, subprocess results, error identity and object retirement on
+ARM, x86 and sanitizers. It does not establish fresh kernel, QEMU or device results.
+
+Delegated syntax transfers its genuine original named locals to one dictionary
+in the original local-variable order, then clears the temporary binding frame
+and its cached locals view. Native duplicate references retire before that
+owner. A successful call releases the dictionary immediately; a saved error
+keeps it until its traceback retires. This preserves path, method, archive and
+context-manager destruction order across the split implementation.

@@ -93,106 +93,82 @@ def _binary():
     return _BINARY
 
 
+_STDLIB_LOCAL_NAMES = ('operation', 'row', 'context', 'resources', 'path', 'method', 'value', 'arguments', 'archive', 'iterator', 'member', '_', 'contents', 'target', 'name', 'resource', 'output', 'temporary', 'source', 'specification', 'art')
+
+
+def _stdlib_pin_scope(pins, frame):
+    try:
+        values = frame.f_locals
+        pins.append({name: values[name] for name in _STDLIB_LOCAL_NAMES if name in values})
+    finally:
+        pins = frame = values = None
+
+
 def _primitive(operation, row, context, resources):
-    path = Path(row["path"]) if "path" in row else None
-    if operation == "path":
-        method = row["method"]
-        if method in ("name", "parent", "parts", "suffix"):
-            value = getattr(path, method)
-            return list(value) if method == "parts" else str(value)
-        arguments = row.get("arguments", [])
-        if method == "unlink" and resources.get("temporary") == str(path):
-            resources.pop("temporary")
-        value = getattr(path, method)(*arguments, **row.get("options", {}))
-        return str(value) if isinstance(value, Path) else value
-    if operation == "join":
-        return str(Path(row["parent"]) / row["child"])
-    if operation == "read_bytes":
-        return path.read_bytes().hex()
-    if operation == "write_bytes":
-        return path.write_bytes(bytes.fromhex(row["data"]))
-    if operation == "read_text":
-        return path.read_text()
-    if operation == "print":
-        print(row["data"])
-        return None
-    if operation == "write_text":
-        return path.write_text(row["data"])
-    if operation == "stat":
-        return path.stat().st_size
-    if operation == "rmtree":
-        return context["shutil"].rmtree(path)
-    if operation == "replace":
-        return context["os"].replace(path, Path(row["destination"]))
-    if operation == "json_loads":
-        return context["json"].loads(row["data"])
-    if operation == "json_dumps":
-        return context["json"].dumps(row["data"], **row.get("options", {}))
-    if operation == "run":
-        context["subprocess"].run(row["arguments"], check=True)
-        return None
-    if operation == "capture":
-        return context["subprocess"].check_output(row["arguments"], text=True)
-    if operation == "tar_open":
-        archive = context["tarfile"].open(path, "r:gz", ignore_zeros=True)
-        return _register(resources, (archive, iter(archive)))
-    if operation == "tar_next":
-        archive, iterator = resources[row["id"]]
-        member = next(iterator, None)
-        if member is None:
-            return None
-        resources["member"] = member
-        return {"name": member.name, "regular": member.isfile()}
-    if operation == "tar_copy":
-        archive, _ = resources[row["id"]]
-        contents = archive.extractfile(resources["member"])
-        if contents is None:
-            return False
-        with contents, path.open("wb") as target:
-            context["shutil"].copyfileobj(contents, target)
-        return True
-    if operation == "zip_open":
-        archive = context["zipfile"].ZipFile(path, row.get("mode", "r"),
-                                            compression=row.get("compression", 0))
-        return _register(resources, archive)
-    if operation == "zip_names":
-        return resources[row["id"]].namelist()
-    if operation == "zip_read":
-        return resources[row["id"]].read(row["name"]).hex()
-    if operation == "zip_write":
-        name = row["name"]
-        if row.get("deterministic"):
-            name = context["zipfile"].ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-            name.compress_type = context["zipfile"].ZIP_DEFLATED
-            name.external_attr = 0o644 << 16
-        return resources[row["id"]].writestr(name, bytes.fromhex(row["data"]))
-    if operation == "zip_file":
-        return resources[row["id"]].write(path, row["name"])
-    if operation == "close":
-        resource = resources.pop(row["id"])
-        return (resource[0] if isinstance(resource, tuple) else resource).close()
-    if operation in ("glob", "rglob"):
-        return [str(item) for item in getattr(path, operation)(row["pattern"])]
-    if operation == "temporary_copy":
-        with context["tempfile"].NamedTemporaryFile(prefix=row["prefix"], dir=path, delete=False) as output:
-            temporary = str(output.name)
-            resources["temporary"] = temporary
-            with Path(row["source"]).open("rb") as source:
-                context["shutil"].copyfileobj(source, output)
-        return temporary
-    if operation == "art_import":
-        specification = context["importlib"].util.spec_from_file_location("art_runtime", path)
-        art = context["importlib"].util.module_from_spec(specification)
-        assert specification.loader is not None
-        specification.loader.exec_module(art)
-        resources["art"] = art
-        return art.MANIFEST
-    if operation == "art_read":
-        return resources["art"].read_manifest(path)
-    if operation == "art_inside":
-        art = resources["art"]
-        return str(art._inside(path, art._relative(row["name"])))
-    raise RuntimeError("unknown bootclasspath primitive " + operation)
+    try:
+        return _entry(b"stdlib", operation, row, context, resources)
+    finally:
+        operation = row = context = resources = None
+
+
+def _boot_stdlib_syntax(_branch, operation, path, row, context, resources, _pins):
+    try:
+        if _branch == "path":
+            method = row["method"]
+            if method in ("name", "parent", "parts", "suffix"):
+                value = getattr(path, method)
+                return list(value) if method == "parts" else str(value)
+            arguments = row.get("arguments", [])
+            if method == "unlink" and resources.get("temporary") == str(path):
+                resources.pop("temporary")
+            value = getattr(path, method)(*arguments, **row.get("options", {}))
+            return str(value) if isinstance(value, Path) else value
+        if _branch == "json_dumps":
+            return context["json"].dumps(row["data"], **row.get("options", {}))
+        if _branch == "tar_copy":
+            archive, _ = resources[row["id"]]
+            contents = archive.extractfile(resources["member"])
+            if contents is None:
+                return False
+            with contents, path.open("wb") as target:
+                context["shutil"].copyfileobj(contents, target)
+            return True
+        if _branch == "zip_write":
+            name = row["name"]
+            if row.get("deterministic"):
+                name = context["zipfile"].ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+                name.compress_type = context["zipfile"].ZIP_DEFLATED
+                name.external_attr = 0o644 << 16
+            return resources[row["id"]].writestr(name, bytes.fromhex(row["data"]))
+        if _branch == "close":
+            resource = resources.pop(row["id"])
+            return (resource[0] if isinstance(resource, tuple) else resource).close()
+        if _branch in ("glob", "rglob"):
+            return [str(item) for item in getattr(path, operation)(row["pattern"])]
+        if _branch == "temporary_copy":
+            with context["tempfile"].NamedTemporaryFile(prefix=row["prefix"], dir=path, delete=False) as output:
+                temporary = str(output.name)
+                resources["temporary"] = temporary
+                with Path(row["source"]).open("rb") as source:
+                    context["shutil"].copyfileobj(source, output)
+            return temporary
+        if _branch == "art_import":
+            specification = context["importlib"].util.spec_from_file_location("art_runtime", path)
+            art = context["importlib"].util.module_from_spec(specification)
+            assert specification.loader is not None
+            specification.loader.exec_module(art)
+            resources["art"] = art
+            return art.MANIFEST
+        if _branch == "art_inside":
+            art = resources["art"]
+            return str(art._inside(path, art._relative(row["name"])))
+        raise RuntimeError("unknown bootclasspath primitive " + operation)
+    finally:
+        _stdlib_pin_scope(_pins, _stdlib_frame())
+        operation = row = context = resources = path = method = value = arguments = archive = iterator = member = _ = contents = target = name = resource = output = temporary = source = specification = art = None
+        _branch = _pins = None
+        _stdlib_frame().f_locals
+
 
 
 def call(operation, arguments, context):
@@ -298,6 +274,7 @@ import builtins as _builtins
 import contextlib as _contextlib
 import importlib.util as _import_util
 import sys as _sys
+_stdlib_frame = _sys._getframe
 
 _host_spec = _import_util.spec_from_file_location('android_runtime_transport', _HERE.parent / 'native_host.py')
 _host = _import_util.module_from_spec(_host_spec)

@@ -772,6 +772,7 @@ pub fn boot_entry(operation &char, namespace voidptr, arguments voidptr, pins vo
 		'arguments' { boot_arguments(unsafe { &context }, C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1)) }
 		'invoke' { boot_invoke(unsafe { &context }, C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1), C.PyTuple_GetItem(arguments, 2)) }
 		'register' { boot_register(unsafe { &context }, C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1)) }
+		'stdlib' { boot_stdlib(unsafe { &context }, C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1), C.PyTuple_GetItem(arguments, 2), C.PyTuple_GetItem(arguments, 3)) }
 		'primitive' { boot_primitive(unsafe { &context }, string_value(C.PyTuple_GetItem(arguments, 0)), C.PyTuple_GetItem(arguments, 1), C.PyTuple_GetItem(arguments, 2), C.PyTuple_GetItem(arguments, 3)) }
 		else { unsafe { nil } }
 	}
