@@ -32,6 +32,7 @@
 @[has_globals]
 module wake
 
+import cpufreq
 import memory
 import lib
 import x86.apic
@@ -227,6 +228,11 @@ pub fn sleep_processor(enter fn ()) bool {
 	slept := save_and_enter(enter)
 	disarm()
 	restore_extended()
+	if slept {
+		// Its frequency registers are as power-on left them: the interface
+		// is off again, and the next write of a request would fault.
+		cpufreq.cpu_lost_power(0)
+	}
 	return slept
 }
 
