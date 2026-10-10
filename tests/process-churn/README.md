@@ -12,7 +12,7 @@ the ARM medium classes. The 32-class capacity is checked rather than silently
 discarding classes.
 
 `PROCESS CHURN: DONE failures=0` means the workload and measurements completed.
-It does not mean the kernel has no leaks. `check-results.py` requires all
+It does not mean the kernel has no leaks. `check-results` requires all
 cohorts, real grace periods, and untruncated live-allocation summaries. Its
 optional slabinfo check rejects the measured 48-byte descriptor slope and
 requires the final slab/big-page deltas to settle; it does not assert that
@@ -32,16 +32,16 @@ python3 tests/process-churn/run.py --mode slabinfo \
 python3 tests/process-churn/run.py --mode slabinfo --arch amd64 \
   --runner-root /path/to/main-checkout --kernel /path/to/amd64-kernel/bin/vinix \
   > /tmp/slabinfo-amd64.log 2>&1
-python3 tests/process-churn/check-results.py /tmp/slabinfo-arm.log \
+tests/process-churn/check-results /tmp/slabinfo-arm.log \
   --mode slabinfo --expect-flat-slabinfo
-python3 tests/process-churn/check-results.py /tmp/slabinfo-amd64.log \
+tests/process-churn/check-results /tmp/slabinfo-amd64.log \
   --mode slabinfo --expect-flat-slabinfo
 
 # ARM exec cohorts need the populated desktop image and its matching module ISO.
 python3 tests/process-churn/run.py --runner-root /path/to/main-checkout \
   --kernel /path/to/arm-kernel --image /path/to/initramfs-desktop.tar \
   --module-iso /path/to/initramfs-desktop.iso > /tmp/exec-cohorts.log 2>&1
-python3 tests/process-churn/check-results.py /tmp/exec-cohorts.log
+tests/process-churn/check-results /tmp/exec-cohorts.log
 tests/kernel-allocs/sites /path/to/arm-kernel/bin/vinix \
   < /tmp/exec-cohorts.log
 
@@ -55,22 +55,22 @@ for mode in waits pipes sampling; do
     --runner-root /path/to/main-checkout --kernel /path/to/arm-kernel \
     --timeout 1800 \
     > "/tmp/churn-$mode.log" 2>&1
-  python3 tests/process-churn/check-results.py "/tmp/churn-$mode.log" --mode "$mode"
+  tests/process-churn/check-results "/tmp/churn-$mode.log" --mode "$mode"
 done
 
 # Directory cohorts require the ARM runner's actual persistent ext2 volume.
 python3 tests/process-churn/run.py --mode directories \
   --runner-root /path/to/main-checkout --kernel /path/to/arm-kernel \
   > /tmp/churn-directories.log 2>&1
-python3 tests/process-churn/check-results.py /tmp/churn-directories.log --mode directories
+tests/process-churn/check-results /tmp/churn-directories.log --mode directories
 
 # Measured select/fork regression fixes. Repeat the guests with --arch amd64.
 python3 tests/process-churn/run.py --mode select \
   --runner-root /path/to/main-checkout --kernel /path/to/arm-kernel \
   > /tmp/select-fixed.log 2>&1
-python3 tests/process-churn/check-results.py /tmp/select-fixed.log \
+tests/process-churn/check-results /tmp/select-fixed.log \
   --mode select --expect-flat-small
-python3 tests/process-churn/check-results.py /tmp/churn-waits.log \
+tests/process-churn/check-results /tmp/churn-waits.log \
   --mode waits --expect-flat-small
 tests/process-churn/check-generated /path/to/blob.c --operations
 ```
