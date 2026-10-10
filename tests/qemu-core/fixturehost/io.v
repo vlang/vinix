@@ -11,6 +11,7 @@ import strings
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <poll.h>
 #flag -I @DIR
 #include "spawn_abi.h"
 
@@ -35,6 +36,14 @@ fn C.posix_spawnattr_init(voidptr) i32
 fn C.posix_spawnattr_destroy(voidptr) i32
 fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
+fn C.poll(&C.pollfd, usize, i32) i32
+
+struct C.pollfd {
+mut:
+	fd      i32
+	events  i16
+	revents i16
+}
 
 @[typedef]
 struct C.sigset_t {}
@@ -360,4 +369,111 @@ pub fn capture_in_preferred(argv []string, log string, env map[string]string, me
 		return CommandError{ argv: argv.clone(), status: status, output: text, binary_output: binary_output }
 	}
 	return text
+}
+
+pub struct CapturedCommand {
+pub:
+	status int
+	stdout string
+	stderr string
+}
+
+// subprocess.run(capture_output=True) keeps both binary streams and reports
+// nonzero exit statuses to its caller. Drain both pipes before waiting so a
+// full stderr pipe cannot block a child whose stdout is being consumed.
+pub fn capture_both_preferred(argv []string, env map[string]string, host_arch string) !CapturedCommand {
+	mut output_pipe := [2]i32{}
+	mut error_pipe := [2]i32{}
+	if C.pipe(&output_pipe[0]) != 0 {
+		number := C.errno
+		return file_error('', number)
+	}
+	mut output_read_open := true
+	mut output_write_open := true
+	mut error_read_open := false
+	mut error_write_open := false
+	defer {
+		if output_read_open { C.close(output_pipe[0]) }
+		if output_write_open { C.close(output_pipe[1]) }
+		if error_read_open { C.close(error_pipe[0]) }
+		if error_write_open { C.close(error_pipe[1]) }
+	}
+	if C.pipe(&error_pipe[0]) != 0 {
+		number := C.errno
+		return file_error('', number)
+	}
+	error_read_open = true
+	error_write_open = true
+	// Keep pipe storage distinct from the standard streams even when a caller
+	// entered with one of those descriptors closed.
+	for index in 0 .. 4 {
+		fd := if index < 2 { output_pipe[index] } else { error_pipe[index - 2] }
+		if fd >= 3 { continue }
+		moved := C.fcntl(fd, C.F_DUPFD_CLOEXEC, 3)
+		if moved < 0 { number := C.errno; return file_error('', number) }
+		C.close(fd)
+		if index < 2 { output_pipe[index] = moved } else { error_pipe[index - 2] = moved }
+	}
+	for fd in [output_pipe[0], output_pipe[1], error_pipe[0], error_pipe[1]] {
+		if C.fcntl(fd, C.F_SETFD, C.FD_CLOEXEC) != 0 {
+			number := C.errno
+			return file_error('', number)
+		}
+	}
+	mut actions := C.posix_spawn_file_actions_t{}
+	initialized := C.posix_spawn_file_actions_init(&actions)
+	if initialized != 0 { return file_error('', initialized) }
+	defer { C.posix_spawn_file_actions_destroy(&actions) }
+	for configured in [C.posix_spawn_file_actions_adddup2(&actions, output_pipe[1], 1),
+		C.posix_spawn_file_actions_adddup2(&actions, error_pipe[1], 2),
+		C.posix_spawn_file_actions_addclose(&actions, output_pipe[0]),
+		C.posix_spawn_file_actions_addclose(&actions, output_pipe[1]),
+		C.posix_spawn_file_actions_addclose(&actions, error_pipe[0]),
+		C.posix_spawn_file_actions_addclose(&actions, error_pipe[1])] {
+		if configured != 0 { return file_error('', configured) }
+	}
+	pid := spawn_command_preferred(argv, env, &actions,
+		[output_pipe[0], output_pipe[1], error_pipe[0], error_pipe[1]], host_arch)!
+	mut reaped := false
+	defer {
+		if !reaped {
+			C.kill(pid, C.SIGKILL)
+			wait(pid) or {}
+		}
+	}
+	C.close(output_pipe[1])
+	output_write_open = false
+	C.close(error_pipe[1])
+	error_write_open = false
+	mut descriptors := [C.pollfd{fd: output_pipe[0], events: i16(C.POLLIN)},
+		C.pollfd{fd: error_pipe[0], events: i16(C.POLLIN)}]!
+	mut output := strings.new_builder(8192)
+	mut errors := strings.new_builder(8192)
+	mut buffer := [8192]u8{}
+	for output_read_open || error_read_open {
+		if C.poll(&descriptors[0], 2, -1) < 0 {
+			number := C.errno
+			if number == C.EINTR { continue }
+			return file_error('', number)
+		}
+		for index in 0 .. 2 {
+			if descriptors[index].fd < 0 || descriptors[index].revents == 0 { continue }
+			count := C.read(descriptors[index].fd, &buffer[0], usize(buffer.len))
+			number := C.errno
+			if count < 0 {
+				if number == C.EINTR { continue }
+				return file_error('', number)
+			}
+			if count == 0 {
+				C.close(descriptors[index].fd)
+				descriptors[index].fd = -1
+				if index == 0 { output_read_open = false } else { error_read_open = false }
+				continue
+			}
+			if index == 0 { output.write(buffer[..int(count)])! } else { errors.write(buffer[..int(count)])! }
+		}
+	}
+	status := wait(pid)!
+	reaped = true
+	return CapturedCommand{status, output.str(), errors.str()}
 }
