@@ -131,6 +131,7 @@ mut:
 	swift_metadata_arena u64 // Adjacent sealed String metadata/accessor pages, under the runtime lock.
 	swift_array_arena u64 // Array accessor/descriptor/witness pages and zero-filled generic cache.
 	swift_array_metadata map[u64]u64 // Element metadata -> sealed Array metadata, under the runtime lock.
+	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_hash_code u64 // Sealed generic Hashable forwarding entries, retired after callbacks drain.
 	names        map[string]u64
 	pool_key u64

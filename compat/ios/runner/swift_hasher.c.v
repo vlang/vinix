@@ -170,7 +170,7 @@ fn swift_hasher_bridge(code u64, body u64, arguments int) {
 	write32(code + 20, 0xd503201f)
 	unsafe { *(&u64(code + 24)) = body }
 }
-fn swift_hasher_emit(code u64) {
+fn swift_hasher_default_emit(code u64) {
 	// Both Hashable and RawRepresentable defaults borrow indirect Self in
 	// x20, seed x0, metadata x1 and Self Hashable table x2. A 72-byte local
 	// Hasher lives at sp+48. Save metadata/table across the V initializer and
@@ -188,6 +188,9 @@ fn swift_hasher_emit(code u64) {
 		*(&u64(code + 96)) = u64(voidptr(swift_hasher_seed_into))
 		*(&u64(code + 104)) = u64(voidptr(swift_hasher_finalize))
 	}
+}
+fn swift_hasher_emit(code u64) {
+	swift_hasher_default_emit(code)
 	// Generic combine: borrowed value x0, metadata x1, table x2; Hasher self
 	// x20. Use the value as witness context and restore the Hasher afterwards.
 	for i, op in [u32(0xa9be7bfd), 0xa90153f3, 0x910003fd,
@@ -203,7 +206,7 @@ fn swift_hasher_emit(code u64) {
 }
 fn swift_hasher_symbol(symbol string) ?u64 {
 	// Only measured functions/data are provided. Hasher type metadata and
-	// concrete standard-library Hashable conformances remain unsupported.
+	// additional standard-library Hashable conformances remain unsupported.
 	offset := match symbol {
 		'_$sSHsE13_rawHashValue4seedS2i_tF', '_$sSYsSHRzSH8RawValueSYRpzrlE08_rawHashB04seedS2i_tF' { 192 }
 		'_$ss6HasherV7combineyyxSHRzlF' { 320 }

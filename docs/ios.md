@@ -1792,26 +1792,52 @@ allocations. The existing Array checks also pass under sanitizers. Both compiled
 ARM64 runners contain the same single `ret` instruction as the native initializer;
 generated C checks verify no hidden allocations.
 
-All twenty-three native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
-regression pass. One more strong import resolves. Fortnite still exits with status
-1 before entry at EOSSDK's Int Hashable witness table, `_$sSiSHsWP`. Native table
-layouts and concrete Int hashing instructions are captured for the next layer.
-Evidence is retained under `swift-integer-checks`. Other associated-type manglings,
-Hasher metadata, concrete standard-library Hashable conformances, conformance
-discovery, generic interpolation and application Swift heap support remain
-incomplete.
+The pointer initializer layer passed twenty-three native V checks and the full
+four-core ARM64 C++/UIKit/GLES/PPSSPP regression, resolving one more strong import.
+Its probe stopped before entry at EOSSDK's Int Hashable table, `_$sSiSHsWP`;
+evidence is retained under `swift-integer-checks`.
+
+Int now has canonical, sealed metadata, all eight POD value witnesses, and real
+Equatable/Hashable witness tables and conformance descriptors in V. Its eight-byte
+payload has no extra inhabitants; enums with empty cases use one additional tag
+byte. Hashable's descriptor includes its generic signature requiring Equatable,
+the inherited table requirement and the three hashing requirements. Public Int
+hashing and borrowed indirect witnesses feed the full word into the existing
+process-seeded Hasher. Generic dispatch, combine, hash-value and raw-hash defaults
+use the same tables. Metadata, descriptor, accessor and measured protocol aliases
+resolve together; runtime-wide conformance discovery remains unsupported.
+
+Native/V ASAN/UBSAN checks pass in random and deterministic seed modes: value
+witnesses, exact eight/nine-byte enum storage through UINT32_MAX, signed limits,
+every single/complemented bit, five signed seeds, all partial Hasher tails,
+guarded state, equality/inequality, unchanged borrowed inputs and Swift context
+preservation. Eight workers exercise concurrent publication and hashing;
+`Array<Int>` uses the same metadata. Two drained teardowns prove both Int pages
+unmapped after dependent Array specializations retire. Generated C contains no
+hidden allocations in the thirteen Int runtime bodies or existing Array bodies.
+
+All twenty-four native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. Twenty-four more strong imports resolve across the three images.
+Fortnite still exits with status 1 before entry at EOSSDK's StaticString overload
+of `_assertionFailure`,
+`_$ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF`.
+Evidence is retained under `swift-integer-hash-checks`, including installed LLVM
+disassembly obtained from V, native descriptor/enum measurements, sanitizer and
+guest logs. Other associated-type manglings, Hasher metadata, additional concrete
+standard-library conformances, conformance discovery, generic interpolation and
+application Swift heap support remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,369 | 789 | 81 |
-| EOSSDK | 582 | 80 | 18 |
-| MarketplaceKitWrapper | 77 | 99 | 23 |
-| All images | 2,028 | 968 | 122 |
+| Fortnite executable | 1,377 | 781 | 81 |
+| EOSSDK | 589 | 73 | 18 |
+| MarketplaceKitWrapper | 86 | 90 | 23 |
+| All images | 2,052 | 944 | 122 |
 
-The C++/GLES/Text variant reports 2,041 resolved imports, 955 unresolved strong
+The C++/GLES/Text variant reports 2,065 resolved imports, 931 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
