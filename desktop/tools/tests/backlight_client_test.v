@@ -137,6 +137,59 @@ fn test_backlight_whole_writes_and_fresh_bounds() {
 	assert set_backlight_percent_with(mut m, 101) == .invalid && m.opens == 0
 }
 
+// A display that turns off takes the panel to its minimum and remembers the
+// exact level, which a percentage would round on the way back.
+fn test_backlight_dims_for_display_off_and_restores_the_exact_level() {
+	mut m := mock_backlight()
+	m.reply = valid_backlight.replace('requested_nits=100', 'requested_nits=137').bytes()
+	assert dim_backlight_with(mut m) == 137
+	assert m.written.bytestr() == '2\n' && m.writes == 1 && !m.live
+	assert set_backlight_nits_with(mut m, 137) == .ok
+	assert m.written.bytestr() == '137\n' && m.writes == 2 && !m.live
+	// 34% of 2..400 is also 137 nits here, but 138 has no percentage at all.
+	assert set_backlight_nits_with(mut m, 138) == .ok && m.written.bytestr() == '138\n'
+
+	// Before the first request the level is the one the panel reports.
+	m = mock_backlight()
+	m.reply = valid_backlight.replace('requested_nits=100', 'requested_nits=unknown').bytes()
+	assert dim_backlight_with(mut m) == 99 && m.written.bytestr() == '2\n'
+	// A level nobody knows cannot be put back, so the panel is left alone.
+	m = mock_backlight()
+	m.reply = valid_backlight.replace('requested_nits=100', 'requested_nits=unknown').replace('actual_nits=99',
+		'actual_nits=unknown').bytes()
+	assert dim_backlight_with(mut m) == -1 && m.writes == 0 && !m.live
+	// So is one that is missing, offline, read-only, or that refuses.
+	m = mock_backlight()
+	m.open_error = .unavailable
+	assert dim_backlight_with(mut m) == -1 && m.writes == 0
+	m = mock_backlight()
+	m.reply = valid_backlight.replace('online=1', 'online=0').bytes()
+	assert dim_backlight_with(mut m) == -1 && m.writes == 0 && !m.live
+	m = mock_backlight()
+	m.rw_error = .permission
+	assert dim_backlight_with(mut m) == -1 && m.writes == 0 && !m.live
+	m = mock_backlight()
+	m.write_error = .io
+	assert dim_backlight_with(mut m) == -1 && !m.live
+
+	// A level outside what the device reports now is not sent.
+	m = mock_backlight()
+	for nits in [-1, 0, 1, 401, 100000] {
+		assert set_backlight_nits_with(mut m, nits) == .invalid
+	}
+	assert m.writes == 0 && !m.live
+	assert set_backlight_nits_with(mut m, 2) == .ok && m.written.bytestr() == '2\n'
+	assert set_backlight_nits_with(mut m, 400) == .ok && m.written.bytestr() == '400\n'
+	m.reply = valid_backlight.replace('online=1', 'online=0').bytes()
+	assert set_backlight_nits_with(mut m, 100) == .offline
+	m = mock_backlight()
+	m.rw_error = .permission
+	assert set_backlight_nits_with(mut m, 100) == .permission && m.writes == 0 && !m.live
+	m = mock_backlight()
+	m.short_write = true
+	assert set_backlight_nits_with(mut m, 100) == .io && m.writes == 1 && !m.live
+}
+
 fn test_backlight_bounded_interrupts() {
 	for interrupts in [2, 20] {
 		mut m := mock_backlight()

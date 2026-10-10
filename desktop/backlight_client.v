@@ -224,6 +224,11 @@ fn set_backlight_percent_with(mut io DeviceIO, percent int) BacklightResult {
 		return .permission
 	}
 	nits := backlight_percent_to_nits(&state, percent) or { return .invalid }
+	return write_backlight_nits(mut io, fd, nits)
+}
+
+// One whole decimal nit command on a descriptor whose state was just read.
+fn write_backlight_nits(mut io DeviceIO, fd int, nits int) BacklightResult {
 	text := '${nits}\n'
 	defer { unsafe { text.free() }
 	 }
@@ -240,6 +245,47 @@ fn set_backlight_percent_with(mut io DeviceIO, percent int) BacklightResult {
 	return .io
 }
 
+// set_backlight_nits_with asks for an exact level, to put back one that was
+// read earlier: a percentage would round it. It is held to the bounds the
+// device reports now, like every other command.
+fn set_backlight_nits_with(mut io DeviceIO, nits int) BacklightResult {
+	state, fd, result := open_backlight_state(mut io)
+	if result != .ok {
+		return result
+	}
+	defer { io.close(fd) }
+	if !state.online {
+		return .offline
+	}
+	if !state.writable {
+		return .permission
+	}
+	if nits < state.min_nits || nits > state.max_nits {
+		return .invalid
+	}
+	return write_backlight_nits(mut io, fd, nits)
+}
+
+// dim_backlight_with takes the panel down to its minimum for a display that
+// is off, and returns the level to put back when it comes on again, or -1
+// when nothing was changed: no backlight, one that cannot be written, or a
+// level nobody knows and so nobody could restore. The minimum is not off;
+// the panel still glows behind the black frame.
+fn dim_backlight_with(mut io DeviceIO) int {
+	mut state := BacklightState{}
+	if read_backlight_with(mut io, mut state) != .ok || !state.online || !state.writable {
+		return -1
+	}
+	level := if state.requested_nits >= 0 { state.requested_nits } else { state.actual_nits }
+	if level < state.min_nits || level > state.max_nits {
+		return -1
+	}
+	if set_backlight_percent_with(mut io, 0) != .ok {
+		return -1
+	}
+	return level
+}
+
 fn read_backlight(mut out BacklightState) BacklightResult {
 	mut io := PosixDeviceIO{}
 	return read_backlight_with(mut io, mut out)
@@ -248,6 +294,16 @@ fn read_backlight(mut out BacklightState) BacklightResult {
 fn set_backlight_percent(percent int) BacklightResult {
 	mut io := PosixDeviceIO{}
 	return set_backlight_percent_with(mut io, percent)
+}
+
+fn set_backlight_nits(nits int) BacklightResult {
+	mut io := PosixDeviceIO{}
+	return set_backlight_nits_with(mut io, nits)
+}
+
+fn dim_backlight() int {
+	mut io := PosixDeviceIO{}
+	return dim_backlight_with(mut io)
 }
 
 // One step of the bar in Settings, so the two agree.
