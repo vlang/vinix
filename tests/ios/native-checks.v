@@ -64,7 +64,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn build(root string, out string, only string) {
 	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'signal-checks',
-		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'native-init'] {
+		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -125,6 +125,8 @@ fn build(root string, out string, only string) {
 					'swift_integer_hash_test.v'
 				} else if item == 'swift-fatal-checks' {
 					'swift_fatal_test.v'
+				} else if item == 'swift-interpolation-checks' {
+					'swift_interpolation_test.v'
 				} else {
 					'thread_policy_test.v'
 				}
@@ -240,6 +242,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/swift-integer-checks', fs + '/opt/ios/swift-integer-checks')
 	copy_file(out + '/swift-integer-hash-checks', fs + '/opt/ios/swift-integer-hash-checks')
 	copy_file(out + '/swift-fatal-checks', fs + '/opt/ios/swift-fatal-checks')
+	copy_file(out + '/swift-interpolation-checks', fs + '/opt/ios/swift-interpolation-checks')
 	sysroot := root + '/build-aarch64-userland/sysroot'
 	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
 		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
@@ -425,6 +428,8 @@ fn main() {
 		build(root, out, 'swift-integer-hash-checks')
 	} else if mode == 'build-swift-fatal' {
 		build(root, out, 'swift-fatal-checks')
+	} else if mode == 'build-swift-interpolation' {
+		build(root, out, 'swift-interpolation-checks')
 	} else if mode == 'verify-monitor' {
 		verify_monitor(out)
 	} else if mode == 'hash' {

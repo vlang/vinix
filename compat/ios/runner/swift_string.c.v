@@ -107,7 +107,7 @@ fn swift_buffer_refs(object u64, delta i64) !u64 {
 	if object == 0 { return 0 }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	if object !in ios_runtime.swift_buffers {
+	if object !in ios_runtime.swift_buffers && object !in ios_runtime.swift_strings {
 		return error('iOS: Swift ARC for application heap objects is not implemented')
 	}
 	location := unsafe { &u64(object + 8) }
@@ -124,6 +124,7 @@ fn swift_buffer_refs(object u64, delta i64) !u64 {
 		// readers or application deinit callbacks for these byte buffers.
 		C.ios_store_pointer(location, 3 | (u64(1) << 32))
 		ios_runtime.swift_buffers.delete(object)
+		ios_runtime.swift_strings.delete(object)
 		C.free(unsafe { voidptr(object) })
 	} else {
 		C.ios_store_pointer(location, 3 | ((updated - 1) * swift_strong_step))
@@ -160,7 +161,7 @@ fn swift_bridge_release(object u64) { swift_bridge_release_n(object, 1) }
 fn swift_unknown_is_native(object u64) bool {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	if object in ios_runtime.swift_buffers { return true }
+	if object in ios_runtime.swift_buffers || object in ios_runtime.swift_strings { return true }
 	if object in ios_runtime.objects || object in ios_runtime.classes || object in ios_runtime.constants
 		|| object in ios_runtime.block_refs { return false }
 	panic('iOS: Swift unknown-object ARC for unregistered objects is not implemented')
@@ -178,7 +179,9 @@ fn swift_buffers_stop() {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if ios_runtime.swift_buffers.len != 0 { panic('iOS: Swift UTF-8 arrays still owned at shutdown') }
+	if ios_runtime.swift_strings.len != 0 { panic('iOS: Swift Strings still owned at shutdown') }
 	unsafe { ios_runtime.swift_buffers.free() }
+	unsafe { ios_runtime.swift_strings.free() }
 	swift_arc_stop()
 	swift_metadata_stop()
 	swift_hash_stop()
@@ -186,6 +189,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_interpolation_symbol(symbol) { return address }
 	if address := swift_fatal_symbol(symbol) { return address }
 	if address := swift_array_symbol(symbol) { return address }
 	if address := swift_integer_symbol(symbol) { return address }

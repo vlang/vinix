@@ -127,8 +127,10 @@ mut:
 	associations map[u64]&ObjAssociations // Object -> key/value table, under the same recursive lock.
 	monitors map[u64]&ObjMonitor
 	swift_buffers map[u64]u64 // Owned UTF-8 array allocation -> element count, under the runtime lock.
+	swift_strings map[u64]u64 // Owned native-tail String allocation -> byte capacity, under the same lock.
 	swift_arc_code u64 // Sealed ARM64 preserve-most entry points, released at quiescent teardown.
 	swift_metadata_arena u64 // Adjacent sealed String metadata/accessor pages, under the runtime lock.
+	swift_interpolation_arena u64 // Frozen interpolation metadata and TextOutputStream witnesses.
 	swift_array_arena u64 // Array accessor/descriptor/witness pages and zero-filled generic cache.
 	swift_array_metadata map[u64]u64 // Element metadata -> sealed Array metadata, under the runtime lock.
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.

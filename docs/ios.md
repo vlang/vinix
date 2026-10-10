@@ -1849,25 +1849,63 @@ All twenty-five native guest checks and the full four-core ARM64
 C++/UIKit/GLES/PPSSPP regression pass. Six more strong imports resolve across
 the three images. An initial run exited 73 in the existing stdio directory
 fixture; the unchanged rerun passed, and both serial logs are retained. Fortnite
-still exits with status 1 before entry at EOSSDK's generic
+then exited with status 1 before entry at EOSSDK's generic
 string-interpolation append overload,
 `_$ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzs20TextOutputStreamableRzlF`.
-Assertion evidence is retained under `swift-fatal-checks`. Other associated-type
-manglings, Hasher metadata, additional concrete standard-library conformances,
-conformance discovery, generic interpolation and application Swift heap support
-remain incomplete.
+Assertion evidence is retained under `swift-fatal-checks`.
+
+The dual-constrained generic interpolation overload now dispatches the source's
+actual `TextOutputStreamable.write` witness in V. Sealed ARM64 adapters forward
+the measured source/target metadata and tables, preserve Swift's context register
+and hold no registry lock across callbacks. Frozen interpolation metadata has one
+String field at offset zero and reuses String's non-POD value witnesses. Its
+canonical `TextOutputStream` descriptor and conformance supply all four methods.
+The installed default lock/unlock bodies are single return instructions; the
+generic ASCII default creates a String and calls the supplied target's write
+witness, supporting a target that retains the result.
+
+The constructor checks capacity arithmetic and reserves native-tail String
+storage. Literal append and `String.append` borrow their inputs, grow byte
+capacity, preserve UTF-8 and embedded NUL, reuse unique storage and copy retained
+aliases. Self-append handles overlap and finishes copying before releasing the
+old owner. String buffers have their own registry and measured count/flags and
+capacity header, distinct from UTF-8 Array storage. Their private descriptor
+does not implement Swift class metadata or reflection.
+
+Installed-library and V interpolation, existing String storage, String metadata
+and String protocol suites pass ASAN/UBSAN in both seed modes. Cases cover small
+and large boundaries, negative/overflowing hints, real heap String input and its
+stream witness, all four stream requirements, an ASCII default whose retained
+output survives overwriting the source buffer, and arbitrary source tables.
+Reentrant workers verify callback context and locking. Eight resolvers publish
+one sealed arena; two drained cycles leave no owners and prove it unmapped.
+Eleven generated runtime bodies have no hidden V allocations on valid paths;
+registered storage and rejected-input Result errors are the explicit allocations.
+Existing Int, Array and assertion bodies remain allocation-free.
+
+All twenty-six native V checks and the full four-core ARM64
+C++/UIKit/GLES/PPSSPP regression pass. Eight more strong imports resolve across
+the executable and EOSSDK.
+
+The Fortnite probe now stops before entry at EOSSDK's uninitialized Array
+allocator, `_$ss27_allocateUninitializedArrayySayxG_BptBwlF`, with exit status 1.
+Interpolation evidence is retained under `swift-interpolation-checks`, including
+native measurements of that next allocator's ABI and typed/empty storage.
+Unconstrained interpolation, other associated-type manglings, Hasher metadata,
+additional conformances, runtime-wide conformance discovery and arbitrary
+application Swift heap classes remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,379 | 779 | 81 |
-| EOSSDK | 591 | 71 | 18 |
+| Fortnite executable | 1,384 | 774 | 81 |
+| EOSSDK | 594 | 68 | 18 |
 | MarketplaceKitWrapper | 88 | 88 | 23 |
-| All images | 2,058 | 938 | 122 |
+| All images | 2,066 | 930 | 122 |
 
-The C++/GLES/Text variant reports 2,071 resolved imports, 925 unresolved strong
+The C++/GLES/Text variant reports 2,079 resolved imports, 917 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

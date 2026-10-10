@@ -143,6 +143,7 @@ fn swift_metadata_stop() {
 	// owned buffers have drained.
 	swift_array_stop()
 	swift_integer_stop()
+	swift_interpolation_stop()
 	if ios_runtime.swift_metadata_arena != 0 {
 		if C.munmap(unsafe { voidptr(ios_runtime.swift_metadata_arena) }, usize(C.getpagesize()) * 2) != 0 {
 			panic('iOS: cannot retire Swift String metadata')
