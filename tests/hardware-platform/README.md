@@ -38,6 +38,11 @@ here runs any.
 | `pci-hotplug` | aarch64, x86_64 | The machine boots with an empty PCI Express port, which the kernel watches itself, and no network card. The port's slot must be in `/sys/bus/pci/slots`, `empty`, without power or a card. The controller adds an e1000 behind the port (`device_add`): it must appear as `0000:01:00.0`, bound to the e1000 driver, with an address inside the port's memory window, decoding it and allowed to master the bus, the slot `occupied` with power; and the network must work through it (the TFTP read). Then 105 warm-up and 100 measured cycles of removing the card through its `remove` file and finding it again by a rescan, which may leave at most 30 more live heap objects and no more large pages, the network still working afterwards. The controller asks for the card back (`device_del`, which presses the slot's button): within the button's five seconds and the removal the card must be gone and the slot `empty`. Both steps are then repeated, the second card taking the first one's place. QEMU must have reported `DEVICE_DELETED` twice: it lets go of a card only when the guest has cut the slot's power. On x86-64 the machine is started with `-global ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off`, without which QEMU's firmware keeps its ports. |
 | `pci-hotplug-acpi` | x86_64 | The same machine as QEMU makes it by default: firmware keeps the ports, refuses to hand them over through `_OSC`, and announces the card and asks for it back with ACPI notifications. No slot may be listed; everything else holds as in `pci-hotplug`, and `DEVICE_DELETED` twice here means the kernel evaluated `_EJ0` after letting go of the card. |
 | `pci-hotplug-iommu` | x86_64 | `pci-hotplug-acpi` on a machine with an Intel IOMMU and `vinix.iommu=1`: the card that arrives must report a domain of its own (`isolated` in its `dma` file) each time it is found, the network must work through it, and at the end the unit must have recorded no fault. |
+| `suspend-deep` | x86_64 | Suspend to RAM (ACPI S3) on a machine with four CPUs, a SATA disk, an e1000 and QEMU's standard VGA. `mem_sleep` offers `deep` and selecting it sticks. Two rehearsals (`pm_test` = `platform`) go the whole way down and back without asking firmware: one undisturbed, which counts as a rehearsal that worked; one during which the controller presses a key, which must be counted as a failed sleep (`last_failed_step` `platform`, a wake source as the reason). Then three sleeps, ended by QEMU's `system_wakeup` (sent only once QEMU has reported `SUSPEND`; QEMU's ACPI shows it as the power button), by the clock's alarm, and by a key. After each: a thread pinned to every CPU runs there and `/proc/stat` bills that CPU for it; 32 MiB of memory is word for word what was written; a pattern written to the disk before reads back, a megabyte of disk the controller filled and nothing had read reads as filled, and a new pattern goes out and comes back; a file comes from QEMU's TFTP server; the monotonic clock did not go back and it and the wall clock moved on together, by at least the time asleep less a second; the sleep was not billed to the program as processor time; a counting thread stood still; the rounding mode the thread set is still set; what was drawn on the screen is in the framebuffer; `suspend_stats` names the right wake source, counts the sleep as `deep`, and shows the protection registers compared on all four CPUs with no change; and `/sys/power/deep_sleep` shows that the way back found PCI registers and interrupt routes to write back and the display off, which is what says power was lost. After three sleeps a line typed on the keyboard reaches the console and the mouse moves the pointer. Five more sleeps follow one after another, ended by the alarm, and may leave at most 30 more live kernel heap objects (measurement noise; one object lost per sleep with what each sleep allocates would show) and no more large pages. At the end the power button still reaches init. On the host: QEMU must have reported `SUSPEND` and `WAKEUP` eight times each; pictures of the screen taken with `screendump` before the first sleep and after the last must both show the guest's pattern, in the same mode; and the patterns written after each resume must be in the disk image. |
+| `suspend-deep-xapic` | x86_64 | The same on processors without x2APIC (`-cpu max,-x2apic`), where the local APICs are driven through memory and INIT and the startup IPI go through the two halves of the command register. |
+| `suspend-deep-iommu`, `suspend-deep-iommu-amd` | x86_64 | The same behind Intel VT-d and behind AMD-Vi, booted with `vinix.iommu=1`. In addition the unit must say in its own registers that it is translating through the kernel's tables after every sleep, having been found off on the way back each time; the card and the disk controller must still report a domain of their own; and the unit must have recorded no fault. That a device is *stopped* from reaching other memory after a resume is not shown here: the self-tests that make a card try run at boot only. |
+| `suspend-deep-undrawable` | x86_64 | A machine whose screen is on an adapter the kernel cannot set a mode on (QEMU's VirtIO display): `mem_sleep` lists `s2idle` alone, selecting `deep` is refused, `/sys/power/deep_sleep` says the display is why, and `mem` sleeps as suspend to idle. |
+| `suspend-deep-forced`, `suspend-deep-headless` | x86_64 | The same machine with `vinix.deep_sleep=force`, and a machine with no display at all: `deep` is offered, and one suspend to RAM ended by the alarm comes back with QEMU reporting `SUSPEND` and `WAKEUP`. |
 
 Every scenario also fails on a line containing `KERNEL PANIC`,
 `FATAL EXCEPTION` or `HWTEST FAIL`, and a scenario whose machine is to power
@@ -152,7 +157,9 @@ and then powers the machine off. The controller polls the serial log, splits
 it into lines, removes escape sequences and carriage returns, and looks for
 its markers in whole lines only. A scenario's record in
 `hwhost/scenario.v` says which lines are required, which are forbidden, what
-to send over QMP when a given line appears, and how the machine is to end:
+to send over QMP when a given line appears -- and, for a machine that has to
+be suspended first, once QEMU has reported that it is -- which QMP events
+must have been seen, and how the machine is to end:
 `poweroff` (by itself, before the timeout) or `running` (the controller stops
 it once every marker has been seen).
 
@@ -168,9 +175,14 @@ it once every marker has been seen).
    function.
 3. One record in `scenarios` in `hwhost/scenario.v`: name, architectures,
    extra kernel command line and QEMU arguments (`{state}` is the scenario's
-   state directory), disks to create, required and forbidden markers,
-   actions, the expected ending, and patterns to look for on a disk
-   afterwards. A record that cannot pass yet gets a `pending` reason.
+   state directory), disks to create and what to fill them with, required
+   and forbidden markers, actions, the expected ending, and patterns to look
+   for on a disk afterwards. An action can wait for QEMU to have reported an
+   event a number of times as well as for its marker (`event`,
+   `event_count`, `event_delay_ms`); a scenario can require events by count
+   (`events`), check pictures of the screen its actions took with
+   `screendump` (`screens`), and ask for more than the default time
+   (`timeout`). A record that cannot pass yet gets a `pending` reason.
 
 The table is checked before anything boots (`validate_scenarios`), and
 `hwhost/scenario_test.v` pins which scenarios a default run selects on each

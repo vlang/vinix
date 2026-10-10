@@ -34,7 +34,16 @@
 // runs through step 4, waits pm_test_delay_ms instead of sleeping, and comes
 // back: every driver's suspend and resume are exercised without depending on
 // anything waking the machine, which is how a new machine's drivers are
-// checked before it is trusted to sleep.
+// checked before it is trusted to sleep. With `platform`, and `deep` selected,
+// the platform's part is rehearsed as well: it goes as far down as it can
+// without asking firmware, and comes back the way it does when firmware
+// refuses.
+//
+// On the way back from a suspend to RAM the devices have been without power.
+// The platform puts back what belongs to no driver -- the interrupt
+// controllers, the clocks, PCI configuration space, the IOMMUs, the display
+// mode -- before it returns here, and says so (devcore.set_power_lost()) for
+// the drivers whose devices a suspend to idle leaves untouched.
 @[has_globals]
 module syspower
 

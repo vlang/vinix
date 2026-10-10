@@ -363,8 +363,9 @@ fn store_alarm(_ voidptr, data &u8, length u64) u64 {
 }
 
 // Waits for the moment the alarm is set to, and reports it as a wake source.
-// Until a suspend to RAM exists the kernel's own timer is the alarm: in a
-// suspend to idle it keeps running.
+// The kernel's own timer is the alarm for a suspend to idle, in which it
+// keeps running. A suspend to RAM stops it, and hands the alarm to the
+// platform's battery-backed clock for as long as the machine is down.
 fn alarm_thread() {
 	for {
 		generation := event.generation(mut syspower_alarm_changed)

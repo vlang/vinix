@@ -4,14 +4,15 @@ This is the record for roadmap workstream 4: what the kernel now does to find
 devices, bind and recover drivers, isolate DMA, load firmware, manage power
 and sleep, and what it does not do yet.
 
-Everything described here was built for both architectures and exercised in
-QEMU guests (x86-64 under TCG, AArch64 under HVF). **None of it has run on a
-physical machine.** The hardware-specific paths that no emulator has -- the
-Intel, AMD and Apple frequency registers, processor temperature sensors,
-MWAIT idle states -- are covered by host unit tests of their arithmetic and
-are otherwise unverified. The embedded controller driver has run only
-against a simulated controller: its protocol on the host, and the whole of
-it but the two port instructions in a guest. Which machine is
+Everything described here was built for both architectures -- suspend to RAM
+for x86-64 only -- and exercised in QEMU guests (x86-64 under TCG, AArch64
+under HVF). **None of it has run on a physical machine.** The
+hardware-specific paths that no emulator has -- the Intel, AMD and Apple
+frequency registers, processor temperature sensors, MWAIT idle states -- are
+covered by host unit tests of their arithmetic and are otherwise unverified.
+The embedded controller driver has run only against a simulated controller:
+its protocol on the host, and the whole of it but the two port instructions
+in a guest. Which machine is
 qualified for what is kept in [the qualification matrix](hardware-qualification.md);
 this document does not qualify anything.
 
@@ -56,6 +57,7 @@ pointed at.
 | `virtio_*` (AArch64 MMIO) | platform | listed from the device's own status | no | no | no | no | not behind an IOMMU |
 | `battery`, `ac`, `button` | ACPI | listed as claimed | no | -- | -- | -- | -- |
 | `ec` | ACPI | listed as claimed | no | holds its events back when it may not wake | stops taking events | asks a failed controller one question | -- |
+| `i8042`, `psmouse`, `serial8250` (x86-64) | platform | listed as claimed | no | set up again after a loss of power | -- | -- | -- |
 
 A driver without `remove` cannot be unbound and `/sys` has no `unbind` file
 for it. Apple's platform drivers (SMC, ANS, DART, DCP, AGX, Wi-Fi, speakers,
@@ -166,11 +168,15 @@ isolated` in the device's `dma` file). The other PCI drivers still choose
 physical addresses themselves and are given all of memory (`identity`):
 they work behind a unit and are not confined by it.
 
+A unit that lost power in a suspend to RAM is brought back before any device
+may use the bus again (`kernel/dma/resume_amd64.v`); one that will not come
+back stops the machine.
+
 Not implemented: interrupt remapping, queued invalidation (so VT-d units of
 version 6 and later are left off), devices behind conventional PCI bridges
-under VT-d (refused a domain), restoring a unit after a sleep that powers it
-down, ARM SMMU. Apple's DARTs are still set up by the drivers of the devices
-behind them (`kernel/apple/dart`) and are not units of this layer.
+under VT-d (refused a domain), ARM SMMU. Apple's DARTs are still set up by
+the drivers of the devices behind them (`kernel/apple/dart`) and are not
+units of this layer.
 
 ## Firmware
 
@@ -360,7 +366,8 @@ What this is not:
 
 ## Sleep
 
-Writing `freeze` or `mem` to `/sys/power/state` suspends to idle:
+Writing `freeze` to `/sys/power/state` suspends to idle, and so does `mem`
+unless suspend to RAM has been selected (below):
 
 1. filesystem caches are flushed;
 2. userspace is frozen (every thread parks at its next return to userspace;
@@ -397,18 +404,134 @@ and comes back after `pm_test_delay_ms`: every driver's suspend and resume
 run without depending on a wakeup. This is how a machine's drivers should be
 checked before the machine is trusted to sleep.
 
+With `platform` in `pm_test`, and `deep` selected (below), the rehearsal goes
+the whole way down for a suspend to RAM -- processors parked, everything
+read out -- and comes back after the delay without asking firmware. It is the
+way back from a sleep that firmware refused, with nothing having lost power.
+A wake source that reports during it ends it as a failed sleep.
+
+### Suspend to RAM (x86-64)
+
+`/sys/power/mem_sleep` chooses what `mem` means: `s2idle`, the default, or
+`deep`, ACPI's S3, where memory keeps its power and nothing else does. With
+`deep` selected the sequence above carries on past step 4 (`kernel/syspower/deep_amd64.v`):
+
+1. the thread moves to the boot processor, the one firmware resumes;
+2. firmware prepares (`_PTS`) and is given the address to resume at;
+3. an alarm that is set is handed to the battery-backed clock;
+4. every other processor is parked, and PCI configuration space, the
+   display mode and the screen's contents are read out;
+5. with interrupts off, the interrupt controllers and clocks are read out,
+   the processor is saved, and firmware is asked for S3.
+
+On the way back firmware runs first, then the kernel's own real-mode entry,
+and execution continues after step 5 as if a call had returned.
+
+**The real-mode entry.** A processor that wakes from S3, or is sent a
+startup IPI, begins in real mode below 1 MiB. Eight pages there -- the
+highest free run, away from the firmware data at the bottom -- are taken
+out of the allocator before its first allocation. One holds a trampoline
+(`kernel/asm/x86_64/wake_trampoline.S`) that climbs from real mode through
+protected mode to long mode; the others hold a page table of the kernel's
+own that maps that one page onto itself beside the kernel's half of the
+address space. Its address goes into the FACS waking vector; the 64-bit
+vector is left empty.
+
+**The processor that sleeps** saves what it holds and gets it back
+(`kernel/asm/x86_64/wake_context.S`, `kernel/x86/wake/context.v`): the
+callee-saved registers and the stack; CR0, CR2, CR3, CR4 and EFER; the GDT,
+IDT, task and LDT registers and the segment registers; the FS, GS and kernel
+GS bases; STAR, LSTAR, CSTAR, SFMASK and the PAT; XCR0 and the floating
+point state of the thread that asked for the sleep; IA32_SPEC_CTRL and
+IA32_MISC_ENABLE where present; its local APIC (mode, spurious vector, local
+vectors, timer divider); and VMX operation. The debug registers, SYSENTER
+registers and TSC_AUX are not saved because the kernel never loads them.
+**MTRRs and microcode are left to firmware**, as they are at boot.
+
+**The other processors** are not given a saved context. An idle processor in
+this scheduler holds no thread, no lock and nothing on its stack, so each is
+made idle and kept there (`kernel/sched/park_amd64.v`): `may_run_here()`
+refuses every thread on it, the thread it ran is put down at its next
+scheduler interrupt, and from `await()` it goes offline under the TLB
+shootdown lock, reads out its local APIC and halts with interrupts off.
+Afterwards each is started with INIT and a startup IPI through the same
+trampoline, set up by the code that set it up at boot
+(`x86.cpu.initialisation.reinitialise()`: descriptor tables, TSS, page
+table, SYSCALL, PAT, GS, CR0.WP, SMEP, SMAP, UMIP, extended state,
+speculation controls from the policy chosen at boot, VMX), given its local
+APIC back, and enters the idle loop as it did at boot. This happens the same
+way whether or not the power went, so a sleep that firmware refused runs the
+same code as one that happened.
+
+**Time.** The counter the kernel keeps time with stops or starts again with
+the power; the battery-backed clock does not. It is read before and after,
+and the counter is made to carry on from where it was plus the difference,
+so neither the monotonic nor the wall clock stops or goes back, and both
+move on by the time asleep -- **to within a second**, which is what that
+clock counts in. As in a suspend to idle, the monotonic clock includes the
+sleep. The time asleep is not billed to the thread that asked for the sleep
+as processor time. An alarm more than a day ahead cannot be given to the
+clock and does not wake the machine from S3.
+
+**Devices.** Before any driver resumes: the 8259s are masked and every I/O
+APIC redirection entry written back; the PIT is reprogrammed; **IOMMU units
+are brought back** (root or device table, command and event rings,
+translation on) and stop the machine if they will not come back; **PCI
+configuration space** of every function is restored
+(`kernel/devcore/pci_state.v`: D0 first, address registers and bridge
+windows before the command register, MSI and the MSI-X control word); and
+the display is restored. `ahci` and `e1000` then reset and reprogram their
+devices as they always have on resume; the keyboard controller, the PS/2
+mouse and the serial ports are set up again only after a loss of power. The
+fixed power and sleep button events are enabled again. A deep sleep is
+**refused while a bound PCI device's driver has no suspend and resume**
+(`nvme`, `ata`, `hda`, `xhci`): such a device would come back blank.
+
+**The display.** Firmware does not set the mode again after S3, and the
+kernel has no graphics driver, so `deep` is only offered where the kernel
+can bring the picture back itself: there is no framebuffer, or it is on the
+adapter QEMU's `std` VGA and `bochs-display` have (PCI 1234:1111), whose
+mode registers and pixels are saved and restored. On any other machine with
+a screen `mem_sleep` lists `s2idle` alone, and `/sys/power/deep_sleep` says
+why. `vinix.deep_sleep=force` offers it anyway, for a machine run without a
+screen or whose firmware restores the mode; the screen is then whatever
+firmware leaves.
+
+**What ended it** is read on the way back: the clock's alarm (PM1 status),
+a byte waiting in the keyboard controller (keyboard or pointer), the power
+or sleep button. In a deep sleep it is the platform that decides what may
+wake the machine; the `enabled` setting of a wake source only decides
+whether the alarm is armed. QEMU reports its `system_wakeup` command as the
+power button.
+
+`/sys/power/deep_sleep` also counts the suspends to RAM and says what the
+way back from the last one had to write back (PCI registers, interrupt
+routes, the display, IOMMU units), and `suspend_stats` has
+`last_failed_reason`, `last_depth`, `deep` and `security_cpus`. A kernel
+built with `-d wake_trace` writes each step of a sleep to the first serial
+port.
+
 What this is not:
 
-- **Not suspend to RAM.** `mem` is suspend to idle; `/sys/power/mem_sleep`
-  offers only `s2idle`. Nothing loses power, the alarm is the kernel's own
-  timer, and on x86 CPU 0 keeps its 1 kHz tick, so the power saved is what
-  suspended devices and idle CPUs save and no more.
+- **Not tried on a physical machine.** Suspend to RAM has run only in QEMU
+  (q35, OVMF, TCG). On real hardware nothing here is known to work: the
+  firmware's resume path, the A20 gate (assumed open), low memory surviving
+  firmware, MTRRs and microcode on the other processors, wake-up from
+  devices that need a wake GPE armed (none is), and the AMD IOMMU's own PCI
+  capability are all untested assumptions.
 - **Not hibernation.** There is no memory image and no `disk` state.
-- Only `e1000` and `ahci` have suspend and resume. Every other driver keeps
-  its device running through a sleep, which is correct for suspend to idle
-  and would not be for anything deeper.
-- The protection registers are checked on the CPU that carries out the sleep,
-  not on every CPU.
+- Only `e1000`, `ahci`, the keyboard controller, the PS/2 mouse and the
+  serial ports come back from a loss of power. A machine with another bound
+  PCI driver is refused deep sleep, and is left with suspend to idle.
+- On x86-64 the protection registers (CR0, CR4, EFER, IA32_SPEC_CTRL) are
+  recorded and compared on every online processor, each asked by an
+  interrupt, for both kinds of sleep. On AArch64 they are checked on the
+  CPU that carries out the sleep only.
+- A processor that does not start again after a sleep is logged and left
+  out; the machine carries on without it, and threads that may only run
+  there do not run.
+- The VMX part (leaving and entering VMX operation around a sleep) has not
+  executed: no emulator used here has VT-x.
 - The dark screen is a black picture, not a display switched off: there is
   no backlight class and no display power control (DPMS), so a panel's
   backlight stays lit behind it, and Apple's panel is not darkened at all.
@@ -509,6 +632,7 @@ telling ACPI (most laptops), and Apple's sensors and fans (SMC).
 | `vinix.ec=off` | do not drive the embedded controller |
 | `vinix.ec=clear` | at start and on resume, query the controller until it names no event, whatever its event bit says (Linux's `EC_FLAGS_CLEAR_ON_RESUME`); untried |
 | `vinix.ec=dsdt-gpe` | where the ECDT and `_GPE` name different events, use `_GPE` (Linux's `EC_FLAGS_TRUST_DSDT_GPE`); untried. The three combine with commas |
+| `vinix.deep_sleep=force\|off` | x86-64: offer suspend to RAM although the kernel cannot bring the display back; never offer it |
 
 ## What is not done
 
@@ -524,9 +648,11 @@ Beyond the limits stated in each section:
 - Behind the embedded controller: a second controller, the SMBus host and
   Smart Batteries, controllers not on I/O ports, events in a block of their
   own. And the controller itself on any real laptop.
-- Suspend to RAM, hibernation, backlight and display power control.
-- Restoring an IOMMU, or any driver but `e1000` and `ahci`, after a sleep
-  that powers devices down.
+- Suspend to RAM on anything but QEMU's PC: see its section for what is
+  untested. Hibernation, backlight and display power control.
+- Coming back from a loss of power for `nvme`, `ata`, `hda` and `xhci`;
+  restoring a display the kernel has no mode-setting for; wake-up GPEs
+  (`_PRW`) for devices; an RTC alarm more than a day ahead.
 - **Desktop.** The native desktop uses these interfaces now, and none of
   that has run against a kernel: it is tested on the host, against the text
   the kernel writes and a machine the tests stand in for. Settings and the
