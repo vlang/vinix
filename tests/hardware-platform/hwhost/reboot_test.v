@@ -288,3 +288,30 @@ fn test_what_the_suspend_to_disk_scenarios_ask_of_the_controller() {
 	// The device an image goes to is not kept once its scenario has passed.
 	assert hibernate.disks.any(it.name == 'image.raw' && it.bulky)
 }
+
+fn test_a_boot_can_have_a_command_line_of_its_own() {
+	scenario := Scenario{
+		...rebooted()
+		cmdline: 'vinix.hibernate=sd1'
+		reboots: [Reboot{
+			own_cmdline: true
+		}, Reboot{}, Reboot{
+			own_cmdline: true
+			cmdline:     'vinix.iommu=1'
+		}]
+	}
+	assert scenario.boot_cmdline(0) == 'vinix.hibernate=sd1'
+	// None at all, which is not the same as the scenario's.
+	assert scenario.boot_cmdline(1) == ''
+	// For that boot alone.
+	assert scenario.boot_cmdline(2) == 'vinix.hibernate=sd1'
+	assert scenario.boot_cmdline(3) == 'vinix.iommu=1'
+	waiting := find_scenario(scenarios, 'hibernate-waiting') or { panic('no hibernate-waiting') }
+	assert waiting.boots() == 3
+	assert waiting.boot_cmdline(0).contains('vinix.hibernate=sd1')
+	assert waiting.boot_cmdline(1) == ''
+	assert waiting.boot_cmdline(2).contains('vinix.hibernate=sd1')
+	// A system is installed onto a blank disk of four gigabytes or more.
+	root := find_scenario(scenarios, 'hibernate-root') or { panic('no hibernate-root') }
+	assert root.disks.any(it.name == 'system.raw' && it.size_mib >= 4096 && it.header == '' && it.bulky)
+}

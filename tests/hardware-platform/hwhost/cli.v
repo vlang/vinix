@@ -21,6 +21,8 @@ each scenario by what the guest prints on the serial port.
   --list             print the scenarios and exit
   --state-dir DIR    keep each scenario's logs and images in DIR/<scenario>;
                      DIR must be empty or not exist yet
+  --failures-only    with --state-dir: keep the images only of scenarios that
+                     failed; the logs of all of them stay
   --timeout SECONDS  how long one scenario's machine may run (default 120)
   --qemu PATH        the QEMU to use instead of the one on PATH"
 
@@ -32,8 +34,11 @@ pub mut:
 	list      bool
 	help      bool
 	state_dir string
-	timeout   int = 120
-	qemu      string
+	// With a state directory: the images of a scenario that passed are
+	// deleted as they are without one.
+	failures_only bool
+	timeout       int = 120
+	qemu          string
 }
 
 // Options take their value as the next argument or after `=`.
@@ -53,6 +58,13 @@ pub fn parse_options(arguments []string) !Options {
 				return error('--list takes no value')
 			}
 			options.list = true
+			continue
+		}
+		if name == '--failures-only' {
+			if argument.contains('=') {
+				return error('--failures-only takes no value')
+			}
+			options.failures_only = true
 			continue
 		}
 		if name !in ['--arch', '--kernel', '--scenario', '--state-dir', '--timeout', '--qemu'] {
@@ -108,6 +120,9 @@ pub fn parse_options(arguments []string) !Options {
 	}
 	if options.kernel == '' {
 		return error('--kernel is required')
+	}
+	if options.failures_only && options.state_dir == '' {
+		return error('--failures-only is about what --state-dir keeps')
 	}
 	return options
 }
@@ -273,14 +288,14 @@ pub fn run(arguments []string, controller_source string) int {
 		}
 	}
 	watch_interrupts()
-	status := run_selection(host, selection, kernel, work, options.timeout, keep)
+	status := run_selection(host, selection, kernel, work, options.timeout, keep, options.failures_only)
 	if !keep {
 		release_work_directory(work)
 	}
 	return status
 }
 
-fn run_selection(host Host, selection Selection, kernel string, work string, timeout int, keep bool) int {
+fn run_selection(host Host, selection Selection, kernel string, work string, timeout int, keep bool, failures_only bool) int {
 	guest_directory := os.join_path(work, 'guest')
 	guest := build_guest(host, guest_directory) or {
 		if err is Interrupted {
@@ -299,8 +314,9 @@ fn run_selection(host Host, selection Selection, kernel string, work string, tim
 			guest:   guest
 			state:   os.join_path(work, scenario.name)
 			// A scenario that says it needs longer than the run allows gets it.
-			timeout: if scenario.timeout > timeout { scenario.timeout } else { timeout }
-			keep:    keep
+			timeout:       if scenario.timeout > timeout { scenario.timeout } else { timeout }
+			keep:          keep
+			failures_only: failures_only
 		})
 		if outcome.interrupted {
 			was_interrupted = true

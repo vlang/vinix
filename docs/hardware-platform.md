@@ -722,8 +722,9 @@ vinix.hibernate=sd1        the name the device has in /dev, with or without /dev
 /sys/power/disk        [shutdown]   -- what happens once the image is written;
                                        the only way there is
 /sys/power/hibernate   available, or unavailable: and why; the device; what the
-                       last boot found on it; the last image's pages, bytes and
-                       times; what the kernel that loaded it reported
+                       last boot found on it, and a device an image is still
+                       waiting on; the last image's pages, bytes and times;
+                       what the kernel that loaded it reported
 /sys/power/suspend_stats/disk, and last_depth `disk`, last_wake `resume-from-disk`
 ```
 
@@ -742,7 +743,7 @@ Before the first image the device has to be one of two things: blank over
 its first and last megabyte, or already carrying a header of this system's.
 A device with anything else on it is left exactly as it is and `disk` is not
 offered, so a root filesystem named by mistake is not written over; it is
-looked at again before every image. The installer that takes a blank disk
+looked at again before every image, once userspace is frozen. The installer that takes a blank disk
 for the system (`vinix.disk=auto`) never takes the named one. Its node is
 made mode 0600, and so is the disk a named partition is on: **the image is a
 copy of memory with every secret the kernel had, it is not encrypted, and
@@ -763,9 +764,12 @@ are recorded and the screen's picture is put away, as for any sleep. Then:
 1. the thread moves to the boot processor;
 2. tables are made and a free page is taken for every page in use, with
    some to spare, and for everything writing the image will need
-   (`hibernate.prepare()`). If memory is too full for a copy of itself the
-   page cache gives back what it can read again; if it is still too full,
-   or the image would not fit the device, the sleep fails with the reason;
+   (`hibernate.prepare()`). Whether there is room is worked out before any
+   page is taken -- the rest of the kernel is still running, and much of it
+   stops the machine when it is refused memory. If memory is too full for a
+   copy of itself the page cache gives back what it can read again; if it
+   is still too full, or the image would not fit the device, the sleep
+   fails with the reason;
 3. the other processors are parked, PCI configuration space and the display
    mode are read out;
 4. with interrupts off the interrupt controllers and clocks are read out and
@@ -785,9 +789,15 @@ still frozen. It writes the device -- first a header that describes no
 image, so that an old image cannot be entered once it is partly written
 over; then the list and the pages; a flush; and last the header, which is
 read back and compared -- and switches the machine off. If anything fails
-before that header reads back, the device holds no image, everything taken
+before that header is written, the device holds no image, everything taken
 is given back, and the machine thaws as from any failed sleep with the
-reason in `suspend_stats`.
+reason in `suspend_stats`. One failure is different: the last header
+written, not confirmed by the flush or the reading back, and then not
+replaceable either. Nobody knows what the device holds then, and if it is
+the image, it is an image of the disks as they are at that moment. The
+machine is switched off all the same: the next start goes back into the
+image or finds none and starts afresh, and either is right so long as
+nothing more is changed.
 
 **Nothing else reaches a disk after the snapshot.** The image holds every
 mounted filesystem as it was at that instant; a block allocated or a page
@@ -795,7 +805,11 @@ swapped out afterwards would be a change the image knows nothing of. So
 every block driver passes a fence before it writes or discards
 (`kernel/block/fence`): from the snapshot on, a write that is not the
 image's is held there until the machine is off -- or until hibernation has
-failed, when it goes through. The power-off itself is `transition()`'s
+failed, when it goes through. A request that had passed the fence and was
+waiting for its disk to wake when the snapshot was taken is asked again
+with the disk's lock held; and the page cache holds a writer before it
+takes its own lock, so that nothing is held at a driver's door with a lock
+another thread could need. The power-off itself is `transition()`'s
 without its first step, the flush of the filesystems, for the same reason:
 they were flushed before the snapshot, and the devices' own caches are
 flushed by their shutdown.
@@ -829,6 +843,21 @@ a header that describes no image**, and the machine starts afresh. The same
 header is written, flushed and read back just before an image is entered:
 an image is entered once, and a crash on the way in cannot be gone back
 into.
+
+**An image nobody went back into.** A start that is not told of the image
+-- no `vinix.hibernate=`, or the name now belongs to another disk -- would
+mount the system's disk, change it, and leave behind an image that a later
+start goes back into: a kernel that then corrupts the disk from what it
+remembers. So every start that has its disks up and has not gone back into
+an image reads the first block of each disk and partition for one that
+still could be (`look_for_images()`; reads, nothing else). If there is one
+-- on a device it was not told of, on the named device when the image could
+not be discarded, or the named device cannot be read at all -- **the
+system's disk is not mounted**: the machine runs from memory, the kernel
+says which device and what to do, `/sys/power/hibernate` has it under
+`waiting`, and `disk` is not offered. The image is not touched, since its
+device was not named this time. A verified root, which is only read, is
+mounted regardless.
 
 Three things are deliberately *not* compared, because two boots of the same
 QEMU machine already differ in them: how the boot loader divided memory
@@ -867,8 +896,9 @@ boot had not yet set, are written from the kernel's own record of them.
 **What is refused, and when.**
 
 - Before anything is suspended: no device named, or not found when the
-  disks came up; a named device that is neither blank nor this system's; no
-  real-mode entry for the other processors.
+  disks came up; a named device that is neither blank nor this system's, or
+  that cannot be read; an image from an earlier start still waiting on a
+  device; no real-mode entry for the other processors.
 - With the bindings frozen: a bound PCI device whose driver cannot bring it
   back from a loss of power, as for a suspend to RAM. None of x86-64's
   drivers is one any more.
@@ -915,22 +945,31 @@ What this is not:
   keeps there is this boot's, and the methods of a kernel put back from an
   image run against it.
 - **The image is not encrypted or signed.** See the device, above.
-- **A boot that does not look at the device leaves the image there.** If
-  the machine is started without `vinix.hibernate=`, or with another
-  system, and its filesystems are written to, and it is then started with
-  the option again, the kernel inside the image wakes to disks that have
-  moved on, and will corrupt them. Nothing here can tell; whoever starts
-  the machine another way has to clear the device.
+- **Only this kernel knows to leave a waiting image's disks alone.** A
+  start of another system, or of a kernel from before this, mounts and
+  writes what it likes; started with the option again afterwards, the
+  kernel inside the image wakes to disks that have moved on and will
+  corrupt them. Nothing in the image records the state of the filesystems
+  it holds, so nothing can tell. And this kernel only keeps *itself* from
+  mounting the system's disk: a program in a machine running from memory
+  can still mount a disk by hand.
 - If the device cannot be written when an image is refused, or just before
   one would be entered, the image stays on it. The kernel says so, does not
-  enter it, and can do no more.
+  enter it and does not mount the system's disk, and can do no more.
 - The boot loader's reclaimable memory is saved whole -- 65 MiB of a 1 GiB
   QEMU machine -- because the kernel does not know which part of it holds
   the answers it still reads. The image is not compressed.
 - A device that appears after the disks came up is not looked for; a
   partition as the image's device, and an IDE disk, follow the same code
   and have not been tried: the tests use a whole SATA disk. A release
-  kernel does not start `nvme`.
+  kernel does not start `nvme`, and where it is started it comes up after
+  the image has been looked for, so an NVMe disk cannot hold one.
+- What has been through a resume is small: an ext2 root on a SATA disk
+  with two files written to it, and the kernel's own state. No swap, no
+  journal replay, no filesystem with much in its cache, no desktop.
+- Interrupts left pending in the local or I/O APIC by the kernel that
+  loaded the image are not cleared before the image's kernel takes them
+  over; none has been seen to matter.
 - The kernel must be the same build. An image is not carried from one
   kernel to the next, and an updated system discards it.
 - No part of the image is read back before the machine is switched off but
@@ -1191,6 +1230,8 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `hibernate-cycles`: five suspends to disk one after another, six boots; the kernel heap after the last four as after the first | pass | -- |
 | `hibernate-damaged-header`, `hibernate-damaged-pages`, `hibernate-memory`: an image damaged while the machine was off, and a machine with less memory, start afresh, say why, discard the image and work | pass | -- |
 | `hibernate-unnamed`, `hibernate-foreign`: with no device named, or one that holds something else, there is no `disk` and both disks are byte for byte as they were made | pass | -- |
+| `hibernate-root`: the system installed on a disk; a file written before the image is taken, another by the resumed kernel, both read back by a third start afresh from the disk | pass | -- |
+| `hibernate-waiting`: the same, started once without the option in between: the image is found waiting and left whole, the system's disk is not mounted, no disk is written to; the next start goes back into the image | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
 | `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` (kernel built with `-d acpiec_selftest`: a simulated embedded controller) | pass | -- |

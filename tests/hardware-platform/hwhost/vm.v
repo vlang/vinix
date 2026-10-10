@@ -35,6 +35,13 @@ pub:
 	state   string // this scenario's state directory
 	timeout int    // seconds the machine may run
 	keep    bool   // leave the images in the state directory
+	// ... of a scenario that failed only
+	failures_only bool
+}
+
+// Whether the images of a scenario that ended this way stay on disk.
+pub fn (run Run) keeps_images(passed bool) bool {
+	return run.keep && !(passed && run.failures_only)
 }
 
 pub struct Outcome {
@@ -398,7 +405,7 @@ pub fn run_scenario(host Host, scenario Scenario, run Run) Outcome {
 		reason = err.msg()
 	}
 	machine.stop()
-	if !run.keep {
+	if !run.keeps_images(reason == '') {
 		remove_images(scenario, run.state)
 	} else if reason == '' {
 		for disk in scenario.disks {

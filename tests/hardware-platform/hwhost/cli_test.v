@@ -96,3 +96,37 @@ fn test_a_failure_says_why_and_shows_the_serial_port() {
 	})
 	assert silent.contains('nothing was printed on the serial port')
 }
+
+fn test_failures_only_is_about_a_kept_state_directory() {
+	kept := parse_options(['--arch', 'x86_64', '--kernel', 'k', '--state-dir', 'd', '--failures-only'])!
+	assert kept.failures_only
+	assert !parse_options(['--arch', 'x86_64', '--kernel', 'k', '--state-dir', 'd'])!.failures_only
+	parse_options(['--arch', 'x86_64', '--kernel', 'k', '--failures-only']) or {
+		assert err.msg().contains('--state-dir')
+		parse_options(['--arch', 'x86_64', '--kernel', 'k', '--state-dir', 'd', '--failures-only=yes']) or {
+			assert err.msg().contains('takes no value')
+			return
+		}
+	}
+	assert false
+}
+
+fn test_which_images_stay() {
+	// Without a state directory none do; with one all do, unless only the
+	// failures were asked for.
+	assert !Run{}.keeps_images(true) && !Run{}.keeps_images(false)
+	assert Run{
+		keep: true
+	}.keeps_images(true)
+	assert Run{
+		keep: true
+	}.keeps_images(false)
+	assert !Run{
+		keep:          true
+		failures_only: true
+	}.keeps_images(true)
+	assert Run{
+		keep:          true
+		failures_only: true
+	}.keeps_images(false)
+}

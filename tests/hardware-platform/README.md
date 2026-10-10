@@ -64,6 +64,8 @@ here runs any.
 | `hibernate-memory` | x86_64 | The same with nothing damaged and the second boot given 768 MiB instead of 1 GiB: the image is refused because the memory of the machine has changed, and discarded. |
 | `hibernate-unnamed` | x86_64 | The same two disks and no `vinix.hibernate=`: `state` offers `freeze mem`, writing `disk` fails, `/sys/power/hibernate` says no device was named, and a suspend to idle still works. **On the host both disk files must be byte for byte what the controller made**, which is how "nothing was written to any disk" is known rather than reported. |
 | `hibernate-foreign` | x86_64 | `vinix.hibernate=sd1` names a disk that starts with somebody's data. It is neither blank nor this system's, so `disk` is not offered, `/sys/power/hibernate` says the device holds something else and is left alone, writing `disk` fails, the kernel counts no write to any disk, the node is mode 0600 all the same, and on the host both disks are byte for byte as made. |
+| `hibernate-root` | x86_64 | The scenarios above run from memory, with no filesystem on a disk mounted when the image is taken; this one has what a suspend to disk is for. A third disk, blank and 4 GiB, is one the kernel installs the system onto at the machine's first start (`vinix.disk=auto`, which the boot medium always asks for; the device named for the image is never taken for that, and is too small here anyway), so the root is an ext2 volume on `sd2`. First start: the program writes a megabyte of a pattern to a file on the root and syncs, leaves its note, and writes `disk`. Second start: the write returns in the same process; the kernel counts one resume, with no write to a disk before the image was looked for and nothing lost; the file reads as written; a second file is written and synced by the kernel whose memory holds the filesystem; the machine is switched off in the ordinary way. Third start, afresh from the disk (the required line `read back from the disk` is printed only here): the kernel found no image; **both files are read back whole by a kernel that has never seen them**; a third is written. On the host the image device must hold no image. |
+| `hibernate-waiting` | x86_64 | The same machine, and between the suspend to disk and the resume a start *without* `vinix.hibernate=` (the boot medium is made again with the other command line). That kernel is told of no image. It must find one all the same: `/sys/power/hibernate` says `waiting: sd1`; `state` offers no `disk`; the file on the system's disk does not exist, because the disk was not mounted and the machine runs from memory; the kernel counts no write to any disk; and the image device still starts with `VINIXHIB` and says its pages. The program writes nothing either, not even its note. The third start has the option again and must go back into the image (the required line `back in the image`): one resume counted, the file as written, a second written and read back. With the check taken out of the kernel the second start mounts the system's disk and the scenario fails there. |
 
 Every scenario also fails on a line containing `KERNEL PANIC`,
 `FATAL EXCEPTION` or `HWTEST FAIL`, and a scenario whose machine is to power
@@ -160,6 +162,11 @@ deleted: `DIR/guest` holds the guest program and each `DIR/<scenario>` has
   of a gigabyte of the machine's memory after a run, and is kept only when
   the scenario failed.
 
+With `--failures-only` as well, the images of every scenario that passed are
+deleted as they are without a state directory, and only the logs stay: a
+whole run otherwise leaves a boot image of 26 MiB for each of some fifty
+scenarios.
+
 A scenario that boots its machine more than once (below) has a serial log
 for each boot -- `serial.log`, `serial-2.log`, `serial-3.log` -- since QEMU
 empties the file it is given; `qemu.log` and `qmp.log` run on through all of
@@ -207,7 +214,9 @@ The required lines, the actions and the events are those of all the boots
 together, in order, and the timeout covers them all. Between two boots,
 with the machine off, the controller can overwrite part of a disk
 (`damage`), and a boot can be given QEMU arguments of its own (`qemu`: a
-second `-m` replaces the first). Since a guest that starts afresh in a
+second `-m` replaces the first) or a kernel command line of its own
+(`own_cmdline`, `cmdline`), for which the boot medium is made again around
+the same kernel and guest. Since a guest that starts afresh in a
 later boot starts from the top of its scenario, one that has to know which
 boot it is in leaves itself a note on a disk.
 
@@ -288,11 +297,14 @@ memory, in where it put the kernel, and in one ACPI table -- and the kernel
 was changed until it no longer depended on those. What a real firmware
 varies from boot to boot is not known here, and where it varies more the
 image is refused, which these scenarios show for three cases only: a
-damaged header, a damaged page, and less memory. Nothing checks that an
-image is refused for each of the other reasons the kernel has, and nothing
-here can show what happens when a machine is started some other way in
-between and its disks are changed: the kernel cannot tell, and resuming
-then corrupts them.
+damaged header, a damaged page, and less memory. That each of the kernel's
+other reasons is given for the difference it names is tested on the host
+(`tests/hibernate`), not in a machine. `hibernate-waiting` shows that this
+kernel, started without being told of an image, leaves the image and the
+system's disk alone; nothing here can show what happens when the machine
+is started with another system in between and its disks are changed: the
+kernel cannot tell, and resuming then corrupts them. And the filesystem a
+resume has been shown to keep whole held three files.
 
 Two further limits:
 

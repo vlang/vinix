@@ -61,7 +61,7 @@ fn test_every_real_scenario_runs_somewhere() {
 	// So is suspend to disk.
 	for name in ['hibernate', 'hibernate-xapic', 'hibernate-iommu', 'hibernate-iommu-amd', 'hibernate-cycles',
 		'hibernate-damaged-header', 'hibernate-damaged-pages', 'hibernate-memory', 'hibernate-unnamed',
-		'hibernate-foreign'] {
+		'hibernate-foreign', 'hibernate-root', 'hibernate-waiting'] {
 		assert name in names_of(x86.run)
 		assert name !in names_of(arm.run)
 	}
