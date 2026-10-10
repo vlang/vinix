@@ -265,6 +265,19 @@ pub fn finish_block_mount(token int, committed bool) {
 pub fn begin_block_reconfigure(identity resource.BlockIdentity) ?int {
 	block_policy_lock.acquire()
 	defer { block_policy_lock.release() }
+	return reserve_block_extent_locked(identity)
+}
+
+// Discard is destructive even at securelevel zero. Exclude filesystem and
+// swap ownership at every level, and honor level two's raw-write prohibition.
+pub fn begin_block_discard(identity resource.BlockIdentity) ?int {
+	block_policy_lock.acquire()
+	defer { block_policy_lock.release() }
+	if securelevel() >= 2 { errno.set(errno.eperm); return none }
+	return reserve_block_extent_locked(identity)
+}
+
+fn reserve_block_extent_locked(identity resource.BlockIdentity) ?int {
 	if !identity.valid() {
 		errno.set(errno.enodev)
 		return none

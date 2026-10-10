@@ -8,6 +8,7 @@ import platform
 import re
 import shutil
 import subprocess
+import struct
 import sys
 import tarfile
 import tempfile
@@ -56,6 +57,9 @@ def main():
         with disk.open('r+b') as f:
             f.seek(1024 * 1024 - 512); f.write(bytes([0xA1]) * 512)
             f.seek(1536 * 1024); f.write(bytes([0xA2]) * 512)
+            if a.arch == 'amd64':
+                f.seek(446); f.write(struct.pack('<B3sB3sII', 0, bytes(3), 0x83, bytes(3), 12 * 1024 * 1024 // 512, 2048))
+                f.seek(510); f.write(b'\x55\xaa')
         env = {**os.environ, 'VINIX_INITRAMFS': str(archive), 'VINIX_BOOT_DISK': str(work / 'boot.img'),
                'VINIX_EFIVARS': str(work / 'efivars.fd'), 'VINIX_QEMU_PACKAGE_STORE': str(work / 'packages.tar'),
                'VINIX_QEMU_PERSIST_DISK': str(disk), 'VINIX_QEMU_PERSIST_SIZE_MB': '16',
@@ -73,11 +77,11 @@ def main():
             firmware = os.environ.get('VINIX_OVMF_CODE_AMD64', str(Path(qemu).parent.parent / 'share/qemu/edk2-x86_64-code.fd'))
             command = [qemu, '-machine', 'q35,smm=off', '-accel', os.environ.get('VINIX_QEMU_ACCEL', 'tcg'), '-cpu', 'max', '-m', '1024', '-smp', '2',
                        '-drive', f'if=pflash,format=raw,unit=0,readonly=on,file={firmware}', '-cdrom', str(work / 'test.iso'),
-                       '-drive', f'if=ide,format=raw,file={disk},cache=writeback', '-display', 'none', '-monitor', 'none', '-serial', 'stdio', '-nic', 'none', '-no-reboot']
+                       '-drive', f'if=ide,format=raw,file={disk},cache=writeback,discard=unmap', '-display', 'none', '-monitor', 'none', '-serial', 'stdio', '-nic', 'none', '-no-reboot']
         with tempfile.TemporaryDirectory(prefix='vinix-volume-drive-', dir='/tmp') as drive_directory:
             if a.arch == 'aarch64':
                 drive = Path(drive_directory) / 'disk.raw'; drive.symlink_to(disk.resolve())
-                env['VINIX_QEMU_EXTRA'] = f'-drive if=none,format=raw,file={drive},id=volume-test -device virtio-blk-device,drive=volume-test'
+                env['VINIX_QEMU_EXTRA'] = f'-drive if=none,format=raw,file={drive},id=volume-test,discard=unmap -device virtio-blk-device,drive=volume-test'
             if not mapped.boot_guest(command, env, helper, int(os.environ.get('VINIX_QEMU_TIMEOUT', '300')), 'full'):
                 raise RuntimeError('volume guest qualification failed')
         with disk.open('rb') as f:
@@ -86,6 +90,9 @@ def main():
                 if f.read(512) != bytes([value]) * 512: raise RuntimeError('out-of-volume sentinel changed')
             f.seek(1024 * 1024)
             if f.read(512) != bytes([0x73]) * 512: raise RuntimeError('mapped physical data missing')
-        print(f'PASS {a.arch}: volumes, CLI, alias/bounds, growth, removal races, 200-cycle retention and physical sentinels')
+            for offset in (4 * 1024 * 1024, 4 * 1024 * 1024 + 8192):
+                f.seek(offset)
+                if f.read(4096) != bytes([0x95]) * 4096: raise RuntimeError('discard changed adjacent volume data')
+        print(f'PASS {a.arch}: volumes, discard, CLI, alias/bounds, growth, removal races, 200-cycle retention and physical sentinels')
     return 0
 if __name__ == '__main__': raise SystemExit(main())

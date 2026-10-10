@@ -77,12 +77,53 @@ permissions and bad userspace pointers rejected before dispatch leave the
 volume counters unchanged. These are request failure counters, not a hardware
 diagnostic classification. A partition reports parent counters with flag 16;
 a logical view tracks its own forwarded operations and inherits parent
-offline/flush capability. Large
-syscalls can comprise several backend operations. Health here means I/O error
+offline/flush/discard capability. Large syscalls can comprise several backend
+operations. Health here means I/O error
 and availability reporting; SMART wear, temperature, predictive failure and
 real-hardware qualification remain future work. Unsupported backends return
 `ENOTTY`. Geometry also supports `BLKGETSIZE64`, `BLKGETSIZE`, `BLKSSZGET`, and
 `BLKROGET` without allowing destructive ioctl passthrough.
+
+## TRIM/discard
+
+`vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES` submits Linux
+`BLKDISCARD` (`0x1277`), whose argument is two `uint64_t` byte values: offset
+and length. Status flag 32 advertises backend discard support. Length must be
+nonzero; both values must align to the logical sector size, and the full range
+must fit inside the opened device. No rounding expands the requested range.
+
+Discard requires a writable descriptor, a trusted MAC domain, `CAP_SYS_ADMIN`
+and the initial user namespace. It rejects read-only/offline devices and
+unsupported backends. Aliases retain the backing device's capability and
+physical identity. Partitions and managed volumes translate only their own
+bounds. Mounted/protected filesystems, pending mounts, swap, concurrent raw
+writes and geometry changes exclude discard at every securelevel. Securelevel
+two also prohibits discard through descriptors opened earlier.
+
+The ioctl reserves the opened device's whole physical extent across batches of
+whole logical sectors, up to 64 KiB or one larger sector. Locks are released
+between batches; scheduling, signals, exec
+cancellation and raised securelevels are checked there. A failure or
+interruption may leave an already completed prefix discarded. Errors propagate
+to the caller and backend error counters; successful discard does not inflate
+read/write byte counters. Discard is a deallocation hint, not secure erasure,
+and makes no promise about the contents returned by later reads. It does not
+flush data or trigger filesystem free-space trimming; use it only for ranges
+whose data can be discarded.
+
+AHCI uses non-queued ATA DSM/TRIM only when IDENTIFY advertises it. NVMe uses
+Dataset Management with Deallocate when ONCS bit 2 advertises it. VirtIO
+negotiates DISCARD and honors the reported maximum sectors and segment count.
+All commands use exact ranges; protocol limits split requests rather than
+truncate them. AHCI/VirtIO reuse their permanent DMA buffers. NVMe uses one
+fallible range page and frees it after completion or proven controller disable,
+retaining it when a failed reset leaves DMA ownership uncertain. NVMe remains
+disabled by the existing production-kernel initialization policy.
+
+Protocol references: [VirtIO 1.2 block requests](https://docs.oasis-open.org/virtio/virtio/v1.2/virtio-v1.2.html),
+[NVMe NVM command set](https://nvmexpress.org/wp-content/uploads/NVM-Express-NVM-Command-Set-Specification-1.0e-2024.07.29-Ratified.pdf),
+and Linux's [ATA capability definitions](https://github.com/torvalds/linux/blob/master/include/linux/ata.h)
+and [DSM command construction](https://github.com/torvalds/linux/blob/master/drivers/ata/libata-scsi.c).
 
 ## Qualification and remaining roadmap work
 
@@ -90,12 +131,21 @@ real-hardware qualification remain future work. Unsupported backends return
 kernels on disposable ARM VirtIO and AMD64 AHCI disks. It covers bounds,
 read-only policy, aliases, stale FDs/generation reuse, namespace collisions,
 mount restrictions, invalid userspace pointers, CLI execution, concurrent
-open/remove, physical guard sectors, active-swap exclusion and retained heap
-after distinct-extent management cycles. `tests/block-storage` injects
+open/remove, discard through aliases/partitions, physical guard sectors,
+active-swap exclusion and retained heap after distinct-extent management
+cycles. `tests/block-storage` injects
 controller completion/flush errors; `tests/mounted-disk-policy` checks
 mount/write/swap interleavings.
 
+NVMe discard is qualified with the production command/completion code and
+mocked MMIO on the host, including 200 successful operations and failed-reset
+DMA ownership. An attempted NVMe development guest panicked during device
+initialization before reaching userspace. Native NVMe boot qualification and
+its production initialization policy remain open; host results do not establish
+real-controller or guest readiness.
+
 The encompassing roadmap item stays open: persistent volume discovery,
 storage pools/RAID, full-disk encryption and recovery, online filesystem resize,
-TRIM/discard and controller-specific health data are not implemented by this
-increment. The anonymous pager's encrypted swap remains a separate feature.
+filesystem-aware trimming and controller-specific health data are not
+implemented by this increment. The anonymous pager's encrypted swap remains a
+separate feature.

@@ -56,7 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
-	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n')
+	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n')
 	return 2
 }
 
@@ -64,6 +64,7 @@ pub fn run(argc i32, argv &&char) i32 {
 	if argc < 3 { return usage() }
 	mut request := u64(0)
 	mut data := Request{}
+	mut range := [2]u64{}
 	unsafe {
 		if C.strcmp(argv[1], c'status') == 0 && argc == 3 {
 			request = 0x56560004
@@ -72,6 +73,10 @@ pub fn run(argc i32, argv &&char) i32 {
 		} else if C.strcmp(argv[1], c'grow') == 0 && argc == 4 {
 			request = 0x56560002
 			data.length = decimal(argv[3]) or { return usage() }
+		} else if C.strcmp(argv[1], c'discard') == 0 && argc == 5 {
+			request = 0x1277
+			range[0] = decimal(argv[3]) or { return usage() }
+			range[1] = decimal(argv[4]) or { return usage() }
 		} else if C.strcmp(argv[1], c'create') == 0 && (argc == 6 || argc == 7) {
 			request = 0x56560001
 			slot := decimal(argv[3]) or { return usage() }
@@ -87,7 +92,7 @@ pub fn run(argc i32, argv &&char) i32 {
 			return usage()
 		}
 	}
-	flags := i32(if request == 0x56560001 && data.flags == 0 { C.O_RDWR } else { C.O_RDONLY }) | i32(C.O_CLOEXEC)
+	flags := i32(if request == 0x1277 || (request == 0x56560001 && data.flags == 0) { C.O_RDWR } else { C.O_RDONLY }) | i32(C.O_CLOEXEC)
 	fd := unsafe { C.open(argv[2], flags) }
 	if fd < 0 {
 		C.perror(c'vinix-volume: open')
@@ -104,10 +109,16 @@ pub fn run(argc i32, argv &&char) i32 {
 			C.printf(c'vinix-volume: unsupported status version\n')
 			return 1
 		}
-		C.printf(c'bytes=%lu sector=%lu readonly=%lu offline=%lu flush=%lu\nreads=%lu writes=%lu read_bytes=%lu write_bytes=%lu flushes=%lu\nerrors=%lu last_error=%lu disk=%lu offset=%lu slot=%lu generation=%lu\n',
+		C.printf(c'bytes=%lu sector=%lu readonly=%lu offline=%lu flush=%lu discard=%lu\nreads=%lu writes=%lu read_bytes=%lu write_bytes=%lu flushes=%lu\nerrors=%lu last_error=%lu disk=%lu offset=%lu slot=%lu generation=%lu\n',
 			result.bytes, result.sector, result.flags & 1, (result.flags >> 1) & 1, (result.flags >> 2) & 1,
+			(result.flags >> 5) & 1,
 			result.reads, result.writes, result.read_bytes, result.write_bytes, result.flushes,
 			result.errors, result.last_error, result.disk_id, result.start, result.slot, result.generation)
+	} else if request == 0x1277 {
+		if C.ioctl(fd, request, &range[0]) != 0 {
+			C.perror(c'vinix-volume: discard')
+			return 1
+		}
 	} else {
 		if C.ioctl(fd, request, &data) != 0 {
 			C.perror(c'vinix-volume: change')

@@ -16,7 +16,7 @@ def main():
         work = Path(directory)
         def put(path, text):
             p = work / path; p.parent.mkdir(parents=True, exist_ok=True); p.write_text(text)
-        for source in ['kernel/fs/storage_control.v', 'kernel/resource/block_status.v',
+        for source in ['kernel/fs/storage_control.v', 'kernel/resource/block_status.v', 'kernel/resource/block_discard.v',
                        'kernel/resource/block_identity.v', 'kernel/security/device_policy.v']:
             target = work / '/'.join(source.split('/')[1:])
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -41,6 +41,7 @@ pub fn isblk(mode u32) bool { return mode & 0o170000 == ifblk }
 module errno
 __global host_errno_code int
 pub const eperm=1
+pub const eintr=4
 pub const eio=5
 pub const ebadf=9
 pub const enomem=12
@@ -87,14 +88,17 @@ pub const mac_read=u64(1)
 pub const mac_write=u64(2)
 __global pub admin bool = true
 pub struct Namespace { pub: user voidptr }
-pub struct Process { pub: ns Namespace }
-pub struct Thread { pub: process Process }
+pub struct Process { pub: ns Namespace exiting bool }
+pub struct Thread { pub: process Process masked_signals u64 must_exit bool }
 __global thread Thread
 pub fn current_thread() &Thread { return &thread }
 pub fn mac_trusted() bool { return admin }
 pub fn is_initial_namespace(_ voidptr) bool { return true }
 pub fn has_capability(_ Process, _ int) bool { return admin }
+pub fn pending_signals(_ &Thread) u64 { return 0 }
+pub fn host_cancel(cancel bool) { thread = Thread{must_exit: cancel} }
 ''')
+        put('sched/sched.v', '@[has_globals]\nmodule sched\n__global pub host_yield_hook = fn () {}\npub fn yield(_ bool) { host_yield_hook() }\n')
         put('resource/base.v', '''module resource
 import stat
 import klock

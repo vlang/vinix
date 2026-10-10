@@ -47,7 +47,9 @@ const descriptor_next = u16(1)
 const descriptor_write = u16(2)
 const feature_read_only = u32(1 << 5)
 const feature_flush = u32(1 << 9)
+const feature_discard = u32(1 << 13)
 const request_flush = u32(4)
+const request_discard = u32(11)
 
 const mmio_base = u64(0x0a000000)
 const mmio_slot_size = u64(0x200)
@@ -65,6 +67,14 @@ mut:
 	type_    u32
 	reserved u32
 	sector   u64
+}
+
+@[packed]
+struct DiscardRange {
+mut:
+	sector u64
+	count  u32
+	flags  u32
 }
 
 struct VirtioBlockDevice {
@@ -92,6 +102,7 @@ pub mut:
 	ready           bool
 	read_only       bool
 	flush_supported bool
+	discard_sectors u32
 	name            string
 }
 
@@ -293,6 +304,54 @@ fn (mut device VirtioBlockDevice) sync(_handle voidptr) ? {
 	completed = true
 }
 
+fn (mut device VirtioBlockDevice) discard(offset u64, bytes u64) ? {
+	mut completed := false
+	defer { if !completed { device.metrics.failed() } }
+	if !resource.discard_range_valid(u64(device.stat.size), 512, offset, bytes) {
+		errno.set(errno.einval); return none
+	}
+	device.l.acquire()
+	defer { device.l.release() }
+	if !device.ready { errno.set(errno.enodev); return none }
+	if device.read_only { errno.set(errno.erofs); return none }
+	if device.discard_sectors == 0 { errno.set(errno.eopnotsupp); return none }
+	mut sector := offset / 512
+	mut left := bytes / 512
+	for left != 0 {
+		// A timed-out request owns both permanent buffers until collected.
+		for device.last_used != device.next_available {
+			if !device.collect_one() { errno.set(errno.eio); return none }
+		}
+		count := if left < device.discard_sectors { u32(left) } else { device.discard_sectors }
+		mut header := unsafe { &RequestHeader(device.request_virt) }
+		header.type_ = request_discard
+		header.reserved = 0
+		header.sector = 0
+		mut range := unsafe { &DiscardRange(device.data_virt) }
+		range.sector = sector
+		range.count = count
+		range.flags = 0
+		unsafe { *&u8(device.request_virt + sizeof(RequestHeader)) = 0xff }
+		write_descriptor(device, 0, device.request_phys, sizeof(RequestHeader), descriptor_next, 1)
+		write_descriptor(device, 1, device.data_phys, sizeof(DiscardRange), descriptor_next, 2)
+		write_descriptor(device, 2, device.request_phys + sizeof(RequestHeader), 1, descriptor_write, 0)
+		position := u64(device.next_available % device.queue_size)
+		unsafe { *&u16(device.avail + 4 + position * 2) = 0 }
+		device.next_available++
+		cpu.dmb_ish()
+		unsafe { *&u16(device.avail + 2) = device.next_available }
+		mmio_w32(device.base + reg_queue_notify, 0)
+		if !device.collect_one() { errno.set(errno.eio); return none }
+		status := unsafe { *&u8(device.request_virt + sizeof(RequestHeader)) }
+		if status != 0 {
+			errno.set(if status == 2 { errno.eopnotsupp } else { errno.eio }); return none
+		}
+		sector += count
+		left -= count
+	}
+	completed = true
+}
+
 fn (mut device VirtioBlockDevice) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	result := device.read_tracked_inner(_handle, buffer, loc, count) or { device.metrics.failed(); return none }
 	if result > 0 { device.metrics.completed(u64(result), false) }
@@ -350,6 +409,7 @@ fn (mut device VirtioBlockDevice) block_status() resource.BlockStatus {
 	if !device.ready { flags |= resource.block_offline }
 	if device.flush_supported { flags |= resource.block_flush }
 	if device.read_only { flags |= resource.block_readonly }
+	if device.discard_sectors != 0 { flags |= resource.block_discard }
 	return device.metrics.snapshot(u64(device.stat.size), u64(device.stat.blksize), flags, device.block_identity())
 }
 
@@ -406,9 +466,18 @@ pub fn initialise(hhdm u64) {
 		mmio_w32(base + reg_status, status_acknowledge | status_driver)
 		// Accept the backend's immutable write protection before filesystems
 		// inspect it, independently of support for cache flush commands.
-		features := mmio_r32(base + reg_host_features) & (feature_read_only | feature_flush)
+		mut features := mmio_r32(base + reg_host_features) & (feature_read_only | feature_flush | feature_discard)
 		device.read_only = features & feature_read_only != 0
 		device.flush_supported = features & feature_flush != 0
+		if features & feature_discard != 0 {
+			maximum := mmio_r32(base + reg_config + 36)
+			discard_segments := mmio_r32(base + reg_config + 40)
+			if maximum == 0 || discard_segments == 0 || device.read_only {
+				features &= ~feature_discard
+			} else {
+				device.discard_sectors = maximum
+			}
+		}
 		mmio_w32(base + reg_guest_features, features)
 		mmio_w32(base + reg_guest_page_size, u32(memory.page_size))
 		if !setup_queue(mut device) {

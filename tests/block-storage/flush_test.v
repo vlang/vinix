@@ -1,6 +1,7 @@
 module virtio_blk
 
 import x86.hpet as hpet_clock
+import stat
 
 __global simulated_device &VirtioBlockDevice
 __global withhold_completion bool
@@ -28,6 +29,9 @@ fn setup() &VirtioBlockDevice {
 		request_phys:    request
 		ready:           true
 		flush_supported: true
+		data_virt: u64(unsafe { calloc(1, 4096) })
+		discard_sectors: 8
+		stat: stat.Stat{size: 65536, blksize: 512}
 	}
 	simulated_device = device
 	withhold_completion = false
@@ -83,4 +87,42 @@ fn test_timed_out_flush_keeps_buffers_until_late_completion() {
 	device.sync(unsafe { nil }) or { assert false }
 	assert device.next_available == 2
 	assert device.last_used == 2
+}
+
+fn test_discard_splits_exact_ranges_and_uses_device_readable_data() {
+	mut device := setup()
+	device.data_phys = device.data_virt
+	device.discard(512, 20 * 512) or { assert false }
+	assert device.next_available == 3 && device.last_used == 3
+	header := unsafe { &RequestHeader(device.request_virt) }
+	range := unsafe { &DiscardRange(device.data_virt) }
+	assert header.type_ == request_discard && header.sector == 0 && header.reserved == 0
+	assert range.sector == 17 && range.count == 4 && range.flags == 0
+	assert unsafe { *&u32(device.desc + 16 + 8) } == sizeof(DiscardRange)
+	assert unsafe { *&u16(device.desc + 16 + 12) } == descriptor_next
+	status_code = 2
+	mut failed := false
+	device.discard(0, 512) or { failed = true }
+	assert failed
+}
+
+fn test_discard_timeout_cannot_overwrite_pending_range() {
+	mut device := setup()
+	withhold_completion = true
+	device.discard(512, 512) or {}
+	range := unsafe { &DiscardRange(device.data_virt) }
+	assert device.next_available == 1 && device.last_used == 0
+	device.discard(1024, 512) or {}
+	assert range.sector == 1 && device.next_available == 1
+	withhold_completion = false
+	device.discard(1024, 512) or { assert false }
+	assert device.next_available == 2 && device.last_used == 2 && range.sector == 2
+	device.discard_sectors = 0
+	device.discard(0, 512) or {}
+	device.discard_sectors = 8
+	device.read_only = true
+	device.discard(0, 512) or {}
+	device.read_only = false
+	device.discard(u64(-1), 512) or {}
+	assert device.next_available == 2
 }

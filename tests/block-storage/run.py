@@ -42,15 +42,15 @@ def main() -> None:
     ])
     functions = "\n\n".join(function(source, name) for name in [
         "send_cmd", "send_cmd_and_wait", "fail_controller", "ready_timeout_ns",
-        "rw_lba", "transfer", "sync",
+        "rw_lba", "transfer", "sync", "discard",
     ])
     with tempfile.TemporaryDirectory(prefix="vinix-storage-host-") as directory:
         work = Path(directory)
         write(work, "v.mod", "Module { name: 'vinix_storage_host_tests' }\n")
-        write(work, "resource/resource.v", "module resource\npub struct BlockMetrics {}\npub fn (mut m BlockMetrics) failed() {}\npub fn (mut m BlockMetrics) flushed() {}\n")
+        write(work, "resource/resource.v", "module resource\npub struct BlockMetrics {}\npub fn (mut m BlockMetrics) failed() {}\npub fn (mut m BlockMetrics) flushed() {}\n" + function((ROOT / 'kernel/resource/block_discard.v').read_text(), 'discard_range_valid'))
         write(work, "nvme/nvme.v", declarations.replace("module nvme", "module nvme\n" + imports)
               + "\nconst page_size = u64(4096)\nconst higher_half = u64(0)\n"
-              + "#include <stdio.h>\n#define kprintf printf\nfn C.kprintf(&char, ...voidptr) int\n"
+              + "#include <stdio.h>\n#define kprintf printf\n#define vinix_stack_alloc __builtin_alloca\nfn C.kprintf(&char, ...voidptr) int\nfn C.vinix_stack_alloc(usize) voidptr\n"
               + functions)
         write(work, "proc/proc.v", "module proc\npub fn account_disk_transfer(_ u64, _ bool) {}\npub fn account_disk_io(_ u64, _ u64, _ bool) {}\n")
         write(work, "pci/pci.v", "module pci\npub struct PCIBar {}\n")
@@ -77,6 +77,10 @@ pub fn div_roundup[T](a T, b T) T { return (a + b - 1) / b }
         write(work, "errno/errno.v", """module errno
 pub const eio = 5
 pub const enomem = 12
+pub const einval = 22
+pub const enodev = 19
+pub const erofs = 30
+pub const eopnotsupp = 95
 pub fn set(_ int) {}
 """)
         write(work, "memory/memory.v", """@[has_globals]
@@ -126,7 +130,7 @@ pub fn set_hook(hook fn ()) { tick_hook = hook; ticks = 0 }
             "event.eventstruct", "stat", "resource",
         ])
         functions = "\n\n".join(function(virtio, name) for name in [
-            "mmio_r32", "mmio_w32", "write_descriptor", "collect_one", "sync",
+            "mmio_r32", "mmio_w32", "write_descriptor", "collect_one", "sync", "discard",
         ])
         write(work, "virtio_blk/virtio_blk.v", declarations.replace("module virtio_blk", "module virtio_blk\n" + imports)
               + "\nfn C.memcpy(voidptr, voidptr, usize) voidptr\n" + functions)
@@ -145,7 +149,7 @@ pub fn get_ns() u64 { return hpet_clock.nanoseconds() }
             "x86.hpet as hpet_clock",
         ])
         functions = "\n\n".join(function(ahci, name) for name in [
-            "find_cmd_slot", "send_cmd", "sync",
+            "find_cmd_slot", "send_cmd", "sync", "set_prdt", "discard",
         ])
         write(work, "ahci/ahci.v", declarations.replace("module ahci", "module ahci\n" + imports)
               + "\nconst higher_half = u64(0)\n" + functions)

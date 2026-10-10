@@ -4,6 +4,10 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES` deallocates a range
+through supported block backends. The offset and length are decimal bytes.
+See the storage documentation for extent protection and interruption behavior.
+
 The image builders call `build-support/storage-tools/stage.py`, which uses the
 repository's V module producer and a static target musl compiler. To install it
 into an existing target filesystem:

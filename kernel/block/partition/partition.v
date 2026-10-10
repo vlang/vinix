@@ -7,6 +7,7 @@ import event.eventstruct
 import resource
 import lib
 import fs
+import errno
 
 const gpt_signature = u64(0x5452415020494645)
 
@@ -110,6 +111,14 @@ fn (mut this Partition) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 // parent's, including errors from the hardware cache flush.
 fn (mut this Partition) sync(handle voidptr) ? {
 	resource.sync_resource(mut this.parent_device, handle)?
+}
+
+fn (mut this Partition) discard(offset u64, bytes u64) ? {
+	if !resource.discard_range_valid(u64(this.stat.size), u64(this.stat.blksize), offset, bytes) {
+		errno.set(errno.einval); return none
+	}
+	if resource.backend_is_read_only(mut this.parent_device) { errno.set(errno.erofs); return none }
+	resource.discard_resource(mut this.parent_device, this.device_offset + offset, bytes)?
 }
 
 fn (mut this Partition) unref(handle voidptr) ? {

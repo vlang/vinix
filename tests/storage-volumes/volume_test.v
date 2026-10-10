@@ -8,6 +8,7 @@ import klock
 import memory
 import proc
 import resource
+import sched
 import security
 import stat
 
@@ -28,6 +29,10 @@ mut:
 	switch_at      int
 	next_identity  resource.BlockIdentity
 	metrics        resource.BlockMetrics
+	discard_calls  int
+	discard_offset u64
+	discard_bytes  u64
+	no_data        bool
 }
 
 fn (d &Disk) block_identity() resource.BlockIdentity {
@@ -40,12 +45,13 @@ fn (d &Disk) block_identity() resource.BlockIdentity {
 }
 
 fn (mut d Disk) block_status() resource.BlockStatus {
-	mut snapshot := d.metrics.snapshot(8192, 512, if d.readonly {
+	mut snapshot := d.metrics.snapshot(u64(d.stat.size), u64(d.stat.blksize), if d.readonly {
 		resource.block_readonly
 	} else {
 		u64(0)
 	}, d.identity)
 	if d.no_status { snapshot.version = 0 }
+	snapshot.flags |= resource.block_discard
 	return snapshot
 }
 
@@ -72,6 +78,14 @@ fn (mut d Disk) sync(_ voidptr) ? {
 		errno.set(errno.eio)
 		return none
 	}
+}
+
+fn (mut d Disk) discard(offset u64, bytes u64) ? {
+	d.discard_calls++
+	d.discard_offset = offset
+	d.discard_bytes = bytes
+	if d.failed { errno.set(errno.eio); return none }
+	if !d.no_data { unsafe { C.memset(&d.bytes[offset], 0, bytes) } }
 }
 
 fn (mut d Disk) unref(_ voidptr) ? { d.refcount-- }
@@ -253,4 +267,83 @@ fn test_unsupported_parent_status_fails_closed() {
 	assert errno.get() == errno.enotty
 	assert create_logical_volume(mut descriptor, VolumeRequest{ version: 1, slot: 8, length: 512 }) or { -1 } == -1
 	assert logical_volumes[8] == unsafe { nil }
+}
+
+fn test_discard_bounds_translation_permissions_and_reservation_cleanup() {
+	mut disk, mut descriptor := fixture(109)
+	mut range := [u64(512), u64(512)]!
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == 0
+	assert disk.discard_calls == 1 && disk.discard_offset == 512 && disk.discard_bytes == 512
+	for invalid in [u64(0), 511, u64(-1), 8192] {
+		range[1] = invalid
+		assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	}
+	assert disk.discard_calls == 1
+	range[1] = 512
+	proc.admin = false
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	proc.admin = true
+	descriptor.handle.flags = resource.o_rdonly
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	descriptor.handle.flags = resource.o_rdwr
+	disk.readonly = true
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	disk.readonly = false
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, unsafe { nil }) or { -1 } == -1
+	security.host_securelevel = 2
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	security.host_securelevel = 0
+	assert create_logical_volume(mut descriptor, VolumeRequest{version: 1, slot: 9, offset: 1024, length: 1024}) or { -1 } == 0
+	mut volume := logical_volumes[9]
+	mut handle := file.Handle{resource: volume.box, flags: resource.o_rdwr}
+	mut view := file.FD{handle: &handle}
+	assert storage_ioctl(mut view, resource.block_discard_ioctl, &range[0]) or { -1 } == 0
+	assert disk.discard_offset == 1536 && disk.discard_bytes == 512
+	disk.failed = true
+	assert storage_ioctl(mut view, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	assert volume.block_status().errors == 1
+	disk.failed = false
+	assert change_logical_volume(mut volume, volume_remove, VolumeRequest{}) or { -1 } == 0
+	mount := security.begin_block_mount(disk.identity) or { panic('leaked reservation') }
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	security.finish_block_mount(mount, true)
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+}
+
+fn test_large_discard_yields_cancels_and_releases_the_whole_extent() {
+	mut disk, mut descriptor := fixture(110)
+	disk.no_data = true
+	disk.stat.size = 131072
+	disk.identity = resource.BlockIdentity{is_block: true, disk_id: 110, length: 131072}
+	mut range := [u64(0), u64(131072)]!
+	sched.host_yield_hook = fn () { proc.host_cancel(true) }
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	assert errno.get() == errno.eintr && disk.discard_calls == 1 && disk.discard_bytes == 65536
+	proc.host_cancel(false)
+	token := security.begin_block_reconfigure(disk.identity) or { panic('cancel leaked reservation') }
+	security.end_block_reconfigure(token)
+	sched.host_yield_hook = fn () { security.host_securelevel = 2 }
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == -1
+	assert errno.get() == errno.eperm && disk.discard_calls == 2
+	security.host_securelevel = 0
+	sched.host_yield_hook = fn () {}
+	assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == 0
+	assert disk.discard_calls == 4 && disk.discard_offset == 65536 && disk.discard_bytes == 65536
+}
+
+fn test_discard_batches_preserve_whole_logical_sectors() {
+	expected_calls := [3, 100]!
+	for index, sector in [u64(1536), u64(131072)]! {
+		mut disk, mut descriptor := fixture(111)
+		disk.no_data = true
+		size := sector * 100
+		disk.stat.size = i64(size)
+		disk.stat.blksize = i64(sector)
+		disk.identity = resource.BlockIdentity{is_block: true, disk_id: 111, length: size}
+		mut range := [u64(0), size]!
+		assert storage_ioctl(mut descriptor, resource.block_discard_ioctl, &range[0]) or { -1 } == 0
+		assert disk.discard_calls == expected_calls[index]
+		assert disk.discard_offset % sector == 0 && disk.discard_bytes % sector == 0
+		assert disk.discard_offset + disk.discard_bytes == size
+	}
 }

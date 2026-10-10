@@ -7,6 +7,8 @@ import x86.hpet as hpet_clock
 __global simulated_pair &NVMEQueuePair
 __global simulated_mode int
 __global completion_code u16
+__global discarded_start u64
+__global discarded_blocks u32
 
 fn hardware_tick() {
 	mut pair := simulated_pair
@@ -18,6 +20,13 @@ fn hardware_tick() {
 	if unsafe { *pair.submission_doorbell } == u32(pair.sq_tail) {
 		tail := if pair.sq_tail == 0 { pair.entry_cnt - 1 } else { pair.sq_tail - 1 }
 		command := unsafe { pair.submission_queue[tail] }
+		if command.opcode == opcode_dataset_management {
+			pointer := unsafe { command.private.dataset.prp1 }
+			range := unsafe { &NVMEDiscardRange(pointer) }
+			discarded_start = range.start
+			discarded_blocks = range.blocks
+			assert range.attributes == 0
+		}
 		unsafe {
 			pair.completion_queue[pair.cq_head] = NVMECompletion{
 				cid:     command.cid
@@ -32,7 +41,7 @@ fn hardware_tick() {
 fn setup(mode int) &NVMEQueuePair {
 	mut controller := &NVMEController{
 		regs:          &NVMERegisters{ cc: 1, csts: 1 }
-		controller_id: unsafe { nil }
+		controller_id: &NVMEControllerID{oncs: 1 << 2}
 		admin_queue:   unsafe { nil }
 	}
 	mut pair := &NVMEQueuePair{
@@ -158,4 +167,51 @@ fn test_read_write_errors_release_prp_and_bounce() {
 	assert ns.transfer(buffer, 0, 12288, true) or { i64(-1) } == 12288
 	assert memory.allocated_pages() == before
 	unsafe { free(buffer) }
+}
+
+fn test_discard_encoding_completion_errors_and_200_cycles_free_dma() {
+	pair := setup(0)
+	mut ns := namespace(pair)
+	before := memory.allocated_pages()
+	for _ in 0 .. 200 {
+		ns.discard(512, 1024) or { assert false }
+		assert discarded_start == 1 && discarded_blocks == 2
+		assert memory.allocated_pages() == before
+	}
+	command := unsafe { pair.submission_queue[1] }
+	assert command.opcode == 9
+	assert unsafe { command.private.dataset.nsid } == 42
+	assert unsafe { command.private.dataset.ranges } == 0
+	assert unsafe { command.private.dataset.attributes } == 1 << 2
+	completion_code = 1
+	mut failed := false
+	ns.discard(0, 512) or { failed = true }
+	assert failed && memory.allocated_pages() == before
+}
+
+fn test_discard_failed_disable_quarantines_only_submitted_range_page() {
+	for mode in [2, 3] {
+		pair := setup(mode)
+		mut ns := namespace(pair)
+		before := memory.allocated_pages()
+		ns.discard(0, 512) or {}
+		assert pair.parent_controller.failed
+		assert memory.allocated_pages() == before + if mode == 3 { u64(1) } else { u64(0) }
+		tail := pair.sq_tail
+		ns.discard(0, 512) or {}
+		assert pair.sq_tail == tail
+		assert memory.allocated_pages() == before + if mode == 3 { u64(1) } else { u64(0) }
+	}
+}
+
+fn test_discard_unsupported_and_invalid_intervals_never_allocate_or_submit() {
+	mut pair := setup(0)
+	mut ns := namespace(pair)
+	before := memory.allocated_pages()
+	ns.discard(u64(-1), 512) or {}
+	ns.discard(0, 0) or {}
+	ns.discard(1, 512) or {}
+	pair.parent_controller.controller_id.oncs = 0
+	ns.discard(0, 512) or {}
+	assert pair.sq_tail == 0 && memory.allocated_pages() == before
 }

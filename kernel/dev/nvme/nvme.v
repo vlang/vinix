@@ -36,6 +36,7 @@ const opcode_format_cmd = 0x80
 // lock. One I/O queue also works with the specification's default queue grant.
 const nvme_io_queue_cnt = 1
 const opcode_flush = u8(0)
+const opcode_dataset_management = u8(9)
 const command_timeout_ns = u64(30_000_000_000)
 const max_transfer = u64(128 * 1024)
 const command_failed = u16(0xffff)
@@ -143,6 +144,26 @@ pub mut:
 	appmask  u16
 }
 
+@[packed]
+struct NVMECommandDataset {
+pub mut:
+	nsid u32
+	reserved1 [2]u64
+	prp1 u64
+	prp2 u64
+	ranges u32
+	attributes u32
+	reserved2 [4]u32
+}
+
+@[packed]
+struct NVMEDiscardRange {
+mut:
+	attributes u32
+	blocks u32
+	start u64
+}
+
 union NVMECommandPrivate {
 pub mut:
 	create_cq    NVMECommandCreateCQ
@@ -152,6 +173,7 @@ pub mut:
 	features     NVMECommandFeatures
 	identify     NVMECommandIdentify
 	rw           NVMECommandRW
+	dataset      NVMECommandDataset
 }
 
 @[packed]
@@ -430,6 +452,48 @@ fn (mut dev NVMENamespace) sync(_handle voidptr) ? {
 	completed = true
 }
 
+fn (mut dev NVMENamespace) discard(offset u64, bytes u64) ? {
+	mut completed := false
+	defer { if !completed { dev.metrics.failed() } }
+	if !resource.discard_range_valid(u64(dev.stat.size), u64(dev.stat.blksize), offset, bytes) {
+		errno.set(errno.einval); return none
+	}
+	if dev.parent_controller.failed { errno.set(errno.enodev); return none }
+	if dev.parent_controller.controller_id.oncs & (1 << 2) == 0 {
+		errno.set(errno.eopnotsupp); return none
+	}
+	physical := memory.pmm_alloc_nozero_fallible(1) @[freed]
+	if physical == unsafe { nil } { errno.set(errno.enomem); return none }
+	mut owned := false
+	defer { if !owned { memory.pmm_free(physical, 1) } }
+	mut range := unsafe { &NVMEDiscardRange(u64(physical) + higher_half) }
+	mut command := unsafe { &NVMECommand(C.vinix_stack_alloc(sizeof(NVMECommand))) }
+	mut start := offset / u64(dev.stat.blksize)
+	mut left := bytes / u64(dev.stat.blksize)
+	for left != 0 {
+		blocks := if left < u32(-1) { u32(left) } else { u32(-1) }
+		range.attributes = 0
+		range.blocks = blocks
+		range.start = start
+		unsafe {
+			*command = NVMECommand{}
+			command.opcode = opcode_dataset_management
+			command.private.dataset.nsid = u32(dev.nsid)
+			command.private.dataset.prp1 = u64(physical)
+			command.private.dataset.ranges = 0 // One range, zero based.
+			command.private.dataset.attributes = 1 << 2 // Deallocate.
+		}
+		status := dev.parent_controller.queue_list[0].send_cmd_and_wait(mut command, -1)
+		if status != 0 {
+			owned = status == command_dma_owned
+			errno.set(errno.eio); return none
+		}
+		start += blocks
+		left -= blocks
+	}
+	completed = true
+}
+
 fn (mut dev NVMENamespace) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	return resource.default_ioctl(handle, request, argp)
 }
@@ -455,6 +519,7 @@ fn (mut dev NVMENamespace) block_status() resource.BlockStatus {
 	defer { dev.l.release() }
 	mut flags := resource.block_flush
 	if dev.parent_controller.failed { flags |= resource.block_offline }
+	if dev.parent_controller.controller_id.oncs & (1 << 2) != 0 { flags |= resource.block_discard }
 	return dev.metrics.snapshot(u64(dev.stat.size), u64(dev.stat.blksize), flags, dev.block_identity())
 }
 

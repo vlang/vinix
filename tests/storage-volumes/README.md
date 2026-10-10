@@ -33,9 +33,17 @@ invalid ioctl/read/write pointers, stable namespace rules, mknod aliases,
 growth with open descriptors, active-swap exclusion, stale-descriptor removal,
 generation reuse and the native CLI. Concurrent opens race 100 removals. After warming metadata and
 graces, it checks that no slab class or large allocation count increases
-across 200 more create/grow/remove cycles using distinct extents.
+across 200 more create/write/discard/grow/remove cycles using distinct extents.
+AMD64 also checks real partition translation. Host tests cover bounded
+discard batches, exec cancellation, securelevel changes, failure cleanup,
+unsupported commands, protocol range encoding and DMA quarantine.
+
+NVMe discard currently has host controller qualification only. Production
+kernels disable NVMe initialization; an attempted development guest panicked
+before the fixture started. Native NVMe qualification remains open.
 
 Controller timeout/short-completion faults run separately in `block-storage`;
 physical mounted/swap extent admission runs in `mounted-disk-policy`. These are
 not a claim of RAID, full-disk encryption, persistent mapping tables, live
-filesystem resizing, discard or hardware SMART qualification.
+filesystem resizing, filesystem-aware free-space trimming or hardware SMART
+qualification.

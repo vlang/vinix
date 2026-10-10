@@ -46,6 +46,14 @@ fn (this &MknodDeviceResource) block_identity() resource.BlockIdentity {
 	return resource.block_identity(mut backing)
 }
 
+fn (mut this MknodDeviceResource) block_status() resource.BlockStatus {
+	return resource.block_status(mut this.backing) or { resource.BlockStatus{version: 0} }
+}
+
+fn (mut this MknodDeviceResource) discard(offset u64, bytes u64) ? {
+	resource.discard_resource(mut this.backing, offset, bytes)?
+}
+
 // A device that decides what an open returns, as /dev/tty and /dev/ptmx do,
 // must decide it for the container's node too.
 fn (mut this MknodDeviceResource) open_owned(flags int) ?&resource.Resource {

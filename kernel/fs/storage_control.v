@@ -11,6 +11,7 @@ import klock
 import memory
 import proc
 import resource
+import sched
 import security
 import stat
 import usercopy
@@ -107,7 +108,7 @@ fn (mut volume LogicalVolume) block_status() resource.BlockStatus {
 	if volume.readonly { flags |= resource.block_readonly }
 	if volume.removed { flags |= resource.block_offline }
 	if parent := resource.block_status(mut volume.parent) {
-		flags |= parent.flags & (resource.block_offline | resource.block_flush)
+		flags |= parent.flags & (resource.block_offline | resource.block_flush | resource.block_discard)
 	}
 	mut result := volume.metrics.snapshot(u64(volume.stat.size), u64(volume.stat.blksize), flags, volume.identity)
 	result.slot = volume.slot
@@ -241,6 +242,20 @@ fn (mut volume LogicalVolume) sync(_ voidptr) ? {
 	volume.metrics.flushed()
 }
 
+fn (mut volume LogicalVolume) discard(offset u64, bytes u64) ? {
+	volume.l.acquire()
+	defer { volume.l.release() }
+	if volume.removed { errno.set(errno.enodev); return none }
+	if volume.readonly { errno.set(errno.erofs); return none }
+	if !resource.discard_range_valid(u64(volume.stat.size), u64(volume.stat.blksize), offset, bytes) {
+		errno.set(errno.einval); return none
+	}
+	resource.discard_resource(mut volume.parent, volume.parent_offset + offset, bytes) or {
+		volume.metrics.failed()
+		return none
+	}
+}
+
 fn (mut volume LogicalVolume) ioctl(handle voidptr, request u64, argument voidptr) ?int {
 	return resource.default_ioctl(handle, request, argument)
 }
@@ -274,6 +289,7 @@ fn storage_request(request u64) bool {
 	return request == volume_create || request == volume_resize || request == volume_remove
 		|| request == resource.block_status_ioctl || request == 0x80081272 || request == 0x1260
 		|| request == 0x1268 || request == 0x125e
+		|| request == resource.block_discard_ioctl
 }
 
 fn storage_admin() bool {
@@ -283,6 +299,7 @@ fn storage_admin() bool {
 }
 
 fn storage_ioctl(mut descriptor file.FD, request u64, argument voidptr) ?int {
+	if request == resource.block_discard_ioctl { return storage_discard(mut descriptor, argument) }
 	if request != volume_create && request != volume_resize && request != volume_remove {
 		snapshot := resource.block_status(mut descriptor.handle.resource)?
 		if request == resource.block_status_ioctl {
@@ -328,6 +345,66 @@ fn storage_ioctl(mut descriptor file.FD, request u64, argument voidptr) ?int {
 	mut backend := descriptor.handle.resource
 	if mut backend is LogicalVolume { return change_logical_volume(mut backend, request, data) }
 	errno.set(errno.enotty)
+	return none
+}
+
+fn storage_discard(mut descriptor file.FD, argument voidptr) ?int {
+	if !storage_admin() { errno.set(errno.eperm); return none }
+	if descriptor.handle.flags & resource.o_accmode != resource.o_rdwr
+		&& descriptor.handle.flags & resource.o_accmode != resource.o_wronly {
+		errno.set(errno.ebadf); return none
+	}
+	descriptor.handle.mac_check(proc.mac_write)?
+	mut range := [2]u64{}
+	if !usercopy.copy_from_user(&range[0], u64(argument), sizeof(range)) {
+		errno.set(errno.efault); return none
+	}
+	mut backend := descriptor.handle.resource
+	for {
+		identity := resource.block_identity(mut backend)
+		snapshot := resource.block_status(mut backend) or {
+			if errno.get() == errno.enotty { errno.set(errno.eopnotsupp) }
+			return none
+		}
+		if snapshot.flags & resource.block_offline != 0 { errno.set(errno.enodev); return none }
+		if snapshot.flags & resource.block_readonly != 0 { errno.set(errno.erofs); return none }
+		if snapshot.flags & resource.block_discard == 0 { errno.set(errno.eopnotsupp); return none }
+		if !resource.discard_range_valid(snapshot.bytes, snapshot.sector, range[0], range[1]) {
+			errno.set(errno.einval); return none
+		}
+		token := security.begin_block_discard(identity) or {
+			if identity != resource.block_identity(mut backend) { continue }
+			return none
+		}
+		if identity != resource.block_identity(mut backend) {
+			security.end_block_reconfigure(token)
+			continue
+		}
+		defer { security.end_block_reconfigure(token) }
+		// Keep every batch sector aligned, including devices whose logical
+		// sector is larger than the usual 64 KiB batch size.
+		batch_bytes := if snapshot.sector > 65536 {
+			snapshot.sector
+		} else {
+			u64(65536) - u64(65536) % snapshot.sector
+		}
+		mut done := u64(0)
+		for done < range[1] {
+			current := proc.current_thread()
+			if katomic.load(&current.must_exit) || current.process.exiting
+				|| proc.pending_signals(current) & ~current.masked_signals != 0 {
+				errno.set(errno.eintr); return none
+			}
+			if security.securelevel() >= 2 { errno.set(errno.eperm); return none }
+			// Keep the reservation and descriptor across bounded device calls,
+			// but release volume/driver locks before yielding or handling signals.
+			count := if range[1] - done < batch_bytes { range[1] - done } else { batch_bytes }
+			resource.discard_resource(mut backend, range[0] + done, count)?
+			done += count
+			if done < range[1] { sched.yield(true) }
+		}
+		return 0
+	}
 	return none
 }
 

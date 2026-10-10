@@ -189,6 +189,7 @@ pub mut:
 	// command tables. Keep them allocated and refuse to reuse this port.
 	failed        bool
 	flush_command u8
+	trim_supported bool
 }
 
 __global (
@@ -246,6 +247,53 @@ fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
 	if !dev.send_cmd(slot) {
 		errno.set(errno.eio)
 		return none
+	}
+	completed = true
+}
+
+fn (mut dev AHCIDevice) discard(offset u64, bytes u64) ? {
+	mut completed := false
+	defer { if !completed { dev.metrics.failed() } }
+	if !resource.discard_range_valid(u64(dev.stat.size), u64(dev.stat.blksize), offset, bytes) {
+		errno.set(errno.einval); return none
+	}
+	dev.l.acquire()
+	defer { dev.l.release() }
+	if dev.failed { errno.set(errno.enodev); return none }
+	if !dev.trim_supported { errno.set(errno.eopnotsupp); return none }
+	mut sector := offset / u64(dev.stat.blksize)
+	mut left := bytes / u64(dev.stat.blksize)
+	if sector >= u64(1) << 48 || left > (u64(1) << 48) - sector {
+		errno.set(errno.einval); return none
+	}
+	for left != 0 {
+		count := if left < 65535 { left } else { u64(65535) }
+		slot := dev.find_cmd_slot() or { errno.set(errno.eio); return none }
+		mut volatile regs := dev.regs
+		mut volatile header := unsafe {
+			&AHCIHBACommand((u64(regs.clb) | (u64(regs.clbu) << 32)) + higher_half + slot * sizeof(AHCIHBACommand))
+		}
+		header.flags = u16(sizeof(AHCIFISh2d) / 4) | (1 << 6)
+		header.prdtl = 1
+		header.prdbc = 0
+		// One 512-byte DSM page, containing one 48-bit LBA / 16-bit count.
+		// The permanent bounce buffer remains quarantined on port failure.
+		unsafe {
+			C.memset(dev.bounce, 0, 512)
+			*&u64(dev.bounce) = sector | (count << 48)
+		}
+		mut volatile table := dev.set_prdt(header, u64(dev.bounce) - higher_half, 0, 511)
+		mut volatile fis := unsafe { &AHCIFISh2d(&table.cfis) }
+		unsafe { C.memset(fis, 0, sizeof(AHCIFISh2d)) }
+		fis.fis_type = fis_reg_h2d
+		fis.flags = 1 << 7
+		fis.command = 0x06
+		fis.featurel = 1
+		fis.countl = 1
+		fis.device = 1 << 6
+		if !dev.send_cmd(slot) { errno.set(errno.eio); return none }
+		sector += count
+		left -= count
 	}
 	completed = true
 }
@@ -335,6 +383,7 @@ fn (mut dev AHCIDevice) block_status() resource.BlockStatus {
 	mut flags := u64(0)
 	if dev.failed { flags |= resource.block_offline }
 	if dev.flush_command != 0 { flags |= resource.block_flush }
+	if dev.trim_supported { flags |= resource.block_discard }
 	return dev.metrics.snapshot(u64(dev.stat.size), u64(dev.stat.blksize), flags, dev.block_identity())
 }
 
@@ -564,6 +613,8 @@ fn (mut d AHCIDevice) initialise() ?int {
 	// ATA IDENTIFY word 83 declares FLUSH CACHE/FLUSH CACHE EXT support.
 	// Do not silently report a persistence barrier on an unsupported disk.
 	commands := unsafe { identity[83] }
+	// IDENTIFY word 169 bit zero advertises the non-queued DSM/TRIM command.
+	d.trim_supported = unsafe { identity[169] & 1 != 0 && identity[169] != 0xffff }
 	if commands & 0xc000 == 0x4000 {
 		if commands & (1 << 13) != 0 {
 			d.flush_command = 0xea
