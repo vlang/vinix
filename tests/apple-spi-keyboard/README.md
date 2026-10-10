@@ -98,3 +98,24 @@ Caps Lock, Control combinations, arrow keys, Fn-navigation, repeat and release.
 Inspect `apple-spi-kbd:` diagnostics when no valid report is received. A missing
 or incomplete DT node must be fixed in the bootloader handoff, not bypassed with
 guessed register addresses.
+
+## Native fixture controller
+
+`run.v` owns the frozen-source inventory, source hashes, compiler arguments,
+allocator guards, exact golden comparisons, native artifact inputs and selected
+guest command. The Python entry point retains argument parsing and ownership
+of the work directory. It imports the existing V provider and module producer
+directly; the independent C/V fixture sources and assertions remain unchanged.
+The serial object producer remains an unchanged dependency.
+
+The transfer removes the original 8,408-byte, 106-line controller block and
+original-revision binding. Fixture literals contribute zero algorithm credit.
+The final receipt reports the net Python reduction including the frontend.
+
+Qualification compares both controllers with instrumented compiler inputs and
+real subprocess/filesystem ownership on ARM64, x86-64 and ARM ASan/UBSan, plus
+actual cold CLI builds. Literal Unix backslashes in caller work paths remain
+filename bytes during recursive directory creation. The unmodified SPI consumer still fails on generated
+`memdup` calls with V 0.5.2 `6d549c2f` and `c6bb06f`; the frozen original
+controller has the same failure. This stage makes no new successful SPI
+fixture, kernel, QEMU or physical-hardware claim.
