@@ -23,7 +23,7 @@ switches the whole driver off and `=1` on again; the last one wins.
 
 | Word | Effect |
 | --- | --- |
-| `legacy` | only the two device nodes, and on the wire only what they need: the address of the shared memory and reads of five keys. No power supply, no zone, no key described or written |
+| `legacy` | only the two device nodes, and on the wire only what they need: the request for the shared memory's address and reads of the percentage (`BUIC`, or `BRSC` where there is none) and the three telemetry keys. No power supply, no zone, no key described or written. The driver is still on the device list and still leaves the SMC alone across a sleep |
 | `nosensors` | no temperatures and no fans: their keys are not asked about |
 | `nolimit` | the charge limit key is neither read nor written, and there is no `charge_control_end_threshold` |
 

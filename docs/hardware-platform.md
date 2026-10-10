@@ -845,7 +845,7 @@ itself, which the SMC keys Linux names do not include.
 | `vinix.cpufreq=off\|simulate` | no frequency driver, or one with memory for registers |
 | `vinix.apple_idle=wfi`, `vinix.apple_cpufreq=1` | Apple hardware only; untried |
 | `vinix.apple_battery=0` | Apple hardware only: do not drive the SMC at all |
-| `vinix.apple_smc=legacy` | Apple hardware only: the SMC as `/dev/battery` and `/dev/battery-power` alone, with nothing but reads of five keys sent to it. `nosensors` leaves out temperatures and fans, `nolimit` the charge limit key; the three combine with commas. Untried on a Mac, like the driver |
+| `vinix.apple_smc=legacy` | Apple hardware only: the SMC as `/dev/battery` and `/dev/battery-power` alone, with nothing but reads of the percentage and the three telemetry keys sent to it. `nosensors` leaves out temperatures and fans, `nolimit` the charge limit key; the three combine with commas. Untried on a Mac, like the driver |
 | `vinix.thermal_sensors=0`, `vinix.tjmax=N` | skip the x86 sensor drivers; state TjMax |
 | `vinix.pci_hotplug=0\|1` | leave PCI Express hot-plug ports alone, or watch them where the kernel would not by itself |
 | `vinix.acpi_thermal=off\|nocrt` | leave firmware's thermal zones and fans alone, or take them without the trip that switches the machine off |
