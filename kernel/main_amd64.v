@@ -48,6 +48,7 @@ import sysdisk
 import block.verity
 import socket
 import socket.inet
+import thermal
 import time
 import x86.hpet
 import x86.hypervisor
@@ -149,6 +150,9 @@ fn kmain_thread() {
 	cpuidle.publish()
 	// And how fast they run.
 	cpufreq.publish()
+	// The processor's temperature sensors and energy counters, and the
+	// thermal zones other drivers registered before /sys was there.
+	thermal.publish()
 
 	streams.initialise()
 	random.initialise()

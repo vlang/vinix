@@ -63,6 +63,7 @@ import dev.pty
 import dev.tty
 import dev.random
 import dev.streams
+import thermal
 import time
 import userland
 import syspower
@@ -274,6 +275,8 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	cpuidle.publish()
 	// And how fast they run.
 	cpufreq.publish()
+	// The thermal zones drivers registered before /sys was there.
+	thermal.publish()
 	print('kmain_thread: sysfs done\n')
 
 	if enable_fake_g17 {
