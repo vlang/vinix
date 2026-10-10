@@ -273,6 +273,9 @@ What this is not:
 - The dark screen is a black picture, not a display switched off: there is
   no backlight class and no display power control (DPMS), so a panel's
   backlight stays lit behind it, and Apple's panel is not darkened at all.
+  The desktop presents a black frame of its own before it asks for a sleep,
+  which is what such a panel shows; a sleep asked for any other way leaves
+  it as it was.
 
 ## Power supplies
 
@@ -378,9 +381,28 @@ Beyond the limits stated in each section:
 - Suspend to RAM, hibernation, backlight and display power control.
 - Restoring an IOMMU, or any driver but `e1000` and `ahci`, after a sleep
   that powers devices down.
-- The desktop: Settings and the taskbar still read `/dev/battery`; there is
-  no Sleep or Restart in the menu and no idle or lid setting.
 - `hwcheck` is built by hand (`tools/hwcheck/build`); no image ships it.
+
+**Desktop.** The native desktop uses these interfaces now, and none of that
+has run against a kernel: it is tested on the host, against the text the
+kernel writes and a machine the tests stand in for. Settings and the taskbar
+read the first present battery in `/sys/class/power_supply` with its status
+and the kernel's time estimates, and fall back to `/dev/battery` where there
+is none, which is still every Apple machine. The Start menu has Restart, and
+Sleep where `/sys/power/state` offers `mem`. Settings > Power has the lid
+action, the performance profile (disabled where the kernel takes none, as in
+every virtual machine) and two idle timeouts, after which the compositor turns
+the display off and puts the machine to sleep; the saved lid action and
+profile are written back when the desktop starts. What it still does not do:
+
+- Nothing can ask for the display to stay on. There is no inhibit interface,
+  so a film watched without input is turned off like anything else.
+- There is no screen lock: a display that comes back on, and a machine that
+  wakes, show the session as it was left.
+- Display off is a black frame, with the backlight at its minimum where the
+  desktop can set one (`/dev/apple-panel-bl`). No panel is powered down.
+- Only the first battery is shown, and the kernel's low and critical
+  thresholds are not announced on screen.
 
 ## Qualification record, 2026-10-10
 

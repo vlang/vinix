@@ -49,8 +49,8 @@ What it does:
   maximize/restore, arrangement, workspace migration and close
 - a **V Start button** and Windows 7-style two-column Start menu, with pinned
   and recently used programs, their recent items, Recent Items, All Programs,
-  type-to-search, readable paged program/search rows, system links and a
-  session button
+  type-to-search, readable paged program/search rows, system links and the
+  session buttons: Shut down, Restart and, where the kernel can, Sleep
 - **shortcuts down the left edge of the wallpaper**, and matching Start-menu
   entries, for every application the desktop can open
 - a **file browser** over the real filesystem: directories first, sizes, and a
@@ -101,8 +101,10 @@ What it does:
 - optional **OBS Studio** (`pkg install obs-studio`), hosted in a private X11
   window with a second screen that receives the native compositor image
 - a **settings application**: window button side, taskbar style, theme,
-  wallpaper, display, battery, experimental M1 Wi-Fi controls and localized
-  control search
+  wallpaper, display, battery, power (idle timeouts, lid and performance
+  profile), experimental M1 Wi-Fi controls and localized control search
+- an **idle timer**: the display turns off and the machine sleeps after the
+  times chosen in Settings, and the input that wakes the display is swallowed
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
 - a **first-run app picker** shown right after the user is created, offering
@@ -202,8 +204,12 @@ typing any word with a q in it drop the user back to the console.
     settings.v     preferences shared by the desktop and Settings application
     settings_app.v the settings application
     settings_wifi.v the Wi-Fi pane: radio control, scan and network list
+    settings_power.v the Power pane: idle timeouts, lid action, profile
+    idle_timer.v   the idle timer's state machine, with no clock of its own
+    idle_wm.v      the compositor's side of it: display off and on, and Sleep
     wallpaper.v    loading and scaling a wallpaper photograph
     backlight_client.v / battery_client.v / wifi_client.v  V device clients
+    power_client.v the kernel's power files in /sys: sleep, lid and profile
     platform.c.v   V POSIX bindings, terminal state, mmap, clocks and directories
     render.v       a ui2 backend that draws an element tree into a framebuffer
     canvas.v       the software renderer: spans, rounded rects, clipping, blend
@@ -797,7 +803,11 @@ instead put close outermost, which is what both conventions do.
 **Wallpaper** offers six colours and ten photographs.
 
 **Display** reports and controls the experimental Apple panel backlight, while
-**Battery** reports the Apple SMC battery device. **Wi-Fi** reads the optional
+**Battery** reports the battery: a power supply in `/sys` where the kernel
+lists one, with its status and estimates, and the Apple SMC battery device
+otherwise. **Power** sets when the display turns off and the machine sleeps
+for want of input, what closing the lid does and the CPU performance profile;
+see `SETTINGS.md` for what each needs of the kernel. **Wi-Fi** reads the optional
 BCM4378 driver, controls its firmware radio, starts scans and lists the networks
 found. Firmware loading and network credentials remain in `wifi-ctl`, and the
 raw Ethernet device is not an IP stack. See `SETTINGS.md` for the exact device
@@ -1169,9 +1179,18 @@ tells the supervised child it owns the system session. `reboot`, `poweroff` and
 than powering the machine down themselves; init forwards that request to the
 compositor. The compositor takes it at a frame boundary, closes its applications,
 restores the console and only then calls `reboot(2)`, which does not return. The Start menu's
-**Shut down** button is the same path. Started from a shell instead of from
+**Shut down** and **Restart** buttons are the same path, with the power-off
+and the restart command. Started from a shell instead of from
 init, the desktop is an ordinary process: both then only end the session and
 give the console back to that shell, as they always have.
+
+**Sleep**, the third button, does not end the session. It is shown only when
+`/sys/power/state` offers `mem`. Between two frames the compositor presents
+a black frame and writes `mem` there; the write returns when the machine
+wakes, and the compositor repaints the whole screen, reads the battery again
+and drops the input that woke the machine. A refused write raises a notice
+and changes nothing. The idle timer described in `SETTINGS.md` sleeps the
+same way.
 
 SIGHUP has a distinct meaning: `vinix-desktop-reload` uses it to ask PID 1 for
 an orderly compositor replacement. It never reaches `reboot(2)`. On a GPU
