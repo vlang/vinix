@@ -202,6 +202,7 @@ fn pthread_symbol(symbol string) ?u64 {
 	if address := pthread_attr_symbol(symbol) { return address }
 	if address := pthread_condattr_symbol(symbol) { return address }
 	if address := pthread_identity_symbol(symbol) { return address }
+	if address := pthread_sched_symbol(symbol) { return address }
 	return match symbol {
 		'_pthread_atfork' { u64(unsafe { voidptr(darwin_pthread_atfork) }) }
 		'_pthread_mutex_init' { u64(unsafe { voidptr(darwin_mutex_init) }) }

@@ -2,12 +2,15 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/resource.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -29,6 +32,16 @@ static void run_program(int native, const char *image, const char *left, const c
         close(descriptors[1]);
         char *arguments[] = { "/opt/ios/run-ios", (char *)image,
             (char *)left, (char *)op, (char *)right, NULL };
+        if (!strcmp(image,"/opt/ios/pthread-sched") && op && !strcmp(op,"--unsupported-native")) {
+            struct sched_param parameters={0};
+            /* musl's process scheduling entry is an ENOSYS stub; its pthread
+             * APIs and this raw syscall reach the real kernel scheduler. */
+            if(syscall(SYS_sched_setscheduler,0,SCHED_BATCH,&parameters))_exit(125);
+        }
+        if (!strcmp(image,"/opt/ios/pthread-sched") && op && !strcmp(op,"--unprivileged")) {
+            struct rlimit limit={0,0};
+            if(setrlimit(RLIMIT_RTPRIO,&limit))_exit(125);
+        }
         execv(native ? image : arguments[0], native ? arguments + 1 : arguments);
         _exit(127);
     }
@@ -219,6 +232,13 @@ int main(void) {
     run("/opt/ios/pthread-identity",NULL,NULL,NULL,0,
         "IOS-PTHREAD-IDENTITY: native handles, process main thread, worker forks, explicit exits, guarded join values and three destructor passes in eight threads\n");
     puts("iOS PASS: native thread identities, explicit exit and key destructor iterations");
+    run("/opt/ios/pthread-sched","--adapter",NULL,NULL,0,
+        "IOS-PTHREAD-SCHED: guarded Darwin parameters, copied inputs, optional outputs, native FIFO/RR changes, yielding and eight threads\n");
+    run("/opt/ios/pthread-sched","--adapter","--unprivileged",NULL,0,
+        "IOS-PTHREAD-SCHED: native privilege denial preserves ordinary policy and errno\n");
+    run("/opt/ios/pthread-sched","--adapter","--unsupported-native",NULL,0,
+        "IOS-PTHREAD-SCHED: unsupported inherited native policy preserves outputs and restores ordinary scheduling\n");
+    puts("iOS PASS: native thread scheduling, guarded Darwin parameters and privilege enforcement");
     run("/opt/ios/ioctl", NULL, NULL, NULL, 0,
         "IOS-IOCTL: descriptor flags, shared nonblocking I/O, queued bytes, native interfaces and eight threads\n");
     puts("iOS PASS: Darwin ioctl controls, socket bytes and interface queries");

@@ -17,6 +17,7 @@
 #include <poll.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sched.h>
 /* Only permanent runner dispatchers are registered with native libc. Handler
  * ownership, ordering and removal before image unmapping are implemented in V.
  * A normal mutex can be unlocked by the fork child, as for POSIX atfork locks. */
@@ -165,6 +166,31 @@ static int ios_thread_join(uint64_t thread, void *output) {
 }
 static int ios_thread_equal(uint64_t first, uint64_t second) {
     return pthread_equal((pthread_t)(uintptr_t)first, (pthread_t)(uintptr_t)second);
+}
+/* Only read/write the native libc structure here. Darwin policy conversion,
+ * supported requests and guarded caller outputs are handled in V. */
+static int ios_thread_getsched(uint64_t thread, int32_t *fields) {
+    int policy = 0;
+    struct sched_param parameters = {0};
+    int result = pthread_getschedparam((pthread_t)(uintptr_t)thread, &policy, &parameters);
+    if (!result) {
+        fields[0] = policy; fields[1] = parameters.sched_priority; fields[2] = 0;
+#ifdef __APPLE__
+        _Static_assert(sizeof(struct sched_param) == 8, "Darwin scheduling parameter layout");
+        memcpy(&fields[2], (const char *)&parameters + 4, 4);
+#endif
+    }
+    return result;
+}
+static int ios_thread_setsched(uint64_t thread, int policy, int priority, int32_t opaque) {
+    struct sched_param parameters = {0};
+    parameters.sched_priority = priority;
+#ifdef __APPLE__
+    memcpy((char *)&parameters + 4, &opaque, 4);
+#else
+    (void)opaque;
+#endif
+    return pthread_setschedparam((pthread_t)(uintptr_t)thread, policy, &parameters);
 }
 /* Read native detach state. V rejects a live detached join before musl's
  * undefined-operation trap. Caller still must provide a live thread handle. */

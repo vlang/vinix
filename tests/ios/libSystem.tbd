@@ -23,6 +23,7 @@ exports:
                    _memmove, _memcmp, _memchr, _bzero, __Unwind_Resume,
                    _pthread_setspecific, _pthread_getspecific, _pthread_key_create,
                    _pthread_key_delete, _pthread_self, _pthread_once, _pthread_equal, _pthread_main_np, _pthread_exit,
+                   _pthread_getschedparam, _pthread_setschedparam, _sched_get_priority_min, _sched_get_priority_max, _sched_yield,
                    _pthread_attr_init, _pthread_attr_destroy, _pthread_attr_getdetachstate, _pthread_attr_setdetachstate,
                    _pthread_attr_getstacksize, _pthread_attr_setstacksize, _pthread_attr_getstack, _pthread_attr_setstack,
                    _pthread_attr_getguardsize, _pthread_attr_setguardsize,

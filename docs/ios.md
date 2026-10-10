@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_getschedparam
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_mach_thread_np
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -858,20 +858,51 @@ with all app workers joined and keys/conditions destroyed before unmapping.
 TLS reads from key destructors and C++ thread-local destructor ordering remain
 unverified. The full ARM64 C++/GLES/PPSSPP regression passes; an earlier attempt
 failed the existing concurrent permission fixture with `ENOENT` and its log is
-preserved. This resolves five more strong imports across Fortnite and EOSSDK;
-the actual game still exits before entry at `pthread_getschedparam`.
+preserved. This resolves five more strong imports across Fortnite and EOSSDK.
+
+The installed Mac pthread library's scheduling parameter is eight bytes, with
+default priority 31 and opaque word 10. Getters permit either or both outputs to
+be null, copy the complete parameter, preserve errno and report `ESRCH` (3) for
+a null thread handle. The priority range calls return 15 and 47 regardless of
+the supplied policy, including unknown values. These behaviors and copied setter
+inputs were measured against `libsystem_pthread.dylib`.
+
+V now translates Darwin ordinary/FIFO/RR policies to native thread scheduling,
+preserves errno and writes guarded 32-bit policy and eight-byte parameter outputs
+only after successful native queries. The default ordinary priority maps from 31
+to native zero; FIFO/RR use the native 1–99 priorities. Setters call real native
+pthread scheduling and obey its permissions. Yield calls native `sched_yield`.
+No allocation or remembered scheduling registry is added. Non-default ordinary
+priorities, non-default opaque words, unrepresentable real-time priorities and
+native batch/idle/deadline/reset policies return `ENOTSUP` (45) explicitly.
+On Mac the adapters retain the native scheduling parameter and policies.
+
+The shared Mac/iOS fixture checks optional and guarded outputs, copied inputs,
+invalid requests, yielding, isolated TLS and eight rounds of eight workers,
+including changing a blocked worker's policy from another thread. The guest
+independently checks the main thread's real FIFO/RR policy and priority in kernel
+stat fields, forces `EPERM` with a zero real-time priority limit before dropping
+root, and verifies that an inherited native batch policy leaves getter outputs
+untouched before restoring ordinary scheduling. This kernel's thread stat files
+report the process main thread's scheduling fields, so worker stat records are
+not used for independent verification. ASAN/UBSAN checks two Mach-O loads/unloads
+with every worker joined and condition/mutex destroyed. The full ARM64
+C++/GLES/PPSSPP regression passes; the existing permission fixture again needed
+a retry after `ENOENT`. These entries resolve eight more strong imports across
+Fortnite and EOSSDK; the actual game still exits before entry at
+`pthread_mach_thread_np`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,299 | 859 | 81 |
-| EOSSDK | 515 | 147 | 18 |
+| Fortnite executable | 1,302 | 856 | 81 |
+| EOSSDK | 520 | 142 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,867 | 1,129 | 122 |
+| All images | 1,875 | 1,121 | 122 |
 
-The C++/GLES/Text variant reports 1,880 resolved imports, 1,116 unresolved strong
+The C++/GLES/Text variant reports 1,888 resolved imports, 1,108 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
