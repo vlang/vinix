@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `2a66331756cfec82ab8de0a3983234554dcccf15`,
-Linguist 7.27.0 reports **Python 5.66%** (439 files, 2,072,242 bytes) and
-**V 75.72%** (2,579 files, 27,709,314 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `defd59e44af0a2b2a5cd07bbfc56e29690294745`,
+Linguist 7.27.0 reports **Python 5.64%** (433 files, 2,062,883 bytes) and
+**V 75.74%** (2,587 files, 27,717,571 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,134,043 Python bytes**. All remaining
-2,072,242 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,143,402 Python bytes**. All remaining
+2,062,883 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 31 stages below remove **93 Python files / 289,106 original bytes** and
+The 32 stages below remove **99 Python files / 298,465 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -62,6 +62,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Wi-Fi firmware packaging, C producers and linked-artifact verifier | `tools/m1-wifi/wifihost`, five native commands and `tests/m1-wifi/test-tools.v` | 14,627 / 321 | `d2036214` |
 | QEMU firmware test launcher | `tests/qemu-ovmf/test-patch`, existing `ovmffixture` | 1,565 / 49 | `170f9cf6` |
 | Scheduler, TLB and CPU policy host launchers | `tests/host-policy/policyhost`, four native commands | 4,174 / 93 | `6a533e64` |
+| Generated policy fixtures, CPU assembly and linked ELF checks | `tests/generated-policy-host/policyhost`, four native fixture commands and `tests/cpu-mitigations/linkedcheck` | 9,359 / 258 | `defd59e4` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -488,12 +489,42 @@ Between `1eb8dcc8` and `2a663317`, counted Python declines by exactly 20,366 byt
 and ten files, matching the retired commands. Concurrent V changes affect the
 relative language shares separately.
 
+The next complete batch retires **six Python files / 9,359 bytes**. Syscall,
+execute-only and mounted-block generated-code checks and CPU assembly adapters
+invoke their V policies directly. The old file/process/exception callback bridge
+is removed. V retains strict UTF-8 and universal newlines, checked writes,
+caller architecture, compiler arguments, inherited streams and private fixture
+cleanup after compiler or fixture failure. LLVM symbol addresses use native
+arbitrary-width conversion. Existing C fixture constants and assertions remain
+unchanged; nine previously qualified complete ARM/x86 fixture contents retain
+their exact hashes and lengths.
+
+The current ARM execute-only function also needs its emitted file-state bit
+definitions. The extractor now includes those definitions, and the unchanged
+128-case protection/gate/attribute fixture passes. Both architecture variants
+of all three generated-code policies pass on ARM, Rosetta x86 and ARM ASan/UBSan
+hosts. The actual assembly adapters pass all 1,024 CPU/flag cases, fifteen thunk
+registers and the scheduler resume checks on each host profile. Native tests
+verify twenty-one compiler/fixture failure retirements and argument/encoding
+errors. All five cold entrypoints pass outside the checkout.
+
+The linked-ELF checker preserves Unicode boundaries and whitespace, greedy
+matches, the first twenty raw-branch failures, unresolved thunk checks, the
+required scheduler symbol and the minimum one hundred thunk branches. Its
+independent rejection tests pass on all three host profiles. A cached production
+x86 kernel passes with 1,549 thunk branches; the older checkout artifact is
+correctly rejected for raw indirect branches. No new kernel build, guest boot
+or hardware validation is claimed. See
+[the generated policy qualification](../tests/generated-policy-host/README.md)
+for input hashes and native commands. No Python was run. Between `2a663317` and
+`defd59e4`, counted Python declines by exactly 9,359 bytes and six files.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 31 stages.
+or hidden in these 32 stages.
 
 ## Earlier completed stages
 

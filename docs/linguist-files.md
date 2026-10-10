@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `2a66331756cfec82ab8de0a3983234554dcccf15`,
+at source commit `defd59e44af0a2b2a5cd07bbfc56e29690294745`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -12,15 +12,15 @@ This is a snapshot; regenerate it when source files change.
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
 | C | 564 | 2,344,457 | 6.41% |
-| Python | 439 | 2,072,242 | 5.66% |
-| Shell | 406 | 1,352,818 | 3.70% |
+| Python | 433 | 2,062,883 | 5.64% |
+| Shell | 411 | 1,353,688 | 3.70% |
 
-All `.v` files are classified as V. The resulting V share is 75.72%, with no
+All `.v` files are classified as V. The resulting V share is 75.74%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,072,242 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,062,883 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 2a66331756cfec82ab8de0a3983234554dcccf15 --breakdown --json
+github-linguist --rev defd59e44af0a2b2a5cd07bbfc56e29690294745 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -861,8 +861,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clipboard/test_host.py` | 3,780 |
 | `tests/clock-control/run.py` | 2,357 |
 | `tests/codex/smoke.py` | 4,944 |
-| `tests/cpu-mitigations/check-assembly.py` | 569 |
-| `tests/cpu-mitigations/check-linked.py` | 1,476 |
 | `tests/cpu-mitigations/run.py` | 4,795 |
 | `tests/desktop-perf/_native_report.py` | 2,681 |
 | `tests/desktop-perf/_runner_native.py` | 11,681 |
@@ -897,7 +895,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dumpability/run.py` | 3,975 |
 | `tests/elf-text/run.py` | 5,791 |
 | `tests/emulator-desktop/_native.py` | 3,457 |
-| `tests/execute-only/check-generated.py` | 954 |
 | `tests/execute-only/run.py` | 6,678 |
 | `tests/ext2-sparse/run.py` | 7,614 |
 | `tests/ext2-xattr/host.py` | 6,852 |
@@ -905,7 +902,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/fs-journal/image.py` | 3,153 |
 | `tests/fs-journal/run.py` | 7,827 |
 | `tests/fsync-scope/run.py` | 5,958 |
-| `tests/generated-policy-host/vinix_policy_native.py` | 4,635 |
 | `tests/gl-triangle/run-vm.py` | 5,439 |
 | `tests/gl-triangle/run.py` | 2,728 |
 | `tests/hypervisor/host-test.py` | 3,871 |
@@ -965,7 +961,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/minecraft/test-fetcher.py` | 4,085 |
 | `tests/minecraft/test-patch-lwjgl.py` | 1,985 |
 | `tests/mount-policy/run_vm.py` | 1,615 |
-| `tests/mounted-disk-policy/check-generated.py` | 788 |
 | `tests/mounted-disk-policy/host.py` | 2,348 |
 | `tests/mounted-disk-policy/run.py` | 10,413 |
 | `tests/n64/desktop.py` | 9,741 |
@@ -1038,7 +1033,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/steam/test-robust-list.py` | 7,922 |
 | `tests/storage-volumes/host.py` | 7,882 |
 | `tests/storage-volumes/run.py` | 6,625 |
-| `tests/syscall-policy/run-host.py` | 937 |
 | `tests/syscall-policy/run.py` | 3,864 |
 | `tests/terminal-jobs/run.py` | 4,434 |
 | `tests/tlb/run.py` | 483 |
@@ -1281,6 +1275,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
 | `tests/compiler-selection/test-kernel-ar` | 145 |
+| `tests/cpu-mitigations/check-assembly` | 179 |
+| `tests/cpu-mitigations/check-linked` | 157 |
 | `tests/cpu-mitigations/check-policy` | 158 |
 | `tests/cpu-power/run.sh` | 638 |
 | `tests/desktop-bootstrap/run-runner.sh` | 169 |
@@ -1302,6 +1298,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/steam-smoke-init.sh` | 2,498 |
 | `tests/dota2/vulkan-init.sh` | 3,187 |
 | `tests/elf-text/run-host.sh` | 2,822 |
+| `tests/execute-only/check-generated` | 178 |
 | `tests/ext2-sparse/run-host.sh` | 2,056 |
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/go/smoke.sh` | 558 |
@@ -1347,6 +1344,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/minecraft/smoke.sh` | 939 |
 | `tests/minecraft/test-launcher.sh` | 8,276 |
 | `tests/mount-policy/run.sh` | 2,110 |
+| `tests/mounted-disk-policy/check-generated` | 178 |
 | `tests/n64/frame` | 180 |
 | `tests/native-boundaries/run` | 104 |
 | `tests/net-random/run.sh` | 294 |
@@ -1427,6 +1425,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/steam/steam-smoke` | 4,054 |
 | `tests/storage/run.sh` | 210 |
 | `tests/storage/test-qemu-storage.sh` | 3,030 |
+| `tests/syscall-policy/run-host` | 178 |
 | `tests/thermal/run.sh` | 502 |
 | `tests/tlb/policy` | 152 |
 | `tests/uname/guest-init.sh` | 1,886 |
