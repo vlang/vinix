@@ -48,6 +48,7 @@ fn main() {
 		require_child('/opt/ios/signal-checks')
 		require_child('/opt/ios/error-checks')
 		require_child('/opt/ios/sysctl-checks')
+		require_child('/opt/ios/terminal-checks')
 		require_child('/opt/ios/regression')
 	} else {
 		args := if mode == 'audit' {

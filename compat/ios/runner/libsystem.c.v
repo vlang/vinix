@@ -119,6 +119,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := process_symbol(symbol) { return address }
 	if address := signals_symbol(symbol) { return address }
 	if address := errors_symbol(symbol) { return address }
+	if address := terminal_symbol(symbol) { return address }
 	if address := mach_memory_symbol(symbol) { return address }
 	if address := common_crypto_symbol(symbol) { return address }
 	address := match symbol {

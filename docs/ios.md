@@ -722,7 +722,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _tcgetattr
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _thread_policy_set
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1227,20 +1227,49 @@ hashes are retained alongside the passing run under `sysctl-checks`.
 The V monitor also rejects QEMU exit without a guest PASS marker and detects
 interleaved kernel exception output. Direct host checks verify both failures
 and successful completion. The hardware-query adapter resolves two more strong
-imports. The actual game still exits with status 1 before entry, now at
-`tcgetattr` in EOSSDK.
+imports. That probe still exited with status 1 before entry, at `tcgetattr`
+in EOSSDK.
+
+The V terminal adapters now implement `tcgetattr` and `tcsetattr` over real
+native terminals. Darwin's 72-byte structure, flag positions, control-character
+indices and disabled value (255 rather than Linux's zero) are translated
+explicitly. Linux input baud zero means follow the output rate; the getter
+reports that effective rate as measured on Darwin. Nineteen baud values from
+zero through 230400 and separate input/output rates are supported. Immediate,
+drained and flushed updates reach native `tcsetattr`; `TCSASOFT` and `CIGNORE`
+preserve hardware flags and rates while applying software settings.
+
+Conversion uses stack storage and copies getter output only after success;
+generated C confirms no per-call heap allocation. Bad descriptors, pipes,
+invalid actions and null buffers return Darwin errors, and successful calls
+preserve errno. Unsupported native flags leave the entire destination untouched
+and return `ENOTSUP` (45). Unrepresentable Darwin flags or control characters,
+including an enabled NUL binding, are rejected before applying an update;
+unsupported baud values return `EINVAL`. Additional output delays, separate
+CTS/RTS flow control and Darwin-specific special characters remain unsupported.
+
+Native Mac PTY comparisons and host ASAN/UBSAN checks pass. All six native V
+checks pass in the four-core ARM64 guest, including real echo suppression and
+restoration, flag and character mapping, separate baud readback, soft updates,
+guarded errors, four workers and two teardowns. The broader Mach-O regression
+failed three times in the existing concurrent permissions check with `chmod`
+returning `ENOENT`; it has not passed at this revision. These logs and the two
+earlier terminal failures that exposed the input-baud encoding are retained
+with VM hashes under `terminal-checks`. The actual Fortnite probe gets past
+four more strong imports and still exits with status 1 before entry, now at
+`thread_policy_set` in EOSSDK.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,322 | 836 | 81 |
-| EOSSDK | 539 | 123 | 18 |
+| Fortnite executable | 1,324 | 834 | 81 |
+| EOSSDK | 541 | 121 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,921 | 1,075 | 122 |
+| All images | 1,925 | 1,071 | 122 |
 
-The C++/GLES/Text variant reports 1,934 resolved imports, 1,062 unresolved strong
+The C++/GLES/Text variant reports 1,938 resolved imports, 1,058 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1276,9 +1305,9 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 ```
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
-`build/ios/fortnite` (default `select-checks`; the hardware-query verification uses
-`sysctl-checks`). Each mode records its own state path and guest `serial.log`
-there. Regression runs the native V select, semaphore, signal, error and sysctl checks before the
+`build/ios/fortnite` (default `select-checks`; the terminal verification uses
+`terminal-checks`). Each mode records its own state path and guest `serial.log`
+there. Regression runs the native V select, semaphore, signal, error, sysctl and terminal checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

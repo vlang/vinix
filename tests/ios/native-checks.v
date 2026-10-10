@@ -64,7 +64,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn build(root string, out string, only string) {
 	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'signal-checks',
-		'error-checks', 'sysctl-checks', 'native-init'] {
+		'error-checks', 'sysctl-checks', 'terminal-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -85,8 +85,10 @@ fn build(root string, out string, only string) {
 					'signals_test.v'
 				} else if item == 'error-checks' {
 					'errors_test.v'
-				} else {
+				} else if item == 'sysctl-checks' {
 					'sysctl_test.v'
+				} else {
+					'terminal_test.v'
 				}
 			} else {
 				'/compat/ios/runner'
@@ -180,6 +182,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/signal-checks', fs + '/opt/ios/signal-checks')
 	copy_file(out + '/error-checks', fs + '/opt/ios/error-checks')
 	copy_file(out + '/sysctl-checks', fs + '/opt/ios/sysctl-checks')
+	copy_file(out + '/terminal-checks', fs + '/opt/ios/terminal-checks')
 	sysroot := root + '/build-aarch64-userland/sysroot'
 	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
 		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
@@ -298,7 +301,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|verify-monitor|regression|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|verify-monitor|regression|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -325,6 +328,8 @@ fn main() {
 		build(root, out, 'error-checks')
 	} else if mode == 'build-sysctl' {
 		build(root, out, 'sysctl-checks')
+	} else if mode == 'build-terminal' {
+		build(root, out, 'terminal-checks')
 	} else if mode == 'verify-monitor' {
 		verify_monitor(out)
 	} else if mode == 'hash' {
