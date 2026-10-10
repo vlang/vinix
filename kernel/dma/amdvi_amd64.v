@@ -5,8 +5,10 @@
 //
 // The parts, in the order a boot goes through them:
 //
-//	amdvi_ivrs_amd64.v  what the ACPI IVRS table says: units, devices, memory
-//	amdvi_amd64.v       this file: find the table and start each unit
+//	amdvi_ivrs_amd64.v      what the ACPI IVRS table says: units, devices, memory
+//	amdvi_amd64.v           this file: find the table and start each unit
+//	amdvi_unit_amd64.v      a unit's registers and tables, and switching it on
+//	amdvi_commands_amd64.v  the command buffer: making a unit forget
 module dma
 
 import acpi
@@ -32,4 +34,69 @@ fn amdvi_initialise() {
 		C.kprintf(c'amdvi: IVRS: %llu malformed blocks and %llu for PCI segments other than 0 passed over\n',
 			u64(amdvi_ivrs.malformed), u64(amdvi_ivrs.foreign_segments))
 	}
+	levels := amdvi_levels_needed()
+	if levels == 0 {
+		print('amdvi: this machine has memory beyond 256 TiB, which needs page tables of five levels; no unit is switched on\n')
+		return
+	}
+	for i in 0 .. amdvi_ivrs.block_count {
+		ivhd := unsafe { &amdvi_ivrs.blocks[i] }
+		if !ivhd.chosen {
+			continue
+		}
+		if amdvi_unit_count >= amdvi_max_units || dma_iommu_count + amdvi_unit_count >= max_iommus {
+			C.kprintf(c'amdvi: more units than the %llu there is room for; the one at 0x%llx is left off\n',
+				u64(max_iommus), ivhd.mmio_phys)
+			continue
+		}
+		mut unit := amdvi_new_unit(unsafe { &u8(table) }, ivhd, levels)
+		if !amdvi_start_unit(mut unit) {
+			unsafe {
+				unit.name.free()
+				unit.entries.free()
+				free(unit)
+			}
+			continue
+		}
+		C.kprintf(c'amdvi: %.*s at 0x%llx (%02llx:%02llx.%llx, IVHD type %llxh): ids to 0x%llx, %llu-level tables, features 0x%llx\n',
+			i32(unit.name.len), unit.name.str, unit.mmio_phys, u64(unit.devid >> 8), u64((unit.devid >> 3) & 31),
+			u64(unit.devid & 7), u64(unit.kind), u64(unit.last_devid), u64(unit.levels),
+			unit.features)
+		amdvi_units[amdvi_unit_count] = unit
+		amdvi_unit_count++
+		// No domains yet: a unit left on would cut every device off for
+		// good. It is stopped again until there is a way to let one through.
+		amdvi_quiesce(unit)
+		C.kprintf(c'amdvi: %.*s answered and was switched off again: devices cannot be given domains yet\n',
+			i32(unit.name.len), unit.name.str)
+	}
+}
+
+// The record for the unit an IVHD block describes. Made once per unit at
+// boot and kept for the life of the machine.
+fn amdvi_new_unit(table &u8, ivhd &AmdviBlock, levels u8) &AmdviUnit {
+	mut unit := &AmdviUnit{}
+	unit.index = amdvi_unit_count
+	unit.name = amdvi_unit_name(amdvi_unit_count)
+	unit.kind = ivhd.kind
+	unit.ivhd_flags = ivhd.flags
+	unit.devid = ivhd.devid
+	unit.cap_offset = ivhd.cap_offset
+	unit.mmio_phys = ivhd.mmio_phys
+	unit.levels = levels
+	// Counted first, so that the list is made at its final size.
+	mut none_yet := []AmdviEntry{}
+	count := amdvi_block_entries(table, ivhd, mut none_yet, false)
+	mut entries := []AmdviEntry{cap: count}
+	entries.flags |= .noslices
+	amdvi_block_entries(table, ivhd, mut entries, true)
+	unit.entries = entries
+	unit.last_devid = amdvi_last_devid(entries)
+	// Firmware's copy of the feature register, where the block has one. It
+	// is what Linux goes by when the register itself disagrees.
+	if ivhd.has_efr {
+		unit.features = ivhd.efr
+		unit.features2 = ivhd.efr2
+	}
+	return unit
 }
