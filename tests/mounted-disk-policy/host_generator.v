@@ -3,6 +3,28 @@ module main
 
 import os
 
+// The host fixtures use POSIX Path semantics: backslashes are filename bytes.
+fn unix_path(base string, parts ...string) string {
+ mut result := base.trim_right('/')
+ for part in parts { result += '/' + part }
+ return result
+}
+fn unix_parent(path string) string {
+ index := path.last_index('/') or { return '.' }
+ return if index == 0 { '/' } else { path[..index] }
+}
+fn unix_mkdir_parents(path string) ! {
+ os.mkdir(path) or {
+  if os.is_dir(path) { return }
+  // pathlib retries a missing parent, while other errors keep their order.
+  if err.code() != 2 { return err }
+  parent := unix_parent(path)
+  if parent == path { return err }
+  unix_mkdir_parents(parent)!
+  os.mkdir(path) or { if os.is_dir(path) { return }; return err }
+ }
+}
+
 // Embedded modules and assertions are the independent original V fixtures.
 // Keep the two phases around Python's metadata-preserving production copies.
 fn stubs(work string) ! {
@@ -14,8 +36,8 @@ fn stubs(work string) ! {
 		$embed_file('hosttemplates/resource/stub.v').to_string(),
 		$embed_file('hosttemplates/security/level.v').to_string()]
 	for i, name in names {
-		target := os.join_path(work, name)
-		os.mkdir_all(os.dir(target))!
+		target := unix_path(work, name)
+		unix_mkdir_parents(unix_parent(target))!
 		mut content := contents[i]
 		if name in ['klock/klock.v', 'resource/stub.v'] {
 			module_name := name.split('/')[0]
@@ -28,9 +50,9 @@ fn stubs(work string) ! {
 
 fn finish(work string) ! {
 	content := $embed_file('hosttemplates/main.v').to_string()
-	os.write_file(os.join_path(work, 'main.v'), content.replace('module main',
+	os.write_file(unix_path(work, 'main.v'), content.replace('module main',
 		'module main\n#flag -I' + work + '\n#include "host.h"'))!
-	os.write_file(os.join_path(work, 'v.mod'), "Module { name: 'blockpolicy_host' }\n")!
+	os.write_file(unix_path(work, 'v.mod'), "Module { name: 'blockpolicy_host' }\n")!
 }
 
 fn main() {

@@ -4,6 +4,28 @@ module main
 import encoding.utf8
 import os
 
+// The host fixtures use POSIX Path semantics: backslashes are filename bytes.
+fn unix_path(base string, parts ...string) string {
+ mut result := base.trim_right('/')
+ for part in parts { result += '/' + part }
+ return result
+}
+fn unix_parent(path string) string {
+ index := path.last_index('/') or { return '.' }
+ return if index == 0 { '/' } else { path[..index] }
+}
+fn unix_mkdir_parents(path string) ! {
+ os.mkdir(path) or {
+  if os.is_dir(path) { return }
+  // pathlib retries a missing parent, while other errors keep their order.
+  if err.code() != 2 { return err }
+  parent := unix_parent(path)
+  if parent == path { return err }
+  unix_mkdir_parents(parent)!
+  os.mkdir(path) or { if os.is_dir(path) { return }; return err }
+ }
+}
+
 // Match the maintained extractor: count every brace, including those in text.
 // The host adapters are independent fixtures; production function bodies are
 // taken verbatim from the kernel under the supplied repository root.
@@ -31,13 +53,13 @@ fn read_source(path string) !string {
 
 fn source_functions(root string, file string, names []string) !string {
  mut result := ''
- source := read_source(os.join_path(root, 'kernel', 'memory', file))!
+ source := read_source(unix_path(root, 'kernel', 'memory', file))!
  for name in names { result += source_function(source, name)! }
  return result
 }
 
 fn generate(root string, work string) ! {
- os.write_file(os.join_path(work, 'v.mod'), "Module { name: 'address_space_test' }\n")!
+ os.write_file(unix_path(work, 'v.mod'), "Module { name: 'address_space_test' }\n")!
  names := ['limine', 'katomic', 'klock', 'x86/cpu']
  modules := [
   $embed_file('policytemplates/limine.v').to_string(),
@@ -46,11 +68,11 @@ fn generate(root string, work string) ! {
   $embed_file('policytemplates/x86/cpu.v').to_string(),
  ]
  for i,name in names {
-  path := os.join_path(work, name)
+  path := unix_path(work, name)
   // Each module directory is new, just as in the disposable Python fixture.
   if os.exists(path) { return error('Module directory already exists: ' + path) }
-  os.mkdir_all(path)!
-  os.write_file(os.join_path(path, os.base(path) + '.v'), modules[i])!
+  unix_mkdir_parents(path)!
+  os.write_file(unix_path(path, os.base(path) + '.v'), modules[i])!
  }
  mut main_source := $embed_file('policytemplates/head.v').to_string()
  main_source += source_functions(root,'pcid_amd64.v',[
@@ -74,7 +96,7 @@ fn generate(root string, work string) ! {
   '(mut pagemap Pagemap) unmap_page(', '(mut pagemap Pagemap) unmap_page_unlocked(',
  ])!
  main_source += $embed_file('policytemplates/assertions.v').to_string()
- os.write_file(os.join_path(work, 'main.v'), main_source)!
+ os.write_file(unix_path(work, 'main.v'), main_source)!
 }
 
 fn main() {
