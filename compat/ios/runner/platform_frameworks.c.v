@@ -94,6 +94,9 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 		}
 		return true
 	}
+	// Literal strings have no heap metadata. Only look it up after selecting
+	// an instance class handled here, so unrelated messages can reach Foundation.
+	if info.name !in ['NSLocale', 'UIDevice', 'NSBundle', 'NSFileHandle', 'NSData', 'NSURL'] { return false }
 	mut header := obj_header(object)
 	match info.name {
 		'NSLocale' {

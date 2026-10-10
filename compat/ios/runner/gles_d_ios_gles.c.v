@@ -290,8 +290,10 @@ fn gles_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 		}
 		return true
 	}
+	context_instance := objc_is_kind(object, ios_runtime.names['EAGLContext'])
+	if !context_instance && !objc_is_kind(object, ios_runtime.names['GLKView']) { return false }
 	mut header := obj_header(object)
-	if objc_is_kind(object, ios_runtime.names['EAGLContext']) {
+	if context_instance {
 		match selector {
 			'initWithAPI:' {
 				if header.graphics != unsafe { nil } { panic('iOS: EAGLContext initialized twice') }

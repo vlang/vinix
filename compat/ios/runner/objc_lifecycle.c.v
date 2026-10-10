@@ -80,33 +80,30 @@ fn (m ObjMetadata) attach_category(category u64) ! {
 }
 
 fn objc_construct(object u64, cls u64) u64 {
-	mut chain := []u64{cap: 16}
-	chain.flags |= .noslices
-	defer { unsafe { chain.free() } }
+	mut chain := [128]u64{}
+	mut count := 0
 	mut current := cls
 	for _ in 0 .. 128 {
 		if current == 0 { break }
-		chain << current
+		chain[count] = current
+		count++
 		info := ios_runtime.classes[current] or { panic('iOS: unknown constructor class') }
 		current = info.parent
 	}
 	if current != 0 { panic('iOS: cyclic constructor superclass chain') }
-	for i := chain.len - 1; i >= 0; i-- {
+	for i := count - 1; i >= 0; i-- {
 		info := ios_runtime.classes[chain[i]] or { panic('iOS: unknown constructor class') }
 		if imp := info.methods['.cxx_construct'] {
 			result := unsafe { ObjInit(voidptr(imp))(object, c'.cxx_construct') }
 			if result == 0 {
 				// Only bases whose constructor completed may be destroyed.
-				for j := i + 1; j < chain.len; j++ {
+				for j := i + 1; j < count; j++ {
 					parent := ios_runtime.classes[chain[j]] or { panic('iOS: unknown destructor class') }
 					if destructor := parent.methods['.cxx_destruct'] {
 						unsafe { ObjVoid(voidptr(destructor))(object, c'.cxx_destruct') }
 					}
 				}
-				owner := ios_runtime.classes[read64(object)] or { panic('iOS: unknown failed constructor class') }
-				C.ios_ref_change(unsafe { &owner.instances }, -1)
-				C.free(obj_header(object))
-				C.ios_ref_change(unsafe { &ios_runtime.live }, -1)
+				objc_failed_construction(object)
 				return 0
 			}
 			if result != object { panic('iOS: invalid Objective-C C++ constructor result') }

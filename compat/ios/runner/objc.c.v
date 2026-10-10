@@ -46,11 +46,16 @@ mut:
 	instances i64
 }
 
-// The header is private to Vinix. The returned object still begins with the
-// compiler's ordinary 8-byte isa and uses the Mach-O's nonfragile ivar offsets.
+// Metadata is private to Vinix and stored separately from object bytes. The
+// object begins with the ordinary isa, including when its caller supplies it.
 struct ObjHeader {
 mut:
 	refs        i64
+	cls u64
+	caller_storage bool
+	releasing bool
+	destroying bool
+	destroyed bool
 	native_size u32
 	text        &char = unsafe { nil }
 	text_length int
@@ -118,6 +123,7 @@ mut:
 struct ObjRuntime {
 mut:
 	classes      map[u64]&ObjClass
+	objects map[u64]&ObjHeader // Object address -> owned metadata; protected by the recursive runtime lock.
 	names        map[string]u64
 	pool_key u64
 	graphics_key u64
@@ -242,34 +248,18 @@ fn ctext(address u64) string {
 }
 
 fn obj_header(object u64) &ObjHeader {
-	return unsafe { &ObjHeader(object - sizeof(ObjHeader)) }
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	return ios_runtime.objects[object] or { panic('iOS: object has no live runtime metadata') }
 }
 
 fn objc_allocate(cls u64) u64 {
 	objc_initialize(cls)
 	info := ios_runtime.classes[cls] or { panic('iOS: allocation of an unknown class') }
 	if info.dynamic && !info.registered { panic('iOS: allocating an instance of an unregistered class') }
-	memory := C.calloc(1, sizeof(ObjHeader) + usize(info.size))
-	if memory == unsafe { nil } { panic('iOS: out of memory') }
-	mut header := unsafe { &ObjHeader(memory) }
-	header.refs = 1
-	header.native_size = info.size
-	header.font_size = 17
-	header.content_scale = 1
-	// calloc does not initialize V array element sizes. Set them explicitly
-	// before any collection/gesture push can grow these buffers.
-	header.items = []u64{}
-	header.keys = []u64{}
-	header.gestures = []u64{}
-	header.data = []u8{}
-	header.items.flags |= .noslices
-	header.keys.flags |= .noslices
-	header.gestures.flags |= .noslices
-	object := u64(memory) + sizeof(ObjHeader)
-	unsafe { *(&u64(object)) = cls }
-	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { header.number = -1 }
-	C.ios_ref_change(unsafe { &ios_runtime.live }, 1)
-	C.ios_ref_change(unsafe { &info.instances }, 1)
+	object := u64(C.calloc(1, usize(info.size)))
+	if object == 0 { panic('iOS: out of memory') }
+	objc_install_storage(cls, object, false)
 	return objc_construct(object, cls)
 }
 
@@ -312,6 +302,7 @@ fn objc_release(object u64) {
 	previous := C.ios_ref_change(unsafe { &header.refs }, -1)
 	if previous <= 0 { panic('iOS: over-release') }
 	if previous != 1 { return }
+	header.releasing = true
 	// Zero weak slots before destructors can observe a dying object.
 	C.ios_objc_initialize_lock()
 	for location, referent in ios_runtime.weak {
@@ -321,50 +312,16 @@ fn objc_release(object u64) {
 		}
 	}
 	C.ios_objc_initialize_unlock()
-	dealloc := native_method(read64(object), 'dealloc')
+	dealloc := native_method(header.cls, 'dealloc')
 	if dealloc != 0 {
 		unsafe { ObjVoid(voidptr(dealloc))(object, c'dealloc') }
 	}
-	// Invoke each class's compiler-generated ARC destructor once, derived first.
-	mut cls := read64(object)
-	for _ in 0 .. 128 {
-		if cls == 0 { break }
-		info := ios_runtime.classes[cls] or { panic('iOS: unknown object class') }
-		if imp := info.methods['.cxx_destruct'] {
-			destructor := unsafe { ObjVoid(voidptr(imp)) }
-			destructor(object, c'.cxx_destruct')
-		}
-		cls = info.parent
-	}
-	$if ios_gles ? { gles_dispose(object) }
-	$if ios_text ? { text_dispose(object) }
-	accessibility_dispose(object)
-	bitmap_dispose(object)
-	cg_provider_dispose(object)
-	for field in header.fields { objc_release(field) }
-	for i in 0 .. header.child_count {
-		mut child := obj_header(header.children[i])
-		child.parent_view = 0
-		objc_release(header.children[i])
-	}
-	if !header.cf_raw_values { for item in header.items { objc_release(item) } }
-	if !header.cf_raw_keys { for key in header.keys { objc_release(key) } }
-	for gesture in header.gestures { objc_release(gesture) }
-	unsafe {
-		header.items.free()
-		header.keys.free()
-		header.gestures.free()
-		header.data.free()
-	}
-	if header.file != unsafe { nil } { C.fclose(header.file) }
-	if header.free_data { C.free(unsafe { voidptr(header.external_data) }) }
-	objc_destroy_weak(unsafe { &header.target })
-	if ios_runtime.first_responder == object { ios_runtime.first_responder = 0 }
-	C.free(header.text)
-	info := ios_runtime.classes[read64(object)] or { panic('iOS: unknown released object class') }
-	C.free(header)
-	C.ios_ref_change(unsafe { &info.instances }, -1)
-	C.ios_ref_change(unsafe { &ios_runtime.live }, -1)
+	// A custom dealloc may explicitly destroy and free its supplied bytes.
+	// Keep metadata until that callback returns and never free its buffer twice.
+	explicitly_destroyed := header.destroyed
+	objc_destroy_contents(object, mut header, true)
+	objc_forget_storage(object, header)
+	if !explicitly_destroyed { C.free(unsafe { voidptr(object) }) }
 }
 
 fn objc_store_strong(location &u64, object u64) {
@@ -422,6 +379,7 @@ fn objc_stop() {
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}
+	if ios_runtime.objects.len == 0 { unsafe { ios_runtime.objects.free() } }
 	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
 	for _, text in ios_runtime.constant_utf8 { unsafe { text.free() } }
 	for address, info in ios_runtime.classes {

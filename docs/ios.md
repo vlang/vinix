@@ -76,7 +76,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases, 144-byte stat records and native `utime` timestamps; version-4 UUIDs from native entropy; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread, `dispatch_once`, main/global/serial dispatch queues, delayed work and synchronous callbacks |
-| Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
+| Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, caller-supplied instance construction and destruction, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, dictionary add-if-absent and raw null entries, exported immutable empty dictionary, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
@@ -1355,21 +1355,50 @@ regression pass with these dictionary changes. The intermediate AddValue-only
 run and its next-blocker probe at the empty-dictionary export are retained
 with VM and runner hashes under `cf-dictionary-checks/before-empty`.
 Three more strong imports now resolve. The actual Fortnite probe still exits
-with status 1 before entry, now at Objective-C's `objc_constructInstance` in
-EOSSDK. That API initializes caller-provided storage; the current runtime
-allocates its own object headers and does not yet support that storage path.
+with status 1 before entry, at Objective-C's `objc_constructInstance` in EOSSDK.
+
+`objc_constructInstance` and `objc_destructInstance` now use V implementations
+matching measurements against the installed Mac's Objective-C runtime. A supplied,
+aligned, zero-filled buffer becomes the instance itself, without sending
+`+initialize` or `init`. C++ constructors run superclass first; a failing
+constructor unwinds only completed bases and leaves the caller's bytes intact.
+Explicit destruction runs derived-class destructors first, clears weak slots,
+releases owned metadata and returns the original address without freeing it.
+
+Private metadata now lives in a separately allocated, synchronized object
+registry for both ordinary and supplied instances. A custom deallocator can
+explicitly destroy its instance and then preserve or free its storage; the
+outer release keeps metadata until that callback returns and avoids a second
+free. Class instance counts track destruction and `object_setClass`. Framework
+and GLES dispatch select their supported classes before reading metadata, so
+literal NSString messages continue to reach Foundation.
+
+Native Mac ASAN/UBSAN checks cover guarded buffer reuse, constructor failure,
+weak references, custom deallocation and ordinary allocated instances. Eight V
+workers and two runtime teardowns leave the object registry and live counts
+empty. The unchanged Objective-C++ startup fixture supplies genuine native C++
+class flags for the Mac measurements. Proofs and generated lifecycle bodies
+are retained under `objc-storage-checks`.
+
+All twelve native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. An initial accessibility regression from eager metadata
+lookups was fixed; another run stopped earlier in the unchanged file-timestamp
+fixture. Both failed serial logs and VM hashes are retained. Four more strong
+imports now resolve. The actual Fortnite binary still exits with status 1
+before entry, now at `objc_getAssociatedObject` in EOSSDK; associated-object
+storage is not yet implemented.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,338 | 820 | 81 |
-| EOSSDK | 552 | 110 | 18 |
+| Fortnite executable | 1,340 | 818 | 81 |
+| EOSSDK | 554 | 108 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,950 | 1,046 | 122 |
+| All images | 1,954 | 1,042 | 122 |
 
-The C++/GLES/Text variant reports 1,963 resolved imports, 1,033 unresolved strong
+The C++/GLES/Text variant reports 1,967 resolved imports, 1,029 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1407,11 +1436,12 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
 `file-time-checks`, the audio constants use `audio-session-checks`, and
-CoreFoundation dictionaries use `cf-dictionary-checks`). Each
+CoreFoundation dictionaries use `cf-dictionary-checks`, and supplied Objective-C
+storage uses `objc-storage-checks`). Each
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant and
-CoreFoundation dictionary checks before the
+CoreFoundation dictionary and supplied Objective-C storage checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

@@ -227,6 +227,8 @@ fn objc_set_class(object u64, cls u64) u64 {
 	C.ios_ref_change(unsafe { &old.instances }, -1)
 	C.ios_ref_change(unsafe { &info.instances }, 1)
 	C.ios_store_pointer(unsafe { &u64(object) }, cls)
+	mut header := obj_header(object)
+	header.cls = cls
 	return previous
 }
 
@@ -338,6 +340,8 @@ fn objc_runtime_symbol(symbol string) ?u64 {
 		'_objc_allocateClassPair' { u64(unsafe { voidptr(objc_allocate_class) }) }
 		'_objc_registerClassPair' { u64(unsafe { voidptr(objc_register_class) }) }
 		'_objc_disposeClassPair' { u64(unsafe { voidptr(objc_dispose_class) }) }
+		'_objc_constructInstance' { u64(unsafe { voidptr(objc_construct_instance) }) }
+		'_objc_destructInstance' { u64(unsafe { voidptr(objc_destruct_instance) }) }
 		'_class_addIvar' { u64(unsafe { voidptr(objc_add_ivar) }) }
 		'_class_getInstanceVariable' { u64(unsafe { voidptr(objc_find_ivar) }) }
 		'_class_copyIvarList' { u64(unsafe { voidptr(objc_copy_ivars) }) }
