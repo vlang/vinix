@@ -310,6 +310,8 @@ pub mut:
 	l             klock.Lock
 	failed        bool
 	dma_quiesced  bool
+	// Put down for a sleep; see power.v.
+	asleep        bool
 	pci_bar       pci.PCIBar
 	volatile regs          &NVMERegisters
 	volatile controller_id &NVMEControllerID
@@ -728,8 +730,21 @@ pub fn (mut pair NVMEQueuePair) send_cmd_and_wait(mut submission NVMECommand, ci
 	// Serialize every queue, including admin, through reset/disable. A queue
 	// lock alone allows a timed-out controller to DMA into another caller's
 	// already released buffers while that caller believes its command failed.
-	controller.l.acquire()
+	// A controller put down for a sleep takes nothing until it is back; it is
+	// looked at again with the lock, since a sleep may begin in between.
+	for {
+		controller.wait_awake()
+		controller.l.acquire()
+		if !controller.asleep { break }
+		controller.l.release()
+	}
 	defer { controller.l.release() }
+	return pair.exchange(mut submission, cid)
+}
+
+// One command and its completion. The caller holds the controller lock.
+fn (mut pair NVMEQueuePair) exchange(mut submission NVMECommand, cid int) u16 {
+	mut controller := pair.parent_controller
 	if controller.failed { return command_failed }
 	if pair.send_cmd(mut submission, cid) == -1 { return command_failed }
 	deadline := hpet_clock.nanoseconds() + command_timeout_ns
@@ -1026,6 +1041,8 @@ pub fn initialise() {
 		bus:      .pci
 		matches:  controller_matches
 		probe:    controller_probe
+		suspend:  controller_suspend
+		resume:   controller_resume
 		shutdown: controller_shutdown
 	}) or { return }
 }
