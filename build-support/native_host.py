@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Owned synchronous transport for maintained native host controllers."""
 import atexit
+import errno
 import json
 import os
 from pathlib import Path
@@ -8,6 +9,44 @@ import signal
 import subprocess
 import tempfile
 import threading
+
+
+_spawn_lock = threading.RLock()
+
+
+def _query_child(process, arguments, **options):
+    # Private pipes must not occupy the caller's closed standard descriptors.
+    # Reserve those slots only while Popen allocates its owned pipe ends.
+    with _spawn_lock:
+        reserved = [None, None, None]
+        try:
+            for fd in range(3):
+                try:
+                    os.fstat(fd)
+                except OSError as error:
+                    if error.errno != errno.EBADF:
+                        raise
+                    reserved[fd] = os.open(os.devnull, os.O_RDWR | os.O_CLOEXEC)
+            return process(arguments, **options)
+        finally:
+            try:
+                for fd in reserved:
+                    if fd is not None:
+                        os.close(fd)
+            finally:
+                options = arguments = process = None
+
+
+class _QueryChild:
+    def __init__(self, process):
+        self.process = process
+
+    def __call__(self, arguments, **options):
+        try:
+            return _query_child(self.process, arguments, **options)
+        finally:
+            # The caller's CALL still owns the arguments and this receiver.
+            options = arguments = self = None
 
 
 class Controller:
@@ -49,7 +88,7 @@ class Controller:
              unpack=lambda value: value, exception=None, cleanup=lambda: None,
              error_fields=lambda error: {}, errors=None):
         errors = [] if errors is None else errors
-        child = (subprocess.Popen if self.process is None else self.process)([self.executable()], stdin=subprocess.PIPE,
+        child = (_QueryChild(subprocess.Popen) if self.process is None else self.process)([self.executable()], stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE, text=True, encoding="utf-8", env=os.environ)
         try:
             child.stdin.write(json.dumps(pack(request)) + "\n")
