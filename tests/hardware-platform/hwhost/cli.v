@@ -7,22 +7,22 @@ module hwhost
 
 import os
 
-pub const usage = 'Usage: run --arch aarch64|x86_64 --kernel PATH [--scenario NAME]...
+pub const usage = "Usage: run --arch aarch64|x86_64 --kernel PATH [--scenario NAME]...
            [--state-dir DIR] [--timeout SECONDS] [--qemu PATH]
        run --list [--arch aarch64|x86_64]
 
 Boots a built kernel in QEMU with a V test program as its init, and judges
 each scenario by what the guest prints on the serial port.
 
-  --arch ARCH        the kernel\'s architecture
+  --arch ARCH        the kernel's architecture
   --kernel PATH      the kernel to boot (bin/vinix of a kernel build)
   --scenario NAME    run this scenario; may be repeated. Without it every
                      scenario for the architecture runs, except pending ones
   --list             print the scenarios and exit
-  --state-dir DIR    keep each scenario\'s logs and images in DIR/<scenario>;
+  --state-dir DIR    keep each scenario's logs and images in DIR/<scenario>;
                      DIR must be empty or not exist yet
-  --timeout SECONDS  how long one scenario\'s machine may run (default 120)
-  --qemu PATH        the QEMU to use instead of the one on PATH'
+  --timeout SECONDS  how long one scenario's machine may run (default 120)
+  --qemu PATH        the QEMU to use instead of the one on PATH"
 
 pub struct Options {
 pub mut:
@@ -214,7 +214,7 @@ fn prepare_state_directory(path string) !string {
 		}
 		entries := os.ls(path)!
 		if entries.len > 0 {
-			return error('--state-dir must be empty: ${path} holds ${entries.len} entries')
+			return error('--state-dir must be an empty directory, and ${path} is not')
 		}
 	} else {
 		os.mkdir_all(path)!

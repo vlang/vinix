@@ -244,13 +244,11 @@ pub fn run_tool(argv []string, extra_environment map[string]string, log_path str
 		}
 		if now_ms() >= deadline {
 			child.stop()
-			return error('${child.name} did not finish in ${timeout_seconds} s\n${log_tail(log_path,
-				20)}')
+			return error('${child.name} did not finish in ${timeout_seconds} s\n${log_tail(log_path, 20)}')
 		}
 		time.sleep(10 * time.millisecond)
 	}
 	if child.exit_code() != 0 {
-		return error('${argv.join(' ')}\n${child.name}: ${child.outcome()}\n${log_tail(log_path,
-			20)}')
+		return error('${argv.join(' ')}\n${child.name}: ${child.outcome()}\n${log_tail(log_path, 20)}')
 	}
 }
