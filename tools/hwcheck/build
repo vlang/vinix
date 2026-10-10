@@ -1,0 +1,38 @@
+#!/bin/sh
+# Build hwcheck as a static program for a Vinix machine.
+#
+#   tools/hwcheck/build aarch64|x86_64 OUTPUT
+#
+# The V compiler is found as for every other build (V, VINIX_V_COMPILER). The
+# AArch64 C compiler needs the musl sysroot of the userland build
+# (VINIX_AARCH64_SYSROOT, by default build-aarch64-userland/sysroot); the
+# x86-64 one is a musl cross compiler (CC_AMD64, by default
+# x86_64-linux-musl-gcc).
+set -eu
+
+if [ "$#" -ne 2 ]; then
+    echo "usage: $0 aarch64|x86_64 OUTPUT" >&2
+    exit 2
+fi
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+. "$repo/build-support/find-v.sh"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-hwcheck.XXXXXX")
+trap 'rm -rf "$work"' 0
+
+case "$1" in
+    aarch64)
+        sysroot=${VINIX_AARCH64_SYSROOT:-"$repo/build-aarch64-userland/sysroot"}
+        "$V" -os linux -arch arm64 -gc none -d no_backtrace -o "$work/hwcheck.c" "$repo/tools/hwcheck/hwcheck.v"
+        "${CC:-clang}" --target=aarch64-linux-musl --sysroot="$sysroot" -static -O1 -w \
+            -fno-stack-protector -L"$sysroot/lib" -fuse-ld=lld -o "$2" "$work/hwcheck.c" -lm -lpthread
+        ;;
+    x86_64)
+        "$V" -os linux -arch amd64 -gc none -d no_backtrace -o "$work/hwcheck.c" "$repo/tools/hwcheck/hwcheck.v"
+        "${CC_AMD64:-x86_64-linux-musl-gcc}" -static -O1 -w -o "$2" "$work/hwcheck.c" -lm -lpthread
+        ;;
+    *)
+        echo "unknown architecture: $1" >&2
+        exit 2
+        ;;
+esac
