@@ -167,9 +167,9 @@ pub fn sum_bytes(seed u64, bytes &u8, count u64) u64 {
 }
 
 pub fn header_checksum(header &Header) u64 {
-	mut copy := *header
-	copy.checksum = 0
-	return sum_words(image_magic, unsafe { &u64(voidptr(&copy)) }, sizeof(Header) / 8)
+	mut unsealed := *header
+	unsealed.checksum = 0
+	return sum_words(image_magic, unsafe { &u64(voidptr(&unsealed)) }, sizeof(Header) / 8)
 }
 
 // How many bytes the frame numbers of `pages` pages take on the device.
