@@ -5,8 +5,8 @@ devices, bind and recover drivers, isolate DMA, load firmware, manage power
 and sleep, and what it does not do yet.
 
 Everything described here was built for both architectures -- suspend to RAM
-for x86-64 only -- and exercised in QEMU guests (x86-64 under TCG, AArch64
-under HVF). **None of it has run on a physical machine.** The
+and suspend to disk for x86-64 only -- and exercised in QEMU guests (x86-64
+under TCG, AArch64 under HVF). **None of it has run on a physical machine.** The
 hardware-specific paths that no emulator has -- the Intel, AMD and Apple
 frequency registers, processor temperature sensors, MWAIT idle states -- are
 covered by host unit tests of their arithmetic and are otherwise unverified.
@@ -387,7 +387,9 @@ What this is not:
 ## Sleep
 
 Writing `freeze` to `/sys/power/state` suspends to idle, and so does `mem`
-unless suspend to RAM has been selected (below):
+unless suspend to RAM has been selected (below). `disk`, where it is
+offered, is a suspend to disk, which has a section of its own further down;
+it begins with the same steps:
 
 1. filesystem caches are flushed;
 2. userspace is frozen (every thread parks at its next return to userspace;
@@ -662,20 +664,9 @@ What this is not:
   lid or a key (their events are armed as firmware describes them, and no
   machine has been woken that way), and the AMD IOMMU's own PCI capability
   are all untested assumptions.
-- **Not hibernation.** There is no memory image and no `disk` state. The
-  suspend to RAM above supplies what a resume from an image would share with
-  it -- devices quiesced and refused when they cannot come back, the other
-  processors parked and started again, interrupt controllers, IOMMUs, PCI
-  configuration and the clock put back -- and none of what is particular to
-  it: somewhere to write the image (there is no swap) and driver phases for
-  freeze, snapshot, thaw, write and power off; an atomic snapshot of the
-  pages in use; a path early in boot that recognises an image, reads it into
-  pages it will not overwrite, copies it into place and jumps into it; a
-  check that this boot's memory map and firmware regions match the image's;
-  ACPI S4 (`_PTS(4)`, the hardware signature, the NVS regions); taking over
-  the PCI addresses and the IOMMU the booting kernel set up; a display mode
-  that may differ from the image's; and protection for an image that holds
-  every secret the kernel had.
+- **Not a suspend to disk**, which is the next section: it uses all of
+  this for the way back, and adds an image of memory, a device to keep it
+  on and a boot that goes back into it.
 - `e1000`, `ahci`, `nvme`, `ata`, `hda`, the keyboard controller, the PS/2
   mouse and the serial ports come back from a loss of power. A machine with
   a bound PCI driver that cannot is refused deep sleep and left with suspend
@@ -712,6 +703,242 @@ What this is not:
   frame of its own, and the backlight at its minimum where it can set one --
   which on such a panel is all that goes dark; a sleep asked for any other
   way leaves it as it was.
+
+### Suspend to disk (x86-64)
+
+`disk` in `/sys/power/state` writes an image of memory to a device, switches
+the machine off, and on the next start goes back into the image: the write
+that asked for it returns then, in the same process, in a machine that has
+been without power. It is offered only when the kernel command line names a
+device for the image:
+
+```
+vinix.hibernate=sd1        the name the device has in /dev, with or without /dev/:
+                           a whole disk or a partition
+```
+
+```
+/sys/power/state       freeze mem disk
+/sys/power/disk        [shutdown]   -- what happens once the image is written;
+                                       the only way there is
+/sys/power/hibernate   available, or unavailable: and why; the device; what the
+                       last boot found on it; the last image's pages, bytes and
+                       times; what the kernel that loaded it reported
+/sys/power/suspend_stats/disk, and last_depth `disk`, last_wake `resume-from-disk`
+```
+
+It is a suspend to RAM with the RAM taken out
+(`kernel/syspower/hibernate_amd64.v`, `kernel/hibernate/`): everything the
+section above describes is used again, and what is new is where memory goes
+and how it comes back.
+
+**The device** is the image's and nothing else's, and is the only thing
+hibernation ever writes. The kernel does not choose one: with no
+`vinix.hibernate=` there is no `disk` state, writing it fails, and no disk
+is written to. What is named is found once, when the disk drivers have
+brought their disks up, and reached through its node's resource -- the read
+and write an open of `/dev/sd1` ends in, with no filesystem or cache between.
+Before the first image the device has to be one of two things: blank over
+its first and last megabyte, or already carrying a header of this system's.
+A device with anything else on it is left exactly as it is and `disk` is not
+offered, so a root filesystem named by mistake is not written over; it is
+looked at again before every image. The installer that takes a blank disk
+for the system (`vinix.disk=auto`) never takes the named one. Its node is
+made mode 0600, and so is the disk a named partition is on: **the image is a
+copy of memory with every secret the kernel had, it is not encrypted, and
+whoever can read the device can read them** -- root, and anybody with the
+disk in their hands.
+
+On the device (`kernel/hibernate/format.v`): a 4 KiB header -- signature,
+version, a checksum of itself, the number of pages, checksums of the list
+and of the pages, how to enter the image, when it was taken, and the
+machine it was taken on -- then the frame number of every saved page, then
+the pages. The checksums tell a whole image from a torn one; they are not a
+signature.
+
+**Going down.** Caches are flushed, userspace is frozen, the hot-plug thread
+is kept off the buses, the devices are suspended, the protection registers
+are recorded and the screen's picture is put away, as for any sleep. Then:
+
+1. the thread moves to the boot processor;
+2. tables are made and a free page is taken for every page in use, with
+   some to spare, and for everything writing the image will need
+   (`hibernate.prepare()`). If memory is too full for a copy of itself the
+   page cache gives back what it can read again; if it is still too full,
+   or the image would not fit the device, the sleep fails with the reason;
+3. the other processors are parked, PCI configuration space and the display
+   mode are read out;
+4. with interrupts off the interrupt controllers and clocks are read out and
+   the processor is saved exactly as for S3 -- and where S3 asks firmware
+   for the sleep, every page is copied (`hibernate.take_snapshot()`).
+
+*Which* pages is read off the allocator and the boot loader's memory map:
+of usable memory, every page the allocator has handed out (its own bitmap,
+and hibernation's tables, among them); all of what the boot loader marked
+reclaimable, which this kernel never reclaims and still reads its answers
+from; and all of the kernel and its modules. Free memory, firmware's
+regions, ACPI's tables and the framebuffer are not saved.
+
+Two kernels come out of step 4. The one that took the copy carries on as
+from a sleep firmware refused: processors started, devices resumed, userspace
+still frozen. It writes the device -- first a header that describes no
+image, so that an old image cannot be entered once it is partly written
+over; then the list and the pages; a flush; and last the header, which is
+read back and compared -- and switches the machine off. If anything fails
+before that header reads back, the device holds no image, everything taken
+is given back, and the machine thaws as from any failed sleep with the
+reason in `suspend_stats`.
+
+**Nothing else reaches a disk after the snapshot.** The image holds every
+mounted filesystem as it was at that instant; a block allocated or a page
+swapped out afterwards would be a change the image knows nothing of. So
+every block driver passes a fence before it writes or discards
+(`kernel/block/fence`): from the snapshot on, a write that is not the
+image's is held there until the machine is off -- or until hibernation has
+failed, when it goes through. The power-off itself is `transition()`'s
+without its first step, the flush of the filesystems, for the same reason:
+they were flushed before the snapshot, and the devices' own caches are
+flushed by their shutdown.
+
+**Coming back.** In `kmain_thread`, straight after the IDE and AHCI drivers
+have their disks and before the verified root or the system disk is looked
+for (`hibernate.resume_at_boot()`): nothing on a disk has been mounted,
+replayed or written. That is also checked rather than trusted: the block
+drivers count every write they are asked for from boot, and a kernel that
+has made any does not enter an image.
+
+A whole image is entered only by a boot that matches it. Compared, each
+with its own reason when it differs:
+
+| What | Why |
+| --- | --- |
+| the kernel: its length and a digest of its code and constants | the image is entered at an address in the kernel |
+| the kernel command line | the two kernels were configured alike: an IOMMU on in one is on in the other |
+| the memory the machine has, as runs of addresses | every saved page goes back into its frame |
+| every region that is not such memory -- firmware's, ACPI's, the framebuffer -- by place, length and kind | the kernel inside believes its own map |
+| where the kernel is mapped, the direct map's offset, the depth of the page tables | pointers |
+| the processors: how many, their APIC numbers in order, their features | they are started again by number |
+| ACPI: the root pointer, every table's address, length, name and contents; the FACS by address | uACPI holds pointers into the tables and runs their methods in place |
+| the framebuffer: address and geometry | the kernel draws on what firmware set up |
+| the pages under 1 MiB processors start on | they are started there |
+
+Anything else -- a damaged header, a list or pages that do not match their
+checksums, a frame that is not memory here, no memory to load it -- and the
+reason is printed and kept in `/sys/power/hibernate`, **the device is given
+a header that describes no image**, and the machine starts afresh. The same
+header is written, flushed and read back just before an image is entered:
+an image is entered once, and a crash on the way in cannot be gone back
+into.
+
+Three things are deliberately *not* compared, because two boots of the same
+QEMU machine already differ in them: how the boot loader divided memory
+between itself, the modules and free memory (it moved by two pages between
+consecutive boots); where it put the kernel (it moved by sixteen); and the
+contents of the ACPI tables BGRT and FPDT, which describe the boot and not
+the machine. The image depends on none of the three.
+
+**Loading.** A page whose frame is free in the loading kernel is read
+straight into it -- the frame is taken from the allocator by number. A page
+whose frame the loading kernel is using is read into a frame the image does
+not want, and the pair is written down. Then the image is marked as used,
+the devices are suspended so that nothing writes to memory behind the
+processor, any IOMMU the loading kernel switched on is switched off, the
+other processors are parked, and with interrupts off the last step
+(`kernel/asm/x86_64/hibernate.S`) runs from a page of its own, on a stack
+and under a page table of its own, all in frames the image does not want:
+it turns global pages and tagged address spaces off, which drops every
+cached translation; copies the pairs into place, over the loading kernel's
+own code, data and page tables; and jumps to the entry a processor woken
+from S3 arrives at, with the image's saved processor. Since the image's
+kernel need not lie in the frames the loading kernel does, that page table
+maps the kernel's addresses onto the image's kernel.
+
+From there it is the way back from a suspend to RAM: descriptor tables,
+MSRs and the extended state; the I/O APICs, the timer chip and the clock
+from where it stopped; the IOMMUs; the other processors through the
+real-mode trampoline; the wall clock moved on by the battery-backed clock;
+PCI configuration space as this kernel had it, with a function that is not
+what it was left to the hot-plug thread; the display mode; the drivers,
+told their devices lost power. What an S3 does with firmware is left out --
+firmware was not asked for a sleeping state and has no wake method to run --
+and the enable bits of ACPI's events, which the hardware lost and a later
+boot had not yet set, are written from the kernel's own record of them.
+
+**What is refused, and when.**
+
+- Before anything is suspended: no device named, or not found when the
+  disks came up; a named device that is neither blank nor this system's; no
+  real-mode entry for the other processors.
+- With the bindings frozen: a bound PCI device whose driver cannot bring it
+  back from a loss of power, as for a suspend to RAM. None of x86-64's
+  drivers is one any more.
+- While the copy is prepared: not enough free memory, after the page cache
+  has given back what it can; an image that would not fit the device.
+- On AArch64 there is no `disk`.
+- The display does not decide. A suspend to RAM needs a display the kernel
+  can set a mode on because firmware sets none on the way back from S3; a
+  machine that is switched off and on gets its mode from firmware and the
+  boot loader as on any start, and what the image needs -- the same
+  framebuffer in the same place -- is one of the things a boot is compared
+  on. `vinix.deep_sleep=` has no part in it.
+- An IOMMU is handed over, not refused: the loading kernel switches its
+  units off before it enters the image, and the kernel inside switches them
+  on with its own tables before any device may use the bus, as after S3.
+
+**Measured** in QEMU (q35, TCG, 1 GiB, 4 processors, an Apple Silicon host
+with nothing else running): with a 64 MiB pattern held by the test program
+the image is 67,734 pages, 265 MiB; copying it takes 140 ms with the machine
+stopped, writing it 380 to 530 ms; the next boot reads it in 390 ms, 0.7 s
+after its kernel started -- 33,010 pages straight into their frames and
+34,724 by way of another -- and the write to `state` returns 5 to 7 s of
+wall-clock time after it was made, most of which is firmware. Without the
+pattern the image is 39,526 pages, of which about 19,700 are the boot
+loader's reclaimable memory and the kernel. Five suspends to disk one after
+another leave the kernel heap where the first left it: 7837 live objects
+before the last four and 7850 after, and the same 7850 after ten.
+
+What this is not:
+
+- **Not tried on a physical machine**, and it depends on more of the
+  machine staying the same than a suspend to RAM does. On real firmware
+  these are assumptions nobody has tested: that two boots have the same
+  memory and the same firmware regions at the same addresses; that the ACPI
+  tables are at the same addresses with the same contents (a table besides
+  BGRT and FPDT whose contents change from boot to boot means every image
+  is refused); that firmware which keeps state of its own across a
+  power-off -- a boot counter, a pending update, a fast-boot path that
+  skips devices -- leaves the machine as the image expects. Where an
+  assumption fails the image is refused and discarded, not entered.
+- **ACPI's S4 is not used.** The machine is switched off through S5 and
+  cold-started. `_PTS(4)` and `_WAK(4)` are not run, the FACS hardware
+  signature is not read, and the NVS regions are not saved: what firmware
+  keeps there is this boot's, and the methods of a kernel put back from an
+  image run against it.
+- **The image is not encrypted or signed.** See the device, above.
+- **A boot that does not look at the device leaves the image there.** If
+  the machine is started without `vinix.hibernate=`, or with another
+  system, and its filesystems are written to, and it is then started with
+  the option again, the kernel inside the image wakes to disks that have
+  moved on, and will corrupt them. Nothing here can tell; whoever starts
+  the machine another way has to clear the device.
+- If the device cannot be written when an image is refused, or just before
+  one would be entered, the image stays on it. The kernel says so, does not
+  enter it, and can do no more.
+- The boot loader's reclaimable memory is saved whole -- 65 MiB of a 1 GiB
+  QEMU machine -- because the kernel does not know which part of it holds
+  the answers it still reads. The image is not compressed.
+- A device that appears after the disks came up is not looked for; a
+  partition as the image's device, and an IDE disk, follow the same code
+  and have not been tried: the tests use a whole SATA disk. A release
+  kernel does not start `nvme`.
+- The kernel must be the same build. An image is not carried from one
+  kernel to the next, and an updated system discards it.
+- No part of the image is read back before the machine is switched off but
+  its header; a page the device took and did not keep is found by the
+  checksum on the way back, when the image is refused.
+- The other limits of a suspend to RAM hold here as well: wake-up is by
+  switching the machine on and by nothing else; an alarm does not start a
+  machine that is off.
 
 ## Power supplies
 
@@ -855,6 +1082,7 @@ itself, which the SMC keys Linux names do not include.
 | `vinix.deep_sleep=force\|off` | x86-64: offer suspend to RAM although the kernel cannot bring the display back; never offer it |
 | `vinix.pci_d3=off` | keep every PCI function in D0 through a sleep |
 | `vinix.acpi_wake=off` | x86-64: do not arm the lid, buttons and keyboard to end a suspend to RAM |
+| `vinix.hibernate=<device>` | x86-64: the block device, by its name in `/dev`, that an image of memory is written to for a suspend to disk. It is overwritten, and looked at for an image at every start. Without the option there is no `disk` state and no disk is written to |
 
 ## What is not done
 
@@ -871,8 +1099,11 @@ Beyond the limits stated in each section:
 - Behind the embedded controller: a second controller, the SMBus host and
   Smart Batteries, controllers not on I/O ports, events in a block of their
   own. And the controller itself on any real laptop.
-- Suspend to RAM on anything but QEMU's PC: see its section for what is
-  untested. Hibernation, backlight and display power control.
+- Suspend to RAM and suspend to disk on anything but QEMU's PC: see their
+  sections for what is untested. For a suspend to disk also: ACPI's S4,
+  an image that is encrypted, signed or compressed, an image carried from
+  one kernel build to another, and any of it on AArch64. Backlight and
+  display power control.
 - Apple's SMC on a Mac. The battery, charger, temperatures, fans and charge
   limit are tested against a simulated SMC on the build machine and in
   QEMU; **no physical run**, of this or of the device nodes before it. Past
@@ -917,8 +1148,9 @@ Beyond the limits stated in each section:
 
 Kernels were built in a git worktree with `make ARCH=aarch64 LIMINE_MP=1` and
 `make ARCH=x86_64`, and run on QEMU 11.1.1 on an Apple Silicon Mac: x86-64
-`q35` under TCG with 2 CPUs (4 for the `suspend-deep` scenarios, with the
-edk2 firmware QEMU ships, which is what resumes the machine from S3),
+`q35` under TCG with 2 CPUs (4 for the `suspend-deep` and `hibernate`
+scenarios, with the edk2 firmware QEMU ships, which is what resumes the
+machine from S3 and starts it again after a suspend to disk),
 AArch64 `virt` under HVF with 4 CPUs. The two are not comparable in speed.
 
 ```sh
@@ -953,6 +1185,12 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `suspend-deep-undrawable`, `suspend-deep-forced`, `suspend-deep-headless`: when deep is offered | pass | -- |
 | `suspend-deep-wake`, `suspend-deep-wake-off`: a lid and a sleep button armed to end a suspend to RAM -- their events left enabled, firmware told, the lid found open afterwards -- and none of it with `vinix.acpi_wake=off` | pass | -- |
 | `drivers-sleep`: HD Audio playing and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM; the recording and the disk image checked afterwards | pass | -- |
+| `hibernate`: suspend to disk twice with 4 CPUs, three boots of one machine; the same process returns from its write each time with its memory, threads, files, descriptors, pipe and child as they were; every CPU, the clocks, disk, network, screen and power button afterwards; no image left on the device | pass | -- |
+| `hibernate-xapic`: the same with page tables four levels deep and no x2APIC | pass | -- |
+| `hibernate-iommu`, `hibernate-iommu-amd`: the same behind VT-d and AMD-Vi, which the kernel that loads the image has switched on as well | pass | -- |
+| `hibernate-cycles`: five suspends to disk one after another, six boots; the kernel heap after the last four as after the first | pass | -- |
+| `hibernate-damaged-header`, `hibernate-damaged-pages`, `hibernate-memory`: an image damaged while the machine was off, and a machine with less memory, start afresh, say why, discard the image and work | pass | -- |
+| `hibernate-unnamed`, `hibernate-foreign`: with no device named, or one that holds something else, there is no `disk` and both disks are byte for byte as they were made | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
 | `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` (kernel built with `-d acpiec_selftest`: a simulated embedded controller) | pass | -- |
@@ -962,12 +1200,13 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `apple-smc-selftest` (kernel built with `-d applesmc_selftest`: a simulated Apple SMC; run 2026-10-11): battery, charger, four temperatures and a fan in `/sys` and in the device nodes; garbage readings that change nothing; the charge limit; a sleep; low, critical and the power-off request; an SMC that stops answering | -- | pass |
 | `apple-smc-selftest-bare`, `-options`, `-legacy` (the same kernel): no fan and no charge limit; `vinix.apple_smc=nosensors,nolimit`; `vinix.apple_smc=legacy` | -- | pass |
 
-Host unit tests: `tests/hardware-platform/hwhost` (9 files),
+Host unit tests: `tests/hardware-platform/hwhost` (10 files),
 `tests/power-supply/run`, `sh tests/cpu-power/run.sh`, `sh tests/thermal/run.sh`,
 `tests/pci-hotplug/run`, `sh tests/acpi-ec/run.sh` (40 tests of the embedded
 controller's protocol against a simulated controller),
 `sh tests/apple_smc/run-host.sh` (51 tests of the SMC client against a
-simulated SMC).
+simulated SMC), `sh tests/hibernate/run.sh` (what makes a suspend-to-disk
+image valid, and on what two machines are compared).
 See [the suite's README](../tests/hardware-platform/README.md) for what each
 scenario checks and for its recorded output.
 

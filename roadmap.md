@@ -241,15 +241,22 @@ consistent filesystem; backup restoration preserves content and metadata.
     the processors, interrupt controllers, clocks, PCI configuration, IOMMUs
     and the display mode put back, tested in QEMU only and offered only where
     the kernel can bring the display back.
+  - [x] [Suspend to disk on x86-64](docs/hardware-platform.md#suspend-to-disk-x86-64):
+    an image of memory written to a device named on the kernel command line,
+    the machine switched off, and the image gone back into at the next start
+    before any filesystem is mounted -- or refused, with the reason, and
+    discarded. Tested in QEMU only; the image is not encrypted.
   - [x] [The desktop's side](desktop/SETTINGS.md): battery state and time left
     from `/sys/class/power_supply`, Sleep and Restart in the Start menu, and
     Settings > Power with the lid action, the performance profile and two idle
     timeouts. Tested on the host only; the display is not turned off by default
     until that has run in a machine.
-  - [ ] Suspend to RAM on a physical machine and for the drivers that cannot
-    yet come back from a loss of power; hibernation; backlight and display
-    power control; a screen lock, and a way for an application to keep the
-    display on.
+  - [ ] Suspend to RAM and suspend to disk on a physical machine, and for the
+    drivers that cannot yet come back from a loss of power; an image that is
+    encrypted, and one that is compressed; ACPI's S4; a suspend to disk on
+    AArch64; a `disk` entry in the desktop; backlight and display power
+    control; a screen lock, and a way for an application to keep the display
+    on.
 - [ ] Restore all device and security state after sleep, firmware errors and
   hotplug; keep recovery possible when a driver fails.
   - [x] [CPU protection registers compared across every sleep; e1000 and AHCI

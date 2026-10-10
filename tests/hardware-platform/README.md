@@ -56,6 +56,14 @@ here runs any.
 | `suspend-deep-wake-off` | x86_64 | The same machine with `vinix.acpi_wake=off`: no `/sys/power/acpi_wakeup`, the byte of the enable register is zero while the machine is suspended, and the record of what firmware was told is empty. |
 | `drivers-sleep` | x86_64 | A machine with an HD Audio controller, whose output QEMU records to a WAV file, and a PCI IDE controller with a disk. A thread of the guest plays a square wave the whole time and the main thread changes its height after each of three sleeps -- a rehearsal, a suspend to idle ended by the alarm, a suspend to RAM ended by the alarm -- each begun with the tone playing; after each the player must go on handing sound to the card, and the disk must hold what was written before the sleep and take a new write. The machine must offer `deep`, which it did not while either driver could not bring its device back. Afterwards the controller looks for the four heights in the recording, a third of a second and a half of each, and for the four patterns in the disk image, and QEMU must have reported `SUSPEND` and `WAKEUP`. QEMU's codec keeps its settings through a controller reset, so this shows the controller, its rings and its stream coming back and not that the codec was programmed again. |
 | `nvme-sleep` | x86_64 | Needs a kernel built with `PROD=false`: a release kernel does not start the NVMe driver. An NVMe disk through the same three sleeps: before each the controller is flushed and told to shut down, after each it is disabled, enabled and its queues created again; what was written before must be there and a new write must reach the disk image. QEMU's controller has a power management capability, so it must also have spent each of the three sleeps in D3hot. |
+| `hibernate` | x86_64 | Suspend to disk, twice, across three boots of one machine: four CPUs, an e1000, a SATA data disk (`sd0`) and a blank SATA disk the kernel command line names for the image (`vinix.hibernate=sd1`). `state` must offer `disk`, `/sys/power/disk` read `[shutdown]` and refuse anything else, `/sys/power/hibernate` say `available`, and `/dev/sd1` be mode 0600. Before each cycle the program has 64 MiB of memory filled with a sequence, a thread that counts, a 16 KiB file in tmpfs, that file open with 5000 bytes read, a pipe with bytes left in it, and a child blocked reading another pipe; it writes a pattern to the data disk and a note for itself, prints `hibernating N` and writes `disk`. The first two boots must end with QEMU reporting that the guest switched the machine off. **The write must return, in that same process** -- had the machine started afresh, the program would start from the top, find its note and fail -- and then: the kernel counts one more resume from disk, and says a kernel loaded it and had written to no disk before it looked; `suspend_stats` has one more success by `disk`, woken by `resume-from-disk`, with the protection registers compared on all four CPUs and unchanged; no processor is lost and no PCI function left unrestored; every page of the image is accounted for as read in place or moved; the monotonic clock carried on (by less than 30 s) while the wall clock moved on by a whole number of seconds more, at least one, which is in `last_sleep_ms`; the counting thread stood still while the machine was down and counts again; memory, the file, the descriptor's offset and what it reads next are as they were; a thread pinned to each CPU runs there and is billed for it; the pattern written before reads back from a disk whose controller has been reset, a new one goes out, and a file comes from QEMU's TFTP server; and the image device holds a header that describes no image. After the second cycle the pipe still has its bytes and the child, sent one, exits with the status that says which; a picture of the screen must show something; and a press of the power button (QMP `system_powerdown`) must reach init, which says ACPI's events were switched on again. On the host: the four patterns must be in the data disk's file and the image disk's file must start with `VINIXHIB` and say no pages. |
+| `hibernate-xapic` | x86_64 | The same with `-cpu max,-x2apic,-la57`: page tables four levels deep, as most machines have them and as the page table an image is entered through must then be, and local APICs driven through memory. |
+| `hibernate-iommu`, `hibernate-iommu-amd` | x86_64 | The same behind Intel VT-d and behind AMD-Vi with `vinix.iommu=1`. The kernel that loads the image has switched the unit on too, with tables of its own, and switches it off before it goes into the image; the kernel inside must have it translating through its own tables again, with the network card confined, after both cycles. |
+| `hibernate-cycles` | x86_64 | Five suspends to disk one after another, six boots, each asked for with one `write` and nothing else. The first is not measured; across the other four the kernel heap may gain at most 30 live objects (what reading `/proc/slabinfo` twice costs) and no large pages, and `MemFree` may fall by less than 16 MiB -- one cycle's copies not given back would be ten times that. Recorded: 7837 objects before and 7850 after, and the same two figures when ten cycles were measured instead of four. |
+| `hibernate-damaged-header`, `hibernate-damaged-pages` | x86_64 | The machine is put away; with it off, the controller overwrites eight bytes of the image's header, or twenty-four bytes sixteen megabytes into its pages. The second boot must start afresh -- the program finds its note -- and `/sys/power/hibernate` must say `image not resumed:` and why: the header does not match its checksum, or, found only once the whole image has been read and half of it put where it belongs, the pages do not match theirs. The image must be gone (the device holds a header that describes none, checked in the guest and on the host), `disk` must be offered again, the pattern written before must be on the data disk, and the disk and the network must work. |
+| `hibernate-memory` | x86_64 | The same with nothing damaged and the second boot given 768 MiB instead of 1 GiB: the image is refused because the memory of the machine has changed, and discarded. |
+| `hibernate-unnamed` | x86_64 | The same two disks and no `vinix.hibernate=`: `state` offers `freeze mem`, writing `disk` fails, `/sys/power/hibernate` says no device was named, and a suspend to idle still works. **On the host both disk files must be byte for byte what the controller made**, which is how "nothing was written to any disk" is known rather than reported. |
+| `hibernate-foreign` | x86_64 | `vinix.hibernate=sd1` names a disk that starts with somebody's data. It is neither blank nor this system's, so `disk` is not offered, `/sys/power/hibernate` says the device holds something else and is left alone, writing `disk` fails, the kernel counts no write to any disk, the node is mode 0600 all the same, and on the host both disks are byte for byte as made. |
 
 Every scenario also fails on a line containing `KERNEL PANIC`,
 `FATAL EXCEPTION` or `HWTEST FAIL`, and a scenario whose machine is to power
@@ -147,7 +155,15 @@ deleted: `DIR/guest` holds the guest program and each `DIR/<scenario>` has
   started;
 - `qemu.log`: QEMU's command line, then what it printed;
 - `image.log`: the output of the tools that built the boot medium;
-- the images themselves.
+- the images themselves, except a disk marked `bulky` in a scenario that
+  passed: the device a suspend-to-disk image is written to holds a quarter
+  of a gigabyte of the machine's memory after a run, and is kept only when
+  the scenario failed.
+
+A scenario that boots its machine more than once (below) has a serial log
+for each boot -- `serial.log`, `serial-2.log`, `serial-3.log` -- since QEMU
+empties the file it is given; `qemu.log` and `qmp.log` run on through all of
+them.
 
 QEMU is stopped (SIGTERM, then SIGKILL after five seconds) and collected
 after every scenario, whether it passed, failed, timed out, or the controller
@@ -179,6 +195,28 @@ must have been seen, and how the machine is to end:
 `poweroff` (by itself, before the timeout) or `running` (the controller stops
 it once every marker has been seen).
 
+**A machine booted more than once.** A scenario with `reboots` is one
+machine started again and again on the same state directory: the same boot
+image, the same disk files with whatever the boot before left in them. (The
+x86-64 machine has no firmware variables to carry over: QEMU's firmware is
+given no store for them.) Every boot but the last must end with QEMU's
+`SHUTDOWN` event saying the guest switched the machine off; a reset, a QEMU
+that failed, or a machine the controller had to stop fails the scenario and
+says which boot. The last boot ends the way the scenario's `ending` says.
+The required lines, the actions and the events are those of all the boots
+together, in order, and the timeout covers them all. Between two boots,
+with the machine off, the controller can overwrite part of a disk
+(`damage`), and a boot can be given QEMU arguments of its own (`qemu`: a
+second `-m` replaces the first). Since a guest that starts afresh in a
+later boot starts from the top of its scenario, one that has to know which
+boot it is in leaves itself a note on a disk.
+
+After the machine has ended for good a scenario's disks are looked at on
+the host: the header each was made with, the patterns the guest was to
+write, bytes that must be at a given place (`disk_bytes`), and for a disk
+marked `untouched` every byte of it against what the controller made --
+which is the only way to know that a machine wrote nothing.
+
 ## Adding a scenario
 
 1. The guest half: a new file in `guest/` with
@@ -204,8 +242,12 @@ it once every marker has been seen).
    screen its actions took with `screendump` and what each must show
    (`screens`: dark, or something; the size of another picture; the pattern
    a guest draws with `guest/framebuffer.v`), and ask for more than the
-   default time (`timeout`). A record that cannot pass yet gets a `pending`
-   reason.
+   default time (`timeout`). A machine can be booted more than once
+   (`reboots`, each with its own extra QEMU arguments and damage to do to a
+   disk first), a
+   disk required to come out as it was made (`untouched`) or to hold given
+   bytes at the end (`disk_bytes`). A record that cannot pass yet gets a
+   `pending` reason.
 
 The table is checked before anything boots (`validate_scenarios`), and
 `hwhost/scenario_test.v` pins which scenarios a default run selects on each
@@ -234,6 +276,23 @@ way back among many. A PS/2 key and `system_wakeup` wake this machine
 whatever the kernel has armed; on hardware a device wakes a machine only if
 its wake event was enabled, which the kernel does for the embedded
 controller's event alone and for no device's `_PRW`.
+
+A pass of a `hibernate` scenario says that the kernel wrote an image, that
+QEMU's machine was switched off and started again from nothing -- firmware,
+boot loader and a new kernel -- and that this second kernel found the
+machine to be the one the image was taken on, read the image, and became
+it. That last judgement is the fragile part, and QEMU is kind to it: the
+same firmware given the same machine puts its tables in the same places
+every time. Even so two boots differed -- in how the boot loader divided
+memory, in where it put the kernel, and in one ACPI table -- and the kernel
+was changed until it no longer depended on those. What a real firmware
+varies from boot to boot is not known here, and where it varies more the
+image is refused, which these scenarios show for three cases only: a
+damaged header, a damaged page, and less memory. Nothing checks that an
+image is refused for each of the other reasons the kernel has, and nothing
+here can show what happens when a machine is started some other way in
+between and its disks are changed: the kernel cannot tell, and resuming
+then corrupts them.
 
 Two further limits:
 
