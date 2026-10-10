@@ -2,16 +2,28 @@
 // Copyright (c) 2026 Alexander Medvednikov
 //
 // Guest side of the AMD-Vi checks: run as /sbin/init in a QEMU q35 machine
-// with an e1000 and, for most cases, `-device amd-iommu`. It reports what the
-// kernel says about its IOMMU and about the network card's DMA domain, proves
-// that the card's transmit and receive DMA work by getting an answer from the
-// network, rebinds the card's driver twenty times while watching the unit's
-// page-table pages and the machine's free memory, and prints the result of
-// the kernel's isolation self-test when the kernel was built with one.
+// with an e1000 and, for most cases, `-device amd-iommu,dma-remap=on`. It
+// reports what the kernel says about its IOMMU and about the network card's
+// DMA domain, proves that the card's transmit and receive DMA work by getting
+// an answer from the network, rebinds the card's driver twenty times while
+// watching the unit's page-table pages and the machine's free memory, and
+// prints the result of the kernel's isolation self-test when the kernel was
+// built with one (`-d amdvi_selftest`).
+//
+// `dma-remap=on` matters. Without it QEMU's AMD IOMMU (as of 11.1) accepts
+// every command and translates nothing: the network works, the domain reads
+// "isolated", and the card can reach all of memory. Only the self-test tells
+// the two apart.
 //
 // Everything goes to the serial console as lines starting "IOMMU-AMD", since
-// an amd64 kernel's own messages go to the screen. The host decides which
-// lines a given boot must show; see the cases in the commit that added this.
+// an amd64 kernel's own messages go to the screen. The cases to boot:
+//
+//	vinix.iommu=1, amd-iommu     a unit, the card "isolated", answers before
+//	                             and after the rebinds, the page-table page
+//	                             count with the card unbound unchanged, and
+//	                             "selftest: result: PASS" from a test kernel
+//	no vinix.iommu=1             "unit: none", the card "direct", answers
+//	vinix.iommu=1, no amd-iommu  the same
 #define _GNU_SOURCE
 #include <arpa/inet.h>
 #include <dirent.h>
@@ -34,7 +46,7 @@
 static int out = 1;
 
 static void say(const char *fmt, ...) {
-    char line[1536];
+    static char line[9216];
     va_list ap;
     va_start(ap, fmt);
     int n = vsnprintf(line, sizeof line, fmt, ap);
@@ -64,7 +76,7 @@ static int write_file(const char *path, const char *text) {
 
 // Print a file as one line, its newlines turned into " | ".
 static void show(const char *label, const char *path) {
-    char text[1400], flat[1500];
+    static char text[8192], flat[9000];
     int n = read_file(path, text, sizeof text);
     if (n < 0) {
         say("IOMMU-AMD %s: (errno %d)\n", label, -n);
@@ -203,19 +215,24 @@ int main(void) {
     network("first");
 
     // Twenty times round: each unbind tears the card's domain down and each
-    // bind builds a new one. Neither may leave anything behind.
-    long tables_before = unit[0] ? field(pages, "table_pages") : -1;
-    long free_before = field("/proc/meminfo", "MemFree");
+    // bind builds a new one. Neither may leave anything behind. The count of
+    // page-table pages is taken with the card unbound, when it should be
+    // whatever firmware's ranges need and no more: with the card bound it
+    // depends on where the card's buffers happened to land.
     snprintf(line, sizeof line, "%s\n", card);
     int failed = 0;
+    if (write_file("/sys/bus/pci/drivers/e1000/unbind", line) < 0) failed++;
+    long tables_before = unit[0] ? field(pages, "table_pages") : -1;
+    long free_before = field("/proc/meminfo", "MemFree");
     for (int i = 0; i < 20; i++) {
-        if (write_file("/sys/bus/pci/drivers/e1000/unbind", line) < 0) failed++;
         if (write_file("/sys/bus/pci/drivers/e1000/bind", line) < 0) failed++;
+        if (write_file("/sys/bus/pci/drivers/e1000/unbind", line) < 0) failed++;
     }
     long tables_after = unit[0] ? field(pages, "table_pages") : -1;
     long free_after = field("/proc/meminfo", "MemFree");
-    say("IOMMU-AMD rebind x20: failed %d, table_pages %ld -> %ld, MemFree %ld -> %ld kB\n", failed,
-        tables_before, tables_after, free_before, free_after);
+    if (write_file("/sys/bus/pci/drivers/e1000/bind", line) < 0) failed++;
+    say("IOMMU-AMD rebind x20: failed %d, table_pages while unbound %ld -> %ld, MemFree while unbound "
+        "%ld -> %ld kB\n", failed, tables_before, tables_after, free_before, free_after);
     show("e1000 dma after rebind", path);
     network("after rebind");
 

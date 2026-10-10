@@ -11,6 +11,9 @@
 //	amdvi_commands_amd64.v  the command buffer: making a unit forget
 //	amdvi_domain_amd64.v    page tables for a device, and the DMA layer's six calls
 //	amdvi_events_amd64.v    the event log, and /sys/class/iommu
+//
+// amdvi_selftest_d_amdvi_selftest.v, in kernels built with -d amdvi_selftest,
+// proves at boot that a unit keeps a device to its domain.
 module dma
 
 import acpi
@@ -85,6 +88,9 @@ fn amdvi_initialise() {
 	}
 	if amdvi_unit_count != 0 {
 		amdvi_start_poller()
+	}
+	$if amdvi_selftest ? {
+		amdvi_selftest_run()
 	}
 }
 

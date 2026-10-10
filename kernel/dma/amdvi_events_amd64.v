@@ -43,6 +43,10 @@ const amdvi_shown_max = 8
 
 struct AmdviEvent {
 mut:
+	// The entry's first two words as the unit wrote them, and what they
+	// and the two after them say.
+	raw0    u32
+	raw1    u32
 	kind    u32
 	devid   u16
 	domain  u16
@@ -118,6 +122,8 @@ fn amdvi_drain_events(mut unit AmdviUnit) u64 {
 		mut words := unsafe { &u32(unit.events + higher_half + u64(head)) }
 		mut event := AmdviEvent{}
 		unsafe {
+			event.raw0 = words[0]
+			event.raw1 = words[1]
 			event.kind = words[1] >> 28
 			event.devid = u16(words[0])
 			event.domain = u16(words[1])
@@ -303,6 +309,10 @@ fn amdvi_show_events(context voidptr, mut text lib.Text) {
 		text.add_radix(u64(fault.flags), 16, 0)
 		text.add(' domain ')
 		text.add_unsigned(u64(fault.domain))
+		text.add(' raw 0x')
+		text.add_radix(u64(fault.raw0), 16, 8)
+		text.add(' 0x')
+		text.add_radix(u64(fault.raw1), 16, 8)
 		text.add_byte(`\n`)
 	} else {
 		text.add('none\n')
@@ -365,5 +375,8 @@ fn amdvi_publish() {
 		amdvi_publish_file(unit, 'cap', amdvi_show_cap)
 		amdvi_publish_file(unit, 'events', amdvi_show_events)
 		amdvi_publish_file(unit, 'domains', amdvi_show_domains)
+		$if amdvi_selftest ? {
+			amdvi_publish_file(unit, 'selftest', amdvi_selftest_show)
+		}
 	}
 }

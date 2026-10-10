@@ -142,29 +142,40 @@ fn amdvi_sync(mut unit AmdviUnit) bool {
 	return done
 }
 
-// Have the unit forget everything it remembers. A unit with INVALIDATE_ALL
-// does it in one command; one without is told entry by entry and domain by
-// domain, which is some hundred thousand commands through a ring of 512 and
-// still only milliseconds.
+// Have the unit forget everything it remembers, when it is switched on.
+//
+// Every device table entry is named to it one by one, even for a unit that
+// has INVALIDATE_ALL. Hardware needs no more than that one command; QEMU's
+// unit only starts translating for a device when it is told to forget that
+// device's entry, and until then lets the device through whatever its entry
+// says. It is at most 65536 commands, once, and milliseconds.
 fn amdvi_flush_everything(mut unit AmdviUnit) bool {
+	if !amdvi_forget_devices(mut unit) {
+		return false
+	}
 	if unit.features & amdvi_feature_invalidate_all != 0 {
 		if !amdvi_queue(mut unit, 0, amdvi_command_invalidate_all, 0, 0) {
 			return false
 		}
 		return amdvi_sync(mut unit)
 	}
-	return amdvi_flush_one_by_one(mut unit)
+	return amdvi_forget_domains(mut unit)
 }
 
-fn amdvi_flush_one_by_one(mut unit AmdviUnit) bool {
+// Forget every device table entry.
+fn amdvi_forget_devices(mut unit AmdviUnit) bool {
 	for devid := u32(0); devid <= unit.last_devid; devid++ {
 		if !amdvi_forget_device(mut unit, u16(devid)) {
 			return false
 		}
 	}
-	if !amdvi_sync(mut unit) {
-		return false
-	}
+	return amdvi_sync(mut unit)
+}
+
+// Forget the translations of every domain there could be: for a unit without
+// INVALIDATE_ALL. The ring holds 512 commands; the unit empties it as fast
+// as it is filled.
+fn amdvi_forget_domains(mut unit AmdviUnit) bool {
 	for domain := u32(0); domain <= 0xffff; domain++ {
 		if !amdvi_forget_domain(mut unit, u16(domain), true) {
 			return false

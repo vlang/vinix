@@ -441,7 +441,7 @@ fn amdvi_point_entry(unit &AmdviUnit, devid u16, root u64, levels u8, id u16) {
 fn amdvi_block_entry(unit &AmdviUnit, devid u16) {
 	mut words := amdvi_dte(unit, u32(devid))
 	unsafe {
-		words[0] = amdvi_blocked_word(words[1])
+		words[0] = amdvi_blocked_word(unit, words[1])
 		words[1] &= ~amdvi_dte_domain_mask
 	}
 }
@@ -533,7 +533,6 @@ fn amdvi_domain_of(mut unit AmdviUnit, devid u16, alias u16) &AmdviDomain {
 		}
 	}
 	domain.unit = unsafe { unit }
-	domain.has_unity = amdvi_unity_any(unit, devid, alias)
 
 	unit.domain_lock.acquire()
 	found = unit.domains
@@ -588,6 +587,7 @@ fn amdvi_ids_taken(mut unit AmdviUnit, domain &AmdviDomain) bool {
 // Give a blocked device tables that hold firmware's ranges for it and
 // nothing else.
 fn amdvi_domain_build(mut unit AmdviUnit, mut domain AmdviDomain) bool {
+	domain.has_unity = amdvi_unity_any(unit, domain.devid, domain.alias)
 	mut fresh := AmdviTable{}
 	if !amdvi_table_create(mut unit, mut fresh) {
 		return false

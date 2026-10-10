@@ -18,10 +18,10 @@
 // gives and Linux follows: everything off, tables in place, command buffer,
 // event log, then the unit.
 //
-// A unit that is on turns away every device whose entry does not point at
-// page tables, so every entry is written in that blocked form before the unit
-// is switched on, and stays that way until a driver asks for memory for the
-// device (see amdvi_domain_amd64.v).
+// A unit that is on must turn away every device nobody has vouched for, so
+// every entry is written in a blocked form before the unit is switched on --
+// no access allowed, and tables that map nothing -- and stays that way until
+// a driver asks for memory for the device (see amdvi_domain_amd64.v).
 //
 // Interrupts are not remapped. Every entry is left with its interrupt table
 // marked invalid, which the specification defines as "forward interrupts
@@ -166,6 +166,8 @@ mut:
 	events             u64
 	// Where the unit writes the number of each "tell me when you get here".
 	semaphore u64
+	// A page of table with no entries: what a blocked device is pointed at.
+	nothing u64
 
 	// The command buffer's tail and the last number handed out; under `lock`.
 	lock             klock.Lock
@@ -290,10 +292,17 @@ fn amdvi_levels_needed() u8 {
 }
 
 // The first word of a device table entry that turns the device away: valid,
-// with translation information that says "no page tables, and neither read
-// nor write allowed without them". Every access faults and is logged.
-fn amdvi_blocked_word(second u64) u64 {
-	mut word := amdvi_dte_valid | amdvi_dte_translation_valid
+// neither read nor write allowed, and page tables that map nothing. Every
+// access faults and is logged.
+//
+// The specification, and Linux, make do with the first two: an entry with no
+// tables at all (mode 0) leaves access to the read and write bits alone. The
+// empty table is there for an implementation that reads mode 0 as "pass
+// everything" without looking at those bits, which QEMU's does; one that
+// honours them never walks it. It is one page a unit, shared by every blocked
+// device, and nothing is ever written to it.
+fn amdvi_blocked_word(unit &AmdviUnit, second u64) u64 {
+	mut word := unit.nothing | (u64(unit.levels) << amdvi_dte_mode_shift) | amdvi_dte_valid | amdvi_dte_translation_valid
 	// AMD erratum 63: a device whose system management setting is 01 has its
 	// management messages dropped unless the entry allows writes. It is the
 	// southbridge of a 2009 chipset; Linux makes the same exception.
@@ -350,7 +359,7 @@ fn amdvi_fill_device_table(mut unit AmdviUnit) {
 	for devid := u32(0); devid <= unit.last_devid; devid++ {
 		mut words := amdvi_dte(unit, devid)
 		unsafe {
-			words[0] = amdvi_blocked_word(words[1])
+			words[0] = amdvi_blocked_word(unit, words[1])
 		}
 	}
 }
@@ -398,9 +407,14 @@ fn amdvi_free_unit_memory(mut unit AmdviUnit) {
 		memory.pmm_free(voidptr(unit.semaphore), 1)
 		unit.semaphore = 0
 	}
+	if unit.nothing != 0 {
+		memory.pmm_free(voidptr(unit.nothing), 1)
+		unit.nothing = 0
+	}
 }
 
-// The device table, both rings and the completion word, zeroed.
+// The device table, both rings, the completion word and the empty table,
+// zeroed.
 fn amdvi_allocate_unit_memory(mut unit AmdviUnit) bool {
 	unit.device_table_pages = lib.div_roundup((u64(unit.last_devid) + 1) * amdvi_dte_bytes,
 		amdvi_page_bytes)
@@ -411,7 +425,9 @@ fn amdvi_allocate_unit_memory(mut unit AmdviUnit) bool {
 	unit.commands = u64(memory.pmm_alloc_fallible(amdvi_ring_pages))
 	unit.events = u64(memory.pmm_alloc_fallible(amdvi_ring_pages))
 	unit.semaphore = u64(memory.pmm_alloc_fallible(1))
-	if unit.device_table == 0 || unit.commands == 0 || unit.events == 0 || unit.semaphore == 0 {
+	unit.nothing = u64(memory.pmm_alloc_fallible(1))
+	if unit.device_table == 0 || unit.commands == 0 || unit.events == 0 || unit.semaphore == 0
+		|| unit.nothing == 0 {
 		amdvi_free_unit_memory(mut unit)
 		return false
 	}
