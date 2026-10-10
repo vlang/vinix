@@ -296,6 +296,20 @@ the battery gauge does not. With `power/wakeup` of the device `disabled` its
 event is off for the sleep. On resume, and at start, a controller whose
 event bit is already up is asked.
 
+A suspend to RAM (x86-64) takes the driver through the same suspend and
+resume. The enable bits of the chipset's general purpose events are lost
+with the power and written again by uACPI on the way back, before `_WAK`;
+the controller's event is among them, or is switched on again by the
+driver's resume if it was off for the sleep. Nothing is done about an
+exchange cut short by the power going: the driver is not stopped for the
+sleep, and one of its threads put down in the middle of an exchange would
+come back to a controller that has forgotten it and time out. A kernel with
+the simulated controller has been through this (`suspend-deep-ec`: values
+read, the chipset's event heard again after each of two sleeps, an event
+held for a sleep asked for afterwards), which says what the chipset's part
+and the driver's do, and nothing about a controller, which there was
+memory that lost no power.
+
 **Thermal zones.** A laptop's thermal zone usually reads its temperature
 from the controller (`_TMP` is a field of its region) and hears of a trip
 through a query whose method sends the zone a Notify. Such a zone goes
@@ -767,10 +781,13 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `suspend-deep`: suspend to RAM with 4 CPUs -- two rehearsals, wakes by `system_wakeup`, alarm and key, five more sleeps; every CPU, memory, disk, network, clocks, keyboard, mouse, power button; the screen dark while down and as drawn afterwards | pass | -- |
 | `suspend-deep-xapic`, `suspend-deep-bridge`: the same without x2APIC, and with the card behind a watched hot-plug port | pass | -- |
 | `suspend-deep-iommu`, `suspend-deep-iommu-amd`: the same behind VT-d and AMD-Vi, the unit found off and brought back each time | pass | -- |
+| `suspend-deep-arrival`: a card put into a watched slot while the machine is suspended to RAM, found after the wake; a sleep with it in; the slot gives it up afterwards | pass | -- |
+| `suspend-deep-departure`: with firmware keeping the ports, a card taken during one sleep is removed after it, and a card put in during the next is found | pass | -- |
 | `suspend-deep-undrawable`, `suspend-deep-forced`, `suspend-deep-headless`: when deep is offered | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
 | `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` (kernel built with `-d acpiec_selftest`: a simulated embedded controller) | pass | -- |
+| `suspend-deep-ec` (the same kernel): the controller's driver through two suspends to RAM | pass | -- |
 
 Host unit tests: `tests/hardware-platform/hwhost` (8 files),
 `tests/power-supply/run`, `sh tests/cpu-power/run.sh`, `sh tests/thermal/run.sh`,
