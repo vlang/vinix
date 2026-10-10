@@ -144,6 +144,7 @@ fn kmain_thread() {
 	fs.mount(vfs_root, '', '/sys', 'sysfs') or {}
 	// Devices and drivers so far, and every change from here on.
 	devcore.publish()
+	dma.publish()
 	syspower.publish()
 	fwload.publish()
 	// The idle states of this machine's CPUs, which they use from here on.

@@ -24,3 +24,16 @@ pub fn initialise() {
 		print('dma: vinix.iommu=1, but this machine describes no IOMMU\n')
 	}
 }
+
+// Publish the units that are on in /sys/class/iommu. Called once /sys is
+// mounted, which is after the units were switched on; each driver's own
+// thread would get there too, but only on its next pass, and the first
+// program to run may look sooner than that.
+pub fn publish() {
+	if vtd_unit_count != 0 && !vtd_published {
+		vtd_publish()
+	}
+	if amdvi_unit_count != 0 && !amdvi_published {
+		amdvi_publish()
+	}
+}
