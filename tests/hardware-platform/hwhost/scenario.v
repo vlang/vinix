@@ -618,6 +618,24 @@ pub const scenarios = [
 		timeout:  240
 	},
 	Scenario{
+		name:     'suspend-deep-bridge'
+		about:    'the same with the card behind a PCI Express port whose hot-plug slot the kernel watches'
+		arches:   ['x86_64']
+		qemu:     ['-smp', '4', '-global', 'ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off', '-nic',
+			'none', '-device', 'pcie-root-port,id=hwport0,chassis=1,bus=pcie.0', '-netdev',
+			'user,id=hwhot0,tftp={state}/tftp', '-device', 'e1000,bus=hwport0,netdev=hwhot0', '-drive',
+			'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [deep_disk]
+		files:    [tftp_probe]
+		required: ['HWTEST START suspend-deep-bridge', 'HWTEST PASS suspend-deep-bridge']
+		actions:  deep_actions
+		ending:   .poweroff
+		patterns: deep_patterns
+		events:   deep_events
+		screens:  deep_screens
+		timeout:  240
+	},
+	Scenario{
 		name:     'suspend-deep-undrawable'
 		about:    'a display the kernel cannot bring back: suspend to RAM is not offered'
 		arches:   ['x86_64']
@@ -747,11 +765,23 @@ const deep_actions = [
 		qmp:      deep_press_shift
 	},
 	Action{
+		after:          'HWTEST STEP deep sleep, a picture'
+		event:          'SUSPEND'
+		event_count:    1
+		event_delay_ms: 500
+		qmp:            '{"execute":"screendump","arguments":{"filename":"{state}/screen-asleep.ppm"}}'
+	},
+	Action{
 		after:          'HWTEST STEP deep sleep for a wakeup'
 		event:          'SUSPEND'
 		event_count:    1
 		event_delay_ms: 2000
 		qmp:            '{"execute":"system_wakeup"}'
+	},
+	Action{
+		after:    'HWTEST STEP awake after the wakeup'
+		delay_ms: 100
+		qmp:      '{"execute":"screendump","arguments":{"filename":"{state}/screen-woken.ppm"}}'
 	},
 	Action{
 		after:          'HWTEST STEP deep sleep for a key'
@@ -786,10 +816,20 @@ const deep_events = ['SUSPEND', 'SUSPEND', 'SUSPEND', 'SUSPEND', 'SUSPEND', 'SUS
 	'SUSPEND', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP']
 
 // What the guest drew before the first sleep must be what the display
-// adapter shows after the last, in the same mode.
+// adapter shows straight after the first wake and after the last, in the
+// same mode; and while the machine is down the screen must be dark.
 const deep_screens = [
 	Screen{
 		file:    'screen-before.ppm'
+		pattern: 256
+	},
+	Screen{
+		file: 'screen-asleep.ppm'
+		dark: true
+	},
+	Screen{
+		file:    'screen-woken.ppm'
+		like:    'screen-before.ppm'
 		pattern: 256
 	},
 	Screen{

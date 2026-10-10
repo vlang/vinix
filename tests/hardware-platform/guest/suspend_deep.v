@@ -238,6 +238,8 @@ mut:
 	sleeps     int // suspends to RAM that worked
 	checks     int // times check_machine() has run after one
 	unit       string // the IOMMU unit in front of the devices, or ''
+	slot       string // the hot-plug slot the card is in, or ''
+	slot_was   string // what the slot's `events` file said before any sleep
 	card       string
 	controller string
 	keyboard   int // /dev/console, to read what is typed
@@ -317,6 +319,15 @@ fn (mut run DeepRun) check_machine(mut t Test, when string) {
 		t.check(dma_line(run.controller) == expected, '${when}: the disk controller says "${dma_line(run.controller)}"')
 		t.check(deep_report('iommu units') == 1 && deep_report('iommu units translating') == 1, '${when}: ${deep_report('iommu units')} units are on and ${deep_report('iommu units translating')} translating')
 		t.check(deep_report('iommu units found off') == run.sleeps && deep_report('iommu units brought back') == run.sleeps, '${when}: after ${run.sleeps} sleeps the unit was found off ${deep_report('iommu units found off')} times and brought back ${deep_report('iommu units brought back')} times')
+	}
+	if run.slot != '' {
+		// The card behind the port is the card that was there: the thread
+		// that watches the slot found nothing to do when it looked again.
+		t.check(wait_until(3000, fn [run] () bool {
+			return read_word(run.slot + '/state') == 'occupied'
+		}), '${when}: the slot is "${read_word(run.slot + '/state')}"')
+		t.check(read_word(run.slot + '/adapter') == '1' && read_word(run.slot + '/power') == '1', '${when}: the slot reports adapter ${read_word(run.slot + '/adapter')} and power ${read_word(run.slot + '/power')}')
+		t.check(read_word(run.slot + '/events') == run.slot_was, '${when}: the slot counts "${read_word(run.slot + '/events').replace('\n', ' ')}", and counted "${run.slot_was.replace('\n', ' ')}" before any sleep')
 	}
 	damaged := memory_damage(run.memory)
 	t.check(damaged < 0, '${when}: memory differs from what was written at word ${damaged} of ${run.memory.len}')
@@ -430,11 +441,28 @@ fn (mut run DeepRun) rehearse(mut t Test) {
 }
 
 // `unit` is the IOMMU unit the machine is to have switched on, dmar0 or
-// ivhd0, or '' for none; `apic` the mode its local APICs are to be in.
-fn deep_scenario(mut t Test, unit string, apic string) {
+// ivhd0, or '' for none; `apic` the mode its local APICs are to be in; with
+// `behind_port` the network card sits in a hot-plug slot the kernel watches.
+fn deep_scenario(mut t Test, unit string, apic string, behind_port bool) {
 	mut run := DeepRun{
 		cpus: cpu_count()
 		unit: unit
+	}
+	if behind_port {
+		run.slot = hot_slot() or {
+			t.check(false, err.msg())
+			return
+		}
+		t.check(wait_until(5000, fn [run] () bool {
+			return read_word(run.slot + '/state') == 'occupied'
+		}), 'the slot is "${read_word(run.slot + '/state')}" before any sleep')
+		port := hot_port() or {
+			t.check(false, err.msg())
+			return
+		}
+		t.check(read_word(run.slot + '/address') == '0000:01:00', 'the slot leads to "${read_word(run.slot + '/address')}"')
+		run.slot_was = read_word(run.slot + '/events')
+		t.info('the card is behind ${port.all_after_last('/')}, in a slot that counts ${run.slot_was.replace('\n', ', ')}')
 	}
 	mode := read_text('/sys/power/deep_sleep') or { '' }
 	t.check(mode.contains('apic mode: ${apic}\n'), 'the local APICs are not in ${apic} mode: "${mode.replace('\n', ' | ')}"')
@@ -494,9 +522,16 @@ fn deep_scenario(mut t Test, unit string, apic string) {
 
 	// Ended by the host, once QEMU says the machine is suspended. QEMU's
 	// ACPI reports that as the power button.
+	// The host takes a picture of the screen while the machine is down,
+	// which must be dark, and one when it is back, which must not be.
+	t.step('deep sleep, a picture')
 	t.step('deep sleep for a wakeup')
 	run.sleep(mut t, 'wakeup', 'power-button', 1000, 60000)
+	t.step('awake after the wakeup')
 	run.check_machine(mut t, 'after the wakeup')
+	if run.drawn {
+		t.check(deep_stat('screen_dark') == '3' && deep_stat('screen_lit') == '0', 'the screen went dark for ${deep_stat('screen_dark')} of two rehearsals and a sleep, and stayed lit for ${deep_stat('screen_lit')}')
+	}
 
 	// Ended by the clock's alarm.
 	write_text('/sys/class/rtc/rtc0/wakealarm', '+4') or { t.check(false, 'wakealarm: ${err.msg()}') }
@@ -569,17 +604,25 @@ fn deep_scenario(mut t Test, unit string, apic string) {
 }
 
 fn scenario_suspend_deep(mut t Test) {
-	deep_scenario(mut t, '', 'x2apic')
+	deep_scenario(mut t, '', 'x2apic', false)
 }
 
 fn scenario_suspend_deep_xapic(mut t Test) {
-	deep_scenario(mut t, '', 'xapic')
+	deep_scenario(mut t, '', 'xapic', false)
 }
 
 fn scenario_suspend_deep_iommu(mut t Test) {
-	deep_scenario(mut t, 'dmar0', 'x2apic')
+	deep_scenario(mut t, 'dmar0', 'x2apic', false)
 }
 
 fn scenario_suspend_deep_iommu_amd(mut t Test) {
-	deep_scenario(mut t, 'ivhd0', 'x2apic')
+	deep_scenario(mut t, 'ivhd0', 'x2apic', false)
+}
+
+// The network card behind a PCI Express port with a hot-plug slot: a bridge
+// whose bus numbers and windows have to come back before the card behind it
+// can be reached at all, and a slot whose power switch and lights are in the
+// port's registers and which a thread looks at twice a second.
+fn scenario_suspend_deep_bridge(mut t Test) {
+	deep_scenario(mut t, '', 'x2apic', true)
 }
