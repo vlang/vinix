@@ -49,11 +49,11 @@ for mode in debug production; do
         exit 1
     fi
     cp "$ROOT/kernel/bin/vinix" "$OUT/vinix-aarch64-$mode.elf"
-    python3 "$ROOT/tests/m1-wifi/verify_build.py" \
+    "$ROOT/tests/m1-wifi/verify-build" \
         "$OUT/vinix-aarch64-$mode.elf" "$ROOT/kernel/obj/blob.c" \
         > "$OUT/$mode-verification.txt"
     cat "$OUT/$mode-verification.txt"
 done
-python3 "$ROOT/tests/m1-wifi/verify_test.py" "$OUT/vinix-aarch64-production.elf" "$ROOT/kernel/obj/blob.c"
+"$ROOT/tests/m1-wifi/verify-test" "$OUT/vinix-aarch64-production.elf" "$ROOT/kernel/obj/blob.c"
 (cd "$OUT" && sha256sum vinix-aarch64-*.elf > SHA256SUMS)
 printf 'PASS clean debug and production kernel builds (not a hardware test)\n'

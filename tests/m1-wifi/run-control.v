@@ -129,7 +129,7 @@ fn hooks() []string {
 }
 
 fn (c Config) core(name string, arch string) ! {
-	c.inherited(['python3', c.path('tools/m1-wifi/compile-v.py'), c.output(name + '.c'), '--arch', arch])!
+	c.inherited([c.path('tools/m1-wifi/compile-v'), c.output(name + '.c'), '--arch', arch])!
 }
 
 fn (c Config) fixture(name string, arch string, guest bool) ! {

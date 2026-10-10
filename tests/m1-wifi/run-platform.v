@@ -140,7 +140,7 @@ fn metadata(here string, name string) string {
 }
 
 fn (c Config) provider(name string, arch string) ! {
-	c.inherited(['python3', c.path('tests/m1-wifi/compile-provider.py'), c.output(name + '.c'), '--kind', 'platform', '--arch', arch])!
+	c.inherited([c.path('tests/m1-wifi/compile-provider'), c.output(name + '.c'), '--kind', 'platform', '--arch', arch])!
 }
 
 fn (c Config) fixture(name string, arch string, guest bool) ! {

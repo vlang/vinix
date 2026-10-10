@@ -110,7 +110,7 @@ Build the control utility with the compiler for the target ARM64 **userspace**
 sysroot, not the freestanding kernel compiler:
 
 ```sh
-python3 tools/m1-wifi/compile-v.py /tmp/wifi-ctl.c --arch arm64
+tools/m1-wifi/compile-v /tmp/wifi-ctl.c --arch arm64
 cc -std=gnu11 -O2 -fwrapv -fno-strict-aliasing -Wall -Wextra -Werror \
   -Itools/m1-wifi -iquote kernel/c /tmp/wifi-ctl.c -o wifi-ctl
 ```
@@ -146,7 +146,7 @@ Do not substitute files from a different Mac or bypass power/regulatory limits.
 
 1. Boot the experimental entry and run `wifi-ctl status`. A successful probe is
    `chip detected`, **not** a connected radio. Save `wifi-ctl status-raw status.bin`.
-2. On the build host, run `tools/m1-wifi/package.py --status status.bin
+2. On the build host, run `tools/m1-wifi/package --status status.bin
    --firmware MATCHING.bin --nvram MATCHING.txt --clm MATCHING.clm_blob
    --txcap MATCHING.txcap_blob --output wifi-bundle`. Paths are explicit: the
    script does not guess a firmware filename hierarchy. Its identity manifest

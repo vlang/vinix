@@ -213,7 +213,7 @@ for arg in "$@"; do
             echo "  --with-qemu-system adds native QEMU and UEFI firmware for nested Vinix"
             echo "  --with-android adds Android Translation Layer and any staged APKs"
             echo "  --with-roblox adds native ATL/ART and the Roblox launchers; supply your own ARM64 APK"
-            echo "  --wifi-bundle stages a package.py output and loads it before the desktop"
+            echo "  --wifi-bundle stages a tools/m1-wifi/package output and loads it before the desktop"
             echo "  VINIX_REFRESH_DESKTOP_STAGING=1 discards the cached assembled layers"
             echo "  VINIX_AARCH64_APP_CACHE changes the persistent desktop binary cache"
             exit 0
@@ -771,11 +771,11 @@ except (OSError, ValueError, RuntimeError) as error:
 PYROBLOX
 fi
 
-# `package.py` produces the only supported bundle format. Its manifest binds
+# `tools/m1-wifi/package` produces the supported bundle format. Its manifest binds
 # the opaque vendor files to identity captured from the target, and wifi-ctl
 # repeats that identity check on the M1 before uploading a byte.
 echo "==> Building wifi-ctl for aarch64-linux-musl..."
-python3 "$SCRIPT_DIR/tools/m1-wifi/compile-v.py" "$BUILD_DIR/wifi-ctl-v.c" --arch arm64
+"$SCRIPT_DIR/tools/m1-wifi/compile-v" "$BUILD_DIR/wifi-ctl-v.c" --arch arm64
 "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
     -isystem "$CC_SHIM" \
     -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \

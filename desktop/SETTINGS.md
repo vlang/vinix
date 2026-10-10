@@ -208,7 +208,7 @@ The normal `desktop` deployment enables Wi-Fi without the other optional Apple
 drivers; `desktop-drivers` enables them all. The desktop image includes
 `wifi-ctl`.
 
-Firmware is not included, but a package created with `tools/m1-wifi/package.py`
+Firmware is not included, but a package created with `tools/m1-wifi/package`
 can be staged and loaded before the desktop starts by building with
 `--wifi-bundle=/path/to/wifi-bundle` (or the `VINIX_WIFI_BUNDLE` environment
 variable). Firmware packaging/manual loading and WPA2 credential entry remain
