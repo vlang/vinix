@@ -153,6 +153,13 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	started := now_ms()
 	m.qmp = qmp_connect(socket, os.join_path(state, 'qmp.log'), mut m.child, started)!
 	m.watch(scenario, state, started + i64(run.timeout) * 1000, run.timeout)!
+	// QEMU has exited or the scenario leaves the machine up; either way what
+	// the guest synced is in the disk files only once QEMU has let go of
+	// them.
+	m.child.stop()
+	for disk in scenario.disks {
+		check_disk_header(disk, state)!
+	}
 	for pattern in scenario.patterns {
 		check_pattern(pattern, state)!
 	}

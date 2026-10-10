@@ -131,10 +131,42 @@ pub fn boot_media(host Host, kernel string, initramfs string, cmdline string, st
 }
 
 // A raw disk of the given size: a hole, apart from what its header says.
+//
+// The size is set first and the header written into it. os.truncate() empties
+// the file before it sizes it, so the other order leaves a blank disk -- the
+// one kind the kernel's installer takes for its own.
 pub fn create_disk(disk Disk, state string) ! {
 	path := os.join_path(state, disk.name)
-	os.write_file(path, disk.header)!
+	os.write_file(path, '')!
 	os.truncate(path, u64(disk.size_mib) << 20)!
+	if disk.header == '' {
+		return
+	}
+	mut file := os.open_file(path, 'r+')!
+	defer {
+		file.close()
+	}
+	file.write_to(0, disk.header.bytes())!
+}
+
+// Whether a disk still starts with what it was created with. A disk that
+// does not was formatted or installed onto while the machine ran, and
+// whatever the scenario then measured, it was not the disk it asked for.
+pub fn check_disk_header(disk Disk, state string) ! {
+	if disk.header == '' {
+		return
+	}
+	mut file := os.open(os.join_path(state, disk.name)) or {
+		return error('cannot read ${disk.name}: ${err.msg()}')
+	}
+	defer {
+		file.close()
+	}
+	mut found := []u8{len: disk.header.len}
+	count := file.read_from(0, mut found) or { 0 }
+	if count != disk.header.len || found.bytestr() != disk.header {
+		return error('${disk.name} no longer starts with "${disk.header}": the machine overwrote the start of the disk')
+	}
 }
 
 // The bytes a guest writes for a pattern; guest/support.v has the same.

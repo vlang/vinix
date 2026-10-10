@@ -263,3 +263,45 @@ pub fn validate_scenarios(all []Scenario) ! {
 		}
 	}
 }
+
+// Replaces `{state}` in a QEMU argument or a QMP command. Anything else in
+// braces that looks like a placeholder is a mistake in the scenario table,
+// and is reported instead of being handed to QEMU as a file name.
+pub fn substitute(text string, state string) !string {
+	replaced := text.replace('{state}', state)
+	mut i := 0
+	for i < replaced.len {
+		if replaced[i] != `{` {
+			i++
+			continue
+		}
+		mut end := i + 1
+		for end < replaced.len && (replaced[end].is_letter() || replaced[end] == `_`) {
+			end++
+		}
+		if end > i + 1 && end < replaced.len && replaced[end] == `}` {
+			return error('unknown placeholder ${replaced[i..end + 1]} in "${text}"')
+		}
+		i++
+	}
+	return replaced
+}
+
+pub fn substitute_all(arguments []string, state string) ![]string {
+	mut out := []string{cap: arguments.len}
+	for argument in arguments {
+		out << substitute(argument, state)!
+	}
+	return out
+}
+
+// A state directory ends up inside QEMU options, where a comma separates
+// fields, and inside QMP JSON. Rather than quote it three ways, refuse the
+// few characters that would need it.
+pub fn check_state_path(path string) ! {
+	for c in path {
+		if c in [`,`, `"`, `\\`, `{`, `}`] || c < 0x20 {
+			return error('the state directory path may not contain , " \\ { } or control characters: ${path}')
+		}
+	}
+}

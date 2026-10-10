@@ -22,6 +22,7 @@ module main
 // Runs the named scenario. False when this program has no such scenario.
 fn run_scenario(name string, mut t Test) bool {
 	match name {
+		'ahci' { scenario_ahci(mut t) }
 		'devices' { scenario_devices(mut t) }
 		'qmp-powerdown' { scenario_qmp_powerdown(mut t) }
 		else { return false }

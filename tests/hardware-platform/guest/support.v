@@ -213,3 +213,40 @@ fn meminfo_kb(field string) !int {
 	return error('/proc/meminfo has no ${field}')
 }
 
+// The bytes of a disk test pattern; the host checks the disk image against
+// the same sequence (hwhost.pattern_bytes).
+fn pattern_bytes(seed u8, length int) []u8 {
+	mut bytes := []u8{len: length}
+	for i in 0 .. length {
+		bytes[i] = u8(int(seed) + i * 7)
+	}
+	return bytes
+}
+
+// Writes a pattern to a device at `offset`, has the device commit it, and
+// reads it back.
+fn write_pattern(path string, offset i64, seed u8, length int) ! {
+	written := pattern_bytes(seed, length)
+	fd := C.open(&char(path.str), C.O_RDWR)
+	if fd < 0 {
+		return errno_error(path)
+	}
+	defer {
+		C.close(fd)
+	}
+	if C.pwrite(fd, written.data, usize(length), offset) != length {
+		return error('write: ${os.posix_get_error_msg(C.errno)}')
+	}
+	if C.fsync(fd) != 0 {
+		return error('fsync: ${os.posix_get_error_msg(C.errno)}')
+	}
+	mut found := []u8{len: length}
+	if C.pread(fd, found.data, usize(length), offset) != length {
+		return error('read back: ${os.posix_get_error_msg(C.errno)}')
+	}
+	for i in 0 .. length {
+		if found[i] != written[i] {
+			return error('byte ${i} read back as 0x${found[i].hex()}, written as 0x${written[i].hex()}')
+		}
+	}
+}
