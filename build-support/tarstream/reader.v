@@ -15,6 +15,7 @@ struct C.archive_entry {}
 
 fn C.archive_read_new() &C.archive
 fn C.archive_read_support_filter_all(&C.archive) int
+fn C.archive_read_support_filter_none(&C.archive) int
 fn C.archive_read_support_format_raw(&C.archive) int
 fn C.archive_read_open_filename(&C.archive, &char, usize) int
 fn C.archive_read_next_header(&C.archive, &&C.archive_entry) int
@@ -47,11 +48,21 @@ fn filter_error(stream &C.archive) IError {
 // libarchive only unwraps compression. Parsing names in V preserves their
 // exact UTF-8 bytes, including decomposed names on macOS.
 pub fn open(path string) !Reader {
+	return open_filtered(path, true)
+}
+
+// Boot module inputs are deliberately uncompressed, matching tar's r: mode.
+pub fn open_plain(path string) !Reader {
+	return open_filtered(path, false)
+}
+
+fn open_filtered(path string, compressed bool) !Reader {
 	stream := C.archive_read_new()
 	if stream == unsafe { nil } { return error('cannot allocate archive stream') }
 	mut opened := false
 	defer { if !opened { C.archive_read_free(stream) } }
-	if C.archive_read_support_filter_all(stream) < 0 || C.archive_read_support_format_raw(stream) != 0
+	filter := if compressed { C.archive_read_support_filter_all(stream) } else { C.archive_read_support_filter_none(stream) }
+	if filter < 0 || C.archive_read_support_format_raw(stream) != 0
 		|| C.archive_read_open_filename(stream, path.str, 10240) != 0 {
 		return filter_error(stream)
 	}

@@ -118,8 +118,8 @@ fn main_runtime(work string, runtime string, assets ah.Value, builds [][]string,
 		initramfs, '--keep', module_iso]))], {
 		'check': ah.Value(true)
 	})!
-	invoke('', 'run_guest_command', [value_arg(strings([python,
-		join(root, 'tools/build-qemu-module-iso.py')!, initramfs, module_iso]))], {
+	invoke('', 'run_guest_command', [value_arg(strings([
+		join(root, 'tools/build-qemu-module-iso')!, initramfs, module_iso]))], {
 		'check': ah.Value(true)
 	})!
 	mut environment := callback('environ', map[string]ah.Value{})!.object()

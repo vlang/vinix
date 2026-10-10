@@ -215,7 +215,7 @@ prepare_qemu_initramfs_parts() {
     local output part
     local -a parts=()
 
-    output="$(python3 "$SCRIPT_DIR/tools/split-qemu-initramfs.py" "$source" "$directory")"
+    output="$("$SCRIPT_DIR/tools/split-qemu-initramfs" "$source" "$directory")"
     while IFS= read -r part; do
         [ -z "$part" ] || parts+=("$part")
     done <<< "$output"
@@ -240,7 +240,7 @@ prepare_qemu_initramfs() {
     local parts="$3"
 
     if command -v xorriso >/dev/null 2>&1; then
-        python3 "$SCRIPT_DIR/tools/build-qemu-module-iso.py" "$source" "$iso"
+        "$SCRIPT_DIR/tools/build-qemu-module-iso" "$source" "$iso"
         export VINIX_INITRAMFS="$source"
         export VINIX_INITRAMFS_COMPRESSED=0
         export VINIX_QEMU_MODULE_ISO="$iso"
@@ -327,7 +327,7 @@ if [ "$DISK_ROOT_DESKTOP" -eq 1 ]; then
     export VINIX_BOOT_DISK_SIZE_MB="${VINIX_BOOT_DISK_SIZE_MB:-512}"
 elif [ "$PERSIST_DESKTOP" -eq 1 ]; then
     export VINIX_QEMU_ROOT_DISK=0
-    python3 "$SCRIPT_DIR/tools/split-desktop-initramfs.py" \
+    "$SCRIPT_DIR/tools/split-desktop-initramfs" \
         "$DESKTOP_INITRAMFS" "$QEMU_DESKTOP_INITRAMFS" \
         "$DESKTOP_ROOT_SEED" "$DESKTOP_STORAGE_MANIFEST"
     prepare_qemu_initramfs "$QEMU_DESKTOP_INITRAMFS" "$QEMU_DESKTOP_ISO" "$QEMU_DESKTOP_PARTS"
