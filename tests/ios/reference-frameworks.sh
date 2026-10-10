@@ -115,6 +115,9 @@ test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permission
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/pthread-condattr.c" -o "$output/pthread-condattr"
 "$output/pthread-condattr"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/pthread-identity.c" -o "$output/pthread-identity"
+"$output/pthread-identity"
 python3 - "$output/process" <<'PY'
 import subprocess, sys
 for mode, number in [("usr1", 30), ("usr2", 31), ("bus", 10)]:

@@ -163,6 +163,9 @@ static int ios_thread_create(void *output, size_t size, uint64_t top, size_t gua
 static int ios_thread_join(uint64_t thread, void *output) {
     return pthread_join((pthread_t)(uintptr_t)thread, (void **)output);
 }
+static int ios_thread_equal(uint64_t first, uint64_t second) {
+    return pthread_equal((pthread_t)(uintptr_t)first, (pthread_t)(uintptr_t)second);
+}
 /* Read native detach state. V rejects a live detached join before musl's
  * undefined-operation trap. Caller still must provide a live thread handle. */
 static int ios_thread_detached(uint64_t thread, int32_t *output) {

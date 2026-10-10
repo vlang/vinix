@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_equal
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_getschedparam
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -838,20 +838,40 @@ The shared Mac/iOS fixture checks copying, opaque bytes, invalid and destroyed
 attributes, timed waits and eight rounds of eight real workers using signals and
 broadcasts. ASAN/UBSAN checks two image loads/unloads with all workers joined and
 conditions destroyed. The full ARM64 C++/GLES/PPSSPP regression passes. This
-resolves two more strong imports in EOSSDK; the actual game still exits before
-entry at `pthread_equal`.
+resolves two more strong imports in EOSSDK.
+
+The installed Mac pthread library compares native handles, accepts null/null
+equality and preserves errno. `pthread_main_np` identifies the process's original
+main thread, including returning false in a child forked by a worker. V now
+exposes native handle comparison and captures the runner's process thread at
+initialization on Vinix; loading an image from a worker does not change that
+identity. On Mac the adapter calls native `pthread_main_np` directly.
+The `pthread_exit` adapter uses actual native thread exit, so joining observes
+the supplied return value after libc has run key destructors.
+
+The shared Mac/iOS fixture runs eight rounds of eight real workers with isolated
+image TLS, distinct handles, mixed return/explicit exit, null and non-null join
+values, guarded outputs and three rearmed key-destructor passes. It also forks
+from a worker and checks the child's main-thread identity. ASAN/UBSAN checks
+two image loads/unloads on the process thread and another on a native worker,
+with all app workers joined and keys/conditions destroyed before unmapping.
+TLS reads from key destructors and C++ thread-local destructor ordering remain
+unverified. The full ARM64 C++/GLES/PPSSPP regression passes; an earlier attempt
+failed the existing concurrent permission fixture with `ENOENT` and its log is
+preserved. This resolves five more strong imports across Fortnite and EOSSDK;
+the actual game still exits before entry at `pthread_getschedparam`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,297 | 861 | 81 |
-| EOSSDK | 512 | 150 | 18 |
+| Fortnite executable | 1,299 | 859 | 81 |
+| EOSSDK | 515 | 147 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,862 | 1,134 | 122 |
+| All images | 1,867 | 1,129 | 122 |
 
-The C++/GLES/Text variant reports 1,875 resolved imports, 1,121 unresolved strong
+The C++/GLES/Text variant reports 1,880 resolved imports, 1,116 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
