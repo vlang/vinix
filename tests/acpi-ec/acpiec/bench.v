@@ -34,6 +34,12 @@ mut:
 	read_values  []u64
 	// Stop answering after this many events have been dispatched.
 	silence_after int = -1
+	// While the protocol waits, another caller asks for a byte: what it was
+	// told each time, and how many register accesses its asking cost.
+	intrude          bool
+	intruding        bool
+	intruder_told    []Outcome
+	intruder_touched u64
 }
 
 fn bench_read(context voidptr, command bool) u8 {
@@ -70,6 +76,15 @@ fn bench_pause(context voidptr, ns u64) {
 		b.longest_pause = ns
 	}
 	b.clock += ns
+	if b.intrude && !b.intruding {
+		b.intruding = true
+		accesses := b.accesses
+		mut c := b.controller
+		outcome, _ := c.region_read(0, 1)
+		b.intruder_told << outcome
+		b.intruder_touched += b.accesses - accesses
+		b.intruding = false
+	}
 }
 
 fn bench_enter(context voidptr) bool {

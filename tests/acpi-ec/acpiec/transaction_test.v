@@ -312,7 +312,7 @@ fn test_a_given_up_controller_can_be_tried_again() {
 	assert b.unlocked == 0
 }
 
-fn test_a_revived_controller_that_used_to_answer_gets_one_try() {
+fn test_a_controller_that_used_to_answer_gets_one_more_try() {
 	mut b, mut c := new_bench()
 	c.region_read(0, 1)
 	b.sim.silent = true
@@ -321,10 +321,43 @@ fn test_a_revived_controller_that_used_to_answer_gets_one_try() {
 	}
 	assert c.failed
 	timeouts := c.timeouts
+	started := b.clock
 	outcome, _ := c.probe()
 	assert outcome == .timeout
 	assert c.failed
+	assert c.failure == .timeout
 	assert c.timeouts == timeouts + 1
+	assert b.clock - started <= exchange_limit()
+	// Answering again, one try is enough, and the count starts afresh.
+	b.sim.silent = false
+	again, _ := c.probe()
+	assert again == .ok
+	assert !c.failed
+	assert c.consecutive == 0
+}
+
+fn test_nobody_waits_behind_a_try_at_a_given_up_controller() {
+	mut b, mut c := new_bench()
+	c.region_read(0, 1)
+	b.sim.silent = true
+	for _ in 0 .. 3 {
+		c.region_read(0, 1)
+	}
+	assert c.failed
+	// Somebody asks for a byte every time the try pauses.
+	b.intrude = true
+	refused := c.refused
+	outcome, _ := c.probe()
+	b.intrude = false
+	assert outcome == .timeout
+	assert b.intruder_told.len > 100
+	for told in b.intruder_told {
+		assert told == .failed
+	}
+	// They were turned away without touching a register or the lock.
+	assert b.intruder_touched == 0
+	assert c.refused == refused + u64(b.intruder_told.len)
+	assert b.unlocked == 0
 }
 
 fn test_a_probe_hands_back_the_event_it_took() {

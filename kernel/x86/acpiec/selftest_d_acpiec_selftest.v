@@ -124,15 +124,15 @@ fn selftest_take_ports() {
 
 // The first word of `text` and what follows it: views, not copies.
 fn first_word(text string) (string, string) {
-	mut start := 0
-	for start < text.len && text[start] == ` ` {
-		start++
+	mut from := 0
+	for from < text.len && text[from] == ` ` {
+		from++
 	}
-	mut end := start
+	mut end := from
 	for end < text.len && text[end] != ` ` {
 		end++
 	}
-	word := unsafe { tos(text.str + start, end - start) }
+	word := unsafe { tos(text.str + from, end - from) }
 	rest := unsafe { tos(text.str + end, text.len - end) }
 	return word, rest
 }

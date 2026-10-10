@@ -273,13 +273,8 @@ fn (mut c Controller) attempt(command u8, wlen u8, w0 u8, w1 u8, answers bool) (
 	return outcome, value
 }
 
-// One exchange, with its restarts and its part in giving the controller up.
-// The caller holds whatever keeps exchanges apart.
-pub fn (mut c Controller) transact(command u8, wlen u8, w0 u8, w1 u8, answers bool) (Outcome, u8) {
-	if c.failed {
-		c.refused++
-		return Outcome.failed, u8(0)
-	}
+// One exchange with its restarts, whatever is thought of the controller.
+fn (mut c Controller) exchange(command u8, wlen u8, w0 u8, w1 u8, answers bool) (Outcome, u8) {
 	c.transactions++
 	c.sent = false
 	c.waited = false
@@ -296,6 +291,25 @@ pub fn (mut c Controller) transact(command u8, wlen u8, w0 u8, w1 u8, answers bo
 	}
 	if outcome == .ok {
 		c.completed++
+		return Outcome.ok, value
+	}
+	if outcome == .timeout {
+		c.timeouts++
+	} else {
+		c.stuck_outputs++
+	}
+	return outcome, u8(0)
+}
+
+// One exchange, and its part in giving the controller up. The caller holds
+// whatever keeps exchanges apart.
+pub fn (mut c Controller) transact(command u8, wlen u8, w0 u8, w1 u8, answers bool) (Outcome, u8) {
+	if c.failed {
+		c.refused++
+		return Outcome.failed, u8(0)
+	}
+	outcome, value := c.exchange(command, wlen, w0, w1, answers)
+	if outcome == .ok {
 		c.consecutive = 0
 		if c.last_status & status_sci_evt == 0 {
 			c.sci_stuck = false
@@ -303,11 +317,6 @@ pub fn (mut c Controller) transact(command u8, wlen u8, w0 u8, w1 u8, answers bo
 			c.sci_seen = true
 		}
 		return Outcome.ok, value
-	}
-	if outcome == .timeout {
-		c.timeouts++
-	} else {
-		c.stuck_outputs++
 	}
 	c.consecutive++
 	limit := if c.completed == 0 { u32(1) } else { fail_after }
@@ -519,26 +528,27 @@ pub fn (mut c Controller) calm() {
 	c.idle_gpes = 0
 }
 
-// Forget that the controller was given up on, for one more try: a single
-// failed exchange gives it up again.
-pub fn (mut c Controller) revive() {
-	c.failed = false
-	c.failure = .ok
-	c.consecutive = if c.completed == 0 { u32(0) } else { fail_after - 1 }
-	c.sci_stuck = false
-	c.sci_seen = false
-}
-
-// Whether a revived controller answers: one query, which every controller
-// has an answer to. The event it names, if any, is the caller's to deliver.
+// Try a controller that was given up on once more: one query, which every
+// controller has an answer to. If it answers it is in use again, and the
+// event it named, if any, is the caller's to deliver. While it is being
+// tried it stays given up on for everybody else, who are still told so at
+// once instead of waiting behind the try.
 pub fn (mut c Controller) probe() (Outcome, u8) {
 	if !c.enter() {
 		return Outcome.busy, u8(0)
 	}
-	c.revive()
-	outcome, number := c.transact(command_query, 0, 0, 0, true)
-	if outcome == .ok && number != 0 {
-		c.queries++
+	outcome, number := c.exchange(command_query, 0, 0, 0, true)
+	if outcome == .ok {
+		c.failed = false
+		c.failure = .ok
+		c.consecutive = 0
+		c.sci_stuck = false
+		c.sci_seen = false
+		if number != 0 {
+			c.queries++
+		}
+	} else if c.failed {
+		c.failure = outcome
 	}
 	c.leave()
 	return outcome, number
