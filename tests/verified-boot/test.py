@@ -9,6 +9,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 
@@ -19,111 +20,85 @@ boot = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(boot)
 
 
+_LITERAL_CACHE = {}
+
+_PE_VALUES = ("x86_64", "x86-64", "Limine 12.8.0 (", ", UEFI)")
+
+_SLOT_KEYS = {
+    "InvalidBundle": "InvalidBundle",
+    "ARCHES": "ARCHES",
+    "CONFIG_MARKER": "CONFIG_MARKER",
+    "Namespace": "Namespace",
+    "TemporaryDirectory": "TemporaryDirectory",
+    "add": "add",
+    "assertIn": "assertIn",
+    "assertRaises": "assertRaises",
+    "build": "build",
+    "build_bundle": "build_bundle",
+    "check_cmdline": "check_cmdline",
+    "command_line": "command_line",
+    "encode": "encode",
+    "eq": "eq",
+    "getitem": "getitem",
+    "join": "join",
+    "mul": "mul",
+    "pack_into": "pack_into",
+    "read_bytes": "read_bytes",
+    "read_text": "read_text",
+    "setitem": "setitem",
+    "sub": "sub",
+    "subTest": "subTest",
+    "symlink_to": "symlink_to",
+    "truediv": "truediv",
+    "unlink": "unlink",
+    "verify_bundle": "verify_bundle",
+    "verity": "verity",
+    "write_bytes": "write_bytes",
+    "xor": "xor",
+}
+
+_controller = boot._bundle_binding['_host'].Controller(ROOT / "tests/verified-boot/policy-query.v",
+                                                  "VINIX_BOOT_TEST_QUERY",
+                                                  process=boot._bundle_controller.process)
+
+
+def _query(operation, *arguments):
+    locals_pin = {}
+    return boot._bundle_binding['call'](operation, (locals_pin, *arguments), globals(), controller=_controller)
+
+
+
+def _format(value):
+    try:
+        return f"{value}"
+    except BaseException:
+        value = None
+        raise
+
+
+def _dict_display(value):
+    try:
+        return {**value}
+    except BaseException:
+        value = None
+        raise
+
+
 def elf(arch):
-    data = bytearray(64)
-    data[:6] = b"\x7fELF\x02\x01"
-    struct.pack_into("<H", data, 18, boot.ARCHES[arch][1])
-    return data
+    return _query("elf", arch)
 
 
 def pe(arch="x86_64"):
     """A mapped PE header for parser tests only; this is never signed/booted."""
-    data = bytearray(2048)
-    data[:2] = b"MZ"
-    struct.pack_into("<I", data, 0x3C, 128)
-    data[128:132] = b"PE\0\0"
-    struct.pack_into("<HH", data, 132, boot.ARCHES[arch][0], 1)
-    struct.pack_into("<H", data, 148, 240)
-    struct.pack_into("<H", data, 152, 0x20B)
-    struct.pack_into("<H", data, 220, 10)
-    struct.pack_into("<I", data, 260, 16)
-    struct.pack_into("<II", data, 408, 1024, 512)
-    data[512:512 + len(boot.CONFIG_MARKER)] = boot.CONFIG_MARKER
-    field = 512 + len(boot.CONFIG_MARKER)
-    data[field:field + 128] = b"0" * 128
-    label = f"Limine 12.8.0 ({'x86-64' if arch == 'x86_64' else arch}, UEFI)".encode()
-    data[800:800 + len(label)] = label
-    return data
+    return _query("pe", arch)
 
 
 class Policy(unittest.TestCase):
     def test_bundle_enforces_all_artifacts_and_root_profile(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            work = Path(temporary)
-            (work / "loader").write_bytes(pe())
-            (work / "kernel").write_bytes(elf("x86_64"))
-            (work / "root").write_bytes(b"first archive")
-            (work / "overlay").write_bytes(b"second archive")
-            output = work / "bundle"
-            args = argparse.Namespace(arch="x86_64", loader=work / "loader", kernel=work / "kernel",
-                                      initramfs=[work / "root", work / "overlay"], output=output,
-                                      cmdline="quiet", dtb=None, developer_unsigned=True,
-                                      key=None, certificate=None, backend="sbsign")
-            boot.build_bundle(args)
-            boot.verify_bundle(output, "x86_64", None, "sbsign", True)
-            with self.assertRaises(boot.InvalidBundle):
-                boot.verify_bundle(output, "x86_64", None, "sbsign")
-            with self.assertRaises(boot.InvalidBundle):
-                boot.build_bundle(args)
-            for filename in ("boot/vinix", "boot/root-0.tar", "boot/root-1.tar", "boot/limine.conf"):
-                path = output / filename
-                original = path.read_bytes()
-                path.write_bytes(original + b"tamper")
-                with self.subTest(filename=filename), self.assertRaises(boot.InvalidBundle):
-                    boot.verify_bundle(output, "x86_64", None, "sbsign", True)
-                path.write_bytes(original)
-            (output / "EFI/BOOT/extra.efi").write_bytes(b"unexpected loader")
-            with self.assertRaises(boot.InvalidBundle):
-                boot.verify_bundle(output, "x86_64", None, "sbsign", True)
-            (output / "EFI/BOOT/extra.efi").unlink()
-            path = output / "boot/root-1.tar"
-            path.unlink()
-            path.symlink_to(work / "overlay")
-            with self.assertRaises(boot.InvalidBundle):
-                boot.verify_bundle(output, "x86_64", None, "sbsign", True)
+        return _query("bundle", self)
 
     def test_block_root_binds_geometry_and_all_hash_levels(self):
-        with tempfile.TemporaryDirectory() as temporary:
-            work = Path(temporary)
-            (work / "loader").write_bytes(pe())
-            (work / "kernel").write_bytes(elf("x86_64"))
-            (work / "bootstrap").write_bytes(b"authenticated bootstrap archive")
-            (work / "data").write_bytes(b"x" * (129 * 4096))
-            metadata = boot.verity.build(work / "data", work / "root-image")
-            options = dict(arch="x86_64", loader=work / "loader", kernel=work / "kernel",
-                           initramfs=[work / "bootstrap"], output=work / "bundle", cmdline="quiet",
-                           dtb=None, developer_unsigned=True, key=None, certificate=None,
-                           backend="sbsign", verity_root=work / "root-image", verity_device="/dev/vda",
-                           verity_data_blocks=metadata["data_blocks"], verity_root_hash=metadata["root_hash"])
-            boot.build_bundle(argparse.Namespace(**options))
-            boot.verify_bundle(work / "bundle", "x86_64", None, "sbsign", True)
-            token = boot.verity.command_line("/dev/vda", 129, metadata["root_hash"])
-            config = work / "bundle/boot/limine.conf"
-            self.assertIn(f"cmdline: quiet {token}\n", config.read_text())
-            image = work / "bundle/boot/verity-root.img"
-            original = image.read_bytes()
-            for offset in (0, 129 * 4096, 130 * 4096, len(original) - 1):
-                corrupt = bytearray(original)
-                corrupt[offset] ^= 1
-                image.write_bytes(corrupt)
-                with self.subTest(offset=offset), self.assertRaises(boot.InvalidBundle):
-                    boot.verify_bundle(work / "bundle", "x86_64", None, "sbsign", True)
-            image.write_bytes(original)
-            image.write_bytes(original[:-1])
-            with self.assertRaises(boot.InvalidBundle):
-                boot.verify_bundle(work / "bundle", "x86_64", None, "sbsign", True)
-            image.write_bytes(original)
-            for key in ("verity_root", "verity_device", "verity_data_blocks", "verity_root_hash"):
-                incomplete = {**options, "output": work / "incomplete", key: None}
-                with self.subTest(missing=key), self.assertRaises(boot.InvalidBundle):
-                    boot.build_bundle(argparse.Namespace(**incomplete))
-            for key, value in (("verity_data_blocks", 128), ("verity_root_hash", "0" * 64)):
-                wrong = {**options, "output": work / "wrong", key: value}
-                with self.subTest(key=key), self.assertRaises(boot.InvalidBundle):
-                    boot.build_bundle(argparse.Namespace(**wrong))
-            for value in (f"{token} {token}", f"x={token} {token}", f"{token} quiet"):
-                with self.subTest(cmdline=value), self.assertRaises(boot.InvalidBundle):
-                    boot.check_cmdline(value, token)
+        return _query("block_root", self)
 
 
 def integration(args):
