@@ -138,7 +138,7 @@ mut:
 	// Only the bounded query owns storage; result indices and input fragments
 	// are inline. Frame labels borrow the query and translation table.
 	search []u8
-	search_results [31]int
+	search_results [settings_search_capacity]int
 	search_count int
 	search_selected int
 	search_page int

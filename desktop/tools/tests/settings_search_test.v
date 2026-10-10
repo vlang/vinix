@@ -169,6 +169,31 @@ fn test_settings_search_utf8_fragments_backspace_selection_and_bounded_paste() {
 	assert editor_bytes_text(app.search) == 'cd' && app.search_escape_len == 0
 }
 
+fn test_settings_search_has_room_for_every_entry_to_match_at_once() {
+	assert settings_search_entries.len <= settings_search_capacity
+	mut app := &SettingsApp{}
+	defer {
+		app.close_app()
+		unsafe { free(app) }
+		set_desktop_language(.en)
+	}
+	// One common letter finds nearly every control, and in some language all
+	// of them: the results are kept inline, one slot per entry.
+	mut most := 0
+	for language in desktop_languages {
+		set_desktop_language(language)
+		for query in ['a', 'e', 'о'] {
+			app.key_input('\x06')
+			app.paste_input(query)
+			assert app.search_count <= settings_search_entries.len
+			if app.search_count > most {
+				most = app.search_count
+			}
+		}
+	}
+	assert most == settings_search_entries.len
+}
+
 fn test_settings_search_fragmented_navigation_paging_and_resize_keep_selection_visible() {
 	set_desktop_language(.en)
 	mut app := &SettingsApp{}

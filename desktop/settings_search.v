@@ -11,6 +11,9 @@ struct SettingsSearchEntry {
 }
 
 const settings_search_limit = 128
+// Room for every entry below to match at once: SettingsApp keeps the indices
+// of its results inline. An entry added here needs one more.
+const settings_search_capacity = 32
 const settings_search_entries = [
 	SettingsSearchEntry{.appearance, 'settings.appearance.buttons', [
 		'settings.appearance.buttons_note',
@@ -323,6 +326,9 @@ fn (mut a SettingsApp) refilter_search() {
 	if !a.searching() { return }
 	query := editor_bytes_text(a.search)
 	for index, entry in settings_search_entries {
+		if a.search_count >= settings_search_capacity {
+			break
+		}
 		if settings_search_matches(entry, query) {
 			a.search_results[a.search_count] = index
 			a.search_count++
