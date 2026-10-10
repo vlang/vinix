@@ -26,9 +26,20 @@ pub mut:
 
 // The counter after the register read `raw`. `mask` is the register's width
 // and `unit` what one count of it is worth, in nanojoules.
+//
+// A register that reads less than it did has wrapped, once. One that seems to
+// have gone more than halfway round between two readings has not: no machine
+// uses that much in the second between them. It was reset -- the processor
+// lost power in a sleep -- or was read on a CPU that keeps a count of its
+// own. Counting starts again from that reading, and nothing is added for the
+// gap.
 pub fn (counter EnergyCounter) advanced(raw u64, mask u64, unit u64) EnergyCounter {
 	mut next := counter
 	reading := raw & mask
+	if counter.primed && (reading - counter.last_raw) & mask > mask / 2 {
+		next.last_raw = reading
+		return next
+	}
 	delta := if counter.primed { (reading - counter.last_raw) & mask } else { reading }
 	// 32 bits of counts times less than 2^31 nanojoules each: no overflow.
 	nanojoules := delta * unit + counter.remainder

@@ -22,6 +22,7 @@
 module thermal
 
 import devcore
+import lib
 import memory
 import pci
 
@@ -42,6 +43,38 @@ __global (
 	thermal_coretemp_cores   &CoretempCore
 	thermal_coretemp_count   int
 )
+
+// The package's status register as it reads now, bit by bit, for x86_probe:
+// whether the processor is throttling itself (PROCHOT) or has, and whether it
+// is at its own critical temperature or has been. Nothing when there is no
+// zone, or no package sensor to ask.
+fn coretemp_describe(mut text lib.Text) {
+	if thermal_coretemp_handle == 0 || !thermal_coretemp_package {
+		return
+	}
+	status := read_package_msr(msr_ia32_package_therm_status) or { return }
+	decoded := dts_decode(status)
+	text.add('coretemp: package status ')
+	add_hex(mut text, status, 8)
+	text.add(if decoded.valid { ', ' } else { ', not valid, ' })
+	text.add_unsigned(u64(decoded.readout))
+	text.add(' below TjMax ')
+	text.add_decimal(thermal_coretemp_tjmax.millicelsius)
+	text.add(' mC')
+	if decoded.prochot {
+		text.add(', throttling itself')
+	}
+	if decoded.prochot_log {
+		text.add(', has throttled itself')
+	}
+	if decoded.critical {
+		text.add(', critical')
+	}
+	if decoded.critical_log {
+		text.add(', has been critical')
+	}
+	text.add_byte(`\n`)
+}
 
 // TjMax forced on the command line, as coretemp's tjmax= parameter: degrees
 // Celsius, used only where the processor does not say. 0 for none.
@@ -77,7 +110,7 @@ fn coretemp_start() {
 	// TjMax: get_tjmax().
 	mut target := u64(0)
 	mut target_ok := false
-	if value := read_msr_on(0, msr_ia32_temperature_target) {
+	if value := probe_msr_on(0, msr_ia32_temperature_target) {
 		target = value
 		target_ok = true
 	}
@@ -93,11 +126,11 @@ fn coretemp_start() {
 			facts.bridge_vendor = bridge.vendor_id
 			facts.bridge_device = bridge.device_id
 		}
-		if value := read_msr_on(0, msr_ia32_platform_id) {
+		if value := probe_msr_on(0, msr_ia32_platform_id) {
 			facts.platform = value
 			facts.platform_ok = true
 		}
-		if value := read_msr_on(0, msr_ia32_ext_config) {
+		if value := probe_msr_on(0, msr_ia32_ext_config) {
 			facts.ee = value
 			facts.ee_ok = true
 		}

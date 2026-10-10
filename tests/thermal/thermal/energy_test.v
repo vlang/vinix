@@ -44,6 +44,24 @@ fn test_one_wrap_between_two_readings_is_counted_right() {
 	assert counter.microjoules > mask_32
 }
 
+fn test_a_register_that_was_reset_starts_the_count_again() {
+	mut counter := EnergyCounter{}.advanced(1000000, mask_32, 1000)
+	counter = counter.advanced(1000500, mask_32, 1000)
+	assert counter.microjoules == 1000500
+	// Back to nearly nothing: not a wrap, which would have been 4 294 kJ in
+	// a second. Nothing is added, and counting goes on from there.
+	counter = counter.advanced(10, mask_32, 1000)
+	assert counter.microjoules == 1000500 && counter.last_raw == 10
+	counter = counter.advanced(30, mask_32, 1000)
+	assert counter.microjoules == 1000520
+	// Half the register in one step is the most that is still a step.
+	half := u64(0x7fffffff)
+	counter = counter.advanced(30 + half, mask_32, 1000)
+	assert counter.microjoules == 1000520 + half
+	counter = counter.advanced(30 + half + 0x80000000, mask_32, 1000)
+	assert counter.microjoules == 1000520 + half
+}
+
 fn test_bits_above_the_register_are_ignored() {
 	mut counter := EnergyCounter{}.advanced(0xdead00000005, mask_32, 1000)
 	assert counter.last_raw == 5 && counter.microjoules == 5

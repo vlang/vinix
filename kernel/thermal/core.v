@@ -273,7 +273,9 @@ pub fn register_zone(zone Zone) u64 {
 		publish_zone(mut record)
 		start_poller()
 	}
-	event.trigger(mut thermal_wake, false)
+	// Nothing to leave pending for a poller that is not waiting: it looks at
+	// the table before it waits, from the generation it read before that.
+	event.trigger(mut thermal_wake, true)
 	return handle
 }
 
@@ -325,19 +327,23 @@ pub fn unregister_zone(handle u64) bool {
 //
 // The handler runs on the polling thread, with the zone still being read: it
 // must not unregister the zone, and no zone is read again until it returns,
-// so one that has much to do hands the work to a thread of its own.
+// so one that has much to do hands the work to a thread of its own. `zone`
+// is the zone's own name and is only good until the handler returns: one
+// that keeps it copies it.
 pub fn set_critical_handler(handler CriticalHandler) {
 	thermal_critical_handler = voidptr(handler)
 }
 
 fn raise_critical(zone string, millicelsius i64) {
 	katomic.inc(mut &thermal_critical_count)
-	if thermal_critical_handler == unsafe { nil } {
+	// Read once: the handler may be changed while this runs.
+	installed := thermal_critical_handler
+	if installed == unsafe { nil } {
 		C.kprintf(c'thermal: CRITICAL: %.*s is at %lld mC and nothing is installed to switch the machine off\n',
 			i32(zone.len), zone.str, millicelsius)
 		return
 	}
-	handler := unsafe { CriticalHandler(thermal_critical_handler) }
+	handler := unsafe { CriticalHandler(installed) }
 	handler(zone, millicelsius)
 }
 

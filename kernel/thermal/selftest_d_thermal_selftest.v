@@ -30,6 +30,8 @@ __global (
 	thermal_selftest_temperature i64
 	thermal_selftest_failing     u32
 	thermal_selftest_fan_percent u32
+	// selftest_zone is being written.
+	thermal_selftest_changing u32
 )
 
 fn selftest_read(_ voidptr) ?i64 {
@@ -154,21 +156,28 @@ fn show_selftest_zone(_ voidptr, mut text lib.Text) {
 }
 
 // This file is not one of the zone's, so removing the zone from here is not a
-// file removing itself.
+// file removing itself. One writer at a time: two would each register a zone
+// and leave one of them with no handle to take it away by.
 fn store_selftest_zone(_ voidptr, data &u8, length u64) u64 {
 	value := fs.sysfs_unsigned(data, length) or { return errno.einval }
+	if value > 1 {
+		return errno.einval
+	}
+	if !katomic.cas(mut &thermal_selftest_changing, u32(0), u32(1)) {
+		return errno.ebusy
+	}
+	mut result := u64(0)
 	if value == 0 {
 		handle := thermal_selftest_handle
 		if handle != 0 {
 			thermal_selftest_handle = 0
 			unregister_zone(handle)
 		}
-		return 0
+	} else if !selftest_register() {
+		result = u64(errno.enomem)
 	}
-	if value == 1 {
-		return if selftest_register() { u64(0) } else { u64(errno.enomem) }
-	}
-	return errno.einval
+	katomic.store(mut &thermal_selftest_changing, u32(0))
+	return result
 }
 
 // ── A processor's sensors, made up ──────────────────────────────────────────

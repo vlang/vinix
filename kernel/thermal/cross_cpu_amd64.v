@@ -223,8 +223,30 @@ fn read_msr_on(cpu_number u64, index u32) ?u64 {
 	return value
 }
 
-// Whether CPU `cpu_number` has register `index`, and said so in time.
-fn msr_readable_on(cpu_number u64, index u32) bool {
+// How often a driver that is starting asks again before it takes a CPU that
+// does not answer for one that has no such register.
+const probe_attempts = 10
+
+// The same for a driver that is deciding, once, whether a sensor is there at
+// all. A CPU that is slow to answer has not said no, and what is decided here
+// is decided for as long as the machine runs: it is asked again.
+fn probe_msr_on(cpu_number u64, index u32) ?u64 {
 	mut value := u64(0)
-	return cross_read(cpu_number, index, unsafe { &value }) == .found
+	for _ in 0 .. probe_attempts {
+		outcome := cross_read(cpu_number, index, unsafe { &value })
+		if outcome == .found {
+			return value
+		}
+		if outcome == .absent {
+			return none
+		}
+	}
+	return none
+}
+
+// Whether CPU `cpu_number` has register `index`, asked as a starting driver
+// asks.
+fn msr_readable_on(cpu_number u64, index u32) bool {
+	_ := probe_msr_on(cpu_number, index) or { return false }
+	return true
 }

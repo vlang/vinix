@@ -217,6 +217,10 @@ fn k10temp_start() {
 	}
 	mut dies := 0
 	for i in 0 .. thermal_k10_model.ccd_limit {
+		// The table of models asks for no more; this keeps it so.
+		if dies >= thermal_k10_dies.len || count >= k10_extra_sensors {
+			break
+		}
 		address := k10temp_ccd_address(thermal_k10_model.ccd_offset, i)
 		register := k10_smn_read(address) or { continue }
 		if !k10temp_ccd_valid(register) {

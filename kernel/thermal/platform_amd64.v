@@ -199,19 +199,33 @@ fn read_package_msr(index u32) ?u64 {
 	return value
 }
 
+// The same for a driver that is starting: see probe_msr_on().
+fn probe_package_msr(index u32) ?u64 {
+	if thermal_x86_one_package {
+		value := x86_msr_here(index) or { return none }
+		return value
+	}
+	value := probe_msr_on(0, index) or { return none }
+	return value
+}
+
 fn platform_start() {
 	x86_identify()
 	cross_cpu_start()
 	if devcore.boot_flag('vinix.thermal_sensors=', true) {
+		// The counters first: registering a zone starts the polling thread,
+		// which reads them, and they are then all in place.
+		rapl_start()
 		coretemp_start()
 		k10temp_start()
-		rapl_start()
 	} else {
 		thermal_coretemp_status = 'switched off on the command line'
 		thermal_k10temp_status = 'switched off on the command line'
 		thermal_rapl_status = 'switched off on the command line'
 	}
-	fs.sysfs_attribute('class/thermal/x86_probe', 0o444, show_x86_probe, unsafe { nil },
+	// Root's: every read of it takes two faults on purpose and interrupts
+	// every CPU.
+	fs.sysfs_attribute('class/thermal/x86_probe', 0o400, show_x86_probe, unsafe { nil },
 		unsafe { nil })
 }
 
@@ -309,6 +323,7 @@ fn show_x86_probe(_ voidptr, mut text lib.Text) {
 	add_hex(mut text, u64(x86_thermal_features()), 8)
 	text.add_byte(`\n`)
 	show_status(mut text, 'coretemp', thermal_coretemp_status)
+	coretemp_describe(mut text)
 	show_status(mut text, 'k10temp', thermal_k10temp_status)
 	show_status(mut text, 'rapl', thermal_rapl_status)
 	if power := package_power_mw() {

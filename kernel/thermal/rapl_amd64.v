@@ -68,7 +68,7 @@ __global (
 // is how rapl_check_domain() tells a domain that is there from one that is
 // not.
 fn rapl_add(slot int, name string, index u32, unit u64) bool {
-	raw := read_package_msr(index) or { return false }
+	raw := probe_package_msr(index) or { return false }
 	if raw & rapl_energy_mask == 0 {
 		return false
 	}
@@ -91,7 +91,7 @@ fn rapl_start() {
 		return
 	}
 	unit_index := if model.amd { msr_amd_rapl_power_unit } else { msr_rapl_power_unit }
-	unit_register := read_package_msr(unit_index) or {
+	unit_register := probe_package_msr(unit_index) or {
 		thermal_rapl_status = 'the model has energy counters, but the unit register faults'
 		return
 	}
