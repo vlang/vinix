@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `42eac0bc33cb2c4e7dd8a9a928d874fd5a067fcf`,
+at source commit `d99bfe8398d6c3eee25c9cfd86351a4c89ce0463`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,478 | 6.86% |
-| Python | 498 | 2,280,243 | 6.67% |
-| Shell | 350 | 1,339,415 | 3.92% |
+| C | 563 | 2,343,478 | 6.85% |
+| Python | 493 | 2,269,383 | 6.63% |
+| Shell | 355 | 1,340,145 | 3.92% |
 
-All `.v` files are classified as V. The resulting V share is 73.48%, with no
+All `.v` files are classified as V. The resulting V share is 73.54%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,280,243 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,269,383 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 42eac0bc33cb2c4e7dd8a9a928d874fd5a067fcf --breakdown --json
+github-linguist --rev d99bfe8398d6c3eee25c9cfd86351a4c89ce0463 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -924,7 +924,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/game2048.py` | 3,080 |
 | `tests/ios/run.py` | 20,826 |
 | `tests/ios/uikit.py` | 5,993 |
-| `tests/ipv6-multicast/check-generated.py` | 1,613 |
 | `tests/ipv6-multicast/run_vm.py` | 3,835 |
 | `tests/kernel-cpu/logic.py` | 3,346 |
 | `tests/kernel-cpu/run.py` | 4,763 |
@@ -1004,16 +1003,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pci-config/_native.py` | 512 |
 | `tests/pci-config/arm_vm.py` | 5,495 |
 | `tests/pointer-scroll/run.py` | 5,488 |
-| `tests/posix-timer/check-generated.py` | 1,464 |
 | `tests/posix-timer/run.py` | 4,098 |
 | `tests/proc-map-lookup/run.py` | 5,764 |
 | `tests/proc-thread-lock/run.py` | 5,066 |
 | `tests/process-churn/_native.py` | 957 |
-| `tests/process-churn/check-generated.py` | 2,462 |
 | `tests/process-churn/check-results.py` | 4,398 |
 | `tests/process-churn/run.py` | 5,871 |
 | `tests/process-smp/run.py` | 5,100 |
-| `tests/procfs-allocs/check-generated.py` | 1,817 |
 | `tests/procfs-allocs/run.py` | 4,043 |
 | `tests/procfs-mount/run.py` | 5,749 |
 | `tests/ps1/desktop.py` | 7,528 |
@@ -1061,7 +1057,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/securelevel/run.py` | 7,028 |
 | `tests/shared-streams/run.py` | 4,049 |
 | `tests/smt-policy/run.py` | 3,248 |
-| `tests/socket-io/check-generated.py` | 3,504 |
 | `tests/socket-io/run.py` | 4,204 |
 | `tests/sound/_native.py` | 957 |
 | `tests/sound/run_vm.py` | 9,126 |
@@ -1366,6 +1361,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/reference-frameworks.sh` | 10,486 |
 | `tests/ios/reference-modules.sh` | 1,436 |
 | `tests/ios/run-objc-calculator.sh` | 674 |
+| `tests/ipv6-multicast/check-generated` | 146 |
 | `tests/ipv6-multicast/run-host.sh` | 137 |
 | `tests/ipv6-multicast/run.sh` | 2,131 |
 | `tests/java/smoke.sh` | 652 |
@@ -1418,7 +1414,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/paging/run-host.sh` | 178 |
 | `tests/pci-config/run.sh` | 5,477 |
 | `tests/pci-config/topology` | 169 |
+| `tests/posix-timer/check-generated` | 146 |
 | `tests/private-pages/run-host.sh` | 16,215 |
+| `tests/process-churn/check-generated` | 146 |
+| `tests/procfs-allocs/check-generated` | 146 |
 | `tests/procfs-mount/check-generated` | 146 |
 | `tests/ps1/frame` | 180 |
 | `tests/ps2/frame` | 180 |
@@ -1435,6 +1434,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/security-mac/run.sh` | 952 |
 | `tests/security-policy/run.sh` | 2,109 |
 | `tests/smt-policy/run-host.sh` | 1,181 |
+| `tests/socket-io/check-generated` | 146 |
 | `tests/sound/run.sh` | 1,419 |
 | `tests/steam/hosted-test.sh` | 3,480 |
 | `tests/steam/launcher-test.sh` | 6,952 |
