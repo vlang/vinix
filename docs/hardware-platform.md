@@ -300,15 +300,20 @@ A suspend to RAM (x86-64) takes the driver through the same suspend and
 resume. The enable bits of the chipset's general purpose events are lost
 with the power and written again by uACPI on the way back, before `_WAK`;
 the controller's event is among them, or is switched on again by the
-driver's resume if it was off for the sleep. Nothing is done about an
-exchange cut short by the power going: the driver is not stopped for the
-sleep, and one of its threads put down in the middle of an exchange would
-come back to a controller that has forgotten it and time out. A kernel with
-the simulated controller has been through this (`suspend-deep-ec`: values
-read, the chipset's event heard again after each of two sleeps, an event
-held for a sleep asked for afterwards), which says what the chipset's part
-and the driver's do, and nothing about a controller, which there was
-memory that lost no power.
+driver's resume if it was off for the sleep. The driver's threads are not
+stopped for the sleep, so one of them can be put down in the middle of an
+exchange, holding the controller's lock and firmware's global lock, when
+the machine goes down. A controller normally keeps its power through S3 --
+it is what watches the lid and the power button -- so the exchange would be
+finished afterwards, and the driver's timeout, which is measured on a clock
+that does not count the time away, would not have run out; what firmware
+does on its way back with the global lock taken is not known. None of that
+has been seen happen. A kernel with the simulated controller has been
+through two suspends to RAM (`suspend-deep-ec`: values read, the chipset's
+event heard again after each, an event held for a sleep asked for
+afterwards), which says what the chipset's part and the driver's suspend
+and resume do, and nothing about a controller, which there was memory that
+lost no power.
 
 **Thermal zones.** A laptop's thermal zone usually reads its temperature
 from the controller (`_TMP` is a field of its region) and hears of a trip
@@ -525,9 +530,11 @@ loses the events it latched, and firmware sends no `Notify` for what it saw
 with no system running. So after such a sleep (`compare_buses()` in
 `kernel/devcore/hotplug.v`):
 
-- a function that no longer answers with the vendor and device it had is
-  not written to, **its driver is not asked to resume it**, and the thread
-  removes it as it removes a card pulled without warning;
+- a function that no longer answers with the vendor and device it had --
+  given a second to, once for all functions, since a device may be that slow
+  after its reset -- is not written to, **its driver is not asked to resume
+  it**, and the thread removes it as it removes a card pulled without
+  warning;
 - a watched slot left with nothing on its bus is treated as empty, so a card
   now in it -- another card, or one put into a slot that was empty -- is
   brought in by the pass over the slots that follows;
