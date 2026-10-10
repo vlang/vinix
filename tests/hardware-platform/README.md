@@ -31,6 +31,8 @@ here runs any.
 | `acpi-ec-off` | x86_64 | The same table with `vinix.ec=off`: there is no controller device and no `ec` driver, and the battery never shows itself, because `_REG` never ran. |
 | `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` | x86_64 | Need a kernel built with `-d acpiec_selftest`, in which a simulated controller answers in place of the two ports; see [below](#the-embedded-controller-self-test). |
 | `suspend-deep-ec` | x86_64 | Needs the same kernel (`-d acpiec_selftest`) and uses `acpi-ec-selftest`'s machine and tables. The chipset's event reaches the driver before any sleep; then, after a suspend to RAM ended by the alarm, a value set in the simulated controller is read through `/sys/class/power_supply` with no exchange timing out, and an event the chipset raises (the host adds a processor) is heard -- its enable bit went with the power, and only the way back from S3 sets it again. A second sleep, with `power/wakeup` of the device `disabled`, must leave a lid that shut for it found on resume by exactly one query, and the chipset's event heard once more afterwards. The simulated controller must have seen no breach of the protocol. The controller is the kernel's own memory and loses no power: this is about the chipset's general purpose events and the driver's suspend and resume across S3, not about a controller. |
+| `apple-smc-selftest` | aarch64 | Needs a kernel built with `-d applesmc_selftest`, in which a simulated Apple SMC answers in place of the mailbox; see [below](#the-apple-smc-self-test). |
+| `apple-smc-selftest-bare`, `-options`, `-legacy` | aarch64 | The same kernel: an SMC with no fan and no charge limit; `vinix.apple_smc=nosensors,nolimit`; `vinix.apple_smc=legacy`. |
 | `qmp-powerdown` | aarch64, x86_64 | The guest waits, with no handler for the power-off request; the controller sends `system_powerdown`; the kernel powers the machine off within 30 s. |
 | `power-button-init` | aarch64, x86_64 | The guest is an init that handles the power-off request (`SIGUSR2`). The controller sends `system_powerdown`; the press must reach init as that signal instead of turning the machine off under it, and init then powers off. |
 | `restart` | aarch64, x86_64 | `reboot(2)` with the restart command resets the machine: QEMU's `SHUTDOWN` event must say `guest-reset`. |
@@ -245,9 +247,10 @@ Two further limits:
 
 ## Scenarios that need a kernel built for them
 
-Three scenarios read the verdict of a self-test compiled into the kernel, and
-two more need a kernel with a simulated embedded controller in it (the next
-section). All are left out of a default run with the reason. Build such a kernel beside the
+Three scenarios read the verdict of a self-test compiled into the kernel, two
+more need a kernel with a simulated embedded controller in it (the next
+section), and four one with a simulated Apple SMC (the section after). All
+are left out of a default run with the reason. Build such a kernel beside the
 ordinary one and name the scenario:
 
 ```sh
@@ -379,3 +382,125 @@ and that ports with nothing behind them do it no harm. The protocol's own
 tests, on the host with a simulated clock, are `sh tests/acpi-ec/run.sh`.
 A scenario that needs longer than a run's `--timeout` says so in its record
 (`timeout`); these two take about 50 s of a 240 s allowance.
+
+### The Apple SMC self-test
+
+QEMU has no System Management Controller, so what stands in for one is
+stated here exactly.
+
+A kernel built with `-d applesmc_selftest` looks at no device tree for an
+SMC, touches no mailbox register and maps no SRAM, on any machine. The
+simulated SMC of `kernel/apple/smc/core/sim_d_applesmc_selftest.v` answers
+the driver's mailbox callbacks instead: the RTKit start-up, the key commands
+(read, describe, write), the shared memory, and a table of keys. Everything
+above those callbacks is the code a Mac runs: the protocol core and its
+deadlines on the real clock, the thread, what it publishes, the power supply
+and thermal classes, the device nodes and `/sys`. The keys start out as a
+laptop on its charger at 62%, with four temperatures, one fan and a charge
+limit key; their types and sizes are those read from a real SMC
+([M1 battery](../../docs/m1-battery.md#keys)). The guest moves the battery
+through its day and makes the SMC misbehave through
+`/sys/devices/platform/apple-smc/smc/selftest`.
+
+`apple-smc-selftest` checks, in this order:
+
+- **what the machine is**: the device and its driver on the device list;
+  `/dev/battery` read whole and a byte at a time, each ending after `62` and
+  a newline, and `/dev/battery-power`'s three lines; every file of
+  `macsmc-battery` and `macsmc-ac`; the zone with no trip point, the four
+  temperatures with Linux's labels and no limits (one of them in the fixed
+  point type), the fan with its speed, label, slowest and fastest and no
+  `pwm1`; the keys as the SMC described them; that starting up wrote no key,
+  and that nothing had to be disbelieved to get there;
+- a temperature and the fan's speed changed in the SMC, seen in hwmon;
+- **the charger pulled**: `Discharging`, the charger offline,
+  `policy/on_battery` 1, the new charge, current and voltage, the SMC's own
+  time to empty, and the device nodes following;
+- **garbage, once each**: a percentage of 0, the firmware's flag that the
+  battery is about to give out, a remaining charge of all ones, a
+  temperature that is not a number and one of 500 degrees. Over six seconds
+  of looking, `capacity` must stay 60 and `capacity_level` `Normal`, the
+  charge must be the SMC's count or the percentage's share, each temperature
+  must read as itself or as nothing, nobody may be asked to power off, and
+  the driver must have counted one jump, one unconfirmed flag and three
+  implausible figures;
+- **the charge limit**: 80 written and read back, with the simulated SMC
+  holding the key at 1 after one write of `CHWA`; 70, 50, 90, 95 and 99
+  refused with `EINVAL` and not sent; 100; a firmware that acknowledges the
+  write and keeps the old value found out by the reading back (`EIO`); a
+  key that may not be written (`EIO`), without ending the channel;
+- **no memory kept**: after a warm-up, 60 rounds a quarter of a second apart,
+  each reading sixteen files and the two nodes five times with no allocation
+  of the guest's own, may leave at most 30 more live kernel heap objects and
+  no more large pages, across at least 14 passes of the thread;
+- **a sleep**: a rehearsal, then four seconds asleep ended by the alarm. The
+  thread must have parked for each, taken no more than 15 turns and sent no
+  more than 80 commands across the sleep (40 turns and 200 commands fit in
+  it), and the battery, the charger, the zone and `/dev/battery` must read
+  at once afterwards;
+- **low**, `capacity_level` `Low`; then **critical**, and the request to
+  power off that the class makes of init after its five seconds;
+- **the SMC stops answering**: within six seconds `status` is `Unknown`,
+  every measured figure 0 and `capacity_level` `Unknown`, the charger
+  offline, the model, the design charge and the limit still there, a write
+  of the limit `EIO`, `/dev/battery` `EIO`, the temperatures and the fan
+  empty, the driver's `transport` no longer `ok`; then the zone is switched
+  off, the limit on CPU performance stays 100, nothing is counted critical,
+  and the machine powers off when the test says so. The simulated SMC must
+  have seen no breach of the protocol and no command it does not know.
+
+`apple-smc-selftest-bare` (`vinix.apple_smc_sim=bare`) is an SMC with no fan
+and no charge limit whose remaining charge is stored the other way round:
+no fan file and no `charge_control_end_threshold` exist, the charge reads
+right, the one-byte flag is disbelieved once, and the battery goes to `Full`.
+`-options` (`vinix.apple_smc=nosensors,nolimit`) has the battery and the
+charger and nothing else, with exactly eighteen keys asked about.
+`-legacy` (`vinix.apple_smc=legacy`) has the two device nodes, across a
+sleep too, with nothing but the address request and reads sent, and no
+supply and no zone.
+
+```sh
+mkdir -p build-aarch64-selftest/obj
+rsync -a --delete --exclude /bin/ --exclude /obj/ --exclude /cc-runtime-x86_64/ kernel/ build-aarch64-selftest/
+make -C build-aarch64-selftest ARCH=aarch64 CC=clang LIMINE_MP=1 V="$V" "VFLAGS=-d applesmc_selftest" -j8
+tests/hardware-platform/run --arch aarch64 --kernel build-aarch64-selftest/bin/vinix \
+    --scenario apple-smc-selftest --scenario apple-smc-selftest-bare \
+    --scenario apple-smc-selftest-options --scenario apple-smc-selftest-legacy
+```
+
+```
+PASS aarch64 apple-smc-selftest (66.6s)
+  garbage: 40 looks over six seconds, capacity never under 60; jumps 1, unconfirmed 1, implausible 3
+  charge limit: 80, 100 set and read back; 5 values refused unsent; 4 writes in all, every one of CHWA
+  16 passes and 5700 reads: live heap objects 4234 -> 4234, large pages 61 -> 61
+  sleep: 3895 ms, 1 turns of the thread and 14 commands across it
+  critical: asked for a power off 6000 ms after the battery read 2%
+  silent: transport "SMC timeout (no retry after an in-flight timeout)"; in all 810 commands, 777 reads, 27 descriptions, 4 writes, violations 0
+PASS aarch64 apple-smc-selftest-bare (13.3s)
+PASS aarch64 apple-smc-selftest-options (15.7s)
+PASS aarch64 apple-smc-selftest-legacy (19.0s)
+```
+
+Run against a kernel broken on purpose, one change at a time, the scenario
+fails each time, at the check that is about the change:
+
+| Change | First failure |
+| --- | --- |
+| the remaining charge read the wrong way round | `charge_now is "2604000", not "2590000"` |
+| a percentage believed at first sight | `capacity_level is Critical after one wild reading` |
+| the thread not parked for a sleep | `parks is 0 after a rehearsal` |
+| the charge limit not read back | `charge_control_end_threshold is "100", not "80"`, and `a limit the SMC did not keep came to errno 0` |
+| what was last published given out whatever its age | `status is Discharging with an SMC that does not answer` |
+
+The first of these passed until the simulated battery's count was made to
+differ from its percentage's share of the full charge, which the driver
+falls back on: a test whose two sources agree cannot say which was read.
+
+What these do not show: anything about a real SMC. The simulated one is this
+repository's reading of Linux's driver; a pass says the kernel agrees with
+that reading from the classes down to the mailbox callbacks. That a real SMC
+answers the describe and write commands as the simulated one does, that its
+shared memory can be read through a device mapping, and which keys an M1
+has, are not shown, and the mailbox and its register accesses are not run at
+all. The client's own tests, on the host with a simulated clock, are
+`sh tests/apple_smc/run-host.sh`.

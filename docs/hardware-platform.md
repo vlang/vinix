@@ -202,8 +202,9 @@ told to stop, an NVMe controller is sent the shutdown notification, the
 e1000 stops DMA -- and then firmware is asked. A PC that ignores the ACPI
 reset register is reset through the keyboard controller, port 0xcf9 and
 finally a triple fault. An Apple SoC is restarted through its watchdog, as
-Linux does; switching one off needs the SMC, which this kernel cannot ask,
-so `poweroff` there ends halted with devices stopped.
+Linux does; switching one off needs a write to the SMC that this kernel does
+not make -- the one key it ever writes is the charge limit -- so `poweroff`
+there ends halted with devices stopped.
 
 ## Firmware events, buttons and the lid
 
@@ -734,11 +735,25 @@ machine going off. The thresholds are in
 power-saving CPU profile and back onto the charger the balanced one, unless
 `/sys/power/profile_policy` is `manual`.
 
-The only drivers are ACPI's. **Apple's SMC battery is not a power supply
-here**: it remains `/dev/battery` and `/dev/battery-power`
-([M1 battery](m1-battery.md)), with no status, energy or time. There is no
-charge limit on any machine: `charge_control_end_threshold` exists only where
-a driver can set one, and none can.
+A battery that says itself how full it is has that figure as `capacity`, and
+the thresholds are held against it, rather than its charge divided by its
+full charge: the percentage a maker shows is not always that quotient.
+
+The drivers are ACPI's and Apple's. **Apple's SMC** is a battery
+(`macsmc-battery`) and a charger (`macsmc-ac`) here, beside the two device
+nodes it always was ([M1 battery](m1-battery.md)): status by Linux's reading
+of the SMC's flags, the SMC's own percentage and time estimates, charge now,
+full and by design, current, voltage and cycle count. Its figures are held to
+what a battery can say before the class sees them -- a percentage that jumps
+is believed at the second look, the firmware's "about to give out" flag
+after two -- and an SMC that stops answering leaves the battery `Unknown`
+with no figures instead of its last ones. **It has run against a simulated
+SMC only, on the build machine and in QEMU; never on a Mac.**
+
+`charge_control_end_threshold` exists only where a driver can set a charge
+limit. One can: Apple's, on firmware that has the `CHWA` key, where it takes
+80 or 100 and nothing else, is written only when a program writes the file,
+and is read back before the write is called done. No ACPI battery has one.
 
 ## CPU idle and frequency
 
@@ -800,10 +815,25 @@ later, the cooler of the two being the one acted on.
 `=off` leaves firmware's zones and fans alone, for a machine whose firmware
 reports temperatures that are not.
 
+Apple's SMC (`kernel/apple/smc`, [M1 battery](m1-battery.md)) is one zone,
+`macsmc`, carrying the four temperatures Linux's device tree gives an M1
+laptop -- flash storage, the battery, the charge regulator, the wireless
+module -- with their labels in hwmon, and each fan the SMC counts with its
+speed and the slowest and fastest it runs (`fanN_input`, `fanN_min`,
+`fanN_max`). The zone has no trip points and the fans no `pwmN`: the SMC
+gives no limit for these sensors and runs its fans itself, so the kernel
+shows both and decides nothing by them. A reading that is not a number, at
+or below absolute zero or of 200 degrees or more reads as nothing. An M1
+MacBook Air has no fan and gets no fan files. As with the battery: tested
+against a simulated SMC on the build machine and in QEMU, never on a Mac.
+
 Not done: the zone's own passive constants (`_TC1`, `_TC2`, `_TSP` -- the
 stepping above is used), `_TZD`, `_TZP`, counting the users of a power
-resource two fans share, fans a laptop's embedded controller runs without
-telling ACPI (most laptops), and Apple's sensors and fans (SMC).
+resource two fans share, and fans a laptop's embedded controller runs
+without telling ACPI (most laptops). Of Apple's SMC: its power, voltage and
+current sensors, the sensor list of the device tree's `apple,smc-hwmon` node
+(the kernel has its own table of four), and the temperature of the SoC
+itself, which the SMC keys Linux names do not include.
 
 ## Boot options
 
@@ -814,6 +844,8 @@ telling ACPI (most laptops), and Apple's sensors and fans (SMC).
 | `vinix.cpuidle=off\|halt\|mwait`, `vinix.max_cstate=N` | x86-64 idle driver and depth |
 | `vinix.cpufreq=off\|simulate` | no frequency driver, or one with memory for registers |
 | `vinix.apple_idle=wfi`, `vinix.apple_cpufreq=1` | Apple hardware only; untried |
+| `vinix.apple_battery=0` | Apple hardware only: do not drive the SMC at all |
+| `vinix.apple_smc=legacy` | Apple hardware only: the SMC as `/dev/battery` and `/dev/battery-power` alone, with nothing but reads of five keys sent to it. `nosensors` leaves out temperatures and fans, `nolimit` the charge limit key; the three combine with commas. Untried on a Mac, like the driver |
 | `vinix.thermal_sensors=0`, `vinix.tjmax=N` | skip the x86 sensor drivers; state TjMax |
 | `vinix.pci_hotplug=0\|1` | leave PCI Express hot-plug ports alone, or watch them where the kernel would not by itself |
 | `vinix.acpi_thermal=off\|nocrt` | leave firmware's thermal zones and fans alone, or take them without the trip that switches the machine off |
@@ -841,6 +873,14 @@ Beyond the limits stated in each section:
   own. And the controller itself on any real laptop.
 - Suspend to RAM on anything but QEMU's PC: see its section for what is
   untested. Hibernation, backlight and display power control.
+- Apple's SMC on a Mac. The battery, charger, temperatures, fans and charge
+  limit are tested against a simulated SMC on the build machine and in
+  QEMU; **no physical run**, of this or of the device nodes before it. Past
+  that: the `CHLS` charge limit of firmware without `CHWA`, the charge
+  inhibit keys, a wake from the SMC's notifications (a battery that runs out
+  during a sleep is not noticed), switching the machine off through the SMC,
+  an interrupt-driven mailbox (each exchange is a busy wait, some fifteen a
+  second), and the SMC after a sleep that cut its power.
 - Coming back from a loss of power for `xhci` and Apple's drivers;
   restoring a display the kernel has no mode-setting for; wake-up by a PCI
   device (PME) or over USB; an RTC alarm more than a day ahead.
@@ -849,7 +889,9 @@ Beyond the limits stated in each section:
   the kernel writes and a machine the tests stand in for. Settings and the
   taskbar read the first present battery in `/sys/class/power_supply` with
   its status and the kernel's time estimates, and fall back to `/dev/battery`
-  where there is none, which is still every Apple machine. The Start menu
+  where there is none. An Apple laptop now has one (`macsmc-battery`), so
+  there too the desktop takes the first path -- which, like the rest of
+  this paragraph, no kernel has been run to show. The Start menu
   has Restart, and Sleep where `/sys/power/state` offers `mem`. Settings >
   Power has the lid action, the performance profile (disabled where the
   kernel takes none, as in every virtual machine) and two idle timeouts,
@@ -917,11 +959,15 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `suspend-deep-ec` (the same kernel): the controller's driver through two suspends to RAM | pass | -- |
 | `nvme-sleep` (kernel built with `PROD=false`): an NVMe disk through the same three sleeps | pass | -- |
 | `pci-d3-selftest` (kernel built with `-d pci_d3_selftest`): the same card made to forget its address and command registers in D3hot, which are written back | pass | pass |
+| `apple-smc-selftest` (kernel built with `-d applesmc_selftest`: a simulated Apple SMC; run 2026-10-11): battery, charger, four temperatures and a fan in `/sys` and in the device nodes; garbage readings that change nothing; the charge limit; a sleep; low, critical and the power-off request; an SMC that stops answering | -- | pass |
+| `apple-smc-selftest-bare`, `-options`, `-legacy` (the same kernel): no fan and no charge limit; `vinix.apple_smc=nosensors,nolimit`; `vinix.apple_smc=legacy` | -- | pass |
 
 Host unit tests: `tests/hardware-platform/hwhost` (9 files),
 `tests/power-supply/run`, `sh tests/cpu-power/run.sh`, `sh tests/thermal/run.sh`,
 `tests/pci-hotplug/run`, `sh tests/acpi-ec/run.sh` (40 tests of the embedded
-controller's protocol against a simulated controller).
+controller's protocol against a simulated controller),
+`sh tests/apple_smc/run-host.sh` (51 tests of the SMC client against a
+simulated SMC).
 See [the suite's README](../tests/hardware-platform/README.md) for what each
 scenario checks and for its recorded output.
 
@@ -929,7 +975,9 @@ Measured for retention, after the kernel's grace period for deferred frees:
 100 unbind/bind cycles of the e1000, 100 cycles of removing a hot-added
 e1000 and finding it again by a rescan, and 50 load/drop cycles of a 100 KiB
 firmware image leave the kernel heap's live objects and large pages where
-they were, on both architectures.
+they were, on both architectures. On AArch64, 16 passes of the Apple SMC's
+thread with 5700 reads of its files in `/sys` and of its two device nodes do
+the same (4234 live objects before and after).
 
 `tests/kernel-allocs/run.sh` already reported about 170 allocation sites not
 in `allowed.txt` before this work, in files it did not touch, and still

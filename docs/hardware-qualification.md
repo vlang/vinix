@@ -13,7 +13,7 @@ follows the roadmap's rules:
 - A row is about the machine named, not about a family. "Works on the M1 Air"
   says nothing about an M1 Mac mini.
 
-As of 2026-10-10 **no machine is qualified for anything**: no checklist has
+As of 2026-10-11 **no machine is qualified for anything**: no checklist has
 been completed and recorded. The repository's own documents say of every
 hardware driver that it has not been validated on the machine it is for; this
 matrix does not improve on what they record.
@@ -44,7 +44,7 @@ State and evidence for the capabilities of [hardware-platform](hardware-platform
 
 | Capability | x86-64 VM (QEMU q35) | AArch64 VM (QEMU virt) | Intel / AMD PC | Apple M1 Air |
 | --- | --- | --- | --- | --- |
-| Device list, driver binding, `/sys` | implemented (VM) | implemented (VM) | implemented, untried | partial: PCI and nothing else; Apple's drivers are not listed |
+| Device list, driver binding, `/sys` | implemented (VM) | implemented (VM) | implemented, untried | partial: PCI and the SMC (`apple-smc`, driver `macsmc`); Apple's other drivers are not listed |
 | Unbind, remove, reset, failure recovery | implemented (VM: e1000, ahci) | implemented (VM: e1000) | untried | open |
 | PCI hotplug, rescan | implemented (VM: a PCIe port the kernel polls, and a card announced by firmware through ACPI; e1000 only) | implemented (VM: a PCIe port the kernel polls; e1000 only) | untried | open: ports are not watched on Apple hardware |
 | DMA domains | implemented (VM) | implemented (VM), no IOMMU | untried | open: Apple drivers program their DARTs themselves |
@@ -58,12 +58,12 @@ State and evidence for the capabilities of [hardware-platform](hardware-platform
 | Suspend to RAM | implemented (VM: ACPI S3 under OVMF with QEMU's standard VGA; e1000, AHCI, PS/2 and serial only; behind VT-d and AMD-Vi) | open (no platform sleep to ask for) | untried: no firmware's way back has been met, wake-up devices are not armed, and it is offered only where the display can be brought back or `vinix.deep_sleep=force` | open |
 | Hibernation | open | open | open | open |
 | Screen sleep, backlight | partial (VM: the boot framebuffer is dark during a sleep; no backlight or display power control) | partial (VM: the same) | untried | partial: brightness through DCP, opt-in ([M1 AGX](m1-agx-bringup.md)); the panel is not darkened for a sleep |
-| Battery, charger, time left | implemented (VM: scripted ACPI battery, and one read through the simulated embedded controller) | open | untried; read through the embedded controller on most laptops, and that driver has met only a simulated one | partial: percentage, voltage, current, power in `/dev` ([M1 battery](m1-battery.md)); not in `/sys`, no status or time |
-| Charge limit | open | open | open | open |
+| Battery, charger, time left | implemented (VM: scripted ACPI battery, and one read through the simulated embedded controller) | implemented (VM: a simulated Apple SMC in a self-test kernel; the machine itself has no battery) | untried; read through the embedded controller on most laptops, and that driver has met only a simulated one | implemented (host, VM): status, the SMC's percentage and time estimates, charge, current, voltage and cycles in `/sys`, and the percentage and telemetry in `/dev`, against a simulated SMC ([M1 battery](m1-battery.md)); **no physical run** |
+| Charge limit | open | implemented (VM: the simulated SMC's `CHWA`, 80 or 100) | open | implemented (host, VM) on firmware with `CHWA`, written only on request and read back; whether this machine's firmware has the key is not known; no physical run |
 | CPU idle states | implemented (VM: HLT) | implemented (VM: WFI) | host: MWAIT tables; untried | open by default (polls); `vinix.apple_idle=wfi` untried |
 | CPU frequency | implemented (VM: simulated driver) | implemented (VM: simulated driver) | host: HWP, SpeedStep, CPPC encodings; untried | host: cluster DVFS sequence; off by default, untried |
-| Temperature, thermal limit | implemented (VM: made-up zone, and a scripted ACPI thermal zone) | implemented (VM: made-up zone) | host: coretemp, k10temp, RAPL decoding; ACPI thermal zones untried, and none has been read through an embedded controller, simulated or real | open: no SMC sensors |
-| Fans | implemented (VM: scripted ACPI fans of each kind, driven by a zone's active trips) | open | untried; a laptop's fans are usually its embedded controller's and not in ACPI | open |
+| Temperature, thermal limit | implemented (VM: made-up zone, and a scripted ACPI thermal zone) | implemented (VM: made-up zone, and a simulated Apple SMC's sensors) | host: coretemp, k10temp, RAPL decoding; ACPI thermal zones untried, and none has been read through an embedded controller, simulated or real | implemented (host, VM): four SMC temperatures in one zone with no trip points, shown and not acted on, against a simulated SMC; the SoC's own temperature is not among them; no physical run |
+| Fans | implemented (VM: scripted ACPI fans of each kind, driven by a zone's active trips) | partial (VM: a simulated Apple SMC's fan, shown and not driven) | untried; a laptop's fans are usually its embedded controller's and not in ACPI | -- (this machine has none; the SMC's fans of an M1 with one are shown, not driven, and only a simulated one has been read) |
 
 ## Device families, by machine
 
@@ -119,7 +119,7 @@ driver's own document says the machine has not validated it.
 | Audio | speakers (TAS2770) | `apple/speakers` | implemented (host) | opt-in. "None of this has been checked on the machine itself yet" ([M1 speakers](m1-speakers.md)). No headphone jack, no microphones |
 | Input | SPI keyboard and trackpad | `apple/spi_keyboard` | implemented (host) | [apple-spi-touchpad](apple-spi-touchpad.md): not built and booted on an M1 Air for that change |
 | Input | USB | none on Apple hardware | open | xHCI is driven on PCI only |
-| Platform | SMC battery | `apple/smc` | implemented (host) | on by default. "Real M1 hardware has NOT been validated here" ([M1 battery](m1-battery.md)) |
+| Platform | SMC battery, charger, temperatures, charge limit | `apple/smc` | implemented (host, VM) | on by default; `vinix.apple_smc=legacy` for the device nodes alone. Run against a simulated SMC on the build machine and in QEMU. "No part of this driver, old or new, has run on a Mac" ([M1 battery](m1-battery.md)). Which of its keys this machine has, and whether its firmware has the charge limit key, is not known |
 | Platform | Type-C display hotplug | `apple/typec` | implemented (host) | opt-in; display attach and detach only |
 | Platform | AIC, PMGR, watchdog, DART | `aarch64/*`, `apple/dart` | implemented | the machine boots through them; four CPUs started |
 
@@ -194,13 +194,33 @@ hwcheck --rehearse-sleep > report.md
    the critical threshold: the machine must shut down cleanly before it
    dies. On a laptop with an embedded controller, record the counters under
    `/sys/bus/acpi/devices/PNP0C09:00/ec/` afterwards: no timeouts, and not
-   failed.
+   failed. A battery that counts charge has `charge_now` in place of
+   `energy_now`.
+
+   On an Apple machine, first the seven steps of
+   [M1 battery](m1-battery.md#on-an-m1), which begin under macOS with
+   `tools/apple-smc/smcprobe` and with the kernel started as
+   `vinix.apple_smc=legacy`. Then, for this step: `capacity` against
+   macOS's percentage read just before the restart; `/dev/battery` the same
+   number, read once to its end; `status` with the charger in, out and with
+   the battery full; record `/sys/devices/platform/apple-smc/smc/keys` and
+   `status`, in which `transport` must be `ok` and `key_errors`,
+   `keys_odd_sized`, `implausible` and `percent_jumps` 0 after an hour, and
+   `parks` one higher after each sleep. Where there is a
+   `charge_control_end_threshold`: write 80, read it back, restart into
+   macOS and see that its own setting agrees, then write 100; record the
+   charge the battery stops at over a day with the limit on.
 9. **Heat.** Compare each temperature with another operating system's
    reading. Under sustained full load the limit must come down before the
    firmware's own protection acts, and the machine must not shut itself off.
    Where firmware describes fans (`/sys/class/thermal/acpi_fans`), they must
    be heard to speed up under load and slow down after it, and `fanN_input`
-   must agree with what is heard.
+   must agree with what is heard. On an Apple machine the zone `macsmc` has
+   no limit to come down for: record each `tempN_input` of `macsmc_hwmon`
+   beside macOS's reading of the same sensor, idle and under load, and on a
+   machine with a fan its `fanN_input` beside what is heard and between
+   `fanN_min` and `fanN_max`; no file may read empty, and no temperature may
+   be one the machine could not be at.
 10. **Idle.** Ten minutes idle with the display on: record power drawn (from
     the battery's `power_now`), each CPU's deepest idle state and the time in
     it.

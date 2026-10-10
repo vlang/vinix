@@ -20,9 +20,12 @@ kernel's own `time_to_empty_now` and `time_to_full_now`, and on the way notes
 whether any `Mains` supply has `online` at `1`. This is what a PC with an ACPI
 battery has.
 
-With no such battery it reads `/dev/battery` exactly as before. That is still
-all an Apple M1 has: its SMC battery is not a power supply to the kernel, so
-there the desktop knows a percentage and nothing else. A battery that is
+With no such battery it reads `/dev/battery` exactly as before. That was all
+an Apple M1 had. The kernel now lists its SMC battery as a power supply too
+(`macsmc-battery`, with `macsmc-ac` beside it; see `../docs/m1-battery.md`),
+so there the desktop takes the first path, and `/dev/battery` is what it
+falls back on when the kernel is started with `vinix.apple_smc=legacy` or
+the SMC does not say what the battery holds when full. A battery that is
 listed but answers badly is still the source: its failure is the sample, and
 `/dev/battery` is not asked instead.
 
@@ -100,13 +103,15 @@ per-frame allocation of Settings text.
 
 - Only the first present battery is shown. A second battery is not added to
   it.
-- The kernel keeps a supply's last reading when its driver stops answering,
-  and `/sys` has no file that says so. The desktop cannot tell such a reading
-  from a fresh one.
+- The kernel keeps an ACPI supply's last reading when its driver stops
+  answering, and `/sys` has no file that says so. The desktop cannot tell
+  such a reading from a fresh one. Apple's SMC battery is different: once
+  its SMC stops answering it reads `Unknown` with a full charge of 0, which
+  the reader above takes for an invalid sample.
 - `capacity_level`, `power_now`, `cycle_count`, `technology` and `model_name`
   are not read or shown.
-- On an Apple M1 there is no status, charger or estimate from the kernel, as
-  above.
+- On an Apple M1 the status, the charger and the estimates are the kernel's
+  reading of the SMC, which has run against a simulated SMC only.
 - None of the power-supply path has run against a kernel: it is tested on the
   host against the text the kernel writes.
 

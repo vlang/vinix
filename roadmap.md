@@ -214,7 +214,15 @@ consistent filesystem; backup restoration preserves content and metadata.
     driver](docs/hardware-platform.md#the-embedded-controller), tested against a
     simulated controller on the host and in QEMU. No physical controller has
     been tried.
-  - [ ] Apple's SMC battery and sensors in the same interfaces, a charge limit.
+  - [x] [Apple's SMC battery and charger as power supplies, its temperatures and
+    fans in the thermal and hwmon classes, and the `CHWA` charge
+    limit](docs/m1-battery.md), tested against a simulated SMC on the host and
+    in QEMU. No physical run: nothing of this driver has been tried on a Mac.
+  - [ ] Apple's SMC on the machine itself
+    ([what to check first](docs/m1-battery.md#on-an-m1)); the `CHLS` charge
+    limit of firmware without `CHWA`; a wake for the SMC's notifications, so
+    that a battery running out during a sleep is noticed; the SoC's own
+    temperature and the SMC's power sensors.
 - [ ] Add reliable suspend/resume, lid behavior, wake sources, screen sleep,
   hibernation and shutdown/reboot that flushes storage and quiesces devices.
   - [x] [Suspend to idle with wake sources, an alarm and a rehearsal mode; lid
