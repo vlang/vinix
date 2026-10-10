@@ -175,6 +175,76 @@ pub fn check_disk_header(disk Disk, state string) ! {
 	}
 }
 
+// What a disk's file holds when the controller has made it, byte for byte.
+pub fn disk_contents(disk Disk) []u8 {
+	mut bytes := []u8{len: disk.size_mib << 20}
+	for fill in disk.prefill {
+		pattern := pattern_bytes(fill.seed, fill.length)
+		for i in 0 .. fill.length {
+			bytes[int(fill.offset) + i] = pattern[i]
+		}
+	}
+	for i in 0 .. disk.header.len {
+		bytes[i] = disk.header[i]
+	}
+	return bytes
+}
+
+// Whether a disk that was to be left alone was: every byte as it was made.
+// For a machine that must not have written to any disk at all, which no
+// account of the guest's own can show.
+pub fn check_disk_untouched(disk Disk, state string) ! {
+	if !disk.untouched {
+		return
+	}
+	found := os.read_bytes(os.join_path(state, disk.name)) or {
+		return error('cannot read ${disk.name}: ${err.msg()}')
+	}
+	expected := disk_contents(disk)
+	if found.len != expected.len {
+		return error('${disk.name} is ${found.len} bytes long, and was made ${expected.len}')
+	}
+	for i in 0 .. expected.len {
+		if found[i] != expected[i] {
+			return error('${disk.name} was written to: byte ${i} is 0x${found[i].hex()}, and was 0x${expected[i].hex()} when the machine was started')
+		}
+	}
+}
+
+// Overwrite part of a disk's file, the machine being off.
+pub fn apply_damage(damage DiskDamage, state string) ! {
+	mut file := os.open_file(os.join_path(state, damage.disk), 'r+') or {
+		return error('cannot damage ${damage.disk}: ${err.msg()}')
+	}
+	defer {
+		file.close()
+	}
+	file.write_to(damage.offset, []u8{len: damage.length, init: damage.fill})!
+}
+
+// Whether a disk's file holds what the scenario says it must at the end.
+pub fn check_disk_bytes(wanted DiskBytes, state string) ! {
+	mut file := os.open(os.join_path(state, wanted.disk)) or {
+		return error('cannot read ${wanted.disk}: ${err.msg()}')
+	}
+	defer {
+		file.close()
+	}
+	expected := if wanted.text != '' { wanted.text.bytes() } else { []u8{len: wanted.zeros} }
+	mut found := []u8{len: expected.len}
+	count := file.read_from(wanted.offset, mut found) or { 0 }
+	place := '${wanted.disk} at offset ${wanted.offset}'
+	if count != expected.len {
+		return error('${place}: read ${count} of ${expected.len} bytes')
+	}
+	for i in 0 .. expected.len {
+		if found[i] != expected[i] {
+			what := if wanted.text != '' { '"${wanted.text}"' } else { '${wanted.zeros} zero bytes' }
+			return error('${place}: byte ${i} is 0x${found[i].hex()}; ${what} were to be there')
+		}
+	}
+}
+
 // The bytes a guest writes for a pattern; guest/support.v has the same.
 pub fn pattern_bytes(seed u8, length int) []u8 {
 	mut bytes := []u8{len: length}

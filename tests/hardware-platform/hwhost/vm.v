@@ -51,8 +51,9 @@ pub:
 
 // Reads what has been added to the serial log since the last look.
 struct SerialReader {
-	path string
 mut:
+	// The log of the boot that is running.
+	path   string
 	offset u64
 	text   SerialLines
 }
@@ -98,7 +99,7 @@ fn (mut m Machine) stop() {
 	}
 }
 
-fn qemu_command(host Host, scenario Scenario, media []string, state string) ![]string {
+fn qemu_command(host Host, scenario Scenario, media []string, state string, boot int) ![]string {
 	mut command := [host.qemu]
 	if host.arch == 'aarch64' {
 		command << ['-machine', 'virt,gic-version=3']
@@ -123,11 +124,47 @@ fn qemu_command(host Host, scenario Scenario, media []string, state string) ![]s
 	}
 	// -no-reboot turns a reset into an exit: a guest that crashes into its
 	// reset vector ends the run instead of booting again until the timeout.
+	// Each boot of a machine that is booted more than once has a serial log
+	// of its own: QEMU empties the file it is given.
 	command << ['-display', 'none', '-monitor', 'none', '-serial',
-		'file:' + os.join_path(state, 'serial.log'), '-no-reboot', '-qmp',
+		'file:' + os.join_path(state, serial_log_name(boot)), '-no-reboot', '-qmp',
 		'unix:' + os.join_path(state, 'qmp.sock') + ',server=on,wait=off']
-	command << substitute_all(scenario.qemu_arguments(host.arch), state)!
+	command << substitute_all(scenario.boot_arguments(host.arch, boot), state)!
 	return command
+}
+
+// What is followed across every boot of one scenario: the markers and the
+// actions take up in a later boot where the one before left them, and the
+// events of the machines that have ended are kept.
+struct Session {
+mut:
+	markers MarkerWatch
+	actions ActionCursor
+	events  EventLog
+}
+
+// The events of the boots that have ended and of the one that is running.
+fn (session &Session) events_with(running &EventLog) EventLog {
+	// Copies of its own: adding counts in place.
+	mut all := EventLog{
+		names:  session.events.names.clone()
+		counts: session.events.counts.clone()
+	}
+	all.add(running)
+	return all
+}
+
+// Why a boot that is not the last did not end the way one must: by the
+// guest switching the machine off. '' when it did.
+pub fn intermediate_end_problem(boot int, shutdown_reason string, exit_code int, outcome string) string {
+	how := if shutdown_reason != '' { shutdown_reason } else { outcome }
+	if exit_code != 0 {
+		return 'QEMU failed in boot ${boot + 1}: ${outcome}'
+	}
+	if shutdown_reason != 'guest-shutdown' {
+		return 'boot ${boot + 1} ended by ${how}, not by the guest switching the machine off'
+	}
+	return ''
 }
 
 // Builds, boots and watches. An error is the reason the scenario failed.
@@ -152,35 +189,62 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	for table in scenario.tables {
 		os.write_file_array(os.join_path(state, table + '.aml'), acpi_table(table)!)!
 	}
-	command := qemu_command(host, scenario, media, state)!
+	mut session := Session{
+		markers: new_marker_watch(scenario.required, scenario.forbidden_markers())
+		actions: new_action_cursor(scenario.actions)
+	}
 	qemu_log := os.join_path(state, 'qemu.log')
-	os.write_file(qemu_log, command.join(' ') + '\n')!
-	m.serial = SerialReader{
-		path: os.join_path(state, 'serial.log')
-	}
-	m.child = start_child(command, map[string]string{}, qemu_log)!
-	m.started = true
+	os.write_file(qemu_log, '')!
 	started := now_ms()
-	m.qmp = qmp_connect(socket, os.join_path(state, 'qmp.log'), mut m.child, started) or {
-		if err is Interrupted {
-			return err
+	deadline := started + i64(run.timeout) * 1000
+	for boot in 0 .. scenario.boots() {
+		last := boot == scenario.boots() - 1
+		if boot > 0 {
+			// The machine is off: QEMU has let go of the disks.
+			for damage in scenario.reboots[boot - 1].damage {
+				apply_damage(damage, state)!
+			}
+			os.rm(socket) or {}
+			m.serial.text.lines << boot_separator(boot)
 		}
-		// A QEMU that would not start has said why, and nowhere else: the
-		// first line of its log is the command, the rest is its complaint.
-		said := os.read_lines(qemu_log) or { []string{} }
-		complaint := if said.len > 1 { '\n  ' + said[1..].join('\n  ') } else { '' }
-		return error(err.msg() + complaint)
+		command := qemu_command(host, scenario, media, state, boot)!
+		mut log := os.open_append(qemu_log)!
+		log.writeln(command.join(' '))!
+		log.close()
+		m.serial.path = os.join_path(state, serial_log_name(boot))
+		m.serial.offset = 0
+		m.child = start_child(command, map[string]string{}, qemu_log)!
+		m.started = true
+		m.qmp = qmp_connect(socket, os.join_path(state, 'qmp.log'), mut m.child, started) or {
+			if err is Interrupted {
+				return err
+			}
+			// A QEMU that would not start has said why, and nowhere else:
+			// its log has the commands, and its complaint after the last.
+			said := os.read_lines(qemu_log) or { []string{} }
+			complaint := if said.len > boot + 1 { '\n  ' + said[boot + 1..].join('\n  ') } else { '' }
+			return error(err.msg() + complaint)
+		}
+		m.watch(scenario, state, deadline, run.timeout, mut session, boot, last)!
+		// QEMU has exited or the scenario leaves the machine up; either way
+		// what the guest synced is in the disk files only once QEMU has let
+		// go of them.
+		m.child.stop()
+		m.qmp.drain()
+		session.events.add(&m.qmp.events)
+		m.qmp.close()
+		m.qmp = unsafe { nil }
+		m.started = false
 	}
-	m.watch(scenario, state, started + i64(run.timeout) * 1000, run.timeout)!
-	// QEMU has exited or the scenario leaves the machine up; either way what
-	// the guest synced is in the disk files only once QEMU has let go of
-	// them.
-	m.child.stop()
 	for disk in scenario.disks {
 		check_disk_header(disk, state)!
+		check_disk_untouched(disk, state)!
 	}
 	for pattern in scenario.patterns {
 		check_pattern(pattern, state)!
+	}
+	for bytes in scenario.disk_bytes {
+		check_disk_bytes(bytes, state)!
 	}
 	for screen in scenario.screens {
 		check_screen(screen, state)!
@@ -193,9 +257,11 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	}
 }
 
-fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout int) ! {
-	mut markers := new_marker_watch(scenario.required, scenario.forbidden_markers())
-	mut actions := new_action_cursor(scenario.actions)
+// Follows one boot until the machine ends, or until nothing more is expected
+// of a machine that stays up. `last` says it is the scenario's final boot,
+// which is the one the scenario's ending is asked of; any other must end
+// with the guest switching the machine off.
+fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout int, mut session Session, boot int, last bool) ! {
 	mut end_deadline := i64(0) // set by an action with end_within
 	mut end_reason := ''
 	mut failed_at := i64(0)
@@ -213,8 +279,8 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 		}
 		now := now_ms()
 		for line in fresh {
-			markers.line(line)
-			actions.line(line, now)
+			session.markers.line(line)
+			session.actions.line(line, now)
 			if line.contains('HWTEST INFO') {
 				m.notes << line.all_after('HWTEST INFO').trim_space()
 			}
@@ -223,7 +289,7 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 		if ended {
 			break
 		}
-		if markers.failed() {
+		if session.markers.failed() {
 			if failed_at == 0 {
 				failed_at = now
 			}
@@ -231,7 +297,8 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 				break
 			}
 		} else {
-			if action := actions.take_ready(now, &m.qmp.events) {
+			events := session.events_with(&m.qmp.events)
+			if action := session.actions.take_ready(now, &events) {
 				command := substitute(action.qmp, state)!
 				answer := m.qmp.execute(command)!
 				fault := answer_fault(action, answer.text)
@@ -243,7 +310,8 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 					end_reason = '${action.end_within} s after ${command}'
 				}
 			}
-			if scenario.ending == .running && markers.complete() && actions.done() {
+			if last && scenario.ending == .running && session.markers.complete()
+				&& session.actions.done() {
 				return
 			}
 		}
@@ -251,35 +319,44 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 			return error('the machine was still running ${end_reason}')
 		}
 		if now >= deadline {
-			event := actions.waiting_for_event()
+			where := if scenario.boots() > 1 { ' (in boot ${boot + 1} of ${scenario.boots()})' } else { '' }
+			event := session.actions.waiting_for_event()
 			if event != '' {
-				return error('timed out after ${timeout} s: QEMU never reported the event ${event}')
+				return error('timed out after ${timeout} s${where}: QEMU never reported the event ${event}')
 			}
-			missing := markers.missing()
+			missing := session.markers.missing()
 			if missing.len > 0 {
-				return error('timed out after ${timeout} s without ${quoted(missing)}')
+				return error('timed out after ${timeout} s${where} without ${quoted(missing)}')
 			}
-			waiting := actions.waiting_for()
+			waiting := session.actions.waiting_for()
 			if waiting != '' {
-				return error('timed out after ${timeout} s waiting for "${waiting}"')
+				return error('timed out after ${timeout} s${where} waiting for "${waiting}"')
 			}
-			return error('timed out after ${timeout} s: the machine did not power off')
+			return error('timed out after ${timeout} s${where}: the machine did not power off')
 		}
 		time.sleep(poll_interval)
 	}
-	if markers.failed() {
-		return error('forbidden "${markers.forbidden_marker}" in the line: ${markers.forbidden_line}')
+	if session.markers.failed() {
+		return error('forbidden "${session.markers.forbidden_marker}" in the line: ${session.markers.forbidden_line}')
 	}
 	// From here on the machine has ended by itself.
 	how := if m.qmp.shutdown_reason != '' { m.qmp.shutdown_reason } else { m.child.outcome() }
-	missing := markers.missing()
+	if !last {
+		problem := intermediate_end_problem(boot, m.qmp.shutdown_reason, m.child.exit_code(),
+			m.child.outcome())
+		if problem != '' {
+			return error(problem)
+		}
+		return
+	}
+	missing := session.markers.missing()
 	if missing.len > 0 {
 		return error('the machine ended (${how}) without ${quoted(missing)}')
 	}
-	if !actions.done() {
-		return error('the machine ended (${how}) before an action could run; its marker was "${actions.waiting_for()}"')
+	if !session.actions.done() {
+		return error('the machine ended (${how}) before an action could run; its marker was "${session.actions.waiting_for()}"')
 	}
-	unseen := m.qmp.events.missing(scenario.events)
+	unseen := session.events_with(&m.qmp.events).missing(scenario.events)
 	if unseen.len > 0 {
 		return error('the machine ended (${how}) without QEMU reporting ${quoted(unseen)} as often as expected')
 	}

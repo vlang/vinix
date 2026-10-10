@@ -38,6 +38,12 @@ fn run_scenario(name string, mut t Test) bool {
 		'drivers-sleep' { scenario_drivers_sleep(mut t) }
 		'nvme-sleep' { scenario_nvme_sleep(mut t) }
 		'firmware' { scenario_firmware(mut t) }
+		'hibernate' { scenario_hibernate(mut t) }
+		'hibernate-damaged-header' { scenario_hibernate_damaged_header(mut t) }
+		'hibernate-damaged-pages' { scenario_hibernate_damaged_pages(mut t) }
+		'hibernate-iommu' { scenario_hibernate_iommu(mut t) }
+		'hibernate-memory' { scenario_hibernate_memory(mut t) }
+		'hibernate-unnamed' { scenario_hibernate_unnamed(mut t) }
 		'iommu-amd' { scenario_iommu_amd(mut t) }
 		'iommu-intel' { scenario_iommu_intel(mut t) }
 		'iommu-amd-selftest', 'iommu-intel-selftest' { scenario_iommu_selftest(mut t) }

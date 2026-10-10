@@ -133,6 +133,16 @@ pub fn (mut log EventLog) note(event string) {
 	log.counts << 1
 }
 
+// Count everything `other` has as well: the events of a machine that ran
+// earlier in the same scenario.
+pub fn (mut log EventLog) add(other &EventLog) {
+	for i, name in other.names {
+		for _ in 0 .. other.counts[i] {
+			log.note(name)
+		}
+	}
+}
+
 // How many times the event arrived.
 pub fn (log &EventLog) count(event string) int {
 	for i, name in log.names {

@@ -46,6 +46,44 @@ pub:
 	// Patterns the host writes before the boot, for a guest to read: data on
 	// the disk that the guest's kernel cannot have in a cache.
 	prefill []DiskPattern
+	// The machine must leave every byte of it as the controller made it.
+	// Checked once the machine has ended, however many times it booted.
+	untouched bool
+}
+
+// Bytes the controller overwrites in a disk's file between two boots, the
+// machine being off: `length` bytes at `offset`, each set to `fill`.
+pub struct DiskDamage {
+pub:
+	disk   string
+	offset u64
+	length int
+	fill   u8
+}
+
+// Bytes a disk's file must hold at `offset` once the machine has ended:
+// `text`, or `zeros` bytes of zero.
+pub struct DiskBytes {
+pub:
+	disk   string
+	offset u64
+	text   string
+	zeros  int
+}
+
+// One more boot of the same machine. A scenario with any is run boot after
+// boot on one state directory: the same boot image, the same disks with
+// whatever the boot before left on them. Every boot but the last must end
+// with the guest switching the machine off, which QEMU reports; the last
+// ends the way the scenario says. The x86-64 machine has no firmware
+// variables to carry over: QEMU's firmware is given none to keep.
+pub struct Reboot {
+pub:
+	// Extra QEMU arguments for this boot alone, after the scenario's own: a
+	// second -m replaces the first.
+	qemu []string
+	// What the controller does to the disks before it.
+	damage []DiskDamage
 }
 
 // Bytes the guest is expected to have left on a disk, checked on the host
@@ -154,6 +192,11 @@ pub:
 	// Files the machine wrote through QEMU (into {state}), and what each must
 	// hold.
 	writings     []Writing
+	// The boots after the first; see Reboot. The markers, the actions and
+	// the events are those of all the boots together, in order.
+	reboots      []Reboot
+	// What the disks must hold at the end, besides their patterns.
+	disk_bytes   []DiskBytes
 }
 
 // What QEMU's TFTP server serves the guest's network probe; see guest/network.v.
@@ -1065,6 +1108,228 @@ pub const scenarios = [
 		]
 		timeout:  120
 	},
+	Scenario{
+		name:       'hibernate'
+		about:      'suspend to disk, twice: the machine is switched off and the same process carries on in the next boot'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       hibernate_machine
+		disks:      [hibernate_data_disk, hibernate_image_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate', 'HWTEST PASS hibernate']
+		actions:    hibernate_actions
+		reboots:    [Reboot{}, Reboot{}]
+		ending:     .poweroff
+		patterns:   hibernate_patterns
+		disk_bytes: hibernate_no_image
+		screens:    [Screen{
+			file: 'after.ppm'
+		}]
+		timeout:    300
+	},
+	Scenario{
+		name:       'hibernate-iommu'
+		about:      'the same behind Intel VT-d, which the kernel that loads the image has switched on too'
+		arches:     ['x86_64']
+		cmdline:    'vinix.iommu=1 vinix.hibernate=sd1'
+		qemu:       hibernate_machine_isolated
+		disks:      [hibernate_data_disk, hibernate_image_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-iommu', 'HWTEST PASS hibernate-iommu']
+		actions:    hibernate_actions
+		reboots:    [Reboot{}, Reboot{}]
+		ending:     .poweroff
+		patterns:   hibernate_patterns
+		disk_bytes: hibernate_no_image
+		screens:    [Screen{
+			file: 'after.ppm'
+		}]
+		timeout:    300
+	},
+	Scenario{
+		name:       'hibernate-damaged-header'
+		about:      'an image whose header was damaged while the machine was off is not gone back into'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       hibernate_machine
+		disks:      [hibernate_data_disk, hibernate_image_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-damaged-header', 'HWTEST PASS hibernate-damaged-header']
+		// Eight bytes of the header, past its signature: what it says no
+		// longer matches its checksum.
+		reboots:    [
+			Reboot{
+				damage: [
+					DiskDamage{
+						disk:   'image.raw'
+						offset: 72
+						length: 8
+						fill:   0xa5
+					},
+				]
+			},
+		]
+		ending:     .poweroff
+		patterns:   hibernate_refusal_patterns
+		disk_bytes: hibernate_no_image
+		timeout:    180
+	},
+	Scenario{
+		name:       'hibernate-damaged-pages'
+		about:      'nor one with a page damaged, which is only found once all of it has been read'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       hibernate_machine
+		disks:      [hibernate_data_disk, hibernate_image_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-damaged-pages', 'HWTEST PASS hibernate-damaged-pages']
+		// Sixteen megabytes in, among the pages of any image of this machine.
+		reboots:    [
+			Reboot{
+				damage: [
+					DiskDamage{
+						disk:   'image.raw'
+						offset: (16 << 20) + 100
+						length: 24
+						fill:   0x5a
+					},
+				]
+			},
+		]
+		ending:     .poweroff
+		patterns:   hibernate_refusal_patterns
+		disk_bytes: hibernate_no_image
+		timeout:    180
+	},
+	Scenario{
+		name:       'hibernate-memory'
+		about:      'nor by a machine with another amount of memory than the image was taken on'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       hibernate_machine
+		disks:      [hibernate_data_disk, hibernate_image_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-memory', 'HWTEST PASS hibernate-memory']
+		reboots:    [
+			Reboot{
+				qemu: ['-m', '768']
+			},
+		]
+		ending:     .poweroff
+		patterns:   hibernate_refusal_patterns
+		disk_bytes: hibernate_no_image
+		timeout:    180
+	},
+	Scenario{
+		name:     'hibernate-unnamed'
+		about:    'with no device named for an image there is no disk state, and nothing is written to any disk'
+		arches:   ['x86_64']
+		qemu:     hibernate_machine
+		disks:    [
+			Disk{
+				...hibernate_data_disk
+				untouched: true
+			},
+			Disk{
+				...hibernate_image_disk
+				untouched: true
+			},
+		]
+		files:    [tftp_probe]
+		required: ['HWTEST START hibernate-unnamed', 'HWTEST PASS hibernate-unnamed']
+		ending:   .poweroff
+	},
+]
+
+// The machine the suspend-to-disk scenarios boot: four processors, a network
+// card, and two SATA disks -- sd0 for the tests to read and write, and sd1,
+// blank when the machine is first started, for the image.
+const hibernate_machine = ['-smp', '4', '-nic', 'user,model=e1000,tftp={state}/tftp', '-drive',
+	'if=ide,format=raw,file={state}/disk.raw', '-drive', 'if=ide,format=raw,file={state}/image.raw']
+
+const hibernate_machine_isolated = ['-smp', '4', '-device', 'intel-iommu', '-nic',
+	'user,model=e1000,tftp={state}/tftp', '-drive', 'if=ide,format=raw,file={state}/disk.raw',
+	'-drive', 'if=ide,format=raw,file={state}/image.raw']
+
+const hibernate_data_disk = Disk{
+	name:     'disk.raw'
+	size_mib: 32
+	header:   'vinix hardware test disk: not blank'
+}
+
+// Room for an image of everything a machine with a gigabyte of memory can
+// have in use and still take a copy of. The file is a hole until written.
+const hibernate_image_disk = Disk{
+	name:     'image.raw'
+	size_mib: 640
+}
+
+const hibernate_actions = [
+	Action{
+		after:    'HWTEST STEP screen after the cycles'
+		delay_ms: 200
+		qmp:      screen_picture('after')
+	},
+]
+
+// What guest/hibernate.v writes around each of its two cycles.
+const hibernate_patterns = [
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 1 << 20
+		length: 65536
+		seed:   0x51
+	},
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 2 << 20
+		length: 65536
+		seed:   0x52
+	},
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 3 << 20
+		length: 65536
+		seed:   0x53
+	},
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 4 << 20
+		length: 65536
+		seed:   0x54
+	},
+]
+
+// And around an image that is refused: one before the machine is put away,
+// one by the machine that started afresh.
+const hibernate_refusal_patterns = [
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 1 << 20
+		length: 65536
+		seed:   0x61
+	},
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 2 << 20
+		length: 65536
+		seed:   0x62
+	},
+]
+
+// What the image device must hold when the machine has ended: the header of
+// a device that is this system's, describing no pages. An image that was
+// gone back into, and one that was refused, are both gone.
+const hibernate_no_image = [
+	DiskBytes{
+		disk: 'image.raw'
+		text: 'VINIXHIB'
+	},
+	DiskBytes{
+		disk:   'image.raw'
+		offset: 24
+		zeros:  8
+	},
 ]
 
 // One sleep that QEMU must have seen begin and end.
@@ -1379,6 +1644,32 @@ pub fn (s &Scenario) qemu_arguments(arch string) []string {
 	return extra
 }
 
+// How many times the machine is booted.
+pub fn (s &Scenario) boots() int {
+	return 1 + s.reboots.len
+}
+
+// The same for boot `boot`, the first being 0: a later boot's own arguments
+// come last, where they override.
+pub fn (s &Scenario) boot_arguments(arch string, boot int) []string {
+	mut extra := s.qemu_arguments(arch)
+	if boot > 0 && boot <= s.reboots.len {
+		extra << s.reboots[boot - 1].qemu
+	}
+	return extra
+}
+
+// The serial log of boot `boot`: serial.log, then serial-2.log and so on,
+// since QEMU empties the file it is given.
+pub fn serial_log_name(boot int) string {
+	return if boot == 0 { 'serial.log' } else { 'serial-${boot + 1}.log' }
+}
+
+// The line put between two boots' serial output where they are shown as one.
+pub fn boot_separator(boot int) string {
+	return '──── boot ${boot + 1} ────'
+}
+
 pub fn (s &Scenario) forbidden_markers() []string {
 	mut markers := always_forbidden.clone()
 	markers << s.forbidden
@@ -1445,6 +1736,23 @@ pub fn validate_scenarios(all []Scenario) ! {
 			if !scenario.qemu_arguments('x86_64').any(it.contains('{state}/${sound.file}'))
 				&& !scenario.qemu_arguments('aarch64').any(it.contains('{state}/${sound.file}')) {
 				return error('scenario ${scenario.name}: nothing records ${sound.file}')
+			}
+		}
+		if scenario.reboots.len > 0 && scenario.ending == .running {
+			return error('scenario ${scenario.name}: a machine booted more than once has to end by itself')
+		}
+		mut damages := []DiskDamage{}
+		for reboot in scenario.reboots {
+			damages << reboot.damage
+		}
+		for damage in damages {
+			if damage.length <= 0 || !scenario.disks.any(it.name == damage.disk) {
+				return error('scenario ${scenario.name}: damage is done to a disk the scenario has, and to some of it')
+			}
+		}
+		for bytes in scenario.disk_bytes {
+			if !scenario.disks.any(it.name == bytes.disk) || (bytes.text == '') == (bytes.zeros == 0) {
+				return error('scenario ${scenario.name}: bytes are expected on a disk the scenario has, as text or as zeros')
 			}
 		}
 		for screen in scenario.screens {
