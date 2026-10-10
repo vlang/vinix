@@ -22,6 +22,8 @@ const desktop_source_paths = [
 	'build-support/init-aarch64/syscall_abi.S',
 	'build-support/init-aarch64/syscall_abi.h',
 	'build-support/init-aarch64/compile-v.py',
+	'build-support/init-aarch64/compile-init',
+	'build-support/init-aarch64/compile_init.v',
 	'tools/m1-wifi/compile-v.py',
 	'tools/m1-wifi/wifi_v.h',
 	'tools/m1-wifi/core/core.v',

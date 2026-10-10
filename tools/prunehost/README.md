@@ -36,5 +36,5 @@ also check lsof statuses and redacted failures. Logs are
 `/tmp/vinix-bootstrap-{arm,x86,san}.log`.
 
 No Python was executed, no real workspace archives were deleted, and these
-host checks do not establish a new guest boot. The other desktop bootstrap
-Python suites remain counted until their own workflow ports are complete.
+host checks do not establish a new guest boot. All desktop bootstrap suites now
+have native entrypoints; see [their checks](../../tests/desktop-bootstrap/README.md).

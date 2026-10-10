@@ -425,7 +425,7 @@ vinix_build_minimal_init() {
     binary="$(mktemp "$INIT_DIR/.init.XXXXXX")"
     source="$object.c"
     abi_object="$object.abi.o"
-    if ! python3 "$SCRIPT_DIR/build-support/init-aarch64/compile-v.py" shell "$source" ||
+    if ! "$SCRIPT_DIR/build-support/init-aarch64/compile-init" shell "$source" ||
        ! clang -target aarch64-linux-none -nostdlib -ffreestanding -O2 \
         -fno-stack-protector -fno-builtin -ffunction-sections -fdata-sections \
         -I"$SCRIPT_DIR/build-support/init-aarch64" -c -o "$object" "$source" ||
