@@ -31,6 +31,21 @@ path. Fixed identifier literals and keyword names can opt into CPython
 interning. The controller determines those finite literals and constant-folded
 values in V; the dictionary remains owned by its counted Python module.
 
+Controllers can opt into the `load_global` callback at an original Python
+`LOAD_GLOBAL` boundary. Its `key` is the Session ID of a finite interned exact
+Unicode name; `builtins` is the Session ID of that original caller frame's
+builtins table. The callback uses the Session's actual globals dictionary,
+returns an independently retained alias, and consults builtins only when the
+name is absent. Dictionary and mapping lookup errors remain actual exceptions;
+a missing name in both tables raises intrinsic `NameError`. The existing
+`resolve` wire-plan callback keeps its original behavior.
+
+The caller supplies its frame's actual table, rather than saving the module's
+`__builtins__` at import or reading it again after callbacks. On CPython 3.9,
+a later function call can acquire a replaced globals `__builtins__` table;
+an already running frame keeps its own table. A thin controller wrapper can
+capture `sys._getframe` privately and pass its caller's `f_builtins` at entry.
+
 The counted Python adapter supplies double keyword expansion, exact pair
 unpacking, dynamically named unbound locals, exception-raising syntax and the
 upstream `contextlib.ExitStack` callback interface. These bindings contain no

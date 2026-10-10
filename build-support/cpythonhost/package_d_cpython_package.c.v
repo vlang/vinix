@@ -609,6 +609,7 @@ fn (mut s PackageSession) primitive(name string, row map[string]ah.Value) ah.Val
 	}
 	match name {
 		'resolve' { return s.retained(s.resolve(ah.field(row, 'name').text())) }
+		'load_global' { return s.retained(s.load_global(row)) }
 		'release' {
 			for id in ah.field(row, 'ids').items() { s.release_id(id.text()) }
 			return null()
