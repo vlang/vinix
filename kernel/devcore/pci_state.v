@@ -135,6 +135,8 @@ pub fn pci_power_down_blocker() &Device {
 
 // Read out the configuration space of every PCI function. Call with bindings
 // frozen and the drivers suspended, so that what is read is what they left.
+// A function already put into D3 for this sleep keeps the record made before
+// it went down, when this is called again on the way to a suspend to RAM.
 // False when there is no memory to keep it in.
 pub fn pci_save_all() bool {
 	wanted := pci_device_count()
@@ -159,12 +161,17 @@ pub fn pci_save_all() bool {
 			continue
 		}
 		mut record := unsafe { &devcore_pci_saved[count] }
+		count++
+		if dev.pci_asleep && record.bdf == pci_bdf(dev.pci) {
+			// Put into D3 for this sleep (pci_power.v), after being read out:
+			// what it holds now is not what it is to be given back.
+			continue
+		}
 		record.bdf = pci_bdf(dev.pci)
 		record.unrestored = false
 		for word in 0 .. pci_state_words {
 			record.words[word] = dev.pci.read[u32](u32(word * 4))
 		}
-		count++
 	}
 	devcore_pci_count = count
 	return true

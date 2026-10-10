@@ -220,6 +220,8 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		sched.thaw_userspace()
 		return false
 	}
+	// Quiet is not off: what can be powered down and brought back is.
+	devcore.pci_sleep_all()
 	before := platform_security_state()
 	syspower_stats.security_cpus = platform_security_cpus(before)
 	screen_down()

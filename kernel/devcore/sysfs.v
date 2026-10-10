@@ -10,6 +10,7 @@
 //	    state health                          Vinix's: bound, failed; its history
 //	    reset remove                          write 1 to ask
 //	    power/wakeup power/wakeup_count       may it end a sleep; did it
+//	    power_state power/d3_count            D0 or D3hot (PCI); sleeps spent in D3hot
 //	/sys/bus/pci/devices/0000:00:03.0 -> ../../../devices/pci0000:00/0000:00:03.0
 //	/sys/bus/pci/drivers/e1000/
 //	    bind unbind                           write a device's name
@@ -160,6 +161,8 @@ fn publish_device(mut dev Device) {
 		attribute(dev, 'class', 0o444, show_class, unsafe { nil })
 		attribute(dev, 'revision', 0o444, show_revision, unsafe { nil })
 		attribute(dev, 'config', 0o400, show_config, unsafe { nil })
+		attribute(dev, 'power_state', 0o444, show_power_state, unsafe { nil })
+		attribute(dev, 'power/d3_count', 0o444, show_d3_count, unsafe { nil })
 	} else if dev.compatible.len != 0 {
 		attribute(dev, 'compatible', 0o444, show_compatible, unsafe { nil })
 	}
@@ -424,6 +427,32 @@ fn store_wakeup(context voidptr, data &u8, length u64) u64 {
 fn show_wakeup_count(context voidptr, mut text lib.Text) {
 	dev := unsafe { &Device(context) }
 	text.add_unsigned(dev.wakeups)
+	text.add_byte(`\n`)
+}
+
+// Linux's words. A function with no power management capability is in D0:
+// it has no other state to be in.
+fn show_power_state(context voidptr, mut text lib.Text) {
+	dev := unsafe { &Device(context) }
+	if dev.pci == unsafe { nil } || !dev.pci.present() {
+		text.add('unknown\n')
+		return
+	}
+	state := pci_power_state(dev.pci)
+	text.add(if state == 3 {
+		'D3hot\n'
+	} else if state == 2 {
+		'D2\n'
+	} else if state == 1 {
+		'D1\n'
+	} else {
+		'D0\n'
+	})
+}
+
+fn show_d3_count(context voidptr, mut text lib.Text) {
+	dev := unsafe { &Device(context) }
+	text.add_unsigned(dev.d3_count)
 	text.add_byte(`\n`)
 }
 

@@ -75,6 +75,7 @@ pub fn publish() {
 	fs.sysfs_attribute('power/suspend_stats/security_changes', 0o444, show_security_changes,
 		unsafe { nil }, unsafe { nil })
 	publish_screen()
+	publish_pci_power()
 	fs.sysfs_attribute('power/suspend_stats/security_cpus', 0o444, show_security_cpus, unsafe { nil },
 		unsafe { nil })
 	fs.sysfs_attribute('power/suspend_stats/last_failed_reason', 0o444, show_failed_reason,

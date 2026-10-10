@@ -110,6 +110,10 @@ pub mut:
 	wakeup_capable  bool
 	wakeup_enabled  bool
 	wakeups         u64
+	// Put into D3hot by the core for the sleep in progress (pci_power.v), and
+	// how many sleeps it has spent there.
+	pci_asleep      bool
+	d3_count        u64
 
 	// Health, for the recovery in recovery.v and for anyone reading sysfs.
 	timeouts       u64
@@ -541,8 +545,10 @@ pub fn suspend_all() &Device {
 }
 
 // Bring back every suspended device, first added first. A device whose driver
-// cannot resume it is handed to recovery rather than left half alive.
+// cannot resume it is handed to recovery rather than left half alive. PCI
+// functions that were put into D3 for the sleep are brought to D0 first.
 pub fn resume_all() {
+	pci_wake_all()
 	resume_from(0)
 }
 
