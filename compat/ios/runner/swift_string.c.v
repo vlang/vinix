@@ -212,6 +212,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'_$sytN' { swift_void_full_metadata() }
 		'_$sSSN' { swift_string_metadata() }
 		'_$sSSMn' { read64(swift_string_metadata() + 8) }
 		'_$sSSMa' { swift_string_metadata(); ios_runtime.swift_metadata_arena }

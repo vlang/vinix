@@ -1968,17 +1968,39 @@ failures occurred before QEMU and are recorded separately from guest results.
 The broader regression failures above still hold publication; the five
 published runners retain their last passing hashes.
 
+V now supplies Void's `_$sytN` full metadata header. Its empty-tuple address
+point is eight bytes after the export, with kind `0x301`, zero elements and
+null labels. The canonical read-only page carries zero-size, stride-one POD
+value witnesses. Copy, take, assignment and destruction touch no value bytes;
+single-payload enum witnesses use the native one/two/four-byte tag boundaries,
+including the installed runtime's UInt32 overflow at `UINT32_MAX` empty cases.
+Dynamic tuple metadata construction remains unimplemented.
+
+Installed-library and V Void tests pass ASAN/UBSAN in both seed modes, alongside
+the existing typed Array suite. Tests inspect actual read-only permissions,
+exercise null/protected addresses, unaligned tags and protected page boundaries,
+verify `Array<Void>` and nested Array alias ownership, and run eight workers
+and two drained/unmapped runtime cycles. Generated witnesses and metadata
+construction/retirement contain no hidden V allocations. All thirty-two
+programs rebuild, and all fourteen Swift ABI guest checks pass.
+
+The actual Fortnite probe now resolves Void and exits with status 1 before
+entry at EOSSDK's `__swift_stdlib_operatingSystemVersion` import. Evidence is
+retained under `swift-void-checks`, including native measurements of that next
+entry's indirect 24-byte return ABI. Full regression remains unpassed and the
+five published runners retain their last passing hashes.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,385 | 773 | 81 |
-| EOSSDK | 596 | 66 | 18 |
-| MarketplaceKitWrapper | 89 | 87 | 23 |
-| All images | 2,070 | 926 | 122 |
+| Fortnite executable | 1,386 | 772 | 81 |
+| EOSSDK | 597 | 65 | 18 |
+| MarketplaceKitWrapper | 90 | 86 | 23 |
+| All images | 2,073 | 923 | 122 |
 
-The C++/GLES/Text variant reports 2,083 resolved imports, 913 unresolved strong
+The C++/GLES/Text variant reports 2,086 resolved imports, 910 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -2030,7 +2052,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all thirteen Swift ABI checks in a small, independent guest and
+`swift` runs all fourteen Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.
