@@ -722,7 +722,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _strcspn
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _strerror
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1156,17 +1156,29 @@ that log is retained, and the completed rerun passed. This resolves two strong
 imports across Fortnite and EOSSDK. The actual game still exits with status 1
 before entry, now at `strcspn` in EOSSDK.
 
+`strcspn`, `strncat` and `strtok_r` now resolve to native libc entry points.
+The installed Mac SDK and Vinix's libc use matching 64-bit sizes, pointers and
+caller-owned tokenizer state for these byte-string operations. EOSSDK's traced
+`strcspn` call uses the returned 64-bit span to split a string in place. The
+existing host libSystem checks and full ARM64 C++/GLES/PPSSPP regression pass;
+the regression needed a retry after the previously observed concurrent
+permissions/readlink failure, whose log is retained. The three bindings resolve
+four more strong imports. The actual game still exits with status 1 before
+entry, now at `strerror` in EOSSDK. Native Mac measurements for the next
+`strerror`/`strerror_r` adapters are retained under `byte-string-checks`;
+those two imports remain unresolved.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,316 | 842 | 81 |
-| EOSSDK | 535 | 127 | 18 |
+| Fortnite executable | 1,319 | 839 | 81 |
+| EOSSDK | 536 | 126 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,911 | 1,085 | 122 |
+| All images | 1,915 | 1,081 | 122 |
 
-The C++/GLES/Text variant reports 1,924 resolved imports, 1,072 unresolved strong
+The C++/GLES/Text variant reports 1,928 resolved imports, 1,068 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

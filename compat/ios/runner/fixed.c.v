@@ -52,7 +52,10 @@ fn C.strrchr(&char, i32) &char
 fn C.strstr(&char, &char) &char
 fn C.strpbrk(&char, &char) &char
 fn C.strspn(&char, &char) usize
+fn C.strcspn(&char, &char) usize
 fn C.strcat(&char, &char) &char
+fn C.strncat(&char, &char, usize) &char
+fn C.strtok_r(&char, &char, &&char) &char
 fn C.strcoll(&char, &char) i32
 fn C.strncmp(&char, &char, usize) i32
 fn C.strncasecmp(&char, &char, usize) i32
@@ -204,7 +207,10 @@ fn fixed_symbol(symbol string) ?u64 {
         '_strstr' { u64(unsafe { voidptr(C.strstr) }) }
         '_strpbrk' { u64(unsafe { voidptr(C.strpbrk) }) }
         '_strspn' { u64(unsafe { voidptr(C.strspn) }) }
+        '_strcspn' { u64(unsafe { voidptr(C.strcspn) }) }
         '_strcat' { u64(unsafe { voidptr(C.strcat) }) }
+        '_strncat' { u64(unsafe { voidptr(C.strncat) }) }
+        '_strtok_r' { u64(unsafe { voidptr(C.strtok_r) }) }
         '_strcoll' { u64(unsafe { voidptr(C.strcoll) }) }
         '_strncmp' { u64(unsafe { voidptr(C.strncmp) }) }
         '_strncasecmp' { u64(unsafe { voidptr(C.strncasecmp) }) }
