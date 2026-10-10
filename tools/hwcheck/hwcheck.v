@@ -231,6 +231,42 @@ fn power(mut r Report) {
 	r.add('')
 }
 
+// The number on the line of /sys/power/pci_d3 that starts with `name`.
+fn d3_figure(name string) int {
+	for line in (os.read_file(sys + '/power/pci_d3') or { '' }).split_into_lines() {
+		if line.starts_with(name + ':') {
+			return line.all_after(':').trim_space().int()
+		}
+	}
+	return 0
+}
+
+// Which PCI functions the last sleep switched nearly off, and whether each
+// came back. Nothing is said on a kernel that has no such report.
+fn d3_report(mut r Report) {
+	if !os.exists(sys + '/power/pci_d3') {
+		return
+	}
+	mut down := []string{}
+	for name in listing(sys + '/bus/pci/devices') {
+		device := '${sys}/bus/pci/devices/${name}'
+		if word(device + '/power/d3_count').int() > 0 {
+			down << name
+		}
+		state := word(device + '/power_state')
+		if state != '' && state != 'D0' {
+			r.problem('pci device ${name} is in ${state} with the machine awake')
+		}
+	}
+	r.add('PCI power states are ${word(sys + '/power/pci_d3').all_before('\n')}: the last sleep put ${d3_figure('last')} functions into D3hot (${down.join(', ')}) and wrote back ${d3_figure('rewritten')} of their registers.')
+	if d3_figure('refused') > 0 {
+		r.problem('${d3_figure('refused')} PCI functions would not go into D3hot')
+	}
+	if d3_figure('not back') > 0 {
+		r.problem('${d3_figure('not back')} PCI functions did not come back from D3hot')
+	}
+}
+
 // Suspends and resumes every device without sleeping.
 fn rehearse(mut r Report) {
 	r.add('## Sleep rehearsal')
@@ -251,6 +287,7 @@ fn rehearse(mut r Report) {
 			'/power/suspend_stats/security_checks')} times and found changed ${word(sys +
 			'/power/suspend_stats/security_changes')} times.')
 	}
+	d3_report(mut r)
 	for bus in listing(sys + '/bus') {
 		for name in listing('${sys}/bus/${bus}/devices') {
 			if word('${sys}/bus/${bus}/devices/${name}/state') == 'failed' {
