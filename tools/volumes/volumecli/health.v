@@ -14,9 +14,12 @@ mut:
 
 @[direct_array_access]
 fn health_valid(report &Health) bool {
-	if report.version != 1 || report.protocol != 1 || report.disk_id == 0
+	if report.version != 1 || report.protocol !in [u64(1), 2]! || report.disk_id == 0
 		|| report.flags & ~u64(31) != 0 { return false }
 	for value in report.reserved { if value != 0 { return false } }
+	if report.protocol == 2 {
+		return report.flags & 15 == 15 && (report.flags & 16 != 0) == (report.data[0] != 0)
+	}
 	if report.flags & 2 != 0 && report.flags & 1 == 0 { return false }
 	if report.flags & 12 != 0 && report.flags & 3 != 3 { return false }
 	if report.flags & 16 != 0 && report.flags & 8 == 0 { return false }
@@ -62,6 +65,7 @@ fn show_health(report &Health) i32 {
 		C.printf(c'vinix-volume: invalid health report\n')
 		return 1
 	}
+	if report.protocol == 2 { return show_nvme_health(report) }
 	mut model := [41]u8{}
 	mut serial := [21]u8{}
 	mut firmware := [9]u8{}

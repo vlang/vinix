@@ -211,7 +211,7 @@ volume counters unchanged. These are request failure counters, not a hardware
 diagnostic classification. A partition reports parent counters with flag 16;
 a logical view tracks its own forwarded operations and inherits parent
 offline/flush/discard capability. Large syscalls can comprise several backend
-operations. AHCI also provides the SMART query below. NVMe/ANS health logs,
+operations. AHCI and the development PCI NVMe driver provide the health queries below. ANS health logs,
 vendor-specific wear and temperature interpretation, predictive monitoring and
 real-hardware qualification remain future work. Unsupported status backends return
 `ENOTTY`. Geometry also supports `BLKGETSIZE64`, `BLKGETSIZE`, `BLKSSZGET`, and
@@ -264,6 +264,58 @@ Protocol layout references are the
 [AHCI received-FIS and transfer-count specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/serial-ata-ahci-spec-rev1-3-1.pdf)
 and [QEMU's ATA SMART implementation](https://github.com/qemu/qemu/blob/master/hw/ide/core.c).
 See [native host and guest qualification](../tests/storage-health/README.md).
+
+## NVMe SMART/Health
+
+```sh
+vinix-volume health /dev/nvme0n0
+```
+
+Whole native PCI NVMe namespaces support the same read-only health ioctl and
+descriptor/MAC policy. The driver retains its existing development-build
+activation policy (`PROD=false`); production probing and physical-controller
+qualification remain separate work. Apple ANS, VirtIO, partitions and linear
+views remain unsupported. The query accepts no admin command passthrough.
+
+Protocol 2 uses the existing 1088-byte version-one ABI: its identity payload is
+the first 512 bytes of a fresh 4096-byte Identify Controller response, and its
+data payload is the complete 512-byte SMART/Health Information log (LID 2).
+The log is controller-wide (`NSID=0xffffffff`), including when opened through a
+particular namespace; the runtime disk ID still identifies the opened namespace.
+Multiple namespaces on the same controller therefore report the same health
+scope. The query sets RAE to retain pending asynchronous notifications. It
+changes no features, warning thresholds, self-tests or namespace data.
+
+Flags 1/2/4/8 indicate that the mandatory log is supported, usable, returned
+and has valid warning status. Flag 16 means the critical-warning byte is nonzero,
+including warning bits unknown to this utility. A command failure returns an
+error without publishing a partial report. NVMe has no ATA data checksum or
+completion transfer-length field; successful command completion is the trust
+boundary for the device's returned payload. The identity and log are two
+successive commands, rather than an atomic controller snapshot.
+
+Each query uses one zeroed, private, page-aligned DMA page and the existing
+controller lock, completion checks and timeout policy. The page is freed after
+both completed commands or an ordinary completion error. After a timeout it is
+freed only if controller disable confirms DMA has stopped; otherwise that one
+submitted page remains quarantined and later queries submit nothing. There is
+no per-query kernel heap allocation. Health queries leave completed block I/O
+counters unchanged; backend failures increment the namespace's error metric.
+
+The utility prints sanitized model, serial and firmware, the raw critical-warning
+byte, temperature in kelvin (zero means unavailable), available spare and its
+threshold as percentages, and the device's percentage-used estimate. That
+estimate may exceed 100. Ten standard counters are printed as full 128-bit
+hexadecimal values, without truncation or conversion of data units to bytes.
+Exit status is 0 with no critical warnings, 3 when any are active, 1 for a query
+or report error and 2 for invalid usage. No warnings is a current device report,
+not a prediction or a durability guarantee.
+
+Protocol references are the
+[NVM Express Base Specification](https://nvmexpress.org/wp-content/uploads/NVM-Express-Base-Specification-2.0e-2024.07.29-Ratified.pdf),
+[libnvme SMART/Health and identity definitions](https://github.com/linux-nvme/libnvme/blob/master/src/nvme/types.h)
+and [QEMU's NVMe controller implementation](https://github.com/qemu/qemu/blob/master/hw/nvme/ctrl.c).
+See [native health qualification](../tests/storage-health/README.md).
 
 ## TRIM/discard
 
@@ -336,15 +388,20 @@ reaping, nonzero utility exits, fork failure and failed exec under ASan/UBSan.
 Host plan-set checks also exercise 64 plans, all global slots, deterministic
 ordering, ignored filenames and enumeration limits.
 
-NVMe discard is qualified with the production command/completion code and
-mocked MMIO on the host, including 200 successful operations and failed-reset
-DMA ownership. An attempted NVMe development guest panicked during device
-initialization before reaching userspace. Native NVMe boot qualification and
-its production initialization policy remain open; host results do not establish
-real-controller or guest readiness.
+NVMe discard and health are qualified with production command/completion code
+and mocked MMIO on the host, including 200 successful operations and failed-reset
+DMA ownership. NVMe now maps high 64-bit BAR registers and the required doorbells
+uncached instead of assuming they are in the initial direct map. Its polled
+completion queues leave interrupts disabled. The development-only activation
+policy, physical-controller and power-loss qualification remain open. The
+development guest also checks healthy/warning NVMe responses and retained heap
+across 200 plan cycles, including 200 successful and 200 bad-pointer queries
+per namespace after warmup. This measurement exposed heap-promoted read command
+temporaries; read and flush commands now stay on the caller's stack while their
+DMA payloads retain the existing completion/reset ownership rules.
 
 The encompassing roadmap item stays open: storage pools/RAID, full-disk
 encryption and recovery, online filesystem resize,
-filesystem-aware trimming, NVMe/ANS health logs and predictive health monitoring are not
+filesystem-aware trimming, ANS health logs and predictive health monitoring are not
 implemented by this increment. The anonymous pager's encrypted swap remains a
 separate feature.

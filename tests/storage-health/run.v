@@ -19,7 +19,8 @@ fn put(work string, name string, content string) ! {
 fn function(source string, name string) !string {
 	mut position := 0
 	for line in source.split_into_lines() {
-		if line.starts_with('fn ') && (line.contains(' ${name}(') || line.starts_with('fn ${name}(')) {
+		if (line.starts_with('fn ') || line.starts_with('pub fn '))
+			&& (line.contains(' ${name}(') || line.starts_with('fn ${name}(')) {
 			mut end := position + (line.index('{') or { return error('Missing brace') }) + 1
 			mut depth := 1
 			for end < source.len && depth != 0 {
@@ -39,11 +40,12 @@ fn host(root string, work string) ! {
 	put(work, 'v.mod', "Module { name: 'storage_health_host' }\n")!
 	put(work, 'pci/pci.v', 'module pci\npub struct PCIBar {}\n')!
 	put(work, 'devcore/core.v', 'module devcore\npub struct Device {}\n')!
-	put(work, 'stat/stat.v', 'module stat\npub struct Stat { pub mut: rdev u64 }\n')!
+	put(work, 'stat/stat.v', 'module stat\npub struct Stat { pub mut: rdev u64 size i64 blksize i64 blocks i64 }\n')!
 	put(work, 'event/eventstruct/event.v', 'module eventstruct\npub struct Event {}\n')!
-	put(work, 'klock/lock.v', '@[has_globals]\nmodule klock\n__global pub depth int\npub struct Lock {}\npub fn (mut l Lock) acquire() { depth++ }\npub fn (mut l Lock) release() { depth-- }\n')!
-	put(work, 'errno/error.v', '@[has_globals]\nmodule errno\n__global pub code int\npub const eio=5\npub const ebadf=9\npub const enodev=19\npub const enotty=25\npub const efault=14\npub const eperm=1\npub fn set(value int) { code=value }\npub fn get() int { return code }\n')!
-	put(work, 'resource/base.v', 'module resource\nimport stat\n#define vinix_stack_alloc __builtin_alloca\nfn C.vinix_stack_alloc(usize) voidptr\npub interface Resource { mut: stat stat.Stat }\npub struct BlockMetrics { pub mut: failures int }\npub fn (mut m BlockMetrics) failed() { m.failures++ }\npub const o_rdonly=0\npub const o_rdwr=2\npub const o_accmode=3|0o10000000\n')!
+	put(work, 'klock/lock.v', '@[has_globals]\nmodule klock\n__global pub depth int\npub struct Lock {}\npub fn (mut l Lock) acquire() { assert depth==0; depth++ }\npub fn (mut l Lock) release() { assert depth==1; depth-- }\npub fn spin_hint() {}\n')!
+	put(work, 'errno/error.v', '@[has_globals]\nmodule errno\n__global pub code int\npub const eio=5\npub const ebadf=9\npub const enodev=19\npub const enotty=25\npub const efault=14\npub const eperm=1\npub const enomem=12\npub const einval=22\npub const eopnotsupp=95\npub fn set(value int) { code=value }\npub fn get() int { return code }\n')!
+	put(work, 'resource/base.v', 'module resource\nimport stat\n#define vinix_stack_alloc __builtin_alloca\nfn C.vinix_stack_alloc(usize) voidptr\npub interface Resource { mut: stat stat.Stat }\npub struct BlockMetrics { pub mut: failures int }\npub fn (mut m BlockMetrics) failed() { m.failures++ }\npub fn (mut m BlockMetrics) flushed() {}\npub const o_rdonly=0\npub const o_rdwr=2\npub const o_accmode=3|0o10000000\n'
+		+ function(os.read_file(root + '/kernel/resource/block_discard.v')!, 'discard_range_valid')!)!
 	os.cp(root + '/kernel/resource/block_health.v', work + '/resource/health.v')!
 	// Select the production AHCI dispatcher explicitly so the same simulated
 	// AMD64 backend is exercised on ARM and AMD64 development hosts.
@@ -62,23 +64,50 @@ fn host(root string, work string) ! {
 	put(work, 'ahci/health.v', os.read_file(root + '/kernel/dev/ahci/health.v')!)!
 	put(work, 'ahci/model.v', os.read_file(root + '/tests/storage-health/model.v')!)!
 	os.cp(root + '/tests/storage-health/health_test.v', work + '/ahci/health_test.v')!
+	nvme_host(root, work)!
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
 	print(command([v, '-nocache', '-enable-globals', '-cc', 'clang', '-cflags', '-fsanitize=address,undefined',
-		'-ldflags', '-fsanitize=address,undefined', 'test', work + '/ahci', work + '/fs'])!)
+		'-ldflags', '-fsanitize=address,undefined', 'test', work + '/ahci', work + '/fs', work + '/nvme'])!)
 	cli := work + '/health-cli-host'
 	command([v, '-nocache', '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
 		'-fsanitize=address,undefined', '-o', cli, root + '/tools/volumes/volumecli/health_test.v'])!
 	print(command([cli])!)
-	println('PASS: production AHCI SMART protocol, fault propagation, descriptor policy and copying under sanitizers')
+	println('PASS: production ATA/NVMe health, completion and DMA ownership, descriptor policy and copying under sanitizers')
+}
+
+fn nvme_host(root string, work string) ! {
+	source := os.read_file(root + '/kernel/dev/nvme/nvme.v')!
+	prefix := source[..source.index('__global (') or { return error('Missing NVMe declarations') }]
+	declarations := prefix.split_into_lines().filter(!it.starts_with('import ')).join('\n')
+	mut functions := ''
+	for name in ['send_cmd', 'send_cmd_and_wait', 'fail_controller', 'ready_timeout_ns', 'rw_lba', 'transfer', 'sync', 'discard'] {
+		functions += function(source, name)! + '\n'
+	}
+	functions += function(source[source.index('pub fn (mut pair NVMEQueuePair) initialise(') or { return error('Missing queue initializer') }..], 'initialise')!
+	put(work, 'nvme/nvme.v', declarations.replace('module nvme', 'module nvme\nimport memory\nimport lib\nimport pci\nimport bitmap\nimport stat\nimport klock\nimport event.eventstruct\nimport errno\nimport katomic\nimport resource\nimport proc\nimport x86.hpet as hpet_clock\n')
+		+ '\nconst page_size=u64(4096)\nconst higher_half=u64(0)\n__global kernel_pagemap=memory.Pagemap{}\n#include <stdio.h>\n#define kprintf printf\n#define vinix_stack_alloc __builtin_alloca\nfn C.kprintf(&char,...voidptr) int\nfn C.vinix_stack_alloc(usize) voidptr\nfn C.memset(voidptr,i32,usize) voidptr\nfn C.memcpy(voidptr,voidptr,usize) voidptr\n' + functions)!
+	os.cp(root + '/kernel/dev/nvme/health.v', work + '/nvme/health.v')!
+	os.cp(root + '/kernel/dev/nvme/mmio.v', work + '/nvme/mmio.v')!
+	os.cp(root + '/tests/storage-health/nvme_boot_test.v', work + '/nvme/boot_test.v')!
+	os.cp(root + '/tests/storage-health/nvme_test.v', work + '/nvme/health_test.v')!
+	os.cp(root + '/tests/block-storage/completion_test.v', work + '/nvme/completion_test.v')!
+	put(work, 'proc/disk.v', 'module proc\npub fn account_disk_transfer(_ u64,_ bool) {}\npub fn account_disk_io(_ u64,_ u64,_ bool) {}\n')!
+	put(work, 'lib/lib.v', 'module lib\npub fn div_roundup[T](a T,b T) T { return (a+b-1)/b }\n')!
+	put(work, 'katomic/katomic.v', 'module katomic\npub fn sync() {}\n')!
+	put(work, 'bitmap/bitmap.v', 'module bitmap\npub struct GenericBitmap { mut: slots []bool }\npub fn (mut b GenericBitmap) initialise(count u64) { b.slots=[]bool{len:int(count)} }\npub fn (b GenericBitmap) alloc() ?u64 { for i,busy in b.slots { if !busy { unsafe { b.slots[i]=true }; return u64(i) } }; return none }\npub fn (b GenericBitmap) free_entry(index u64) { unsafe { b.slots[index]=false } }\n')!
+	put(work, 'x86/hpet/hpet.v', '@[has_globals]\nmodule hpet\n__global tick_hook=fn () {}\n__global ticks=u64(0)\npub fn nanoseconds() u64 { ticks+=1_000_000_000; tick_hook(); return ticks }\npub fn set_hook(hook fn ()) { tick_hook=hook; ticks=0 }\n')!
+	put(work, 'memory/memory.v', '@[has_globals]\nmodule memory\n#include <stdlib.h>\nfn C.posix_memalign(&voidptr,usize,usize) int\n__global live_pages=u64(0)\n__global pub fail_alloc bool\npub fn pmm_alloc_nozero_fallible(pages u64) voidptr { if fail_alloc { return unsafe { nil } }; mut pointer:=unsafe { nil }; if C.posix_memalign(&pointer,4096,usize(pages*4096))!=0 { return unsafe { nil } }; live_pages+=pages; unsafe { C.memset(pointer,0x5a,usize(pages*4096)) }; return pointer }\npub fn pmm_alloc(pages u64) voidptr { pointer:=pmm_alloc_nozero_fallible(pages); assert pointer!=unsafe { nil }; unsafe { C.memset(pointer,0,usize(pages*4096)) }; return pointer }\npub fn pmm_free(pointer voidptr,pages u64) { assert live_pages>=pages; live_pages-=pages; unsafe { free(pointer) } }\npub fn allocated_pages() u64 { return live_pages }\npub const pte_present=u64(1)\npub const pte_writable=u64(2)\npub const pte_noexec=u64(1)<<63\npub fn get_hhdm_offset() u64 { return 0xffff800000000000 }\npub struct Pagemap { pub mut: calls int last_virt u64 last_phys u64 flags u64 fail bool }\npub fn (mut p Pagemap) map_page(virt u64,phys u64,flags u64) ? { p.calls++; if p.fail { return none }; p.last_virt=virt; p.last_phys=phys; p.flags=flags }\n')!
 }
 
 fn audit_generated(path string) ! {
 	text := os.read_file(path)!
 	mut checked := 0
 	for name in ['fs__storage_health', 'resource__block_health', 'ahci__AHCIDevice__block_health',
-		'ahci__AHCIDevice__health_command', 'ahci__ata_word', 'ahci__smart_checksum', 'ahci__smart_status'] {
+		'ahci__AHCIDevice__health_command', 'ahci__ata_word', 'ahci__smart_checksum', 'ahci__smart_status',
+		'nvme__NVMENamespace__block_health', 'nvme__map_registers', 'nvme__map_doorbells',
+		'nvme__NVMENamespace__rw_lba', 'nvme__NVMENamespace__sync'] {
 		mut start := 0
 		mut body := ''
 		for line in text.split_into_lines() {
@@ -98,6 +127,7 @@ fn audit_generated(path string) ! {
 		}
 		if body=='' {
 			if name.starts_with('ahci__') && !text.contains('ahci__AHCIDevice') { continue }
+			if name.starts_with('nvme__') && !text.contains('nvme__NVMENamespace') { continue }
 			return error('Missing generated ${name}')
 		}
 		for allocation in ['memdup(', 'malloc(', 'calloc(', 'realloc(', 'new_array', 'memdup_uncollectable('] {
@@ -106,7 +136,7 @@ fn audit_generated(path string) ! {
 		checked++
 	}
 	if checked < 2 { return error('Missing generated health functions') }
-	println('PASS: ${checked} generated kernel health functions use no heap allocation')
+	println('PASS: ${checked} generated kernel health, mapping and NVMe I/O functions use no heap allocation')
 }
 
 fn main() {

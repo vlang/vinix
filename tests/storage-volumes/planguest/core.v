@@ -408,10 +408,12 @@ fn first_boot(parent &char) {
 		multiple_plans(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
+		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
 		allocation_trace(c'/proc/allocstart', false)
 		cycles(parent, 200)
 		mut before := Heap{}; heap_snapshot(mut before)
 		health_cycles(parent)
+		$if nvme_health_test ? { nvme_health_cycles() }
 		cycles(parent, 200)
 		mut after := Heap{}; heap_snapshot(mut after)
 		mut retained := before.count != after.count || after.large > before.large
@@ -465,6 +467,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		check(C.getppid() == 1 && status(c'/dev/mapper/vinix2').disk_id == status(actual).disk_id
 			&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id, c'init restored reordered physical disks')
 		C.printf(c'PLAN BOOT RESTORED\n')
+		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation
 		second_before := status(c'/dev/mapper/vinix9').generation
 		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)

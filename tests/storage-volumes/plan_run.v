@@ -73,6 +73,14 @@ fn write_disk(path string, wrong bool) ! {
 	file.write(sector[..])!
 }
 
+fn nvme_disk(path string, identity u8) ! {
+	write_disk(path, false)!
+	mut file := os.open_file(path, 'r+')!
+	defer { file.close() }
+	file.seek(440, .start)!
+	file.write([identity])!
+}
+
 fn plan_filesystem(work string) ! {
 	tool := os.find_abs_path_of_executable('mke2fs') or {
 		'/opt/homebrew/opt/e2fsprogs/sbin/mke2fs'
@@ -85,9 +93,12 @@ fn plan_filesystem(work string) ! {
 	}
 }
 
-fn compile_guest(root string, work string, arch string) ! {
+fn compile_guest(root string, work string, arch string, nvme bool) ! {
 	source := work + '/guest.c'
-	generate(root, root + '/tests/storage-volumes/planguest', source, arch)!
+	if nvme {
+		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
+			root + '/tests/storage-volumes/planguest', source, '--arch', 'amd64', '-d', 'nvme_health_test'])!
+	} else { generate(root, root + '/tests/storage-volumes/planguest', source, arch)! }
 	check_generated(source)!
 	cc := if arch == 'aarch64' { 'aarch64-linux-musl-gcc' } else { 'x86_64-linux-musl-gcc' }
 	command([cc, '-static', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -131,7 +142,7 @@ fn pack(work string) ! {
 	command(['tar', '--format=ustar', '-cf', work + '/initramfs.tar', '-C', work + '/seed', '.'])!
 }
 
-fn amd64_boot(root string, work string, kernel string, second bool) ![]string {
+fn amd64_boot(root string, work string, kernel string, second bool, nvme bool) ![]string {
 	iso := work + '/iso'
 	os.mkdir_all(iso + '/boot')!
 	os.mkdir_all(iso + '/EFI/BOOT')!
@@ -148,12 +159,19 @@ fn amd64_boot(root string, work string, kernel string, second bool) ![]string {
 	}
 	first_disk := work + if second { '/wrong.raw' } else { '/volume.raw' }
 	second_disk := work + if second { '/volume.raw' } else { '/wrong.raw' }
-	return [qemu, '-machine', 'q35,smm=off', '-accel', 'tcg', '-cpu', 'max', '-m', '1024', '-smp', '2',
+	mut args := [qemu, '-machine', 'q35,smm=off', '-accel', 'tcg', '-cpu', 'max', '-m', '1024', '-smp', '2',
 		'-drive', 'if=pflash,format=raw,unit=0,readonly=on,file=' + firmware,
 		'-cdrom', work + '/test.iso', '-drive', 'if=ide,format=raw,cache=writeback,file=' + first_disk,
 		'-drive', 'if=ide,format=raw,cache=writeback,file=' + second_disk,
 		'-drive', 'if=ide,format=raw,cache=writeback,file=' + work + '/config.ext2',
 		'-display', 'none', '-monitor', 'none', '-serial', 'stdio', '-nic', 'none', '-no-reboot']
+	if nvme {
+		args << ['-drive','if=none,format=raw,id=nvme-health,file=' + work + '/nvme.raw',
+			'-device','nvme,drive=nvme-health,serial=VINIXHEALTH',
+			'-drive','if=none,format=raw,id=nvme-warning,file=' + work + '/nvme-warning.raw',
+			'-device','nvme,drive=nvme-warning,serial=VINIXWARNING,smart_critical_warning=8']
+	}
+	return args
 }
 
 fn arm_boot(root string, work string, kernel string, second bool) ![]string {
@@ -202,7 +220,11 @@ fn boot(args []string, log string) !string {
 		chunk := process.stdout_read() + process.stderr_read()
 		if chunk != '' { capture.write_string(chunk)!; transcript += chunk }
 		if transcript.contains('PLAN DONE\n') || transcript.contains('PLAN DONE\r') { break }
-		if transcript.contains('PLAN FAIL') || transcript.contains('KERNEL PANIC') || transcript.contains('FATAL EXCEPTION') { break }
+		if transcript.contains('PLAN FAIL') || transcript.contains('KERNEL PANIC') || transcript.contains('FATAL EXCEPTION') {
+			// Let the kernel finish its diagnostic before terminating QEMU.
+			time.sleep(time.second)
+			break
+		}
 		time.sleep(10 * time.millisecond)
 	}
 	last := process.stdout_read() + process.stderr_read()
@@ -214,26 +236,31 @@ fn boot(args []string, log string) !string {
 	return transcript
 }
 
-fn guest(root string, work string, arch string, kernel string) ! {
+fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if kernel == '' || !os.is_file(kernel) { return error('Select an existing kernel with --kernel') }
 	if work.contains(',') { return error('Work directory cannot contain QEMU option separators') }
-	compile_guest(root, work, arch)!
+	compile_guest(root, work, arch, nvme)!
+	if nvme {
+		nvme_disk(work + '/nvme.raw',0x81)!
+		nvme_disk(work + '/nvme-warning.raw',0x82)!
+	}
 	write_disk(work + '/volume.raw', false)!
 	write_disk(work + '/wrong.raw', true)!
 	plan_filesystem(work)!
 	pack(work)!
-	args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false)! }
+	args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, nvme)! }
 	first := boot(args, work + '/first-boot.log')!
 	if !first.contains('init: volume restore failed; continuing') { return error('Production init did not report its invalid boot plan and continue') }
 	if !first.contains('PLAN SET PREFLIGHT PASSED') { return error('Missing multi-disk plan-set qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
+	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
 	mut encoded := ''
 	for line in first.split_into_lines() { if line.starts_with('PLAN FILE ') { encoded = line.all_after('PLAN FILE ').trim_space() } }
 	if encoded.len < 256 || encoded.len > 4224 { return error('Missing saved plan bytes in first boot') }
 	os.write_file_array(work + '/saved-plan.vmap', hex.decode(encoded)!)!
 	// The phase marker and plan stay on the guest's filesystem. No host copy
 	// supplies either file to the second boot.
-	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true)! }
+	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, nvme)! }
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
 	println('PASS ${arch}: multi-disk set preflight, discovery and trust rejection, production init restore after device reorder, 200-cycle retention and reboot data')
@@ -242,21 +269,24 @@ fn guest(root string, work string, arch string, kernel string) ! {
 fn main() {
 	mut options := map[string]string{}
 	mut is_host := false
+	mut nvme := false
 	mut index := 1
 	for index < os.args.len {
 		name := os.args[index]
 		if name == '--host' { is_host = true; index++; continue }
+		if name == '--nvme' { nvme = true; index++; continue }
 		if name !in ['--arch', '--work', '--kernel'] || index + 1 >= os.args.len || name in options {
-			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --arch amd64|aarch64 --kernel KERNEL]'); exit(2)
+			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --arch amd64|aarch64 --kernel KERNEL [--nvme]]'); exit(2)
 		}
 		options[name] = os.args[index + 1]; index += 2
 	}
 	work := os.abs_path(options['--work'])
-	if options['--work'] == '' || os.exists(work) || (!is_host && options['--arch'] !in ['amd64', 'aarch64']) {
+	if options['--work'] == '' || os.exists(work) || (!is_host && options['--arch'] !in ['amd64', 'aarch64'])
+		|| (nvme && (is_host || options['--arch'] != 'amd64')) {
 		eprintln('Select a new private work directory and supported architecture'); exit(2)
 	}
 	os.mkdir(work) or { eprintln(err); exit(1) }
 	root := os.dir(os.dir(os.dir(@FILE)))
 	if is_host { host(root, work) or { eprintln(err); exit(1) } }
-	else { guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
+	else { guest(root, work, options['--arch'], os.real_path(options['--kernel']), nvme) or { eprintln(err); exit(1) } }
 }

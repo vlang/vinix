@@ -3,15 +3,19 @@ module resource
 
 pub const block_health_ioctl = u64(0x56560005)
 pub const health_ata = u64(1)
+pub const health_nvme = u64(2)
 pub const health_supported = u64(1)
 pub const health_enabled = u64(2)
 pub const health_data_valid = u64(4)
 pub const health_status_valid = u64(8)
 pub const health_threshold_exceeded = u64(16)
 
-// Output-only, native little-endian version-one ABI (1088 bytes). ATA data
-// is preserved byte-for-byte: attribute meanings and raw units are vendor
-// specific. No userspace command, address or DMA buffer enters the driver.
+// Output-only, native little-endian version-one ABI (1088 bytes). Protocol 1
+// contains ATA IDENTIFY and SMART READ DATA. Protocol 2 contains the first 512
+// bytes of NVMe Identify Controller and the controller-wide SMART/Health log.
+// Payloads are preserved byte-for-byte. No userspace command, address or DMA
+// buffer enters the driver. Flag 16 means ATA threshold exceeded or any NVMe
+// critical warning; it is not a prediction of future failure.
 pub struct BlockHealth {
 pub mut:
 	version u64 = 1

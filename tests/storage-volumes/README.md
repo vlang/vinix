@@ -39,6 +39,14 @@ its own process. The longer allowance includes 800 utility processes and disk
 discovery on x86 TCG; the strict retention checks are unchanged.
 It preserves logs and a copy of the saved plan in the work directory.
 
+On AMD64, `--nvme` adds two disposable NVMe disks, one with an injected critical
+warning. Use a `PROD=false` kernel because the driver retains development-only
+probing. The fixture checks actual controller-wide health, CLI exit 0/3, bad
+output pointers, descriptor/partition policy, unchanged I/O counters, 200 successful
+and 200 bad-pointer queries per disk inside the retention measurement, and health
+after reboot.
+See [health qualification](../storage-health/README.md).
+
 The fixture boots from an ext2 system disk. A separate raw disk holds managed
 views, and a third disk with different MBR identity first tests wrong-target
 rejection, then holds an independently configured mapping.

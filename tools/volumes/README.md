@@ -10,6 +10,11 @@ and vendor-specific raw attributes. Exit 3 means the threshold is exceeded;
 4 means ATA status is unavailable. Unsupported backends return an error.
 See [the health ABI and limits](../../docs/storage-volumes.md#ata-smart-health).
 
+The same command supports whole PCI NVMe namespaces in development kernels.
+It prints controller-wide critical warnings, standard health fields and ten
+full 128-bit counters; exit 3 means at least one critical warning is active.
+See [NVMe scope and limits](../../docs/storage-volumes.md#nvme-smarthealth).
+
 `vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES` deallocates a range
 through supported block backends. The offset and length are decimal bytes.
 See the storage documentation for extent protection and interruption behavior.

@@ -7,7 +7,6 @@ import dma
 import proc
 import memory
 import lib
-import x86.idt
 import bitmap
 import stat
 import klock
@@ -174,6 +173,7 @@ pub mut:
 	abort        NVMECommandAbort
 	features     NVMECommandFeatures
 	identify     NVMECommandIdentify
+	get_log      NVMECommandGetLog
 	rw           NVMECommandRW
 	dataset      NVMECommandDataset
 }
@@ -442,7 +442,10 @@ fn (mut dev NVMENamespace) transfer(buffer voidptr, loc u64, count u64, write bo
 fn (mut dev NVMENamespace) sync(_handle voidptr) ? {
 	mut completed := false
 	defer { if completed { dev.metrics.flushed() } else { dev.metrics.failed() } }
-	mut command := NVMECommand{}
+	// Submission copies the command into the permanent queue. Keep the
+	// borrowed command on this stack even if disable cannot stop payload DMA.
+	mut command := unsafe { &NVMECommand(C.vinix_stack_alloc(sizeof(NVMECommand))) }
+	unsafe { *command = NVMECommand{} }
 	command.opcode = opcode_flush
 	unsafe { command.private.rw.nsid = u32(dev.nsid) }
 	// All requests share the controller lock, so the barrier cannot pass a
@@ -633,7 +636,8 @@ pub fn (mut pair NVMEQueuePair) initialise(mut parent_controller NVMEController,
 		create_cq_command.private.create_cq.cqid = u16(qid)
 		create_cq_command.private.create_cq.qsize = u16(pair.entry_cnt - 1)
 		create_cq_command.private.create_cq.irq_vector = u16(irq)
-		create_cq_command.private.create_cq.cq_flags = (1 << 0) | (1 << 1)
+		// This driver polls completions; no interrupt handler owns the queue.
+		create_cq_command.private.create_cq.cq_flags = 1 << 0
 	}
 	if parent_controller.admin_queue.send_cmd_and_wait(mut create_cq_command, -1) != 0 {
 		print('nvme: unable to create completion queue\n')
@@ -764,7 +768,9 @@ pub fn (mut ns NVMENamespace) rw_lba(buffer voidptr, start u64, cnt u64, rw bool
 	if cnt == 0 || cnt > 65536 || bytes > ns.max_prps * page_size || bytes > max_transfer {
 		return -1
 	}
-	mut new_command := NVMECommand{}
+	// Only PRPs reference DMA memory; the command itself is copied by send_cmd.
+	mut new_command := unsafe { &NVMECommand(C.vinix_stack_alloc(sizeof(NVMECommand))) }
+	unsafe { *new_command = NVMECommand{} }
 	mut prp_list := voidptr(unsafe { nil })
 	if bytes > page_size * 2 {
 		// One PRP list page, without chaining, is enough for our bounded
@@ -825,8 +831,10 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	}
 
 	c.pci_bar = pci_device.get_bar(0x0)
-
-	c.regs = unsafe { &NVMERegisters(c.pci_bar.base + higher_half) }
+	if !c.pci_bar.is_mmio || c.pci_bar.size < page_size + 16 { return -1 }
+	registers := map_registers(c.pci_bar.base, page_size)
+	if registers == 0 { return -1 }
+	c.regs = unsafe { &NVMERegisters(registers) }
 
 	major_version := (c.regs.vs >> 16) & 0xffff
 	minor_version := (c.regs.vs >> 8) & 0xff
@@ -855,28 +863,14 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 		klock.spin_hint()
 	}
 
-	mut vect := u8(0)
-
-	if pci_device.msi_support == true {
-		print('nvme: device is msi capable\n')
-
-		vect = idt.allocate_vector()
-		pci_device.set_msi(vect)
-	} else if pci_device.msix_support == true {
-		print('nvme: device is msix capable\n')
-
-		vect = idt.allocate_vector()
-		pci_device.set_msix(vect)
-	} else {
-		print('nvme: device is not msi or msix capable\n')
-		return -1
-	}
-
 	// CAP.MQES is zero-based; AQA permits at most 4096 admin entries.
 	c.queue_entries = (c.regs.cap & 0xffff) + 1
 	if c.queue_entries > 256 { c.queue_entries = 256 }
 	if c.queue_entries < 2 { return -1 }
 	c.strides = (c.regs.cap >> 32) & 0xf
+	// Map the admin and single I/O queue's doorbells as well as registers.
+	// A 64-bit BAR can lie outside the direct map's initial 4 GiB span.
+	if !map_doorbells(c.pci_bar.base, c.pci_bar.size, c.strides) { return -1 }
 
 	c.qid_bitmap.initialise(0xffff)
 
@@ -888,7 +882,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 		submission_doorbell: unsafe { nil }
 	}
 
-	if c.admin_queue.initialise(mut c, vect, 0, true) != 0 {
+	if c.admin_queue.initialise(mut c, 0, 0, true) != 0 {
 		print('nvme: failed to create an admin queue\n')
 		return -1
 	}
@@ -940,8 +934,6 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 		return -1
 	}
 
-	mut irq_count := u64(0)
-
 	c.io_queue_bitmap.initialise(nvme_io_queue_cnt)
 
 	for i := 0; i < nvme_io_queue_cnt; i++ {
@@ -953,13 +945,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 			completion_doorbell: unsafe { nil }
 		}
 
-		if pci_device.msix_support == true {
-			vect = idt.allocate_vector()
-			pci_device.set_msix(vect)
-			irq_count++
-		}
-
-		if new_io_queue.initialise(mut c, vect, irq_count, false) != 0 { return -1 }
+		if new_io_queue.initialise(mut c, 0, 0, false) != 0 { return -1 }
 
 		c.queue_list << new_io_queue
 	}
