@@ -62,6 +62,8 @@ pub mut:
 	prdt              &PRDT
 	prdt_phys         u32
 	prdt_cache        &u8
+	// Set for a sleep; see power.v.
+	asleep bool
 }
 
 fn controller_matches(dev &devcore.Device) bool {
@@ -76,6 +78,8 @@ pub fn initialise() {
 		bus:     .pci
 		matches: controller_matches
 		probe:   controller_probe
+		suspend: controller_suspend
+		resume:  controller_resume
 	}) or { return }
 }
 
@@ -90,6 +94,7 @@ fn controller_probe(mut core devcore.Device) bool {
 	mut index := 0
 	for i in 0 .. ata_ports.len {
 		drive := init_ata_drive(i, mut dev) or { continue }
+		remember_drive(drive)
 		// The device node keeps the name.
 		mut text := lib.new_text(8)
 		text.add('ata')
@@ -223,7 +228,16 @@ fn (mut dev ATADrive) read(_handle voidptr, buffer voidptr, loc u64, count u64) 
 	sector_start := loc / ata_bytes_per_sector
 	sector_count := count / ata_bytes_per_sector
 
-	dev.l.acquire()
+	// Held while the drive sleeps, and looked at again with the lock: a sleep
+	// may have begun between the wait and the lock.
+	for {
+		dev.wait_awake()
+		dev.l.acquire()
+		if !dev.asleep {
+			break
+		}
+		dev.l.release()
+	}
 	defer {
 		dev.l.release()
 	}
@@ -256,15 +270,10 @@ fn (mut dev ATADrive) read(_handle voidptr, buffer voidptr, loc u64, count u64) 
 		kio.port_out[u8](dev.cmd_port, 0x25) // READ_DMA command
 		kio.port_out[u8](dev.bmr_command, 0x8 | 0x1)
 
-		for {
-			status := kio.port_in[u8](dev.cmd_port)
-			if status & 0x80 == 0 {
-				break
-			}
-			if status & 0x01 != 0 {
-				C.kprintf(c'ata: Error reading sector %llu on drive', u64(sector_loc))
-				return none
-			}
+		if !dev.finished() {
+			C.kprintf(c'ata: sector %llu: the drive reported an error or did not answer\n', u64(sector_loc))
+			errno.set(errno.eio)
+			return none
 		}
 		kio.port_out[u8](dev.bmr_command, 0)
 
@@ -287,7 +296,16 @@ fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64)
 	sector_start := loc / ata_bytes_per_sector
 	sector_count := count / ata_bytes_per_sector
 
-	dev.l.acquire()
+	// Held while the drive sleeps, and looked at again with the lock: a sleep
+	// may have begun between the wait and the lock.
+	for {
+		dev.wait_awake()
+		dev.l.acquire()
+		if !dev.asleep {
+			break
+		}
+		dev.l.release()
+	}
 	defer {
 		dev.l.release()
 	}
@@ -325,15 +343,10 @@ fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64)
 		kio.port_out[u8](dev.cmd_port, 0x35) // WRITE_DMA command
 		kio.port_out[u8](dev.bmr_command, 0x1)
 
-		for {
-			status := kio.port_in[u8](dev.cmd_port)
-			if status & 0x80 == 0 {
-				break
-			}
-			if status & 0x01 != 0 {
-				C.kprintf(c'ata: Error reading sector %llu on drive', u64(sector_loc))
-				return none
-			}
+		if !dev.finished() {
+			C.kprintf(c'ata: sector %llu: the drive reported an error or did not answer\n', u64(sector_loc))
+			errno.set(errno.eio)
+			return none
 		}
 		kio.port_out[u8](dev.bmr_command, 0)
 
@@ -341,15 +354,10 @@ fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64)
 		kio.port_out[u8](dev.cmd_port, 0xea) // Cache flush EXT command.
 		proc.account_disk_transfer(actual_count * ata_bytes_per_sector, true)
 		proc.account_disk_io(dev.stat.rdev, actual_count * ata_bytes_per_sector, true)
-		for {
-			status := kio.port_in[u8](dev.cmd_port)
-			if status & 0x80 == 0 {
-				break
-			}
-			if status & 0x01 != 0 {
-				C.kprintf(c'ata: Error reading sector %llu on drive', u64(sector_loc))
-				return none
-			}
+		if !dev.finished() {
+			C.kprintf(c'ata: sector %llu: the drive reported an error or did not answer\n', u64(sector_loc))
+			errno.set(errno.eio)
+			return none
 		}
 	}
 
