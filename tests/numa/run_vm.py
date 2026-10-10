@@ -16,6 +16,41 @@ import sys
 import time
 
 
+# Native policy borrows live operands; Python owns PTY fork/exec and finally.
+import importlib.util as _import_util
+from sys import _getframe as _frame
+_spec = _import_util.spec_from_file_location("_numa_binding", Path(__file__).with_name("_native.py"))
+_binding = _import_util.module_from_spec(_spec)
+_spec.loader.exec_module(_binding)
+_LITERAL_CACHE = {}
+_ATTRIBUTE = getattr
+_TRUTH = bool
+_FORMAT = lambda value: f"{value}"
+_REPR = repr
+_ITER = iter
+_SLICE = slice
+_tuple = lambda *values: values
+_list = lambda *values: list(values)
+_triple = lambda value: tuple(value)
+_named = lambda *pairs: dict(pairs)
+
+
+def _policy(operation, *arguments):
+    return _binding.call(operation, globals(), _frame(1).f_builtins, *arguments)
+
+
+def _missing_features(output):
+    return [marker.decode("ascii") for marker in (*FEATURE_MARKERS, PASS_MARKER) if output.count(marker) != 1]
+
+
+def _missing_kernel(output):
+    return [marker.decode("ascii") for marker in KERNEL_MARKERS if marker not in output]
+
+
+def _failures(output):
+    return [marker.decode("ascii", errors="replace") for marker in FAIL_MARKERS if marker in output]
+
+
 PASS_MARKER = b"VINIX QEMU NUMA: PASS"
 FAIL_MARKERS = (
     b"VINIX QEMU NUMA: FAIL",
@@ -65,44 +100,13 @@ def available_port() -> str:
 
 
 def exit_code(status: int) -> int:
-    if os.WIFEXITED(status):
-        return os.WEXITSTATUS(status)
-    if os.WIFSIGNALED(status):
-        return 128 + os.WTERMSIG(status)
-    return 1
+    return _policy("exit_code", status)
+
 
 
 def stop_child(pid: int, master: int) -> None:
-    try:
-        os.write(master, b"\x01x")
-    except OSError:
-        pass
+    _policy("stop", pid, master)
 
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            return
-        time.sleep(0.05)
-
-    try:
-        os.killpg(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        waited, _ = os.waitpid(pid, os.WNOHANG)
-        if waited == pid:
-            return
-        time.sleep(0.05)
-    try:
-        os.killpg(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    try:
-        os.waitpid(pid, 0)
-    except ChildProcessError:
-        pass
 
 
 def run_vm(
@@ -113,108 +117,36 @@ def run_vm(
     timeout: int,
 ) -> int:
     state_dir.mkdir(parents=True, exist_ok=True)
-
-    environment = os.environ.copy()
-    environment["VINIX_INITRAMFS"] = str(initramfs)
-    environment["VINIX_BOOT_DISK"] = str(state_dir / "boot.img")
-    environment["VINIX_EFIVARS"] = str(state_dir / "efivars.fd")
-    environment["VINIX_QEMU_PACKAGE_STORE"] = str(state_dir / "packages.tar")
-    environment["VINIX_QEMU_PERSIST_DISK"] = str(state_dir / "root.ext2")
-    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = "64"
-    environment.pop("VINIX_QEMU_PERSIST", None)
-    environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
-    environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
-    extra = environment.get("VINIX_QEMU_EXTRA", "")
-    environment["VINIX_QEMU_EXTRA"] = f"{extra} {NUMA_TOPOLOGY}".strip()
-    if platform.system() != "Darwin":
-        environment.setdefault("USE_TCG", "1")
-
-    command = [
-        str(root / "scripts/run-aarch64.sh"),
-        "--serial",
-        f"--mem={GUEST_MEMORY_MB}",
-        f"--guest-init={guest_init}",
-    ]
-    if os.environ.get("VINIX_QEMU_NUMA_NO_BUILD") == "1":
-        command.insert(1, "--no-build")
-
-    print("==> Starting AArch64 QEMU boot with two NUMA nodes")
-
+    state = {"root": root, "guest_init": guest_init, "initramfs": initramfs,
+             "state_dir": state_dir, "timeout": timeout}
+    environment, command = _policy("prepare", state)
     pid, master = pty.fork()
     if pid == 0:
         os.chdir(root)
         os.execve(command[0], command, environment)
 
-    transcript = bytearray()
-    status: int | None = None
-    forced_stop = False
-    shutdown_deadline: float | None = None
-    deadline = time.monotonic() + timeout
+    state.update(pid=pid, master=master)
+    del environment, command, pid, master
+    state["transcript"] = bytearray()
+    state["status"] = None
+    state["forced_stop"] = False
+    state["shutdown_deadline"] = None
+    state["deadline"] = time.monotonic() + timeout
+    recent: bytes
+    def snapshot(value):
+        nonlocal recent
+        recent = value
+    def candidates():
+        return (marker in recent for marker in FAIL_MARKERS)
     try:
-        while time.monotonic() < deadline:
-            waited, child_status = os.waitpid(pid, os.WNOHANG)
-            if waited == pid:
-                status = child_status
-                break
-
-            readable, _, _ = select.select([master], [], [], 0.25)
-            if readable:
-                try:
-                    chunk = os.read(master, 65536)
-                except OSError as error:
-                    if error.errno == errno.EIO:
-                        continue
-                    raise
-                if chunk:
-                    transcript.extend(chunk)
-                    sys.stdout.buffer.write(chunk)
-                    sys.stdout.buffer.flush()
-
-            recent = bytes(transcript)
-            finished = PASS_MARKER in recent or any(
-                marker in recent for marker in FAIL_MARKERS
-            )
-            if finished and shutdown_deadline is None:
-                try:
-                    os.write(master, b"\x01x")
-                except OSError as error:
-                    if error.errno != errno.EIO:
-                        raise
-                shutdown_deadline = time.monotonic() + 10
-            if shutdown_deadline is not None and time.monotonic() >= shutdown_deadline:
-                break
+        _policy("capture", state, state["pid"], state["master"], snapshot, candidates)
     finally:
-        if status is None:
-            forced_stop = True
-            stop_child(pid, master)
-        os.close(master)
+        if state["status"] is None:
+            state["forced_stop"] = True
+            stop_child(state["pid"], state["master"])
+        os.close(state["master"])
+    return _policy("report", state)
 
-    output = bytes(transcript)
-    missing = [
-        marker.decode("ascii")
-        for marker in (*FEATURE_MARKERS, PASS_MARKER)
-        if output.count(marker) != 1
-    ]
-    missing += [
-        marker.decode("ascii") for marker in KERNEL_MARKERS if marker not in output
-    ]
-    failures = [
-        marker.decode("ascii", errors="replace")
-        for marker in FAIL_MARKERS
-        if marker in output
-    ]
-    if status is not None and exit_code(status) != 0:
-        failures.append(f"VM runner exit status {exit_code(status)}")
-    if forced_stop:
-        failures.append("VM did not exit after the test")
-    if missing or failures:
-        for item in missing:
-            print(f"ERROR: missing expected QEMU result: {item}", file=sys.stderr)
-        for item in failures:
-            print(f"ERROR: observed QEMU failure: {item}", file=sys.stderr)
-        return 1
-    print("==> AArch64 QEMU NUMA regression passed")
-    return 0
 
 
 def main() -> int:
