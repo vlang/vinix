@@ -223,9 +223,15 @@ consistent filesystem; backup restoration preserves content and metadata.
     the processors, interrupt controllers, clocks, PCI configuration, IOMMUs
     and the display mode put back, tested in QEMU only and offered only where
     the kernel can bring the display back.
+  - [x] [The desktop's side](desktop/SETTINGS.md): battery state and time left
+    from `/sys/class/power_supply`, Sleep and Restart in the Start menu, and
+    Settings > Power with the lid action, the performance profile and two idle
+    timeouts. Tested on the host only; the display is not turned off by default
+    until that has run in a machine.
   - [ ] Suspend to RAM on a physical machine and for the drivers that cannot
-    yet come back from a loss of power; hibernation, backlight and display
-    power control, and the desktop's side of all of it.
+    yet come back from a loss of power; hibernation; backlight and display
+    power control; a screen lock, and a way for an application to keep the
+    display on.
 - [ ] Restore all device and security state after sleep, firmware errors and
   hotplug; keep recovery possible when a driver fails.
   - [x] [CPU protection registers compared across every sleep; e1000 and AHCI

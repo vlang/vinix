@@ -583,7 +583,20 @@ What this is not:
   event left on for a sleep is the embedded controller's, which its driver
   marks), and the AMD IOMMU's own PCI capability are all untested
   assumptions.
-- **Not hibernation.** There is no memory image and no `disk` state.
+- **Not hibernation.** There is no memory image and no `disk` state. The
+  suspend to RAM above supplies what a resume from an image would share with
+  it -- devices quiesced and refused when they cannot come back, the other
+  processors parked and started again, interrupt controllers, IOMMUs, PCI
+  configuration and the clock put back -- and none of what is particular to
+  it: somewhere to write the image (there is no swap) and driver phases for
+  freeze, snapshot, thaw, write and power off; an atomic snapshot of the
+  pages in use; a path early in boot that recognises an image, reads it into
+  pages it will not overwrite, copies it into place and jumps into it; a
+  check that this boot's memory map and firmware regions match the image's;
+  ACPI S4 (`_PTS(4)`, the hardware signature, the NVS regions); taking over
+  the PCI addresses and the IOMMU the booting kernel set up; a display mode
+  that may differ from the image's; and protection for an image that holds
+  every secret the kernel had.
 - Only `e1000`, `ahci`, the keyboard controller, the PS/2 mouse and the
   serial ports come back from a loss of power. A machine with another bound
   PCI driver is refused deep sleep, and is left with suspend to idle.
