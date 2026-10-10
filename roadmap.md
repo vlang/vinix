@@ -240,9 +240,11 @@ consistent filesystem; backup restoration preserves content and metadata.
   - [x] [State after a sleep that powers devices down](docs/hardware-platform.md#suspend-to-ram-x86-64),
     for what QEMU's PC has: every processor's protection registers compared,
     PCI configuration and IOMMU units restored before a driver runs.
-  - [ ] Suspend and resume in the remaining drivers (`nvme`, `ata`, `hda`,
-    `xhci`, Apple's), without which a machine that has one is refused a
-    suspend to RAM.
+  - [x] [Suspend and resume in `nvme`, `ata` and `hda`](docs/hardware-platform.md#devices-and-drivers),
+    so that no PCI driver an x86-64 kernel has refuses a machine a suspend to
+    RAM; sound and an IDE disk are taken through all three kinds of sleep in
+    QEMU, an NVMe disk on a debug kernel.
+  - [ ] Suspend and resume in `xhci` and Apple's drivers.
 
 Acceptance: each advertised machine completes a physical hardware checklist;
 passing synthetic fixtures alone does not qualify a driver.

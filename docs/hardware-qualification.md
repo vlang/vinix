@@ -86,7 +86,7 @@ driver has none, that is said.
 | Graphics | firmware framebuffer | `dev/fbdev/simple` | implemented (VM) | the display on every x86 machine today; no mode setting, no acceleration, no blanking |
 | Graphics | Intel (i915) | LinuxKPI port | partial | "initial kernel API support, not a working Intel graphics driver" ([linux-i915](linux-i915.md)) |
 | Graphics | AMD, NVIDIA | none | open | |
-| Audio | Intel HD Audio | `dev/hda` | partial | binds in QEMU; no test plays or records through it, and no document records that it works |
+| Audio | Intel HD Audio | `dev/hda` | implemented (VM) | playback through QEMU's controller and codec is recorded and checked, across every kind of sleep (`drivers-sleep`); no recording, no jack detection, no physical codec tried |
 | Input | PS/2 keyboard and mouse | `dev/console`, `dev/mouse` | implemented (VM) | ISO checks; hardware-platform `suspend` (wake by key) |
 | Input | USB (xHCI) | none on x86 | open | most PC keyboards and all external ones |
 | Platform | ACPI (uACPI), LAPIC, IOAPIC, HPET | `uacpi`, `x86/*` | implemented (VM) | events, power button, sleep states S5; embedded controller (`x86/acpiec`): host tests of the protocol, and hardware-platform `acpi-ec-selftest` with a simulated controller behind uACPI; no physical controller tried |

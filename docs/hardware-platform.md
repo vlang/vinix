@@ -50,9 +50,9 @@ pointed at.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `e1000` | PCI | yes | yes | yes | yes | yes | per-device domain |
 | `ahci` | PCI | yes | no (mounted disks) | yes | flush, STANDBY IMMEDIATE, stop | port COMRESET | per-device domain |
-| `nvme` | PCI | yes | no | no | shutdown notification | no | all of memory |
-| `ata` | PCI | yes | no | no | no | no | all of memory |
-| `hda` | PCI | yes | no | no | no | no | all of memory |
+| `nvme` | PCI | yes | no | yes: flush and shutdown notification, set up again from nothing | shutdown notification | no | all of memory |
+| `ata` | PCI | yes | no | yes: requests held, drives waited for | no | no | all of memory |
+| `hda` | PCI | yes | no | yes: streams, rings and codec paths programmed again | streams stopped, controller in reset | no | all of memory |
 | `xhci` | PCI | yes | no | no | no | no | all of memory |
 | `virtio_*` (AArch64 MMIO) | platform | listed from the device's own status | no | no | no | no | not behind an IOMMU |
 | `battery`, `ac`, `button` | ACPI | listed as claimed | no | -- | -- | -- | -- |
@@ -513,11 +513,12 @@ registers and bridge windows before the command register, MSI and the MSI-X
 control word, the PCI Express control registers with a port's slot power
 and lights), and the display's mode is set again. After `_WAK` the fixed
 power and sleep button events are enabled again, and the drivers resume:
-`ahci` and `e1000` reset and reprogram their devices as they always have on
-resume; the keyboard controller, the PS/2 mouse and the serial ports are set
-up again only after a loss of power. A deep sleep is **refused while a bound
-PCI device's driver has no suspend and resume** (`nvme`, `ata`, `hda`,
-`xhci`): such a device would come back blank.
+`ahci`, `e1000`, `nvme`, `ata` and `hda` reset and reprogram their devices as
+they do on every resume; the keyboard controller, the PS/2 mouse and the
+serial ports are set up again only after a loss of power. A deep sleep is
+**refused while a bound PCI device's driver has no suspend and resume**:
+such a device would come back blank. Every PCI driver an x86-64 kernel has
+now has both; `xhci`, which has neither, is AArch64's.
 
 **Hot-plug slots, and what changed during the sleep.** The thread that
 watches PCI Express slots is kept off them from before the devices go down
@@ -597,9 +598,13 @@ What this is not:
   the PCI addresses and the IOMMU the booting kernel set up; a display mode
   that may differ from the image's; and protection for an image that holds
   every secret the kernel had.
-- Only `e1000`, `ahci`, the keyboard controller, the PS/2 mouse and the
-  serial ports come back from a loss of power. A machine with another bound
-  PCI driver is refused deep sleep, and is left with suspend to idle.
+- `e1000`, `ahci`, `nvme`, `ata`, `hda`, the keyboard controller, the PS/2
+  mouse and the serial ports come back from a loss of power. A machine with
+  a bound PCI driver that cannot is refused deep sleep and left with suspend
+  to idle; none of x86-64's is left. Sound that was queued when the machine
+  went down is dropped, and what QEMU cannot show is not shown: its codec
+  keeps its settings through a controller reset, so that the codec's paths
+  are programmed again after a sleep is by inspection only.
 - On x86-64 the protection registers (CR0, CR4, EFER, IA32_SPEC_CTRL) are
   recorded and compared on every online processor, each asked by an
   interrupt, for both kinds of sleep. On AArch64 they are checked on the
@@ -740,7 +745,7 @@ Beyond the limits stated in each section:
   own. And the controller itself on any real laptop.
 - Suspend to RAM on anything but QEMU's PC: see its section for what is
   untested. Hibernation, backlight and display power control.
-- Coming back from a loss of power for `nvme`, `ata`, `hda` and `xhci`;
+- Coming back from a loss of power for `xhci` and Apple's drivers;
   restoring a display the kernel has no mode-setting for; wake-up GPEs
   (`_PRW`) for devices; an RTC alarm more than a day ahead.
 - **Desktop.** The native desktop uses these interfaces now, and none of
@@ -806,12 +811,14 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `suspend-deep-arrival`: a card put into a watched slot while the machine is suspended to RAM, found after the wake; a sleep with it in; the slot gives it up afterwards | pass | -- |
 | `suspend-deep-departure`: with firmware keeping the ports, a card taken during one sleep is removed after it, and a card put in during the next is found | pass | -- |
 | `suspend-deep-undrawable`, `suspend-deep-forced`, `suspend-deep-headless`: when deep is offered | pass | -- |
+| `drivers-sleep`: HD Audio playing and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM; the recording and the disk image checked afterwards | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
 | `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` (kernel built with `-d acpiec_selftest`: a simulated embedded controller) | pass | -- |
 | `suspend-deep-ec` (the same kernel): the controller's driver through two suspends to RAM | pass | -- |
+| `nvme-sleep` (kernel built with `PROD=false`): an NVMe disk through the same three sleeps | pass | -- |
 
-Host unit tests: `tests/hardware-platform/hwhost` (8 files),
+Host unit tests: `tests/hardware-platform/hwhost` (9 files),
 `tests/power-supply/run`, `sh tests/cpu-power/run.sh`, `sh tests/thermal/run.sh`,
 `tests/pci-hotplug/run`, `sh tests/acpi-ec/run.sh` (40 tests of the embedded
 controller's protocol against a simulated controller).
