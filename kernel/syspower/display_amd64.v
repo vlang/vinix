@@ -29,6 +29,7 @@ import memory
 import pci
 import term
 import x86.kio
+import x86.wake
 
 const bochs_vendor = u16(0x1234)
 const bochs_device = u16(0x1111)
@@ -253,6 +254,15 @@ fn display_restore() {
 		&& dispi_read(dispi_bpp) == saved[dispi_bpp]
 		&& dispi_read(dispi_virt_width) == saved[dispi_virt_width]
 		&& dispi_read(dispi_enable) & dispi_enabled != 0
+	wake.trace('display took', if took { u64(1) } else { u64(0) })
+	wake.trace('display mmio', display.mmio)
+	wake.trace('display xres saved', u64(saved[dispi_xres]))
+	wake.trace('display xres now', u64(dispi_read(dispi_xres)))
+	wake.trace('display vw saved', u64(saved[dispi_virt_width]))
+	wake.trace('display vw now', u64(dispi_read(dispi_virt_width)))
+	wake.trace('display enable saved', u64(saved[dispi_enable]))
+	wake.trace('display enable now', u64(dispi_read(dispi_enable)))
+	wake.trace('display pixels', display.pixels)
 	display.restores++
 	if !took {
 		display.failures++

@@ -565,7 +565,7 @@ pub const scenarios = [
 		patterns: deep_patterns
 		events:   deep_events
 		screens:  deep_screens
-		timeout:  600
+		timeout:  240
 	},
 	Scenario{
 		name:     'suspend-deep-iommu'
@@ -582,7 +582,7 @@ pub const scenarios = [
 		patterns: deep_patterns
 		events:   deep_events
 		screens:  deep_screens
-		timeout:  600
+		timeout:  240
 	},
 ]
 

@@ -241,7 +241,7 @@ fn (mut run DeepRun) check_machine(mut t Test, when string, thorough bool) {
 	}
 	if run.drawn {
 		wrong := run.screen.pattern_errors()
-		t.check(wrong == 0, '${when}: ${wrong} pixels of what was drawn on the screen are gone')
+		t.check(wrong == 0, "${when}: ${wrong} pixels of what was drawn on the screen are gone; ${run.screen.first_error()}; ${run.screen.error_map()}")
 	}
 	if run.iommu {
 		t.check(dma_line(run.card) == 'domain: dmar0 isolated', '${when}: the card says "${dma_line(run.card)}"')
@@ -328,7 +328,8 @@ fn deep_scenario(mut t Test, iommu bool) {
 		run.screen = screen
 		run.screen.draw_pattern()
 		run.drawn = true
-		t.info('screen: ${screen.width} by ${screen.height}, pattern drawn')
+		t.check(run.screen.pattern_errors() == 0, "what was drawn on the screen does not read back: ${run.screen.pattern_errors()} pixels differ")
+		t.info("screen: ${screen.width} by ${screen.height}, pattern drawn")
 	} else {
 		t.check(false, 'the screen: ${err.msg()}')
 	}

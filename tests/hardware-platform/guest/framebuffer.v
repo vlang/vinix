@@ -4,12 +4,14 @@
 // Drawing on the machine's screen, for the scenarios that ask whether what
 // was on it survives something.
 //
-// /dev/fb0 is the framebuffer the kernel was handed at boot. Mapping it is
-// also what tells the kernel's console to stop drawing there, as it does for
-// a desktop, so that what this program draws is not written over by the next
-// kernel message. The pattern is one the host can work out for itself from a
-// picture of the screen: in column x of row y, red is x, green is y and blue
-// is their sum, each as a byte.
+// /dev/fb0 is the framebuffer the kernel was handed at boot, and the kernel's
+// console draws on it too: the next kernel message scrolls the console and
+// paints its text over whatever else is there. A program that takes the
+// screen for itself says so the way a desktop does, by putting the console
+// into graphics mode, and from then on the kernel leaves the pixels alone.
+// The pattern is one the host can work out for itself from a picture of the
+// screen: in column x of row y, red is x, green is y and blue is their sum,
+// each as a byte.
 module main
 
 #include <sys/mman.h>
@@ -20,6 +22,9 @@ fn C.ioctl(fd i32, request u64, argument voidptr) i32
 
 const fbioget_vscreeninfo = u64(0x4600)
 const fbioget_fscreeninfo = u64(0x4602)
+// KDSETMODE, whose argument is the mode itself, and KD_GRAPHICS.
+const kdsetmode = u64(0x4b3a)
+const kd_graphics = u64(1)
 
 // How many columns and rows of the screen's corner carry the pattern; the
 // host's ScreenCheck names the same number.
@@ -42,12 +47,16 @@ fn u32_at(buffer []u8, offset int) int {
 		offset + 3]) << 24))
 }
 
-// Maps the framebuffer. An error when the machine has none, or one in a
-// layout this does not draw on.
+// Takes the screen from the console and maps the framebuffer. An error when
+// the machine has none, or one in a layout this does not draw on.
 fn open_screen() !Screen {
 	fd := C.open(c'/dev/fb0', C.O_RDWR)
 	if fd < 0 {
 		return errno_error('/dev/fb0')
+	}
+	console := C.open(c'/dev/console', C.O_RDWR)
+	if console < 0 || C.ioctl(console, kdsetmode, voidptr(kd_graphics)) != 0 {
+		return errno_error('/dev/console: graphics mode')
 	}
 	// struct fb_var_screeninfo and struct fb_fix_screeninfo, as Linux lays
 	// them out; only a few fields are read.
@@ -108,4 +117,44 @@ fn (s &Screen) pattern_errors() int {
 		}
 	}
 	return wrong
+}
+
+// Where the corner first differs from the pattern, and what is there: for a
+// failure report.
+fn (s &Screen) first_error() string {
+	mask := (u32(0xff) << u32(s.red)) | (u32(0xff) << u32(s.green)) | (u32(0xff) << u32(s.blue))
+	for y in 0 .. screen_block {
+		for x in 0 .. screen_block {
+			value := (u32(u8(x)) << u32(s.red)) | (u32(u8(y)) << u32(s.green)) | (u32(u8(x + y)) << u32(s.blue))
+			found := unsafe { *s.pixel(x, y) }
+			if found & mask != value {
+				return 'column ${x} of row ${y} holds 0x${found.hex()}, not 0x${value.hex()}'
+			}
+		}
+	}
+	return 'nothing differs'
+}
+
+// A map of the corner in cells of 16 by 16 pixels, a row of cells per word:
+// `#` where a pixel differs from the pattern, `.` where none does.
+fn (s &Screen) error_map() string {
+	mask := (u32(0xff) << u32(s.red)) | (u32(0xff) << u32(s.green)) | (u32(0xff) << u32(s.blue))
+	mut rows := []string{}
+	for cell_y in 0 .. screen_block / 16 {
+		mut row := []u8{}
+		for cell_x in 0 .. screen_block / 16 {
+			mut wrong := false
+			for y in cell_y * 16 .. cell_y * 16 + 16 {
+				for x in cell_x * 16 .. cell_x * 16 + 16 {
+					value := (u32(u8(x)) << u32(s.red)) | (u32(u8(y)) << u32(s.green)) | (u32(u8(x + y)) << u32(s.blue))
+					if unsafe { *s.pixel(x, y) } & mask != value {
+						wrong = true
+					}
+				}
+			}
+			row << if wrong { u8(`#`) } else { u8(`.`) }
+		}
+		rows << row.bytestr()
+	}
+	return rows.join(' ')
 }
