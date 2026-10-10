@@ -1,5 +1,6 @@
 module hda
 
+import devcore
 import memory
 import dev.oss
 import event.eventstruct
@@ -191,19 +192,13 @@ fn (mut s HDAStream) play(play bool) {
 fn (mut s HDAStream) reset() {
 	assert (s.regs.ctl0 & sdctl0_run) == 0, 'stream must be stopped prior to resetting'
 
+	// By the clock: this is reached from a program closing the device, and a
+	// controller that has stopped answering must not keep it for ever.
 	s.regs.ctl0 |= sdctl0_srst
-	for {
-		if s.regs.ctl0 & sdctl0_srst != 0 {
-			break
-		}
-	}
+	devcore.spin_until(stream_in_reset, voidptr(s.regs), reset_timeout_ns)
 
 	s.regs.ctl0 &= ~sdctl0_srst
-	for {
-		if s.regs.ctl0 & sdctl0_srst == 0 {
-			break
-		}
-	}
+	devcore.spin_until(stream_out_of_reset, voidptr(s.regs), reset_timeout_ns)
 
 	s.initialize_output()
 	s.cur_user_pos = 0

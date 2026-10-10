@@ -1015,10 +1015,11 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 
 	gctl &= ~gctl_crst
 	c.regs.gctl = gctl
-	for {
-		if c.regs.gctl & gctl_crst == 0 {
-			break
-		}
+	// By the clock, here and below: a controller that never goes into reset or
+	// never comes out of it used to hold up the boot for ever.
+	if !devcore.spin_until(controller_in_reset, voidptr(c.regs), reset_timeout_ns) {
+		print('hda: the controller did not go into reset\n')
+		return -1
 	}
 
 	sys.nsleep(1000 * 200)
@@ -1026,10 +1027,9 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	gctl = c.regs.gctl
 	gctl |= gctl_crst
 	c.regs.gctl = gctl
-	for {
-		if c.regs.gctl & gctl_crst != 0 {
-			break
-		}
+	if !devcore.spin_until(controller_out_of_reset, voidptr(c.regs), reset_timeout_ns) {
+		print('hda: the controller did not come out of reset\n')
+		return -1
 	}
 
 	gcap := c.regs.gcap
