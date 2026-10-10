@@ -16,6 +16,7 @@ set -eu
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 kernel=$repo/kernel
 allowed=$repo/tests/kernel-allocs/allowed.txt
+copy_tool=${VINIX_KERNEL_ALLOCS_COPY_TOOL:-"$repo/tests/kernel-allocs/copy-sources"}
 
 . "$repo/build-support/find-v.sh"
 
@@ -43,7 +44,7 @@ for arch in aarch64 x86_64; do
 	# The real build uses source symlinks, so V can also find imports omitted
 	# from the seed list (for example, x86's shared DRM modules). Keep those
 	# imports inside the scratch project so their allocation warnings count.
-	python3 "$repo/tests/kernel-allocs/copy_sources.py" "$kernel" \
+	"$copy_tool" "$kernel" \
 		"$work/$arch.files" "$src" > "$work/$arch.copied"
 	if [ $arch = aarch64 ]; then
 		flags='-arch arm64 -d aarch64 -d limine_mp'
