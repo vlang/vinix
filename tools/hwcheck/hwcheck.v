@@ -129,6 +129,14 @@ fn devices(mut r Report) {
 	} else {
 		r.add('IOMMU units on: ${units.join(', ')}.')
 	}
+	slots := listing(sys + '/bus/pci/slots')
+	if slots.len == 0 {
+		r.add('No PCI hot-plug slot is watched by the kernel.')
+	}
+	for name in slots {
+		slot := '${sys}/bus/pci/slots/${name}'
+		r.add('PCI hot-plug slot ${name}: ${word(slot + '/state')}, leads to ${word(slot + '/address')}.')
+	}
 	r.add('')
 	r.add('Device nodes: ${listing('/dev').filter(it != 'pts' && it != 'shm').join(' ')}')
 	r.add('')
@@ -150,6 +158,8 @@ fn power(mut r Report) {
 		}
 	}
 	r.add('| may wake the machine | ${wake.join(', ')} |')
+	r.add('| screen across a sleep | dark ${word(sys + '/power/suspend_stats/screen_dark')} times, left lit ${word(sys +
+		'/power/suspend_stats/screen_lit')} |')
 	r.add('| sleeps so far | ${word(sys + '/power/suspend_stats/success')} succeeded, ${word(sys +
 		'/power/suspend_stats/fail')} failed |')
 	cpu0 := sys + '/devices/system/cpu/cpu0'
@@ -195,6 +205,20 @@ fn power(mut r Report) {
 				'/mode')} |')
 			if word(zone + '/mode') == 'disabled' {
 				r.problem('thermal zone ${name} is disabled: its sensor stopped answering')
+			}
+		}
+	}
+	r.add('')
+	// The fans firmware describes: how each is driven and what it was last
+	// told.
+	fans := (os.read_file(sys + '/class/thermal/acpi_fans') or { '' }).split_into_lines()
+	if fans.len == 0 {
+		r.add('No fan is known to the kernel.')
+	} else {
+		r.add('Fans: ${fans.join('; ')}.')
+		for fan in fans {
+			if fan.contains(' failures ') {
+				r.problem('firmware refused a fan command: ${fan}')
 			}
 		}
 	}
