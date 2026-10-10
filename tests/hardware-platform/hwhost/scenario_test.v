@@ -53,7 +53,8 @@ fn test_every_real_scenario_runs_somewhere() {
 	// Suspend to RAM is a PC's: every flavour of it runs there by default,
 	// and none on the other architecture.
 	for name in ['suspend-deep', 'suspend-deep-xapic', 'suspend-deep-bridge', 'suspend-deep-iommu', 'suspend-deep-iommu-amd',
-		'suspend-deep-undrawable', 'suspend-deep-forced', 'suspend-deep-headless'] {
+		'suspend-deep-arrival', 'suspend-deep-departure', 'suspend-deep-undrawable', 'suspend-deep-forced',
+		'suspend-deep-headless'] {
 		assert name in names_of(x86.run)
 		assert name !in names_of(arm.run)
 	}

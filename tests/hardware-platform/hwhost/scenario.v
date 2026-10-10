@@ -636,6 +636,38 @@ pub const scenarios = [
 		timeout:  240
 	},
 	Scenario{
+		name:        'suspend-deep-arrival'
+		about:       'a card put into a watched slot while the machine is suspended to RAM is found when it wakes'
+		arches:      ['x86_64']
+		qemu:        hotplug_machine
+		qemu_x86_64: ['-smp', '2', '-global', 'ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off']
+		files:       [tftp_probe]
+		required:    ['HWTEST START suspend-deep-arrival', 'HWTEST PASS suspend-deep-arrival']
+		actions:     deep_arrival_actions
+		ending:      .poweroff
+		events:      ['SUSPEND', 'WAKEUP', 'SUSPEND', 'WAKEUP', 'DEVICE_DELETED']
+		screens:     [Screen{
+			file: 'woken.ppm'
+		}]
+		timeout:     180
+	},
+	Scenario{
+		name:     'suspend-deep-departure'
+		about:    'a card taken while the machine is suspended to RAM is removed when it wakes, and one put in is found'
+		arches:   ['x86_64']
+		qemu:     ['-smp', '2', '-nic', 'none', '-device', 'pcie-root-port,id=hwport0,chassis=1,bus=pcie.0',
+			'-netdev', 'user,id=hwhot0,tftp={state}/tftp', '-device', 'e1000,bus=hwport0,netdev=hwhot0,id=hwcard0']
+		files:    [tftp_probe]
+		required: ['HWTEST START suspend-deep-departure', 'HWTEST PASS suspend-deep-departure']
+		actions:  deep_departure_actions
+		ending:   .poweroff
+		events:   ['SUSPEND', 'WAKEUP', 'SUSPEND', 'WAKEUP', 'SUSPEND', 'WAKEUP', 'DEVICE_DELETED']
+		screens:  [Screen{
+			file: 'woken.ppm'
+		}]
+		timeout:  180
+	},
+	Scenario{
 		name:     'suspend-deep-undrawable'
 		about:    'a display the kernel cannot bring back: suspend to RAM is not offered'
 		arches:   ['x86_64']
@@ -808,6 +840,73 @@ const deep_actions = [
 	Action{
 		after: 'HWTEST STEP waiting for power button'
 		qmp:   '{"execute":"system_powerdown"}'
+	},
+]
+
+// A card that comes or goes while QEMU has the machine suspended. The guest
+// prints both lines before it goes down; the card is dealt with half a second
+// into the sleep and the machine woken two seconds after that.
+const deep_wakeup = '{"execute":"system_wakeup"}'
+
+const deep_arrival_actions = [
+	Action{
+		after:          'HWTEST STEP a card while asleep'
+		event:          'SUSPEND'
+		event_count:    1
+		event_delay_ms: 500
+		qmp:            hotplug_add
+	},
+	Action{
+		after:          'HWTEST STEP a wakeup with the card in'
+		event:          'SUSPEND'
+		event_count:    1
+		event_delay_ms: 2500
+		qmp:            deep_wakeup
+	},
+	Action{
+		after:    'HWTEST STEP screen after the sleeps'
+		delay_ms: 200
+		qmp:      screen_picture('woken')
+	},
+	Action{
+		after: 'HWTEST STEP card in use after the sleeps'
+		qmp:   hotplug_remove
+	},
+]
+
+const deep_departure_actions = [
+	Action{
+		after:          'HWTEST STEP the card goes while asleep'
+		event:          'SUSPEND'
+		event_count:    1
+		event_delay_ms: 500
+		qmp:            hotplug_remove
+	},
+	Action{
+		after:          'HWTEST STEP a wakeup without the card'
+		event:          'SUSPEND'
+		event_count:    1
+		event_delay_ms: 2500
+		qmp:            deep_wakeup
+	},
+	Action{
+		after:          'HWTEST STEP a card while asleep'
+		event:          'SUSPEND'
+		event_count:    2
+		event_delay_ms: 500
+		qmp:            hotplug_add
+	},
+	Action{
+		after:          'HWTEST STEP a wakeup with the card in'
+		event:          'SUSPEND'
+		event_count:    2
+		event_delay_ms: 2500
+		qmp:            deep_wakeup
+	},
+	Action{
+		after:    'HWTEST STEP screen after the sleeps'
+		delay_ms: 200
+		qmp:      screen_picture('woken')
 	},
 ]
 
