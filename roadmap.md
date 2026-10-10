@@ -160,6 +160,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Apple ANS namespace/partition I/O counters, shared physical identity and offline/error reporting](docs/storage-volumes.md#apple-ans-block-status).
   - [x] [Periodic storage health/error monitoring with counter deltas and persistent session exit status](docs/storage-volumes.md#periodic-storage-monitoring).
   - [x] [Periodic NVMe/ANS thermal and wear telemetry, full 128-bit hardware counter deltas and new media-error detection](docs/storage-volumes.md#nvme-and-ans-telemetry).
+  - [x] [Atomic checksummed multi-disk plan bundles, complete-set publication and preflighted boot replay](docs/storage-volumes.md#atomic-multi-disk-bundles).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

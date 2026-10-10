@@ -5,7 +5,8 @@ block devices (including their partitions). A view maps a sector-aligned byte
 range to `/dev/mapper/vinix0` through `/dev/mapper/vinix63`. Creating, growing or
 removing a view changes kernel mappings only; it does not format the device or
 move its contents. Kernel mappings last until reboot. Saved volume plans retain
-their geometry and disk identity for explicit or configured restore after boot.
+their geometry and disk identity for explicit or configured restore after boot;
+multi-disk bundles publish a complete saved configuration in one file.
 
 The native V utility is installed as `/usr/sbin/vinix-volume` by both userland
 and desktop image builders. Commands require a trusted MAC domain,
@@ -131,7 +132,8 @@ The packaged ARM desktop init and both architectures' Alpine init scripts, plus
 the AMD64 desktop init, run `boot-restore` once before starting applications or
 the interactive shell. It loads `/etc/vinix/volumes.vmap` when present, together
 with visible `.vmap` files in `/etc/vinix/volumes.d` as one plan set. Missing
-configuration or an empty set is a successful no-op. The opened `/etc`,
+configuration or an empty set is a successful no-op. An optional
+`/etc/vinix/volumes.vset` bundle joins the same preflighted set. The opened `/etc`,
 `/etc/vinix`, enabled plans directory and every enabled file must be owned by
 root and not writable by group or others; none of those path components may be
 a symlink. Plans must also satisfy the regular-file and checksum rules.
@@ -181,8 +183,61 @@ lock. Kernel creation still checks privilege, mounted/swap protection, quota and
 current geometry. A failure during creation or concurrent reconfiguration can
 leave previously created mappings in place, including an earlier disk's complete
 plan. Replay resumes from matching mappings and never removes unlisted views.
-Saving several files does not publish a set atomically; finish enrollment before
-boot or explicit restore. Pools, spanning volumes and RAID remain separate work.
+Saving several individual files does not publish a set atomically; finish
+enrollment before boot or explicit restore, or use the bundle below. Pools,
+spanning volumes and RAID remain separate work.
+
+## Atomic multi-disk bundles
+
+```sh
+# Capture all managed views on these explicitly selected physical disks.
+vinix-volume save-set /root/volumes.vset /dev/vda /dev/vdb
+vinix-volume restore-bundle /root/volumes.vset
+# To enable the same bundle before applications start:
+vinix-volume save-set /etc/vinix/volumes.vset /dev/vda /dev/vdb
+vinix-volume boot-restore
+```
+
+`save-set BUNDLE DEVICE [DEVICE ...]` accepts 1–64 whole physical disks. Each
+disk needs the same identity and geometry as a single-disk plan. It saves all
+managed mappings on those disks, preserving offsets, slots and read-only mode;
+a disk with no managed mappings is also valid. Duplicate disk identities,
+physical aliases and duplicate global slots fail before publication. All disk
+descriptors remain open until every identity has been rechecked. An unreadable
+later disk or invalid snapshot preserves the previous bundle.
+
+The complete bundle uses one exclusive mode-0600 temporary file, file fsync,
+atomic rename and directory fsync, anchored to the same directory descriptor as
+single-plan publication. Readers opening the destination see the previous or
+the new complete file. Write, file-flush, close or rename failures preserve the
+old destination and remove the temporary. A directory-flush failure after rename
+reports failure with the new file already published and durability unconfirmed.
+These guarantees depend on the backing filesystem's existing flush/recovery
+guarantees; a checksum does not make an unjournaled filesystem crash-safe.
+
+The bounded `VINIXVS1` version-1 format has a 64-byte header containing version,
+disk count, total byte count, total mapping count, CRC32 and zero reserved bytes,
+followed by complete `VINIXVM1` disk plans in command-line order. Both inner and
+outer checksums are validated, together with global identity/slot uniqueness.
+At most 64 mappings are stored across all disks, so the largest bundle is 6208
+bytes. CRC32 detects accidental corruption; it does not authenticate a bundle.
+
+`restore-bundle` reads a bounded regular file without following its final
+symlink, discovers all physical disks, then uses the existing plan-set preflight
+and idempotent restore. A malformed later plan, missing disk or mapping conflict
+fails before any create. Matching views retain their generations and descriptors;
+unlisted views are never removed. Boot replay loads the legacy `volumes.vmap`,
+then `volumes.vset`, then visible `volumes.d/*.vmap` files into one set and applies
+the ordinary root-ownership/write-permission rules to each enabled input. Remove
+duplicate individual enrollment before enabling a bundle: overlaps are rejected
+rather than giving one configuration precedence.
+
+Atomic publication applies to the saved configuration. Saving still requires
+serialized administration: the kernel has no global mapping snapshot or
+configuration generation. Restoring remains a sequence of independently checked
+creates; a quota, I/O or concurrent-reconfiguration failure during application
+can leave an already created prefix. Replaying the same bundle resumes from
+matching entries. Filesystem mounting, pools and RAID remain separate work.
 
 ## Status ABI
 

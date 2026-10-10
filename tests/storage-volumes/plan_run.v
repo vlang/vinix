@@ -30,16 +30,51 @@ fn check_generated(path string) ! {
 
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
-	binary := work + '/plan-host'
-	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
-		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
-		'-fsanitize=address,undefined', '-o', binary, root + '/tools/volumes/volumecli/plan_test.v'])!
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	print(command([binary])!)
-	generate(root, root + '/tools/volumes/volumecli', work + '/volume.c', 'x86_64')!
-	check_generated(work + '/volume.c')!
+	for entry in ['plan_test', 'plan_bundle_test'] {
+		binary := work + '/' + entry
+		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
+			'-fsanitize=address,undefined', '-o', binary, root + '/tools/volumes/volumecli/' + entry + '.v'])!
+		print(command([binary])!)
+		println('PASS ' + entry + ': ASan/UBSan')
+	}
+	bundle_publication_tests(root, work, v)!
+	for arch in ['aarch64', 'x86_64'] {
+		path := work + '/volume-' + arch + '.c'
+		generate(root, root + '/tools/volumes/volumecli', path, arch)!
+		check_generated(path)!
+	}
 	init_policy(root, work)!
 	println('PASS host: plan format, identity, corruption, bounded plan sets, atomic publication and sanitizers')
+}
+
+// Replace only the shared publisher's synchronous syscall boundary. The
+// production encoder, cleanup and publication ordering are compiled unchanged.
+fn bundle_publication_tests(root string, work string, v string) ! {
+	fixture := work + '/bundleio'
+	os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
+		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file == 'plan_io.v' {
+			start := source.index('fn publish_bytes(') or { return error('Missing shared publisher') }
+			end := source.index('\nfn volume_path(') or { return error('Missing publisher boundary') }
+			mut publisher := source[start..end]
+			for name in ['write', 'fsync', 'close', 'renameat'] {
+				publisher = publisher.replace('C.' + name + '(', 'bundle_mock_' + name + '(')
+			}
+			source = source[..start] + publisher + source[end..]
+		}
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/bundle_io_test.v', fixture + '/bundle_io_test.v')!
+	binary := work + '/bundle-io-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, fixture + '/bundle_io_test.v'])!
+	print(command([binary])!)
+	println('PASS bundle publication: interruption, short writes, file/directory flush, close and rename faults under ASan/UBSan')
 }
 
 fn init_policy(root string, work string) ! {
@@ -264,6 +299,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	first := boot(args, work + '/first-boot.log')!
 	if !first.contains('init: volume restore failed; continuing') { return error('Production init did not report its invalid boot plan and continue') }
 	if !first.contains('PLAN SET PREFLIGHT PASSED') { return error('Missing multi-disk plan-set qualification') }
+	if !first.contains('PLAN BUNDLE PASSED:') { return error('Missing atomic multi-disk bundle qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
@@ -277,7 +313,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, nvme)! }
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
-	println('PASS ${arch}: multi-disk set preflight, discovery and trust rejection, production init restore after device reorder, 200-cycle retention and reboot data')
+	println('PASS ${arch}: atomic bundle save, multi-disk preflight, discovery and trust rejection, production init restore after device reorder, 200-cycle retention and reboot data')
 }
 
 fn main() {

@@ -111,6 +111,7 @@ fn load_plan_directory(directory i32, mut set PlanSet, trusted bool) bool {
 
 fn load_boot_plans(directory i32, mut set PlanSet) bool {
 	if !load_relative_plan(directory, c'volumes.vmap', mut set, true, true) { return false }
+	if !load_relative_bundle(directory, c'volumes.vset', mut set, true, true) { return false }
 	plans := C.openat(directory, c'volumes.d', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 	if plans < 0 {
 		if unsafe { C.errno == C.ENOENT } { return true }

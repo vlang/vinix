@@ -17,7 +17,16 @@ Each work directory must be new. Host checks cover format bounds, every
 truncated prefix and single-bit corruption, checksummed invalid records,
 512/4096-byte identity parsing, GPT header CRC, changed identity/geometry and
 atomic file publication and discovery's regular-file/symlink rejection with
-ASan/UBSan. Plan-set checks cover duplicate disks/slots, 64 plans and all global
+ASan/UBSan. Bundle checks include every truncated prefix and single-bit
+corruption, checksummed invalid headers/later records, append rollback,
+duplicate global slots/disk identities, the 6208-byte/64-disk bound and output
+canaries. A publisher fixture replaces only synchronous syscall boundaries;
+it tests EINTR and short writes, write/file-fsync/close/rename failures preserving
+the old file, and directory-fsync failure retaining the new published file with
+unconfirmed durability. A destination matching a temporary candidate must survive
+publication and cleanup. Both architectures' complete generated utilities are
+audited for implicit heap/runtime dependencies.
+Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init
 policy variants, including
@@ -66,14 +75,21 @@ rejects corrupt later plans, duplicate disk keys/global slots, missing disks,
 untrusted directories/files and selected symlinks without creating a prefix.
 Conflicting requested slots and unlisted overlapping views on the later disk
 leave earlier disks untouched. Directory-only and legacy-plus-directory restore
-both preserve data and existing generations. The fixture measures slab/large
-retention over 200 save/boot-restore cycles after 200 warmup cycles, with both
-disks enabled. A flushed phase marker and enrolled plans stay on ext2 across an
+both preserve data and existing generations. A bundle then replaces the individual
+enrollment. Failed saves with a missing later disk or repeated physical identity
+preserve the previous file; invalid arguments do not replace it. Corruption,
+missing disks, untrusted bundle mode/owner, final symlinks, legacy enrollment
+conflicts and later occupied/unlisted slots fail without creating a prefix.
+Explicit and boot bundle replay preserve data and existing generations.
+The fixture measures slab/large retention over 200 bundle-save/boot-restore
+cycles after 200 warmup cycles, with both disks enabled. A flushed phase marker
+and the atomically published bundle stay on ext2 across an
 abrupt VM stop. The physical disks are reordered for the second boot. Production ARM
-native init or AMD64 desktop init restores both disk-resident plans before the
+native init or AMD64 desktop init restores both disks from the bundle before the
 test application starts, and the application checks persisted data, read-only
 mode, the correct physical disks after reordering and idempotence. The host does
-not inject the plans or phase marker between boots.
+not inject the bundle or phase marker between boots. The controller requires
+the bundle preflight marker before accepting the first boot.
 
 The fixture touches its readable ELF load pages before sampling. This keeps
 cold faults in the long-lived test program's diagnostic code from appearing as

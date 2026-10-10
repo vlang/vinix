@@ -104,6 +104,12 @@ fn publish_plan(path &char, plan &Plan) bool {
 	mut bytes := [2112]u8{}
 	size := encode_plan(plan, &bytes[0])
 	if size == 0 { plan_error(c'invalid volume snapshot'); return false }
+	return publish_bytes(path, &bytes[0], size)
+}
+
+@[direct_array_access]
+fn publish_bytes(path &char, bytes &u8, size int) bool {
+	if size <= 0 { return false }
 	mut parent := [4096]char{}
 	mut name := [256]char{}
 	mut length := 0
@@ -129,17 +135,19 @@ fn publish_plan(path &char, plan &Plan) bool {
 	mut fd := i32(-1)
 	for attempt := 0; attempt < 64; attempt++ {
 		C.snprintf(&temporary[0], 64, c'.vinix-volume-%ld-%u', i64(C.getpid()), u32(attempt))
+		if C.strcmp(&temporary[0], &name[0]) == 0 { continue }
 		fd = C.openat(directory, &temporary[0], C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC, u32(0o600))
 		if fd >= 0 || unsafe { C.errno != C.EEXIST } { break }
 	}
 	if fd < 0 { C.perror(c'vinix-volume: create temporary plan'); return false }
+	mut published := false
 	defer {
 		if fd >= 0 { C.close(fd) }
-		C.unlinkat(directory, &temporary[0], 0)
+		if !published { C.unlinkat(directory, &temporary[0], 0) }
 	}
 	mut done := 0
 	for done < size {
-		written := C.write(fd, unsafe { &bytes[done] }, usize(size - done))
+		written := C.write(fd, unsafe { bytes + done }, usize(size - done))
 		if written < 0 && unsafe { C.errno == C.EINTR } { continue }
 		if written <= 0 { C.perror(c'vinix-volume: write plan'); return false }
 		done += int(written)
@@ -151,6 +159,7 @@ fn publish_plan(path &char, plan &Plan) bool {
 	if C.renameat(directory, &temporary[0], directory, &name[0]) != 0 {
 		C.perror(c'vinix-volume: publish plan'); return false
 	}
+	published = true
 	if C.fsync(directory) != 0 { C.perror(c'vinix-volume: plan published but directory flush failed'); return false }
 	return true
 }
@@ -165,22 +174,30 @@ fn save_plan(device &char, path &char) i32 {
 	mut plan := unsafe { &Plan(C.alloca(sizeof(Plan))) }
 	unsafe { *plan = Plan{} }
 	mut parent := Status{}
-	if !probe_disk(fd, mut plan.key, mut parent) { return 1 }
+	if !snapshot_plan(fd, mut plan, mut parent) || !publish_plan(path, plan) { return 1 }
+	C.printf(c'saved %u volume mappings\n', plan.count)
+	return 0
+}
+
+@[direct_array_access]
+fn snapshot_plan(fd i32, mut plan Plan, mut parent Status) bool {
+	plan = Plan{}
+	if !probe_disk(fd, mut plan.key, mut parent) { return false }
 	for slot := u32(0); slot < 64; slot++ {
 		mut name := [64]char{}
 		volume_path(slot, &name[0])
 		view := C.open(&name[0], C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
 		if view < 0 {
 			if unsafe { C.errno == C.ENOENT } { continue }
-			C.perror(c'vinix-volume: open mapping'); return 1
+			C.perror(c'vinix-volume: open mapping'); return false
 		}
 		mut status := Status{}
 		valid := query_status(view, mut status)
 		C.close(view)
-		if !valid { return 1 }
+		if !valid { return false }
 		if status.disk_id != parent.disk_id { continue }
 		if status.flags & 8 == 0 || status.slot != slot || status.sector != parent.sector {
-			return plan_error(c'mapper slot has incompatible metadata')
+			plan_error(c'mapper slot has incompatible metadata'); return false
 		}
 		plan.rows[plan.count] = Request{slot: slot, offset: status.start, length: status.bytes, flags: status.flags & 1}
 		plan.count++
@@ -189,11 +206,9 @@ fn save_plan(device &char, path &char) i32 {
 	unsafe { *after = DiskKey{} }
 	mut status := Status{}
 	if !probe_disk(fd, mut after, mut status) || !key_matches(unsafe { &plan.key }, after) || status.disk_id != parent.disk_id {
-		return plan_error(c'disk identity changed while saving')
+		plan_error(c'disk identity changed while saving'); return false
 	}
-	if !publish_plan(path, plan) { return 1 }
-	C.printf(c'saved %u volume mappings\n', plan.count)
-	return 0
+	return plan_valid(unsafe { &plan })
 }
 
 fn mapping_matches(status &Status, parent &Status, row &Request) bool {

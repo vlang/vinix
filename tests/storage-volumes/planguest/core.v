@@ -155,8 +155,9 @@ fn heap_snapshot(mut snapshot Heap) {
 }
 
 fn cycles(parent &char, count int) {
+	other := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 	for _ in 0 .. count {
-		simple(c'save', parent, c'/etc/vinix/volumes.vmap', 0)
+		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, other, unsafe { &char(nil) }, 0)
 		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 	}
 	C.sleep(13)
@@ -406,6 +407,7 @@ fn first_boot(parent &char) {
 		view_data()
 		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0, c'alias fixture cleanup')
 		multiple_plans(parent, wrong)
+		bundle_plans(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -426,7 +428,7 @@ fn first_boot(parent &char) {
 			allocation_trace(c'/proc/allocsites', true)
 		}
 		check(!retained, c'heap retention')
-		simple(c'save', parent, c'/etc/vinix/volumes.vmap', 0)
+		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, wrong, &char(nil), 0)
 		plan := C.open(c'/root/saved.vmap', C.O_RDONLY); check(plan >= 0, c'open exported plan')
 		mut bytes := [2112]u8{}
 		size := C.read(plan, &bytes[0], 2112)

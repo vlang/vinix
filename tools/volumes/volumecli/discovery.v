@@ -118,7 +118,7 @@ fn automatic_plan(path &char, restore bool) i32 {
 	return automatic_loaded(plan, restore)
 }
 
-// The legacy plan and volumes.d form one preflighted set. Absence is normal.
+// Legacy plan, bundle and volumes.d form one preflighted set. Absence is normal.
 // Configuration directories and every enabled file must be trusted.
 fn boot_restore() i32 {
 	etc := C.open(c'/etc', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)

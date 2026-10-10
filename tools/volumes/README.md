@@ -36,8 +36,13 @@ restore keeps matching views. Use a persistent filesystem for the plan; disk
 discovery uses `vinix-volume discover PLAN`, and `restore-auto PLAN` restores
 the unique physical match. Distinct disks with duplicate identity are rejected.
 
+`vinix-volume save-set BUNDLE DEVICE [DEVICE ...]` saves all selected disks in a
+single checksummed file, publishing the complete set with one atomic rename.
+`restore-bundle BUNDLE` discovers every disk and preflights the whole set before
+creating mappings. See [bundle format and durability limits](../../docs/storage-volumes.md#atomic-multi-disk-bundles).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
-optional root-owned `/etc/vinix/volumes.vmap` and visible `.vmap` files in
+optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported
 while boot continues. The configuration directories and enabled files must
 not be writable by group or others. One plan per disk and unique global mapper
