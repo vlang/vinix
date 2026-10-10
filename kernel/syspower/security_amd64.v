@@ -88,8 +88,10 @@ fn security_answer() {
 	if katomic.load(&syspower_security_answers[number]) == request {
 		return
 	}
-	if katomic.load(&syspower_security_restoring) != 0 {
-		before := syspower_security_before[number]
+	before := syspower_security_before[number]
+	// A processor that did not answer before the sleep has no record to go
+	// back to, only zeroes, which are not to be written anywhere.
+	if katomic.load(&syspower_security_restoring) != 0 && (before.cr0 != 0 || before.cr4 != 0) {
 		now := protections_here()
 		if now.efer != before.efer {
 			msr.wrmsr(msr_efer, before.efer)
