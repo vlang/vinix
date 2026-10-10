@@ -64,7 +64,9 @@ fn (e Engine) sources() ![]ah.Value {
 		paths << e.support_path(name)!
 	}
 	for name in ['build-support/musl/stage.py', 'build-support/musl/malloc-retain.patch',
-		'build-support/musl/alpine-1.2.6/manifest.json', 'build-support/java-cacerts.py'] {
+		'build-support/musl/alpine-1.2.6/manifest.json', 'build-support/java-cacerts',
+		'build-support/java-cacerts.v', 'build-support/javacacerts/core.v',
+		'build-support/run-v-tool.sh', 'build-support/find-v.sh'] {
 		paths << e.root_path(name)!
 	}
 	for name in ['_native.py', 'host-query.v'] { paths << e.support_path(name)! }
@@ -249,7 +251,7 @@ fn (e Engine) stage(args ah.Value, package_lock ah.Value, downloads ah.Value) !a
 	run(['python3', str(e.support_path('compile-v-runtime.py')!)!,
 		str(join(runtime, 'usr/lib/libvinix-android-compat.so')!)!, '--cc', str(compiler)!,
 		'--generated-dir', str(join(build_dir, 'runtime-generated')!)!], null())!
-	run(['python3', str(e.root_path('build-support/java-cacerts.py')!)!,
+	run([str(e.root_path('build-support/java-cacerts')!)!,
 		str(join(runtime, 'usr/share/ca-certificates/mozilla')!)!,
 		str(join(runtime, 'etc/ssl/certs/java/cacerts')!)!], null())!
 	resources := join(runtime, 'usr/share/atl')!

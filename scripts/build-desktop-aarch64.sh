@@ -1342,8 +1342,8 @@ for minecraft_support in \
     install -m755 "$SCRIPT_DIR/build-support/minecraft/$minecraft_support" \
         "$STAGING/usr/libexec/vinix-minecraft/$minecraft_support"
 done
-install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
-    "$STAGING/usr/libexec/vinix-minecraft/java-cacerts.py"
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/java-cacerts-stage.v" \
+    --arch aarch64 --staging "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"
 install -m755 "$X11_STAGING/usr/bin/vinix-xinput" "$STAGING/usr/bin/vinix-xinput"
 install -m755 "$X11_STAGING/usr/bin/vinix-wine-host" "$STAGING/usr/bin/vinix-wine-host"

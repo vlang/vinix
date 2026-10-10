@@ -54,43 +54,11 @@ for support in run-minecraft minecraft-login minecraft-xinitrc; do
 	cp "$repo/build-support/minecraft/$support" \
 		"$root/usr/libexec/vinix-minecraft/$support"
 done
-cat >"$work/minecraft-tools/fetch-minecraft.py" <<'EOF'
-#!/usr/bin/env python3
-import os
-import sys
-from pathlib import Path
-
-arguments = sys.argv[1:]
-staging = Path(arguments[arguments.index("--staging") + 1])
-game_root = arguments[arguments.index("--game-root") + 1]
-max_java = arguments[arguments.index("--max-java") + 1]
-root = staging / game_root.lstrip("/")
-(root / "libraries/org/lwjgl/lwjgl/3.3.3").mkdir(parents=True, exist_ok=True)
-(root / "versions/1.21.5").mkdir(parents=True, exist_ok=True)
-(root / "libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar").write_text("core\n")
-(root / "libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar").write_text("native\n")
-(root / "versions/1.21.5/1.21.5.jar").write_text("client\n")
-(root / "launch.env").write_text(
-    "MC_VERSION='1.21.5'\n"
-    "MC_VERSION_TYPE='release'\n"
-    "MC_ASSET_INDEX='17'\n"
-    "MC_JAVA_MAJOR='21'\n"
-    "MC_CLASSPATH='/usr/share/minecraft/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3.jar:/usr/share/minecraft/libraries/org/lwjgl/lwjgl/3.3.3/lwjgl-3.3.3-natives-linux-arm64.jar'\n"
-)
-Path(os.environ["VINIX_TEST_MINECRAFT_FETCH_LOG"]).write_text(
-    " ".join(arguments) + f"\nmax-java={max_java}\n"
-)
-EOF
-cat >"$work/minecraft-tools/java-cacerts.py" <<'EOF'
-#!/usr/bin/env python3
-import sys
-from pathlib import Path
-
-destination = Path(sys.argv[2])
-destination.parent.mkdir(parents=True, exist_ok=True)
-destination.write_text("test Java trust store\n")
-EOF
-chmod +x "$work/minecraft-tools/"*.py
+if [ -n "${VINIX_PACKAGE_FIXTURE:-}" ]; then
+	"$VINIX_PACKAGE_FIXTURE" setup "$work"
+else
+	"$repo/build-support/run-v-tool.sh" "$repo/tests/packages/minecraft-fixture.v" setup "$work"
+fi
 
 cat > "$work/bin/apk" <<'EOF'
 #!/bin/sh
@@ -264,9 +232,9 @@ run_pkg() {
 	VINIX_PKG_BSDTAR="${VINIX_PKG_BSDTAR:-$host_tar}" \
 	VINIX_PKG_SHA256SUM="${VINIX_PKG_SHA256SUM:-$work/bin/sha256sum}" \
 	VINIX_PKG_BUSYBOX= \
-	VINIX_PKG_PYTHON="$(command -v python3)" \
-	VINIX_MINECRAFT_FETCHER="$work/minecraft-tools/fetch-minecraft.py" \
-	VINIX_JAVA_CACERTS_HELPER="$work/minecraft-tools/java-cacerts.py" \
+	VINIX_PKG_PYTHON="$work/minecraft-tools/fetch-minecraft" \
+	VINIX_MINECRAFT_FETCHER="$work/minecraft-tools/fetch-minecraft" \
+	VINIX_JAVA_CACERTS_HELPER="${VINIX_JAVA_CACERTS_TOOL:-$repo/build-support/java-cacerts}" \
 	VINIX_TEST_MINECRAFT_FETCH_LOG="$work/minecraft-fetch.log" \
 	VINIX_TEST_APK_LOG="$log" \
 	VINIX_TEST_ROOT="$root" \

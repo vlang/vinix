@@ -15,7 +15,7 @@ ALPINE_ARCH=aarch64
 OPENJDK_PACKAGE=openjdk25-jdk
 JAVA_HOME=/usr/lib/jvm/java-25-openjdk
 
-for tool in curl python3 tar; do
+for tool in curl tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1
@@ -69,7 +69,7 @@ install -m755 "$SCRIPT_DIR/tests/java/smoke.sh" \
 # its Mozilla certificate package in an apk trigger. Raw APK extraction does
 # not execute triggers, so produce the same JKS input explicitly and keep the
 # package's standard $JAVA_HOME/lib/security/cacerts symlink usable.
-python3 "$SCRIPT_DIR/build-support/java-cacerts.py" \
+"$SCRIPT_DIR/build-support/java-cacerts" \
     "$STAGING/usr/share/ca-certificates/mozilla" \
     "$STAGING/etc/ssl/certs/java/cacerts"
 

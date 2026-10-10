@@ -115,8 +115,8 @@ install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-login" \
     "$STAGING/usr/libexec/vinix-minecraft/minecraft-login"
 install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-xinitrc" \
     "$STAGING/usr/libexec/vinix-minecraft/minecraft-xinitrc"
-install -m755 "$SCRIPT_DIR/build-support/java-cacerts.py" \
-    "$STAGING/usr/libexec/vinix-minecraft/java-cacerts.py"
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/java-cacerts-stage.v" \
+    --arch aarch64 --staging "$STAGING"
 
 install -m755 "$SCRIPT_DIR/tests/network/tools-smoke.sh" \
     "$STAGING/root/network-tools-smoke.sh"

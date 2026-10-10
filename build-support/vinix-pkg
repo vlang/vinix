@@ -901,15 +901,14 @@ finalize_java() {
 
 	# java-cacerts is normally populated by an Alpine trigger. Package installs
 	# deliberately disable triggers, so build the same JKS trust store directly.
-	python=${VINIX_PKG_PYTHON:-$(root_path /usr/bin/python3)}
-	helper=${VINIX_JAVA_CACERTS_HELPER:-$(root_path /usr/libexec/vinix-minecraft/java-cacerts.py)}
+	helper=${VINIX_JAVA_CACERTS_HELPER:-$(root_path /usr/libexec/vinix-minecraft/java-cacerts)}
 	certificates=$(root_path /usr/share/ca-certificates/mozilla)
 	cacerts=$(root_path /etc/ssl/certs/java/cacerts)
-	if [ ! -x "$python" ] || [ ! -f "$helper" ]; then
-		echo "pkg: this image lacks the Python Minecraft/Java installer support" >&2
+	if [ ! -x "$helper" ]; then
+		echo "pkg: this image lacks the native Java trust-store utility: $helper" >&2
 		exit 1
 	fi
-	"$python" "$helper" "$certificates" "$cacerts"
+	"$helper" "$certificates" "$cacerts"
 }
 
 install_minecraft() {
