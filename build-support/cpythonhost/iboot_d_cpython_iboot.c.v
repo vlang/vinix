@@ -14,6 +14,7 @@ fn C.PyObject_GetAttr(voidptr, voidptr) voidptr
 fn C.PyUnicode_Concat(voidptr, voidptr) voidptr
 fn C.PyObject_Format(voidptr, voidptr) voidptr
 fn C.PyEval_GetBuiltins() voidptr
+fn C.PyDict_GetItemWithError(voidptr, voidptr) voidptr
 fn C.PyDict_SetItem(voidptr, voidptr, voidptr) i32
 fn C.PyList_Append(voidptr, voidptr) i32
 fn C.PyList_Insert(voidptr, isize, voidptr) i32
@@ -72,15 +73,20 @@ fn ib_attr(value voidptr, name string) voidptr {
 }
 
 fn (s &IbootCodec) global(name string) voidptr {
-	value := unsafe { C.PyDict_GetItemString(s.namespace, name.str) }
-	if value != unsafe { nil } { return own(value) }
-	dictionary := C.PyEval_GetBuiltins()
-	fallback := unsafe { C.PyDict_GetItemString(dictionary, name.str) }
-	if fallback != unsafe { nil } { return own(fallback) }
-	message := py_string("name '" + name + "' is not defined")
-	C.PyErr_SetObject(unsafe { voidptr(C.PyExc_NameError) }, message)
-	drop(message)
-	return unsafe { nil }
+ key := ib_literal_name(name)
+ if key == unsafe { nil } { return key }
+ mut value := C.PyDict_GetItemWithError(s.namespace,key)
+ if value != unsafe { nil } { drop(key);return own(value) }
+ if pending_error() { drop(key);return unsafe { nil } }
+ value = C.PyDict_GetItemWithError(C.PyEval_GetBuiltins(),key)
+ drop(key)
+ if value != unsafe { nil } { return own(value) }
+ if pending_error() { return unsafe { nil } }
+ message := py_string("name '" + name + "' is not defined")
+ if message == unsafe { nil } { return message }
+ C.PyErr_SetObject(unsafe { voidptr(C.PyExc_NameError) },message)
+ drop(message)
+ return unsafe { nil }
 }
 
 fn (s &IbootCodec) pin(names []string, values []voidptr) {
@@ -383,16 +389,24 @@ fn (s &IbootCodec) boot_args(devtree voidptr, size voidptr, top voidptr) voidptr
 	}
 	fb := s.global('FB_BASE')
 	if virt == unsafe { nil } || phys == unsafe { nil } || fb == unsafe { nil } {
-		drop(virt)
-		drop(phys)
 		drop(fb)
+		drop(phys)
+		drop(virt)
 		drop(target1)
 		return unsafe { nil }
 	}
-	range := ib_binary('sub', fb, own(phys))
-	if range == unsafe { nil } {
-		drop(virt)
+	phys_range := s.global('PHYS_BASE')
+	if phys_range == unsafe { nil } {
+		drop(fb)
 		drop(phys)
+		drop(virt)
+		drop(target1)
+		return phys_range
+	}
+	range := ib_binary('sub', fb, phys_range)
+	if range == unsafe { nil } {
+		drop(phys)
+		drop(virt)
 		drop(target1)
 		return range
 	}

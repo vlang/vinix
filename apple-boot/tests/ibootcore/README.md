@@ -67,3 +67,8 @@ their original Python body. Independent plans and error controls compare the
 original block and whole main workflow; this stage makes no new guest claim.
 It removes 2,569 original Python bytes across 48 lines; net Python reduction is
 1,925 bytes.
+
+Fixed global-name lookups also preserve the actual dictionary comparison error.
+A finite interned name is borrowed for lookup; builtin fallback occurs only
+when the namespace lookup has no result and no pending error. This is a
+zero-credit correction: it removes no Python policy or counted Python bytes.
