@@ -2,15 +2,15 @@
 
 The target is to reduce the committed Python share to **5% or less** by porting
 maintained implementations and their tests to native V. The work is in progress.
-At source `47ff6efd23a8127efa82a9b15e236e5241a83fd9`, Linguist 7.27.0 reports
-**Python 5.40%** (513 files, 2,421,538 bytes) and **V 79.86%** (2,008 files,
-35,781,305 bytes). The complete committed-blob inventory and reproduction
+At source `d9933b67dc233a1e7239939f999bc36879f9bb8c`, Linguist 7.27.0 reports
+**Python 5.16%** (524 files, 2,340,449 bytes) and **V 80.04%** (2,097 files,
+36,328,579 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,784,747 Python bytes**. Roughly another
-0.18 MB must move at equal replacement size to reach 5%; replacement sizes and
+The measured net reduction so far is **2,865,836 Python bytes**. Roughly another
+0.07 MB must move at equal replacement size to reach 5%; replacement sizes and
 the other counted languages determine the actual percentage.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
@@ -21,9 +21,9 @@ archive would receive zero translation credit.
 ## Completed stages
 
 Counts below describe each stage's own original Python implementations and
-tests, including comments and blank lines. The 158 completed stages have a gross
-scope of **3,246,740 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
-and concurrent committed Python changes account for **461,993 bytes**
+tests, including comments and blank lines. The 182 completed stages have a gross
+scope of **3,361,548 bytes**. Counted import bridges, forwarders, fixed public data, caller edits
+and concurrent committed Python changes account for **495,712 bytes**
 between gross scope and the measured net reduction. Adapter additions receive
 no extra migration credit.
 
@@ -187,6 +187,30 @@ no extra migration credit.
 | TLB independent host-policy generator | `tests/tlb/policy.v` | 2,290 / 48 | `ae2770a3741c1b2870b4c1a35a426cf67779da08` |
 | Android Run ordinary object bridge | `build-support/cpythonhost/run_d_cpython_android_run.c.v` | 5,540 / 126 | `8244f8fa9300ee5fca4a264fb3630dc469bceece` |
 | Dota Vulkan ordinary object and preparation policies | `build-support/cpythonhost/vulkan_d_cpython_vulkan.c.v` | 5,646 / 124 | `47ff6efd23a8127efa82a9b15e236e5241a83fd9` |
+| Mounted-disk independent host generator | `tests/mounted-disk-policy/host_generator.v` | 599 / 8 | `3ef3701d36fe2cc72f51cbe4a1555f094e508b10` |
+| Scheduler QoS independent host generator | `tests/scheduler-qos/policy.v` | 1,513 / 38 | `7361951566ba8b5a8df505ffec2a4badbacd4d94` |
+| Scheduler preemption independent host generator | `tests/scheduler-preemption/policy.v` | 540 / 15 | `451cad711d8e9b9f064b848c08b40d5ad78e6a6e` |
+| VirGL VM host controller | `tests/virtio-gpu-virgl/virglcore/core.v` | 8,674 / 207 | `acb31a0838354e1334906eefabfc3a6be9566e27` |
+| Verified-boot independent policy controller | `tests/verified-boot/boottest/policy.v` | 5,750 / 94 | `ad563b364a603076f50b0c730d5f0a944d7526b0` |
+| Apple SPI independent fixture controller | `tests/apple-spi-keyboard/run.v` | 8,462 / 107 | `9c9117b2be2951f1e2481783a5ab559033f32d55` |
+| J313 speaker independent fixture controller | `tests/apple-speakers/run.v` | 8,372 / 100 | `670f3d15b17cedc8fdcd1469677cbf17c5ddcc67` |
+| M1 Wi-Fi control independent fixture controller | `tests/m1-wifi/run-control.v` | 7,841 / 94 | `a6ebc78dc87d7abc651f4e405c362a1c5b82cfc0` |
+| Dota Vulkan supplied-object fixture bindings | `build-support/cpythonhost/vulkan_fixture_d_cpython_vulkan.c.v` | 1,360 / 21 | `f9bc4f4a2cfaa347be9729cb0b77884dd51ad9da` |
+| OpenBSD security VM host controller | `tests/openbsd-security/securitycore/core.v` | 6,494 / 154 | `7b8a9d493d4598fbb2939744fab60d368e4d358a` |
+| CPU mitigation independent fixture controller | `tests/cpu-mitigations/check-policy.v` | 1,945 / 27 | `d7133c117e2a8c3bfd183f962c2010fcd9da0974` |
+| Disk no-sync VM controller | `tests/disk-no-sync/run_native.v` | 4,447 / 102 | `1030dde029ab17fe5ec62997acb8089d851ef87b` |
+| Reboot persistence VM controller | `tests/reboot-persistence/rebootcore/core.v` | 6,314 / 136 | `08672646790fa82976fabd2fce24f85132b4192a` |
+| M1 Wi-Fi protocol independent fixture controller | `tests/m1-wifi/run-protocol.v` | 6,377 / 77 | `0364411c90ce7c26c3d824992597aa2c7e02ffc8` |
+| M1 Wi-Fi helper independent fixture controller | `tests/m1-wifi/run-helpers.v` | 5,078 / 67 | `4befc6dbf6d97184720586757ea757c8a3fc8ba8` |
+| Apple ANS media independent fixture controller | `tests/apple-ans/run.v` | 7,193 / 81 | `4bc9c76338875b21410f2fe996fa29768d5f0952` |
+| M1 platform independent fixture controller | `tests/m1-wifi/run-platform.v` | 6,827 / 72 | `8d4b4dc7a724edaa18374bf74664235d10c06dd4` |
+| Android Boot ordinary stdlib primitive dispatch | `build-support/cpythonhost/boot_stdlib_d_cpython_boot.c.v` | 2,093 / 49 | `4355c909465114002843f74ad40cfc875e41e5e1` |
+| NUMA VM host controller | `tests/numa/numacore/core.v` | 3,776 / 104 | `cc2a12bd9e798ffc8a6187de9617fc911d82cf44` |
+| Sound VM supervisor | `tests/sound/soundcore/core.v` | 2,074 / 46 | `033f6a3ed72e95bba79410c3f70c2364d3f68774` |
+| VMX host build and validation controller | `tests/hypervisor/check-vmx.v` | 4,757 / 78 | `f4c41516d642390ab1ecec15299cb5fdb1e33434` |
+| Roblox staging policy | `build-support/roblox/robloxstage/policy.v` | 3,975 / 69 | `e9f18c70d5b45f0cc1999030e6e5e211a7e5486f` |
+| Vinix allocation benchmark host runner | `tests/alloc-bench/vinixcore/core.v` | 5,491 / 93 | `f477d5efbe7c79976ff993ac52a1990d28f9aa45` |
+| N64/PS1/PS2 desktop preparation | `tests/emulator-desktop/desktopprep/policy.v` | 4,856 / 57 | `d9933b67dc233a1e7239939f999bc36879f9bb8c` |
 
 Shell entrypoints compile V executables in a private temporary directory using
 `build-support/run-v-tool.sh` and the compiler selected by `find-v.sh`. They
@@ -324,6 +348,30 @@ lookup errors, checked allocation retirement and original lookup/reference
 order. Earlier actual negative controls remain recorded. All frontend bindings,
 retained syntax and concurrent committed source changes remain counted; these
 small per-stage reductions are separate from the committed graph totals.
+
+The next 24 bounded stages count selected original behavior, excluding retained
+Python syntax, loader/forwarding code and fixed compiler or guest recipe data.
+The mounted-disk, QoS, preemption and CPU controllers also transfer byte-identical
+V fixture literals with zero algorithm credit. Historical result snapshots and
+independent guest fixtures remain untouched. Gross stage credit and counted
+Python reductions remain separate: the Sound supervisor adds 370 Python bytes
+through its ownership bridge, despite translating 2,074 original behavior bytes.
+
+Roblox translates 3,975 bytes/69 lines and removes 1,468 counted Python bytes;
+its returned provenance literals receive zero credit. Emulator preparation
+translates 4,856 bytes/57 lines and removes 2,371 counted Python bytes across
+three harnesses and the shared bridge. The allocation benchmark runner translates
+5,491 bytes/93 lines and removes 2,622 counted Python bytes. Its independent
+allocator/sampler, shell expressions, lazy generator syntax and original
+TemporaryDirectory/finally owners remain intact.
+
+Finite literal/keyword allocation (`589a4629`), raw Unix paths (`deeac98c`),
+dual-stream capture/reaping (`ec1a25af`), original global lookup (`6e95bbcb`,
+`03a1eed7`), the Sound import repair (`dc8097f7`) and invoking-Python text codecs
+(`4d2b7285`) receive zero new algorithm credit. Their binding additions remain
+counted. Unrelated committed kernel and iOS changes affect the denominator;
+the language graph is measured from the explicit source revision, rather than
+attributed entirely to these Python ports. The 5% target has not been reached.
 
 ## Validation
 
@@ -1393,6 +1441,73 @@ workloads were not weakened.
   locals and error aliases remain owned; documented private-frame/recursion
   and bounded OOM limits remain intact. Host checks add no fresh guest/GPU claim.
 
+- Mounted-disk, QoS, preemption and CPU generators pass ARM, Rosetta x86 and
+  ASan/UBSan controls for exact generated files, partial effects, raw paths,
+  malformed input, original fixture extraction/assertions, subprocess errors,
+  SIGINT and disposable-owner retirement. The CPU policy's unchanged original
+  and native ABI checks pass 12,288 cases per profile. Fixed fixture text has
+  zero translation credit.
+- Apple SPI, speakers, ANS and M1 protocol/platform host recipes pass complete
+  original/native command, raw-path, encoding, missing-import, CLI, FD and cold
+  installer comparisons. The tested original and native actual compilation
+  failures remain identical: existing V-to-C memdup casts block these fixture
+  builds, and the ANS x86 attempt also encounters ARM assembly. These are not
+  reported as successful fixture executions. Wi-Fi control and helper stages
+  separately execute all eleven original/native fixture bodies successfully on
+  both host architectures. None of these host results adds physical Apple or
+  Wi-Fi operation evidence.
+- OpenBSD, VirGL, NUMA, disk no-sync, reboot persistence and Sound controllers
+  pass all three host profiles with real PTYs/children, EOF, signals, incoming
+  handled errors, named/saved locals, exact FD/reference baselines and actual
+  cold installers. NUMA's clock failure and Sound's named-local retirement
+  negatives were retained and corrected before qualification. Reboot's actual
+  retained generator uses the original shared loop cell. Disk's frontend Git
+  executable mode was restored before its qualified commit. No fresh QEMU
+  boot, desktop performance measurement or audio playback is claimed.
+- The Android Boot stdlib dispatcher passes its original client groups on all
+  three profiles, actual filesystem syntax leaves, supplied callbacks, rich
+  global lookup, saved-error order, 500 repeated reference checks and both cold
+  installers. An actual saved-Path destruction-order mismatch required one
+  ordered dictionary matching the original named locals. Original archive,
+  recursive conversion and Python context/exception syntax stays counted.
+  The Dota fixture bridge adds original recursive/selection and rich-object
+  ownership checks without claiming a new rendering or guest run.
+- VMX passes controlled full build/validate workflows on all three profiles,
+  raw/surrogate paths, actual CLI/closed-stdio/CLOEXEC/FD controls, owned child
+  interruption and both five-controller cold installers. Actual original/native
+  ABI fixtures pass 7,680 cases per profile. The complete checker's unchanged
+  cross inttypes header failure is retained; no VMX entry or QEMU/kernel build
+  success follows from those host controls.
+- Roblox passes the ten unchanged filesystem fixtures and 158 supplied-object,
+  failure and teardown pairs on each profile. An actual formatting callback
+  that changes RuntimeError exposed factory-lookup ordering; the final source
+  captures the original factory first. Each profile also passes 500 ordinary
+  calls, 100 saved errors, exact reader references/finite literal identities,
+  actual CLI/closed-stdio children and real SIGINT publication rollback. Both
+  actual cold routes build and retire SDK, staging and Android controllers.
+- The allocation benchmark runner passes full controlled workflows, actual
+  USTAR payloads, supplied checksum/compiler/validation objects, detached
+  writers, retained generators, actual child/CLI/SIGINT cases and GC-disabled
+  500-call/100-saved-error/threaded ownership checks. Final qualification includes
+  the source's restored original Git mode, with all execution bytes identical
+  to its complete three-profile matrix; fresh CLI and both cold routes confirm
+  that final mode. These controls do not constitute benchmark measurements.
+- Emulator preparation passes six real filesystem/raw-path pairs, 408 supplied
+  object/fault/prior-error pairs, 42 controlled complete harness workflows and
+  eleven environment-field retirement cases per profile. The first source
+  inserted fields too early and dropped temporary values in the wrong order
+  on failure; its actual negative remains retained. The final V source evaluates
+  the complete field stack before publication and retires it in reverse order.
+  Each profile passes 500 calls, 100 saved errors, exact references/literal
+  identities/FDs, 24 actual closed-stdio children and nine CLI pairs. Both actual
+  cold routes create six mode-0700 SDK/query owners, perform 101 preparation
+  calls per harness and retire every owner at interpreter exit. Original QMP,
+  pixel/gameplay assertions, parser/context owners and deadlines are unchanged.
+  The frozen archive has one unused older Roblox frontend; all actual consumed
+  dependencies match the committed checkout, and that drift is recorded rather
+  than claiming a complete current-HEAD snapshot. No fresh emulator/guest/GPU
+  execution result is inferred from controlled host workflows.
+
 Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 
 | Stage directory | Qualified receipt | SHA256 |
@@ -1755,6 +1870,96 @@ Machine-local evidence is under `/Users/alex/.cache/vinix-python-to-v/`:
 | `tlb-policy-generator-20261010` | `qualification-final-v1.json` | `8e34e78b90e850f890a7b16b6f9d02eb2d93e0a966ff1d09ce79358dce847066` |
 | `tlb-policy-generator-20261010` | `post-commit-final-v1.json` | `5fd1dfe62fe0776a2a4ae4fb9776ed71f260fc8e4a030a9801bcb39675c3327d` |
 | `tlb-policy-generator-20261010` | `android-peer-final-v1.json` | `b95c72b452bd4b9da33de82e5fd4c88c93d7b38916f5983fc5ca89bd2dd353fa` |
+| `mounted-disk-host-generator-20261010` | `qualification-final-v1.json` | `2f16ad38b03b07c928636f226e07614c24a212f731e8d6fc029d6c534bbc9b3f` |
+| `mounted-disk-host-generator-20261010` | `post-commit-final-v1.json` | `fa9f7bbc7467e63715339faed2dd03b0b653f1993559e278b99dcb5c4e2b337b` |
+| `mounted-disk-host-generator-20261010` | `android-peer-final-v1.json` | `2970df5238d0a3a6aa5d102192ee37588fad1c733e08d3e899c10ebbd5a49231` |
+| `scheduler-qos-host-generator-20261010` | `qualification-final-v2.json` | `64028d7716499bb3fc2cbd52bd09c5aaab2339f487e4829452502d69d8cdac9e` |
+| `scheduler-qos-host-generator-20261010` | `post-commit-final-v2.json` | `74d9c02a2323d77b46834528824caeac243caecd8f570df7cde4fb0b5f2ea7b0` |
+| `scheduler-qos-host-generator-20261010` | `agx-qos-peer-final-v2.json` | `bda9704322f89e72e91222a43f307faf6d5060ba80ac0c092544650d14151309` |
+| `scheduler-preemption-host-generator-20261010` | `qualification-final-v2.json` | `315c3afebf828b7c1039d9d915c2490014c8a6db3fe8306783092d160c5e9156` |
+| `scheduler-preemption-host-generator-20261010` | `post-commit-final-v2.json` | `07299c9ee36fb0883f42d41c14e6e3c1224780d67f5358bd1771347828967e5a` |
+| `scheduler-preemption-host-generator-20261010` | `agx-peer-final-v2.json` | `ed9972f800f2a6c980f131804bb7ccabe710bc90b9de7528bf5c99681ffca610` |
+| `virgl-vm-controller-20261010` | `qualification5.json` | `b47f8beac7dc66bcaa4a9da8459f10b1e7aea0e3ca50f1aa428b8ce70402951e` |
+| `virgl-vm-controller-20261010` | `post-commit5.json` | `d9485075b3a9cc6bbecce4c10726e08d346e5d661fddeb97e3210e3c85b1c5d1` |
+| `virgl-vm-controller-20261010` | `agx-peer-final-v5.json` | `059bd587b50fcd91a4d98d3a8d14878edb74690ca31b6f700e615c3511c811f7` |
+| `boot-policy-fixture-20261010` | `qualification-final-v5.json` | `4afc0166b0cce5a6c37060bc770d842ae3a6b886f7966210abf841ddd39f5538` |
+| `boot-policy-fixture-20261010` | `post-commit-final-v5.json` | `1e0dc09603e43671b28cc8bba181f798ea9a53d53ba4c3d297f7a7cc0779c63f` |
+| `boot-policy-fixture-20261010` | `agx-peer-final-v5.json` | `6e95d8d3758749288934b57bcb6da936d9227ac3cfe101374eb2ebdb2aad7210` |
+| `spi-host-controller-20261010` | `qualification-final-v3.json` | `0f9ac5d6c88d643f21ff90a2b83c1660d3a81d2625023afedc87fc279785a761` |
+| `spi-host-controller-20261010` | `post-commit-final-v3.json` | `6cecf218de8f3d8e0d896d4f1c3aeb35d36ec20c0d9d370725eacbbaa9e578db` |
+| `spi-host-controller-20261010` | `root-peer-final-v3.json` | `2604a7f67f5a79f08a4222b72a20d9c1b9a239e080c094e951fa8572ea8c2acc` |
+| `speaker-host-controller-20261010` | `qualification-final-v2.json` | `c45af29bacbb428ccc182752f67c3f3d532104a775cf90a92c4a9daaf858027a` |
+| `speaker-host-controller-20261010` | `post-commit-final-v2.json` | `3d6c96140ff9b1b3c7819ba41b7057c806ba8e6dc508f045034ae57d944b855e` |
+| `speaker-host-controller-20261010` | `root-peer-final-v2.json` | `98322f2af6623c88210dd8035c8b5d650010074798e90138613e8d76a8925427` |
+| `wifi-control-host-controller-20261010` | `qualification-final-v2.json` | `9609f6ac9b4fd204c853f0317af761795fec437ad4cd62e80ed399cacb6ef386` |
+| `wifi-control-host-controller-20261010` | `post-commit-final-v2.json` | `d5e3af4c17330b75aa6e187b97ecc69507f8b8a2954f7d1d28940bf000e1bbe8` |
+| `wifi-control-host-controller-20261010` | `agx-peer-final-v2.json` | `e21c1e10e87034872ec37542d9733534a6973b02a2905eabd0c684ea013ff399` |
+| `vulkan-fixture-object-adapter-20261010` | `qualification-v3.json` | `f4b83777bb774697c76668103008e18426f9ea30809daeba5ff7f890b1590c2a` |
+| `vulkan-fixture-object-adapter-20261010` | `post-commit-v3.json` | `1207dd54a5705eddb88e50a7dd459d55eb0d19ab913d8449b133a65ed14cc1e2` |
+| `vulkan-fixture-object-adapter-20261010` | `linux-host-peer-final-v3.json` | `5cc198e2b25137e3d106931c71c7f8ae635e4b4479ef3463d16e6ad7658f35c9` |
+| `openbsd-security-controller-20261010` | `qualification-final-v2.json` | `acf899db3c06af1e72816bc99e0f218ce371057a2666b3a662deef0f3347b1a8` |
+| `openbsd-security-controller-20261010` | `postcommit-final-v2.json` | `16154c5be44ff8dcbadc4cd6dc5f84b5ba44537a75a0e2786860f2143430b0f1` |
+| `openbsd-security-controller-20261010` | `agx-peer-final-v2.json` | `6fb5409c55e33713ce9a6cf97f668aee4d19e7689aa08607ebe40d22874d03e0` |
+| `cpu-policy-host-controller-20261010` | `qualification-final-v2.json` | `f1ae65a5f35a88f8eeb30a70e687b053a5bfa2eae3fbd0fa96be55a3d7f7b385` |
+| `cpu-policy-host-controller-20261010` | `post-commit-final-v2.json` | `7add134100d283f1621480ca1d115d7a568f800f5e5cae4d1445df68db9c9fcb` |
+| `cpu-policy-host-controller-20261010` | `android-peer-final-v2.json` | `55e553ea3c4adcf79d5cb54047aefb80457fd54d4f20d5fbecff825e60d85b96` |
+| `disk-no-sync-host-controller-20261010` | `qualification-final-v2.json` | `fcfa3931ba28294f510a66c8ac1f1309f103b3bb7550f5963ed10c3cf2b7cbf8` |
+| `disk-no-sync-host-controller-20261010` | `post-commit-final-v2.json` | `319ed189597453f2be4c3d3bb0748c079f024adff88ef56ef83bef7cd0645bee` |
+| `disk-no-sync-host-controller-20261010` | `linux-host-peer-final-v2-mode.json` | `3b9cbfac7efc915240459555f1a68af456a0e868274a9f7df2b0bdcbef865260` |
+| `reboot-persistence-controller-20261010` | `qualification-final-v2.json` | `6e29ef7c5ca5b49ac5504868e1211f1086c60697d8e01009d6122c83212d363c` |
+| `reboot-persistence-controller-20261010` | `postcommit-final-v2.json` | `261e76af63f28e15c2c963455c2e5eed67061ba968733445bec478deb805d74f` |
+| `reboot-persistence-controller-20261010` | `agx-peer-final-v2.json` | `33ec50f9f6299cba640d291717dff8df04c9dfc2c62b7d97241e280db0860b07` |
+| `wifi-protocol-host-controller-20261010` | `qualification-final-v5.json` | `3ac7df7ee5eb1e454daea656fee05b887366d9704785bf9cca9770bf84707fd4` |
+| `wifi-protocol-host-controller-20261010` | `post-commit-final-v5.json` | `ce146531afeac4d8a639a3fabcc3e9023e7a9be6132093cef0d5ecd623e98151` |
+| `wifi-protocol-host-controller-20261010` | `agx-peer-final-v5.json` | `ba54ddd76677f4d85fb748298cf988308b418231f278325c3e80e465f8a2b129` |
+| `wifi-helpers-host-controller-20261010` | `qualification-final-v3.json` | `7bcadca67d53b2379abddb884551ab8a4b0df83f58ff5a5f1ceb364a7124626e` |
+| `wifi-helpers-host-controller-20261010` | `post-commit-final-v3.json` | `50e906d6a35efc7a665332f7506d12258ca6ab7309e6e341fac932c2c131b66b` |
+| `wifi-helpers-host-controller-20261010` | `root-peer-final-v3.json` | `2a500c59440e8b3c8854a91afd2c9807f691b3fdb8c90bfabf279eb1bef80189` |
+| `ans-host-controller-20261010` | `qualification-final-v9.json` | `aed9185d375692b908d9cb045f689f39be5331939b4d516ef36e59c89b8c0ca7` |
+| `ans-host-controller-20261010` | `post-commit-final-v9.json` | `88a394d12eef9f8e5f2ff6a5f252e2abdc15e97cb277744aa86a2f3ecc73bdd3` |
+| `ans-host-controller-20261010` | `root-peer-final-v9.json` | `12f6cde759c3705bc24e02179a2cb6b2b30295974b70bca08c2fd7367120af7f` |
+| `wifi-platform-host-controller-20261010` | `qualification-final-v4.json` | `6d261f072a8bee82a8e1702bf6a233a407888405df1fa00b191ec49133373cda` |
+| `wifi-platform-host-controller-20261010` | `post-commit-final-v4.json` | `000ed9a384a83ea2489401332bd5b57566a30dfed380290d612106059d98e283` |
+| `wifi-platform-host-controller-20261010` | `root-peer-final-v4.json` | `cda5121249c055c339262be9aae7524525394b784a8e142c91b1ce31bef597bd` |
+| `boot-stdlib-dispatch-20261010` | `qualification-final-v2.json` | `3151fb3f396cf1a12545281bdcba013201d136adfa587698c2395a08b5d80463` |
+| `boot-stdlib-dispatch-20261010` | `post-commit-final-v2.json` | `ec3c60e5eb666e2d968c9163949303ab2e5a05d95c4ce43163f98e71db7bf469` |
+| `boot-stdlib-dispatch-20261010` | `agx-peer-final-v2.json` | `cdd76e12e2e451df068933701559d41b39b6c0330e307877767f4f01077ab5aa` |
+| `numa-vm-host-controller-20261010` | `qualification-final-v3.json` | `0e12495ab17e9fecab9dc4b8544d2fd8f33efdba595cb94a5035168b5b38dbb3` |
+| `numa-vm-host-controller-20261010` | `post-commit-final-v3.json` | `fbeee7067211fdd33d998109b38fbb7caf6be25a6e7658e520c20c42b565ed12` |
+| `numa-vm-host-controller-20261010` | `linux-host-peer-final-v3.json` | `b636116b21db9b0835197ead4d44307f2a5e2a6d0520e9afb29238b872713572` |
+| `sound-controller-20261010` | `qualification-final-v2.json` | `ec6975cc6b453b90f24e9cd66a59b4d62df7c81115bca9c9c8722abbef5a5e64` |
+| `sound-controller-20261010` | `postcommit-final-v2.json` | `8393d48c90f65631d787da3655e3dfe8697c3c737f5f48c15781e32627f83115` |
+| `sound-controller-20261010` | `agx-peer-final-v2.json` | `ecc719b84da5636b57fd34ce568fd8173ddce845a3af821d924bdfb2b658b2f0` |
+| `vmx-host-controller-20261010` | `qualification-final-v6.json` | `b57253c49a6defcff0282551e63bed73d37b2f12435a36c1b8ad9406b62a8b40` |
+| `vmx-host-controller-20261010` | `post-commit-final-v6.json` | `b2027799e3ea5f461ddf7a30a17df3580fa245b962f20adf52e820e17a495fe4` |
+| `vmx-host-controller-20261010` | `agx-peer-final-v6.json` | `278c8fe8a6394b8bf378e4af33131bf075c828cafdc93f504e72724f007c6bc3` |
+| `roblox-stage-controller-20261010` | `qualification-final-v3.json` | `9ab7ebb121d0252868eb46b016f250ce0cd44aef9c9d916b9d57ec03c09958a1` |
+| `roblox-stage-controller-20261010` | `post-commit-final-v3.json` | `7d34a8ec5a6e484ff49e930f5f481fe5e2c35104cd678a3a46dcd5099d1a0f98` |
+| `roblox-stage-controller-20261010` | `android-peer-final-v3.json` | `268d5ba8923a937309500d91717c40aa377420dd3a423a8f4f732cfbf10957f7` |
+| `alloc-bench-vinix-controller-20261010` | `qualification-final-v2.json` | `4e0408e65688576ee57fce9ce65dba1019aef5b7744a1aa1b13709ee16bfe372` |
+| `alloc-bench-vinix-controller-20261010` | `post-commit-final-v2.json` | `815521a5e8bf93d924381a7ec50d8f291adeb42fc8bab892c2028ffc829c0d81` |
+| `alloc-bench-vinix-controller-20261010` | `linux-host-peer-final-v2.json` | `02b69ef12f745ab84da84f1f2c3fce827bc9b04ec5f946ca3e0c48fd10db4609` |
+| `emulator-desktop-preparation-20261010` | `qualification-final-v3.json` | `67575f868295bfffdf6fe6ce139ec7a7e2da8e149c6f0ec6b78a5e5294609c22` |
+| `emulator-desktop-preparation-20261010` | `post-commit-final-v3.json` | `11d3788acf178050456bd9f0c625c91bd6711c6fd7cc1c9dc203516587b0e0cf` |
+| `emulator-desktop-preparation-20261010` | `linux-host-peer-final-v3.json` | `8b8795928121ed0bdd12a41dbc6a743aab4e19138e964648189fb4dc183e67cf` |
+| `package-load-global-20261010` | `qualification-sdk-v2.json` | `c61dc9c26cf4820fae1acd4e035b4bfabc762ea6526e6cf7123ce1979da932d2` |
+| `package-load-global-20261010` | `post-commit-sdk-v2.json` | `923498acfc9f8be1919286af9f2c4c54958024c650544663c1ea77c02239cccb` |
+| `package-load-global-20261010` | `agx-peer-sdk-v2.json` | `333b219b702cceebc4b10e0f1738fae1e822a4632ea6ffddbedbf924b5ebc916` |
+| `virgl-load-global-20261010` | `qualification2.json` | `1d539762951fd44d1654920db03f43c0c13fd2af6cb4771998bf438caa482edd` |
+| `virgl-load-global-20261010` | `post-commit2.json` | `8274ac0488a1f7426bab0a583b76156e74fb31c3f3ec0156f54c89a6774926a9` |
+| `virgl-load-global-20261010` | `agx-peer-final-v2.json` | `ffd9acbef433e4b1488a27ff24d0b11d339fbe166e63810589c3a67b47075eeb` |
+| `dual-stream-capture-20261010` | `qualification-final-v1.json` | `8623cf893a97f53e3155999ac4c870d2320aaca5c989979ecffacae07643f3ba` |
+| `dual-stream-capture-20261010` | `post-commit-final-v1.json` | `97c5fac5c6a20b87ed9c356fb558558b3a60134362bbeb5f08f7b8e804686cf8` |
+| `dual-stream-capture-20261010` | `agx-peer-harness-correction.json` | `2be1e1daef6b23c9275faa28d0e810a3a92d98b3eb3297b70e0c2e0d5660d34d` |
+| `unix-generator-paths-20261010` | `qualification-final-v1.json` | `372eac1230766c128ea7296db47eb59a23711870308a78612607305b4213b945` |
+| `unix-generator-paths-20261010` | `post-commit-final-v1.json` | `c0ba21a0289ac730c642eadd0706a11447b0e328fd40ebe7f16f1c1285dc881f` |
+| `unix-generator-paths-20261010` | `agx-peer-harness-correction.json` | `456dd757cc7c4b758401850c8dd4fda93c548f4338119b3cbdc9569ced6f93c7` |
+| `nm-parent-codec-host-controllers-20261010` | `qualification-final-v1.json` | `f92625a7ab99eea0c1b69749c37ae425f6b717524e6389df63fc6deb96cc6d20` |
+| `nm-parent-codec-host-controllers-20261010` | `post-commit-final-v1.json` | `e4ec6deb6dd9a975127ef3ab96fbca401091dcc8b47143b616595da3e6f1bafa` |
+| `nm-parent-codec-host-controllers-20261010` | `root-peer-final-v1.json` | `a4a4b4757bded0937890a86c7e2ddd605a47778a2fa3d5a50fc5b3d9d39931e5` |
+| `sound-controller-20261010/loader-fix` | `qualification.json` | `f5e4e2c3055cd3c779f8d7937b18251bf28a80e0b26865ac06a47c0331511171` |
+| `sound-controller-20261010/loader-fix` | `postcommit.json` | `0ccd107b7717e92a9406284f5c991f7c38eadb8abb0439b72797d912c09c0fb0` |
+| `sound-controller-20261010/loader-fix` | `root-peer.json` | `960cec6a7007ae86ea8619fef955063c07632117e97d322aded506f23e53f1b2` |
 
 The allocation comparator's `alloc-compare-20261008/final-qualification.json`
 and `postcommit.json` bind its source, compiler, control results and exact
