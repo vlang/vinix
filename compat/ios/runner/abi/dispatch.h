@@ -283,6 +283,21 @@ static int ios_mutex_create(void *object, int kind) {
     pthread_mutexattr_destroy(&attr);
     return result;
 }
+static int ios_mutex_create_firstfit(void *object, int kind) {
+#if defined(__APPLE__)
+    pthread_mutexattr_t attr;
+    int result = pthread_mutexattr_init(&attr);
+    if (result) return result;
+    result = pthread_mutexattr_settype(&attr, kind == 1 ? PTHREAD_MUTEX_ERRORCHECK : kind == 2 ? PTHREAD_MUTEX_RECURSIVE : PTHREAD_MUTEX_NORMAL);
+    if (!result) result = pthread_mutexattr_setpolicy_np(&attr, PTHREAD_MUTEX_POLICY_FIRSTFIT_NP);
+    if (!result) result = pthread_mutex_init(object, &attr);
+    pthread_mutexattr_destroy(&attr);
+    return result;
+#else
+    /* Native musl unlock releases the lock before waking a futex waiter. */
+    return ios_mutex_create(object, kind);
+#endif
+}
 static int ios_thread_name(const char *name) {
 #ifdef __APPLE__
     return pthread_setname_np(name);

@@ -5,12 +5,13 @@ fn C.ios_sizeof_mutex() usize
 fn C.ios_sizeof_cond() usize
 fn C.ios_sizeof_once() usize
 fn C.ios_mutex_create(voidptr, int) int
+fn C.ios_mutex_create_firstfit(voidptr, i32) i32
 fn C.ios_thread_name(&char) int
 fn C.ios_key_create(voidptr, voidptr) int
-fn C.pthread_mutex_destroy(voidptr) int
-fn C.pthread_mutex_lock(voidptr) int
-fn C.pthread_mutex_trylock(voidptr) int
-fn C.pthread_mutex_unlock(voidptr) int
+fn C.pthread_mutex_destroy(voidptr) i32
+fn C.pthread_mutex_lock(voidptr) i32
+fn C.pthread_mutex_trylock(voidptr) i32
+fn C.pthread_mutex_unlock(voidptr) i32
 fn C.pthread_cond_init(voidptr, voidptr) i32
 fn C.pthread_cond_destroy(voidptr) i32
 fn C.pthread_cond_signal(voidptr) i32
@@ -48,16 +49,25 @@ fn pthread_mutex_native(object u64, create_type int) !voidptr {
 	}
 	pointer := C.calloc(1, C.ios_sizeof_mutex())
 	if pointer == unsafe { nil } { return error('out of memory') }
-	if C.ios_mutex_create(pointer, kind) != 0 { C.free(pointer); return error('mutex initialization failed') }
+	if C.ios_mutex_create_firstfit(pointer, i32(kind)) != 0 { C.free(pointer); return error('mutex initialization failed') }
 	system_data.mutexes[object] = pointer
 	return pointer
 }
 
-fn darwin_mutex_init(object u64, attributes u64) int {
+fn darwin_mutex_init(object u64, attributes u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	if object == 0 { return 22 }
 	kind := if attributes == 0 { 0 } else {
-		if read64(attributes) != 0x4d545841 { return 22 }
-		int(read32(attributes + 8))
+		if !pthread_mutexattr_valid(attributes) { return 22 }
+		flags := read32(attributes + 12)
+		policy := (flags >> 6) & 7
+		if policy != 1 && policy != 2 { return 22 }
+		// Musl's mutex releases ownership before waking a waiter (FIRSTFIT).
+		// The per-process registry cannot supply shared state, priority protocols
+		// or FAIRSHARE ownership handoff. Reject those before allocating/writing.
+		if policy != 2 || (flags >> 4) & 3 != 2 || flags & 3 != 0 { return 45 }
+		int((flags >> 2) & 3)
 	}
 	if kind !in [0, 1, 2] { return 22 }
 	pthread_mutex_native(object, kind) or { return 22 }
@@ -65,47 +75,36 @@ fn darwin_mutex_init(object u64, attributes u64) int {
 	return 0
 }
 
-fn darwin_mutex_lock(object u64) int {
+fn darwin_mutex_lock(object u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	pointer := pthread_mutex_native(object, -1) or { return 22 }
-	return pthread_error(C.pthread_mutex_lock(pointer))
+	return i32(pthread_error(int(C.pthread_mutex_lock(pointer))))
 }
 
-fn darwin_mutex_trylock(object u64) int {
+fn darwin_mutex_trylock(object u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	pointer := pthread_mutex_native(object, -1) or { return 22 }
-	return pthread_error(C.pthread_mutex_trylock(pointer))
+	return i32(pthread_error(int(C.pthread_mutex_trylock(pointer))))
 }
 
-fn darwin_mutex_unlock(object u64) int {
+fn darwin_mutex_unlock(object u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	pointer := pthread_mutex_native(object, -1) or { return 22 }
-	return pthread_error(C.pthread_mutex_unlock(pointer))
+	return i32(pthread_error(int(C.pthread_mutex_unlock(pointer))))
 }
 
-fn darwin_mutex_destroy(object u64) int {
+fn darwin_mutex_destroy(object u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	pointer := pthread_mutex_native(object, -1) or { return 22 }
 	result := C.pthread_mutex_destroy(pointer)
 	if result == 0 { system_data.mutexes.delete(object); C.free(pointer); unsafe { *(&u64(object)) = 0 } }
-	return pthread_error(result)
-}
-
-fn darwin_mutexattr_init(attributes u64) int {
-	if attributes == 0 { return 22 }
-	unsafe { *(&u64(attributes)) = 0x4d545841 }
-	write32(attributes + 8, 0)
-	return 0
-}
-
-fn darwin_mutexattr_type(attributes u64, kind int) int {
-	if attributes == 0 || read64(attributes) != 0x4d545841 || kind !in [0, 1, 2] { return 22 }
-	write32(attributes + 8, u32(kind))
-	return 0
-}
-
-fn darwin_mutexattr_destroy(attributes u64) int {
-	if attributes == 0 || read64(attributes) != 0x4d545841 { return 22 }
-	unsafe { *(&u64(attributes)) = 0 }
-	return 0
+	return i32(pthread_error(int(result)))
 }
 
 fn pthread_cond_native(object u64, initialize bool) !voidptr {
@@ -200,6 +199,7 @@ fn darwin_thread_name(name &char) int { return pthread_error(C.ios_thread_name(n
 
 fn pthread_symbol(symbol string) ?u64 {
 	if address := pthread_attr_symbol(symbol) { return address }
+	if address := pthread_mutexattr_symbol(symbol) { return address }
 	if address := pthread_condattr_symbol(symbol) { return address }
 	if address := pthread_identity_symbol(symbol) { return address }
 	if address := pthread_sched_symbol(symbol) { return address }
@@ -211,9 +211,6 @@ fn pthread_symbol(symbol string) ?u64 {
 		'_pthread_mutex_trylock' { u64(unsafe { voidptr(darwin_mutex_trylock) }) }
 		'_pthread_mutex_unlock' { u64(unsafe { voidptr(darwin_mutex_unlock) }) }
 		'_pthread_mutex_destroy' { u64(unsafe { voidptr(darwin_mutex_destroy) }) }
-		'_pthread_mutexattr_init' { u64(unsafe { voidptr(darwin_mutexattr_init) }) }
-		'_pthread_mutexattr_settype' { u64(unsafe { voidptr(darwin_mutexattr_type) }) }
-		'_pthread_mutexattr_destroy' { u64(unsafe { voidptr(darwin_mutexattr_destroy) }) }
 		'_pthread_cond_init' { u64(unsafe { voidptr(darwin_cond_init) }) }
 		'_pthread_cond_wait' { u64(unsafe { voidptr(darwin_cond_wait) }) }
 		'_pthread_cond_timedwait' { u64(unsafe { voidptr(darwin_cond_timedwait) }) }

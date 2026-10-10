@@ -53,8 +53,11 @@ fn cxx_mutex_trylock(object u64) bool {
 	return result == 0
 }
 fn cxx_recursive_mutex_init(object u64) {
-	mut attributes := [u64(0x4d545841), 2]!
-	if darwin_mutex_init(object, u64(unsafe { &attributes[0] })) != 0 { panic('iOS: C++ recursive mutex initialization failed') }
+	mut attributes := [u64(0), u64(0)]!
+	address := u64(unsafe { &attributes[0] })
+	if darwin_mutexattr_init(address) != 0 || darwin_mutexattr_type(address, 2) != 0
+		|| darwin_mutex_init(object, address) != 0 { panic('iOS: C++ recursive mutex initialization failed') }
+	if darwin_mutexattr_destroy(address) != 0 { panic('iOS: C++ recursive mutex attribute destruction failed') }
 }
 fn cxx_unique_mutex(unique_lock u64) u64 {
 	if unique_lock == 0 || unsafe { *(&u8(unique_lock + 8)) } == 0 { panic('iOS: C++ condition wait requires an owned unique_lock') }

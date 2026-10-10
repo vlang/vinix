@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_mutexattr_setpolicy_np
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_rwlock_destroy
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -934,7 +934,35 @@ and errno. ASAN/UBSAN exercises two Mach-O loads/unloads, a native fork after
 unload and the V namespace's allocation/retirement paths; native robust owner
 tracking is exercised in the ARM64 guest. The full C++/GLES/PPSSPP regression
 passes. These entries resolve five strong imports across Fortnite and EOSSDK.
-The actual game still exits before entry at `pthread_mutexattr_setpolicy_np`.
+That probe still exited before entry at `pthread_mutexattr_setpolicy_np`.
+
+The V mutex-attribute adapters now follow the measured 16-byte Darwin layout:
+signature, signed priority ceiling and packed type, sharing, protocol and policy
+fields. Initialization preserves the unused flag bits and defaults to private
+NORMAL/FIRSTFIT. Getters use guarded 32-bit outputs; setters preserve unrelated
+fields and reject invalid values. Copied attributes are independent values,
+and destruction clears only a valid signature. Ceiling values range from -999
+through 999 in the installed Mac implementation.
+
+Both EOSSDK call sites request FIRSTFIT (3), including one recursive mutex.
+These requests create real native mutexes: musl releases ownership before waking
+a futex waiter, allowing a new contender to acquire it. Host verification uses
+the Mac's explicit native FIRSTFIT policy. Recursive and ERRORCHECK behavior,
+condition waits and errno preservation use native pthread operations. The C++
+recursive constructor now builds attributes through the same V functions.
+Explicit FAIRSHARE ownership handoff, shared-process mutex storage and priority
+protocols remain unsupported: attributes can represent those requests, but mutex
+initialization returns Darwin ENOTSUP (45) before allocating or changing the
+caller object. Destruction requires a quiescent mutex; busy-object destruction
+and cancellation are outside this tested subset.
+
+The shared Mac/iOS fixture checks exact packed fields, copied attributes,
+preserved guards, invalid policies and ceiling boundaries, all four static
+initializers, timed condition waits and three rounds of eight workers for each
+mutex type. It also runs inside the existing condition-attribute guest fixture.
+ASAN/UBSAN checks two Mach-O loads/unloads and rejection before native allocation.
+The full ARM64 C++/GLES/PPSSPP regression passes. The actual game gets past the
+mutex-policy import but still exits before entry at `pthread_rwlock_destroy`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -942,11 +970,11 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,306 | 852 | 81 |
-| EOSSDK | 521 | 141 | 18 |
+| EOSSDK | 522 | 140 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,880 | 1,116 | 122 |
+| All images | 1,881 | 1,115 | 122 |
 
-The C++/GLES/Text variant reports 1,893 resolved imports, 1,103 unresolved strong
+The C++/GLES/Text variant reports 1,894 resolved imports, 1,102 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

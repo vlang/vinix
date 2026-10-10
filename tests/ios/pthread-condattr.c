@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include "pthread-mutexattr.h"
 typedef unsigned long word;
 struct attr {word signature,flags;};
 struct condition {word words[6];};
@@ -81,5 +82,6 @@ int main(int argc,char **argv){
     CHECK(pthread_condattr_destroy(a)==0 && *__error()==177,20);
     CHECK(guarded.before==0x123456789abcdef0UL && guarded.after==0xfedcba9876543210UL,21);
     for(int i=0;i<8;i++)CHECK(roundtrip()==0,22);
+    CHECK(mutexattr_checks(adapter)==0,23);
     puts("IOS-CONDATTR: guarded attributes, native sharing bits, repeated destruction, copied private conditions, timed waits, signals, broadcasts and eight threads");return 0;
 }
