@@ -225,6 +225,9 @@ consistent filesystem; backup restoration preserves content and metadata.
   - [x] [PCI devices put into D3hot for a sleep](docs/hardware-platform.md#pci-power-states)
     and given their configuration again, where the driver can bring the
     device back from nothing. Tested with the one card QEMU powers down.
+  - [x] [The lid, the buttons and the keyboard armed to end a suspend to
+    RAM](docs/hardware-platform.md#suspend-to-ram-x86-64) as firmware describes
+    them (`_PRW`). No machine has been woken that way: QEMU's cannot be.
   - [x] [Suspend to RAM on x86-64 (ACPI S3)](docs/hardware-platform.md#suspend-to-ram-x86-64):
     the processors, interrupt controllers, clocks, PCI configuration, IOMMUs
     and the display mode put back, tested in QEMU only and offered only where

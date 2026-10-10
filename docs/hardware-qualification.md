@@ -183,6 +183,10 @@ hwcheck --rehearse-sleep > report.md
    input, network, audio and storage work, the sound goes on;
    `suspend_stats/fail` and `security_changes` are 0. Leave one sleep of each
    depth overnight and record the charge lost.
+   Before the first `deep` sleep record `/sys/power/acpi_wakeup`: the lid
+   and the keyboard should be listed, and `armed` should go up for each with
+   every sleep. A lid that is armed and still does not wake the machine is
+   an event of firmware's that did not arrive: record the line.
 8. **Battery.** Compare `capacity`, `status`, `energy_now` and
    `time_to_empty_now` with the firmware's own figures (or another operating
    system on the same machine) at 100%, 50% and 10%. Pull and replace the
