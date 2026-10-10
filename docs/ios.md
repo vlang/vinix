@@ -1984,23 +1984,43 @@ and two drained/unmapped runtime cycles. Generated witnesses and metadata
 construction/retirement contain no hidden V allocations. All thirty-two
 programs rebuild, and all fourteen Swift ABI guest checks pass.
 
-The actual Fortnite probe now resolves Void and exits with status 1 before
+The Void probe resolved the empty tuple and exited with status 1 before
 entry at EOSSDK's `__swift_stdlib_operatingSystemVersion` import. Evidence is
 retained under `swift-void-checks`, including native measurements of that next
 entry's indirect 24-byte return ABI. Full regression remains unpassed and the
 five published runners retain their last passing hashes.
+
+V now supplies `__swift_stdlib_operatingSystemVersion` using the existing iOS
+17.0 device profile, matching this IPA's minimum OS version. The ordinary
+ARM64 C ABI returns three signed pointer-sized fields in exactly 24 bytes
+through x8. `UIDevice.systemVersion` reads the profile's static text, and the
+Swift query returns 17.0.0 independently of the host OS. The getter needs no
+allocation, cache, lock or runtime arena.
+
+Installed-library and V version tests pass ASAN/UBSAN in both seed modes.
+Native results agree with this Mac's sysctl; V results agree with UIDevice.
+Direct calls and a raw x8 probe verify guards, a protected page boundary,
+preserved Swift context/errno, concurrent resolution and eight query workers.
+Calls also work before initialization and after two drained runtime cycles.
+All thirty-three programs rebuild, and all fifteen Swift ABI guest checks pass.
+
+The version probe now exits with status 1 before entry at EOSSDK's
+`__swift_stdlib_reportUnimplementedInitializerInFile` import. Evidence is retained
+under `swift-version-checks`, including native measurements of that reporter's
+ordinary C ABI, bounded diagnostic and successful return. Full regression
+remains unpassed and the five published runners retain their last passing hashes.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,386 | 772 | 81 |
-| EOSSDK | 597 | 65 | 18 |
-| MarketplaceKitWrapper | 90 | 86 | 23 |
-| All images | 2,073 | 923 | 122 |
+| Fortnite executable | 1,387 | 771 | 81 |
+| EOSSDK | 598 | 64 | 18 |
+| MarketplaceKitWrapper | 91 | 85 | 23 |
+| All images | 2,076 | 920 | 122 |
 
-The C++/GLES/Text variant reports 2,086 resolved imports, 910 unresolved strong
+The C++/GLES/Text variant reports 2,089 resolved imports, 907 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -2052,7 +2072,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all fourteen Swift ABI checks in a small, independent guest and
+`swift` runs all fifteen Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.

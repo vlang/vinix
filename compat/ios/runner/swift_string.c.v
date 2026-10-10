@@ -212,6 +212,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'__swift_stdlib_operatingSystemVersion' { u64(unsafe { voidptr(ios_operating_system_version) }) }
 		'_$sytN' { swift_void_full_metadata() }
 		'_$sSSN' { swift_string_metadata() }
 		'_$sSSMn' { read64(swift_string_metadata() + 8) }

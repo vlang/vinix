@@ -107,7 +107,7 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 		}
 		'UIDevice' {
 			match selector {
-				'systemVersion' { frame.x[0] = make_string(c'17.0') }
+				'systemVersion' { frame.x[0] = make_string(unsafe { &char(ios_system_version_text.str) }) }
 				'systemName' { frame.x[0] = make_string(c'iOS') }
 				'name' { frame.x[0] = make_string(c'Vinix ARM64') }
 				'model', 'localizedModel' { frame.x[0] = make_string(c'iPad') }
