@@ -259,8 +259,9 @@ fn test_expected_ops_match_actual_guest_workload() {
 	}
 	shell := os.read_file(os.join_path(os.dir(@FILE), '../perf-init.sh'))!
 	for program in churn_programs {
-		assert shell.contains(program)
+		assert source.contains(program)
 	}
+	assert shell.contains('"$perf/measure" churn 300 "$label"')
 	assert expected(['new'], ['ops'], 1).len == 36
 }
 

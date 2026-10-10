@@ -133,8 +133,10 @@ upgrade, rollback and recovery are repeatable from published images.
   support where useful; verify protection and teardown during concurrent access.
   See [implementation and limits](docs/address-space-tlb.md) and
   [qualification](tests/tlb/README.md).
-- [ ] Eliminate measured per-operation retention and close unresolved kernel
+- [x] Eliminate measured per-operation retention and close unresolved kernel
   stress failures; audit generated V-to-C allocations and every new lifetime.
+  See [implementation and qualification limits](docs/memory-retention.md) and
+  [retention acceptance tests](tests/memory-retention/README.md).
 
 Acceptance: repeated workloads stop growing memory after warmup, resource abuse
 does not panic the machine, and the desktop remains usable during pressure.

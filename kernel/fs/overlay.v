@@ -228,12 +228,13 @@ fn overlay_dispose_real(mut real VFSNode, held bool) {
  // reference and reservation until a safe cleanup is possible.
  res.unlink(voidptr(real)) or { return }
  if stat.isdir(mode) { real.removed = true; res.stat.nlink = 0 }
- if !held { res.unref(unsafe { nil }) or {} }
+ if !held { release_resource_after_grace(res) }
  orphan_node(mut real, mode)
 }
 fn overlay_drop_real_locked(mut dir VFSNode, name string, held bool) {
  if name !in dir.children { return }
  mut real := unsafe { dir.children[name] }
+ if real != unsafe { nil } { hold_parent(mut real) }
  dir.children.delete(name)
  if real != unsafe { nil } { overlay_dispose_real(mut real, held) }
 }
@@ -686,6 +687,7 @@ fn overlay_unlink(mut dir VFSNode, mut node VFSNode, name string) ? {
 		unsafe { upper_dir.children[name] = whiteout }
   whiteout = unsafe { nil }
 	}
+	hold_parent(mut node)
 	dir.children.delete(name)
 	if is_dir {
 		node.removed = true
@@ -740,6 +742,7 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 			}
 			overlay_drop_real_locked(mut new_upper, new_name, held)
 		}
+		hold_parent(mut replaced)
 		new_dir.children.delete(new_name)
 		if replaced_is_dir {
 			replaced.removed = true
@@ -756,7 +759,7 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	unsafe {
 		new_upper.children[new_name] = real
 	}
-	adopt(mut real, mut new_upper, new_name)
+	adopt(mut real, mut new_upper, new_name.clone())
 	if old_node.overlay.has_lower {
 		unsafe { old_upper.children[old_name] = old_whiteout }
   old_whiteout = unsafe { nil }
@@ -769,7 +772,7 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	unsafe {
 		new_dir.children[new_name] = old_node
 	}
-	adopt(mut old_node, mut new_dir, new_name)
+	adopt(mut old_node, mut new_dir, new_name.clone())
 }
 
 // ── Mounting ─────────────────────────────────────────────────────────────────
@@ -885,7 +888,7 @@ fn overlay_discard_created(mut dir VFSNode, mut node VFSNode) {
   res.stat.nlink = 0
   real.removed = true
   real.orphan = true
-  real.discarded_directory = true
+  real.directory_resource = true
   retire_node(mut real)
  } else { overlay_dispose_real(mut real, false) }
  // The previous whiteout never left its upper slot.

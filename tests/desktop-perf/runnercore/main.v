@@ -158,7 +158,15 @@ fn main_runtime(work string, runtime string, assets ah.Value, builds [][]string,
 	per_run := arithmetic('add', arithmetic('add', settle, seconds)!, ah.Value(60))!
 	mut timeout := timeout_option
 	if compare('eq', timeout, ah.Value(0))! {
-		timeout = arithmetic('add', ah.Value(900), arithmetic('mul', arithmetic('mul', arithmetic('mul', per_run, ah.Value(builds.len))!, ah.Value(scenarios.len))!, rounds)!)!
+		mut scenario_budget := ah.Value(0)
+		for scenario in scenarios {
+			// Ops has 36 full warmup/measured cohorts, each with two 13s
+			// reclamation waits. Churn executes 2,400 validated children.
+			allowance := if scenario == 'ops' { ah.Value(1500) }
+				else if scenario == 'churn' { ah.Value(240) } else { per_run }
+			scenario_budget = arithmetic('add', scenario_budget, allowance)!
+		}
+		timeout = arithmetic('add', ah.Value(900), arithmetic('mul', arithmetic('mul', scenario_budget, ah.Value(builds.len))!, rounds)!)!
 	}
 	print_message('==> Measuring ' + labels.join(', ') + ' over ' + scenarios.join(', ') + ' x' + string_value(rounds)! + ' (up to ' + string_value(timeout)! + 's)', true)!
 	callback('pointer', {

@@ -99,45 +99,10 @@ run_case() {
 		sync
 		return
 	fi
-	# No desktop either: what running short programs leaves behind. Each is
-	# run first to warm any cache it fills, then counted.
+	# A persistent native observer avoids charging shell measurement helpers
+	# and their unreaped process corpses to the churn workload.
 	if [ "$scenario" = churn ]; then
-		for program in /bin/true "/bin/sleep 0" "/usr/bin/curl --version" \
-			"/bin/busybox awk BEGIN{}"; do
-			$program >/dev/null 2>&1
-			$program >/dev/null 2>&1
-			sync
-			sleep 2
-			before=$("$perf/measure" used)
-			cat /proc/slabinfo >/tmp/slabinfo.before 2>/dev/null
-			if [ -r /proc/allocstart ]; then
-				cat /proc/allocstart >/dev/null
-			fi
-			i=0
-			while [ "$i" -lt 300 ]; do
-				$program >/dev/null 2>&1
-				i=$((i + 1))
-			done
-			sync
-			# Let both the process quarantine and the five-second VFS grace
-			# expire; the periodic worker now reaps without a further exit.
-			sleep 6
-			sync
-			after=$("$perf/measure" used)
-			echo "PERF-CHURN $label program=\"$program\" runs=300 retained_kb=$(((after - before) / 1024)) per_run_bytes=$(((after - before) / 300))"
-			# Which heap classes kept what, where the kernel says.
-			if [ -s /tmp/slabinfo.before ]; then
-				cat /proc/slabinfo | /bin/busybox awk -v label="$label" -v program="$program" '
-					NR == FNR { if ($1 != "#") { objects[$1] = $3; pages[$1] = $4 }; next }
-					$1 != "#" && ($3 - objects[$1] != 0 || $4 - pages[$1] != 0) {
-						printf "PERF-SLAB %s program=\"%s\" class=%s objects=%+d pages=%+d\n", label, program, $1, $3 - objects[$1], $4 - pages[$1]
-					}' /tmp/slabinfo.before -
-			fi
-			if [ -r /proc/allocsites ]; then
-				/bin/busybox awk -v label="$label" -v program="$program" \
-					'{ printf "PERF-SITE %s program=\"%s\" %s\n", label, program, $0 }' /proc/allocsites
-			fi
-		done
+		"$perf/measure" churn 300 "$label" || echo "PERF-ERROR $label churn failed"
 		return
 	fi
 

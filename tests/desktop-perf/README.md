@@ -17,6 +17,18 @@ removes temporary VM disks and overlay files after a run, including failures.
 A missing measurement, malformed metric, missing completion marker, timeout,
 guest error, or panic fails the run while preserving partial results.
 
+Use `--scenarios=ops,churn,cache` to measure kernel retention without a desktop.
+`ops` warms a full 200-operation cohort on tmpfs and EXT2, then repeats it and
+waits 13 seconds on both snapshots for cascading deferred reclamation. `churn`
+uses one native observer to warm and run
+each short program 300 times, validate its exit and compare memory and slab
+objects/pages without adding shell diagnostic helpers to the after snapshot.
+Tracking kernels also print `PERF-SITE` allocation chains. See
+[memory-retention qualification](../memory-retention/README.md).
+These scenarios need a cached image containing all four churn programs and
+their libraries; a missing program or unsuccessful child exit fails the run.
+The default timeout accounts for the longer warmup and reclamation waits.
+
 The optional native scenarios are:
 
 | Scenario | Requested clients | Minimum measured processes |

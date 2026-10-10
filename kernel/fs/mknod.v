@@ -299,11 +299,14 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	}
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	// A view into `path`: the node made below is given a copy of its own.
 	parent_of_tgt_node, target_node, basename := walk_path(parent, path, 0, true)
 	if unsafe { parent_of_tgt_node == 0 } {
 		return errno.err, errno.get()
 	}
+	require_linked(parent_of_tgt_node) or { return errno.err, errno.get() }
 	// pledge(2) asks "dpath" for a FIFO or a device and "cpath" for a file.
 	policy_access := if kind == stat.ififo || kind == stat.ifchr || kind == stat.ifblk {
 		proc.policy_device
@@ -330,10 +333,6 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	umask := proc.current_thread().process.umask
 	final_mode := (mode & ~umask) & 0o7777
 
-	vfs_lock.acquire()
-	defer {
-		vfs_lock.release()
-	}
 	// A FIFO or a device node in an overlay directory is made in its upper
 	// layer.
 	if dir.overlay != unsafe { nil } && (kind == stat.ififo || kind == stat.ifchr
@@ -345,7 +344,7 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 	}
 	match kind {
 		0, stat.ifreg {
-			internal_create_with_acl(dir, basename, stat.ifreg | (mode & 0o7777), 0, true) or {
+			internal_create_with_acl_locked(dir, basename, stat.ifreg | (mode & 0o7777), 0, true) or {
 				return errno.err, errno.get()
 			}
 		}

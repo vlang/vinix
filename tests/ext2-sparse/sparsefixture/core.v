@@ -20,7 +20,7 @@ __global positions [9]u64
 const sparse_bytes = [u8(0x71), 0x92, 0x53]!
 const crossing_bytes = [u8(1), 3, 5, 7, 9, 11, 13, 15, 2, 4, 6, 8, 10, 12, 14, 16]!
 
-struct Heap { mut: size [16]isize count [16]isize large isize n i32 }
+struct Heap { mut: size [32]isize count [32]isize large isize n i32 }
 fn C.printf(&char, ...) i32
 fn C.sscanf(&char, &char, ...) i32
 fn C.fopen(&char, &char) &C.FILE
@@ -30,6 +30,7 @@ fn C.setbuf(&C.FILE, voidptr)
 fn C.memcmp(voidptr, voidptr, usize) i32
 fn C.memcpy(voidptr, voidptr, usize) voidptr
 fn C.memset(voidptr, i32, usize) voidptr
+fn C.__builtin_alloca(usize) voidptr
 fn C.statfs(&char, &C.statfs) i32
 fn C.fstat(i32, &C.stat) i32
 fn C.open(&char, i32, ...) i32
@@ -119,7 +120,7 @@ fn snapshot(heap &Heap) {
 		mut line := [256]char{}
 		for C.fgets(&line[0], i32(sizeof(line)), file) != nil {
 			mut index := isize(0); mut size := isize(0); mut objects := isize(0); mut pages := isize(0)
-			if C.sscanf(&line[0], c'size-%ld %ld %ld %ld', &index, &size, &objects, &pages) == 4 && heap.n < 16 {
+			if C.sscanf(&line[0], c'size-%ld %ld %ld %ld', &index, &size, &objects, &pages) == 4 && heap.n < 32 {
 				heap.size[heap.n] = size
 				heap.count[heap.n] = objects
 				heap.n++
@@ -142,17 +143,22 @@ fn churn() {
 	unsafe {
 		fd := C.open(c'/root/sparse-churn', C.O_CREAT | C.O_TRUNC | C.O_RDWR, i32(0o600))
 		check(fd >= 0, 93)
-		available := free_blocks()
 		for _ in 0 .. 32 { cycle(fd) }
-		C.sleep(6)
-		mut before := Heap{}; mut after := Heap{}
-		snapshot(&before)
+		// A preceding unlinked mapped-tail file drops its namespace reference
+		// after the VFS grace. Record free blocks after that cleanup settles.
+		C.sleep(7)
+		available := free_blocks()
+		// Explicit stack storage avoids V promoting an escaping local to a
+		// heap allocation in this freestanding fixture.
+		before := &Heap(C.__builtin_alloca(sizeof(Heap)))
+		after := &Heap(C.__builtin_alloca(sizeof(Heap)))
+		snapshot(before)
 		mut start := C.timespec{}; mut end := C.timespec{}
 		check(C.clock_gettime(C.CLOCK_MONOTONIC, &start) == 0, 100)
 		for _ in 0 .. 500 { cycle(fd) }
 		check(C.clock_gettime(C.CLOCK_MONOTONIC, &end) == 0, 102)
-		C.sleep(6)
-		snapshot(&after)
+		C.sleep(7)
+		snapshot(after)
 		check(before.n == after.n && after.large - before.large < 16, 105)
 		mut kept := isize(0)
 		for i in 0 .. before.n {
@@ -232,6 +238,9 @@ pub fn entry() i32 {
 			state[0] = 3
 		}
 		check(C.pwrite(stage, &state[0], sizeof(state), 0) == isize(sizeof(state)), 180)
+		// Namespace references protect pre-unlink readers for one VFS grace.
+		// Drain closed zero-link inodes before checking raw EXT2 with e2fsck.
+		C.sleep(7)
 		check((fd < 0 || C.fsync(fd) == 0) && C.fsync(stage) == 0, 181)
 		C.sync()
 		C.printf(c'EXT2 SPARSE DONE %s ino=0\n', step)

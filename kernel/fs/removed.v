@@ -20,8 +20,9 @@ import time
 // as when it has exited. So each waits here for removed_grace_ns, far longer
 // than a lookup takes, and is freed then only if no process runs it.
 //
-// Directories are not freed: a file still open, or a directory still someone's
-// cwd, keeps a removed directory as its parent.
+// Removed directories retain their dot entries and resource while a cwd/root,
+// descriptor or unlinked child still needs them. Each orphan pins its parent,
+// so a removed subtree is reclaimed from its leaves without dangling parents.
 const removed_grace_ns = u64(5_000_000_000)
 // Reaping scans the process table, so it is not done more often than this.
 const removed_reap_interval_ns = u64(1_000_000_000)
@@ -32,6 +33,8 @@ struct RetiredItem {
 	resource &resource.Resource = unsafe { nil }
 	node  &VFSNode = unsafe { nil }
 	bytes &u8      = unsafe { nil }
+	text string
+	directory_busy bool
 	at    u64
 }
 
@@ -45,9 +48,15 @@ __global (
 // once no open-file description does either. `mode` is read before the name's
 // reference is dropped, which may free the resource.
 fn orphan_node(mut node VFSNode, mode u32) {
-	if !(stat.isreg(mode) || stat.islnk(mode) || stat.issock(mode) || stat.ischr(mode) || stat.isblk(mode) || stat.isifo(mode)) || pinned(node) {
+	if !(stat.isdir(mode) || stat.isreg(mode) || stat.islnk(mode) || stat.issock(mode) || stat.ischr(mode) || stat.isblk(mode) || stat.isifo(mode)) {
 		return
 	}
+	hold_parent(mut node)
+	if pinned(node) { return }
+	// CGroup.node is a permanent controller identity, also read by asynchronous
+	// accounting. Its existing mount-lifetime charge owns this directory.
+	if stat.isdir(mode) && is_cgroup_resource(node.resource) { return }
+
 	node.orphan = true
 	if katomic.load(&node.handles) == 0 {
 		retire_node(mut node)
@@ -76,9 +85,24 @@ fn retire_node(mut node VFSNode) {
 	if !katomic.cas(mut &node.retired, u32(0), u32(1)) {
 		return
 	}
+	hold_parent(mut node)
 	retire(RetiredItem{
 		node: unsafe { node }
 	})
+}
+
+fn hold_parent(mut node VFSNode) {
+	if node.parent != unsafe { nil } && voidptr(node.parent) != voidptr(node)
+		&& katomic.cas(mut &node.parent_held, u32(0), u32(1)) {
+		mut parent := node.parent
+		katomic.inc(mut &parent.parent_refs)
+	}
+}
+
+// A rename publishes another owned name; lockless path readers may still be
+// using the old one. String.free also knows to leave literal names alone.
+fn free_string_after_grace(value string) {
+	if value.len != 0 { retire(RetiredItem{text: value}) }
 }
 
 // free_after_grace frees `ptr` after the grace period, for memory another CPU
@@ -101,6 +125,8 @@ fn retire(item RetiredItem) {
 		bytes: item.bytes
 		charge: item.charge
 		resource: item.resource
+		text: item.text
+		directory_busy: item.directory_busy
 		at:    time.monotonic_ns()
 	}
 	removed_lock.release()
@@ -126,10 +152,10 @@ pub fn reap_removed() {
 		return
 	}
 	// Taken off the front, oldest first, and dealt with outside the lock.
-	mut items := []RetiredItem{cap: due} @[freed]
-	for i in 0 .. due {
-		items << removed_items[i]
-	}
+	mut items := []RetiredItem{len: due} @[freed]
+	// Transfer the original owned strings. V deep-clones a string-bearing
+	// struct pushed directly from an array index, losing the original names.
+	unsafe { C.memcpy(items.data, removed_items.data, usize(due) * sizeof(RetiredItem)) }
 	removed_items.delete_many(0, due)
 	removed_lock.release()
 
@@ -146,6 +172,7 @@ pub fn reap_removed() {
 	for item in items {
 		if item.node == unsafe { nil } {
 			unsafe { free(item.bytes) }
+			unsafe { item.text.free() }
 			if item.resource != unsafe { nil } {
 				mut res := item.resource
 				resource.release_resource(mut res)
@@ -161,20 +188,38 @@ pub fn reap_removed() {
 			// stays.
 			continue
 		}
-		if in_use {
-			// A process runs it still: another round.
+		if katomic.load(&node.handles) != 0 {
+			// fchdir publishes cwd while its description still pins the node.
+			// Check that pin before scanning owners, so a final close cannot
+			// turn a completed owner scan into permission to free the new cwd.
+			katomic.store(mut &node.retired, u32(0))
+			if katomic.load(&node.handles) == 0 { retire_node(mut node) }
+			continue
+		}
+		if in_use || katomic.load(&node.parent_refs) != 0 {
+			// A child can hand its cwd to this parent through "..". Check that
+			// durable source pin before scanning the newly published owners.
+			retire(RetiredItem{node: node, directory_busy: item.directory_busy})
+			continue
+		}
+		directory_busy := node.removed && proc.directory_in_use(voidptr(node))
+		if directory_busy {
 			retire(RetiredItem{
 				node: node
+				directory_busy: directory_busy
 			})
 			continue
 		}
-		if katomic.load(&node.handles) != 0 {
-			// Opened again, through a lookup that began before the unlink. Its
-			// last handle retires it anew.
-			katomic.store(mut &node.retired, u32(0))
-			if katomic.load(&node.handles) == 0 {
-				retire_node(mut node)
-			}
+		if item.directory_busy {
+			// The last cwd/root was released since the previous scan. Give
+			// lookups that used that reference a complete grace period too.
+			retire(RetiredItem{node: node})
+			continue
+		}
+		released := katomic.load(&node.directory_released)
+		checked_at := time.monotonic_ns()
+		if node.removed && (checked_at < released || checked_at - released < removed_grace_ns) {
+			retire(RetiredItem{node: node})
 			continue
 		}
 		free_node(node)
@@ -186,18 +231,32 @@ pub fn reap_removed() {
 	}
 }
 
+// Called before a cwd/root owner drops its reference, under its own lock.
+// Never wait on VFS/table locks here. Concurrent owners cannot move the last
+// release time backwards, and no allocation is needed on this repeated path.
+fn directory_releasing(pointer voidptr) {
+	if pointer == unsafe { nil } { return }
+	mut node := unsafe { &VFSNode(pointer) }
+	now := time.monotonic_ns()
+	mut before := katomic.load(&node.directory_released)
+	for before < now {
+		if katomic.cas(mut &node.directory_released, before, now) { break }
+		before = katomic.load(&node.directory_released)
+	}
+}
+
 fn free_node(node &VFSNode) {
 	// A watch added through /proc/self/fd/N was never forgotten by name.
- if node.discarded_directory {
-  // Only dot entries are owned by this failed fresh directory. Path lookups
-  // share the directory's grace; these directory nodes were never published.
-  if node.children != unsafe { nil } {
-   for _, dot in node.children { unsafe { free(dot) } }
-   unsafe { node.children.free(); free(node.children) }
-  }
-  mut res := node.resource
-  resource.release_resource(mut res)
- }
+	if node.directory_resource {
+		// Only dot redirects remain after rmdir. They are owned, rather than
+		// aliases of the parent, and share the enclosing node's grace period.
+		if node.children != unsafe { nil } {
+			for _, dot in node.children { unsafe { free(dot) } }
+			unsafe { node.children.free(); free(node.children) }
+		}
+		mut res := node.resource
+		resource.release_resource(mut res)
+	}
 	kbudget.release(node.kernel_charge)
 	inotify_forget(node)
  if node.overlay != unsafe { nil } {
@@ -206,6 +265,10 @@ fn free_node(node &VFSNode) {
 	unsafe {
 		node.name.free()
 		node.symlink_target.free()
+		if node.parent_held != 0 {
+			mut parent := node.parent
+			katomic.dec(mut &parent.parent_refs)
+		}
 		free(node)
 	}
 }

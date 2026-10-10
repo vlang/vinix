@@ -147,7 +147,6 @@ pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, a
 		new_proc.stack_end = old_process.stack_end
 		new_proc.saved_auxv = old_process.saved_auxv.clone()
 		new_proc.mmap_anon_non_fixed_base = old_process.mmap_anon_non_fixed_base
-		new_proc.current_directory = proc.current_directory_of(old_process)
   proc.inherit_command_line(mut new_proc, old_process) or {
    proc.lock_table()
    mut doomed := new_proc.pagemap

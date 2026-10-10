@@ -342,11 +342,17 @@ pub fn syscall_unshare(_ voidptr, flags u64) (u64, u64) {
 
 // Give back a thread's own view of the filesystem when it exits.
 pub fn release_thread_fs(mut t proc.Thread) {
+	mut process := t.process
+	process.threads_lock.acquire()
 	if t.fs == unsafe { nil } {
+		process.threads_lock.release()
 		return
 	}
 	mut own := t.fs
+	proc.directory_releasing(own.root_directory)
+	proc.directory_releasing(own.current_directory)
 	t.fs = unsafe { nil }
+	process.threads_lock.release()
 	if own.mnt != unsafe { nil } {
 		release_namespace(mut own.mnt)
 	}

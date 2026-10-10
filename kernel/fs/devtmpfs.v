@@ -458,6 +458,7 @@ fn detach_device_node(name string, expected &resource.Resource) ?&VFSNode {
 	// A retired endpoint can finish after its numeric path has been reused.
 	// It must never detach the replacement device.
 	if node.resource != expected { return none }
+	hold_parent(mut node)
 	parent.children.delete(leaf)
 	node.resource.stat.nlink = 0
 	mut removed_resource := node.resource

@@ -3,6 +3,16 @@ module proc
 
 import lib
 
+__global (directory_released_hook fn (voidptr))
+
+pub fn on_directory_released(callback fn (voidptr)) { directory_released_hook = callback }
+
+pub fn directory_releasing(directory voidptr) {
+	if directory != unsafe { nil } && voidptr(directory_released_hook) != unsafe { nil } {
+		directory_released_hook(directory)
+	}
+}
+
 // Snapshot the directory and its mount route under one lock. Never retain a
 // pointer into shared CLONE_FS state or hold its lock across a VFS path walk.
 pub fn snapshot_root_directory(_process &Process, context &lib.MountContext) voidptr {
@@ -49,12 +59,14 @@ pub fn set_root_fs(mut process Process, directory voidptr, context &lib.MountCon
 	mut own := thread_fs_of(process)
 	if own != unsafe { nil } {
 		own.lock.acquire()
+		directory_releasing(own.root_directory)
 		own.root_directory = directory
 		lib.copy_mount_context(&own.root_mount, context)
 		own.lock.release()
 		return
 	}
 	process.fs_lock.acquire()
+	directory_releasing(process.root_directory)
 	process.root_directory = directory
 	lib.copy_mount_context(&process.root_mount, context)
 	process.fs_lock.release()
@@ -64,12 +76,14 @@ pub fn set_current_fs(mut process Process, directory voidptr, context &lib.Mount
 	mut own := thread_fs_of(process)
 	if own != unsafe { nil } {
 		own.lock.acquire()
+		directory_releasing(own.current_directory)
 		own.current_directory = directory
 		lib.copy_mount_context(&own.current_mount, context)
 		own.lock.release()
 		return
 	}
 	process.fs_lock.acquire()
+	directory_releasing(process.current_directory)
 	process.current_directory = directory
 	lib.copy_mount_context(&process.current_mount, context)
 	process.fs_lock.release()

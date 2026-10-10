@@ -34,9 +34,12 @@
  *                                                 kernel heap kept, per size class
  *                                                 from /proc/slabinfo: what a desktop
  *                                                 doing it all day would leak
+ *     measure churn COUNT LABEL...                run short programs with one
+ *                                                 observer across both snapshots
  */
 #define _GNU_SOURCE
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
@@ -277,6 +280,7 @@ struct heap {
 	int count;
 	long size[MAX_CLASSES];
 	long objects[MAX_CLASSES];
+	long pages[MAX_CLASSES];
 	long large_pages;
 };
 
@@ -293,6 +297,7 @@ static int read_heap(struct heap *h) {
 		    h->count < MAX_CLASSES) {
 			h->size[h->count] = size;
 			h->objects[h->count] = objects;
+			h->pages[h->count] = pages;
 			h->count++;
 		} else if (sscanf(line, "large - - %ld", &pages) == 1) {
 			h->large_pages = pages;
@@ -661,10 +666,11 @@ struct op {
 };
 
 static void measure_op(const struct op *op, int count, const char *label) {
-	/* A first round fills whatever the kernel keeps for good. */
-	for (int i = 0; i < 20; i++)
+	/* Warm the same cohort size. Deferred inode release makes a burst use
+	 * distinct disk blocks; a smaller warmup leaves their page cache cold. */
+	for (int i = 0; i < count; i++)
 		op->run(i);
-	sleep(1);
+	sleep(13);
 	struct heap before, after;
 	if (read_heap(&before) < 0) {
 		printf("PERF-ERROR %s cannot read /proc/slabinfo\n", label);
@@ -676,11 +682,9 @@ static void measure_op(const struct op *op, int count, const char *label) {
 		copy_lines("/proc/allocstart", NULL, NULL);
 	for (int i = 0; i < count; i++)
 		op->run(i);
-	/* Reaped processes and threads are freed two seconds on, at the next
-	 * reap, and removed files five seconds on, at the next unlink. */
-	sleep(6);
-	op_tmp_file(-1);
-	op_fork(0);
+	/* A namespace release can retire its closed UNIX endpoint for a second
+	 * grace. Let both five-second periods and worker scans finish. */
+	sleep(13);
 	read_heap(&after);
 	if (tracked) {
 		char prefix[640];
@@ -688,7 +692,7 @@ static void measure_op(const struct op *op, int count, const char *label) {
 		         scratch_dir);
 		copy_lines("/proc/allocsites", prefix, stdout);
 	}
-	long bytes = (after.large_pages - before.large_pages) * 16384;
+	long bytes = (after.large_pages - before.large_pages) * sysconf(_SC_PAGESIZE);
 	char classes[512] = "";
 	for (int c = 0; c < after.count && c < before.count; c++) {
 		long delta = after.objects[c] - before.objects[c];
@@ -708,7 +712,66 @@ static void measure_op(const struct op *op, int count, const char *label) {
 	       scratch_dir, count, bytes / count, classes);
 }
 
+static int run_program(char *const argv[]) {
+	pid_t child = fork();
+	if (child == 0) {
+		int null = open("/dev/null", O_WRONLY);
+		if (null >= 0) { dup2(null, STDOUT_FILENO); dup2(null, STDERR_FILENO); close(null); }
+		execv(argv[0], argv); _exit(127);
+	}
+	if (child < 0) {
+		printf("PERF-ERROR program=\"%s\" fork errno=%d\n", argv[0], errno); return 0;
+	}
+	int status = 0; pid_t waited;
+	do { waited = waitpid(child, &status, 0); } while (waited < 0 && errno == EINTR);
+	if (waited == child && WIFEXITED(status) && WEXITSTATUS(status) == 0) return 1;
+	printf("PERF-ERROR program=\"%s\" wait=%d status=%d errno=%d\n", argv[0], (int)waited, status, errno);
+	return 0;
+}
+
+/* Keep the observer process alive across both snapshots. Shell cat/awk/sleep
+ * helpers otherwise leave fresh process corpses and diagnostic descriptors
+ * only in the after snapshot, disguising those as program retention. */
+static int churn(int count, const char *label) {
+	/* take() clears its 48 KiB output buffer after capturing the memory
+	 * header. Warm the slab parser's buffers and stack storage as well. */
+	struct heap before, after;
+	if (take(&last) < 0 || read_heap(&before) < 0 || read_heap(&after) < 0) return 1;
+	char *programs[][4] = {{"/bin/true", NULL}, {"/bin/sleep", "0", NULL},
+		{"/usr/bin/curl", "--version", NULL}, {"/bin/busybox", "awk", "BEGIN{}", NULL}};
+	const char *names[] = {"/bin/true", "/bin/sleep 0", "/usr/bin/curl --version", "/bin/busybox awk BEGIN{}"};
+	for (unsigned p = 0; p < sizeof programs / sizeof programs[0]; ++p) {
+		copy_lines("/proc/allocstart", NULL, NULL);
+		/* Match the measured quarantine/slab peak before the first snapshot. */
+		for (int i = 0; i < count; ++i) if (!run_program(programs[p])) return 1;
+		sync(); sleep(7);
+		/* Collect the memory header after the diagnostic reads have touched
+		 * their output pages, including writes to fork/COW observer pages. */
+		if (take(&last) < 0 || read_heap(&before) < 0 || take(&last) < 0) return 1;
+		uint64_t used = last.header.total_memory - last.header.free_memory;
+		copy_lines("/proc/allocstart", NULL, NULL);
+		for (int i = 0; i < count; ++i) if (!run_program(programs[p])) return 1;
+		sync(); sleep(7);
+		if (take(&last) < 0 || read_heap(&after) < 0 || take(&last) < 0) return 1;
+		int64_t delta = (int64_t)(last.header.total_memory - last.header.free_memory) - (int64_t)used;
+		printf("PERF-CHURN %s program=\"%s\" runs=%d retained_kb=%lld per_run_bytes=%lld\n",
+			label, names[p], count, (long long)(delta / 1024), (long long)(delta / count));
+		for (int c = 0; c < after.count && c < before.count; ++c) {
+			long objects = after.objects[c] - before.objects[c];
+			long pages = after.pages[c] - before.pages[c];
+			if (objects || pages) printf("PERF-SLAB %s program=\"%s\" class=size-%ld objects=%+ld pages=%+ld\n",
+				label, names[p], after.size[c], objects, pages);
+		}
+		if (after.large_pages != before.large_pages)
+			printf("PERF-SLAB %s program=\"%s\" class=large pages=%+ld\n", label, names[p], after.large_pages - before.large_pages);
+		char prefix[640]; snprintf(prefix, sizeof prefix, "PERF-SITE %s program=\"%s\"", label, names[p]);
+		copy_lines("/proc/allocsites", prefix, stdout);
+	}
+	return 0;
+}
+
 static void ops(int count, const char *label) {
+	copy_lines("/proc/allocstart", NULL, NULL);
 	static const struct op table[] = {
 		{"stat", op_stat},               {"pipe", op_pipe},
 		{"socketpair", op_socketpair},   {"inet_socket", op_inet_socket},
@@ -752,14 +815,17 @@ int main(int argc, char **argv) {
 		wakeups(atoi(argv[2]), atoi(argv[3]), label);
 		return 0;
 	}
-	if (argc >= 4 && strcmp(argv[1], "ops") == 0) {
+	if (argc >= 4 && (strcmp(argv[1], "ops") == 0 || strcmp(argv[1], "churn") == 0)) {
 		char label[512] = "";
 		for (int i = 3; i < argc; i++) {
 			if (i > 3)
 				strncat(label, " ", sizeof label - strlen(label) - 1);
 			strncat(label, argv[i], sizeof label - strlen(label) - 1);
 		}
-		ops(atoi(argv[2]), label);
+		int count = atoi(argv[2]);
+		if (count <= 0) return 1;
+		if (strcmp(argv[1], "churn") == 0) return churn(count, label);
+		ops(count, label);
 		return 0;
 	}
 	if (argc == 2 && strcmp(argv[1], "used") == 0) {

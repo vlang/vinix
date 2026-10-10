@@ -59,10 +59,14 @@ import no allocators.
 
 The independent reference is the 185-line `tests/ext2-sparse/guest.c` at
 `bb26e71deb05913c617fdf3c47483041064f3fd7`, blob
-`07e6dc32d39cb1890036af93257d5e144a89e945`. The port preserves all 54 physical
+`07e6dc32d39cb1890036af93257d5e144a89e945`. The port originally preserved all 54 physical
 check sites (53 on ARM), their original diagnostic line numbers, the 16-class
 heap bank, 32 warmups, 500 measured cycles, six-second settling intervals and
-original memory/runtime limits. `VINIX_V_COMPILER` selects the compiler.
+original memory/runtime limits. The current fixture has a 32-class heap bank
+to include every ARM class, explicitly allocates its diagnostic structs on the
+stack and settles for seven seconds. It also drains closed unlinked inode
+references before final synchronization and the power-cut marker. The original
+memory/runtime limits remain. `VINIX_V_COMPILER` selects the compiler.
 `--state-dir` retains a fresh disk and inputs; `--prebuilt-init` runs a frozen
 independent control without replacing the maintained V source.
 

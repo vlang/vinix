@@ -237,11 +237,15 @@ pub fn own_thread_fs() &ThreadFS {
 			root_mount: process.root_mount
 			current_mount: process.current_mount
 		}
-		process.fs_lock.release()
 		if process.ns.mnt != unsafe { nil } {
 			own.mnt = get_namespace(mut process.ns.mnt)
 		}
+		// The directory reaper scans ThreadFS under threads_lock. Publish a
+		// complete snapshot with that lock, before the scanner can use it.
+		process.threads_lock.acquire()
 		t.fs = own
+		process.threads_lock.release()
+		process.fs_lock.release()
 	}
 	return t.fs
 }
@@ -302,12 +306,15 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 		time:             get_namespace(mut parent.ns.time)
 	}
 	child.caps = parent.caps
-	unlock_table()
-	// Snapshot filesystem node and route under their own locks, after the
-	// namespace reference transaction has released the process-table lock.
+	// Keep the table lock throughout the source-to-child handoff. A reused
+	// child PID can precede its parent in the reaper's scan; independent field
+	// locks alone could let that scan miss both sides of a transferred cwd.
+	child.fs_lock.acquire()
 	child.root_directory = snapshot_root_directory(parent, &child.root_mount)
 	child.current_directory = snapshot_current_directory(parent, &child.current_mount)
 	child.exe_node = snapshot_executable(parent, &child.exe_mount)
+	child.fs_lock.release()
+	unlock_table()
 	child.mac_domain = parent.mac_domain
 	child.mac_next_domain = parent.mac_next_domain
 	child.no_new_privs = parent.no_new_privs

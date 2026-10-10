@@ -979,10 +979,12 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 			unsafe { &VFSNode(other.root_directory) }
 		}
 		if voidptr(other_root) == voidptr(old_root) || voidptr(other_root) == voidptr(old_top) {
+			proc.directory_releasing(other.root_directory)
 			other.root_directory = voidptr(new_root)
 			other.root_mount = unsafe { *new_mount }
 		}
 		if other.current_directory == voidptr(old_root) || other.current_directory == voidptr(old_top) {
+			proc.directory_releasing(other.current_directory)
 			other.current_directory = voidptr(new_root)
 			other.current_mount = unsafe { *new_mount }
 		}
@@ -999,10 +1001,12 @@ pub fn syscall_pivot_root(_ voidptr, _new_root charptr, _put_old charptr) (u64, 
 			unsafe { &VFSNode(own.root_directory) }
 		}
 		if voidptr(own_root) == voidptr(old_root) || voidptr(own_root) == voidptr(old_top) {
+			proc.directory_releasing(own.root_directory)
 			own.root_directory = voidptr(new_root)
 			own.root_mount = unsafe { *new_mount }
 		}
 		if own.current_directory == voidptr(old_root) || own.current_directory == voidptr(old_top) {
+			proc.directory_releasing(own.current_directory)
 			own.current_directory = voidptr(new_root)
 			own.current_mount = unsafe { *new_mount }
 		}

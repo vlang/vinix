@@ -101,7 +101,7 @@ def main():
                     finished, _ = helper.boot(runner, SimpleNamespace(init=work / "init", timeout=timeout), environment,
                         os.environ.get("VINIX_QEMU_RT_NO_BUILD") != "1", step)
                 else:
-                    finished = mapped.amd64_boot(command + ["-drive", f"if=ide,format=raw,file={disk},cache=writeback"],
+                    finished = mapped.boot_guest(command + ["-drive", f"if=ide,format=raw,file={disk},cache=writeback"],
                         environment, helper, timeout, step)
                 if not finished: return 1
                 path = "/root/sparse-persist" if args.arch == "amd64" else "/sparse-persist"

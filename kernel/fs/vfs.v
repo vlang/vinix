@@ -69,8 +69,13 @@ pub mut:
 	handles       int
 	orphan        bool
 	retired       u32
- // A failed fresh upper directory retains its name reference until safe reap.
- discarded_directory bool
+	// Unlinked children keep their old parent until their node is reclaimed.
+	// Dot redirects do not count: the directory owns them, without a cycle.
+	parent_refs int
+	parent_held u32
+	// A removed directory keeps its namespace resource reference until reap.
+	directory_resource bool
+	directory_released u64
 	overlaid      bool
 	mount_covered bool
 }
@@ -106,6 +111,7 @@ pub fn add_filesystem(filesystem &FileSystem, identifier string) {
 pub fn initialise() {
 	vfs_root = create_node(&TmpFS(unsafe { nil }), &VFSNode(unsafe { nil }), '', false)
 	file.on_handle_released(release_handle_node)
+	proc.on_directory_released(directory_releasing)
 	file.on_mount_flags(mount_flags)
 
 	filesystems = map[string]&FileSystem{}
@@ -433,6 +439,8 @@ fn join_path(nodes []&VFSNode) string {
 }
 
 pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, target, 0, true)
 
 	if parent_of_tgt_node != unsafe { nil }
@@ -477,6 +485,8 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 }
 
 pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	// The new node is named by `dest`, so the final component is only
 	// looked at.
 	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, target, 0, true)
@@ -523,6 +533,8 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 }
 
 pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	// Nothing here keeps the final component, so it stays a view into `name`.
 	mut parent_of_tgt, mut node, basename := walk_path(parent, name, 0, true)
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
@@ -564,38 +576,26 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	}
 	// A read-only or failing backend must leave the namespace intact.
 	node.resource.unlink(voidptr(node))?
+	// Establish the orphan's parent pin before the map can appear empty to
+	// rmdir, including while dropping an ext2 reference may block on I/O.
+	hold_parent(mut node)
 	dir_flag := if stat.isdir(node.resource.stat.mode) { in_isdir } else { u32(0) }
 	inotify_emit(parent_of_tgt, basename, in_delete | dir_flag, 0)
 	inotify_emit(node, '', in_delete_self, 0)
 	inotify_forget(node)
-	// A removed directory can still be stood in or open: a shim runs in the
-	// bundle directory containerd deletes. Such a one keeps its node, its
-	// entries and its resource, and it is left with no links and nothing but
-	// `.` and `..` in it, into which nothing can be made. Freeing them had
-	// the next lookup from there read freed memory.
-	mut held := false
+	// Keep a removed directory's dot entries and namespace resource reference
+	// until neither cwd/root, open descriptions nor unlinked children need it.
 	if stat.isdir(node.resource.stat.mode) {
 		node.removed = true
 		node.resource.stat.nlink = 0
-		held = proc.directory_in_use(voidptr(node))
-		if !held && node.resource.refcount <= 1 {
-			unsafe {
-				free(node.children['.'].children)
-				free(node.children['.'])
-				free(node.children['..'].children)
-				free(node.children['..'])
-				// The map's own storage and keys as well as the map: freeing
-				// only the latter lost the rest at every rmdir.
-				node.children.free()
-				free(node.children)
-				node.children = nil
-			}
-		}
+		node.directory_resource = true
 	}
 	parent_of_tgt.children.delete(basename)
 	mode := node.resource.stat.mode
-	if !held {
-		node.resource.unref(unsafe { nil })?
+	if !node.directory_resource {
+		// The namespace reference protects lockless metadata readers too.
+		// Release outside vfs_lock: a final PTY close can remove another name.
+		release_resource_after_grace(node.resource)
 	}
 	orphan_node(mut node, mode)
 }
@@ -619,10 +619,6 @@ fn require_linked(directory &VFSNode) ? {
 }
 
 pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
-	vfs_lock.acquire()
-	defer {
-		vfs_lock.release()
-	}
 	// bind(2) makes a socket's name with this; pledge(2) covers that with
 	// "unix" rather than "cpath".
 	access := if mode & stat.ifmt == stat.ifsock {
@@ -678,6 +674,13 @@ fn internal_create_checked(parent &VFSNode, name string, mode u32, access u32) ?
 }
 
 fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
+	apply_umask bool) ?&VFSNode {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	return internal_create_with_acl_locked(parent, name, mode, access, apply_umask)
+}
+
+fn internal_create_with_acl_locked(parent &VFSNode, name string, mode u32, access u32,
 	apply_umask bool) ?&VFSNode {
 	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, name, 0, true)
 
@@ -844,19 +847,7 @@ pub fn syscall_mkdirat(_ voidptr, dirfd int, _path charptr, mode u32) (u64, u64)
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
-	// internal_create() below makes its own copy of the name for the node.
-	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, path, 0, true)
-
-	if unsafe { parent_of_tgt_node == 0 } { return errno.err, errno.get() }
-	if !policy_check_name(parent_of_tgt_node, basename, proc.policy_create) {
-		return errno.err, errno.get()
-	}
-
-	if unsafe { target_node != 0 } {
-		return errno.err, errno.eexist
-	}
-
-	internal_create_with_acl(parent_of_tgt_node, basename, (mode & 0o7777) | stat.ifdir, 0, true) or {
+	internal_create_with_acl(parent, path, (mode & 0o7777) | stat.ifdir, proc.policy_create, true) or {
 		return errno.err, errno.get()
 	}
 
@@ -995,11 +986,19 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		// The Alpine package database creates executables directly with openat;
 		// preserve the requested permission bits instead of forcing every new
 		// regular file to 0644.
+		created = true
 		new_node := internal_create_with_acl(parent, path,
 			stat.ifreg | (mode & 0o7777), policy_open_access(flags), true) or {
-			return errno.err, errno.get()
+			// Another creator can publish after the initial lookup. A plain
+			// O_CREAT open then uses that file; O_EXCL still reports EEXIST.
+			if errno.get() != errno.eexist || creat_flags & resource.o_excl != 0 {
+				return errno.err, errno.get()
+			}
+			created = false
+			get_node_with_mount_cursor(parent, path, follow_links, open_mount) or {
+				return errno.err, errno.get()
+			}
 		}
-		created = true
 		new_node
 	}
 	if !created && creat_flags & resource.o_creat != 0 && creat_flags & resource.o_excl != 0 {
@@ -1520,9 +1519,12 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	defer {
 		unsafe { newpath.free() }
 	}
+	if newpath.len == 0 { return errno.err, errno.enoent }
 
 	oldbase := get_parent_dir(olddirfd, oldpath) or { return errno.err, errno.get() }
 	newbase := get_parent_dir(newdirfd, newpath) or { return errno.err, errno.get() }
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	oldparent, found_old_node, _ := walk_path(oldbase, oldpath, 0, true)
 	// A view into `newpath`, copied below for the node that keeps it.
 	mut newparent, found_new_node, basename := walk_path(newbase, newpath, 0, true)
@@ -1532,6 +1534,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	if unsafe { newparent == nil } {
 		return errno.err, errno.enoent
 	}
+	require_linked(newparent) or { return errno.err, errno.get() }
 	if unsafe { found_new_node != nil } {
 		return errno.err, errno.eexist
 	}
@@ -2048,7 +2051,7 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 	if old_parent_of.overlay != unsafe { nil } {
 		// The moved node and its upper-layer node both keep the new name.
 		overlay_rename(mut old_parent_of, old_basename, mut old_node, mut new_parent_of,
-			new_basename.clone(), new_node)?
+			new_basename, new_node)?
 		cookie := inotify_next_cookie()
 		dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
 		inotify_emit(old_parent_of, old_basename, in_moved_from | dir_flag, cookie)
@@ -2066,11 +2069,18 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		// The filesystem rename hook already removed the destination name. Drop
 		// the VFS link without invoking a second backend unlink.
 		if new_node.resource.stat.nlink > 0 { new_node.resource.stat.nlink-- }
+		hold_parent(mut new_node)
 		inotify_emit(new_node, '', in_delete_self, 0)
 		inotify_forget(new_node)
 		new_parent_of.children.delete(new_basename)
 		replaced_mode := new_node.resource.stat.mode
-		new_node.resource.unref(unsafe { nil })?
+		if stat.isdir(replaced_mode) {
+			new_node.removed = true
+			new_node.resource.stat.nlink = 0
+			new_node.directory_resource = true
+		} else {
+			release_resource_after_grace(new_node.resource)
+		}
 		orphan_node(mut new_node, replaced_mode)
 	}
 
@@ -2089,8 +2099,19 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 // Re-parent a node after a move, keeping the "." and ".." entries a directory
 // carries pointed at the right places.
 fn adopt(mut node VFSNode, mut parent VFSNode, name string) {
+	old_name := node.name
 	node.name = name
-	node.parent = parent
+	free_string_after_grace(old_name)
+	if node.parent_held != 0 && voidptr(node.parent) != voidptr(parent) {
+		// A permanently pinned overlay/mount node may keep an orphan hold.
+		// Transfer it before publishing another parent or dropping the old one.
+		katomic.inc(mut &parent.parent_refs)
+		mut old_parent := node.parent
+		node.parent = parent
+		katomic.dec(mut &old_parent.parent_refs)
+	} else {
+		node.parent = parent
+	}
 
 	if !stat.isdir(node.resource.stat.mode) {
 		return

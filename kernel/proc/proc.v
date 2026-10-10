@@ -629,6 +629,10 @@ pub fn free_pid(pid int) {
 
 	mut reaped := processes[pid]
 	if reaped != unsafe { nil } { reap_pidfd_locked(mut reaped) }
+	if reaped != unsafe { nil } {
+		directory_releasing(reaped.root_directory)
+		directory_releasing(reaped.current_directory)
+	}
 	release_process_number(reaped)
 	processes[pid] = unsafe { nil }
 	remember_released_id(pid)
@@ -1302,9 +1306,6 @@ pub fn thread_ids(pid int) []int {
 	return ids
 }
 
-// Whether some process or thread stands in `directory`: has it as its working
-// directory or its root. Neither holds a reference on it, so removing the
-// directory has to ask. A process whose thread list is busy counts as one.
 // mark_programs_in_use sets in_use[i] for each of `nodes` some process runs,
 // as its exe_node: /proc/<pid>/exe reads it for as long as the process is
 // listed, exited or not. One pass over the table for all of them.
@@ -1327,6 +1328,9 @@ pub fn mark_programs_in_use(nodes []voidptr, mut in_use []bool) {
 	}
 }
 
+// Cwd/root fields are read under their owning locks. Conservatively retain a
+// directory if an owner is busy; never wait under the process table lock for
+// a thread being published or removed. The reaper retries after a grace.
 pub fn directory_in_use(directory voidptr) bool {
 	lock_table()
 	defer { unlock_table() }
@@ -1335,19 +1339,22 @@ pub fn directory_in_use(directory voidptr) bool {
 		if process == unsafe { nil } {
 			continue
 		}
-		if process.current_directory == directory || process.root_directory == directory {
-			return true
-		}
 		mut owner := unsafe { process }
+		if !owner.fs_lock.test_and_acquire() { return true }
+		held := owner.current_directory == directory || owner.root_directory == directory
+		owner.fs_lock.release()
+		if held { return true }
 		if !owner.threads_lock.test_and_acquire() {
 			return true
 		}
 		mut inside := false
 		for t in process.threads {
-			if t.fs != unsafe { nil } && (t.fs.current_directory == directory
-				|| t.fs.root_directory == directory) {
-				inside = true
-				break
+			if t.fs != unsafe { nil } {
+				mut own := t.fs
+				if !own.lock.test_and_acquire() { inside = true; break }
+				inside = own.current_directory == directory || own.root_directory == directory
+				own.lock.release()
+				if inside { break }
 			}
 		}
 		owner.threads_lock.release()
