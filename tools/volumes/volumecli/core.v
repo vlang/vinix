@@ -56,12 +56,23 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
-	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume health DEVICE\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n       vinix-volume save DEVICE PLAN\n       vinix-volume restore DEVICE PLAN\n       vinix-volume discover PLAN\n       vinix-volume restore-auto PLAN\n       vinix-volume restore-set DIRECTORY\n       vinix-volume boot-restore\n')
+	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume health DEVICE\n       vinix-volume monitor DEVICE INTERVAL_SECONDS [SAMPLES]\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n       vinix-volume save DEVICE PLAN\n       vinix-volume restore DEVICE PLAN\n       vinix-volume discover PLAN\n       vinix-volume restore-auto PLAN\n       vinix-volume restore-set DIRECTORY\n       vinix-volume boot-restore\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'monitor') == 0 {
+			if argc != 4 && argc != 5 { return usage() }
+			interval := decimal(argv[3]) or { return usage() }
+			if interval == 0 || interval > 86400 { return usage() }
+			mut samples := u64(0)
+			if argc == 5 {
+				samples = decimal(argv[4]) or { return usage() }
+				if samples == 0 { return usage() }
+			}
+			return monitor_device(argv[2], u32(interval), samples)
+		}
 		if argc == 3 && C.strcmp(argv[1], c'health') == 0 { return query_health(argv[2]) }
 		if argc == 2 && C.strcmp(argv[1], c'boot-restore') == 0 { return boot_restore() }
 		if argc == 3 && C.strcmp(argv[1], c'discover') == 0 { return automatic_plan(argv[2], false) }

@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`vinix-volume monitor DEVICE INTERVAL_SECONDS [SAMPLES]` periodically reports
+health warnings, offline/error state and completed I/O byte deltas through one
+read-only descriptor. Omit the sample count to run until interrupted. Bounded
+sessions retain warnings or failures in their exit code even after recovery;
+unavailable health still permits status monitoring. See
+[monitoring semantics and exit codes](../../docs/storage-volumes.md#periodic-storage-monitoring).
+
 `vinix-volume health DEVICE` queries whole AHCI ATA disks without changing
 SMART settings. It prints sanitized identity, the drive's threshold status
 and vendor-specific raw attributes. Exit 3 means the threshold is exceeded;

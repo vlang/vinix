@@ -217,6 +217,48 @@ real-hardware qualification remain future work. Unsupported status backends retu
 `ENOTTY`. Geometry also supports `BLKGETSIZE64`, `BLKGETSIZE`, `BLKSSZGET`, and
 `BLKROGET` without allowing destructive ioctl passthrough.
 
+## Periodic storage monitoring
+
+```sh
+# Poll once a minute until interrupted.
+vinix-volume monitor /dev/sd0 60
+# Collect ten samples for a script, with one second between samples.
+vinix-volume monitor /dev/sd0 1 10
+```
+
+`monitor` opens one read-only descriptor and combines block status with the
+existing ATA/NVMe/ANS health query. The interval is an integer from 1 to 86400
+seconds, measured after each completed sample. An optional positive sample count
+ends the session; the final sample has no following sleep. Every sample prints
+one flushed line, so output is immediately available through pipes.
+
+Lines report the physical disk ID, healthy/warning/unavailable/query-failed or
+offline state, warning bits, query errno, cumulative backend errors and last
+errno, new errors, completed read/write bytes and their deltas. ATA warnings
+mean the device's threshold status is exceeded; NVMe/ANS preserve all critical
+warning bits, including unknown bits. Partitions and volumes can be monitored
+through their status capability while health remains unavailable. Shared parent
+counters retain the backend's physical meaning described above.
+
+The first sample establishes the counter baseline, so historical errors do not
+fail a fresh session. A decreasing counter sets `counters_reset=1` and starts a
+fresh baseline with zero deltas. Device ID, start offset, mapper slot and
+generation must remain stable across the session and each health query; an
+identity change stops monitoring. Capacity growth can retain the same identity.
+Health and status are separate snapshots; status is refreshed after health so
+a query's error/offline transition is reported immediately. An offline snapshot
+skips the health command and keeps reporting status.
+
+Bounded sessions retain their most serious observation even after recovery:
+exit 1 for query/output/status failures, offline state or newly observed backend
+errors; otherwise exit 3 for any device health warning, 4 for unavailable health,
+or 0 for healthy samples. Invalid arguments return 2 before opening the device.
+Invalid reports and identity changes stop immediately with exit 1. Monitoring
+uses the ordinary read/ioctl access gates and requires no management privilege.
+The report and counter snapshots use fixed caller-stack storage throughout the
+loop. Warnings come from device reports; vendor-specific interpretation and
+failure prediction remain open. See [monitor qualification](../tests/storage-monitor/README.md).
+
 ## ATA SMART health
 
 ```sh

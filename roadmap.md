@@ -158,6 +158,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Read-only PCI NVMe controller identity, SMART/Health logs and critical-warning reporting](docs/storage-volumes.md#nvme-smarthealth).
   - [x] [Read-only Apple ANS controller identity and SMART/Health queries with pinned DMA and serialized shutdown](docs/storage-volumes.md#apple-ans-smarthealth).
   - [x] [Apple ANS namespace/partition I/O counters, shared physical identity and offline/error reporting](docs/storage-volumes.md#apple-ans-block-status).
+  - [x] [Periodic storage health/error monitoring with counter deltas and persistent session exit status](docs/storage-volumes.md#periodic-storage-monitoring).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

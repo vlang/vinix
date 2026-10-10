@@ -51,6 +51,10 @@ fn health_check(parent &char) {
 	check(view>=0 && C.ioctl(view,u64(0x56560005),voidptr(1))==-1 && unsafe { C.errno==C.ENOTTY }
 		&& C.close(view)==0,c'health rejects volume')
 	simple(c'health',parent,unsafe { &char(nil) },$if amd64 { 0 } $else { 1 })
+	tool(c'monitor', parent, c'1', c'2', unsafe { &char(nil) }, $if amd64 { 0 } $else { 4 })
+	tool(c'monitor', c'/dev/mapper/vinix2', c'1', c'1', unsafe { &char(nil) }, 4)
+	tool(c'monitor', c'/root/health-regular', c'1', c'1', unsafe { &char(nil) }, 1)
+	C.printf(c'STORAGE MONITOR PASSED: physical samples, volume health unavailable, regular file rejected\n')
 	// Repeat only the query with one retained descriptor. Its success and
 	// failure paths must not retain a kernel object or promote the report.
 	C.printf(c'HEALTH QUERY PASSED\n')

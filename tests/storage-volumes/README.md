@@ -80,6 +80,12 @@ unsupported VirtIO on ARM; invalid pointers and descriptor/resource rejection;
 the packaged `health` command; and 200 additional health queries within the
 retention measurement. See [the health tests](../storage-health/README.md).
 
+It also executes `vinix-volume monitor` with two samples on the physical disk,
+checks unavailable health on a logical volume and rejects a regular file.
+The first boot must emit the monitor qualification marker. Host fault, reset,
+warning/recovery and 200-sample coverage is in
+[the native V monitor suite](../storage-monitor/README.md).
+
 The older block-volume and controller qualification commands below remain
 listed as historical tooling; the saved-plan checks above use V throughout.
 
