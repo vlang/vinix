@@ -6,13 +6,21 @@
 // The zone counts how often it has been asked for its temperature (_TMP), and
 // what it answers depends on the count:
 //
-//   asks 1-4     40 degrees: nothing to do
-//   asks 5-8     55: past _AC1 (50), the gentler fans run at half speed
-//   asks 9-12    75: past _AC0 (70), every fan runs flat out
-//   asks 13-18   85: past _PSV (80), the processors are to be held back
-//   asks 19-26   60: back under _AC0 and _PSV
-//   asks 27-38   40: back under _AC1
-//   ask 39 on    105: past _CRT (100), the machine must be switched off
+//   ask 1        40 degrees: nothing to do
+//   ask 2        all ones: no temperature at all, as from a sensor that
+//                could not be read
+//   ask 3        105, once: past _CRT, and gone when asked again (ask 4, 40)
+//   asks 4-6     40
+//   asks 7-10    55: past _AC1 (50), the gentler fans run at half speed
+//   asks 11-14   75: past _AC0 (70), every fan runs flat out
+//   asks 15-20   85: past _PSV (80), the processors are to be held back
+//   asks 21-28   60: back under _AC0 and _PSV
+//   asks 29-40   40: back under _AC1
+//   ask 41 on    105: past _CRT (100), the machine must be switched off
+//
+// The second and third asks are what firmware does on a bad day. A kernel
+// that takes either for a temperature switches the machine off at once, and
+// the scenario ends there, failed.
 //
 // with two exceptions that stand for the physics a script does not have. It
 // stays at 75 until the two fans that can only be switched are both running,
@@ -144,18 +152,21 @@ fn thermal_bench() []u8 {
 				aml_named('TICK', aml_integer(0)),
 				aml_method('_TMP', [
 					// Hot until the fans that can only be switched both run.
-					aml_if(aml_and(aml_equal(tick, aml_integer(12)), aml_not(aml_and(switched,
+					aml_if(aml_and(aml_equal(tick, aml_integer(14)), aml_not(aml_and(switched,
 						powered))), [aml_return(tenths(75))]),
 					// And not on to the end while either still does.
-					aml_if(aml_and(aml_equal(tick, aml_integer(38)), aml_or(switched, powered)),
+					aml_if(aml_and(aml_equal(tick, aml_integer(40)), aml_or(switched, powered)),
 						[aml_return(tenths(40))]),
 					aml_increment(tick),
-					until(5, 40),
-					until(9, 55),
-					until(13, 75),
-					until(19, 85),
-					until(27, 60),
-					until(39, 40),
+					// Firmware on a bad day: no temperature, then a wild one.
+					aml_if(aml_equal(tick, aml_integer(2)), [aml_return(aml_integer(0xffffffff))]),
+					aml_if(aml_equal(tick, aml_integer(3)), [aml_return(tenths(105))]),
+					until(7, 40),
+					until(11, 55),
+					until(15, 75),
+					until(21, 85),
+					until(29, 60),
+					until(41, 40),
 					aml_return(tenths(105)),
 				]),
 				aml_method('_AC0', [aml_return(aml_integer(bench_ac0_tenths))]),

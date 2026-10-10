@@ -708,6 +708,17 @@ the zone's fans in hwmon and can be set by hand through `pwmN` until the
 zone next changes its mind; `/sys/class/thermal/acpi_fans` lists what each
 was last told. A `Notify` that trips or fan lists changed reads them again.
 
+Firmware's figures are not all believed, because what follows a critical
+reading is the machine switching itself off. A reading at or below absolute
+zero or of 200 degrees or more is a failed reading, not a temperature; a
+trip at or below freezing or at 200 degrees or more is not a trip; and a
+reading at or past the critical trip is taken again a twentieth of a second
+later, the cooler of the two being the one acted on.
+`/sys/class/thermal/acpi_zones` counts what each zone had to disbelieve.
+`vinix.acpi_thermal=nocrt` takes the zones without their critical trips, and
+`=off` leaves firmware's zones and fans alone, for a machine whose firmware
+reports temperatures that are not.
+
 Not done: the zone's own passive constants (`_TC1`, `_TC2`, `_TSP` -- the
 stepping above is used), `_TZD`, `_TZP`, counting the users of a power
 resource two fans share, fans a laptop's embedded controller runs without
@@ -724,6 +735,7 @@ telling ACPI (most laptops), and Apple's sensors and fans (SMC).
 | `vinix.apple_idle=wfi`, `vinix.apple_cpufreq=1` | Apple hardware only; untried |
 | `vinix.thermal_sensors=0`, `vinix.tjmax=N` | skip the x86 sensor drivers; state TjMax |
 | `vinix.pci_hotplug=0\|1` | leave PCI Express hot-plug ports alone, or watch them where the kernel would not by itself |
+| `vinix.acpi_thermal=off\|nocrt` | leave firmware's thermal zones and fans alone, or take them without the trip that switches the machine off |
 | `vinix.ec=off` | do not drive the embedded controller |
 | `vinix.ec=clear` | at start and on resume, query the controller until it names no event, whatever its event bit says (Linux's `EC_FLAGS_CLEAR_ON_RESUME`); untried |
 | `vinix.ec=dsdt-gpe` | where the ECDT and `_GPE` name different events, use `_GPE` (Linux's `EC_FLAGS_TRUST_DSDT_GPE`); untried. The three combine with commas |

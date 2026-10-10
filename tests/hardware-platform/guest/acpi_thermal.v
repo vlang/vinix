@@ -125,6 +125,13 @@ fn scenario_acpi_thermal(mut t Test) {
 		return
 	}
 	t.check(lowest_limit < 100, 'the processors were never held back')
+	// The script began with a reading that was no temperature and one critical
+	// reading that was gone at a second look. The machine is still up, so
+	// neither was acted on; the kernel must also say it saw them for what they
+	// were, and must not have given the zone up over one bad reading.
+	account := read_text('/sys/class/thermal/acpi_zones') or { '' }
+	t.check(account.contains('critical 100000') && account.contains('implausible 1 unconfirmed 1'), 'the zone\'s account of what it disbelieved is "${account.trim_space()}"')
+	t.check(read_word(zone + '/mode') == 'enabled', 'the zone is "${read_word(zone + '/mode')}" after one bad reading')
 
 	// The verdict first: the script is about to pass the critical trip, and
 	// past it the kernel turns the machine off without asking this program.

@@ -30,6 +30,20 @@
 //
 //	/sys/class/thermal/acpi_fans   every fan, how it is driven, and what it
 //	                               was last told
+//	/sys/class/thermal/acpi_zones  every zone: its critical trip, and how
+//	                               often a reading failed, could not have
+//	                               been a temperature, or was critical and
+//	                               not borne out by a second look
+//
+// Firmware's figures are not all believed. A reading at or below absolute
+// zero, or of 200 degrees or more, is a failed reading and not a temperature;
+// a trip at or below freezing or at 200 degrees or more is not a trip; and a
+// reading at or past the critical trip is taken a second time, a twentieth of
+// a second later, and the cooler of the two is the one acted on -- what
+// follows a critical reading is the machine switching itself off, and one
+// wild figure from a controller that was busy must not be enough for that.
+// `vinix.acpi_thermal=nocrt` on the command line takes the zones without
+// their critical trips, and `=off` leaves zones and fans alone.
 //
 // The method names, units and package layouts are the specification's (ACPI
 // 6.5, chapter 11); what is done with them follows Linux's drivers
@@ -43,6 +57,7 @@
 @[has_globals]
 module acpipm
 
+import devcore
 import fs
 import katomic
 import lib
@@ -62,6 +77,11 @@ const kelvin_tenths_at_zero = i64(2732)
 const active_hysteresis = i64(2000)
 // How far under the other trips it falls before what they did is undone.
 const trip_hysteresis = i64(2000)
+
+// No part of a machine that still answers is this hot: 200 degrees.
+const implausible_millis = i64(200_000)
+// How long after a critical reading the zone is asked again.
+const confirm_ms = u64(50)
 
 // _STA of a fan: there and working.
 const fan_present = u64(0x3)
@@ -107,6 +127,14 @@ mut:
 	node     uacpi.Node
 	name     [8]u8
 	name_len int
+	// The critical trip, kept here as well: a reading at or past it is read
+	// a second time before it is believed.
+	has_critical bool
+	critical     i64
+	// Readings and trips that could not be a temperature, and critical
+	// readings that a second look did not bear out.
+	implausible u64
+	unconfirmed u64
 	// The thermal module's handle for the zone.
 	handle       u64
 	active       [max_active_trips]ActiveTrip
@@ -123,10 +151,25 @@ __global (
 	// One thread at a time decides about the fans; a second one that comes
 	// by meanwhile leaves it to the first.
 	acpipm_cooling_busy u32
+	// `vinix.acpi_thermal=nocrt`: firmware's critical trips are not acted on.
+	acpipm_thermal_no_critical bool
 )
 
 fn celsius_millis(kelvin_tenths u64) i64 {
-	return (i64(kelvin_tenths) - kelvin_tenths_at_zero) * 100
+	// Firmware's figure is taken as the 32 bits it is: all ones, which a
+	// method that could not read its sensor may return, must come out as an
+	// absurd temperature and not wrap into a believable one.
+	return (i64(kelvin_tenths & 0xffffffff) - kelvin_tenths_at_zero) * 100
+}
+
+// Whether a reading can be a temperature of a machine that is running.
+fn plausible_reading(millis i64) bool {
+	return millis > thermal.absolute_zero && millis < implausible_millis
+}
+
+// Whether a trip point is one to act on.
+fn plausible_trip(millis i64) bool {
+	return millis > 0 && millis < implausible_millis
 }
 
 // ── Fans ────────────────────────────────────────────────────────────────────
@@ -264,6 +307,10 @@ fn (mut zone FirmwareZone) read_active_trips() {
 	zone.active_count = 0
 	for x in 0 .. max_active_trips {
 		kelvin := uacpi.evaluate_integer(zone.node, active_trip_names[x]) or { break }
+		if !plausible_trip(celsius_millis(kelvin)) {
+			zone.implausible++
+			continue
+		}
 		mut trip := &zone.active[zone.active_count]
 		trip.temperature = celsius_millis(kelvin)
 		trip.fan_count = 0
@@ -342,11 +389,38 @@ fn zone_temperature(context voidptr) ?i64 {
 		zone.failures++
 		return none
 	}
-	temperature := celsius_millis(kelvin)
-	// A zone that reports nothing sensible reports absolute zero or below.
-	if temperature <= thermal.absolute_zero {
+	mut temperature := celsius_millis(kelvin)
+	// A zone that reports nothing sensible reports absolute zero or below, or
+	// a figure no machine that is still running has reached. Neither is a
+	// temperature, and the second must not be taken for a reason to switch
+	// the machine off.
+	if !plausible_reading(temperature) {
+		zone.implausible++
 		zone.failures++
 		return none
+	}
+	if zone.has_critical && temperature >= zone.critical {
+		// What follows a critical reading is the machine being switched off.
+		// Firmware has been known to give one wild figure -- on its way out
+		// of a sleep, or while its controller is busy -- so the zone is asked
+		// again, and the cooler of the two answers is the one believed.
+		devcore.sleep_ms(confirm_ms)
+		again := uacpi.evaluate_integer(zone.node, '_TMP') or {
+			zone.failures++
+			return none
+		}
+		second := celsius_millis(again)
+		if !plausible_reading(second) {
+			zone.implausible++
+			zone.failures++
+			return none
+		}
+		if second < zone.critical {
+			zone.unconfirmed++
+		}
+		if second < temperature {
+			temperature = second
+		}
 	}
 	zone.cool(temperature)
 	return temperature
@@ -361,14 +435,31 @@ fn (mut zone FirmwareZone) register() {
 		read:    zone_temperature
 		context: voidptr(zone)
 	}
+	// A trip at or below freezing, or beyond anything a machine survives, is
+	// firmware's way of having none, and is not acted on.
 	if kelvin := uacpi.evaluate_integer(zone.node, '_PSV') {
-		record.add_trip(.passive, celsius_millis(kelvin), trip_hysteresis)
+		if plausible_trip(celsius_millis(kelvin)) {
+			record.add_trip(.passive, celsius_millis(kelvin), trip_hysteresis)
+		} else {
+			zone.implausible++
+		}
 	}
 	if kelvin := uacpi.evaluate_integer(zone.node, '_HOT') {
-		record.add_trip(.hot, celsius_millis(kelvin), trip_hysteresis)
+		if plausible_trip(celsius_millis(kelvin)) {
+			record.add_trip(.hot, celsius_millis(kelvin), trip_hysteresis)
+		} else {
+			zone.implausible++
+		}
 	}
+	zone.has_critical = false
 	if kelvin := uacpi.evaluate_integer(zone.node, '_CRT') {
-		record.add_trip(.critical, celsius_millis(kelvin), 0)
+		if !plausible_trip(celsius_millis(kelvin)) {
+			zone.implausible++
+		} else if !acpipm_thermal_no_critical {
+			record.add_trip(.critical, celsius_millis(kelvin), 0)
+			zone.has_critical = true
+			zone.critical = celsius_millis(kelvin)
+		}
 	}
 	// The zone's fans, each once, for hwmon.
 	mut fans := [max_fans]thermal.Fan{}
@@ -451,6 +542,23 @@ fn show_fans(_ voidptr, mut text lib.Text) {
 	}
 }
 
+// What each zone has had to disbelieve: one line a zone.
+fn show_zones(_ voidptr, mut text lib.Text) {
+	for i in 0 .. acpipm_zone_count {
+		zone := &acpipm_zones[i]
+		text.add(unsafe { tos(&zone.name[0], zone.name_len) })
+		text.add(if zone.has_critical { ' critical ' } else { ' no-critical ' })
+		text.add_decimal(if zone.has_critical { zone.critical } else { i64(0) })
+		text.add(' failed ')
+		text.add_unsigned(zone.failures)
+		text.add(' implausible ')
+		text.add_unsigned(zone.implausible)
+		text.add(' unconfirmed ')
+		text.add_unsigned(zone.unconfirmed)
+		text.add_byte(`\n`)
+	}
+}
+
 // Find the fans and the zones. Called once ACPI events are on and the
 // thermal module is published.
 pub fn initialise_thermal() {
@@ -458,10 +566,26 @@ pub fn initialise_thermal() {
 		return
 	}
 	acpipm_thermal_up = true
+	// For the machine whose firmware reports temperatures that are not: `off`
+	// leaves its zones and fans alone, `nocrt` takes the zones without the
+	// trip that switches the machine off.
+	if choice := devcore.boot_option('vinix.acpi_thermal=') {
+		if choice == 'off' {
+			print('acpipm: thermal zones and fans left alone by vinix.acpi_thermal=off\n')
+			return
+		}
+		if choice == 'nocrt' {
+			print('acpipm: critical trips ignored by vinix.acpi_thermal=nocrt\n')
+			acpipm_thermal_no_critical = true
+		}
+	}
 	uacpi.for_each_device('PNP0C0B', fan_found, unsafe { nil })
 	uacpi.for_each_thermal_zone(zone_found, unsafe { nil })
 	if acpipm_fan_count != 0 {
 		fs.sysfs_attribute('class/thermal/acpi_fans', 0o444, show_fans, unsafe { nil }, unsafe { nil })
+	}
+	if acpipm_zone_count != 0 {
+		fs.sysfs_attribute('class/thermal/acpi_zones', 0o444, show_zones, unsafe { nil }, unsafe { nil })
 	}
 	if acpipm_zone_count + acpipm_fan_count != 0 {
 		C.kprintf(c'acpipm: %lld thermal zones, %lld fans\n', i64(acpipm_zone_count), i64(acpipm_fan_count))
