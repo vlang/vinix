@@ -77,9 +77,9 @@ fn test_values_of_every_length_come_back_in_the_smc_s_order() {
 	assert out[0] == 62
 	assert vinix_smc_read_key(bench.state, key_b0fc, 2, &out[0]) == 0
 	assert little_endian(&out[0], 2) == 4200
-	// Stored the old way round on this firmware: 2604 is 0x0a2c.
+	// Stored the old way round on this firmware: 2590 is 0x0a1e.
 	assert vinix_smc_read_key(bench.state, key_b0rm, 2, &out[0]) == 0
-	assert out[0] == 0x0a && out[1] == 0x2c
+	assert out[0] == 0x0a && out[1] == 0x1e
 	assert vinix_smc_read_key(bench.state, key_chis, 4, &out[0]) == 0
 	assert little_endian(&out[0], 4) == 1
 	before := bench.copies

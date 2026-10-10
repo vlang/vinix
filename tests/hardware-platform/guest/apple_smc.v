@@ -164,7 +164,7 @@ fn smc_check_charging(mut t Test) {
 	smc_check_word(mut t, smc_battery + 'status', 'Charging')
 	smc_check_word(mut t, smc_battery + 'capacity', '62')
 	smc_check_word(mut t, smc_battery + 'capacity_level', 'Normal')
-	smc_check_word(mut t, smc_battery + 'charge_now', '2604000')
+	smc_check_word(mut t, smc_battery + 'charge_now', '2590000')
 	smc_check_word(mut t, smc_battery + 'charge_full', '4200000')
 	smc_check_word(mut t, smc_battery + 'charge_full_design', '4380000')
 	smc_check_word(mut t, smc_battery + 'current_now', '1500000')
@@ -285,6 +285,10 @@ fn scenario_apple_smc_selftest(mut t Test) {
 		t.check(keys.contains(line + '\n'), 'keys has no line "${line}": ${keys.replace('\n', ', ')}')
 	}
 	smc_check_charging(mut t)
+	// Nothing had to be disbelieved, and no key failed, to get there.
+	for name in ['implausible', 'percent_jumps', 'critical_unconfirmed', 'key_errors', 'keys_odd_sized'] {
+		t.check(smc_count(smc_status, name) == 0, 'status says ${name} ${smc_count(smc_status, name)} with everything in order')
+	}
 	smc_check_word(mut t, smc_limit, '100')
 	zone, hwmon := smc_zone()
 	if !t.check(zone != '', 'no thermal zone of type macsmc') {
@@ -312,7 +316,7 @@ fn scenario_apple_smc_selftest(mut t Test) {
 	smc_expect(mut t, smc_charger + 'online', '0', 4000)
 	smc_expect(mut t, '/sys/class/power_supply/policy/on_battery', '1', 4000)
 	smc_expect(mut t, smc_battery + 'capacity', '60', 4000)
-	smc_expect(mut t, smc_battery + 'charge_now', '2520000', 4000)
+	smc_expect(mut t, smc_battery + 'charge_now', '2533000', 4000)
 	smc_expect(mut t, smc_battery + 'current_now', '1200000', 4000)
 	smc_expect(mut t, smc_battery + 'voltage_now', '11700000', 4000)
 	// The SMC's own estimate, in minutes there and seconds here.
@@ -344,8 +348,10 @@ fn scenario_apple_smc_selftest(mut t Test) {
 		}
 		level := read_word(smc_battery + 'capacity_level')
 		t.check(level == 'Normal', 'capacity_level is ${level} after one wild reading')
+		// The SMC's count, or for the pass in which that was all ones the
+		// share of the full charge the percentage stands for.
 		charge := read_word(smc_battery + 'charge_now').i64()
-		t.check(charge <= 4200000, 'charge_now is ${charge}, more than the battery holds')
+		t.check(charge == 2533000 || charge == 2520000, 'charge_now is ${charge} after one wild reading')
 		for file in ['temp1_input', 'temp2_input'] {
 			word := read_word(hwmon + file)
 			wanted := if file == 'temp1_input' { '38500' } else { '55500' }
@@ -466,7 +472,7 @@ fn scenario_apple_smc_selftest(mut t Test) {
 	smc_sim(mut t, 'scene low')
 	smc_expect(mut t, smc_battery + 'capacity', '8', 5000)
 	smc_expect(mut t, smc_battery + 'capacity_level', 'Low', 3000)
-	smc_expect(mut t, smc_battery + 'charge_now', '336000', 3000)
+	smc_expect(mut t, smc_battery + 'charge_now', '345000', 3000)
 	smc_expect(mut t, smc_battery + 'time_to_empty_now', '1020', 8000)
 	t.check(!smc_power_off_asked, 'a low battery asked for a power off')
 	smc_sim(mut t, 'scene critical')
@@ -534,6 +540,9 @@ fn scenario_apple_smc_selftest_bare(mut t Test) {
 	t.check(smc_count(smc_status, 'fans') == 0 && smc_count(smc_status, 'charge_limit') == 0, 'status says fans ${smc_count(smc_status,
 		'fans')}, charge_limit ${smc_count(smc_status, 'charge_limit')}')
 	smc_check_charging(mut t)
+	for name in ['implausible', 'percent_jumps', 'critical_unconfirmed', 'key_errors', 'keys_odd_sized'] {
+		t.check(smc_count(smc_status, name) == 0, 'status says ${name} ${smc_count(smc_status, name)} with everything in order')
+	}
 	// What the SMC has not got has no file.
 	t.check(!os.exists(smc_limit), 'there is a charge limit file with no key behind it')
 	zone, hwmon := smc_zone()
@@ -550,7 +559,7 @@ fn scenario_apple_smc_selftest_bare(mut t Test) {
 	// One byte long on this firmware, and still not believed at one look.
 	smc_sim(mut t, 'scene unplugged')
 	smc_expect(mut t, smc_battery + 'status', 'Discharging', 4000)
-	smc_expect(mut t, smc_battery + 'charge_now', '2520000', 4000)
+	smc_expect(mut t, smc_battery + 'charge_now', '2533000', 4000)
 	smc_sim(mut t, 'once BCF0 01')
 	sleep_ms(3500)
 	t.check(smc_count(smc_status, 'critical_unconfirmed') == 1, 'critical_unconfirmed is ${smc_count(smc_status, 'critical_unconfirmed')}')

@@ -484,7 +484,10 @@ fn (s &Sim) stored_remaining(mah u64) u64 {
 }
 
 // A laptop on its charger, at 62 percent of the 4200 mAh its battery still
-// holds of the 4380 it was made with, taking 1.5 A.
+// holds of the 4380 it was made with, taking 1.5 A. The remaining charge it
+// counts, 2590 mAh, is not to the digit that share of the full charge, here
+// or at any later moment: a real gauge's never is, and a test has to be able
+// to tell which of the two it was shown.
 //
 // `fan` gives it one fan, as a MacBook Pro has and a MacBook Air has not;
 // `limit` gives it the CHWA key; `old_order` makes its firmware the kind
@@ -506,7 +509,7 @@ pub fn (mut s Sim) laptop(fan bool, limit bool, old_order bool) {
 	s.put(0x42304156, sim_type_ui16, sim_read, 2, 12300) // B0AV
 	s.put(0x42304143, 0x73693136, sim_read, 2, 1500) // B0AC, si16
 	s.put(0x42304150, 0x73693332, sim_read, 4, 18450) // B0AP, si32
-	s.put(key_b0rm, sim_type_ui16, sim_read, 2, s.stored_remaining(2604))
+	s.put(key_b0rm, sim_type_ui16, sim_read, 2, s.stored_remaining(2590))
 	s.put(key_b0te, sim_type_ui16, sim_read, 2, 0xffff)
 	s.put(key_b0tf, sim_type_ui16, sim_read, 2, 65)
 	s.put(key_bsfc, sim_type_flag, sim_read, 1, 0)
@@ -566,7 +569,7 @@ pub fn (mut s Sim) scene(scene SimScene) {
 	match scene {
 		.charging {
 			s.set_charger(true)
-			s.set_level(62, 2604)
+			s.set_level(62, 2590)
 			s.set_current(1500, 18450)
 			s.update(0x42304156, 12300)
 			s.update(key_bsfc, 0)
@@ -576,7 +579,7 @@ pub fn (mut s Sim) scene(scene SimScene) {
 		}
 		.unplugged {
 			s.set_charger(false)
-			s.set_level(60, 2520)
+			s.set_level(60, 2533)
 			s.set_current(-1200, -14000)
 			s.update(0x42304156, 11700)
 			s.update(key_bsfc, 0)
@@ -586,7 +589,7 @@ pub fn (mut s Sim) scene(scene SimScene) {
 		}
 		.low {
 			s.set_charger(false)
-			s.set_level(8, 336)
+			s.set_level(8, 345)
 			s.set_current(-1200, -13000)
 			s.update(0x42304156, 10900)
 			s.update(key_bsfc, 0)
@@ -595,7 +598,7 @@ pub fn (mut s Sim) scene(scene SimScene) {
 		}
 		.critical {
 			s.set_charger(false)
-			s.set_level(2, 84)
+			s.set_level(2, 91)
 			s.set_current(-1200, -12000)
 			s.update(0x42304156, 9900)
 			s.update(key_bsfc, 0)

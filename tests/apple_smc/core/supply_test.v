@@ -275,7 +275,7 @@ fn test_charging() {
 		supply := rig.pass()
 		assert supply.charge == .charging
 		assert supply.percent == 62
-		assert supply.remaining == 2604000
+		assert supply.remaining == 2590000
 		assert supply.full == 4200000
 		assert supply.design == 4380000
 		assert supply.current == 1500000
@@ -299,7 +299,7 @@ fn test_the_charger_pulled_and_the_battery_run_down() {
 	mut supply := rig.pass()
 	assert supply.charge == .discharging
 	assert supply.percent == 60
-	assert supply.remaining == 2520000
+	assert supply.remaining == 2533000
 	assert supply.current == 1200000
 	assert supply.voltage == 11700000
 	assert supply.charger_known && !supply.charger_online
@@ -316,7 +316,7 @@ fn test_the_charger_pulled_and_the_battery_run_down() {
 	assert supply.percent == 60
 	supply = rig.pass()
 	assert supply.percent == 8
-	assert supply.remaining == 336000
+	assert supply.remaining == 345000
 	assert rig.filter.jumps == 1
 	// Six points down in a second is one more than is believed at sight.
 	rig.bench.sim.scene(.critical)
@@ -567,7 +567,7 @@ fn test_figures_that_cannot_be_what_they_claim_are_left_out() {
 	assert supply.remaining == 42000 * 62
 	assert rig.filter.implausible == 1
 	supply = rig.pass()
-	assert supply.remaining == 2604000
+	assert supply.remaining == 2590000
 	// A tenth over is allowed: a gauge that has not relearned what full is.
 	rig.bench.sim.update(key_b0rm, 4600)
 	assert rig.pass().remaining == 4600000
@@ -585,7 +585,7 @@ fn test_figures_that_cannot_be_what_they_claim_are_left_out() {
 		supply = odd.pass()
 		assert supply.full == 0, '${full}'
 		// Held against what it was made to hold instead.
-		assert supply.remaining == 2604000
+		assert supply.remaining == 2590000
 		odd.free()
 	}
 	// No voltage at all is not a voltage.
@@ -628,7 +628,7 @@ fn test_the_percentage_gone_leaves_the_rest() {
 	rig.bench.wait(1000)
 	supply := rig.pass()
 	assert supply.percent == -1
-	assert supply.remaining == 2604000 && supply.full == 4200000
+	assert supply.remaining == 2590000 && supply.full == 4200000
 	assert supply.charge == .charging
 	rig.free()
 }
