@@ -5,6 +5,7 @@ import x86.idt
 import x86.apic
 import x86.kio
 import dev.keyboard
+import wakesrc
 import event
 import flanterm as _
 
@@ -173,6 +174,13 @@ fn keyboard_handler() {
 	for {
 		event.await_one(mut int_events[vect], true) or {}
 		input_byte := read_ps2()
+		// A key going down ends a sleep, if keys are allowed to. Its release
+		// does not: the release of the key that asked for the sleep arrives
+		// just as the machine has gone down. Break codes have the top bit
+		// set, as has the 0xe0 that prefixes an extended key.
+		if input_byte < 0x80 {
+			wakesrc.report(.keyboard)
+		}
 
 		if input_byte == 0xe0 {
 			console_extra_scancodes = true

@@ -265,6 +265,7 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	fs.mount(vfs_root, '', '/sys', 'sysfs') or {}
 	// Devices and drivers so far, and every change from here on.
 	devcore.publish()
+	syspower.publish()
 	print('kmain_thread: sysfs done\n')
 
 	if enable_fake_g17 {

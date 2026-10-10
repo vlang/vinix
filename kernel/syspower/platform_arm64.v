@@ -72,3 +72,12 @@ fn platform_start() {
 	sched.new_kernel_thread(voidptr(qemu_events), unsafe { nil }, true)
 	C.kprintf(c'syspower: power button through the event device at 0x%llx\n', base)
 }
+
+// No machine this runs on has a suspend to RAM the kernel can ask for.
+fn platform_deep_available() bool {
+	return false
+}
+
+fn platform_deep_sleep() bool {
+	return false
+}

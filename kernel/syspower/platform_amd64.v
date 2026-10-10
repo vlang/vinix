@@ -68,3 +68,14 @@ fn platform_start() {
 	uacpi.on_fixed_button(fixed_button)
 	uacpi.start_events()
 }
+
+// Suspend to RAM is not offered yet: coming back from it means starting the
+// processors again from real mode, which this kernel leaves to the boot
+// loader today.
+fn platform_deep_available() bool {
+	return false
+}
+
+fn platform_deep_sleep() bool {
+	return false
+}

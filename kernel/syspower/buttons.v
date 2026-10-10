@@ -20,6 +20,7 @@ import event
 import event.eventstruct
 import katomic
 import sched
+import wakesrc
 
 pub enum Button {
 	power
@@ -49,9 +50,15 @@ pub fn set_init_signal(send fn (signal int) bool) {
 	syspower_hooks.signal_init = send
 }
 
-// A button was pressed. Safe from an interrupt.
+// A button was pressed. Safe from an interrupt. Pressed while the machine
+// sleeps, a button wakes it and does nothing else: nobody means "turn off"
+// by the press that brings a sleeping laptop back.
 pub fn button(kind Button) {
 	katomic.inc(mut &syspower_presses[int(kind)])
+	if sleeping() {
+		wakesrc.report(if kind == .power { wakesrc.Source.power_button } else { wakesrc.Source.sleep_button })
+		return
+	}
 	bit := u32(1) << u32(kind)
 	for {
 		pending := katomic.load(&syspower_pending)
@@ -112,6 +119,7 @@ fn power_button() {
 	transition(.power_off)
 }
 
-// Sleep is not written yet; the press is counted and otherwise ignored.
+// The sleep button sleeps the way `mem` in /sys/power/state does.
 fn sleep_button() {
+	enter_sleep(if mem_is_deep() { SleepDepth.deep } else { SleepDepth.idle })
 }

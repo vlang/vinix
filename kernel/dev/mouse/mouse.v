@@ -10,6 +10,7 @@ import event.eventstruct
 import klock
 import katomic
 import errno
+import wakesrc
 import x86.kio
 import x86.apic
 import x86.idt
@@ -265,6 +266,8 @@ fn handler() {
 
 	for {
 		event.await_one(mut int_events[ps2_mouse_vector], true) or {}
+		// A pointer ends a sleep, if it is allowed to.
+		wakesrc.report(.pointer)
 
 		// we will get some spurious packets at the beginning and they will screw
 		// up the alignment of the handler cycle so just ignore everything in

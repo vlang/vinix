@@ -139,6 +139,7 @@ fn kmain_thread() {
 	fs.mount(vfs_root, '', '/sys', 'sysfs') or {}
 	// Devices and drivers so far, and every change from here on.
 	devcore.publish()
+	syspower.publish()
 
 	streams.initialise()
 	random.initialise()

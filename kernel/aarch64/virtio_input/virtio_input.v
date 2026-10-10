@@ -5,6 +5,7 @@ import memory
 import aarch64.cpu
 import aarch64.uart
 import dev.keyboard
+import wakesrc
 import klock
 
 fn C.vinix_call_void_fn(callback voidptr)
@@ -721,13 +722,23 @@ fn poll_device(idx int) {
 		ev_value := unsafe { *&u32(event_addr + 4) }
 		match ev_type {
 			ev_key {
+				// A key or a button going down ends a sleep, if it is allowed
+				// to. Its release does not: the release of the key that asked
+				// for the sleep arrives just as the machine has gone down.
 				if ev_code >= btn_left && ev_code <= btn_last {
+					if ev_value != 0 {
+						wakesrc.report(.pointer)
+					}
 					process_button(ev_code, ev_value)
 				} else {
+					if ev_value != 0 {
+						wakesrc.report(.keyboard)
+					}
 					process_key(ev_code, ev_value)
 				}
 			}
 			ev_abs {
+				wakesrc.report(.pointer)
 				process_abs(ev_code, ev_value)
 			}
 			ev_rel {

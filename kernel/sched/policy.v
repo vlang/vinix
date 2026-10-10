@@ -207,6 +207,10 @@ fn cgroup_holds_thread_back(t &proc.Thread, in_kernel bool) bool {
 	}
 	now := clock_ns()
 	resource_now := time.monotonic_ns()
+	// The whole of userspace, for a system sleep: see freeze.v.
+	if userspace_frozen() {
+		return true
+	}
 	return katomic.load(&t.process.job_stop_complete) || proc.cgroup_holds_back(t.process, now)
 		|| proc.cgroup_io_delay(t, resource_now) || katomic.load(&t.memory_until_ns) > resource_now
 }
@@ -229,7 +233,8 @@ pub fn park_for_cgroup() {
 		}
 		now := clock_ns()
 		resource_now := time.monotonic_ns()
-		if !katomic.load(&t.process.job_stop_complete) && !proc.cgroup_holds_back(t.process, now)
+		if !userspace_frozen() && !katomic.load(&t.process.job_stop_complete)
+			&& !proc.cgroup_holds_back(t.process, now)
 			&& !proc.cgroup_io_delay(t, resource_now) && katomic.load(&t.memory_until_ns) <= resource_now {
 			break
 		}
