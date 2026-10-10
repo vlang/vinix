@@ -1318,17 +1318,34 @@ before entry, at AVFAudio's `AVAudioSessionInterruptionOptionKey` in EOSSDK.
 Its native Mac string value and the other imported audio-session constants
 have been measured; audio-session configuration and output remain unsupported.
 
+The thirteen remaining imported AVAudioSession string constants now resolve
+through both AVFAudio and AVFoundation. Their values match the installed Mac's
+native exports, including `Receiver`, `Speaker` and `Headphones` for the port
+constants. Each data import addresses a cached, owned eight-byte NSString
+pointer cell. Native Mac ASAN/UBSAN checks verify guarded UTF-8 conversion,
+framework alias identity, eight concurrent first lookups, autorelease-pool
+survival and two clean runtime teardowns.
+
+All ten native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. An initial run passed the native checks before hitting the
+previously observed concurrent readlink fixture's regular-file `ENOENT`;
+its serial log and VM hashes are retained under `audio-session-checks`.
+Sixteen more strong imports resolve across the executable and EOSSDK.
+The actual Fortnite probe still exits with status 1 before entry, now at
+CoreFoundation's `CFDictionaryAddValue` in EOSSDK. Audio-session configuration
+and output remain unsupported.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,327 | 831 | 81 |
-| EOSSDK | 544 | 118 | 18 |
+| Fortnite executable | 1,337 | 821 | 81 |
+| EOSSDK | 550 | 112 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,931 | 1,065 | 122 |
+| All images | 1,947 | 1,049 | 122 |
 
-The C++/GLES/Text variant reports 1,944 resolved imports, 1,052 unresolved strong
+The C++/GLES/Text variant reports 1,960 resolved imports, 1,036 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1365,9 +1382,10 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
-`file-time-checks`). Each mode records its own state path and guest `serial.log`
+`file-time-checks`, and the audio constants use `audio-session-checks`). Each
+mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
-terminal, thread-policy, file timestamp and UUID checks before the
+terminal, thread-policy, file timestamp, UUID and audio-session constant checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

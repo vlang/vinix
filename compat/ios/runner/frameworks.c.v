@@ -219,9 +219,22 @@ fn framework_constant(symbol string) ?u64 {
 		'_AVAudioSessionCategoryAudioProcessing' { 'AVAudioSessionCategoryAudioProcessing' }
 		'_AVAudioSessionCategoryPlayback' { 'AVAudioSessionCategoryPlayback' }
 		'_AVAudioSessionCategorySoloAmbient' { 'AVAudioSessionCategorySoloAmbient' }
+		'_AVAudioSessionCategoryPlayAndRecord' { 'AVAudioSessionCategoryPlayAndRecord' }
+		'_AVAudioSessionCategoryRecord' { 'AVAudioSessionCategoryRecord' }
 		'_AVAudioSessionInterruptionNotification' { 'AVAudioSessionInterruptionNotification' }
+		'_AVAudioSessionInterruptionOptionKey' { 'AVAudioSessionInterruptionOptionKey' }
+		'_AVAudioSessionInterruptionReasonKey' { 'AVAudioSessionInterruptionReasonKey' }
 		'_AVAudioSessionInterruptionTypeKey' { 'AVAudioSessionInterruptionTypeKey' }
 		'_AVAudioSessionMediaServicesWereResetNotification' { 'AVAudioSessionMediaServicesWereResetNotification' }
+		'_AVAudioSessionModeDefault' { 'AVAudioSessionModeDefault' }
+		'_AVAudioSessionModeVoiceChat' { 'AVAudioSessionModeVoiceChat' }
+		'_AVAudioSessionPortBuiltInReceiver' { 'Receiver' }
+		'_AVAudioSessionPortBuiltInSpeaker' { 'Speaker' }
+		'_AVAudioSessionPortHeadphones' { 'Headphones' }
+		'_AVAudioSessionRouteChangeNotification' { 'AVAudioSessionRouteChangeNotification' }
+		'_AVAudioSessionRouteChangeReasonKey' { 'AVAudioSessionRouteChangeReasonKey' }
+		'_AVAudioSessionSilenceSecondaryAudioHintNotification' { 'AVAudioSessionSilenceSecondaryAudioHintNotification' }
+		'_AVAudioSessionSilenceSecondaryAudioHintTypeKey' { 'AVAudioSessionSilenceSecondaryAudioHintTypeKey' }
 		'_AVCaptureSessionPresetMedium' { 'AVCaptureSessionPresetMedium' }
 		'_AVLayerVideoGravityResizeAspectFill' { 'AVLayerVideoGravityResizeAspectFill' }
 		'_AVMediaTypeVideo' { 'vide' }
