@@ -217,8 +217,8 @@ fn test_swift_hash_forwarding() {
 		}
 		assert ios_runtime.swift_hash_code == entries[0] && ios_runtime.swift_metadata_arena == 0
 		hash_run(HashApi{ entries: entries }, probe)
-		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSHsE13_rawHashValue4seedS2i_tF') { assert false }
-		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$ss6HasherVACycfC') { assert false }
+		assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSHsE13_rawHashValue4seedS2i_tF') or { panic(err) } != 0
+		if _ := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$ss6HasherVMa') { assert false }
 		assert ios_runtime.objects.len == 0 && ios_runtime.swift_buffers.len == 0 && ios_runtime.live == 0
 		objc_stop()
 		assert ios_runtime.swift_hash_code == 0 && ios_runtime.swift_metadata_arena == 0 && ios_runtime.swift_arc_code == 0

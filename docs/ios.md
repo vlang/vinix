@@ -1653,24 +1653,73 @@ the stdio directory-enumeration fixture returned 73; the third identical full
 suite passes. Both failed serial logs and VM hashes are retained; causes remain
 unestablished.
 
-Two more strong imports resolve. Fortnite still exits with status 1 before
-entry, now at the `RawRepresentable._rawHashValue(seed:)` default in EOSSDK,
+Those dispatch entries resolved two more strong imports. That probe exited with
+status 1 before entry at the `RawRepresentable._rawHashValue(seed:)` default in EOSSDK,
 `_$sSYsSHRzSH8RawValueSYRpzrlE08_rawHashB04seedS2i_tF`. Native instructions for
-that next blocker are captured, but its implementation, Swift Hasher, concrete
-standard-library Hashable conformances, runtime-wide conformance lookup, generic
-interpolation and application Swift heap support remain incomplete.
+that blocker establish that it creates a local Hasher and calls Self's
+`hash(into:)` witness.
+
+That default and the general Hashable raw-hash default now resolve in V, with
+Hasher constructors, scalar/partial/raw-buffer combining, generic combine,
+finalizers, static hash functions and process hashing parameters. The frozen
+72-byte layout contains a tail/count word, four SipHash state words and four
+reserved zero words. The implementation follows
+[Swift Hasher](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/stdlib/public/core/Hasher.swift)
+and [SipHash-1-3](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/stdlib/public/core/SipHash.swift),
+and matches the installed library's intermediate states and final hashes.
+The process seeds are generated once with native entropy; setting
+`SWIFT_DETERMINISTIC_HASHING=1` selects zero keys, matching
+[Swift's process parameters](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/stdlib/public/stubs/GlobalObjects.cpp).
+The same parameters are exported for client-inlined initialization and survive
+runtime shutdown.
+
+V emits ARM64 bridges for Swift's context register and raw-hash defaults into
+the existing immutable RX page. Defaults borrow opaque Self, create a local
+Hasher, call the caller's Hashable witness and finalize its state. Generic
+combine temporarily uses the value as context and restores the Hasher context.
+Raw buffers use start/end addresses and bounded byte loads at any alignment.
+Public consuming `finalize()` computes on a copy; internal `_finalize()` mutates
+the original state. These operations allocate nothing and hold no runtime lock
+across callbacks.
+
+Native/V ASAN/UBSAN checks pass with random and deterministic process seeds,
+covering all 21 functions and the parameters export. They compare 64 captured
+native hash vectors with eight chunk sizes, all tail occupancies and partial
+lengths, narrow integer truncation, modulo-256 count wrap, signed seed boundaries,
+guarded state and unaligned buffers through 513 bytes. Generic/default callbacks
+exercise borrowed one-byte and 16-byte receivers, context preservation,
+reentrant symbol resolution and eight concurrent workers. Concurrent resolution
+and two runtime teardowns leave no objects, buffers or code mappings. The earlier
+generic hash checks also pass in both seed modes. Measurements, generated bodies,
+fixed primary sources and guest evidence are retained under `swift-hasher-checks`.
+
+Generated C checks verify that the runtime Hasher bodies contain no heap
+allocation calls. Function-scoped stack storage avoids V's automatic promotion
+of temporary state passed to ABI entry bodies. All twenty native V checks and
+the full four-core ARM64 C++/UIKit/GLES/PPSSPP regression pass on the final build.
+The passing preliminary regression and probe are retained with VM hashes;
+the final evidence uses the rebuilt runners after the stack-storage fix.
+
+Five more strong imports resolve. Fortnite still exits with status 1 before
+entry at EOSSDK's `RawRepresentable.hash(into:)` default,
+`_$sSYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF`. Native instructions for
+that next blocker are captured. It needs associated RawValue metadata, temporary
+value storage, getter/hash witnesses and value-witness destruction. That default,
+Hasher type metadata, concrete standard-library Hashable conformances,
+runtime-wide conformance lookup, generic interpolation and application Swift
+heap support remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,361 | 797 | 81 |
-| EOSSDK | 574 | 88 | 18 |
-| MarketplaceKitWrapper | 70 | 106 | 23 |
-| All images | 2,005 | 991 | 122 |
+| Fortnite executable | 1,364 | 794 | 81 |
+| EOSSDK | 575 | 87 | 18 |
+| MarketplaceKitWrapper | 71 | 105 | 23 |
+| All images | 2,010 | 986 | 122 |
 
-The C++/GLES/Text variant reports 2,018 resolved imports, 978 unresolved strong
+The C++/GLES/Text variant reports 2,023 resolved imports, 973 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
