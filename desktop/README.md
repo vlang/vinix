@@ -104,7 +104,8 @@ What it does:
   wallpaper, display, battery, power (idle timeouts, lid and performance
   profile), experimental M1 Wi-Fi controls and localized control search
 - an **idle timer**: the display turns off and the machine sleeps after the
-  times chosen in Settings, and the input that wakes the display is swallowed
+  times chosen in Settings, and the input that wakes the display is swallowed;
+  both are off until a time is chosen
 - **native ui2 applications**: every Files, Calculator, Terminal, Settings and
   utility window is backed by its own OS process, PID and memory accounting
 - a **first-run app picker** shown right after the user is created, offering

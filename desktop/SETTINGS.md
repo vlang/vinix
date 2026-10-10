@@ -23,7 +23,7 @@ wallpaper_color=4
 wallpaper_image=2
 keyboard_layouts=us,ru
 keyboard_layout=ru
-display_off_after=10
+display_off_after=never
 sleep_after=never
 lid_action=suspend
 power_profile=auto
@@ -41,12 +41,11 @@ enabled input sources in Settings' order, using `us`, `ru`, `es`, `fr`, `de`
 and `pt`, and `keyboard_layout` is the one typing uses; it must be among them.
 A record with only `keyboard_layout` enables that layout beside `us`, and one
 with only `keyboard_layouts` types with the first listed. Both default to `us`.
-`display_off_after` and `sleep_after` are `never` or one of `1`, `2`, `5`, `10`,
-`15`, `30` and `60` minutes, defaulting to `10` and `never`; when both are
-times the display's may not be the later, and a record naming only
-`sleep_after` brings the display's default down to it. `lid_action` is
-`suspend` (the default) or `ignore`, and `power_profile` is `auto` (the
-default), `performance`, `balanced` or `power_saver`. See [Power](#power).
+`display_off_after` and `sleep_after` are `never` (the default for both) or
+one of `1`, `2`, `5`, `10`, `15`, `30` and `60` minutes; when both are times
+the display's may not be the later. `lid_action` is `suspend` (the default) or
+`ignore`, and `power_profile` is `auto` (the default), `performance`,
+`balanced` or `power_saver`. See [Power](#power).
 
 The compositor loads the snapshot before allocating its canvas or launching
 applications. After accepting Settings changes and applying any scale change,
@@ -289,10 +288,16 @@ nobody is using it, when its lid is closed, and how hard its CPUs work.
 ### Idle timeouts
 
 **Turn display off after** and **Sleep after** are each Never or 1, 2, 5, 10,
-15, 30 or 60 minutes. A new profile has ten minutes and Never. When both are
-times the display's is never the later: choosing a sleep sooner than the
-display turns off brings the display forward to it, and choosing a display
-timeout longer than the sleep pushes the sleep back.
+15, 30 or 60 minutes. When both are times the display's is never the later:
+choosing a sleep sooner than the display turns off brings the display forward
+to it, and choosing a display timeout longer than the sleep pushes the sleep
+back.
+
+**Both are Never until somebody chooses a time**, on a new profile and for a
+settings file from before these keys. The compositor's display-off path has
+only been run in host tests, never in a virtual machine or on a machine, and a
+default that can leave a user in front of a black screen is not turned on
+until it has been. The setting works for whoever chooses a time.
 
 The compositor counts from the last key press, pointer movement, button or
 scroll. The pointer device answers every read with where the pointer is, so

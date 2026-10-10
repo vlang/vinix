@@ -162,8 +162,9 @@ fn test_power_pane_sets_the_timeouts_and_keeps_the_display_before_sleep() {
 		labels << choice.text
 	}
 	assert labels == ['Never', '1 min', '2 min', '5 min', '10 min', '15 min', '30 min', '60 min']
-	// As a new profile has them: the display after ten minutes, sleep never.
-	assert power_pane_checked(mut app, display) == 4
+	// As a new profile has them: never for both, until somebody chooses.
+	assert desktop.settings.display_off_minutes == 0 && desktop.settings.sleep_minutes == 0
+	assert power_pane_checked(mut app, display) == 0
 	assert power_pane_checked(mut app, sleep) == 0
 	assert power_pane_get(mut app, 'settings.power.idle_note').text == 'Counted from the last key press or pointer movement.'
 

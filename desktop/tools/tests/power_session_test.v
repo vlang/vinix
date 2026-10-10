@@ -502,14 +502,17 @@ fn test_idle_sleep_follows_the_display_and_a_refusal_is_not_repeated() {
 
 fn test_idle_timeouts_come_from_settings_and_recording_is_use() {
 	mut d := power_test_desktop()
-	// Never, the way a profile that chose it has it.
-	d.settings.display_off_minutes = 0
-	d.settings.sleep_minutes = 0
+	// A desktop nobody has set up turns nothing off and sleeps by itself
+	// never, however long it is left: both timeouts start at never.
+	assert d.settings == Settings{}
+	assert d.settings.display_off_minutes == 0 && d.settings.sleep_minutes == 0
 	d.idle_tick()
-	power_test_idle(mut d, 3 * 60 * 60 * 1000)
-	assert !d.idle.display_off && !d.idle.sleep_requested
-	// The default: ten minutes for the display, never for sleep.
-	d.settings = Settings{}
+	power_test_idle(mut d, 24 * 60 * 60 * 1000)
+	assert !d.idle.display_off && !d.idle.blank_pending && !d.idle.sleep_requested
+	assert power_test_dims == 0 && power_test_sleeps == 0
+	// Whoever chooses a time gets it: ten minutes for the display, and still
+	// no sleep.
+	d.settings.set_display_off_minutes(10)
 	d.idle_key_input()
 	power_test_idle(mut d, 599_000)
 	assert !d.idle.display_off

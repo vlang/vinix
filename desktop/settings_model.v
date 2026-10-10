@@ -96,7 +96,12 @@ mut:
 	keyboard_layout  KeyboardLayout
 	// Minutes without input before the display turns off and before the
 	// machine sleeps; zero is never. See idle_timer.v.
-	display_off_minutes int = idle_display_off_default
+	//
+	// Both start at never. Turning the display off has only been run in host
+	// tests, never in a virtual machine or on a machine, and a default that
+	// can leave somebody in front of a black screen is not turned on until it
+	// has been. Whoever chooses a time gets one.
+	display_off_minutes int
 	sleep_minutes       int
 	// What closing the lid does and which performance profile the CPUs keep.
 	// The kernel holds both while it runs, so the desktop puts them back from
@@ -109,7 +114,6 @@ mut:
 
 // The idle timeouts Settings offers, in minutes. Zero is never.
 const idle_timeout_choices = [0, 1, 2, 5, 10, 15, 30, 60]!
-const idle_display_off_default = 10
 
 // What closing the lid does, in the kernel's words for /sys/power/lid/action.
 enum LidAction {

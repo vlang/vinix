@@ -393,7 +393,9 @@ Beyond the limits stated in each section:
   kernel takes none, as in every virtual machine) and two idle timeouts,
   after which the compositor turns the display off and puts the machine to
   sleep; the saved lid action and profile are written back when the desktop
-  starts. What it still does not do:
+  starts. Both timeouts are Never until somebody chooses a time: turning the
+  display off has not been run in a virtual machine or on a machine, and is
+  not a default until it has been. What it still does not do:
   - Nothing can ask for the display to stay on. There is no inhibit
     interface, so a film watched without input is turned off like anything
     else.

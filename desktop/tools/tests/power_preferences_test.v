@@ -15,12 +15,14 @@ fn power_preference_home(name string) string {
 }
 
 fn test_power_preferences_defaults_round_trip_and_validate() {
+	// Neither timeout is on until somebody chooses a time: the display is not
+	// turned off, nor the machine put to sleep, by a default.
 	defaults := Settings{}
-	assert defaults.display_off_minutes == 10 && defaults.sleep_minutes == 0
+	assert defaults.display_off_minutes == 0 && defaults.sleep_minutes == 0
 	assert defaults.lid_action == .suspend && defaults.power_profile == .automatic
 
 	record := desktop_encode_preferences(DesktopPreferences{})?
-	assert record.ends_with('display_off_after=10\nsleep_after=never\nlid_action=suspend\npower_profile=auto\n')
+	assert record.ends_with('display_off_after=never\nsleep_after=never\nlid_action=suspend\npower_profile=auto\n')
 	p := DesktopPreferences{
 		settings: Settings{
 			display_off_minutes: 5
@@ -33,10 +35,10 @@ fn test_power_preferences_defaults_round_trip_and_validate() {
 	assert custom.ends_with('display_off_after=5\nsleep_after=30\nlid_action=ignore\npower_profile=power_saver\n')
 	assert desktop_parse_preferences(custom)? == p
 
-	// A snapshot from before these keys keeps the display's ten minutes and
-	// asks nothing new of the kernel: no sleep, and its own lid and profile.
+	// A snapshot from before these keys turns nothing off and asks nothing
+	// new of the kernel: no timeouts, and its own lid and profile.
 	legacy := desktop_parse_preferences('version=1\ntheme=macos\n')?
-	assert legacy.settings.display_off_minutes == 10 && legacy.settings.sleep_minutes == 0
+	assert legacy.settings.display_off_minutes == 0 && legacy.settings.sleep_minutes == 0
 	assert legacy.settings.lid_action == .suspend && legacy.settings.power_profile == .automatic
 	assert legacy.settings.theme == .macos
 
@@ -68,14 +70,19 @@ fn test_power_preferences_defaults_round_trip_and_validate() {
 	}
 	assert desktop_parse_preferences('version=1\nlid_action=ignore')?.settings.lid_action == .ignore
 
-	// A record naming only when to sleep brings the display's default down
-	// to it; naming a later display-off beside it is a contradiction.
-	sleep_only := desktop_parse_preferences('version=1\nsleep_after=5')?
-	assert sleep_only.settings.sleep_minutes == 5 && sleep_only.settings.display_off_minutes == 5
-	later := desktop_parse_preferences('version=1\nsleep_after=30')?
-	assert later.settings.sleep_minutes == 30 && later.settings.display_off_minutes == 10
-	display_only := desktop_parse_preferences('version=1\ndisplay_off_after=60')?
-	assert display_only.settings.display_off_minutes == 60 && display_only.settings.sleep_minutes == 0
+	// A record naming one timeout has never beside it, whichever it names
+	// and whatever the time; naming a later display-off beside a sleep is a
+	// contradiction.
+	for minutes in idle_timeout_choices {
+		text := if minutes == 0 { 'never' } else { minutes.str() }
+		sleep_only := desktop_parse_preferences('version=1\nsleep_after=${text}')?
+		assert sleep_only.settings.sleep_minutes == minutes
+		assert sleep_only.settings.display_off_minutes == 0
+		display_only := desktop_parse_preferences('version=1\ndisplay_off_after=${text}')?
+		assert display_only.settings.display_off_minutes == minutes
+		assert display_only.settings.sleep_minutes == 0
+	}
+	assert desktop_parse_preferences('version=1\ndisplay_off_after=30\nsleep_after=5') == none
 
 	for invalid in ['version=1\ndisplay_off_after=0', 'version=1\ndisplay_off_after=3',
 		'version=1\ndisplay_off_after=61', 'version=1\ndisplay_off_after=-1',
@@ -95,7 +102,17 @@ fn test_power_preferences_defaults_round_trip_and_validate() {
 }
 
 fn test_power_settings_keep_the_display_no_later_than_sleep() {
-	mut settings := Settings{}
+	// Out of the box neither is set, and choosing one leaves the other never.
+	mut untouched := Settings{}
+	untouched.set_sleep_minutes(5)
+	assert untouched.sleep_minutes == 5 && untouched.display_off_minutes == 0
+	untouched = Settings{}
+	untouched.set_display_off_minutes(30)
+	assert untouched.display_off_minutes == 30 && untouched.sleep_minutes == 0
+
+	mut settings := Settings{
+		display_off_minutes: 10
+	}
 	// Sleeping sooner than the display turns off brings the display forward.
 	settings.set_sleep_minutes(5)
 	assert settings.sleep_minutes == 5 && settings.display_off_minutes == 5

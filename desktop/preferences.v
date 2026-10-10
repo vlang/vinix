@@ -289,13 +289,9 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 	} else if seen & u32(4096) == 0 {
 		p.settings.keyboard_layout = keyboard_first_layout(p.settings.keyboard_layouts)
 	}
-	// A record naming only when to sleep has the display's default beside it,
-	// which is brought down to that when it would be the later. When both are
-	// named they must already agree.
-	if seen & u32(16384) == 0 && p.settings.sleep_minutes != 0
-		&& p.settings.display_off_minutes > p.settings.sleep_minutes {
-		p.settings.display_off_minutes = p.settings.sleep_minutes
-	}
+	// A record naming one idle timeout has never beside it, which holds with
+	// any time. When both are named they must already agree, as validation
+	// checks.
 	if seen & u32(1) == 0 || !desktop_preferences_valid(p) {
 		return none
 	}
