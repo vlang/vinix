@@ -2,6 +2,8 @@
 module ahci
 
 import pci
+import devcore
+import dma
 import proc
 import memory
 import stat
@@ -168,6 +170,9 @@ pub mut:
 	cmd_slots u32
 
 	device_list []&AHCIDevice
+	// The device core's record of the controller: who its memory is asked
+	// for, and who a port that stops answering is reported against.
+	core &devcore.Device = unsafe { nil }
 }
 
 struct AHCIDevice {
@@ -190,6 +195,31 @@ pub mut:
 	failed        bool
 	flush_command u8
 	trim_supported bool
+	// Where the port's command list and received-FIS area are. The port's
+	// registers say so too, until the controller is reset or loses power in
+	// a sleep; these are what they are written back from. See power.v.
+	command_list u64
+	fis_base     u64
+	// Set while the machine sleeps; requests wait for it to clear.
+	asleep bool
+}
+
+// Zeroed pages for the port's controller to read and write, by the address
+// to give it. Zero when there are none.
+fn (mut d AHCIDevice) controller_pages(pages u64) u64 {
+	mut core := d.parent_controller.core
+	buffer := dma.alloc_buffer(mut core, pages * page_size) or { return 0 }
+	return buffer.bus
+}
+
+// The port stopped answering. It refuses further work at once; the device
+// core decides whether to reset it.
+fn (mut d AHCIDevice) fail(what string) {
+	d.failed = true
+	mut core := d.parent_controller.core
+	if core != unsafe { nil } {
+		devcore.report_timeout(mut core, what)
+	}
 }
 
 __global (
@@ -217,6 +247,7 @@ fn (mut dev AHCIDevice) write_tracked_inner(_handle voidptr, buffer voidptr, loc
 fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
 	mut completed := false
 	defer { if completed { dev.metrics.flushed() } else { dev.metrics.failed() } }
+	dev.wait_awake()
 	dev.l.acquire()
 	defer { dev.l.release() }
 	if dev.failed || dev.flush_command == 0 {
@@ -257,6 +288,7 @@ fn (mut dev AHCIDevice) discard(offset u64, bytes u64) ? {
 	if !resource.discard_range_valid(u64(dev.stat.size), u64(dev.stat.blksize), offset, bytes) {
 		errno.set(errno.einval); return none
 	}
+	dev.wait_awake()
 	dev.l.acquire()
 	defer { dev.l.release() }
 	if dev.failed { errno.set(errno.enodev); return none }
@@ -348,6 +380,7 @@ fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool)
 		if write && user {
 			unsafe { C.memcpy(staging, caller, chunk) }
 		}
+		dev.wait_awake()
 		dev.l.acquire()
 		if dev.failed {
 			dev.l.release()
@@ -447,7 +480,7 @@ fn (mut d AHCIDevice) send_cmd(slot u32) bool {
 	deadline := hpet_clock.nanoseconds() + command_timeout_ns
 	for (regs.tfd & (0x88)) != 0 {
 		if hpet_clock.nanoseconds() >= deadline {
-			d.failed = true
+			d.fail('command timed out')
 			return false
 		}
 		klock.spin_hint()
@@ -457,7 +490,7 @@ fn (mut d AHCIDevice) send_cmd(slot u32) bool {
 
 	for (regs.cmd & hba_cmd_cr) != 0 {
 		if hpet_clock.nanoseconds() >= deadline {
-			d.failed = true
+			d.fail('command timed out')
 			return false
 		}
 		klock.spin_hint()
@@ -478,7 +511,7 @@ fn (mut d AHCIDevice) send_cmd(slot u32) bool {
 			// Stop issuing work. Do not reuse DMA memory even if this engine
 			// fails to stop; all device-owned allocations are permanent.
 			regs.cmd &= ~hba_cmd_st
-			d.failed = true
+			d.fail('command timed out')
 			return false
 		}
 		klock.spin_hint()
@@ -491,7 +524,7 @@ fn (mut d AHCIDevice) send_cmd(slot u32) bool {
 	regs.cmd &= ~hba_cmd_st
 	for (regs.cmd & hba_cmd_cr) != 0 {
 		if hpet_clock.nanoseconds() >= deadline {
-			d.failed = true
+			d.fail('command timed out')
 			return false
 		}
 		klock.spin_hint()
@@ -499,7 +532,7 @@ fn (mut d AHCIDevice) send_cmd(slot u32) bool {
 	regs.cmd &= ~hba_cmd_fre
 	for (regs.cmd & hba_cmd_fr) != 0 {
 		if hpet_clock.nanoseconds() >= deadline {
-			d.failed = true
+			d.fail('command timed out')
 			return false
 		}
 		klock.spin_hint()
@@ -562,7 +595,15 @@ fn (mut d AHCIDevice) initialise() ?int {
 	}
 
 	mut volatile regs := d.regs
-	command_list := u64(memory.pmm_alloc(1))
+	// Everything the controller reads or writes is asked for in its name, so
+	// that an IOMMU lets it reach these pages and no others. A probe that
+	// fails part way leaves them to the device core, which takes back what a
+	// driver left mapped.
+	command_list := d.controller_pages(1)
+	if command_list == 0 {
+		return none
+	}
+	d.command_list = command_list
 
 	regs.clb = u32(command_list)
 	regs.clbu = u32(command_list >> 32)
@@ -573,13 +614,20 @@ fn (mut d AHCIDevice) initialise() ?int {
 				i * sizeof(AHCIHBACommand))
 		}
 
-		desc_base := u64(memory.pmm_alloc(1))
+		desc_base := d.controller_pages(1)
+		if desc_base == 0 {
+			return none
+		}
 
 		cmd_hdr.ctba = u32(desc_base)
 		cmd_hdr.ctbau = u32(desc_base >> 32)
 	}
 
-	fib_base := u64(memory.pmm_alloc(1))
+	fib_base := d.controller_pages(1)
+	if fib_base == 0 {
+		return none
+	}
+	d.fis_base = fib_base
 
 	regs.fb = u32(fib_base)
 	regs.fbu = u32(fib_base >> 32)
@@ -595,7 +643,11 @@ fn (mut d AHCIDevice) initialise() ?int {
 	cmd_hdr.flags |= u16(sizeof(AHCIFISh2d) / 4)
 	cmd_hdr.prdtl = 1
 
-	mut identity := unsafe { &u16(u64(memory.pmm_alloc(1)) + higher_half) }
+	identity_page := d.controller_pages(1)
+	if identity_page == 0 {
+		return none
+	}
+	mut identity := unsafe { &u16(identity_page + higher_half) }
 
 	mut volatile cmd_table := d.set_prdt(cmd_hdr, u64(identity) - higher_half, 1, 511)
 
@@ -663,15 +715,23 @@ fn (mut d AHCIDevice) initialise() ?int {
 	}
 	C.kprintf(c'ahci: device: sector count: %llu\n', u64(sector_cnt))
 
-	d.bounce = voidptr(u64(memory.pmm_alloc(lib.div_roundup(max_transfer, page_size))) +
-		higher_half)
+	bounce_page := d.controller_pages(lib.div_roundup(max_transfer, page_size))
+	if bounce_page == 0 {
+		return none
+	}
+	d.bounce = voidptr(bounce_page + higher_half)
 
 	d.stat.blocks = sector_cnt
 	d.stat.blksize = sector_size
 	d.stat.size = sector_cnt * sector_size
 	d.stat.rdev = resource.create_dev_id()
 	d.stat.mode = 0o644 | stat.ifblk
-	memory.pmm_free(voidptr(u64(identity) - higher_half), 1)
+	mut core := d.parent_controller.core
+	dma.free_buffer(mut core, dma.Buffer{
+		virt:  identity_page + higher_half
+		bus:   identity_page
+		bytes: page_size
+	})
 
 	return 0
 }
@@ -686,7 +746,11 @@ pub fn (mut c AHCIController) declare_ownership() int {
 
 	regs.bohc |= (1 << 1)
 
-	for regs.bohc & (1 << 0) == 0 {
+	// Firmware answers by setting its own bit, and one that never does must
+	// not hang the boot: the specification allows it 25 ms, and what follows
+	// decides whether the handoff happened.
+	handoff := devcore.deadline(100 * devcore.millisecond)
+	for regs.bohc & (1 << 0) == 0 && !handoff.expired() {
 		asm volatile amd64 {
 			pause
 		}
@@ -790,17 +854,37 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 	return 0
 }
 
-pub fn initialise() {
-	for device in scanned_devices {
-		if device.class == ahci_class && device.subclass == ahci_subclass
-			&& device.prog_if == ahci_progif {
-			mut ahci_device := &AHCIController{
-				regs: unsafe { nil }
-			}
+fn controller_matches(dev &devcore.Device) bool {
+	return dev.is_pci_class(ahci_class, ahci_subclass, ahci_progif)
+}
 
-			if ahci_device.initialise(device) != -1 {
-				ahci_controller_list << ahci_device
-			}
-		}
+fn controller_probe(mut dev devcore.Device) bool {
+	mut controller := &AHCIController{
+		regs: unsafe { nil }
+		core: unsafe { dev }
 	}
+	if controller.initialise(dev.pci) == -1 {
+		// Nothing was started on it: see AHCIController.initialise().
+		unsafe { free(controller) }
+		return false
+	}
+	dev.driver_data = voidptr(controller)
+	ahci_controller_list << controller
+	return true
+}
+
+// Register with the device core, which hands over every AHCI controller the
+// machine has. There is no `remove`: a controller's disks hold mounted
+// filesystems, and it is not given up while the machine runs.
+pub fn initialise() {
+	devcore.register_driver(devcore.Driver{
+		name:     'ahci'
+		bus:      .pci
+		matches:  controller_matches
+		probe:    controller_probe
+		suspend:  controller_suspend
+		resume:   controller_resume
+		shutdown: controller_shutdown
+		reset:    controller_reset
+	}) or { return }
 }
