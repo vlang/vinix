@@ -32,11 +32,20 @@ fn run_child(path string, args []string) i32 {
 	return status
 }
 
+fn require_child(path string) {
+	if run_child(path, []) != 0 {
+		println('IOS-NATIVE: FAIL ' + path)
+		C.fflush(unsafe { nil })
+		panic('native check failed')
+	}
+}
+
 fn main() {
 	mode := os.read_file('/opt/ios/check-mode') or { panic(err) }
 	if mode == 'regression' {
-		if run_child('/opt/ios/select-checks', []) != 0 { panic('select checks failed') }
-		if run_child('/opt/ios/regression', []) != 0 { panic('regression failed') }
+		require_child('/opt/ios/select-checks')
+		require_child('/opt/ios/semaphore-checks')
+		require_child('/opt/ios/regression')
 	} else {
 		args := if mode == 'audit' {
 			['--audit', '/opt/ios/FortniteClient-IOS-Shipping']

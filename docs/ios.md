@@ -67,6 +67,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Universal binaries | 32/64-bit slice tables, both byte orders; prefer ordinary ARM64 over ARM64e |
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
 | Mach VM subset | Current-task `vm_allocate`, shared `vm_remap` aliases and whole-mapping `vm_deallocate`, backed by native shared storage; fixed mappings preserve occupied addresses |
+| Mach semaphore subset | Current-task, process-private FIFO/LIFO `semaphore_create`, `semaphore_destroy`, `semaphore_signal` and `semaphore_wait`, with native blocking and owned send references |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit` termination |
@@ -720,7 +721,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _semaphore_create
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _sigaction
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1083,8 +1084,41 @@ The standalone host driver and guest PID 1 are now V. They reuse the existing
 prepared Mach-O fixtures and native compiler/library closure, boot the preserved
 verified kernel, and stage both actual Fortnite frameworks for retries and
 audits. New select tests execute in native V; the existing regression fixtures
-are unchanged. The real game resolves two more strong imports but still exits
+are unchanged. That game retry resolved two more strong imports and exited
 with status 1 before entry at `semaphore_create`.
+
+The V Mach semaphore adapters now maintain actual credits and block using native
+mutexes and condition variables. FIFO and LIFO policies grant one queued waiter
+per signal; otherwise a signal adds a credit. Destroy wakes pending waits with
+`KERN_TERMINATED` and consumes one send reference. Extra send references keep the
+terminated port name valid until released. Dropping the last reference also
+wakes pending waits. Call pins keep each object's native storage alive through
+guard unlock and the last returning waiter. Generated C confirms wait nodes use
+native stack storage, with no per-wait heap allocation, and identity comparisons
+use addresses. Caller errno and guarded 32-bit outputs are preserved.
+
+Names are not reused across runtime teardowns. The fork child discards private
+copies without visiting vanished threads' wait nodes; the parent's waiters and
+credits remain intact. Inherited semaphore rights are outside this process-private
+subset and return an invalid-name error in the child. Only policies 0 (FIFO) and
+2 (LIFO) are supported; other policy flags fail explicitly. Initial counts are
+nonnegative signed 32-bit values. Signalling a full `INT_MAX` count returns
+`KERN_RESOURCE_SHORTAGE`, avoiding the signed-count wrap observed in the installed
+Mac library. Timed waits, broadcast/thread-targeted signals, cancellation and
+interprocess Mach semaphore rights remain unimplemented or unverified.
+
+Shared V checks compare native Mac and adapter credit consumption, blocking,
+send-reference changes, terminated names, errors and eight destroy waiters.
+Adapter checks also verify FIFO/LIFO order, eight last-reference-drop waiters,
+count bounds, wrong-object ports, a fork while a worker is blocked, and two
+runtime teardowns with an undestroyed object. Host ASAN/UBSAN and the full ARM64
+C++/GLES/PPSSPP regression pass. The regression needed a retry after the previously
+observed permissions `readlink`/`ENOENT` failure; its failed log is retained.
+The V host driver now allows expected negative-fixture panics during regression
+and receives a distinct failure marker from native PID 1. EOSSDK's two traced
+create sites use FIFO with zero initial credits. The four adapters resolve four
+strong EOSSDK imports; the actual game still exits with status 1 before entry,
+now at `sigaction`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -1092,11 +1126,11 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,315 | 843 | 81 |
-| EOSSDK | 530 | 132 | 18 |
+| EOSSDK | 534 | 128 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,905 | 1,091 | 122 |
+| All images | 1,909 | 1,087 | 122 |
 
-The C++/GLES/Text variant reports 1,918 resolved imports, 1,078 unresolved strong
+The C++/GLES/Text variant reports 1,922 resolved imports, 1,074 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1130,8 +1164,11 @@ v -nocache -cc clang run tests/ios/native-checks.v audit
 v -nocache -cc clang run tests/ios/native-checks.v static-audit
 ```
 
-Each mode records its own state path in `build/ios/fortnite/select-checks` and
-writes a guest `serial.log` there. Regression requires the guest PASS marker;
+`VINIX_IOS_CHECK_NAME` selects a single output directory name under
+`build/ios/fortnite` (default `select-checks`; the semaphore verification uses
+`semaphore-checks`). Each mode records its own state path and guest `serial.log`
+there. Regression runs the native V select and semaphore checks before the
+existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build
 missing dependency trees or invoke the concurrent Python controller migration.

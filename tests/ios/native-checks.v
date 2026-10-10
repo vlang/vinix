@@ -62,7 +62,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 }
 
 fn build(root string, out string, only string) {
-	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'native-init'] {
+	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -72,10 +72,14 @@ fn build(root string, out string, only string) {
 			mut args := ['v', '-os', 'linux', '-arch', 'arm64', '-enable-globals', '-gc', 'none',
 				'-prod', '-d', 'glibc', '-d', 'no_backtrace', '-d', 'ios_cxx', '-path',
 				'@vlib|' + root + '/compat/ios|@vmodules', '-o', generated]
-			if item == 'select-checks' { args = args.filter(it != '-prod') }
+			if item.ends_with('-checks') { args = args.filter(it != '-prod') }
 			if item == 'run-ios-gles' { args << ['-d', 'ios_gles', '-d', 'ios_text'] }
-			args << root + if item == 'select-checks' {
-				'/compat/ios/runner/select_test.v'
+			args << root + if item.ends_with('-checks') {
+				'/compat/ios/runner/' + if item == 'select-checks' {
+					'select_test.v'
+				} else {
+					'mach_semaphore_test.v'
+				}
 			} else {
 				'/compat/ios/runner'
 			}
@@ -142,6 +146,7 @@ fn regression_root(root string, out string, fs string) {
 	os.write_file_array(fs + '/opt/ios/calculator-fat', fat) or { panic(err) }
 	os.write_file_array(fs + '/opt/ios/truncated', calculator[..31]) or { panic(err) }
 	copy_file(out + '/select-checks', fs + '/opt/ios/select-checks')
+	copy_file(out + '/semaphore-checks', fs + '/opt/ios/semaphore-checks')
 	sysroot := root + '/build-aarch64-userland/sysroot'
 	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
 		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
@@ -152,7 +157,9 @@ fn regression_root(root string, out string, fs string) {
 fn await_checks(mut p os.Process, log string, marker string) ! {
 	for _ in 0 .. 1200 {
 		text := os.read_file(log) or { '' }
-		if text.contains('iOS FAIL:') || text.contains('KERNEL PANIC') || text.contains('FATAL EXCEPTION') || text.contains('V panic:') {
+		if text.contains('iOS FAIL:') || text.contains('IOS-NATIVE: FAIL')
+			|| text.contains('KERNEL PANIC') || text.contains('FATAL EXCEPTION')
+			|| (marker != 'VINIX iOS GUEST: PASS' && text.contains('V panic:')) {
 			return error(text)
 		}
 		if text.contains(marker) { return }
@@ -228,10 +235,15 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|regression|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|regression|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
-	out := root + '/build/ios/fortnite/select-checks'
+	requested := os.getenv('VINIX_IOS_CHECK_NAME')
+	check_name := if requested == '' { 'select-checks' } else { requested }
+	if check_name.contains('/') || check_name in ['.', '..'] {
+		panic('check name must be one directory component')
+	}
+	out := root + '/build/ios/fortnite/' + check_name
 	os.mkdir_all(out + '/tmp') or { panic(err) }
 	os.setenv('TMPDIR', out + '/tmp', true)
 	os.setenv('COPYFILE_DISABLE', '1', true)
@@ -242,6 +254,8 @@ fn main() {
 		build(root, out, 'native-init')
 	} else if mode == 'build-select' {
 		build(root, out, 'select-checks')
+	} else if mode == 'build-semaphore' {
+		build(root, out, 'semaphore-checks')
 	} else if mode == 'hash' {
 		if os.args.len != 3 { panic('usage: native-checks hash FILE') }
 		println(sha256.sum(os.read_bytes(os.args[2]) or { panic(err) }).hex())
