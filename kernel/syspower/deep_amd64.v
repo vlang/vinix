@@ -219,7 +219,7 @@ fn enter_nothing() {
 // rehearsal's delay with its processors parked, and comes back the way it
 // does when firmware refuses -- which is then not a failure.
 fn deep_sleep_here(rehearse bool) bool {
-	mut alarm := false
+	mut alarm := u64(0)
 	if !rehearse {
 		status := uacpi.prepare_sleep(uacpi.sleep_state_s3)
 		if status != .ok {
@@ -251,15 +251,19 @@ fn deep_sleep_here(rehearse bool) bool {
 			devcore.sleep_ms(test_delay_ms())
 		}
 		ints := cpu.interrupt_toggle(false)
+		before_clock := rtc.now() or { u64(0) }
 		if !uacpi.events_idle() {
 			why = 'firmware events would not fall quiet'
 		} else if wakesrc.pending() {
 			why = 'a wake source reported before the machine was down'
+		} else if alarm != 0 && before_clock >= alarm {
+			// Getting here took longer than the alarm had to run. It has
+			// gone off unheard, and would not again for a day.
+			why = 'the alarm went off before the machine was down'
 		} else if !apic.io_apic_save() {
 			why = 'no memory for the interrupt routes'
 		} else {
 			before_ns := hpet_clock.nanoseconds()
-			before_clock := rtc.now() or { u64(0) }
 			wake.trace('asking for S3', before_clock)
 			slept = wake.sleep_processor(if rehearse { enter_nothing } else { enter_s3 })
 			wake.trace('processor back, slept', if slept { u64(1) } else { u64(0) })
@@ -298,7 +302,7 @@ fn deep_sleep_here(rehearse bool) bool {
 	if !rehearse {
 		uacpi.leave_sleep(uacpi.sleep_state_s3)
 	}
-	if alarm {
+	if alarm != 0 {
 		disarm_clock_alarm(cause == int(wakesrc.Source.alarm))
 	}
 	if slept {
@@ -344,35 +348,41 @@ fn deep_restore_devices() {
 	display_restore()
 }
 
-// Hand a set alarm to the battery-backed clock. True if it was.
-fn arm_clock_alarm() bool {
+// Hand a set alarm to the battery-backed clock. Returns the moment it is set
+// for, in that clock's seconds, or 0 when there is no alarm to hand over or
+// the clock would not take it.
+fn arm_clock_alarm() u64 {
 	deadline := katomic.load(&syspower_alarm_ns)
 	if deadline == 0 || !wakesrc.allowed(.alarm) {
-		return false
+		return 0
 	}
 	now := devcore.now_ns()
-	// A whole number of seconds, rounded up, and at least one: the clock's
-	// alarm matches a second that is yet to come.
+	// A whole number of seconds, rounded up, and at least two. The clock's
+	// alarm goes off when its seconds reach the number it was given, which
+	// for "one second from now" may be a moment from now -- before the
+	// machine is down, where it wakes nothing, and then not again until the
+	// same time tomorrow.
 	mut seconds := if deadline > now {
 		(deadline - now + devcore.second - 1) / devcore.second
 	} else {
-		u64(1)
+		u64(0)
 	}
-	if seconds == 0 {
-		seconds = 1
+	if seconds < 2 {
+		seconds = 2
 	}
 	if seconds > rtc.alarm_limit_seconds {
 		// Further off than the clock can be set. The machine sleeps until
 		// something else wakes it; the alarm is still the kernel's then.
 		print('syspower: the alarm is more than a day off and will not wake the machine from S3\n')
-		return false
+		return 0
 	}
-	if !rtc.set_alarm(seconds) {
+	at := rtc.set_alarm(seconds)
+	if at == 0 {
 		print('syspower: the clock would not take the alarm; it will not wake the machine from S3\n')
-		return false
+		return 0
 	}
 	uacpi.set_rtc_wake(true)
-	return true
+	return at
 }
 
 // Take the alarm back from the clock. One that went off is done with, and the

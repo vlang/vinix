@@ -178,13 +178,14 @@ fn seconds_of(reading Reading) ?u64 {
 }
 
 // Have the clock raise its alarm `seconds` from now, between one second and
-// alarm_limit_seconds. False when the clock cannot be read or the time is
-// out of range; nothing is set then.
-pub fn set_alarm(seconds u64) bool {
+// alarm_limit_seconds. Returns the moment it is set for, as now() counts, or
+// 0 when the clock cannot be read or the time is out of range; nothing is
+// set then.
+pub fn set_alarm(seconds u64) u64 {
 	if seconds == 0 || seconds > alarm_limit_seconds {
-		return false
+		return 0
 	}
-	current := now() or { return false }
+	current := now() or { return 0 }
 	target := (current + seconds) % 86400
 	rtc_lock.acquire()
 	defer {
@@ -213,7 +214,7 @@ pub fn set_alarm(seconds u64) bool {
 	// Reading the flags clears them: an alarm from before is not this one.
 	read_register(reg_c)
 	write_register(reg_b, (mode & ~b_alarm_interrupt) | b_alarm_interrupt)
-	return true
+	return current + seconds
 }
 
 // Switch the alarm off. True if it had gone off.

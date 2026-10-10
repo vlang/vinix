@@ -201,6 +201,16 @@ lose its link, an emulated disk never times out, and an HVF or TCG processor
 has neither the timing nor the firmware of a real board. Nothing here has
 been run on an Apple silicon machine booted natively or on a PC.
 
+A pass of a `suspend-deep` scenario says that QEMU suspended the machine,
+reset its processors and devices when it was woken, and that OVMF, resuming
+from S3, handed the boot processor to the kernel's waking vector with
+memory intact; and that the kernel then put back everything the scenario
+looks at. What QEMU's wake-up does to a device is a reset, which is not
+everything a loss of power does to a real one, and OVMF's is one firmware's
+way back among many. A PS/2 key and `system_wakeup` wake this machine
+whatever the kernel has armed; on hardware a device wakes a machine only if
+its wake event was enabled, which the kernel does not do yet.
+
 Two further limits:
 
 - An x86-64 kernel built for production prints nothing on the serial port,
