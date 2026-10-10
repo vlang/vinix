@@ -81,3 +81,15 @@ fn platform_deep_available() bool {
 fn platform_deep_sleep() bool {
 	return false
 }
+
+fn platform_deep_reason() string {
+	return 'no machine this kernel runs on has a suspend to RAM it can ask for'
+}
+
+fn platform_deep_failure() string {
+	return ''
+}
+
+fn platform_deep_blocker() &devcore.Device {
+	return unsafe { nil }
+}

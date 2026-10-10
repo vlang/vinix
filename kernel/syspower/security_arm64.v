@@ -33,3 +33,10 @@ fn security_changed(before SecurityState) bool {
 	now := platform_security_state()
 	return now.sctlr != before.sctlr || now.tcr != before.tcr
 }
+
+// How many processors the check covered: the one that carried out the sleep.
+// No sleep on this architecture powers a processor down, and the others are
+// not asked.
+fn platform_security_cpus(_ SecurityState) u64 {
+	return 1
+}

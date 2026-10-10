@@ -66,18 +66,25 @@ pub struct SleepStats {
 pub mut:
 	success u64
 	fail    u64
-	// What stopped the last sleep that failed.
+	// What stopped the last sleep that failed, and for a step that can fail
+	// in more than one way, how.
 	failed_step   string
 	failed_device string
-	// The last sleep that worked: what ended it, how long it lasted, and how
-	// long the machine took to go down and to come back.
+	failed_reason string
+	// The last sleep that worked: what ended it, how deep it was, how long it
+	// lasted, and how long the machine took to go down and to come back.
 	last_wake       string
+	last_depth      string
 	last_sleep_ms   u64
 	last_suspend_ms u64
 	last_resume_ms  u64
-	// Whether the CPU state checked on the way back was as it was left.
+	// How many of the sleeps that worked were suspends to RAM.
+	deep u64
+	// Whether the CPU state checked on the way back was as it was left, and
+	// on how many processors it was last checked.
 	security_checks  u64
 	security_changes u64
+	security_cpus    u64
 }
 
 __global (
@@ -127,9 +134,11 @@ pub fn set_mem_deep(deep bool) bool {
 	return true
 }
 
-fn fail_sleep(step string, device string) {
+// `reason` is a literal, or empty.
+fn fail_sleep(step string, device string, reason string) {
 	syspower_stats.fail++
 	syspower_stats.failed_step = step
+	syspower_stats.failed_reason = reason
 	// A copy the statistics keep: the device can go away, its name with it.
 	unsafe { syspower_stats.failed_device.free() }
 	syspower_stats.failed_device = if device.len == 0 { '' } else { device.clone() }
@@ -147,23 +156,39 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	}
 	started := devcore.now_ns()
 	if !pagecache.sync_all() {
-		fail_sleep('sync', '')
+		fail_sleep('sync', '', '')
 		return false
 	}
+	rehearsing := syspower_rehearsal == .devices
+	going_deep := !rehearsing && kind == .deep && mem_is_deep()
 	sched.freeze_userspace()
 	devcore.sleep_ms(freeze_settle_ms)
 	// What userspace wrote before it stopped.
 	pagecache.sync_all()
 
 	devcore.freeze_bindings()
+	if going_deep {
+		// A device whose driver cannot bring it back from nothing would come
+		// out of a suspend to RAM dead, with its driver none the wiser.
+		blocker := platform_deep_blocker()
+		if blocker != unsafe { nil } {
+			C.kprintf(c'syspower: %.*s (%.*s) cannot be powered down; no suspend to RAM\n', i32(blocker.name.len),
+				blocker.name.str, i32(blocker.driver.name.len), blocker.driver.name.str)
+			fail_sleep('devices', blocker.name, 'its driver cannot resume a device that lost power')
+			devcore.thaw_bindings()
+			sched.thaw_userspace()
+			return false
+		}
+	}
 	refused := devcore.suspend_all()
 	if refused != unsafe { nil } {
-		fail_sleep('devices', refused.name)
+		fail_sleep('devices', refused.name, 'its driver refused')
 		devcore.thaw_bindings()
 		sched.thaw_userspace()
 		return false
 	}
 	before := platform_security_state()
+	syspower_stats.security_cpus = platform_security_cpus(before)
 	screen_down()
 	// Only now: what is seen while the machine is still going down -- the
 	// release of the key that asked for the sleep, the click that chose it
@@ -171,11 +196,10 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	wakesrc.arm()
 	asleep := devcore.now_ns()
 
-	rehearsing := syspower_rehearsal == .devices
 	mut slept := true
 	if rehearsing {
 		devcore.sleep_ms(test_delay_ms())
-	} else if kind == .deep && mem_is_deep() {
+	} else if going_deep {
 		slept = platform_deep_sleep()
 	} else {
 		platform_idle_sleep()
@@ -211,10 +235,20 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	}
 
 	if !slept {
-		fail_sleep('platform', '')
+		fail_sleep('platform', '', platform_deep_failure())
 		return false
 	}
 	syspower_stats.success++
+	if going_deep {
+		syspower_stats.deep++
+	}
+	syspower_stats.last_depth = if rehearsing {
+		'rehearsal'
+	} else if going_deep {
+		'deep'
+	} else {
+		's2idle'
+	}
 	syspower_stats.last_wake = woken_by
 	syspower_stats.last_suspend_ms = (asleep - started) / devcore.millisecond
 	syspower_stats.last_sleep_ms = (woke - asleep) / devcore.millisecond

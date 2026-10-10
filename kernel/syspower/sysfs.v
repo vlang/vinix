@@ -5,12 +5,15 @@
 //
 //	/sys/power/state              freeze mem; write one to sleep
 //	/sys/power/mem_sleep          what mem means: [s2idle] deep
+//	/sys/power/deep_sleep         whether deep is offered, and why not (Vinix's)
 //	/sys/power/pm_test            [none] devices: rehearse instead of sleeping
 //	/sys/power/pm_test_delay_ms   how long a rehearsal stays down (Vinix's)
 //	/sys/power/suspend_stats/     success fail last_failed_dev last_failed_step,
-//	                              and Vinix's last_wake, last_*_ms and
-//	                              security_checks, security_changes, screen_dark
-//	                              and screen_lit (screen.v)
+//	                              and Vinix's last_failed_reason, last_wake,
+//	                              last_depth, deep, last_*_ms,
+//	                              security_checks, security_changes,
+//	                              security_cpus, and screen_dark and
+//	                              screen_lit (screen.v)
 //	/sys/power/profile_policy     [auto] manual: whether the CPU performance
 //	                              profile follows the power source
 //	/sys/power/lid/               state (open, closed, unknown), closes, and
@@ -71,6 +74,15 @@ pub fn publish() {
 	fs.sysfs_attribute('power/suspend_stats/security_changes', 0o444, show_security_changes,
 		unsafe { nil }, unsafe { nil })
 	publish_screen()
+	fs.sysfs_attribute('power/suspend_stats/security_cpus', 0o444, show_security_cpus, unsafe { nil },
+		unsafe { nil })
+	fs.sysfs_attribute('power/suspend_stats/last_failed_reason', 0o444, show_failed_reason,
+		unsafe { nil }, unsafe { nil })
+	fs.sysfs_attribute('power/suspend_stats/last_depth', 0o444, show_last_depth, unsafe { nil },
+		unsafe { nil })
+	fs.sysfs_attribute('power/suspend_stats/deep', 0o444, show_deep_count, unsafe { nil },
+		unsafe { nil })
+	fs.sysfs_attribute('power/deep_sleep', 0o444, show_deep_sleep, unsafe { nil }, unsafe { nil })
 
 	// The file's context is the source's number plus one, so that the first
 	// is not the nil a file with no context has.
@@ -230,6 +242,36 @@ fn show_security_checks(_ voidptr, mut text lib.Text) {
 
 fn show_security_changes(_ voidptr, mut text lib.Text) {
 	number_line(mut text, syspower_stats.security_changes)
+}
+
+fn show_security_cpus(_ voidptr, mut text lib.Text) {
+	number_line(mut text, syspower_stats.security_cpus)
+}
+
+fn show_failed_reason(_ voidptr, mut text lib.Text) {
+	text.add(syspower_stats.failed_reason)
+	text.add_byte(`\n`)
+}
+
+fn show_last_depth(_ voidptr, mut text lib.Text) {
+	text.add(syspower_stats.last_depth)
+	text.add_byte(`\n`)
+}
+
+fn show_deep_count(_ voidptr, mut text lib.Text) {
+	number_line(mut text, syspower_stats.deep)
+}
+
+// "available", or "unavailable: " and why the platform's suspend to RAM is
+// not offered on this machine.
+fn show_deep_sleep(_ voidptr, mut text lib.Text) {
+	if deep_available() {
+		text.add('available\n')
+		return
+	}
+	text.add('unavailable: ')
+	text.add(platform_deep_reason())
+	text.add_byte(`\n`)
 }
 
 // ── /sys/class/wakeup ───────────────────────────────────────────────────────
