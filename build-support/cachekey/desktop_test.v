@@ -86,6 +86,20 @@ fn test_v_launcher_change_invalidates() {
 	assert first != fixture_key(root, v, env)!
 }
 
+fn test_wifi_native_producer_dependencies_invalidate() {
+	root := desktop_temporary()!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	v, env := desktop_fixture(root)!
+	for name in ['tools/m1-wifi/compile-v.v', 'tools/m1-wifi/wifihost/generator.v',
+		'tests/linuxkpi/hosttest/module_text.v', 'tools/m1-wifi/core/native.v'] {
+		path := root + '/' + name
+		fixture_write(path, 'original producer source\n')!
+		first := fixture_key(root, v, env)!
+		fixture_write(path, 'changed producer source\n')!
+		assert first != fixture_key(root, v, env)!, name
+	}
+}
+
 fn test_m1_triangle_source_change_invalidates() {
 	root := desktop_temporary()!
 	defer { os.rmdir_all(root) or { panic(err) } }
