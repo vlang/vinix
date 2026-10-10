@@ -1700,13 +1700,51 @@ the full four-core ARM64 C++/UIKit/GLES/PPSSPP regression pass on the final buil
 The passing preliminary regression and probe are retained with VM hashes;
 the final evidence uses the rebuilt runners after the stack-storage fix.
 
-Five more strong imports resolve. Fortnite still exits with status 1 before
+Five more strong imports resolved in that build. Its probe exited with status 1 before
 entry at EOSSDK's `RawRepresentable.hash(into:)` default,
-`_$sSYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF`. Native instructions for
-that next blocker are captured. It needs associated RawValue metadata, temporary
-value storage, getter/hash witnesses and value-witness destruction. That default,
-Hasher type metadata, concrete standard-library Hashable conformances,
-runtime-wide conformance lookup, generic interpolation and application Swift
+`_$sSYsSHRzSH8RawValueSYRpzrlE4hash4intoys6HasherVz_tF`.
+
+That default now resolves in V. It obtains associated RawValue metadata, sizes
+a 16-byte-aligned stack temporary using the value witness table, calls the
+RawRepresentable getter with its indirect result address in `x8`, then calls
+RawValue's hash witness with the temporary as Swift context. Value-witness
+destruction consumes the owned getter result exactly once afterward. Self stays
+borrowed and unchanged. The callbacks hold no runtime lock, and generated C
+checks verify scoped stack storage without V heap promotion.
+
+The genuine RawRepresentable protocol descriptor and its requirement-base,
+associated-type, initializer and getter descriptor aliases also resolve. Native
+descriptor flags, relative names and alias addresses were measured. Associated
+type slots contain complete metadata or a low-bit-tagged mangled name, rather
+than an accessor function. The V helper follows
+[Swift's associated-type lookup](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/stdlib/public/runtime/Metadata.cpp)
+and [metadata ABI](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/include/swift/ABI/Metadata.h):
+cached metadata returns state Complete for every request; the concrete `SS`
+String mangling, with or without its protocol-context prefix, resolves to
+String metadata and publishes it using acquire/release operations. Other
+generic or symbolic mangled type names reject explicitly.
+
+Native/V ASAN/UBSAN checks pass in both hash-seed modes. They exercise exact
+payload sizes 0, 1, 3, 8, 16, 17, 33, 257 and 8,193 bytes, distinct metadata and
+witness tables, guarded Hasher state, preserved contexts, associated requirement
+indices 1/3/7/15, complete-response requests and concurrent tagged-name caching.
+Getter/hash/destroy ordering and reference ownership are checked inside callbacks;
+String cases use the actual native and V String destruction witnesses. Reentrant
+callbacks at every phase wait for another resolver worker, eight workers hash
+independent values, and two runtime cycles leave no owned objects, buffers or
+mappings. The existing Hasher checks also pass under ASAN/UBSAN. Evidence is
+retained under `swift-raw-representable-checks`.
+
+All twenty-one native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass on the final build. The passing preliminary regression, probe
+and audits from before the requirement aliases are retained with VM hashes and
+both runner binaries/generated C; final evidence uses the rebuilt exports.
+
+Fourteen more strong imports resolve. Fortnite still exits with status 1 before
+entry at EOSSDK's generic Array metadata accessor, `_$sSaMa`; its installed Mac
+instructions are captured. Generic Array metadata/value witnesses, other
+associated-type manglings, Hasher metadata, concrete standard-library Hashable
+conformances, conformance discovery, generic interpolation and application Swift
 heap support remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -1714,12 +1752,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,364 | 794 | 81 |
-| EOSSDK | 575 | 87 | 18 |
-| MarketplaceKitWrapper | 71 | 105 | 23 |
-| All images | 2,010 | 986 | 122 |
+| Fortnite executable | 1,368 | 790 | 81 |
+| EOSSDK | 580 | 82 | 18 |
+| MarketplaceKitWrapper | 76 | 100 | 23 |
+| All images | 2,024 | 972 | 122 |
 
-The C++/GLES/Text variant reports 2,023 resolved imports, 973 unresolved strong
+The C++/GLES/Text variant reports 2,037 resolved imports, 959 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
