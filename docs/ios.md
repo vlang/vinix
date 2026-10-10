@@ -1444,21 +1444,53 @@ Intervening runs hit a filesystem fault in the preserved kernel's
 observed timestamp failure. Their serial logs and VM hashes are also retained.
 
 All fourteen native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
-regression pass. Six more strong imports resolve. The actual Fortnite binary
-still exits with status 1 before entry, now at `objc_sync_enter` in EOSSDK;
-Objective-C synchronized-object monitors remain unsupported.
+regression pass. Six more strong imports resolve. The next Fortnite linking
+blocker was `objc_sync_enter` in EOSSDK.
+
+`objc_sync_enter` and `objc_sync_exit` now provide recursive object monitors
+in V, matching measurements against the installed Mac Objective-C runtime.
+Nil succeeds; an unmatched exit or an exit from another thread returns signed
+32-bit `-1`. Keys are opaque identities: classes, tagged pointers and blocks
+are accepted without inspecting or retaining the object. Releasing an instance
+or block while its monitor is held does not prevent the matching exit.
+
+Each recursive entry or waiting acquisition pins its monitor under the runtime
+registry lock, then waits on a separate native recursive mutex after unlocking
+the registry. Independent monitors and object creation can therefore progress
+while a caller waits. Exit keeps the registry guarded through native unlock
+and frees the monitor only after the last entry and waiter are gone. Balanced
+use leaves no monitor allocations; shutdown requires an empty table.
+
+Native Mac ASAN/UBSAN checks cover nil, ownership errors, recursive depth 64,
+weak death while locked, opaque and released-block identities, 50 recursive
+waiter handoffs and independent registry access. Eight workers protect a
+shared counter while another thread attempts foreign exits. Two V runtime
+teardowns leave monitors, object metadata, blocks and live counts empty.
+Measurements, EOSSDK call traces, generated bodies and failed VM evidence are
+retained under `objc-sync-checks`.
+
+All fifteen native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. Three earlier attempts hit poison-pointer faults in the
+preserved kernel's `fs.reduce_node_on_mount` or `stubs.memcmp` during the
+unchanged concurrent timestamp check, before reaching the monitor check.
+Their serial logs, VM hashes and kernel debug-symbol locations are retained.
+
+Four more strong imports resolve. The actual Fortnite probe still exits with
+status 1 before entry, at Swift's string-to-UTF-8 array getter
+`_$sSS11utf8CStrings15ContiguousArrayVys4Int8VGvg` in EOSSDK.
+The Darwin Swift core runtime remains unsupported.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,345 | 813 | 81 |
-| EOSSDK | 559 | 103 | 18 |
+| Fortnite executable | 1,347 | 811 | 81 |
+| EOSSDK | 561 | 101 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,964 | 1,032 | 122 |
+| All images | 1,968 | 1,028 | 122 |
 
-The C++/GLES/Text variant reports 1,977 resolved imports, 1,019 unresolved strong
+The C++/GLES/Text variant reports 1,981 resolved imports, 1,015 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1498,12 +1530,13 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `file-time-checks`, the audio constants use `audio-session-checks`, and
 CoreFoundation dictionaries use `cf-dictionary-checks`, supplied Objective-C
 storage uses `objc-storage-checks`, associated objects use
-`objc-associated-checks`, and property access uses `objc-property-checks`). Each
+`objc-associated-checks`, property access uses `objc-property-checks`, and
+object monitors use `objc-sync-checks`). Each
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant and
-CoreFoundation dictionary, supplied Objective-C storage, associated-object and
-property checks before the
+CoreFoundation dictionary, supplied Objective-C storage, associated-object,
+property and object-monitor checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

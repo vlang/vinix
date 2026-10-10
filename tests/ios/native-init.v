@@ -57,6 +57,7 @@ fn main() {
 		require_child('/opt/ios/objc-storage-checks')
 		require_child('/opt/ios/objc-associated-checks')
 		require_child('/opt/ios/objc-property-checks')
+		require_child('/opt/ios/objc-sync-checks')
 		require_child('/opt/ios/regression')
 	} else {
 		args := if mode == 'audit' {

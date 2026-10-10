@@ -125,6 +125,7 @@ mut:
 	classes      map[u64]&ObjClass
 	objects map[u64]&ObjHeader // Object address -> owned metadata; protected by the recursive runtime lock.
 	associations map[u64]&ObjAssociations // Object -> key/value table, under the same recursive lock.
+	monitors map[u64]&ObjMonitor
 	names        map[string]u64
 	pool_key u64
 	graphics_key u64
@@ -389,6 +390,7 @@ fn objc_stop() {
 	}
 	if ios_runtime.objects.len == 0 { unsafe { ios_runtime.objects.free() } }
 	unsafe { ios_runtime.associations.free() }
+	objc_monitors_stop()
 	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
 	for _, text in ios_runtime.constant_utf8 { unsafe { text.free() } }
 	for address, info in ios_runtime.classes {
