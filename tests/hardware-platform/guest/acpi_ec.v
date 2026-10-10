@@ -186,6 +186,9 @@ fn scenario_acpi_ec_selftest(mut t Test) {
 	boot_transactions := ec_count('transactions')
 	t.check(boot_transactions >= 20, 'only ${boot_transactions} exchanges by the time init runs')
 	t.check(ec_count('timeouts') == 0, 'timeouts while booting: ${ec_count('timeouts')}')
+	// With vinix.ec=clear the controller is asked once at start whatever its
+	// event bit says, and names nothing; without, it is not asked at all.
+	t.check(ec_sim_count('empty_queries') == if early { 0 } else { 1 }, '${ec_sim_count('empty_queries')} queries named nothing while booting')
 	t.info('boot: init ${booted} ms after the clock started, ${boot_transactions} exchanges, source ${read_word(ec +
 		'source')}')
 
@@ -260,6 +263,8 @@ fn scenario_acpi_ec_selftest(mut t Test) {
 	t.check(ec_count('methods_missing') == missing + 1, 'methods_missing went from ${missing} to ${ec_count('methods_missing')}')
 
 	ec_selftest_sleep(mut t)
+	// And once more after each of the four sleeps.
+	t.check(ec_sim_count('empty_queries') == if early { 0 } else { 5 }, '${ec_sim_count('empty_queries')} queries had named nothing after four sleeps')
 	ec_selftest_retention(mut t)
 	ec_selftest_signals(mut t)
 	// With a controller that works nobody has ever waited a second for the

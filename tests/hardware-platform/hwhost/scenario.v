@@ -407,9 +407,10 @@ pub const scenarios = [
 	},
 	Scenario{
 		name:     'acpi-ec-selftest-dsdt'
-		about:    'the same with no ECDT: the controller is found in the namespace alone'
+		about:    'the same with no ECDT, and the controller cleared of events at start and on resume'
 		arches:   ['x86_64']
 		define:   'acpiec_selftest'
+		cmdline:  'vinix.ec=clear,dsdt-gpe'
 		timeout:  240
 		tables:   ['ec-bench-dsdt']
 		qemu:     ec_selftest_qemu('ec-bench-dsdt', false)
