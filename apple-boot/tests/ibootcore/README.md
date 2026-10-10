@@ -3,9 +3,8 @@
 The maintained V implementation owns the seven binary construction helpers in
 `qemu_iboot.py`: alignment, C strings, 32-bit and 64-bit packing, Apple DeviceTree
 nodes and the synthetic tree, and revision-2 boot arguments. The Python public
-signatures, annotations and defaults remain the caller interface. The existing
-QMP controller, assembly builder, real IORegistry tree workflow and
-main parser are unchanged in this stage.
+signatures, annotations and defaults remain the caller interface. The assembly builder, real IORegistry tree workflow and main parser retain
+their existing implementation.
 
 The V library uses the calling CPython's public object API. Arithmetic keeps
 Python integer widths and overloaded operators. Imported packers, constructors
@@ -41,3 +40,17 @@ file/FD, nested-call, thread and fixed-literal controls check lifetime boundarie
 The counted Python frontend keeps the one-item unpack and nested function
 syntax; it contains no PNG algorithm. This stage removes 856 original
 Python bytes across 17 lines; net Python reduction is 307 bytes.
+
+QMP connection, reply parsing and command/error handling now also live in V.
+The frontend retains the class and its three public method signatures. The
+controller uses actual socket and JSON objects, preserves target lookup before
+argument evaluation, and consumes temporary call arguments in reverse stack
+order before the callable. Named reply data, lines, messages and requests stay
+owned across callbacks and in saved error scopes. Fixed names and literals use
+the finite implementation pools; caller commands and formatted errors do not.
+Independent controls cover fragmented/event replies, connection and JSON
+failures, rich formatting, aliases, saved traceback retirement, nested/thread
+calls and 500 actual Unix-socket exchanges with an exact FD baseline. This
+controller stage does not claim a new QEMU boot. It removes 1170 original Python
+bytes across 32 lines; counted frontend overhead leaves a net reduction of 703
+Python bytes.

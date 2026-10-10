@@ -107,7 +107,7 @@ def _iboot(operation, *arguments):
             _CODEC_LIBRARY = library
     pins = []
     return _CODEC_LIBRARY.target(operation.encode(), _CODEC_NAMESPACE, arguments,
-                                 {"pair": _CODEC_API["_pair"], "pins": pins, "single": _iboot_single})
+                                 {"pair": _CODEC_API["_pair"], "pins": pins, "single": _iboot_single, "raise": _iboot_raise})
 
 
 def align(value: int, alignment: int) -> int:
@@ -177,38 +177,24 @@ def build_stub(work: Path, boot_args_address: int, entry: int) -> Path:
     return path
 
 
+def _iboot_raise(error):
+    try:
+        raise error
+    finally:
+        error = None
+
+
 class Qmp:
     """Just enough of QEMU's machine protocol to save memory and quit."""
 
     def __init__(self, path: Path):
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.connect(str(path))
-        self.sock.settimeout(60)
-        self.buffer = b""
-        self.reply()  # greeting
-        self.execute("qmp_capabilities")
+        _iboot('qmp_init', self, path)
 
     def reply(self) -> dict:
-        while True:
-            while b"\n" not in self.buffer:
-                data = self.sock.recv(65536)
-                if not data:
-                    raise ConnectionError("QMP closed")
-                self.buffer += data
-            line, self.buffer = self.buffer.split(b"\n", 1)
-            message = json.loads(line)
-            if "event" not in message:
-                return message
+        return _iboot('qmp_reply', self)
 
     def execute(self, command: str, **arguments) -> dict:
-        request = {"execute": command}
-        if arguments:
-            request["arguments"] = arguments
-        self.sock.sendall(json.dumps(request).encode() + b"\n")
-        message = self.reply()
-        if "error" in message:
-            raise RuntimeError(f"{command}: {message['error']}")
-        return message
+        return _iboot('qmp_execute', self, command, arguments)
 
 
 def _iboot_single(value):

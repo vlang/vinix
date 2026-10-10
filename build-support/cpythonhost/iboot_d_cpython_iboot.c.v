@@ -23,6 +23,7 @@ struct IbootCodec {
 	pins      voidptr
 	pair      voidptr
 	single    voidptr
+ raise_ voidptr
 }
 
 // These arguments are the finite numeric constants in the seven helper bodies.
@@ -102,24 +103,24 @@ fn (s &IbootCodec) pin(names []string, values []voidptr) {
 	error.discard()
 }
 
-// Consume temporary arguments before the actual borrowed callable, including
+// Consume temporary arguments in reverse order before the actual borrowed callable, including
 // exceptional returns. Named callers supply their own independent references.
 fn ib_invoke(target voidptr, values []voidptr) voidptr {
 	if target == unsafe { nil } || values.any(it == unsafe { nil }) {
-		for value in values { drop(value) }
+		for i := values.len - 1; i >= 0; i-- { drop(values[i]) }
 		drop(target)
 		return unsafe { nil }
 	}
 	args := C.PyTuple_New(values.len)
 	if args == unsafe { nil } {
-		for value in values { drop(value) }
+		for i := values.len - 1; i >= 0; i-- { drop(values[i]) }
 		drop(target)
 		return args
 	}
 	for i, value in values { C.PyTuple_SetItem(args, i, own(value)) }
 	result := C.PyObject_Call(target, args, unsafe { nil })
 	drop(args)
-	for value in values { drop(value) }
+	for i := values.len - 1; i >= 0; i-- { drop(values[i]) }
 	drop(target)
 	return result
 }
@@ -725,10 +726,13 @@ fn (s &IbootCodec) build_adt(segment voidptr, with_aic voidptr) voidptr {
 }
 
 pub fn iboot_codec_entry(operation &char, namespace voidptr, arguments voidptr, syntax voidptr) voidptr {
-	s := IbootCodec{ namespace: namespace, pins: unsafe { C.PyDict_GetItemString(syntax, c'pins') }, pair: unsafe { C.PyDict_GetItemString(syntax, c'pair') }, single: unsafe { C.PyDict_GetItemString(syntax, c'single') } }
+	s := IbootCodec{ namespace: namespace, pins: unsafe { C.PyDict_GetItemString(syntax, c'pins') }, pair: unsafe { C.PyDict_GetItemString(syntax, c'pair') }, single: unsafe { C.PyDict_GetItemString(syntax, c'single') }, raise_: unsafe { C.PyDict_GetItemString(syntax, c'raise') } }
 	op := unsafe { operation.vstring() }
 	return match op {
-		'png_chunk' { s.png_chunk(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
+		'qmp_init' { s.qmp_init(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
+ 'qmp_reply' { s.qmp_reply(C.PyTuple_GetItem(arguments,0)) }
+ 'qmp_execute' { s.qmp_execute(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1), C.PyTuple_GetItem(arguments,2)) }
+ 'png_chunk' { s.png_chunk(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1)) }
 		'write_png' { s.png(C.PyTuple_GetItem(arguments,0), C.PyTuple_GetItem(arguments,1), C.PyTuple_GetItem(arguments,2)) }
 		'align' { s.align(C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1)) }
 		'cstr' { s.cstr(C.PyTuple_GetItem(arguments, 0)) }
