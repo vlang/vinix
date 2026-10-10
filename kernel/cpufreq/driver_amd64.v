@@ -42,8 +42,15 @@
 //
 // None of this has run on hardware. Every virtual machine this kernel is
 // tested in shows none of the CPUID bits above, and gets the driver "none";
-// the arithmetic is tested on the host (tests/cpu-power) and the paths below
-// are not exercised at all.
+// the arithmetic is tested on the host (tests/cpu-power).
+//
+// What can be run in a virtual machine is everything but the registers.
+// vinix.cpufreq=simulate starts a driver, "simulated", that goes the whole
+// way SpeedStep goes -- policies, worker, a value left for each CPU, each CPU
+// writing its own on its pass through the scheduler -- with a word of memory
+// per CPU in place of IA32_PERF_CTL and made-up ratios of 8 to 30. The
+// frequencies it reports are not the machine's. It is there so that
+// tests/cpu-power can watch a request reach every CPU.
 @[has_globals]
 module cpufreq
 
@@ -58,6 +65,8 @@ enum X86Control {
 	hwp
 	speedstep
 	cppc
+	// SpeedStep's path with memory for registers; see the top of the file.
+	simulated
 }
 
 // What one logical CPU knows about its own registers. `ready` and everything
@@ -90,6 +99,8 @@ mut:
 	aperf    u64
 	mperf    u64
 	status   u64
+	// The simulated driver's stand-in for IA32_PERF_CTL.
+	pretend u64
 	// What the reader of scaling_cur_freq last saw, and made of it.
 	seen_aperf u64
 	seen_mperf u64
@@ -136,7 +147,7 @@ fn cpu_service(cpu_number u64) {
 	if me.ready == 0 {
 		cpu_setup(mut me)
 	}
-	if cpufreq_x86_aperf || cpufreq_x86_control == .speedstep {
+	if cpufreq_x86_aperf || cpufreq_x86_control == .speedstep || cpufreq_x86_control == .simulated {
 		// Odd while the three are replaced, so a reader on another CPU can
 		// tell a mixed set from a whole one.
 		me.sequence++
@@ -146,6 +157,8 @@ fn cpu_service(cpu_number u64) {
 		}
 		if cpufreq_x86_control == .speedstep {
 			me.status = msr.rdmsr(msr_perf_status)
+		} else if cpufreq_x86_control == .simulated {
+			me.status = me.pretend
 		}
 		me.sequence++
 	}
@@ -158,6 +171,7 @@ fn cpu_service(cpu_number u64) {
 		.hwp { msr.wrmsr(msr_hwp_request, value) }
 		.speedstep { msr.wrmsr(msr_perf_ctl, value) }
 		.cppc { msr.wrmsr(msr_amd_cppc_req, value) }
+		.simulated { me.pretend = value }
 		.absent {}
 	}
 	me.applied = generation
@@ -196,6 +210,12 @@ fn cpu_setup(mut me CpuControl) {
 			me.capabilities = msr.rdmsr(msr_amd_cppc_cap1)
 			me.found_request = msr.rdmsr(msr_amd_cppc_req)
 		}
+		.simulated {
+			// Ratios 8 to 24, 30 with turbo, in the registers' own layouts.
+			me.platform_info = (u64(8) << 40) | (u64(24) << 8)
+			me.turbo_limit = 30
+			me.misc_enable = 0
+		}
 		.absent {}
 	}
 	katomic.store(mut &me.ready, u32(1))
@@ -215,7 +235,7 @@ fn adopt(mut policy Policy, me &CpuControl) {
 			limits.hw_max_khz = u64(caps.highest) * me.per_level
 			limits.nominal_khz = u64(caps.guaranteed) * me.per_level
 		}
-		.speedstep {
+		.speedstep, .simulated {
 			s := speedstep_of(me)
 			limits.hw_min_khz = u64(s.lowest) * khz_per_level
 			limits.hw_max_khz = u64(speedstep_highest(s)) * khz_per_level
@@ -264,7 +284,7 @@ fn x86_apply(_ int, mut policy Policy) {
 			hwp_request(me.found_request, hwp_plan(policy.governor, policy.preference,
 				hwp_caps(me.capabilities), me.per_level, lowest, highest), cpufreq_x86_hwp_epp)
 		}
-		.speedstep {
+		.speedstep, .simulated {
 			s := speedstep_of(me)
 			perf_ctl(s, speedstep_ratio(s, policy.wanted_khz, highest), highest)
 		}
@@ -313,7 +333,7 @@ fn x86_current(_ int, policy &Policy) u64 {
 			return me.seen_khz
 		}
 	}
-	if cpufreq_x86_control == .speedstep {
+	if cpufreq_x86_control == .speedstep || cpufreq_x86_control == .simulated {
 		return u64(perf_status_ratio(status)) * khz_per_level
 	}
 	return 0
@@ -344,6 +364,7 @@ fn driver_start(cpus int) {
 		.hwp { 'intel_hwp' }
 		.speedstep { 'intel_speedstep' }
 		.cppc { 'amd_cppc' }
+		.simulated { 'simulated' }
 		.absent { 'none' }
 	}
 	cpufreq_driver.settable = true
@@ -362,6 +383,12 @@ fn detect() X86Control {
 		if choice == 'off' {
 			print('cpufreq: switched off by vinix.cpufreq=off\n')
 			return .absent
+		}
+		if choice == 'simulate' {
+			print('cpufreq: simulated driver by vinix.cpufreq=simulate; its frequencies are not real\n')
+			cpufreq_x86_aperf = false
+			cpufreq_x86_turbo = true
+			return .simulated
 		}
 	}
 	_, _, vendor_b, vendor_c, vendor_d := cpu.cpuid(0, 0)

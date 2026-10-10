@@ -29,6 +29,15 @@
 //
 // Everywhere else -- every virtual machine -- there is no driver, and nothing
 // that says what the frequency is: the files in /sys read 0 and "<unknown>".
+//
+// What can be run in a virtual machine is everything but the registers.
+// vinix.cpufreq=simulate starts the same driver, under the name "simulated",
+// on two made-up clusters with the M1's operating points, whose register
+// blocks are words of memory that behave as the Linux driver assumes: BUSY
+// for a moment after a command, then the new state in the status register.
+// The frequencies it reports are not the machine's. It is there so that
+// tests/cpu-power can run the policies, the worker and this file's own code
+// in a guest.
 @[has_globals]
 module cpufreq
 
@@ -76,6 +85,86 @@ fn mmio_write(context voidptr, offset u32, value u64) {
 
 fn mmio_pause(_ voidptr, us u32) {
 	timer.busywait_us(us)
+}
+
+// A register block of the simulated driver.
+struct PretendBlock {
+mut:
+	command u64
+	status  u64
+	// BUSY reads as set for this many more reads of the command register.
+	busy_reads u32
+}
+
+__global (
+	cpufreq_pretend_blocks [2]PretendBlock
+)
+
+fn pretend_read(context voidptr, offset u32) u64 {
+	mut block := unsafe { &PretendBlock(context) }
+	if offset == dvfs_status {
+		return block.status
+	}
+	if offset != dvfs_cmd {
+		return 0
+	}
+	if block.busy_reads > 0 {
+		block.busy_reads--
+		return block.command | dvfs_cmd_busy
+	}
+	return block.command
+}
+
+fn pretend_write(context voidptr, offset u32, value u64) {
+	mut block := unsafe { &PretendBlock(context) }
+	if offset != dvfs_cmd {
+		return
+	}
+	block.command = value & ~dvfs_cmd_busy
+	if value & dvfs_cmd_set != 0 {
+		// The t8103's current-state field.
+		block.status = (block.status & ~(u64(0xf) << 4)) | ((value & 0xf) << 4)
+		block.busy_reads = 3
+	}
+}
+
+// Two clusters with the operating points of the M1's (Asahi's t8103.dtsi),
+// the lower half of the CPUs in the first.
+fn pretend_clusters(cpus int) {
+	split := if cpus > 1 { cpus / 2 } else { 1 }
+	for index in 0 .. 2 {
+		mut cluster := unsafe { &cpufreq_apple_clusters[index] }
+		cluster.info = dvfs_info(.t8103)
+		cluster.count = 0
+		cluster.cpus = 0
+		for cpu_number in 0 .. cpus {
+			if cpu_number < max_cpus && (cpu_number < split) == (index == 0) {
+				cluster.cpus |= u64(1) << u32(cpu_number)
+			}
+		}
+		if cluster.cpus == 0 {
+			continue
+		}
+		steps := if index == 0 { 5 } else { 15 }
+		for step in 0 .. steps {
+			// 600 MHz up in steps of 372 MHz, and of 204 MHz from 600 MHz
+			// to 3.456 GHz: near enough the real tables' shape.
+			khz := if index == 0 { u64(600000) + u64(step) * 372000 } else { u64(600000) +
+					u64(step) * 204000 }
+			cluster.points[cluster.count] = DvfsPoint{
+				khz:    khz
+				pstate: u32(step + 1)
+			}
+			cluster.count++
+		}
+		cpufreq_apple_io[index] = DvfsIo{
+			read:    pretend_read
+			write:   pretend_write
+			pause:   mmio_pause
+			context: voidptr(&cpufreq_pretend_blocks[index])
+		}
+		cpufreq_apple_count = index + 1
+	}
 }
 
 // The driver's apply(): the operating point for what the governor asked for,
@@ -231,8 +320,15 @@ fn apple_discover() bool {
 // Find this machine's frequency control. `cpus` is how many CPUs there are.
 fn driver_start(cpus int) {
 	cpufreq_driver.name = 'none'
-	if devcore.boot_flag('vinix.apple_cpufreq=', false) {
-		if devicetree.is_available() && apple_discover() {
+	mut simulated := false
+	if choice := devcore.boot_option('vinix.cpufreq=') {
+		simulated = choice == 'simulate'
+	}
+	if simulated {
+		pretend_clusters(cpus)
+	}
+	if simulated || devcore.boot_flag('vinix.apple_cpufreq=', false) {
+		if cpufreq_apple_count > 0 || (devicetree.is_available() && apple_discover()) {
 			for i in 0 .. cpufreq_apple_count {
 				cluster := unsafe { &cpufreq_apple_clusters[i] }
 				top := cluster.points[cluster.count - 1].khz
@@ -244,11 +340,15 @@ fn driver_start(cpus int) {
 				C.kprintf(c'cpufreq: cluster %llu: CPUs 0x%llx, %llu points, %llu to %llu kHz\n',
 					u64(i), cluster.cpus, u64(cluster.count), cluster.points[0].khz, top)
 			}
-			cpufreq_driver.name = 'apple_dvfs'
+			cpufreq_driver.name = if simulated { 'simulated' } else { 'apple_dvfs' }
 			cpufreq_driver.settable = true
 			cpufreq_driver.apply = apple_apply
 			cpufreq_driver.current = apple_current
-			print('cpufreq: Apple cluster DVFS by vinix.apple_cpufreq=1; untested on hardware\n')
+			if simulated {
+				print('cpufreq: simulated driver by vinix.cpufreq=simulate; its frequencies are not real\n')
+			} else {
+				print('cpufreq: Apple cluster DVFS by vinix.apple_cpufreq=1; untested on hardware\n')
+			}
 		} else {
 			print('cpufreq: vinix.apple_cpufreq=1, but the device tree describes no cluster\n')
 		}

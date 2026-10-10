@@ -454,6 +454,114 @@ static void refused(const char *p, const char *text) {
     if (strcmp(before, after) != 0) fail("%s changed from \"%s\" to \"%s\" by a refused write", p, before, after);
 }
 
+static long long freq_num(int cpu, const char *file) {
+    char p[200];
+    freq_path(p, sizeof p, cpu, file);
+    return readnum(p);
+}
+
+static int freq_write(int cpu, const char *file, long long value) {
+    char p[200], b[40];
+    freq_path(p, sizeof p, cpu, file);
+    snprintf(b, sizeof b, "%lld\n", value);
+    return writefile(p, b);
+}
+
+static void set_governors(const char *name) {
+    char p[200], b[40];
+    snprintf(b, sizeof b, "%s\n", name);
+    for (int c = 0; c < ncpus; c++) {
+        freq_path(p, sizeof p, c, "scaling_governor");
+        if (writefile(p, b) < 0) fail("cpu%d: governor %s refused", c, name);
+    }
+}
+
+// How many CPUs run at the top and at the bottom of their allowed range.
+static void count_at(int *top, int *bottom, char *line, int cap) {
+    *top = *bottom = 0;
+    int n = 0;
+    for (int c = 0; c < ncpus; c++) {
+        long long cur = freq_num(c, "scaling_cur_freq");
+        if (cur == freq_num(c, "scaling_max_freq")) ++*top;
+        if (cur == freq_num(c, "scaling_min_freq")) ++*bottom;
+        n += snprintf(line + n, cap - n, " %lld", cur);
+    }
+}
+
+static void *spin_long(void *arg) {
+    *(uint64_t *)arg = spin_job(spin_rounds * 4);
+    return NULL;
+}
+
+// What a driver has to do with the policies, whichever driver it is: put a
+// governor's choice into effect on every CPU, keep to the range, and follow
+// the load.
+static void driven(void) {
+    char line[512];
+    int top, bottom;
+
+    set_governors("performance");
+    sleep_ms(400);
+    count_at(&top, &bottom, line, sizeof line);
+    sayf("CPUTEST   performance: kHz%s\n", line);
+    if (top != ncpus) fail("performance: %d of %d CPUs at their maximum", top, ncpus);
+
+    set_governors("powersave");
+    sleep_ms(400);
+    count_at(&top, &bottom, line, sizeof line);
+    sayf("CPUTEST   powersave: kHz%s\n", line);
+    if (bottom != ncpus) fail("powersave: %d of %d CPUs at their minimum", bottom, ncpus);
+
+    // The range: a ceiling in the middle is kept to, one outside what the
+    // hardware has is brought inside, a floor above the ceiling comes down.
+    set_governors("performance");
+    for (int c = 0; c < ncpus; c++) {
+        long long hw_min = freq_num(c, "cpuinfo_min_freq"), hw_max = freq_num(c, "cpuinfo_max_freq");
+        long long middle = (hw_min + hw_max) / 2;
+        if (freq_write(c, "scaling_max_freq", middle) < 0) fail("cpu%d: scaling_max_freq refused %lld", c, middle);
+        if (freq_num(c, "scaling_max_freq") != middle) fail("cpu%d: scaling_max_freq reads %lld after %lld", c, freq_num(c, "scaling_max_freq"), middle);
+    }
+    sleep_ms(400);
+    count_at(&top, &bottom, line, sizeof line);
+    sayf("CPUTEST   performance under half the range: kHz%s\n", line);
+    for (int c = 0; c < ncpus; c++) {
+        long long cur = freq_num(c, "scaling_cur_freq"), hi = freq_num(c, "scaling_max_freq");
+        long long hw_min = freq_num(c, "cpuinfo_min_freq"), hw_max = freq_num(c, "cpuinfo_max_freq");
+        if (cur > hi) fail("cpu%d: runs at %lld above its ceiling %lld", c, cur, hi);
+        if (cur < hw_min) fail("cpu%d: runs at %lld below the hardware's %lld", c, cur, hw_min);
+        freq_write(c, "scaling_max_freq", 1);
+        if (freq_num(c, "scaling_max_freq") != hw_min) fail("cpu%d: a ceiling of 1 kHz reads %lld, not %lld", c, freq_num(c, "scaling_max_freq"), hw_min);
+        freq_write(c, "scaling_max_freq", 99999999);
+        if (freq_num(c, "scaling_max_freq") != hw_max) fail("cpu%d: a ceiling of 99999999 kHz reads %lld, not %lld", c, freq_num(c, "scaling_max_freq"), hw_max);
+        freq_write(c, "scaling_max_freq", (hw_min + hw_max) / 2);
+        freq_write(c, "scaling_min_freq", 99999999);
+        if (freq_num(c, "scaling_min_freq") != freq_num(c, "scaling_max_freq"))
+            fail("cpu%d: floor %lld above ceiling %lld", c, freq_num(c, "scaling_min_freq"), freq_num(c, "scaling_max_freq"));
+        freq_write(c, "scaling_min_freq", hw_min);
+        freq_write(c, "scaling_max_freq", hw_max);
+        if (freq_num(c, "scaling_min_freq") != hw_min || freq_num(c, "scaling_max_freq") != hw_max) fail("cpu%d: range not restored", c);
+    }
+
+    // ondemand: down when idle, up under load.
+    set_governors("ondemand");
+    sleep_ms(700);
+    count_at(&top, &bottom, line, sizeof line);
+    sayf("CPUTEST   ondemand, idle: kHz%s\n", line);
+    if (bottom < (ncpus + 1) / 2) fail("ondemand: only %d of %d idle CPUs at their minimum", bottom, ncpus);
+    pthread_t t[MAX_CPUS];
+    uint64_t r[MAX_CPUS];
+    for (int c = 0; c < ncpus; c++) pthread_create(&t[c], NULL, spin_long, &r[c]);
+    sleep_ms(600);
+    count_at(&top, &bottom, line, sizeof line);
+    sayf("CPUTEST   ondemand, every CPU busy: kHz%s\n", line);
+    if (top < (ncpus + 1) / 2) fail("ondemand: only %d of %d busy CPUs at their maximum", top, ncpus);
+    for (int c = 0; c < ncpus; c++) pthread_join(t[c], NULL);
+    sleep_ms(700);
+    count_at(&top, &bottom, line, sizeof line);
+    sayf("CPUTEST   ondemand, idle again: kHz%s\n", line);
+    if (bottom < (ncpus + 1) / 2) fail("ondemand: only %d of %d CPUs back at their minimum", bottom, ncpus);
+}
+
 static void cpufreq(void) {
     static const char *files[] = {"scaling_driver", "scaling_governor", "scaling_available_governors", "scaling_min_freq",
                                   "scaling_max_freq", "scaling_cur_freq", "cpuinfo_min_freq", "cpuinfo_max_freq",
@@ -533,6 +641,13 @@ static void cpufreq(void) {
         if (r < 0 || strcmp(now, profiles[g]) != 0) fail("profile %s was not taken", profiles[g]);
     }
     refused(CPU_DIR "/cpufreq/profile", "ludicrous\n");
+    freq_path(p, sizeof p, 0, "energy_performance_available_preferences");
+    readfile(p, b, sizeof b);
+    if (strcmp(b, "default") == 0) {
+        freq_path(p, sizeof p, 0, "energy_performance_preference");
+        refused(p, "power\n");
+    }
+    driven();
 }
 
 int main(void) {
