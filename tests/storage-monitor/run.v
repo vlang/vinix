@@ -24,11 +24,15 @@ fn qualify(root string, work string) ! {
 			}
 			source = source.replace('C.fflush(', 'monitor_mock_flush(')
 		}
+		if file == 'monitor_health.v' {
+			source = source.replace('fn C.fputs(&char, voidptr) i32\n', '')
+				.replace('C.fputs(', 'monitor_mock_fputs(')
+		}
 		os.write_file(work + '/volumecli/' + file, source)!
 	}
 	os.cp(root + '/tests/storage-monitor/model.v', work + '/volumecli/model.v')!
 	os.cp(root + '/tests/storage-monitor/io_test.v', work + '/volumecli/io_test.v')!
-	for file in ['monitor_test.v', 'health_test.v'] {
+	for file in ['monitor_test.v', 'monitor_health_test.v', 'health_test.v'] {
 		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
 		if file == 'monitor_test.v' {
 			start := source.index('fn test_monitor_') or { return error('Missing monitor tests') }
@@ -41,7 +45,7 @@ fn qualify(root string, work string) ! {
 	os.write_file(work + '/volumecli/status_helper.v', helper.all_before('fn test_monitor_'))!
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for file in ['monitor_test', 'io_test', 'health_test'] {
+	for file in ['monitor_test', 'monitor_health_test', 'io_test', 'health_test'] {
 		binary := work + '/' + file
 		command([v, '-nocache', '-gc', 'none', '-no-closures', '-target-libc-headers',
 			'-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
@@ -51,7 +55,11 @@ fn qualify(root string, work string) ! {
 		output := command([binary])!
 		if file == 'io_test' {
 			for marker in ['sample=200 disk=91 health=healthy', 'warnings=0x80', 'health=unavailable',
-				'health=offline', 'health=query-failed', 'new_errors=1', 'counters_reset=1'] {
+				'health=offline', 'health=query-failed', 'new_errors=1', 'counters_reset=1',
+				'health=media-errors', 'telemetry=unavailable', 'telemetry=nvme scope=controller',
+				'temperature_kelvin=300', 'percentage_used=200', 'health_counters_reset=1',
+				'media_errors_delta=0x00000000000000000000000000000001',
+				'media_errors_delta=0x00000000000000010000000000000000'] {
 				if !output.contains(marker) { return error('Missing monitor output: ${marker}') }
 			}
 		}
@@ -71,6 +79,13 @@ fn qualify(root string, work string) ! {
 		}
 		println('PASS: ${arch} production CLI has no heap allocation or V runtime dependency')
 	}
+	capture_test := work + '/capture-test'
+	command([v, '-nocache', '-gc', 'none', '-cc', 'clang', '-cflags', '-fsanitize=address,undefined',
+		'-ldflags', '-fsanitize=address,undefined', '-o', capture_test,
+		root +
+			'/tests/storage-volumes/bootcapture/capture_test.v'])!
+	print(command([capture_test])!)
+	println('PASS: bounded boot transcript markers under ASan/UBSan')
 }
 
 fn main() {

@@ -2,6 +2,8 @@
 @[has_globals]
 module volumecli
 
+fn C.fputs(&char, voidptr) i32
+
 struct MonitorModel {
 mut:
 	mode         int
@@ -12,6 +14,7 @@ mut:
 	sleeps       int
 	flushes      int
 	prints       int
+	tails        int
 }
 
 __global monitor_model MonitorModel
@@ -80,7 +83,8 @@ fn monitor_mock_ioctl(fd i32, request u64, output voidptr) i32 {
 		}
 		return -1
 	}
-	if monitor_model.mode in [6, 13]! {
+	if monitor_model.mode in [6, 13]!
+		|| (monitor_model.mode == 23 && monitor_model.health_calls == 2) {
 		unsafe {
 			C.errno = C.EIO
 		}
@@ -102,6 +106,32 @@ fn monitor_mock_ioctl(fd i32, request u64, output voidptr) i32 {
 	}
 	if monitor_model.mode == 14 { health.disk_id = 92 }
 	if monitor_model.mode == 15 { health.flags = 31 } // Warning flag disagrees with data.
+	if monitor_model.mode in [20, 21, 22, 23, 24, 25, 26]! {
+		health.data[1] = 44 // 300 kelvin, without converting vendor attributes.
+		health.data[2] = 1
+		health.data[3] = 95
+		health.data[4] = 10
+		health.data[5] = 200 // Percentage Used can legitimately exceed 100.
+		health.data[160] = 5 // Historical media errors do not fail the baseline.
+		if monitor_model.mode == 20 {
+			for i in 160 .. 168 {
+				health.data[i] = if monitor_model.health_calls == 1 { u8(255) } else { u8(0) }
+			}
+			health.data[168] = if monitor_model.health_calls == 1 { u8(1) } else { u8(2) }
+		}
+		if monitor_model.mode == 21 { health.data[176] = u8(monitor_model.health_calls) }
+		if monitor_model.mode == 22 && monitor_model.health_calls > 1 { health.data[160] = 4 }
+		if monitor_model.mode == 23 && monitor_model.health_calls > 2 { health.data[160] = 7 }
+		if monitor_model.mode == 24 && monitor_model.health_calls == 2 {
+			health.protocol = 1
+			health.flags = 1
+		}
+		if monitor_model.mode == 25 {
+			health.data[1] = 0
+			health.data[2] = 0
+		}
+		if monitor_model.mode == 26 && monitor_model.health_calls > 1 { health.data[168] = 1 }
+	}
 	unsafe {
 		*(&Health(output)) = health
 	}
@@ -139,4 +169,15 @@ fn monitor_mock_printf(format &char, sample u64, disk u64, state &char, warnings
 	return C.printf(format, sample, disk, state, warnings, offline, query_error, errors,
 		last_error, new_errors, read_bytes, write_bytes, read_delta, write_delta, baseline,
 		counters_reset)
+}
+
+fn monitor_mock_fputs(text &char, stream voidptr) i32 {
+	monitor_model.tails++
+	if monitor_model.mode == 19 {
+		unsafe {
+			C.errno = C.EIO
+		}
+		return -1
+	}
+	return C.fputs(text, stream)
 }

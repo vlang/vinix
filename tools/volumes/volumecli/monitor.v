@@ -15,8 +15,9 @@ struct MonitorDelta {
 }
 
 struct MonitorObservation {
-	code        i32
-	query_error i32
+	code         i32
+	query_error  i32
+	health_valid bool
 }
 
 fn monitor_status_valid(status &Status) bool {
@@ -91,6 +92,7 @@ fn monitor_sample(fd i32, previous &Status, baseline bool, mut status Status,
 	before := status
 	mut result := i32(0)
 	mut query_error := i32(0)
+	mut queried := false
 	if C.ioctl(fd, u64(0x56560005), unsafe { &health }) != 0 {
 		query_error = unsafe { C.errno }
 		result = if query_error == C.ENOTTY || query_error == C.EOPNOTSUPP { i32(4) } else { i32(1) }
@@ -101,6 +103,7 @@ fn monitor_sample(fd i32, previous &Status, baseline bool, mut status Status,
 		}
 	} else {
 		result = health_exit(unsafe { &health })
+		queried = true
 	}
 	if !monitor_status(fd, mut status) { return MonitorObservation{
 			code: -1
@@ -112,17 +115,20 @@ fn monitor_sample(fd i32, previous &Status, baseline bool, mut status Status,
 		}
 	}
 	return MonitorObservation{
-		code:        result
-		query_error: query_error
+		code:         result
+		query_error:  query_error
+		health_valid: queried
 	}
 }
 
 fn monitor_show(sample u64, status &Status, health &Health, query_error i32,
-	observation i32, delta MonitorDelta, baseline bool) bool {
+	observation i32, delta MonitorDelta, baseline bool, media_errors bool) bool {
 	state := if status.flags & 2 != 0 {
 		&char(c'offline')
 	} else if observation == 1 {
 		&char(c'query-failed')
+	} else if media_errors {
+		&char(c'media-errors')
 	} else if observation == 3 {
 		&char(c'warning')
 	} else if observation == 4 {
@@ -135,7 +141,7 @@ fn monitor_show(sample u64, status &Status, health &Health, query_error i32,
 	} else {
 		u32(0)
 	}
-	return C.printf(c'sample=%lu disk=%lu health=%s warnings=0x%02x offline=%lu query_errno=%d errors=%lu last_error=%lu new_errors=%lu read_bytes=%lu write_bytes=%lu read_delta=%lu write_delta=%lu baseline=%u counters_reset=%u\n',
+	return C.printf(c'sample=%lu disk=%lu health=%s warnings=0x%02x offline=%lu query_errno=%d errors=%lu last_error=%lu new_errors=%lu read_bytes=%lu write_bytes=%lu read_delta=%lu write_delta=%lu baseline=%u counters_reset=%u',
 		sample, status.disk_id, state, warnings, (status.flags >> 1) & 1, query_error,
 		status.errors, status.last_error, delta.errors, status.read_bytes, status.write_bytes,
 		delta.read_bytes, delta.write_bytes, u32(baseline), u32(delta.reset)) >= 0
@@ -155,6 +161,10 @@ fn monitor_device(path &char, interval u32, samples u64) i32 {
 	// V can promote a large mut argument to the heap. Reuse one caller-stack
 	// report for all synchronous queries; alloca must stay outside the loop.
 	mut health := unsafe { &Health(C.alloca(sizeof(Health))) }
+	mut health_counters := unsafe { &MonitorHealthCounters(C.alloca(sizeof(MonitorHealthCounters))) }
+	unsafe {
+		*health_counters = MonitorHealthCounters{}
+	}
 	for {
 		mut status := Status{}
 		unsafe {
@@ -163,13 +173,14 @@ fn monitor_device(path &char, interval u32, samples u64) i32 {
 		observation := monitor_sample(fd, unsafe { &previous }, baseline, mut status, mut health)
 		if observation.code < 0 { return 1 }
 		delta := monitor_delta(unsafe { &previous }, unsafe { &status }, baseline)
-		if !monitor_show(sample, unsafe { &status }, health, observation.query_error, observation.code, delta, baseline)
-			|| C.fflush(C.stdout) != 0 {
+		health_delta := monitor_health_delta(mut health_counters, health, observation.health_valid)
+		if !monitor_show(sample, unsafe { &status }, health, observation.query_error, observation.code, delta, baseline, health_delta.media_errors)
+			|| !monitor_health_show(health, unsafe { &health_delta }) || C.fflush(C.stdout) != 0 {
 			C.perror(c'vinix-volume: monitor output')
 			return 1
 		}
 		result = monitor_exit(result, observation.code)
-		if status.flags & 2 != 0 || delta.errors != 0 { result = 1 }
+		if status.flags & 2 != 0 || delta.errors != 0 || health_delta.media_errors { result = 1 }
 		if samples != 0 && sample == samples { return result }
 		previous = status
 		baseline = false

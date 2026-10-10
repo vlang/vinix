@@ -10,6 +10,9 @@ read-only descriptor. Omit the sample count to run until interrupted. Bounded
 sessions retain warnings or failures in their exit code even after recovery;
 unavailable health still permits status monitoring. See
 [monitoring semantics and exit codes](../../docs/storage-volumes.md#periodic-storage-monitoring).
+NVMe/ANS samples include standard thermal/wear fields and all ten hardware
+counters with full 128-bit deltas. New media errors fail the session even when
+the critical-warning byte remains zero.
 
 `vinix-volume health DEVICE` queries whole AHCI ATA disks without changing
 SMART settings. It prints sanitized identity, the drive's threshold status

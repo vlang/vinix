@@ -37,6 +37,9 @@ The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 600 seconds and terminates only
 its own process. The longer allowance includes 800 utility processes and disk
 discovery on x86 TCG; the strict retention checks are unchanged.
+Serial output is streamed to disk, with a fixed marker window for read boundaries;
+pipe buffers are freed after writing, and the completed transcript is read once.
+This bounds capture memory during verbose development-kernel NVMe qualification.
 It preserves logs and a copy of the saved plan in the work directory.
 
 On AMD64, `--nvme` adds two disposable NVMe disks, one with an injected critical
@@ -45,6 +48,9 @@ probing. The fixture checks actual controller-wide health, CLI exit 0/3, bad
 output pointers, descriptor/partition policy, unchanged I/O counters, 200 successful
 and 200 bad-pointer queries per disk inside the retention measurement, and health
 after reboot.
+Bounded monitor sessions on both controllers exercise standard thermal/wear
+fields and full-width counter deltas, retaining exit 0/3; their separate result
+marker is required on the first boot.
 See [health qualification](../storage-health/README.md).
 
 The fixture boots from an ext2 system disk. A separate raw disk holds managed
@@ -73,6 +79,7 @@ The fixture touches its readable ELF load pages before sampling. This keeps
 cold faults in the long-lived test program's diagnostic code from appearing as
 workload retention. Allocation tracking is started when available, and a
 failed retention check dumps the remaining sites for diagnosis.
+Large-allocation page totals are printed before the slab deltas on every run.
 
 The same first-boot fixture now qualifies the read-only health ABI: actual
 QEMU AHCI SMART identity, data/checksum and threshold status on AMD64;

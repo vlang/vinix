@@ -12,7 +12,7 @@ fn test_monitor_uses_one_readonly_descriptor_flushes_each_sample_and_does_not_sl
 	assert monitor_model.opens == 1 && monitor_model.closes == 1
 	assert monitor_model.status_calls == 400 && monitor_model.health_calls == 200
 	assert monitor_model.sleeps == 199 && monitor_model.flushes == 200
-		&& monitor_model.prints == 200
+		&& monitor_model.prints == 200 && monitor_model.tails == 200
 }
 
 fn test_monitor_warns_recovers_and_retains_the_session_exit_status() {
@@ -34,7 +34,7 @@ fn test_monitor_warns_recovers_and_retains_the_session_exit_status() {
 }
 
 fn test_monitor_stops_on_bad_status_identity_health_or_output_and_closes_the_descriptor() {
-	for mode in [7, 8, 9, 12, 14, 15, 17, 18]! {
+	for mode in [7, 8, 9, 12, 14, 15, 17, 18, 19]! {
 		monitor_model_reset(mode)
 		assert monitor_test_run(c'1', c'2') == 1
 		assert monitor_model.opens == 1 && monitor_model.closes == 1
@@ -50,6 +50,11 @@ fn test_monitor_stops_on_bad_status_identity_health_or_output_and_closes_the_des
 	monitor_model_reset(18)
 	assert monitor_test_run(c'1', c'1') == 1
 	assert monitor_model.prints == 1 && monitor_model.flushes == 0
+	assert monitor_model.sleeps == 0 && monitor_model.closes == 1
+	assert monitor_model.tails == 0
+	monitor_model_reset(19)
+	assert monitor_test_run(c'1', c'1') == 1
+	assert monitor_model.prints == 1 && monitor_model.tails == 1 && monitor_model.flushes == 0
 	assert monitor_model.sleeps == 0 && monitor_model.closes == 1
 }
 
@@ -80,4 +85,15 @@ fn test_monitor_accepts_optional_count_and_numeric_upper_bounds() {
 	monitor_model_reset(18)
 	assert monitor_test_run(c'1', c'18446744073709551615') == 1
 	assert monitor_model.opens == 1 && monitor_model.closes == 1
+}
+
+fn test_monitor_observes_full_width_hardware_errors_and_recovers_across_query_gaps() {
+	for mode, expected in [i32(1), 0, 0, 1, 4, 0, 1] {
+		monitor_model_reset(mode + 20)
+		assert monitor_test_run(c'1', c'3') == expected
+		assert monitor_model.health_calls == 3 && monitor_model.flushes == 3
+		assert monitor_model.opens == 1 && monitor_model.closes == 1
+	}
+	monitor_model_reset(20)
+	assert monitor_test_run(c'1', c'1') == 0 // Ignore historical media errors.
 }

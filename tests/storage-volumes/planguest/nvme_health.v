@@ -25,6 +25,7 @@ fn nvme_health_check() {
 		check(before.reads==after.reads && before.writes==after.writes && before.flushes==after.flushes
 			&& before.errors==after.errors,c'health leaves NVMe I/O counters unchanged')
 		simple(c'health',path,unsafe { &char(nil) },if index==0 { 0 } else { 3 })
+		tool(c'monitor',path,c'1',c'2',unsafe { &char(nil) },if index==0 { 0 } else { 3 })
 		write_only:=C.open(path,C.O_WRONLY)
 		check(write_only>=0 && C.ioctl(write_only,u64(0x56560005),voidptr(1))==-1
 			&& unsafe { C.errno==C.EBADF } && C.close(write_only)==0,c'NVMe health write-only rejection')
@@ -33,6 +34,7 @@ fn nvme_health_check() {
 	check(part>=0 && C.ioctl(part,u64(0x56560005),voidptr(1))==-1 && unsafe { C.errno==C.ENOTTY }
 		&& C.close(part)==0,c'NVMe health partition rejection')
 	C.printf(c'NVME HEALTH PASSED\n')
+	C.printf(c'NVME MONITOR PASSED: controller telemetry, healthy and critical warning sessions\n')
 }
 
 fn nvme_health_cycles() {

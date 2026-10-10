@@ -232,15 +232,42 @@ seconds, measured after each completed sample. An optional positive sample count
 ends the session; the final sample has no following sleep. Every sample prints
 one flushed line, so output is immediately available through pipes.
 
-Lines report the physical disk ID, healthy/warning/unavailable/query-failed or
-offline state, warning bits, query errno, cumulative backend errors and last
+Lines report the physical disk ID, healthy/warning/media-errors/unavailable,
+query-failed or offline state, warning bits, query errno, cumulative backend errors and last
 errno, new errors, completed read/write bytes and their deltas. ATA warnings
 mean the device's threshold status is exceeded; NVMe/ANS preserve all critical
 warning bits, including unknown bits. Partitions and volumes can be monitored
 through their status capability while health remains unavailable. Shared parent
 counters retain the backend's physical meaning described above.
 
-The first sample establishes the counter baseline, so historical errors do not
+### NVMe and ANS telemetry
+
+Successful NVMe/ANS samples append `telemetry=nvme scope=controller`, temperature
+in kelvin (zero is reported as unavailable), spare/threshold percentages and
+percentage used, which can exceed 100. All ten standard counters and their
+`_delta` fields retain the full unsigned 128-bit value as 32 hexadecimal digits.
+Data units stay in the device's reported units rather than being converted to
+bytes; these controller totals are separate from namespace/backend I/O counters.
+
+The first successful NVMe/ANS sample establishes `health_baseline=1` and zero
+hardware deltas. Historical media errors do not fail it. New media errors set
+`health=media-errors` and make the session return 1 even if no critical-warning
+bit is set. Growth of the error-log entry counter is reported but does not by
+itself imply a media failure. No extra warning thresholds or prediction are
+inferred from temperature, spare or wear fields.
+
+A decrease in any of the ten hardware counters sets `health_counters_reset=1`
+and starts a fresh hardware baseline with zero deltas. This baseline is independent
+of the driver I/O counters. Failed/unavailable queries print `telemetry=unavailable`
+without presenting stale measurements; the next successful NVMe/ANS query covers
+the gap since the last successful query. A successful ATA report clears the
+NVMe baseline. ATA vendor attributes remain available through `health` without
+guessing their units. Partitions and linear volumes also print unavailable
+telemetry. No hardware counter baseline is persisted across utility invocations.
+
+### Sampling and exit status
+
+The first sample establishes the backend counter baseline, so historical errors do not
 fail a fresh session. A decreasing counter sets `counters_reset=1` and starts a
 fresh baseline with zero deltas. Device ID, start offset, mapper slot and
 generation must remain stable across the session and each health query; an
@@ -251,7 +278,7 @@ skips the health command and keeps reporting status.
 
 Bounded sessions retain their most serious observation even after recovery:
 exit 1 for query/output/status failures, offline state or newly observed backend
-errors; otherwise exit 3 for any device health warning, 4 for unavailable health,
+or media errors; otherwise exit 3 for any device health warning, 4 for unavailable health,
 or 0 for healthy samples. Invalid arguments return 2 before opening the device.
 Invalid reports and identity changes stop immediately with exit 1. Monitoring
 uses the ordinary read/ioctl access gates and requires no management privilege.

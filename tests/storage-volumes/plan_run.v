@@ -5,6 +5,7 @@ module main
 import os
 import time
 import encoding.hex
+import bootcapture
 
 #include <signal.h>
 fn C.kill(i32, i32) i32
@@ -214,23 +215,34 @@ fn boot(args []string, log string) !string {
 		if process.is_alive() { unsafe { C.kill(i32(process.pid), 9) }; process.wait() }
 		process.close()
 	}
-	mut transcript := ''
+	mut markers := bootcapture.Capture{}
 	started := time.sys_mono_now()
 	for process.is_alive() && time.sys_mono_now() - started < u64(600 * time.second) {
-		chunk := process.stdout_read() + process.stderr_read()
-		if chunk != '' { capture.write_string(chunk)!; transcript += chunk }
-		if transcript.contains('PLAN DONE\n') || transcript.contains('PLAN DONE\r') { break }
-		if transcript.contains('PLAN FAIL') || transcript.contains('KERNEL PANIC') || transcript.contains('FATAL EXCEPTION') {
+		stdout := process.stdout_read()
+		if stdout != '' { capture.write_string(stdout)!; markers.observe(stdout) }
+		unsafe { stdout.free() }
+		stderr := process.stderr_read()
+		if stderr != '' { capture.write_string(stderr)!; markers.observe(stderr) }
+		unsafe { stderr.free() }
+		if markers.done { break }
+		if markers.failed {
 			// Let the kernel finish its diagnostic before terminating QEMU.
 			time.sleep(time.second)
 			break
 		}
 		time.sleep(10 * time.millisecond)
 	}
-	last := process.stdout_read() + process.stderr_read()
-	capture.write_string(last)!
-	transcript += last
-	if !transcript.contains('PLAN DONE') || transcript.contains('PLAN FAIL') || transcript.contains('KERNEL PANIC') {
+	stdout := process.stdout_read()
+	capture.write_string(stdout)!
+	markers.observe(stdout)
+	unsafe { stdout.free() }
+	stderr := process.stderr_read()
+	capture.write_string(stderr)!
+	markers.observe(stderr)
+	unsafe { stderr.free() }
+	capture.flush()
+	transcript := os.read_file(log)!
+	if !transcript.contains('PLAN DONE') || markers.failed {
 		return error('Guest qualification failed: see ${log}')
 	}
 	return transcript
@@ -255,6 +267,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
+	if nvme && !first.contains('NVME MONITOR PASSED:') { return error('Missing NVMe monitor qualification') }
 	mut encoded := ''
 	for line in first.split_into_lines() { if line.starts_with('PLAN FILE ') { encoded = line.all_after('PLAN FILE ').trim_space() } }
 	if encoded.len < 256 || encoded.len > 4224 { return error('Missing saved plan bytes in first boot') }

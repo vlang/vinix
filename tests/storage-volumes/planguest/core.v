@@ -416,6 +416,7 @@ fn first_boot(parent &char) {
 		$if nvme_health_test ? { nvme_health_cycles() }
 		cycles(parent, 200)
 		mut after := Heap{}; heap_snapshot(mut after)
+		C.printf(c'PLAN LARGE before=%ld after=%ld\n', before.large, after.large)
 		mut retained := before.count != after.count || after.large > before.large
 		for i := 0; i < before.count; i++ {
 			C.printf(c'PLAN RETAIN size=%ld delta=%ld\n', before.sizes[i], after.live[i] - before.live[i])
