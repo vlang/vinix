@@ -136,6 +136,16 @@ mut:
 	enabled       bool
 	// Commands the unit did not answer in time, or refused.
 	timeouts u64
+
+	// Transfers the unit refused; see vtd_fault_amd64.v.
+	faults          u64
+	fault_overflows u64
+	last_fault      VtdFault
+	// The limit on how many of them are logged.
+	log_started      bool
+	log_window_start u64
+	log_window_lines u32
+	log_suppressed   u64
 }
 
 __global (
@@ -404,9 +414,9 @@ fn vtd_unit_probe(drhd_index u32) &VtdUnit {
 	return unit
 }
 
-// Give the unit its tables and the state it starts in: the fault interrupt
-// masked, translation off. False when there is no memory or the translation
-// firmware left on could not be stopped.
+// Give the unit its tables and the state it starts in: no faults pending, the
+// fault interrupt masked, translation off. False when there is no memory or
+// the translation firmware left on could not be stopped.
 fn vtd_unit_prepare(mut unit VtdUnit) bool {
 	name := unit.name
 	unit.lock.acquire()
@@ -423,6 +433,8 @@ fn vtd_unit_prepare(mut unit VtdUnit) bool {
 	}
 	vtd_write32(unit, vtd_reg_fectl, vtd_fectl_masked)
 	unit.lock.release()
+	// Whatever faulted before now is firmware's business.
+	vtd_drain_faults(mut unit, false)
 
 	unit.root = u64(memory.pmm_alloc_fallible(1))
 	bitmap_pages := (u64(unit.domain_limit) / 8 + page_size - 1) / page_size
@@ -579,5 +591,8 @@ fn vtd_initialise() {
 	vtd_firmware = firmware
 	for i := u32(0); i < firmware.drhd_count; i++ {
 		vtd_unit_start(i)
+	}
+	if vtd_unit_count != 0 {
+		vtd_start_poller()
 	}
 }
