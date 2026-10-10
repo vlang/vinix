@@ -447,8 +447,12 @@ choices and their coupling, the lid hidden without one, the profile disabled
 when refused, the page reading without writing, its fit in every language,
 the settings crossing the process boundary and being saved, and the
 compositor's side of the timer and of Sleep against a clock and a machine the
-tests stand in for. None of it has run against a kernel: no test here writes
-to `/sys`, puts a machine to sleep or turns a panel off.
+tests stand in for. `power_memory_test.v` holds the heap at zero bytes kept
+across a thousand battery polls and power-file reads and writes, the Power
+and Battery pages through frames, clicks and every language, and the idle
+timer through display-off and sleep cycles. None of it has run against a
+kernel: no test here writes to `/sys`, puts a machine to sleep or turns a
+panel off.
 
 Desktop scaling is independent of the DCP backlight transport and never changes
 the status of physical brightness adjustment.

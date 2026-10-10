@@ -81,8 +81,11 @@ makes the sample invalid rather than an empty battery. A driver with neither
 file has only its `capacity` to go by.
 
 The listing keeps at most eight names of up to 31 bytes in fixed storage, paths
-are built in a fixed buffer, and nothing in a poll allocates. A poll is about
-ten small reads every five seconds.
+are built in a fixed buffer, and a poll keeps nothing on the heap: the names
+and the path are static rather than locals, which V would move to the heap on
+each call, and the files are read through one `DeviceIO` made once rather than
+one boxed per call. `power_memory_test.v` measures this. A poll is about ten
+small reads every five seconds.
 
 The session history retains the most recent 64 percentage changes in a fixed
 allocation-free ring. The graph places those samples on a real 24-hour time
