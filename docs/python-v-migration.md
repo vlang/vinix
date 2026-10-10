@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `d99bfe8398d6c3eee25c9cfd86351a4c89ce0463`,
-Linguist 7.27.0 reports **Python 6.63%** (493 files, 2,269,383 bytes) and
-**V 73.54%** (2,222 files, 25,169,614 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `12d47222462ad41d7b8c5cbd325dddd8400a5948`,
+Linguist 7.27.0 reports **Python 6.43%** (491 files, 2,264,028 bytes) and
+**V 74.27%** (2,357 files, 26,138,152 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,936,902 Python bytes**. All remaining
-2,269,383 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **2,942,257 Python bytes**. All remaining
+2,264,028 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The seventeen stages below remove **39 Python files / 91,965 original bytes** and
+The eighteen stages below remove **41 Python files / 97,320 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -48,6 +48,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Resource-accounting, pagecache and procfs generated-C guards | `tests/generated-source-guards/guardcore`, three V entrypoints | 6,326 / 139 | `2886191c` |
 | Kernel archiver selection and archive test | `tests/compiler-selection/test-kernel-ar.v`, `archivercheck` | 3,039 / 68 | `fb58af4e` |
 | Procfs, IPv6, socket, POSIX timer and process-churn generated-C guards | `tests/generated-source-guards/guardcore`, five V entrypoints | 10,860 / 220 | `03b19974` |
+| Process-churn report checker and callback bridge | `tests/process-churn/churncheck`, `check-results.v` | 5,355 / 170 | `12d47222` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -201,15 +202,35 @@ cached October 1 x86 C is older: it lacks an IPv6 definition and the required
 scratch patterns, and all five checks correctly reject it. No new kernel builds,
 guest boots or retention measurements are established by these host checks.
 Logs are `/tmp/vinix-scratch-guards-*-final.log` and
-`/tmp/vinix-scratch-production-final.log`. Between `42eac0bc` and this snapshot,
+`/tmp/vinix-scratch-production-final.log`. Between `42eac0bc` and `d99bfe83`,
 counted Python declined by exactly 10,860 bytes, matching the new stage.
+
+The next stage replaces the process-churn report checker and its Python bridge
+with a native V command. All seven modes retain cohort coverage, six-second
+grace, allocation tracking, timed-work evidence, filesystem identity and optional
+flatness thresholds. Native field parsing covers Unicode words, whitespace and
+decimal digits, replacement UTF-8 decoding, integer aliases and arbitrary-size
+values. Reports preserve measurement order and emit no partial stdout on failure.
+
+ARM, Rosetta x86 and ARM ASan/UBSan builds and native tests pass. Seven cold
+launcher checks compare complete output, and a controlled tracking failure
+checks status, error streams and temporary compiler cleanup. The generated-C
+source guard still passes. Caller auditing permits removal of the old callback
+query, bindings and three bridge aliases; the separate Python QEMU runner is
+unchanged and still needs translation. No Python was run. These are guest-format
+fixtures, not new guest boots or kernel retention measurements. Logs are
+`/tmp/vinix-churn-report-*-final.log` and `/tmp/vinix-churn-cold-final.log`.
+
+Between `d99bfe83` and `12d47222`, counted Python declined by exactly 5,355
+bytes, matching this stage. Concurrent V source changes affect the language
+shares independently.
 
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these seventeen stages.
+or hidden in these eighteen stages.
 
 ## Earlier completed stages
 

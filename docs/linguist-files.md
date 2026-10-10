@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `d99bfe8398d6c3eee25c9cfd86351a4c89ce0463`,
+at source commit `12d47222462ad41d7b8c5cbd325dddd8400a5948`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,478 | 6.85% |
-| Python | 493 | 2,269,383 | 6.63% |
-| Shell | 355 | 1,340,145 | 3.92% |
+| C | 563 | 2,343,478 | 6.66% |
+| Python | 491 | 2,264,028 | 6.43% |
+| Shell | 361 | 1,343,784 | 3.82% |
 
-All `.v` files are classified as V. The resulting V share is 73.54%, with no
+All `.v` files are classified as V. The resulting V share is 74.27%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,269,383 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,264,028 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev d99bfe8398d6c3eee25c9cfd86351a4c89ce0463 --breakdown --json
+github-linguist --rev 12d47222462ad41d7b8c5cbd325dddd8400a5948 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -1006,8 +1006,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/posix-timer/run.py` | 4,098 |
 | `tests/proc-map-lookup/run.py` | 5,764 |
 | `tests/proc-thread-lock/run.py` | 5,066 |
-| `tests/process-churn/_native.py` | 957 |
-| `tests/process-churn/check-results.py` | 4,398 |
 | `tests/process-churn/run.py` | 5,871 |
 | `tests/process-smp/run.py` | 5,100 |
 | `tests/procfs-allocs/run.py` | 4,043 |
@@ -1329,6 +1327,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
 | `tests/compiler-selection/test-kernel-ar` | 145 |
+| `tests/cpu-power/run.sh` | 638 |
 | `tests/desktop-perf/perf-init.sh` | 8,147 |
 | `tests/desktop-perf/run-host-tests.sh` | 286 |
 | `tests/desktop/first-run-apps-init.sh` | 4,538 |
@@ -1349,6 +1348,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ext2-sparse/run-host.sh` | 2,056 |
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/go/smoke.sh` | 558 |
+| `tests/hardware-platform/run` | 178 |
 | `tests/hypervisor/run.sh` | 124 |
 | `tests/hyprland/smoke.sh` | 413 |
 | `tests/ios/build-2048-model.sh` | 1,128 |
@@ -1415,8 +1415,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pci-config/run.sh` | 5,477 |
 | `tests/pci-config/topology` | 169 |
 | `tests/posix-timer/check-generated` | 146 |
+| `tests/power-supply/run` | 748 |
 | `tests/private-pages/run-host.sh` | 16,215 |
 | `tests/process-churn/check-generated` | 146 |
+| `tests/process-churn/check-results` | 144 |
 | `tests/procfs-allocs/check-generated` | 146 |
 | `tests/procfs-mount/check-generated` | 146 |
 | `tests/ps1/frame` | 180 |
@@ -1443,6 +1445,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/steam/steam-smoke` | 4,054 |
 | `tests/storage/run.sh` | 180 |
 | `tests/storage/test-qemu-storage.sh` | 3,030 |
+| `tests/thermal/run.sh` | 502 |
 | `tests/uname/guest-init.sh` | 1,886 |
 | `tests/user-access/sites` | 180 |
 | `tests/virtio-gpu-virgl/desktop-guest-init.sh` | 1,941 |
@@ -1477,4 +1480,5 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/recover_t8103_adt` | 163 |
 | `tools/agx-re/trace_diff` | 156 |
 | `tools/apple-backlight/test.sh` | 415 |
+| `tools/hwcheck/build` | 1,429 |
 | `tools/m1-wifi/get-v.sh` | 2,538 |
