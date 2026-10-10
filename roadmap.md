@@ -184,8 +184,12 @@ consistent filesystem; backup restoration preserves content and metadata.
   - [x] [Device core, bounded waits and failure recovery, DMA domains, Intel VT-d
     and AMD-Vi (opt-in), firmware loader](docs/hardware-platform.md), tested in
     [QEMU guests](tests/hardware-platform/README.md) on both architectures.
-  - [ ] PCI hotplug and rescan; a USB core; Apple's drivers in the device list and
-    behind the DMA layer; an IOMMU on by default once a PC has been tried.
+  - [x] [PCI hotplug and rescan](docs/hardware-platform.md#pci-hotplug-and-rescan):
+    PCI Express ports the kernel watches, devices firmware announces through
+    ACPI, and addresses for what arrives. Only the e1000 can be taken out again.
+  - [ ] A USB core; Apple's drivers in the device list and behind the DMA layer;
+    an IOMMU on by default once a PC has been tried; hotplug of bridges, and
+    drivers other than the e1000 that let go of a device.
 - [ ] Support the common storage, Ethernet, wireless, graphics and audio device
   families needed by the reference PC/laptop set; identify vendor dependencies.
   - [x] [What each machine class needs, the driver that is or is not there, and
@@ -199,22 +203,27 @@ consistent filesystem; backup restoration preserves content and metadata.
     and charger with a smoothed time-left estimate and low/critical
     policy](docs/hardware-platform.md#power-supplies). Hardware registers are
     covered by host tests only.
-  - [ ] Fan control, ACPI thermal zones, an embedded controller driver, Apple's
-    SMC battery and sensors in the same interfaces, a charge limit.
+  - [x] [ACPI thermal zones and the fans their active trips
+    drive](docs/hardware-platform.md#thermal), tested against a scripted zone in
+    QEMU.
+  - [ ] An embedded controller driver, Apple's SMC battery and sensors in the
+    same interfaces, a charge limit.
 - [ ] Add reliable suspend/resume, lid behavior, wake sources, screen sleep,
   hibernation and shutdown/reboot that flushes storage and quiesces devices.
   - [x] [Suspend to idle with wake sources, an alarm and a rehearsal mode; lid
     and power button; power off and restart that flush storage and stop every
     device](docs/hardware-platform.md#sleep).
-  - [ ] Suspend to RAM, hibernation, screen sleep and the desktop's side of all
-    of it.
+  - [x] [The screen dark for a sleep](docs/hardware-platform.md#sleep) where it is
+    the boot framebuffer.
+  - [ ] Suspend to RAM, hibernation, backlight and display power control, and
+    the desktop's side of all of it.
 - [ ] Restore all device and security state after sleep, firmware errors and
   hotplug; keep recovery possible when a driver fails.
   - [x] [CPU protection registers compared across every sleep; e1000 and AHCI
     resumed and reset in place; a failing device reset, probed again or set
     aside without taking the machine down](docs/hardware-platform.md#waiting-and-recovery).
   - [ ] Suspend and resume in the remaining drivers; state after a sleep that
-    powers devices down; hotplug.
+    powers devices down.
 
 Acceptance: each advertised machine completes a physical hardware checklist;
 passing synthetic fixtures alone does not qualify a driver.

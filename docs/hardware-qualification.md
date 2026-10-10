@@ -46,7 +46,7 @@ State and evidence for the capabilities of [hardware-platform](hardware-platform
 | --- | --- | --- | --- | --- |
 | Device list, driver binding, `/sys` | implemented (VM) | implemented (VM) | implemented, untried | partial: PCI and nothing else; Apple's drivers are not listed |
 | Unbind, remove, reset, failure recovery | implemented (VM: e1000, ahci) | implemented (VM: e1000) | untried | open |
-| PCI hotplug, rescan | open | open | open | open |
+| PCI hotplug, rescan | implemented (VM: a PCIe port the kernel polls, and a card announced by firmware through ACPI; e1000 only) | implemented (VM: a PCIe port the kernel polls; e1000 only) | untried | open: ports are not watched on Apple hardware |
 | DMA domains | implemented (VM) | implemented (VM), no IOMMU | untried | open: Apple drivers program their DARTs themselves |
 | IOMMU isolation | implemented (VM: VT-d and AMD-Vi, opt-in) | open (no SMMU driver) | untried; opt-in `vinix.iommu=1` | partial: DART per driver, not through `dma` |
 | Firmware loader | implemented (VM) | implemented (VM) | untried | open: Wi-Fi firmware still comes from userspace |
@@ -55,13 +55,13 @@ State and evidence for the capabilities of [hardware-platform](hardware-platform
 | Lid | implemented (VM: scripted ACPI lid) | open | untried; needs an EC driver on most laptops | open |
 | Suspend to idle, wake sources, alarm | implemented (VM) | implemented (VM) | untried | open: untried, and the idle loop polls |
 | Suspend to RAM, hibernation | open | open | open | open |
-| Screen sleep, backlight | open | open | open | partial: brightness through DCP, opt-in ([M1 AGX](m1-agx-bringup.md)) |
+| Screen sleep, backlight | partial (VM: the boot framebuffer is dark during a sleep; no backlight or display power control) | partial (VM: the same) | untried | partial: brightness through DCP, opt-in ([M1 AGX](m1-agx-bringup.md)); the panel is not darkened for a sleep |
 | Battery, charger, time left | implemented (VM: scripted ACPI battery) | open | untried; needs an EC driver on most laptops | partial: percentage, voltage, current, power in `/dev` ([M1 battery](m1-battery.md)); not in `/sys`, no status or time |
 | Charge limit | open | open | open | open |
 | CPU idle states | implemented (VM: HLT) | implemented (VM: WFI) | host: MWAIT tables; untried | open by default (polls); `vinix.apple_idle=wfi` untried |
 | CPU frequency | implemented (VM: simulated driver) | implemented (VM: simulated driver) | host: HWP, SpeedStep, CPPC encodings; untried | host: cluster DVFS sequence; off by default, untried |
-| Temperature, thermal limit | implemented (VM: made-up zone) | implemented (VM: made-up zone) | host: coretemp, k10temp, RAPL decoding; untried | open: no SMC sensors |
-| Fans | open | open | open | open |
+| Temperature, thermal limit | implemented (VM: made-up zone, and a scripted ACPI thermal zone) | implemented (VM: made-up zone) | host: coretemp, k10temp, RAPL decoding; ACPI thermal zones untried | open: no SMC sensors |
+| Fans | implemented (VM: scripted ACPI fans of each kind, driven by a zone's active trips) | open | untried; a laptop's fans are usually its embedded controller's and not in ACPI | open |
 
 ## Device families, by machine
 
