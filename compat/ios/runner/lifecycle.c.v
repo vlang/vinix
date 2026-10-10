@@ -227,6 +227,7 @@ fn image_cxa_finalize(dso u64) {
 fn image_runtime_stop() {
 	// A link/protection failure must never execute a module's terminators.
 	if image_runtime.started { image_cxa_finalize(0) }
+	image_atfork_stop()
 	for storage in image_runtime.tls_modules {
 		if storage.active {
 			C.free(C.pthread_getspecific(storage.key))

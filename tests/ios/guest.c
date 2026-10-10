@@ -96,6 +96,21 @@ static void test_memory_budget(void) {
     puts("iOS PASS: native hierarchical app memory budgets and live accounting");
 }
 
+static void test_atfork(void) {
+    run("/opt/ios/atfork","--adapter",NULL,NULL,0,
+        "IOS-ATFORK: real forks, ordered callbacks, eight-thread registration/forking, image TLS, guarded wait status, signals and errno\n");
+    const char *root="/ios-fork-cgroup",*group="/ios-fork-cgroup/fork-limit";
+    if(mkdir(root,0700) || mount("none",root,"cgroup2",0,NULL) || mkdir(group,0700))
+        fail("fork quota fixture setup");
+    char pid[32];snprintf(pid,sizeof(pid),"%d",getpid());
+    memory_group_write("/ios-fork-cgroup/fork-limit/cgroup.procs",pid);
+    run("/opt/ios/atfork","--fork-failure",group,NULL,0,
+        "IOS-ATFORK: native fork failure, Darwin EAGAIN, parent callbacks and unlocked registry\n");
+    memory_group_write("/ios-fork-cgroup/cgroup.procs",pid);
+    if(rmdir(group) || umount(root) || rmdir(root)) fail("fork quota fixture cleanup");
+    puts("iOS PASS: image-owned fork callbacks, real cloning and Darwin wait status");
+}
+
 extern void test_uikit(void);
 extern void test_2048(void);
 extern void test_gles_ui(void);
@@ -192,6 +207,7 @@ int main(void) {
         "IOS-PROCESS: delivering Darwin SIGBUS\n");
     puts("iOS PASS: Darwin process credentials, signal delivery and allocation sizes");
     test_memory_budget();
+    test_atfork();
     run("/opt/ios/ioctl", NULL, NULL, NULL, 0,
         "IOS-IOCTL: descriptor flags, shared nonblocking I/O, queued bytes, native interfaces and eight threads\n");
     puts("iOS PASS: Darwin ioctl controls, socket bytes and interface queries");

@@ -185,6 +185,7 @@ fn darwin_thread_name(name &char) int { return pthread_error(C.ios_thread_name(n
 
 fn pthread_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_pthread_atfork' { u64(unsafe { voidptr(darwin_pthread_atfork) }) }
 		'_pthread_mutex_init' { u64(unsafe { voidptr(darwin_mutex_init) }) }
 		'_pthread_mutex_lock' { u64(unsafe { voidptr(darwin_mutex_lock) }) }
 		'_pthread_mutex_trylock' { u64(unsafe { voidptr(darwin_mutex_trylock) }) }

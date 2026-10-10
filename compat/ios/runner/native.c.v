@@ -47,6 +47,7 @@ fn execute(image macho.Image, arguments []string) !int {
 		system_data_stop()
 	}
 	system_data_start()!
+	image_atfork_start()!
 	ios_runtime.bundle = os.dir(path)
 	image_runtime.path = path.clone()
 	module_dependencies(0, 0)!

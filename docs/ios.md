@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_atfork
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_attr_destroy
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -750,26 +750,54 @@ space, verifies headroom loss after touching 8 MiB, recovery after unmapping,
 live child/parent limit changes and unlimited budgets. ASAN covers bounded
 hierarchy parsing and two Mach-O image loads/unloads with eight concurrent
 callers. The full ARM64 C++/GLES/PPSSPP regression passes. This resolves two more
-strong imports across Fortnite and EOSSDK; the actual game still stops before
-entry at `pthread_atfork`.
+strong imports across Fortnite and EOSSDK.
 
 The installed `libsystem_pthread.dylib` reference accepts null fork handlers
 and preserves errno across eight-thread registration. A real fork verifies
 reverse registration order for prepare callbacks and forward order for parent
-and child callbacks. Vinix's missing adapter must keep those callbacks tied to
-loaded Mach-O images, including their unload lifetime.
+and child callbacks. A separate native probe that attempted registration from
+a prepare callback terminated before that registration returned.
+
+The V `pthread_atfork` adapter keeps an image-owned callback list. A single
+permanent native dispatcher invokes prepare callbacks in reverse order and
+parent/child callbacks in forward order around real libc forks, including the
+parent phase when a fork fails. A mutex pins the list throughout all phases
+and serializes concurrent forks. Null handlers are accepted without allocating;
+registration preserves errno and returns Darwin error numbers. Registration
+from any active callback explicitly returns `EDEADLK` (11).
+
+After image destructors run, teardown waits for active callbacks, removes every
+handler and frees its storage before the Mach-O mappings unmap. Native libc
+retains only dispatcher pointers into the runner, so a later native fork cannot
+call an unloaded app. App callbacks share one native dispatcher group; their
+relative registration order with callbacks added by native backend libraries
+is not preserved. Broader Objective-C/UI execution in a multithreaded fork child
+remains unverified.
+
+V `fork` and `waitpid` adapters use actual native cloning and child events,
+preserve successful-call errno and translate native failures. Wait flags and
+exit, signal, stopped and continued status are translated to Darwin's ABI;
+status output remains untouched for `WNOHANG` with no ready child. Shared Mac/iOS
+fixtures check ordering, image TLS, eight-thread registration and forking,
+guarded 32-bit wait status, signals, stop/continue events, null status and errors.
+The guest also forces a real `EAGAIN` using its enforced PID quota and checks
+parent callbacks and subsequent registration. ASAN/UBSAN checks two Mach-O
+loads/unloads, a real fork after unmapping and teardown blocked on an active
+prepare callback. The full ARM64 C++/GLES/PPSSPP regression passes. This resolves
+two more strong imports across Fortnite and EOSSDK; the actual game still exits
+before entry at `pthread_attr_destroy`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,292 | 866 | 81 |
-| EOSSDK | 504 | 158 | 18 |
+| Fortnite executable | 1,293 | 865 | 81 |
+| EOSSDK | 505 | 157 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,849 | 1,147 | 122 |
+| All images | 1,851 | 1,145 | 122 |
 
-The C++/GLES/Text variant reports 1,862 resolved imports, 1,134 unresolved strong
+The C++/GLES/Text variant reports 1,864 resolved imports, 1,132 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

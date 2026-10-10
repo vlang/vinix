@@ -15,6 +15,27 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <poll.h>
+#include <unistd.h>
+#include <sys/wait.h>
+/* Only permanent runner dispatchers are registered with native libc. Handler
+ * ownership, ordering and removal before image unmapping are implemented in V.
+ * A normal mutex can be unlocked by the fork child, as for POSIX atfork locks. */
+static pthread_mutex_t ios_atfork_mutex = PTHREAD_MUTEX_INITIALIZER;
+static _Thread_local int ios_atfork_dispatching;
+static void ios_atfork_lock(void) { if (pthread_mutex_lock(&ios_atfork_mutex)) abort(); }
+static void ios_atfork_unlock(void) { if (pthread_mutex_unlock(&ios_atfork_mutex)) abort(); }
+static int ios_atfork_phase(void) { return ios_atfork_dispatching; }
+static void ios_atfork_set_phase(int phase) { ios_atfork_dispatching = phase; }
+static int ios_atfork_install(void *prepare, void *parent, void *child) {
+    return pthread_atfork((void (*)(void))prepare, (void (*)(void))parent, (void (*)(void))child);
+}
+static int ios_fork(void) { return fork(); }
+static int ios_waitpid(int pid, int *status, int flags) { return waitpid(pid, status, flags); }
+static void ios_wait_status(int status, int32_t *fields) {
+    fields[0] = WIFEXITED(status) ? 1 : WIFSIGNALED(status) ? 2 : WIFSTOPPED(status) ? 3 : WIFCONTINUED(status) ? 4 : 0;
+    fields[1] = fields[0] == 1 ? WEXITSTATUS(status) : fields[0] == 2 ? WTERMSIG(status) : fields[0] == 3 ? WSTOPSIG(status) : 0;
+    fields[2] = fields[0] == 2 && WCOREDUMP(status);
+}
 #ifdef __APPLE__
 /* The installed kernel library exports this iOS API on macOS, although its
  * SDK declaration is unavailable there. Keep the actual native symbol/ABI. */
