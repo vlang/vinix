@@ -45,8 +45,8 @@ ASan/UBSan check `ENOMEM`, `EFAULT`, validation rollback, last-owner release and
 four concurrent inherit/release workers racing repeated parent reset/install:
 
 ```sh
-python3 tests/syscall-policy/run-host.py kernel/obj/blob.c
-python3 tests/syscall-policy/run-host.py build-amd64-kernel/obj/blob.c
+tests/syscall-policy/run-host kernel/obj/blob.c
+tests/syscall-policy/run-host build-amd64-kernel/obj/blob.c
 ```
 
 Both generated architecture variants pass. The script also checks those

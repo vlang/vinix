@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-only
 module policyhost
 import json2
+import math.big
+
+fn symbol_decimal(value string) !string {
+	if value == '' { return error('empty ELF symbol address') }
+	return big.integer_from_radix(value, 16)!.str()
+}
 
 const assembly_registers = ['rax', 'rbx', 'rcx', 'rdx', 'rsi', 'rdi', 'rbp', 'r8', 'r9', 'r10', 'r11', 'r12', 'r13', 'r14', 'r15']
 const assembly_globals = ['vinix_x86_mitigation_policies', 'host_cpu_number', 'host_spec_value', 'host_spec_writes', 'host_ibpb', 'host_clears', 'host_registers', 'host_resume_sp']
@@ -69,7 +75,7 @@ fn assembly_execute(directory string, assembly string) ! {
 	mut symbols := map[string]string{}
 	for line in split_lines(listing) {
 		fields := whitespace_fields(line)
-		if fields.len == 3 { symbols[fields[2]] = callback('integer', {'text': json2.Any(fields[0].bytes().hex()), 'base': json2.Any(16)})!.str() }
+		if fields.len == 3 { symbols[fields[2]] = symbol_decimal(fields[0])! }
 	}
 	data := read_bytes(directory + '/test.bin')!
 	write_text(directory + '/test.c', assembly_fixture(data, symbols)!)!

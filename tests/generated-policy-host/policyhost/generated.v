@@ -24,7 +24,7 @@ pub fn execute_content(source string) !(string, int) {
 		adapted, count := pan_adapter(bodies[3]); bodies[3] = adapted
 		if count != 1 || bodies[3].contains('__asm__') { return failure('RuntimeError', 'unexpected PAN instruction adapter; inspect generated C') }
 	}
-	prefixes := ['memory__pte_', 'mmap__prot_', ...if arm { ['memory__arm64_pte_', 'cpu__pstate_pan'] } else { []string{} }]
+	prefixes := ['memory__pte_', 'mmap__prot_', ...if arm { ['memory__arm64_pte_', 'memory__arm64_file_', 'cpu__pstate_pan'] } else { []string{} }]
 	mut defines := []string{}
 	for line in split_lines(source) {
 		if line.starts_with('#define ') {

@@ -12,7 +12,7 @@ ineffective MSR write. It checks setup allocation failure and retry, permits
 one successful boot allocation, and rejects unexpected allocator imports.
 It frees its own host policy array.
 
-`check-assembly.py` assembles and links the production x86 macros and thunks as
+`check-assembly` assembles and links the production x86 macros and thunks as
 ELF, then executes their instruction bytes under Rosetta. Only privileged ports
 and the final scheduler's DS/ES loads, SWAPGS, and IRETQ have host adapters. The
 instruction stream is not rewritten into Mach-O macro syntax. The host C checks
@@ -22,15 +22,15 @@ RSB stack balance, and the actual scheduler epilogue's saved register restoratio
 user/kernel CS checks, adjusted error marker, and unchanged memory below the
 saved frame. This helper requires macOS/Rosetta and Homebrew LLVM tools.
 
-`check-linked.py` scans the final x86 production ELF for raw indirect CALL/JMP,
+`check-linked` scans the final x86 production ELF for raw indirect CALL/JMP,
 verifies the compiler actually uses external thunks, and checks the final
 scheduler stub is present. It also covers linked C dependencies and handwritten
 assembly, which compiler flags alone would not rewrite.
 
 ```sh
 tests/cpu-mitigations/check-policy
-python3 tests/cpu-mitigations/check-assembly.py
-python3 tests/cpu-mitigations/check-linked.py build-amd64-kernel/bin/vinix
+tests/cpu-mitigations/check-assembly
+tests/cpu-mitigations/check-linked build-amd64-kernel/bin/vinix
 VINIX_VM_RUNNER_ROOT=/Users/alex/code/vinix \
 VINIX_AMD64_KERNEL="$PWD/build-amd64-kernel/bin/vinix" \
 python3 tests/cpu-mitigations/run.py --cpu max

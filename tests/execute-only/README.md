@@ -115,8 +115,8 @@ data-read protection assertion; it allowed that read. Logs are saved locally as
 The generated-production-code harness runs with ASan/UBSan:
 
 ```sh
-python3 tests/execute-only/check-generated.py kernel/obj/blob.c
-python3 tests/execute-only/check-generated.py build-amd64-kernel/obj/blob.c
+tests/execute-only/check-generated kernel/obj/blob.c
+tests/execute-only/check-generated build-amd64-kernel/obj/blob.c
 ```
 
 Both blobs passed all protection/gate/COW/attribute combinations. ARM also

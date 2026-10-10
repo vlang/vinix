@@ -14,3 +14,12 @@ fn test_symbol_addresses_keep_all_decimal_digits() {
 	assert content.contains('blob+18446744073709551616000000000000000001')
 	assert content.contains('uint64_t storage[64] = {0}, *frame = storage + 32;')
 }
+fn test_native_symbol_conversion_does_not_narrow_elf_addresses() {
+	assert symbol_decimal('ffffffffffffffff')! == '18446744073709551615'
+	assert symbol_decimal('100000000000000000000000000000000')! == '340282366920938463463374607431768211456'
+	assert symbol_decimal('0000')! == '0'
+	for invalid in ['', 'xyz', '12g'] {
+		symbol_decimal(invalid) or { continue }
+		assert false, 'accepted invalid ELF address'
+	}
+}
