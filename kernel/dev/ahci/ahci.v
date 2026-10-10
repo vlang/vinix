@@ -11,6 +11,7 @@ import klock
 import event.eventstruct
 import resource
 import errno
+import block.fence
 import block.partition
 import fs
 import katomic
@@ -236,6 +237,7 @@ fn (mut dev AHCIDevice) read_tracked_inner(_handle voidptr, buffer voidptr, loc 
 }
 
 fn (mut dev AHCIDevice) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	if !fence.before_write() { errno.set(errno.eio); dev.metrics.failed(); return none }
 	result := dev.write_tracked_inner(_handle, buffer, loc, count) or { dev.metrics.failed(); return none }
 	if result > 0 { dev.metrics.completed(u64(result), true) }
 	return result
@@ -285,6 +287,7 @@ fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
 fn (mut dev AHCIDevice) discard(offset u64, bytes u64) ? {
 	mut completed := false
 	defer { if !completed { dev.metrics.failed() } }
+	if !fence.before_write() { errno.set(errno.eio); return none }
 	if !resource.discard_range_valid(u64(dev.stat.size), u64(dev.stat.blksize), offset, bytes) {
 		errno.set(errno.einval); return none
 	}

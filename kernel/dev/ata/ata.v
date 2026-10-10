@@ -14,6 +14,7 @@ import errno
 import event.eventstruct
 import katomic
 import proc
+import block.fence
 
 const pci_class = 0x1
 
@@ -288,6 +289,12 @@ fn (mut dev ATADrive) read(_handle voidptr, buffer voidptr, loc u64, count u64) 
 fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	// Check alignment to the sector boundary.
 	if loc % ata_bytes_per_sector != 0 || count % ata_bytes_per_sector != 0 {
+		errno.set(errno.eio)
+		return none
+	}
+
+	// Held while an image of memory is being written for hibernation.
+	if !fence.before_write() {
 		errno.set(errno.eio)
 		return none
 	}

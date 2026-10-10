@@ -236,6 +236,18 @@ pub fn sleep_processor(enter fn ()) bool {
 	return slept
 }
 
+// Where the record of the saved processor is, and the code that puts a
+// processor back from it: for the kernel that loads an image of this one
+// from a disk, and enters it there as the trampoline does after a suspend to
+// RAM.
+pub fn context_address() u64 {
+	return u64(voidptr(&x86wake_context))
+}
+
+pub fn resume_entry() u64 {
+	return u64(voidptr(C.x86_wake_resume))
+}
+
 // Not inlined, and nothing of its own kept on the stack across the call: the
 // second return of x86_wake_save() finds the stack as the first one left it,
 // less whatever `enter` did below it.
