@@ -22,7 +22,7 @@ fn policy_putchar(character i32, _ voidptr) {
 
 fn policy_panic_putchar(character i32, _ voidptr) {
 	policy_serial(u8(character), true)
-	unsafe { policy_terminal(&char(&character), 1) }
+	unsafe { policy_panic_terminal(&char(&character), 1) }
 }
 
 fn policy_benchmark_putchar(character i32, _ voidptr) {

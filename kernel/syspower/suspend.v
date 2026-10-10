@@ -12,12 +12,13 @@
 //     driver that refuses stops the sleep, and the ones already down come
 //     back;
 //  4. the state the machine must have when it comes back is recorded (see
-//     security_amd64.v and security_arm64.v), and wake sources start being
-//     listened to -- only now, so that the release of the key that asked for
-//     the sleep does not end it;
+//     security_amd64.v and security_arm64.v), the screen goes dark
+//     (screen.v), and wake sources start being listened to -- only now, so
+//     that the release of the key that asked for the sleep does not end it;
 //  5. the platform sleeps until a wake source reports;
-//  6. the recorded state is compared with what the CPU has now, the devices
-//     are resumed, first added first, and userspace thaws.
+//  6. the screen comes back, the recorded state is compared with what the
+//     CPU has now, the devices are resumed, first added first, and userspace
+//     thaws.
 //
 // Two depths are offered, by the names Linux gives them in /sys/power/state:
 //
@@ -163,6 +164,7 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		return false
 	}
 	before := platform_security_state()
+	screen_down()
 	// Only now: what is seen while the machine is still going down -- the
 	// release of the key that asked for the sleep, the click that chose it
 	// from a menu -- is not a reason to come straight back.
@@ -180,6 +182,7 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	}
 
 	woke := devcore.now_ns()
+	screen_up()
 	syspower_stats.security_checks++
 	if security_changed(before) {
 		// Not survivable silently: the machine came back without a

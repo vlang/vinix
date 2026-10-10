@@ -424,8 +424,10 @@ pub fn print(s voidptr, len u64) {
 	terminal_print_lock.acquire()
 	// In graphics mode the bytes are dropped rather than queued: the UART
 	// still carries them (see kprint.kwrite), and replaying a backlog over a
-	// desktop that just exited would be worse than losing it.
-	if !terminal_graphics_mode {
+	// desktop that just exited would be worse than losing it. The same goes
+	// for a screen made dark for a sleep (sleep.v): text drawn on it would
+	// light it, and be painted over when the picture comes back.
+	if !terminal_graphics_mode && !screen_dark {
 		C.flanterm_write(flanterm_ctx, s, len)
 	}
 	terminal_print_lock.release()

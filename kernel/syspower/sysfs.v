@@ -9,7 +9,8 @@
 //	/sys/power/pm_test_delay_ms   how long a rehearsal stays down (Vinix's)
 //	/sys/power/suspend_stats/     success fail last_failed_dev last_failed_step,
 //	                              and Vinix's last_wake, last_*_ms and
-//	                              security_checks, security_changes
+//	                              security_checks, security_changes, screen_dark
+//	                              and screen_lit (screen.v)
 //	/sys/power/profile_policy     [auto] manual: whether the CPU performance
 //	                              profile follows the power source
 //	/sys/power/lid/               state (open, closed, unknown), closes, and
@@ -69,6 +70,7 @@ pub fn publish() {
 		unsafe { nil }, unsafe { nil })
 	fs.sysfs_attribute('power/suspend_stats/security_changes', 0o444, show_security_changes,
 		unsafe { nil }, unsafe { nil })
+	publish_screen()
 
 	// The file's context is the source's number plus one, so that the first
 	// is not the nil a file with no context has.
