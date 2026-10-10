@@ -35,6 +35,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'iommu-off' { scenario_iommu_off(mut t) }
 		'pci-hotplug' { scenario_pci_hotplug(mut t) }
 		'pci-hotplug-acpi' { scenario_pci_hotplug_acpi(mut t) }
+		'pci-hotplug-iommu' { scenario_pci_hotplug_iommu(mut t) }
 		'power-button-init' { scenario_power_button_init(mut t) }
 		'qmp-powerdown' { scenario_qmp_powerdown(mut t) }
 		'restart' { scenario_restart(mut t) }

@@ -409,6 +409,7 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `screen-sleep`: pictures of the screen lit before, dark during and lit after a sleep and a rehearsal | pass | pass |
 | `pci-hotplug`: a card put into a port the kernel watches and taken out, twice; 100 remove/rescan cycles | pass | pass |
 | `pci-hotplug-acpi`: the same, announced and asked back by firmware | pass | -- |
+| `pci-hotplug-iommu`: the same behind Intel VT-d, the card isolated each time it arrives | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
 

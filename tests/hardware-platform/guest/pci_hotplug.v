@@ -116,6 +116,14 @@ fn hot_arrival(mut t Test, round string, own_ports bool) bool {
 	driver := os.readlink(hot_card + '/driver') or { '' }
 	t.check(driver.ends_with('/e1000'), 'the card is bound to "${driver}", not to e1000')
 	check_card_addresses(mut t)
+	// Behind an IOMMU that is on, a card that arrives is confined like one
+	// that was there at boot: a domain of its own, holding what it was given.
+	units := list_dir('/sys/class/iommu') or { []string{} }
+	if units.len > 0 {
+		dma := read_text(hot_card + '/dma') or { '' }
+		t.check(dma.contains('isolated'), 'the card that arrived is not isolated: "${dma.replace('\n',
+			' ')}"')
+	}
 	if own_ports {
 		slot := hot_slot() or {
 			t.check(false, err.msg())
@@ -264,4 +272,19 @@ fn scenario_pci_hotplug(mut t Test) {
 
 fn scenario_pci_hotplug_acpi(mut t Test) {
 	pci_hotplug(mut t, false)
+}
+
+// The firmware-announced card again, on a machine whose IOMMU is on.
+fn scenario_pci_hotplug_iommu(mut t Test) {
+	units := list_dir('/sys/class/iommu') or { []string{} }
+	if !t.check(units.len > 0, 'no IOMMU unit is on') {
+		return
+	}
+	pci_hotplug(mut t, false)
+	for unit in units {
+		// The unit's own account of what it stopped: nothing.
+		faults := read_text('/sys/class/iommu/${unit}/faults') or { 'unreadable' }
+		t.check(faults.contains('count: 0'), '${unit} recorded faults: ${faults.replace('\n',
+			' ')}')
+	}
 }

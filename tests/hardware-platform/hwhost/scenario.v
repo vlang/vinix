@@ -125,6 +125,10 @@ const iommu_disk = Disk{
 const hotplug_machine = ['-nic', 'none', '-device', 'pcie-root-port,id=hwport0,chassis=1,bus=pcie.0',
 	'-netdev', 'user,id=hwhot0,tftp={state}/tftp']
 
+// The same machine with an Intel IOMMU.
+const hotplug_machine_isolated = ['-device', 'intel-iommu', '-nic', 'none', '-device',
+	'pcie-root-port,id=hwport0,chassis=1,bus=pcie.0', '-netdev', 'user,id=hwhot0,tftp={state}/tftp']
+
 const hotplug_add = '{"execute":"device_add","arguments":{"driver":"e1000","bus":"hwport0","id":"hwcard0","netdev":"hwhot0"}}'
 const hotplug_remove = '{"execute":"device_del","arguments":{"id":"hwcard0"}}'
 
@@ -440,6 +444,18 @@ pub const scenarios = [
 		qemu:     hotplug_machine
 		files:    [tftp_probe]
 		required: ['HWTEST START pci-hotplug-acpi', 'HWTEST PASS pci-hotplug-acpi']
+		actions:  hotplug_actions
+		events:   ['DEVICE_DELETED', 'DEVICE_DELETED']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'pci-hotplug-iommu'
+		about:    'a card that arrives behind an IOMMU that is on gets a domain of its own'
+		arches:   ['x86_64']
+		cmdline:  'vinix.iommu=1'
+		qemu:     hotplug_machine_isolated
+		files:    [tftp_probe]
+		required: ['HWTEST START pci-hotplug-iommu', 'HWTEST PASS pci-hotplug-iommu']
 		actions:  hotplug_actions
 		events:   ['DEVICE_DELETED', 'DEVICE_DELETED']
 		ending:   .poweroff
