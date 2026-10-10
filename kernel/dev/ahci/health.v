@@ -66,8 +66,7 @@ fn smart_status(fis &AHCIFISd2h) ?bool {
 fn (mut dev AHCIDevice) block_health() ?resource.BlockHealth {
 	mut completed := false
 	defer { if !completed { dev.metrics.failed() } }
-	dev.wait_awake()
-	dev.l.acquire()
+	dev.take(false)
 	defer { dev.l.release() }
 	if dev.failed { errno.set(errno.enodev); return none }
 	mut report := resource.BlockHealth{protocol: resource.health_ata, disk_id: dev.stat.rdev}

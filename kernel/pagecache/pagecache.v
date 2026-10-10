@@ -2,6 +2,7 @@
 // access to a backing resource; callbacks must bypass the cache itself.
 module pagecache
 
+import block.fence
 import errno
 import klock
 import memory
@@ -426,6 +427,10 @@ pub fn (mut this Cache) read(context voidptr, load IO, store IO, buf voidptr, lo
 }
 
 pub fn (mut this Cache) write(context voidptr, load IO, store IO, buf voidptr, loc u64, count u64, size u64) ?i64 {
+	// While an image of memory is being written for a suspend to disk,
+	// nothing may reach a disk (block/fence). A writer is held here, with
+	// nothing held, rather than at the driver's door with this cache's lock.
+	fence.wait_open()
 	this.l.acquire()
 	defer { this.l.release() }
 	this.bind(context, size) or { return none }
@@ -530,6 +535,7 @@ fn (this &Cache) gather_run(first u64, count u64, buffer voidptr) u64 {
 // disk's cache, 256 MiB of pages dirtied by a large download, stopped every
 // CPU that touched the disk for minutes at a time, and with them the desktop.
 pub fn (mut this Cache) sync(context voidptr, store IO) ? {
+	fence.wait_open()
 	this.l.acquire()
 	if this.owner == unsafe { nil } {
 		this.l.release()
@@ -758,6 +764,7 @@ pub fn (mut this Cache) reclaim_clean(budget u64) u64 {
 // Teardown is failure-atomic with respect to dirty data. Callers must not
 // destroy the cache/backing resource if release fails.
 pub fn (mut this Cache) release(context voidptr, store IO) ? {
+	fence.wait_open()
 	this.l.acquire()
 	defer { this.l.release() }
 	if this.owner != unsafe { nil } && this.owner != context {

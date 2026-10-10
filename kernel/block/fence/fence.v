@@ -28,6 +28,7 @@ module fence
 
 import acpisync
 import katomic
+import sched
 
 // How often a held writer looks again.
 const held_poll_ms = u64(20)
@@ -62,10 +63,45 @@ pub fn before_write() bool {
 		return false
 	}
 	katomic.inc(mut &blockfence_held)
+	wait_lowered()
+	return true
+}
+
+fn wait_lowered() {
 	for katomic.load(&blockfence_up) != 0 {
 		acpisync.sleep(held_poll_ms)
+		// A thread with a signal coming is not put to sleep; it is still
+		// held, and takes turns with the rest rather than spin.
+		sched.reschedule()
 	}
-	return true
+}
+
+// Whether a write by the calling thread would be held or refused now. For a
+// driver to ask again once it has its device's lock: a request that passed
+// before_write() and then waited -- for a device that was asleep, as every
+// device is while the snapshot is taken -- must not go to the device after
+// the fence has gone up behind it. One that finds it closed lets go of its
+// lock, calls wait_open() and starts again.
+pub fn closed() bool {
+	if katomic.load(&blockfence_up) == 0 {
+		return false
+	}
+	return acpisync.thread_id() != katomic.load(&blockfence_owner)
+		|| katomic.load(&blockfence_passing) == 0
+}
+
+// Wait, holding nothing, until writes go through again. For whoever is about
+// to take a lock under which a write may be made -- the page cache takes its
+// own before it calls a driver -- so that a writer is held where it holds
+// nothing another thread could need, and not at the driver's door with that
+// lock. The thread that raised the fence is not held: what it may not write
+// is refused it at the driver.
+pub fn wait_open() {
+	if katomic.load(&blockfence_up) == 0 || acpisync.thread_id() == katomic.load(&blockfence_owner) {
+		return
+	}
+	katomic.inc(mut &blockfence_held)
+	wait_lowered()
 }
 
 // How many writes block drivers have been asked for since the machine
@@ -101,4 +137,10 @@ pub fn pass(on bool) {
 // Writers held at the fence and writes of the owner's refused, since boot.
 pub fn held() (u64, u64) {
 	return katomic.load(&blockfence_held), katomic.load(&blockfence_refused)
+}
+
+// Whether the calling thread is the one that raised the fence: it cannot
+// wait for it to come down, since it is the one that would bring it down.
+pub fn mine() bool {
+	return katomic.load(&blockfence_up) != 0 && acpisync.thread_id() == katomic.load(&blockfence_owner)
 }

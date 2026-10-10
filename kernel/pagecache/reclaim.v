@@ -1,6 +1,7 @@
 @[has_globals]
 module pagecache
 
+import block.fence
 import klock
 import katomic
 import memory
@@ -94,6 +95,9 @@ pub fn resident_bytes() u64 {
 // the machine restarts. Flushing continues past a failing cache so one broken
 // device cannot strand the others, and the failure is still reported.
 pub fn sync_all() bool {
+	// Held, with nothing held, while writes are fenced off for an image of
+	// memory: what a hook or a cache would write may not reach a disk now.
+	fence.wait_open()
 	registered_caches_lock.acquire()
 	count := katomic.load(&registered_caches_len)
 	hook_count := sync_hooks_len

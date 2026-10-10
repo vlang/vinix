@@ -15,6 +15,7 @@
 // (ahci_do_hardreset, ahci_stop_engine, ahci_stop_fis_rx).
 module ahci
 
+import block.fence
 import devcore
 
 // Port registers the rest of the driver does not name.
@@ -245,4 +246,33 @@ fn (mut d AHCIDevice) wait_awake() {
 	for d.asleep {
 		devcore.sleep_ms(10)
 	}
+}
+
+// Take the disk's lock to send it a command, with the disk awake: it is
+// looked at again once the lock is held, since a sleep may have begun
+// between the wait and the lock, and a command sent to a controller that
+// has been put down -- or, worse, to one that another kernel set up and
+// this one has not set up again yet -- goes through registers that mean
+// nothing. `writing` says the command changes what is on the disk; such a
+// one is also held while writes are fenced off for an image of memory
+// (block/fence), which may have happened while it waited. False, with the
+// lock not held, when the command may not be sent at all.
+fn (mut d AHCIDevice) take(writing bool) bool {
+	for {
+		d.wait_awake()
+		d.l.acquire()
+		if d.asleep {
+			d.l.release()
+			continue
+		}
+		if !writing || !fence.closed() {
+			return true
+		}
+		d.l.release()
+		if fence.mine() {
+			return false
+		}
+		fence.wait_open()
+	}
+	return false
 }

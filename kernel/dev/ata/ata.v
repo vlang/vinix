@@ -304,14 +304,20 @@ fn (mut dev ATADrive) write(_handle voidptr, buffer voidptr, loc u64, count u64)
 	sector_count := count / ata_bytes_per_sector
 
 	// Held while the drive sleeps, and looked at again with the lock: a sleep
-	// may have begun between the wait and the lock.
+	// may have begun between the wait and the lock. So may an image have
+	// been taken, and the fence that holds writes gone up behind this one.
 	for {
 		dev.wait_awake()
 		dev.l.acquire()
-		if !dev.asleep {
+		if !dev.asleep && !fence.closed() {
 			break
 		}
 		dev.l.release()
+		if fence.mine() {
+			errno.set(errno.eio)
+			return none
+		}
+		fence.wait_open()
 	}
 	defer {
 		dev.l.release()

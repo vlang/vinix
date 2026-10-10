@@ -429,6 +429,18 @@ fn (mut dev NVMENamespace) transfer(buffer voidptr, loc u64, count u64, write bo
 		chunk := if count - done < most { count - done } else { most }
 		caller := voidptr(u64(buffer) + done)
 		if write { unsafe { C.memcpy(bounce, caller, chunk) } }
+		// A write that waited, for a controller put down for a sleep, while
+		// an image of memory was taken is held like one that begins now.
+		// Not as surely as on SATA, where this is asked with the disk's
+		// lock held: the command is queued further down, under the
+		// controller's.
+		if write && fence.closed() {
+			if fence.mine() {
+				errno.set(errno.eio)
+				return none
+			}
+			fence.wait_open()
+		}
 		result := dev.rw_lba(bounce, (loc + done) / u64(dev.stat.blksize), chunk / u64(dev.stat.blksize), write)
 		if result != 0 {
 			owned = result == -2

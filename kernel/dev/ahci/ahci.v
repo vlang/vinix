@@ -249,8 +249,7 @@ fn (mut dev AHCIDevice) write_tracked_inner(_handle voidptr, buffer voidptr, loc
 fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
 	mut completed := false
 	defer { if completed { dev.metrics.flushed() } else { dev.metrics.failed() } }
-	dev.wait_awake()
-	dev.l.acquire()
+	dev.take(false)
 	defer { dev.l.release() }
 	if dev.failed || dev.flush_command == 0 {
 		errno.set(errno.eio)
@@ -291,8 +290,7 @@ fn (mut dev AHCIDevice) discard(offset u64, bytes u64) ? {
 	if !resource.discard_range_valid(u64(dev.stat.size), u64(dev.stat.blksize), offset, bytes) {
 		errno.set(errno.einval); return none
 	}
-	dev.wait_awake()
-	dev.l.acquire()
+	if !dev.take(true) { errno.set(errno.eio); return none }
 	defer { dev.l.release() }
 	if dev.failed { errno.set(errno.enodev); return none }
 	if !dev.trim_supported { errno.set(errno.eopnotsupp); return none }
@@ -383,8 +381,10 @@ fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool)
 		if write && user {
 			unsafe { C.memcpy(staging, caller, chunk) }
 		}
-		dev.wait_awake()
-		dev.l.acquire()
+		if !dev.take(write) {
+			errno.set(errno.eio)
+			return none
+		}
 		if dev.failed {
 			dev.l.release()
 			errno.set(errno.eio)
