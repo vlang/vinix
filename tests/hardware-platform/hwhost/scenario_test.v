@@ -60,6 +60,28 @@ fn test_every_real_scenario_runs_somewhere() {
 	}
 }
 
+// The Apple SMC scenarios need a kernel with a simulated SMC in it: none is
+// in a default run, each can be named, and none runs on a PC.
+fn test_the_apple_smc_scenarios_are_run_only_when_named() {
+	names := ['apple-smc-selftest', 'apple-smc-selftest-bare', 'apple-smc-selftest-options',
+		'apple-smc-selftest-legacy']
+	arm := select_scenarios(scenarios, 'aarch64', []string{})!
+	for name in names {
+		assert name !in names_of(arm.run)
+		assert name in names_of(arm.skipped)
+		scenario := find_scenario(scenarios, name) or { panic('no ${name} scenario') }
+		assert scenario.define == 'applesmc_selftest'
+		assert scenario.arches == ['aarch64']
+	}
+	named := select_scenarios(scenarios, 'aarch64', names)!
+	assert names_of(named.run) == names
+	select_scenarios(scenarios, 'x86_64', ['apple-smc-selftest']) or {
+		assert err.msg().contains('does not run on x86_64')
+		return
+	}
+	assert false, 'apple-smc-selftest was selected on x86_64'
+}
+
 fn test_named_scenarios_keep_their_order_and_run_once() {
 	selection := select_scenarios(scenarios, 'x86_64', ['ahci', 'devices', 'ahci'])!
 	assert names_of(selection.run) == ['ahci', 'devices']
