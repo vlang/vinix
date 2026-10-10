@@ -140,7 +140,8 @@ fn swift_string_metadata() u64 {
 
 fn swift_metadata_stop() {
 	// Like ARC thunks, metadata is retired only after all workers/callbacks and
-	// owned buffers have drained. No generic metadata cache is supported yet.
+	// owned buffers have drained.
+	swift_array_stop()
 	if ios_runtime.swift_metadata_arena != 0 {
 		if C.munmap(unsafe { voidptr(ios_runtime.swift_metadata_arena) }, usize(C.getpagesize()) * 2) != 0 {
 			panic('iOS: cannot retire Swift String metadata')

@@ -129,6 +129,8 @@ mut:
 	swift_buffers map[u64]u64 // Owned UTF-8 array allocation -> element count, under the runtime lock.
 	swift_arc_code u64 // Sealed ARM64 preserve-most entry points, released at quiescent teardown.
 	swift_metadata_arena u64 // Adjacent sealed String metadata/accessor pages, under the runtime lock.
+	swift_array_arena u64 // Array accessor/descriptor/witness pages and zero-filled generic cache.
+	swift_array_metadata map[u64]u64 // Element metadata -> sealed Array metadata, under the runtime lock.
 	swift_hash_code u64 // Sealed generic Hashable forwarding entries, retired after callbacks drain.
 	names        map[string]u64
 	pool_key u64

@@ -64,14 +64,14 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn build(root string, out string, only string) {
 	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'signal-checks',
-		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'native-init'] {
+		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
-			checked(['v', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-prod', '-d', 'no_backtrace',
+			checked(['v', '-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-prod', '-d', 'no_backtrace',
 				'-o', generated, root + '/tests/ios/native-init.v'])
 		} else {
-			mut args := ['v', '-os', 'linux', '-arch', 'arm64', '-enable-globals', '-gc', 'none',
+			mut args := ['v', '-nocache', '-cc', 'clang', '-os', 'linux', '-arch', 'arm64', '-enable-globals', '-gc', 'none',
 				'-prod', '-d', 'glibc', '-d', 'no_backtrace', '-d', 'ios_cxx', '-path',
 				'@vlib|' + root + '/compat/ios|@vmodules', '-o', generated]
 			if item.ends_with('-checks') { args = args.filter(it != '-prod') }
@@ -117,6 +117,8 @@ fn build(root string, out string, only string) {
 					'swift_hasher_test.v'
 				} else if item == 'swift-raw-representable-checks' {
 					'swift_raw_representable_test.v'
+				} else if item == 'swift-array-checks' {
+					'swift_array_test.v'
 				} else {
 					'thread_policy_test.v'
 				}
@@ -228,6 +230,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/swift-hash-checks', fs + '/opt/ios/swift-hash-checks')
 	copy_file(out + '/swift-hasher-checks', fs + '/opt/ios/swift-hasher-checks')
 	copy_file(out + '/swift-raw-representable-checks', fs + '/opt/ios/swift-raw-representable-checks')
+	copy_file(out + '/swift-array-checks', fs + '/opt/ios/swift-array-checks')
 	sysroot := root + '/build-aarch64-userland/sysroot'
 	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
 		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
@@ -346,7 +349,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|verify-monitor|regression|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|verify-monitor|regression|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -405,6 +408,8 @@ fn main() {
 		build(root, out, 'swift-hasher-checks')
 	} else if mode == 'build-swift-raw-representable' {
 		build(root, out, 'swift-raw-representable-checks')
+	} else if mode == 'build-swift-array' {
+		build(root, out, 'swift-array-checks')
 	} else if mode == 'verify-monitor' {
 		verify_monitor(out)
 	} else if mode == 'hash' {

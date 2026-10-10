@@ -11,8 +11,8 @@ mut:
 }
 
 // A private descriptor for buffers owned by this implementation. It is NOT
-// Swift class/type metadata: generic array reflection, casts, value witnesses
-// and allocation remain unsupported exports. The measured array body and ARC
+// Swift class/type metadata: generic array storage reflection, casts and
+// allocation remain unsupported exports. The measured array body and ARC
 // entry points below are the supported operations on these buffers.
 struct SwiftUTF8BufferDescriptor {
 	name &char = c'Vinix Swift UTF-8 buffer'
@@ -185,6 +185,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_array_symbol(symbol) { return address }
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {

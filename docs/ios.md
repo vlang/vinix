@@ -1740,24 +1740,62 @@ regression pass on the final build. The passing preliminary regression, probe
 and audits from before the requirement aliases are retained with VM hashes and
 both runner binaries/generated C; final evidence uses the rebuilt exports.
 
-Fourteen more strong imports resolve. Fortnite still exits with status 1 before
-entry at EOSSDK's generic Array metadata accessor, `_$sSaMa`; its installed Mac
-instructions are captured. Generic Array metadata/value witnesses, other
-associated-type manglings, Hasher metadata, concrete standard-library Hashable
-conformances, conformance discovery, generic interpolation and application Swift
-heap support remain incomplete.
+Fourteen more strong imports resolved in that build. Its probe exited with status
+1 before entry at EOSSDK's generic Array metadata accessor, `_$sSaMa`.
+
+The Array accessor and nominal descriptor now resolve in V. Measurements from
+the installed Mac library show an eight-byte BridgeObject payload, independent
+of Element, and a shared value witness table. Each specialization records its
+Element metadata pointer and zero field offset. The implementation follows
+[Swift's frozen Array definition](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/stdlib/public/core/Array.swift)
+and [generic metadata ABI](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/include/swift/ABI/Metadata.h).
+The descriptor has one key type parameter, no requirements, nearby accessor and
+instantiation bridges, a complete instantiation pattern and writable zero-filled
+private cache storage. Reflection Fields records remain absent.
+
+The cache publishes one sealed metadata mapping per exact Element pointer under
+the runtime lock. Repeated requests reuse the same complete metadata. Eight value
+witnesses implement retain/copy, destroy, copy/take assignment and enum tags.
+Copies acquire ownership before publishing, assignments publish before retiring
+the old owner, and takes transfer ownership without retaining. Releases hold no
+registry lock across an ObjC deallocator. The array storage ARC path currently
+accepts registered UTF-8 buffers, ObjC owners and immortal references; this does
+not implement general Swift array storage allocation or reflection.
+
+Native/V ASAN/UBSAN checks pass in both hash-seed modes, alongside the existing
+String metadata and String/ARC checks. They cover both exports, descriptor and
+pattern accessors, complete-response requests, all eight witnesses, guarded
+buffers, native and ObjC ownership, distinct-owner and self-copy assignments,
+and exact eight/nine-byte enum payloads through `UINT32_MAX`. Eight workers race
+publication of sixteen nested specializations while copying shared owners.
+A native nonblocking request may observe partial initialization; the native
+fixture requests completion before using that entry. Vinix always publishes
+complete metadata. Reentrant deallocation waits for another resolver/copy worker.
+Two shutdowns leave no owners and prove all specialization and arena mappings
+unmapped. Generated C checks reject hidden V heap promotions in the runtime
+bodies. Measurements, primary sources and verification evidence are retained
+under `swift-array-checks`.
+
+All twenty-two native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. Three more strong imports resolve. Fortnite still exits with
+status 1 before entry at EOSSDK's `Int.init(bitPattern: OpaquePointer?)`,
+`_$sSi10bitPatternSis13OpaquePointerVSg_tcfC`. The installed initializer is a
+single return instruction; native calls preserve all 64 bits, including nil and
+the signed boundary. Other associated-type manglings, Hasher metadata, concrete
+standard-library Hashable conformances, conformance discovery, generic
+interpolation and application Swift heap support remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,368 | 790 | 81 |
-| EOSSDK | 580 | 82 | 18 |
-| MarketplaceKitWrapper | 76 | 100 | 23 |
-| All images | 2,024 | 972 | 122 |
+| Fortnite executable | 1,369 | 789 | 81 |
+| EOSSDK | 581 | 81 | 18 |
+| MarketplaceKitWrapper | 77 | 99 | 23 |
+| All images | 2,027 | 969 | 122 |
 
-The C++/GLES/Text variant reports 2,037 resolved imports, 959 unresolved strong
+The C++/GLES/Text variant reports 2,040 resolved imports, 956 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
