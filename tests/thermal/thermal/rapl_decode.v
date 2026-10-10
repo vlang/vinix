@@ -1,0 +1,1 @@
+../../../kernel/thermal/rapl_decode_amd64.v

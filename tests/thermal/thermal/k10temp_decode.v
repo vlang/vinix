@@ -1,0 +1,1 @@
+../../../kernel/thermal/k10temp_decode_amd64.v

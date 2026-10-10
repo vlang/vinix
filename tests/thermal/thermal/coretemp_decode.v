@@ -1,0 +1,1 @@
+../../../kernel/thermal/coretemp_decode_amd64.v

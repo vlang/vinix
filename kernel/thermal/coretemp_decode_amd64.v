@@ -16,7 +16,6 @@
 module thermal
 
 pub const msr_ia32_platform_id = u32(0x17)
-pub const msr_ia32_bios_sign_id = u32(0x8b)
 pub const msr_ia32_ext_config = u32(0xee)
 pub const msr_ia32_therm_status = u32(0x19c)
 pub const msr_ia32_temperature_target = u32(0x1a2)
@@ -95,12 +94,6 @@ pub fn coretemp_target_ttarget(target u64) i64 {
 pub fn coretemp_has_tjmax(model u32) bool {
 	return model > 0xe && model != 0x1c && model != 0x26 && model != 0x27 && model != 0x35
 		&& model != 0x36
-}
-
-// Errata AE18 of the first Core processors: the readout may stop updating
-// after a deep sleep, fixed in stepping D0 and in microcode 0x39.
-pub fn coretemp_errata_ae18(model u32, stepping u32, microcode u32) bool {
-	return model == 0xe && stepping < 0xc && microcode < 0x39
 }
 
 // What adjust_tjmax() looks at.

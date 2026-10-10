@@ -1,0 +1,1 @@
+../../../kernel/thermal/x86_identity_amd64.v
