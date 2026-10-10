@@ -1412,21 +1412,53 @@ generated lifecycle bodies are retained under `objc-associated-checks`.
 All thirteen native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
 regression pass. Earlier runs hit the previously observed concurrent readlink
 and file-timestamp failures in unchanged checks; both failed serial logs and
-VM hashes are retained. Four more strong imports resolve. The actual Fortnite
-binary still exits with status 1 before entry, now at `objc_getProperty` in
-EOSSDK; atomic Objective-C property helpers remain unsupported.
+VM hashes are retained. Four more strong imports resolve. The next Fortnite
+linking blocker was `objc_getProperty` in EOSSDK.
+
+V now implements `objc_getProperty`, the legacy six-argument `objc_setProperty`,
+and the atomic retain/copy setters. The existing nonatomic setters share the
+same implementation, including real copying of supported Foundation values.
+Atomic getters retain the slot value under the runtime lock and autorelease it
+after unlocking. Setters acquire or copy the new value before locking, publish
+it before retiring the old reference, and run deallocation callbacks outside
+the lock. Signed pointer-sized offsets address the app's actual ivar storage;
+offset zero delegates to the existing class access/replacement helpers.
+
+Native property setters invoke `copyWithZone:nil` or `mutableCopyWithZone:nil`
+directly, ignoring overrides of `copy` and `mutableCopy`. V matches this
+measured behavior while associated-object copying continues to dispatch
+`copy`. Mutable data, arrays and dictionaries receive independent mutable
+snapshots. Copy setters also promote stack blocks to owned heap blocks.
+
+Native Mac ASAN/UBSAN checks cover all setters, getter pool ownership,
+guarded positive and negative offsets, class replacement, nil-copy clearing,
+mutable snapshots, blocks and reentrant deallocation. A deallocator waits for
+another thread to read the same slot, verifying that callbacks run without
+the property lock. Eight workers share a slot, and two V teardowns leave
+metadata, class instance counts and live objects empty. An initial native
+block fixture accessed V state before initialization; it was corrected and
+the clean sanitizer run and passing guest suite repeated. Its diagnostic and
+the earlier passing VM hashes are retained under `objc-property-checks`.
+Intervening runs hit a filesystem fault in the preserved kernel's
+`fs.reduce_node_on_mount` during concurrent readlink, and the previously
+observed timestamp failure. Their serial logs and VM hashes are also retained.
+
+All fourteen native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. Six more strong imports resolve. The actual Fortnite binary
+still exits with status 1 before entry, now at `objc_sync_enter` in EOSSDK;
+Objective-C synchronized-object monitors remain unsupported.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,342 | 816 | 81 |
-| EOSSDK | 556 | 106 | 18 |
+| Fortnite executable | 1,345 | 813 | 81 |
+| EOSSDK | 559 | 103 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,958 | 1,038 | 122 |
+| All images | 1,964 | 1,032 | 122 |
 
-The C++/GLES/Text variant reports 1,971 resolved imports, 1,025 unresolved strong
+The C++/GLES/Text variant reports 1,977 resolved imports, 1,019 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1465,12 +1497,13 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 `build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
 `file-time-checks`, the audio constants use `audio-session-checks`, and
 CoreFoundation dictionaries use `cf-dictionary-checks`, supplied Objective-C
-storage uses `objc-storage-checks`, and associated objects use
-`objc-associated-checks`). Each
+storage uses `objc-storage-checks`, associated objects use
+`objc-associated-checks`, and property access uses `objc-property-checks`). Each
 mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant and
-CoreFoundation dictionary, supplied Objective-C storage and associated-object checks before the
+CoreFoundation dictionary, supplied Objective-C storage, associated-object and
+property checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

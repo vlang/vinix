@@ -124,17 +124,11 @@ fn objc_retain_autorelease(object u64) u64 { return objc_autorelease(objc_retain
 fn objc_unsafe_claim(object u64) u64 { return object }
 
 fn objc_property_strong(object u64, selector u64, value u64, offset i64) {
-	_ = selector
-	objc_store_strong(unsafe { &u64(object + u64(offset)) }, value)
+	objc_property_set(object, selector, offset, value, false, 0)
 }
 
 fn objc_property_copy(object u64, selector u64, value u64, offset i64) {
-	_ = selector
-	copied := if value != 0 && is_block(value) { block_copy(value) } else { objc_retain(value) }
-	location := unsafe { &u64(object + u64(offset)) }
-	old := unsafe { *location }
-	unsafe { *location = copied }
-	objc_release(old)
+	objc_property_set(object, selector, offset, value, false, 1)
 }
 
 fn objc_store_weak(location &u64, object u64) u64 {

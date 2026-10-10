@@ -345,6 +345,10 @@ fn objc_runtime_symbol(symbol string) ?u64 {
 		'_objc_setAssociatedObject' { u64(unsafe { voidptr(objc_set_associated) }) }
 		'_objc_getAssociatedObject' { u64(unsafe { voidptr(objc_get_associated) }) }
 		'_objc_removeAssociatedObjects' { u64(unsafe { voidptr(objc_remove_associated) }) }
+		'_objc_getProperty' { u64(unsafe { voidptr(objc_property_get) }) }
+		'_objc_setProperty' { u64(unsafe { voidptr(objc_property_set) }) }
+		'_objc_setProperty_atomic' { u64(unsafe { voidptr(objc_property_atomic) }) }
+		'_objc_setProperty_atomic_copy' { u64(unsafe { voidptr(objc_property_atomic_copy) }) }
 		'_class_addIvar' { u64(unsafe { voidptr(objc_add_ivar) }) }
 		'_class_getInstanceVariable' { u64(unsafe { voidptr(objc_find_ivar) }) }
 		'_class_copyIvarList' { u64(unsafe { voidptr(objc_copy_ivars) }) }

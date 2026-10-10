@@ -14,11 +14,17 @@ mut:
 type ObjCopyWithZone = fn (u64, &char, u64) u64
 
 fn objc_association_copy(value u64) u64 {
+	return objc_copy_value(value, false)
+}
+
+fn objc_copy_value(value u64, with_zone bool) u64 {
 	if is_block(value) { return block_copy(value) }
 	cls := read64(value)
-	copy_imp := native_method(cls, 'copy')
-	if copy_imp != 0 {
-		return unsafe { ObjInit(voidptr(copy_imp))(value, &char(objc_selector(c'copy'))) }
+	if !with_zone {
+		copy_imp := native_method(cls, 'copy')
+		if copy_imp != 0 {
+			return unsafe { ObjInit(voidptr(copy_imp))(value, &char(objc_selector(c'copy'))) }
+		}
 	}
 	zone_imp := native_method(cls, 'copyWithZone:')
 	if zone_imp != 0 {
