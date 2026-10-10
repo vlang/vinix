@@ -98,11 +98,11 @@ fn settings_power_choice(id string, label string, x int, y int, width int, selec
 		frame:               ui2.rect(f64(x), f64(y), f64(width), 28)
 		enabled:             false
 		box:                 ui2.BoxStyle{
-			bg:     if selected { body_rule } else { files_up_disabled }
+			bg:     if selected { settings_choice_fixed } else { files_up_disabled }
 			radius: 6
 		}
 		text_style:          ui2.TextStyle{
-			color: body_muted
+			color: if selected { body_text } else { body_muted }
 			size:  12
 			align: .center
 		}

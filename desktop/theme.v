@@ -218,6 +218,8 @@ const terminal_button = u32(0x333843)
 const settings_sidebar_bg = u32(0xf3f5f9)
 const settings_category_selected = u32(0xdfe7f5)
 const settings_choice_bg = u32(0xe9edf4)
+// A choice that is in force and cannot be changed: the accent, washed out.
+const settings_choice_fixed = u32(0xc3d6f3)
 
 // ── Desktop shortcuts ──────────────────────────────────────────────
 // Icons sit down the left edge of the wallpaper, out of the way of where
