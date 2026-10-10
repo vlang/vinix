@@ -344,8 +344,9 @@ completions retain the existing failed-controller policy: DMA stays pinned and
 later health calls neither clear it nor submit. Stopping/stopped controllers
 also reject calls before touching DMA. Reports, command bytes and interface
 dispatch use the caller's stack; queries allocate no heap or physical pages and
-do not charge completed disk transfers. ANS does not yet expose per-device block
-error metrics.
+do not charge completed disk transfers. Failed backend health requests increment
+the namespace's block error counter once; successful queries leave I/O counters
+unchanged.
 
 The driver still requires explicit ANS boot opt-in and its existing clean
 handoff/platform checks. Host transport faults and an isolated ARM kernel model
@@ -354,6 +355,45 @@ they do not qualify health-log accuracy or firmware support on a physical M1.
 See [ANS boot and hardware acceptance](apple-ans-rw-root.md) and
 [native health qualification](../tests/storage-health/README.md). The ANS NVMMU
 layout follows the [Linux Apple NVMe driver](https://github.com/torvalds/linux/blob/master/drivers/nvme/host/apple.c).
+
+## Apple ANS block status
+
+```sh
+vinix-volume status /dev/ans0n1
+vinix-volume status /dev/ans0n1p1
+```
+
+Published ANS namespaces and GPT partitions expose the version-one, 128-byte
+block status ABI. Capacity and start offset describe the opened view. `disk_id`
+identifies its physical namespace; partitions set flag 16 and share that
+namespace's counters. Namespace IDs remain distinct, including after shutdown.
+The whole namespace stays read-only. Only the boot-selected writable Linux-data
+partition clears the read-only flag while the controller is ready and its write
+policy remains valid. Failed or stopping/stopped controllers report offline and
+read-only; status remains readable without submitting a command or touching DMA.
+
+ANS counters measure successfully completed physical commands and bytes,
+including native root/data filesystem traffic. A rounded read counts all sectors
+transferred; a partial write counts its boundary reads, written sectors and
+implicit flush. A resource sync flushes every namespace, charging each successful
+flush to that namespace. Completed prefixes remain counted when a later command
+fails. These are physical command counts, rather than counts of userspace calls.
+Failed block read/write/sync and supported health requests increment `errors`
+once on the requesting namespace and retain their errno in `last_error`.
+Validation failures count; zero-byte/EOF success and successful metadata queries
+do not. Native filesystem internal failures are not additional block requests.
+
+Snapshots and updates share the ANS operation lock. Eight fixed counter records
+require no allocation on repeated paths and preserve the exported transport
+layout used by existing controller fixtures. Status metadata does not enable ANS
+linear volumes, raw writes, discard or controller reconstruction. ANS volume
+management still needs qualification of native filesystem extent protection.
+
+The [V transport tests and ARM kernel fixture](../tests/storage-health/README.md)
+cover shared geometry/counters, read-modify-write, completed prefixes, failures,
+offline state and 200 allocation-flat I/O/error cycles. QEMU exercises the
+software model; physical base-M1 controller and firmware qualification remains
+required as described in [ANS acceptance](apple-ans-rw-root.md).
 
 ## TRIM/discard
 

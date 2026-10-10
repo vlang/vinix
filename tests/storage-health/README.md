@@ -1,4 +1,4 @@
-# ATA, NVMe and Apple ANS health qualification
+# ATA, NVMe and Apple ANS health/status qualification
 
 The host controller and fixtures are V throughout:
 
@@ -49,8 +49,17 @@ two hundred calls after each fatal failure neither submit nor clear owned DMA.
 ANS partitions reject queries, and the architecture's production dispatcher is
 exercised under ASan/UBSan.
 
+ANS status tests also copy the production resource read/write/sync methods and
+exported transport calls. The independent I/O completion model verifies rounded
+reads, partition boundary read-modify-write, namespace-wide sync, separate
+namespace totals, successful prefixes before read/write/flush failures, one error
+per failed request, health retry, EOF/validation and offline/read-only policy.
+Whole and partition views expose identical physical counters with their own
+capacity and offset. Status queries submit no admin command. Counter storage
+stays outside the mirrored transport layout, preserving the older ANS fixtures.
+
 The optional `--generated` check rejects heap allocation in generated
-health/mapping functions, the ANS transport and NVMe read/flush commands;
+health/status/mapping functions, ANS accounting/transport and NVMe read/flush commands;
 it detects compiler promotion of borrowed reports, interface slots and command
 temporaries as well as explicit allocation.
 For AMD64, use a development (`PROD=false`) blob so the compiler retains the
@@ -59,9 +68,10 @@ NVMe boot-only mapping functions.
 For a kernel allocation measurement, create a separate ARM git worktree and link
 its untracked kernel build dependencies as for an ordinary build. The following
 V producer installs only the maintained hardware model and a boot self-test into
-that worktree; the production transport, health method and dispatcher run against
+that worktree; the production transport, health/status methods and dispatchers run against
 the real kernel allocator. It rejects the main checkout and modified ANS boot
-source. No test hook or model is added to an ordinary kernel.
+source unless it matches the current production checkout (for testing an
+uncommitted feature). No test hook or model is added to an ordinary kernel.
 
 ```sh
 V=/path/to/v build-support/run-v-tool.sh tests/storage-health/ans_fixture.v /path/to/ans-worktree
@@ -76,7 +86,10 @@ V=/path/to/v build-support/run-v-tool.sh tests/storage-health/ans_fixture.v \
 ```
 
 The kernel self-test warms the path, then makes 200 resource-dispatched queries
-and compares every slab class and large-allocation page count. Reports include
+and compares every slab class and large-allocation page count. It then warms
+and repeats 200 read/partial-write/sync/failed-raw-write/status cycles, checking
+the exact namespace totals and partition flags while every allocation class
+stays flat. Both result markers are required on both boots. Reports include
 an unknown warning bit and payload tail bytes. Its synchronous software model
 is freed before normal ANS initialization. The guest also runs the existing
 storage-plan/health/reboot suite. This tests kernel dispatch and allocation

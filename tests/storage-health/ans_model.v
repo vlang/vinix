@@ -24,6 +24,15 @@ pub mut:
 	post        int
 	invalidated int
 	prepared    bool
+	io_commands int
+	io_head u32
+	io_phase u32 = 1
+	account_reads u64
+	account_writes u64
+	write_first u8
+	write_last u8
+	write_at_7 u8
+	write_at_517 u8
 }
 
 pub fn model_setup(mode int, step int, warning u8) &HealthModel {
@@ -35,13 +44,25 @@ pub fn model_setup(mode int, step int, warning u8) &HealthModel {
 	// Ans includes every GPT partition: avoid a controller-sized stack
 	// temporary in the opt-in kernel fixture's setup and retirement paths.
 	unsafe { C.memset(&ans_controller, 0, sizeof(Ans)) }
+	reset_namespace_metrics()
 	ans_controller.dma = model.dma
 	ans_controller.physical = 0x800000000
 	ans_controller.cookie = model
 	ans_controller.nvme = 0x100000
 	ans_controller.mailbox = 0x200000
 	ans_controller.live = 1
+	ans_controller.started = 1
+	ans_controller.ioq_active = 1
+	ans_controller.max_transfer = 4096
 	ans_controller.nns = 2
+	for i in 0 .. 2 {
+		ans_controller.ns[i].id = u32(i + 1)
+		ans_controller.ns[i].sector = 512
+		ans_controller.ns[i].blocks = 4096
+		ans_controller.ns[i].nparts = 1
+		ans_controller.ns[i].parts[0].start = 8
+		ans_controller.ns[i].parts[0].blocks = 2048
+	}
 	ans_controller.queues[0].phase = 1
 	ans_controller.queues[1].phase = 1
 	ans_controller.ops = Ans_ops{
@@ -63,16 +84,35 @@ pub fn model_free(model &HealthModel) {
 		C.free(model)
 	}
 	unsafe { C.memset(&ans_controller, 0, sizeof(Ans)) }
+	reset_namespace_metrics()
+}
+
+pub fn model_enable_writes() {
+	ans_controller.write_enabled = 1
+	ans_controller.write_ns = 0
+	ans_controller.write_part = 0
+	ans_controller.write_start = 8
+	ans_controller.write_blocks = 2048
+}
+
+pub fn model_offline_state(state int) {
+	ans_controller.stopping = u32(state == 1)
+	ans_controller.stopped = u32(state == 2)
+	ans_controller.live = if state == 3 { i32(0) } else { i32(1) }
 }
 
 fn health_read32(cookie voidptr, address u64) u32 {
 	model := unsafe { &HealthModel(cookie) }
 	if address == 0x200114 { return 1 << 17 } // Empty RTKit mailbox.
 	if address == 0x10001c {
-		return if model.mode == 8 && model.commands == model.step { u32(3) } else { u32(1) }
+		return if model.mode == 8 && health_step(model) == model.step { u32(3) } else { u32(1) }
 	}
 	health_model_require(address == 0x128120)
-	return if model.mode == 7 && model.commands == model.step { u32(1) } else { u32(0) }
+	return if model.mode == 7 && health_step(model) == model.step { u32(1) } else { u32(0) }
+}
+
+fn health_step(model &HealthModel) int {
+	return if model.io_commands > 0 { model.io_commands } else { model.commands }
 }
 
 fn health_read64(_ voidptr, _ u64) u64 {
@@ -90,10 +130,20 @@ fn health_write32(cookie voidptr, address u64, value u32) {
 			health_model_require(value == model.head)
 			return
 		}
+		if address == 0x10100c {
+			health_model_require(value == model.io_head)
+			return
+		}
 		if address == 0x128118 {
-			health_model_require(value == 0)
-			for i in 0 .. 128 { health_model_require(model.dma[32768 + i] == 0) }
+			health_model_require(value <= 1)
+			tcb := if value == 0 { 32768 } else { 81920 + 128 }
+			for i in 0 .. 128 { health_model_require(model.dma[tcb + i] == 0) }
 			model.invalidated++
+			return
+		}
+		if address == 0x124910 {
+			health_model_require(value == 1)
+			health_io_submit(mut model)
 			return
 		}
 		health_model_require(address == 0x12490c && value == 0) // Admin queue, fixed tag 0.
@@ -148,6 +198,48 @@ fn health_write32(cookie voidptr, address u64, value u32) {
 	}
 }
 
+fn health_io_submit(mut model HealthModel) {
+	unsafe {
+		command := model.dma + 49152 + 64
+		tcb := model.dma + 81920 + 128
+		opcode := command[0]
+		health_model_require(opcode <= 2 && a_le16(command + 2) == 1)
+		health_model_require(a_le32(command + 4) == 1 || a_le32(command + 4) == 2)
+		bytes := if opcode == 0 { 0 } else { (int(a_le16(command + 48)) + 1) * 512 }
+		health_model_require(bytes <= 4096 && a_le64(command + 32) == 0)
+		health_model_require(tcb[0] == 0 && tcb[2] == 1)
+		health_model_require(tcb[1] == if opcode == 0 { u8(0) } else if opcode == 1 { u8(2) } else { u8(1) })
+		if bytes > 0 {
+			health_model_require(a_le64(command + 24) == 0x800020000 && model.prepared)
+			model.prepared = false
+		} else {
+			health_model_require(a_le64(command + 24) == 0)
+		}
+		model.io_commands++
+		if model.mode in [2, 3]! && model.io_commands == model.step { return }
+		if opcode == 2 {
+			for i in 0 .. bytes { model.dma[131072 + i] = u8(i * 17 + 2) }
+		} else if opcode == 1 {
+			health_model_require(a_le16(command + 50) == 1 << 14)
+			model.write_first = model.dma[131072]
+			model.write_last = model.dma[131072 + bytes - 1]
+			if bytes > 517 {
+				model.write_at_7 = model.dma[131072 + 7]
+				model.write_at_517 = model.dma[131072 + 517]
+			}
+		}
+		entry := model.dma + 65536 + model.io_head * 16
+		a_zero(entry, 16)
+		a_put16(entry + 8, if model.mode == 6 && model.io_commands == model.step { u16(64) } else { u16(0) })
+		a_put16(entry + 10, if model.mode == 5 && model.io_commands == model.step { u16(0) } else { u16(1) })
+		a_put16(entry + 12, if model.mode == 4 && model.io_commands == model.step { u16(0) } else { u16(1) })
+		status := if model.mode == 1 && model.io_commands == model.step { u16(2) } else { u16(0) }
+		a_put16(entry + 14, status | u16(model.io_phase))
+		model.io_head++
+		if model.io_head == 64 { model.io_head = 0; model.io_phase ^= 1 }
+	}
+}
+
 fn health_now(cookie voidptr) u64 {
 	mut model := unsafe { &HealthModel(cookie) }
 	if model.mode != 3 { model.clock += 1000000 }
@@ -162,7 +254,7 @@ fn health_sync(cookie voidptr, buffer voidptr, count usize, cpu i32) {
 	address := usize(buffer) - usize(model.dma)
 	health_model_require(address + count <= 4587520)
 	if address == 131072 {
-		health_model_require(count == 512 || count == 4096)
+		health_model_require(count != 0 && count <= 4096 && count % 512 == 0)
 		if cpu == 0 {
 			model.pre++
 			model.prepared = true
@@ -177,4 +269,8 @@ fn health_model_require(condition bool) {
 }
 
 @[export: 'vinix_account_disk_transfer']
-fn account(_ u32, _ u64, _ i32) { health_model_require(false) }
+fn account(index u32, bytes u64, writing i32) {
+	mut model := unsafe { &HealthModel(ans_controller.cookie) }
+	health_model_require(index < 2 && model.io_commands > 0)
+	if writing == 0 { model.account_reads += bytes } else { model.account_writes += bytes }
+}

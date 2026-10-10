@@ -9,17 +9,25 @@ fn check_log(path string) ! {
 	if !log.contains('ANS HEALTH MODEL PASSED: 200 queries, no retained slab/large allocations') {
 		return error('Missing ANS kernel model qualification')
 	}
+	if !log.contains('ANS STATUS MODEL PASSED: 200 read/write/flush/error cycles, no retained slab/large allocations') {
+		return error('Missing ANS kernel status qualification')
+	}
 	mut classes := 0
+	mut status_classes := 0
 	for line in log.split_into_lines() {
 		if line.starts_with('ANS HEALTH RETAIN size=') {
 			if !line.ends_with(' delta=0') { return error('ANS heap retention: ${line}') }
 			classes++
 		}
+		if line.starts_with('ANS STATUS RETAIN size=') {
+			if !line.ends_with(' delta=0') { return error('ANS status heap retention: ${line}') }
+			status_classes++
+		}
 	}
-	if classes < 1 || log.contains('KERNEL PANIC') || log.contains('FATAL EXCEPTION') {
+	if classes < 1 || status_classes != classes || log.contains('KERNEL PANIC') || log.contains('FATAL EXCEPTION') {
 		return error('Incomplete or failed kernel model run')
 	}
-	println('PASS: 200 ARM kernel ANS queries; ${classes} slab classes and large allocations stay flat')
+	println('PASS: 200 ARM kernel ANS health queries and read/write/flush/error cycles; ${classes} slab classes and large allocations stay flat')
 }
 
 fn prepare() ! {
@@ -30,8 +38,9 @@ fn prepare() ! {
 	path := work + '/kernel/apple/ans/ans.v'
 	original := os.read_file(path)!
 	committed := os.exec(['git', '-C', work, 'show', 'HEAD:kernel/apple/ans/ans.v'])
-	if committed.exit_code != 0 || committed.output != original {
-		return error('ANS boot source must match the worktree HEAD')
+	production := os.read_file(root + '/kernel/apple/ans/ans.v')!
+	if committed.exit_code != 0 || (committed.output != original && production != original) {
+		return error('ANS boot source must match HEAD or the current production source')
 	}
 	needle := 'pub fn initialise(cmdline string) {'
 	if original.count(needle) != 1 { return error('Missing ANS boot boundary') }

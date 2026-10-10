@@ -1205,6 +1205,7 @@ pub fn a_read_bytes(a &Ans, index u32, buffer voidptr, offset u64, count usize) 
 				return rc
 			}
 			C.vinix_account_disk_transfer(index, u64(bytes), 0)
+			a_count_transfer(a, index, u64(bytes), false)
 			a_sync(a, 131072, usize(bytes), 1)
 			a_copy(voidptr(out), voidptr(a.dma + 131072 + within), n)
 			offset += u64(n)
@@ -1237,6 +1238,7 @@ pub fn a_flush_ns(a &Ans, index u32) i32 {
 		}
 		a.dirty_namespaces &= i32(u16(~(1 << index)))
 		a.flushes_completed++
+		a_count_flush(a, index)
 		return 0
 	}
 }
@@ -1330,6 +1332,7 @@ pub fn a_write_partition(a &Ans, index u32, part u32, buffer voidptr, offset u64
 			}
 			a.writes_completed++
 			C.vinix_account_disk_transfer(index, u64(transfer), 1)
+			a_count_transfer(a, index, u64(transfer), true)
 			absolute += u64(bytes)
 			in_ += bytes
 			count -= bytes

@@ -4,7 +4,7 @@
 module ans
 
 import apple.ans.ext2core as _
-import apple.ans.anscore as _
+import apple.ans.anscore
 
 import resource
 import proc
@@ -119,6 +119,13 @@ pub mut:
 }
 
 fn (mut this AnsBlock) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	return this.read_untracked(_handle, buffer, loc, count) or {
+		this.record_failed()
+		return none
+	}
+}
+
+fn (mut this AnsBlock) read_untracked(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if loc > u64(this.stat.size) {
 		errno.set(errno.einval)
 		return none
@@ -143,6 +150,13 @@ fn (mut this AnsBlock) read(_handle voidptr, buffer voidptr, loc u64, count u64)
 }
 
 fn (mut this AnsBlock) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	return this.write_untracked(_handle, buffer, loc, count) or {
+		this.record_failed()
+		return none
+	}
+}
+
+fn (mut this AnsBlock) write_untracked(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	ans_lock.acquire()
 	defer { ans_lock.release() }
 	if this.partition < 0 || C.vinix_ans_partition_writable(this.ns_index, u32(this.partition)) == 0 {
@@ -170,6 +184,7 @@ fn (mut this AnsBlock) sync(_handle voidptr) ? {
 	// transactions, including partition-scoped read-modify-write operations.
 	if !flush() {
 		errno.set(errno.eio)
+		this.record_failed()
 		return none
 	}
 }
@@ -186,7 +201,7 @@ fn (mut this AnsBlock) ioctl(_handle voidptr, request u64, argp voidptr) ?int {
 	// BLKFLSBUF has no pointer argument. This driver has no software block
 	// cache to invalidate; issue a real NVMe flush and propagate its failure.
 	if request == 0x1261 {
-		if !flush() { errno.set(errno.eio); return none }
+		this.sync(_handle)?
 		return 0
 	}
 	if argp == unsafe { nil } {
@@ -240,7 +255,10 @@ fn publish(index u32, partition int, start u64, blocks u64, name string) {
 	res.stat.blocks = res.stat.size / 512
 	res.stat.blksize = i64(sector)
 	res.stat.rdev = resource.create_dev_id()
-	if partition < 0 { proc.set_native_disk_id(index, res.stat.rdev) }
+	if partition < 0 {
+		proc.set_native_disk_id(index, res.stat.rdev)
+		anscore.set_namespace_id(index, res.stat.rdev)
+	}
 	// Raw storage is not made readable to every unprivileged user.
 	writable := partition >= 0 && C.vinix_ans_partition_writable(index, u32(partition)) != 0
 	res.stat.mode = (if writable { u32(0o600) } else { u32(0o440) }) | stat.ifblk

@@ -14,12 +14,14 @@ fn (mut dev AnsBlock) block_health() ?resource.BlockHealth {
 	defer { ans_lock.release() }
 	if !ans_ready {
 		errno.set(errno.enodev)
+		anscore.namespace_failed(dev.ns_index, errno.enodev)
 		return none
 	}
 	mut report := resource.BlockHealth{ protocol: resource.health_nvme, disk_id: dev.stat.rdev }
 	result := anscore.health(dev.ns_index, unsafe { &report.identify[0] }, unsafe { &report.data[0] })
 	if result != 0 {
 		errno.set(errno.eio)
+		anscore.namespace_failed(dev.ns_index, errno.eio)
 		return none
 	}
 	report.flags = resource.health_supported | resource.health_enabled |
