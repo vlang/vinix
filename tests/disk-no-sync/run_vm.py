@@ -25,6 +25,39 @@ import sys
 import tarfile
 import time
 
+# The invoking interpreter retains PTY ownership, process-group teardown and the
+# upstream archive/regex/decoder primitives. V owns the step and result policy.
+import importlib.util as _import_util
+_spec = _import_util.spec_from_file_location("_disk_no_sync_host", Path(__file__).resolve().parents[2] / "build-support/native_host.py")
+_host = _import_util.module_from_spec(_spec)
+_spec.loader.exec_module(_host)
+_controller = _host.Controller(Path(__file__).with_name("run_native.v"), "VINIX_DISK_NO_SYNC_QUERY", prefix="vinix-no-sync-controller-")
+
+
+def _primitive(name, value):
+    if name == "capture_debugfs":
+        result = subprocess.run([os.fsdecode(bytes.fromhex(item)) for item in value],
+                                capture_output=True, text=True, check=False)
+        return [result.stdout, result.stderr]
+    if name == "process_environment": return [[os.fsencode(key).hex(), os.fsencode(item).hex()] for key, item in os.environ.items()]
+    if name == "build": return os.environ.get("VINIX_DISK_NO_SYNC_NO_BUILD") != "1"
+    if name == "decode_done": return bytes.fromhex(value).decode()
+    if name == "search_group":
+        found = re.search(*value)
+        return None if found is None else found.group(1)
+    if name == "which":
+        found = shutil.which(value)
+        return None if found is None else os.fsencode(found).hex()
+    if name == "access": return os.access(os.fsdecode(bytes.fromhex(value)), os.X_OK)
+    if name == "print": return print(value["message"], file=sys.stderr if value["error"] else sys.stdout)
+    raise KeyError(name)
+
+
+def _native(operation, arguments, primitive=None):
+    action = _primitive if primitive is None else primitive
+    errors = []
+    return _controller.call({"operation": operation, "arguments": arguments}, action, errors=errors, cleanup=errors.clear)
+
 
 START_MARKER = b"VINIX NO SYNC: START"
 # To the end of the line: the number can arrive a digit at a time.
@@ -104,13 +137,8 @@ def stop_child(pid: int, master: int) -> None:
 
 
 def find_debugfs() -> str | None:
-    for candidate in (shutil.which("debugfs"),
-                      "/opt/homebrew/opt/e2fsprogs/sbin/debugfs",
-                      "/usr/local/opt/e2fsprogs/sbin/debugfs",
-                      "/sbin/debugfs"):
-        if candidate and os.access(candidate, os.X_OK):
-            return candidate
-    return None
+    result = _native("find", {})
+    return None if result is None else os.fsdecode(bytes.fromhex(result))
 
 
 def initramfs(path: Path, step: str) -> None:
@@ -131,10 +159,8 @@ def initramfs(path: Path, step: str) -> None:
 
 def boot(root: Path, arguments: argparse.Namespace, environment: dict[str, str],
          build: bool, step: str) -> tuple[bool, int]:
-    command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--mem=2048",
-               f"--guest-init={arguments.init}"]
-    if not build:
-        command.insert(1, "--no-build")
+    command = [os.fsdecode(bytes.fromhex(item)) for item in _native("command", {
+        "root": os.fsencode(root).hex(), "init": os.fsencode(arguments.init).hex(), "build": build})]
 
     print(f"==> Boot for {step}")
     pid, master = pty.fork()
@@ -173,68 +199,21 @@ def boot(root: Path, arguments: argparse.Namespace, environment: dict[str, str],
         sys.stdout.buffer.flush()
         print()
 
-    if any(marker in transcript for marker in FAIL_MARKERS):
-        print(f"ERROR: the guest reported a failure at {step}", file=sys.stderr)
-        return False, 0
-    if START_MARKER not in transcript:
-        print(f"ERROR: the guest never started {step}", file=sys.stderr)
-        return False, 0
-    if done is None or done.group(1).decode() != step:
-        print(f"ERROR: the guest never finished {step}", file=sys.stderr)
-        return False, 0
-    return True, int(done.group(2))
+    finished, number = _native("report", {"transcript": bytes(transcript).hex(), "step": step,
+                                         "done": None if done is None else [done.group(1).hex(), done.group(2).decode("ascii")]})
+    return finished, int(number)
 
 
 def debugfs(tool: str, disk: Path, request: str) -> str:
-    result = subprocess.run([tool, "-R", request, str(disk)], capture_output=True,
-                            text=True, check=False)
-    return result.stdout + result.stderr
+    return _native("debugfs", {"tool": os.fsencode(tool).hex(), "disk": os.fsencode(disk).hex(), "request": os.fsencode(request).hex()})
 
 
 def inode(tool: str, disk: Path, path: str) -> dict[str, str] | None:
-    text = debugfs(tool, disk, f"stat {path}")
-    if "File not found" in text:
-        return None
-    fields = {}
-    for name in ("Type", "Mode", "Links"):
-        match = re.search(rf"\b{name}:\s+(\S+)", text)
-        if match:
-            fields[name] = match.group(1)
-    return fields
+    return _native("inode", {"tool": os.fsencode(tool).hex(), "disk": os.fsencode(disk).hex(), "path": os.fsencode(path).hex()})
 
 
 def check(tool: str, disk: Path, step: str, ino: int) -> list[str]:
-    def expect(path: str, **wanted: str) -> list[str]:
-        found = inode(tool, disk, path)
-        if found is None:
-            return [f"{path} is not on the disk"]
-        return [f"{path} has {name} {found.get(name)}, not {value}"
-                for name, value in wanted.items() if found.get(name) != value]
-
-    def absent(path: str) -> list[str]:
-        return [] if inode(tool, disk, path) is None else [f"{path} is still on the disk"]
-
-    def freed(number: int) -> list[str]:
-        text = debugfs(tool, disk, f"testi <{number}>")
-        return [] if "not in use" in text else [f"inode {number} is still in use"]
-
-    if step == "mkdir":
-        return expect("/made", Type="directory")
-    if step == "create":
-        return expect("/named", Type="regular")
-    if step == "rename":
-        return absent("/named") + expect("/renamed", Type="regular")
-    if step == "link":
-        return expect("/linked", Type="regular", Links="2")
-    if step == "unlink":
-        return absent("/renamed") + expect("/linked", Links="1")
-    if step == "chmod":
-        return expect("/linked", Mode="0600")
-    if step == "exit":
-        return absent("/made/exited") + freed(ino)
-    if step == "exec":
-        return absent("/made/execed") + freed(ino)
-    return [f"no check for {step}"]
+    return _native("check", {"tool": os.fsencode(tool).hex(), "disk": os.fsencode(disk).hex(), "step": step, "number": str(ino)})
 
 
 def main() -> int:
@@ -246,44 +225,21 @@ def main() -> int:
     # Its own lines go out between the guest's raw transcripts, in order.
     sys.stdout.reconfigure(line_buffering=True)
 
-    tool = find_debugfs()
-    if tool is None:
-        print("ERROR: reading the volume needs debugfs (install e2fsprogs)", file=sys.stderr)
-        return 1
+    def primitive(name, value):
+        if name == "paths":
+            root = Path(__file__).resolve().parents[2]
+            arguments.state_dir.mkdir(parents=True, exist_ok=True)
+            return [os.fsencode(root).hex(), os.fsencode(arguments.state_dir).hex()]
+        if name == "port": return available_port()
+        if name == "platform": return platform.system()
+        if name == "initramfs": return initramfs(Path(os.fsdecode(bytes.fromhex(value["path"]))), value["step"])
+        if name == "boot":
+            environment = {os.fsdecode(bytes.fromhex(key)): os.fsdecode(bytes.fromhex(item)) for key, item in value["environment"]}
+            finished, number = boot(Path(os.fsdecode(bytes.fromhex(value["root"]))), arguments, environment, value["build"], value["step"])
+            return [finished, str(number)]
+        return _primitive(name, value)
 
-    root = Path(__file__).resolve().parents[2]
-    arguments.state_dir.mkdir(parents=True, exist_ok=True)
-    disk = arguments.state_dir / "root.ext2"
-    step_initramfs = arguments.state_dir / "initramfs.tar"
-
-    environment = os.environ.copy()
-    environment["VINIX_INITRAMFS"] = str(step_initramfs)
-    environment["VINIX_BOOT_DISK"] = str(arguments.state_dir / "boot.img")
-    environment["VINIX_EFIVARS"] = str(arguments.state_dir / "efivars.fd")
-    environment["VINIX_QEMU_PACKAGE_STORE"] = str(arguments.state_dir / "packages.tar")
-    environment["VINIX_QEMU_PERSIST_DISK"] = str(disk)
-    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = "64"
-    environment.pop("VINIX_QEMU_PERSIST", None)
-    environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
-    environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
-    if platform.system() != "Darwin":
-        environment.setdefault("USE_TCG", "1")
-
-    build = os.environ.get("VINIX_DISK_NO_SYNC_NO_BUILD") != "1"
-    for step in STEPS:
-        initramfs(step_initramfs, step)
-        finished, ino = boot(root, arguments, environment, build, step)
-        build = False
-        if not finished:
-            return 1
-        problems = check(tool, disk, step, ino)
-        if problems:
-            for problem in problems:
-                print(f"ERROR: after {step} with no sync: {problem}", file=sys.stderr)
-            return 1
-        print(f"==> {step} was on the disk when its call returned")
-    print("==> AArch64 changes reached the disk with no sync")
-    return 0
+    return _native("main", {}, primitive)
 
 
 if __name__ == "__main__":
