@@ -9,5 +9,7 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 for name in device_io.v platform.c.v backlight_client.v battery_client.v wifi_client.v; do
     cp "$root/desktop/$name" "$work/"
 done
-cp "$root/desktop/tools/tests/device_io_mock.v" "$root/desktop/tools/tests/battery_client_test.v" "$work/"
+cp "$root/desktop/libc_compat.h" "$work/"
+cp "$root/desktop/tools/tests/device_io_mock.v" "$root/desktop/tools/tests/taskbar_status_mock.v" \
+    "$root/desktop/tools/tests/battery_client_test.v" "$work/"
 "$v" -gc none -enable-globals -stats "$work/battery_client_test.v"

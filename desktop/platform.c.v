@@ -48,6 +48,10 @@ fn C.fstat(fd int, buf &C.stat) int
 
 fn C.lstat(path &char, buf &C.stat) int
 
+// Declared where it is called: the client tests build this file without the
+// applications that also declare it.
+fn C.fstatat(dirfd int, path &char, buf &C.stat, flags int) int
+
 fn C.posix_openpt(flags int) int
 
 fn C.grantpt(fd int) int
