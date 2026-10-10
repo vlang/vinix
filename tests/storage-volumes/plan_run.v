@@ -38,7 +38,7 @@ fn host(root string, work string) ! {
 	generate(root, root + '/tools/volumes/volumecli', work + '/volume.c', 'x86_64')!
 	check_generated(work + '/volume.c')!
 	init_policy(root, work)!
-	println('PASS host: plan format, identity, corruption, bounds, atomic publication and sanitizers')
+	println('PASS host: plan format, identity, corruption, bounded plan sets, atomic publication and sanitizers')
 }
 
 fn init_policy(root string, work string) ! {
@@ -225,6 +225,7 @@ fn guest(root string, work string, arch string, kernel string) ! {
 	args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false)! }
 	first := boot(args, work + '/first-boot.log')!
 	if !first.contains('init: volume restore failed; continuing') { return error('Production init did not report its invalid boot plan and continue') }
+	if !first.contains('PLAN SET PREFLIGHT PASSED') { return error('Missing multi-disk plan-set qualification') }
 	mut encoded := ''
 	for line in first.split_into_lines() { if line.starts_with('PLAN FILE ') { encoded = line.all_after('PLAN FILE ').trim_space() } }
 	if encoded.len < 256 || encoded.len > 4224 { return error('Missing saved plan bytes in first boot') }
@@ -234,7 +235,7 @@ fn guest(root string, work string, arch string, kernel string) ! {
 	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true)! }
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
-	println('PASS ${arch}: discovery, ambiguity and trust rejection, production init restore after device reorder, 200-cycle retention and reboot data')
+	println('PASS ${arch}: multi-disk set preflight, discovery and trust rejection, production init restore after device reorder, 200-cycle retention and reboot data')
 }
 
 fn main() {

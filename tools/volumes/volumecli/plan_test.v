@@ -174,3 +174,81 @@ fn test_discovery_ignores_regular_files_and_symlinks_and_rejects_invalid_plans()
 	assert discover_disk(&invalid, work.str, true, &name[0]) == -1
 	assert os.read_file(path)! == 'not a block device'
 }
+
+fn test_plan_sets_reject_duplicate_disks_and_slots_without_appending() {
+	mut set := PlanSet{}
+	first := sample_plan()
+	assert append_plan(mut set, &first)
+	assert !append_plan(mut set, &first) && set.count == 1
+	mut second := first; second.key.id[0]++
+	assert !append_plan(mut set, &second) && set.count == 1
+	second.rows[0].slot = 9; second.rows[1].slot = 12
+	assert append_plan(mut set, &second) && set.count == 2
+	mut invalid := second; invalid.key.id[0]++; invalid.rows[1].length = 0
+	assert !append_plan(mut set, &invalid) && set.count == 2
+	assert set.slots == (u64(1) << 2) | (u64(1) << 5) | (u64(1) << 9) | (u64(1) << 12)
+}
+
+fn test_plan_sets_support_64_distinct_disks_and_all_global_slots() {
+	mut set := PlanSet{}
+	for i := 0; i < 64; i++ {
+		mut plan := sample_plan(); plan.count = 1; plan.key.id[0] = u8(i + 1)
+		plan.rows[0].slot = u32(i)
+		assert append_plan(mut set, &plan)
+	}
+	assert set.count == 64 && set.slots == u64(-1)
+	mut extra := sample_plan(); extra.count = 0; extra.key.id[0] = 65
+	assert !append_plan(mut set, &extra) && set.count == 64
+}
+
+fn host_plan_directory(path string, mut set PlanSet) bool {
+	fd := C.open(path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if fd < 0 { return false }
+	defer { C.close(fd) }
+	result := load_plan_directory(fd, mut set, false)
+	assert C.fcntl(fd, C.F_GETFD) >= 0 // Enumeration does not close the caller's FD.
+	return result
+}
+
+fn test_plan_directory_sorting_ignored_files_and_selected_link_rejection() {
+	work := os.join_path(os.temp_dir(), 'vinix-plan-set-test-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	first := sample_plan()
+	mut second := first; second.key.id[0]++; second.rows[0].slot = 9; second.rows[1].slot = 12
+	assert publish_plan((work + '/z-data.vmap').str, &second)
+	assert publish_plan((work + '/a-main.vmap').str, &first)
+	for name in ['.disabled.vmap', '.vinix-volume-0-0', 'README', 'old.vmap.bak'] {
+		os.write_file(work + '/' + name, 'deliberately not a plan')!
+	}
+	mut set := PlanSet{}
+	assert host_plan_directory(work, mut set) && set.count == 2
+	assert key_matches(&set.plans[0].key, &first.key) && key_matches(&set.plans[1].key, &second.key)
+	os.symlink(work + '/a-main.vmap', work + '/b-link.vmap')!
+	set = PlanSet{}
+	assert !host_plan_directory(work, mut set)
+	os.rm(work + '/b-link.vmap')!
+	os.mkdir(work + '/b-directory.vmap')!
+	set = PlanSet{}
+	assert !host_plan_directory(work, mut set)
+	assert os.read_file(work + '/README')! == 'deliberately not a plan'
+}
+
+fn test_plan_directory_enforces_plan_and_entry_limits_before_loading() {
+	work := os.join_path(os.temp_dir(), 'vinix-plan-set-limit-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	for i := 0; i < 65; i++ { os.write_file(work + '/${i}.vmap', 'invalid')! }
+	mut set := PlanSet{}
+	assert !host_plan_directory(work, mut set) && set.count == 0
+	for i := 0; i < 65; i++ { os.rm(work + '/${i}.vmap')! }
+	for i := 0; i < 64; i++ {
+		mut plan := sample_plan(); plan.count = 0; plan.key.id[0] = u8(i + 1)
+		assert publish_plan((work + '/${i}.vmap').str, &plan)
+	}
+	assert host_plan_directory(work, mut set) && set.count == 64 && set.slots == 0
+	for i := 0; i < 64; i++ { os.rm(work + '/${i}.vmap')! }
+	set = PlanSet{}
+	for i := 0; i < 4097; i++ { os.write_file(work + '/ignored-${i}', '')! }
+	assert !host_plan_directory(work, mut set) && set.count == 0
+}

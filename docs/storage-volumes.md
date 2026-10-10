@@ -73,7 +73,8 @@ identity and geometry before creating mappings. Runtime disk numbers and paths
 are absent from the saved format. All records are checked for corruption,
 bounds, alignment, duplicate slots and overlapping extents. Every occupied
 requested slot must already match the selected disk, offset, length and
-read-only mode; a conflict fails before creating any missing mapping. Matching
+read-only mode; a conflict fails before creating any missing mapping. Unlisted
+managed views overlapping a requested extent also fail preflight. Matching
 views retain their generation and open descriptors, making repeated restore
 idempotent. Creates retain the kernel's ordinary management privileges, extent
 protection and resource limits.
@@ -128,20 +129,60 @@ matching identities on distinct physical disks fail before creating any view.
 
 The packaged ARM desktop init and both architectures' Alpine init scripts, plus
 the AMD64 desktop init, run `boot-restore` once before starting applications or
-the interactive shell. It loads only `/etc/vinix/volumes.vmap`. A missing plan is
-a successful no-op. The opened `/etc`, `/etc/vinix` and plan must be owned by
+the interactive shell. It loads `/etc/vinix/volumes.vmap` when present, together
+with visible `.vmap` files in `/etc/vinix/volumes.d` as one plan set. Missing
+configuration or an empty set is a successful no-op. The opened `/etc`,
+`/etc/vinix`, enabled plans directory and every enabled file must be owned by
 root and not writable by group or others; none of those path components may be
-a symlink. The plan must also satisfy the regular-file and checksum rules.
+a symlink. Plans must also satisfy the regular-file and checksum rules.
 Directory-relative operations pin the configuration and device directories;
-the discovered disk descriptor remains open through restore.
+all discovered disk descriptors remain open through restore.
 
 A failed boot restore prints its reason and init continues to the desktop or
 recovery shell. It does not format, unlock or mount volumes, retry hotplug, or
-remove existing mappings. One physical disk's plan can be enabled for boot in
-this increment; other plans can be applied explicitly with `restore-auto`.
-Delete the configured plan to disable replay. Normal restore's serialized
-administration and partial-failure rules still apply, and boot replay does not
-provide the root filesystem needed to load its own configuration.
+remove existing mappings. Delete an enabled plan or give it a hidden name or a
+different extension to disable its replay. Boot replay does not provide the
+root filesystem needed to load its own configuration.
+
+## Multi-disk plan sets
+
+As an alternative to the single default file, enable one plan per disk in a
+directory. Do not also leave the same disk's plan enabled as `volumes.vmap`.
+
+```sh
+mkdir -p /etc/vinix/volumes.d
+chown root:root /etc/vinix /etc/vinix/volumes.d
+chmod 755 /etc/vinix /etc/vinix/volumes.d
+vinix-volume save /dev/vda /etc/vinix/volumes.d/main.vmap
+vinix-volume save /dev/vdb /etc/vinix/volumes.d/data.vmap
+vinix-volume restore-set /etc/vinix/volumes.d
+vinix-volume boot-restore
+```
+
+`restore-set DIRECTORY` reads visible files ending in `.vmap`, without recursion.
+Other names, including publication temporaries and backup files, are ignored.
+An enabled symlink, directory, device or other nonregular file fails the set.
+Explicit restoration uses normal file read permissions; boot replay adds the
+ownership and write-permission checks above.
+
+Sets contain at most 64 disk plans and 64 mappings in total. Each directory scan
+visits at most 4096 non-dot entries. Files are loaded in bytewise filename order;
+the legacy default file comes first during boot. Duplicate disk keys or global
+mapper slots fail validation. All plans are decoded before disk discovery, and
+all physical disks and existing mapping slots/extents are checked before the
+first create. An absent or ambiguous disk, a malformed or untrusted later plan,
+or a later mapping conflict cannot leave a restored prefix. Existing matching
+views keep their generations and open descriptors. Physical identities are
+rechecked through the retained disk descriptors after the final preflight.
+
+These are preflight guarantees for serialized administration, not an atomic
+multi-disk transaction. There is no global configuration generation or management
+lock. Kernel creation still checks privilege, mounted/swap protection, quota and
+current geometry. A failure during creation or concurrent reconfiguration can
+leave previously created mappings in place, including an earlier disk's complete
+plan. Replay resumes from matching mappings and never removes unlisted views.
+Saving several files does not publish a set atomically; finish enrollment before
+boot or explicit restore. Pools, spanning volumes and RAID remain separate work.
 
 ## Status ABI
 
@@ -236,11 +277,16 @@ checks persisted data and read-only policy without a host-supplied plan. The
 first boot exercises init recovery from an invalid configured plan, rejects
 corrupt files, untrusted configuration, a different disk, duplicated identity
 and conflicting slots, checks physical aliases and repeated/partial restore,
-and measures retained heap across 200 save/automatic-restore cycles after
-warming the same paths. Before the second boot the physical devices are
-reordered. Production init restores the configured plan before the test
+then qualifies a two-disk set. Duplicate disks/slots, a missing later disk,
+untrusted directory entries, later slot conflicts and unlisted overlaps leave
+earlier disks untouched. Directory-only and legacy-plus-directory replay are
+both checked. The fixture measures retained heap across 200 save/boot-restore
+cycles after warming the same paths. Before the second boot the physical devices
+are reordered. Production init restores both configured disks before the test
 application starts. Host init policy checks cover missing utility, synchronous
 reaping, nonzero utility exits, fork failure and failed exec under ASan/UBSan.
+Host plan-set checks also exercise 64 plans, all global slots, deterministic
+ordering, ignored filenames and enumeration limits.
 
 NVMe discard is qualified with the production command/completion code and
 mocked MMIO on the host, including 200 successful operations and failed-reset

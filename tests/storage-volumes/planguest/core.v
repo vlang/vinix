@@ -44,6 +44,7 @@ fn C.symlink(&char, &char) i32
 fn C.unlink(&char) i32
 fn C.getpid() i32
 fn C.getppid() i32
+fn C.mkdir(&char, u32) i32
 
 struct C.stat { st_rdev u64 }
 
@@ -155,10 +156,123 @@ fn heap_snapshot(mut snapshot Heap) {
 
 fn cycles(parent &char, count int) {
 	for _ in 0 .. count {
-		simple(c'save', parent, c'/root/saved.vmap', 0)
-		simple(c'restore-auto', c'/root/saved.vmap', unsafe { &char(nil) }, 0)
+		simple(c'save', parent, c'/etc/vinix/volumes.vmap', 0)
+		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 	}
 	C.sleep(13)
+}
+
+@[direct_array_access]
+fn second_view_data() {
+	fd := C.open(c'/dev/mapper/vinix9', C.O_RDONLY)
+	mut bytes := [4096]u8{}
+	check(fd >= 0 && C.pread(fd, &bytes[0], 4096, 0) == 4096, c'read second disk data')
+	for value in bytes { check(value == 0xb3, c'second disk data preserved') }
+	check(C.close(fd) == 0, c'close second disk view')
+}
+
+fn copy_plan(from &char, to &char) {
+	input := C.open(from, C.O_RDONLY)
+	mut bytes := [2112]u8{}
+	size := C.read(input, &bytes[0], 2112)
+	check(input >= 0 && size >= 64 && size <= 2112 && C.close(input) == 0, c'read plan copy')
+	output := C.open(to, C.O_WRONLY | C.O_CREAT | C.O_TRUNC, u32(0o600))
+	check(output >= 0 && C.write(output, &bytes[0], usize(size)) == size && C.fsync(output) == 0 && C.close(output) == 0, c'write plan copy')
+}
+
+// Change a record while preserving a valid checksum, so the plan-set test
+// reaches global slot validation rather than failing the format check.
+@[direct_array_access]
+fn conflicting_plan_slot(path &char) {
+	fd := C.open(path, C.O_RDWR)
+	mut bytes := [96]u8{}
+	check(fd >= 0 && C.read(fd, &bytes[0], 96) == 96, c'read slot conflict fixture')
+	bytes[68] = 2
+	mut crc := u32(-1)
+	for i := 0; i < 96; i++ {
+		crc ^= if i >= 36 && i < 40 { u32(0) } else { u32(bytes[i]) }
+		for _ in 0 .. 8 { crc = (crc >> 1) ^ if crc & 1 != 0 { u32(0xedb88320) } else { u32(0) } }
+	}
+	crc = ~crc
+	for i := 0; i < 4; i++ { bytes[36 + i] = u8(crc >> (8 * i)) }
+	check(C.pwrite(fd, &bytes[0], 96, 0) == 96 && C.fsync(fd) == 0 && C.close(fd) == 0, c'write slot conflict fixture')
+}
+
+fn missing_set() {
+	missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5'); missing(c'/dev/mapper/vinix9')
+}
+
+fn remove_set() {
+	unsafe {
+		simple(c'remove', c'/dev/mapper/vinix2', &char(nil), 0)
+		simple(c'remove', c'/dev/mapper/vinix5', &char(nil), 0)
+		simple(c'remove', c'/dev/mapper/vinix9', &char(nil), 0)
+	}
+}
+
+@[direct_array_access]
+fn multiple_plans(parent &char, other &char) {
+	unsafe {
+		check(C.mkdir(c'/etc/vinix/volumes.d', 0o755) == 0, c'create boot plans directory')
+		tool(c'create', other, c'9', c'1048576', c'4096', 0)
+		fd := C.open(c'/dev/mapper/vinix9', C.O_RDWR)
+		mut bytes := [4096]u8{init: 0xb3}
+		check(fd >= 0 && C.pwrite(fd, &bytes[0], 4096, 0) == 4096 && C.fsync(fd) == 0 && C.close(fd) == 0, c'write second disk data')
+		simple(c'save', other, c'/root/second.vmap', 0)
+		simple(c'save', parent, c'/etc/vinix/volumes.vmap', 0)
+		copy_plan(c'/root/second.vmap', c'/etc/vinix/volumes.d/z-data.vmap')
+		// Ignored files must not become enabled plans accidentally.
+		copy_plan(c'/root/bad.vmap', c'/etc/vinix/volumes.d/.disabled.vmap')
+		copy_plan(c'/root/bad.vmap', c'/etc/vinix/volumes.d/old.vmap.bak')
+		remove_set()
+		copy_plan(c'/root/bad.vmap', c'/etc/vinix/volumes.d/z-data.vmap')
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		copy_plan(c'/root/second.vmap', c'/etc/vinix/volumes.d/z-data.vmap')
+		copy_plan(c'/etc/vinix/volumes.vmap', c'/etc/vinix/volumes.d/a-duplicate.vmap')
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		check(C.unlink(c'/etc/vinix/volumes.d/a-duplicate.vmap') == 0, c'remove duplicate plan')
+		conflicting_plan_slot(c'/etc/vinix/volumes.d/z-data.vmap')
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		copy_plan(c'/root/second.vmap', c'/etc/vinix/volumes.d/z-data.vmap')
+		signature(other, 0x1234567a)
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		signature(other, 0x12345679)
+		check(C.chmod(c'/etc/vinix/volumes.d', 0o777) == 0, c'untrusted set directory')
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		check(C.chmod(c'/etc/vinix/volumes.d', 0o755) == 0 && C.chmod(c'/etc/vinix/volumes.d/z-data.vmap', 0o622) == 0, c'untrusted set file')
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		check(C.chmod(c'/etc/vinix/volumes.d/z-data.vmap', 0o600) == 0 && C.chown(c'/etc/vinix/volumes.d/z-data.vmap', 65534, 65534) == 0, c'untrusted set owner')
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		check(C.chown(c'/etc/vinix/volumes.d/z-data.vmap', 0, 0) == 0, c'restore set owner')
+		check(C.rename(c'/etc/vinix/volumes.d/z-data.vmap', c'/etc/vinix/volumes.d/.real-data') == 0
+			&& C.symlink(c'.real-data', c'/etc/vinix/volumes.d/z-data.vmap') == 0, c'set symlink fixture')
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		check(C.unlink(c'/etc/vinix/volumes.d/z-data.vmap') == 0
+			&& C.rename(c'/etc/vinix/volumes.d/.real-data', c'/etc/vinix/volumes.d/z-data.vmap') == 0, c'restore regular set file')
+		// A conflict on the later disk cannot create mappings on the first.
+		tool(c'create', other, c'9', c'3145728', c'4096', 0)
+		kept := status(c'/dev/mapper/vinix9').generation
+		simple(c'boot-restore', &char(nil), &char(nil), 1)
+		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5')
+		check(status(c'/dev/mapper/vinix9').generation == kept, c'conflicting mapping unchanged')
+		simple(c'remove', c'/dev/mapper/vinix9', &char(nil), 0)
+		// The same guarantee includes an unlisted overlapping slot.
+		tool(c'create', other, c'12', c'1048576', c'4096', 0)
+		simple(c'boot-restore', &char(nil), &char(nil), 1); missing_set()
+		simple(c'remove', c'/dev/mapper/vinix12', &char(nil), 0)
+		// Exercise directory-only restoration, then legacy plus directory.
+		check(C.rename(c'/etc/vinix/volumes.vmap', c'/etc/vinix/volumes.d/a-primary.vmap') == 0, c'directory-only set')
+		simple(c'restore-set', c'/etc/vinix/volumes.d', &char(nil), 0)
+		view_data(); second_view_data()
+		first_generation := status(c'/dev/mapper/vinix2').generation
+		second_generation := status(c'/dev/mapper/vinix9').generation
+		simple(c'boot-restore', &char(nil), &char(nil), 0)
+		check(C.rename(c'/etc/vinix/volumes.d/a-primary.vmap', c'/etc/vinix/volumes.vmap') == 0, c'restore legacy plan')
+		simple(c'boot-restore', &char(nil), &char(nil), 0)
+		check(status(c'/dev/mapper/vinix2').generation == first_generation
+			&& status(c'/dev/mapper/vinix9').generation == second_generation, c'plan set idempotence')
+		C.printf(c'PLAN SET PREFLIGHT PASSED\n')
+	}
 }
 
 fn fixture_plan(bytes &u8) {
@@ -291,6 +405,7 @@ fn first_boot(parent &char) {
 		check(status(c'/dev/mapper/vinix5').generation == kept, c'resume keeps existing mapping')
 		view_data()
 		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0, c'alias fixture cleanup')
+		multiple_plans(parent, wrong)
 		allocation_trace(c'/proc/allocstart', false)
 		cycles(parent, 200)
 		mut before := Heap{}; heap_snapshot(mut before)
@@ -341,13 +456,17 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	if phase < 0 { first_boot(parent) }
 	else {
 		C.close(phase)
-		view_data()
+		view_data(); second_view_data()
 		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
-		check(C.getppid() == 1 && status(c'/dev/mapper/vinix2').disk_id == status(actual).disk_id, c'init restored reordered physical disk')
+		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
+		check(C.getppid() == 1 && status(c'/dev/mapper/vinix2').disk_id == status(actual).disk_id
+			&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id, c'init restored reordered physical disks')
 		C.printf(c'PLAN BOOT RESTORED\n')
 		before := status(c'/dev/mapper/vinix2').generation
+		second_before := status(c'/dev/mapper/vinix9').generation
 		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
-		check(status(c'/dev/mapper/vinix2').generation == before, c'reboot restore idempotence')
+		check(status(c'/dev/mapper/vinix2').generation == before
+			&& status(c'/dev/mapper/vinix9').generation == second_before, c'reboot restore idempotence')
 	}
 	C.printf(c'PLAN DONE\n')
 	for { C.pause() }

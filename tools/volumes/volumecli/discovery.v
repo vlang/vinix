@@ -118,8 +118,8 @@ fn automatic_plan(path &char, restore bool) i32 {
 	return automatic_loaded(plan, restore)
 }
 
-// One explicitly installed plan is replayed once before boot applications.
-// Absence is normal. Both the directory and opened file must be trusted.
+// The legacy plan and volumes.d form one preflighted set. Absence is normal.
+// Configuration directories and every enabled file must be trusted.
 fn boot_restore() i32 {
 	etc := C.open(c'/etc', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 	if etc < 0 {
@@ -127,27 +127,17 @@ fn boot_restore() i32 {
 		C.perror(c'vinix-volume: boot configuration directory'); return 1
 	}
 	defer { C.close(etc) }
-	mut info := C.stat{}
 	directory := C.openat(etc, c'vinix', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 	if directory < 0 {
 		if unsafe { C.errno == C.ENOENT } { return 0 }
 		C.perror(c'vinix-volume: boot plan directory'); return 1
 	}
 	defer { C.close(directory) }
-	fd := C.openat(directory, c'volumes.vmap', C.O_RDONLY | C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CLOEXEC)
-	if fd < 0 {
-		if unsafe { C.errno == C.ENOENT } { return 0 }
-		C.perror(c'vinix-volume: boot plan'); return 1
-	}
-	defer { C.close(fd) }
-	if C.fstat(etc, &info) != 0 || info.st_uid != 0 || info.st_mode & 0o022 != 0 {
-		return plan_error(c'boot configuration directory must be owned by root and not writable by group or others')
-	}
-	if C.fstat(directory, &info) != 0 || info.st_uid != 0 || info.st_mode & 0o022 != 0 {
-		return plan_error(c'boot plan directory must be owned by root and not writable by group or others')
-	}
-	mut plan := unsafe { &Plan(C.alloca(sizeof(Plan))) }
-	unsafe { *plan = Plan{} }
-	if !read_plan(fd, mut plan, true) { return 1 }
-	return automatic_loaded(plan, true)
+	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
+	unsafe { *set = PlanSet{} }
+	if !load_boot_plans(directory, mut set) { return 1 }
+	if set.count == 0 { return 0 }
+	if !trusted_directory(etc, c'boot configuration directory must be owned by root and not writable by group or others')
+		|| !trusted_directory(directory, c'boot plan directory must be owned by root and not writable by group or others') { return 1 }
+	return restore_plan_set(set)
 }

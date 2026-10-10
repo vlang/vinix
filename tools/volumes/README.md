@@ -16,11 +16,15 @@ discovery uses `vinix-volume discover PLAN`, and `restore-auto PLAN` restores
 the unique physical match. Distinct disks with duplicate identity are rejected.
 
 Init runs `vinix-volume boot-restore` before applications. It replays the
-optional root-owned `/etc/vinix/volumes.vmap`; absence is a no-op, and failure
-is reported while boot continues. The configuration directories and plan must
-not be writable by group or others. Only one disk's plan is enabled at boot;
-other plans can be restored explicitly. See the storage documentation for
-discovery bounds, alias behavior and filesystem/mount limits.
+optional root-owned `/etc/vinix/volumes.vmap` and visible `.vmap` files in
+`/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported
+while boot continues. The configuration directories and enabled files must
+not be writable by group or others. One plan per disk and unique global mapper
+slots are required. `restore-set DIRECTORY` applies a directory explicitly.
+All plans, discovered disks and existing slot/extent conflicts are checked
+before any mapping is created. Matching mappings keep their generations.
+See the storage documentation for bounds, partial creation failures, serialized
+administration, alias behavior and filesystem/mount limits.
 
 The image builders call `build-support/storage-tools/stage.v`, which uses the
 repository's V module producer and a static target musl compiler. To install it

@@ -17,14 +17,18 @@ Each work directory must be new. Host checks cover format bounds, every
 truncated prefix and single-bit corruption, checksummed invalid records,
 512/4096-byte identity parsing, GPT header CRC, changed identity/geometry and
 atomic file publication and discovery's regular-file/symlink rejection with
-ASan/UBSan. The same controller runs both native init policy variants, including
+ASan/UBSan. Plan-set checks cover duplicate disks/slots, 64 plans and all global
+slots, directory ordering, ignored names, selected nonregular files, descriptor
+ownership and the 4096-entry limit. The same controller runs both native init
+policy variants, including
 missing utility, synchronous reaping, fork/exec failure and failed restore.
 Generated utility, init and guest C are checked for unexpected heap or V
 runtime dependencies.
 
 Guest runs need target musl compilers, Clang/LLD, QEMU, `mke2fs`/`debugfs`, and
-the cached Limine and firmware files from the image builders. ARM also needs mtools; AMD64 needs
-`xorriso`. `VINIX_OVMF_CODE` and `VINIX_OVMF_CODE_AMD64` override firmware paths.
+the cached Limine and firmware files from the image builders. ARM also needs
+mtools; AMD64 needs `xorriso`. `VINIX_OVMF_CODE` and `VINIX_OVMF_CODE_AMD64`
+override firmware paths.
 AMD64 uses the cached Alpine BusyBox and musl loader from
 `build-amd64-userland/staging`; `VINIX_AMD64_USERLAND_ROOT` overrides that root.
 On AMD64 a V console adapter redirects init's output to serial and execs the
@@ -36,20 +40,26 @@ discovery on x86 TCG; the strict retention checks are unchanged.
 It preserves logs and a copy of the saved plan in the work directory.
 
 The fixture boots from an ext2 system disk. A separate raw disk holds managed
-views, and a third disk with different MBR identity tests wrong-target rejection.
+views, and a third disk with different MBR identity first tests wrong-target
+rejection, then holds an independently configured mapping.
 The first boot runs production init with a deliberately invalid plan, verifies
 the failure is reported and the application still starts, then saves
 writable/read-only mappings. It rejects corrupt plans, writable boot
 configuration, duplicated physical identities and conflicting slots before
 creation. It accepts physical aliases, skips symlinks/partitions, checks
-idempotence and restoration with an already matching slot, and measures
-slab/large retention over 200 save/automatic-restore cycles after 200 warmup
-cycles. A flushed phase marker and enrolled plan stay on ext2 across an abrupt
-VM stop. The physical disks are reordered for the second boot. Production ARM
-native init or AMD64 desktop init restores the disk-resident plan before the
+idempotence and restoration with an already matching slot. A multi-disk set then
+rejects corrupt later plans, duplicate disk keys/global slots, missing disks,
+untrusted directories/files and selected symlinks without creating a prefix.
+Conflicting requested slots and unlisted overlapping views on the later disk
+leave earlier disks untouched. Directory-only and legacy-plus-directory restore
+both preserve data and existing generations. The fixture measures slab/large
+retention over 200 save/boot-restore cycles after 200 warmup cycles, with both
+disks enabled. A flushed phase marker and enrolled plans stay on ext2 across an
+abrupt VM stop. The physical disks are reordered for the second boot. Production ARM
+native init or AMD64 desktop init restores both disk-resident plans before the
 test application starts, and the application checks persisted data, read-only
-mode, the new physical identity and idempotence. The host does not inject the
-plan or phase marker between boots.
+mode, the correct physical disks after reordering and idempotence. The host does
+not inject the plans or phase marker between boots.
 
 The fixture touches its readable ELF load pages before sampling. This keeps
 cold faults in the long-lived test program's diagnostic code from appearing as

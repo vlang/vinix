@@ -222,36 +222,75 @@ fn restore_plan(device &char, path &char) i32 {
 
 @[direct_array_access]
 fn restore_loaded(fd i32, plan &Plan) i32 {
+	mut state := unsafe { &RestoreState(C.alloca(sizeof(RestoreState))) }
+	unsafe { *state = RestoreState{} }
+	if !prepare_restore(fd, plan, mut state) { return 1 }
+	return apply_restore(fd, plan, state)
+}
+
+struct RestoreState {
+mut:
+	parent Status
+	present [64]bool
+}
+
+fn verify_restore_disk(fd i32, plan &Plan, parent &Status) bool {
 	mut key := unsafe { &DiskKey(C.alloca(sizeof(DiskKey))) }
 	unsafe { *key = DiskKey{} }
-	mut parent := Status{}
-	if !probe_disk(fd, mut key, mut parent) { return 1 }
-	if !key_matches(key, unsafe { &plan.key }) { return plan_error(c'plan disk identity or geometry does not match') }
-	mut present := [64]bool{}
-	// Validate every occupied slot before creating any missing mapping.
-	for i := u32(0); i < plan.count; i++ {
+	mut status := Status{}
+	if !probe_disk(fd, mut key, mut status) || !key_matches(key, unsafe { &plan.key }) || status.disk_id != parent.disk_id {
+		plan_error(c'disk identity changed before restore'); return false
+	}
+	return true
+}
+
+// Separate preflight from mutation so a plan set can check every disk and
+// occupied slot before creating the first mapping on any disk.
+@[direct_array_access]
+fn prepare_restore(fd i32, plan &Plan, mut state RestoreState) bool {
+	mut key := unsafe { &DiskKey(C.alloca(sizeof(DiskKey))) }
+	unsafe { *key = DiskKey{} }
+	state = RestoreState{}
+	if !probe_disk(fd, mut key, mut state.parent) { return false }
+	if !key_matches(key, unsafe { &plan.key }) { plan_error(c'plan disk identity or geometry does not match'); return false }
+	// Also check unlisted managed extents: a conflict on a later disk must
+	// not be discovered only after an earlier disk has acquired mappings.
+	for slot := u32(0); slot < 64; slot++ {
 		mut name := [64]char{}
-		volume_path(plan.rows[i].slot, &name[0])
+		volume_path(slot, &name[0])
 		view := C.open(&name[0], C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
 		if view < 0 {
 			if unsafe { C.errno == C.ENOENT } { continue }
-			C.perror(c'vinix-volume: open mapping'); return 1
+			C.perror(c'vinix-volume: open mapping'); return false
 		}
 		mut status := Status{}
 		valid := query_status(view, mut status)
 		C.close(view)
-		if !valid { return 1 }
-		if !mapping_matches(unsafe { &status }, unsafe { &parent }, unsafe { &plan.rows[i] }) { return plan_error(c'plan conflicts with an existing mapping') }
-		present[i] = true
+		if !valid { return false }
+		for i := u32(0); i < plan.count; i++ {
+			row := plan.rows[i]
+			if row.slot == slot {
+				if !mapping_matches(unsafe { &status }, unsafe { &state.parent }, unsafe { &plan.rows[i] }) {
+					plan_error(c'plan conflicts with an existing mapping'); return false
+				}
+				state.present[i] = true
+			} else if status.flags & 8 != 0 && status.disk_id == state.parent.disk_id {
+				if status.start > plan.key.bytes || status.bytes > plan.key.bytes - status.start {
+					plan_error(c'existing mapping has incompatible geometry'); return false
+				}
+				if row.offset < status.start + status.bytes && status.start < row.offset + row.length {
+					plan_error(c'plan overlaps an unlisted mapping'); return false
+				}
+			}
+		}
 	}
-	mut after := unsafe { &DiskKey(C.alloca(sizeof(DiskKey))) }
-	unsafe { *after = DiskKey{} }
-	mut status := Status{}
-	if !probe_disk(fd, mut after, mut status) || !key_matches(key, after) || status.disk_id != parent.disk_id {
-		return plan_error(c'disk identity changed before restore')
-	}
+	return verify_restore_disk(fd, plan, unsafe { &state.parent })
+}
+
+@[direct_array_access]
+fn apply_restore(fd i32, plan &Plan, state &RestoreState) i32 {
 	for i := u32(0); i < plan.count; i++ {
-		if present[i] { continue }
+		if state.present[i] { continue }
 		if C.ioctl(fd, u64(0x56560001), &plan.rows[i]) != 0 {
 			C.perror(c'vinix-volume: restore stopped; previously created mappings remain'); return 1
 		}
