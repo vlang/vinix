@@ -13,10 +13,12 @@
 // chipset powers the machine up when hours, minutes and seconds match.
 //
 // The clock counts in whole seconds, so a sleep is measured to within one.
-// The alarm has no date in it: it can be set at most a day ahead.
+// The alarm is set by time of day only, so at most a day ahead; where the
+// chipset adds a day and a month to it, those are set to match any.
 @[has_globals]
 module rtc
 
+import acpi
 import klock
 import x86.kio
 
@@ -51,9 +53,41 @@ pub const alarm_limit_seconds = u64(24 * 3600 - 1)
 const update_spins = 100000
 const read_attempts = 5
 
+// FADT: where the table says which CMOS registers hold the alarm's day and
+// month, each 0 when the clock has none.
+const fadt_day_alarm = u64(106)
+const fadt_month_alarm = u64(107)
+// The day register's top two bits are the clock's own (battery good, and
+// reserved); the day is in the rest, and 0 there is "any day".
+const date_alarm_keep = u8(0xc0)
+
 __global (
 	rtc_lock klock.Lock
+	// The two registers, read from the FADT once.
+	rtc_date_alarm_known bool
+	rtc_day_alarm        u8
+	rtc_month_alarm      u8
 )
+
+fn date_alarm_registers() (u8, u8) {
+	if !rtc_date_alarm_known {
+		rtc_date_alarm_known = true
+		if fadt := acpi.find_sdt('FACP', 0) {
+			if unsafe { *&u32(u64(fadt) + 4) } > u32(fadt_month_alarm) {
+				day := unsafe { *&u8(u64(fadt) + fadt_day_alarm) }
+				month := unsafe { *&u8(u64(fadt) + fadt_month_alarm) }
+				// A register among the clock's own first fourteen is not one.
+				if day >= 0x0d && day < 0x80 {
+					rtc_day_alarm = day
+					if month >= 0x0d && month < 0x80 {
+						rtc_month_alarm = month
+					}
+				}
+			}
+		}
+	}
+	return rtc_day_alarm, rtc_month_alarm
+}
 
 struct Reading {
 mut:
@@ -211,6 +245,17 @@ pub fn set_alarm(seconds u64) u64 {
 	write_register(reg_seconds_alarm, if binary { second } else { to_bcd(second) })
 	write_register(reg_minutes_alarm, if binary { minute } else { to_bcd(minute) })
 	write_register(reg_hours_alarm, (if binary { hour } else { to_bcd(hour) }) | pm)
+	// Where the clock also has a day and a month for its alarm, they are
+	// set to "any": the alarm is within a day, and a date left there by
+	// firmware's own "wake on" setting, or by another system, would have it
+	// match on that date only.
+	day_register, month_register := date_alarm_registers()
+	if day_register != 0 {
+		write_register(day_register, read_register(day_register) & date_alarm_keep)
+		if month_register != 0 {
+			write_register(month_register, 0)
+		}
+	}
 	// Reading the flags clears them: an alarm from before is not this one.
 	read_register(reg_c)
 	write_register(reg_b, (mode & ~b_alarm_interrupt) | b_alarm_interrupt)
