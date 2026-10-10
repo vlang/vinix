@@ -36,58 +36,93 @@ FAIL_MARKERS = (
 )
 
 
+_LITERAL_CACHE = {}
+_SLOT_KEYS = {name: sys.intern(name) for name in ('AF_INET', 'ArgumentParser', 'DEVNULL', 'SIGKILL', 'SIGTERM', 'SOCK_STREAM', 'USTAR_FORMAT', 'WNOHANG', 'add', 'add_argument', 'arch', 'bind', 'buffer', 'chdir', 'close', 'copy', 'copyfile', 'count', 'environ', 'execve', 'extractall', 'f_builtins', 'flush', 'fork', 'get', 'getsockname', 'hexdigest', 'init', 'initramfs', 'insert', 'join', 'killpg', 'mkdir', 'monotonic', 'open', 'parent', 'parents', 'parse_args', 'pop', 'read', 'read_bytes', 'resolve', 'run', 'run_path', 'select', 'setdefault', 'sha256', 'sleep', 'socket', 'state_dir', 'stderr', 'stdout', 'system', 'timeout', 'truncate', 'waitpid', 'which', 'with_name', 'write', 'write_bytes', 'write_text')}
+_ATTRIBUTE, _TRUTH, _ITER, _REPR, _SLICE = getattr, bool, iter, repr, slice
+_namespace = globals
+_frame = sys._getframe
+
+import importlib.util as _loader
+_spec = _loader.spec_from_file_location("reboot_guest_binding", Path(__file__).with_name("_native.py"))
+_library = _loader.module_from_spec(_spec)
+_spec.loader.exec_module(_library)
+
+
+def _native(operation, *arguments):
+    try:
+        return _library.call(operation, _namespace(), _frame(1).f_builtins, *arguments)
+    finally:
+        arguments = None
+
+
+def _list(*items):
+    return [*items]
+
+
+def _tuple(*items):
+    return (*items,)
+
+
+def _named(*pairs):
+    return {key: value for key, value in pairs}
+
+
+def _triple(value):
+    try:
+        first, second, third = value
+        return first, second, third
+    except:
+        value = None
+        raise
+
+
+def _FORMAT(value):
+    try:
+        return f"{value}"
+    finally:
+        value = None
+
+
+
+
+def _mapping(value):
+    try:
+        return {**value}
+    finally:
+        value = None
+
+
+def _RAISE(error):
+    try:
+        raise error
+    finally:
+        error = None
+
+
+def _failure_cell(state, key, value):
+    cells = state.setdefault("_failure_cells", {})
+    cell = cells.setdefault(key, [None])
+    cell[0] = value
+    return cell
+
+
+def _failure_candidates(cell, markers):
+    try:
+        return (_native("contains_marker", cell[0], marker) for marker in markers)
+    finally:
+        markers = None
+
+
 def available_port() -> str:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-        listener.bind(("127.0.0.1", 0))
-        return str(listener.getsockname()[1])
+    return _native("available_port")
 
 
 def gone(pid: int, master: int, seconds: float) -> bool:
-    # pty.fork made scripts/run-aarch64.sh the leader of a process group of its own,
-    # and QEMU is in it. The script exiting is not enough: a QEMU it leaves
-    # behind still runs the guest and holds the disk images. The terminal is
-    # read meanwhile, as nothing can finish exiting with output to it unread.
-    deadline = time.monotonic() + seconds
-    while True:
-        try:
-            os.waitpid(pid, os.WNOHANG)
-        except ChildProcessError:
-            pass
-        try:
-            os.killpg(pid, 0)
-        except ProcessLookupError:
-            return True
-        except PermissionError:
-            # What is left of the group is exiting.
-            pass
-        if time.monotonic() >= deadline:
-            return False
-        readable, _, _ = select.select([master], [], [], 0.05)
-        if readable:
-            try:
-                os.read(master, 65536)
-            except OSError:
-                time.sleep(0.05)
+    return _native("gone", pid, master, seconds)
 
 
 def stop_child(pid: int, master: int) -> None:
-    # Ctrl-A x is QEMU's own quit, and the only stop that lets it release the
-    # disk images cleanly. Signals are the fallback for a QEMU that is wedged.
-    try:
-        os.write(master, b"\x01x")
-    except OSError:
-        pass
-    if gone(pid, master, 5):
-        return
-    for signal_number in (signal.SIGTERM, signal.SIGKILL):
-        try:
-            os.killpg(pid, signal_number)
-        except ProcessLookupError:
-            return
-        except PermissionError:
-            pass
-        if gone(pid, master, 2):
-            return
+    return _native("stop_child", pid, master)
 
 
 def main() -> int:
@@ -102,61 +137,10 @@ def main() -> int:
     root = Path(os.environ.get("VINIX_VM_RUNNER_ROOT", Path(__file__).resolve().parents[2]))
     arguments.state_dir.mkdir(parents=True, exist_ok=True)
 
-    environment = os.environ.copy()
-    environment["VINIX_INITRAMFS"] = str(arguments.initramfs)
-    environment["VINIX_BOOT_DISK"] = str(arguments.state_dir / "boot.img")
-    environment["VINIX_EFIVARS"] = str(arguments.state_dir / "efivars.fd")
-    environment["VINIX_QEMU_PACKAGE_STORE"] = str(arguments.state_dir / "packages.tar")
-    environment["VINIX_QEMU_PERSIST_DISK"] = str(arguments.state_dir / "root.ext2")
-    environment["VINIX_QEMU_PERSIST_SIZE_MB"] = "64"
-    environment.pop("VINIX_QEMU_PERSIST", None)
-    environment["VINIX_KEEP_TEMP_BOOT_DISK"] = "1"
-    environment.setdefault("VINIX_QEMU_PACKAGE_STORE_PORT", available_port())
-    if platform.system() != "Darwin":
-        environment.setdefault("USE_TCG", "1")
-
-    if arguments.arch == "aarch64":
-        command = [str(root / "scripts/run-aarch64.sh"), "--serial", "--mem=2048",
-                   f"--guest-init={arguments.init}"]
-        if os.environ.get("VINIX_REBOOT_PERSISTENCE_NO_BUILD") == "1":
-            command.insert(1, "--no-build")
-    else:
-        # Keep the image attached through a real guest reset. A second QEMU
-        # launch or -no-reboot would not exercise the original shutdown path.
-        archive = arguments.state_dir / "initramfs.tar"
-        shutil.copyfile(arguments.initramfs, archive)
-        with tarfile.open(archive, "a", format=tarfile.USTAR_FORMAT) as stream:
-            stream.add(arguments.init, "sbin/init")
-        isoenv = {**environment, "VINIX_AMD64_KERNEL": os.environ.get("VINIX_AMD64_KERNEL", str(root / "kernel/bin/vinix")),
-                  "VINIX_AMD64_INITRAMFS": str(archive), "VINIX_AMD64_ISO": str(arguments.state_dir / "test.iso"),
-                  "VINIX_AMD64_ISO_BUILD_DIR": str(arguments.state_dir / "iso")}
-        subprocess.run([str(root / "build-support/build-amd64-iso.sh")], env=isoenv, check=True,
-                       stdout=subprocess.DEVNULL)
-        seed = arguments.state_dir / "seed"
-        for name in ("root", "dev", "proc", "tmp", "run"):
-            (seed / name).mkdir(parents=True, exist_ok=True)
-        with tarfile.open(archive) as stream:
-            stream.extractall(seed)
-        (seed / ".vinix-image-id").write_text(hashlib.sha256(archive.read_bytes()).hexdigest()[:16] + "\n")
-        disk = arguments.state_dir / "root.ext2"
-        with disk.open("wb") as stream:
-            stream.truncate(64 * 1024 * 1024)
-        helper_path = root / "tests/disk-no-sync/run_vm.py"
-        debugfs = runpy.run_path(str(helper_path))["find_debugfs"]()
-        if not debugfs:
-            raise RuntimeError("e2fsprogs is required for the native x86 persistence disk")
-        subprocess.run([str(Path(debugfs).with_name("mke2fs")), "-q", "-F", "-t", "ext2", "-b", "4096", "-I", "128",
-                        "-O", "filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum",
-                        "-d", str(seed), str(disk)], check=True)
-        qemu = shutil.which(os.environ.get("VINIX_QEMU_X86_64", "qemu-system-x86_64"))
-        if not qemu:
-            raise RuntimeError("qemu-system-x86_64 is required")
-        firmware = os.environ.get("VINIX_OVMF_CODE_AMD64", str(Path(qemu).parent.parent / "share/qemu/edk2-x86_64-code.fd"))
-        command = [qemu, "-machine", "q35,smm=off", "-accel", os.environ.get("VINIX_QEMU_ACCEL", "tcg"),
-                   "-cpu", "max", "-m", "2048", "-smp", "2", "-drive",
-                   f"if=pflash,format=raw,unit=0,readonly=on,file={firmware}", "-cdrom", str(arguments.state_dir / "test.iso"),
-                   "-drive", f"if=ide,format=raw,file={disk},cache=writeback", "-display", "none", "-monitor", "none",
-                   "-serial", "stdio"]
+    _state = {name: None for name in ('parser', 'arguments', 'root', 'environment', 'command', 'archive', 'stream', 'isoenv', 'seed', 'name', 'disk', 'helper_path', 'debugfs', 'qemu', 'firmware', 'pid', 'master', 'transcript', 'finished', 'deadline', 'waited', '_', 'readable', 'chunk', 'recent', 'text')}
+    _state.update({"parser": parser, "arguments": arguments, "root": root})
+    _native("prepare", _state)
+    environment, command = _state["environment"], _state["command"]
 
     print("==> Booting; the guest restarts itself with reboot(2)")
     pid, master = pty.fork()
@@ -167,54 +151,16 @@ def main() -> int:
     transcript = bytearray()
     finished = False
     deadline = time.monotonic() + arguments.timeout
+    _state.update({"pid": pid, "master": master, "transcript": transcript,
+                   "finished": finished, "deadline": deadline})
+    del transcript, finished, deadline
     try:
-        while time.monotonic() < deadline:
-            waited, _ = os.waitpid(pid, os.WNOHANG)
-            if waited == pid:
-                break
-            readable, _, _ = select.select([master], [], [], 0.25)
-            if not readable:
-                continue
-            try:
-                chunk = os.read(master, 65536)
-            except OSError:
-                break
-            if not chunk:
-                break
-            transcript += chunk
-            sys.stdout.buffer.write(chunk)
-            sys.stdout.buffer.flush()
-            recent = bytes(transcript[-8192:])
-            if PASS_MARKER in recent or any(m in recent for m in FAIL_MARKERS):
-                finished = True
-                break
+        _native("capture", _state, pid, master)
     finally:
         stop_child(pid, master)
         os.close(master)
 
-    text = bytes(transcript)
-    (arguments.state_dir / "serial.log").write_bytes(text)
-    print()
-    if any(marker in text for marker in FAIL_MARKERS):
-        print("ERROR: guest reported a failure", file=sys.stderr)
-        return 1
-    if text.count(START_MARKER) < 2:
-        print("ERROR: the guest did not come back up after reboot(2)", file=sys.stderr)
-        return 1
-    if WROTE_MARKER not in text:
-        print("ERROR: the guest never wrote the marker", file=sys.stderr)
-        return 1
-    # Both boots bracket their sync(2) with this, so a sync that never returns
-    # shows up as a missing second half rather than as a mysterious timeout.
-    if text.count(SYNC_MARKER) < 2:
-        print("ERROR: sync(2) did not return", file=sys.stderr)
-        return 1
-    if PASS_MARKER not in text:
-        print("ERROR: the file written before reboot(2) did not survive it",
-              file=sys.stderr)
-        return 1
-    print(f"==> {arguments.arch} reboot persistence passed")
-    return 0
+    return _native("report", _state)
 
 
 if __name__ == "__main__":
