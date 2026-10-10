@@ -68,6 +68,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
 | Mach VM subset | Current-task `vm_allocate`, shared `vm_remap` aliases and whole-mapping `vm_deallocate`, backed by native shared storage; fixed mappings preserve occupied addresses |
 | Mach semaphore subset | Current-task, process-private FIFO/LIFO `semaphore_create`, `semaphore_destroy`, `semaphore_signal` and `semaphore_wait`, with native blocking and owned send references |
+| Mach thread policy subset | Calling-thread standard/fair scheduling reaches native libc; cache-affinity hints return the measured ARM64 `KERN_NOT_SUPPORTED`; remote and unrepresentable scheduling changes are rejected |
 | Signal subset | Darwin 16-byte `sigaction` and `signal`, translated native numbers/masks, one-argument handlers, `SA_RESTART`/`SA_NODEFER`, and callback draining before image unload |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
@@ -722,7 +723,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _thread_policy_set
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _utime
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1253,23 +1254,52 @@ checks pass in the four-core ARM64 guest, including real echo suppression and
 restoration, flag and character mapping, separate baud readback, soft updates,
 guarded errors, four workers and two teardowns. The broader Mach-O regression
 failed three times in the existing concurrent permissions check with `chmod`
-returning `ENOENT`; it has not passed at this revision. These logs and the two
+returning `ENOENT`; that revision did not pass the broader suite. These logs and the two
 earlier terminal failures that exposed the input-baud encoding are retained
 with VM hashes under `terminal-checks`. The actual Fortnite probe gets past
-four more strong imports and still exits with status 1 before entry, now at
-`thread_policy_set` in EOSSDK.
+four more strong imports and still exited with status 1 before entry, at
+`thread_policy_set` in EOSSDK, in that probe.
+
+The installed Mac's ARM64 `thread_policy_set` returns `KERN_NOT_SUPPORTED`
+(46) for cache-affinity hints, including an empty request. EOSSDK requests
+that flavor with one 32-bit tag and ignores the return value. V now returns
+the same result for live thread ports; a CPU binding would have different
+semantics. Calling-thread standard policy and extended policy with timesharing
+enabled apply real native ordinary scheduling. Fixed-priority, time-constraint,
+importance and remote scheduling updates remain unsupported. Remote requests
+never dereference a borrowed pthread pointer that another thread could free.
+
+The adapter validates the shared Mach namespace. Live task/semaphore ports
+return `KERN_INVALID_ARGUMENT` (4), while invalid or dead thread destinations
+return `MACH_SEND_INVALID_DEST` (268435459). Like the native MIG client, it
+rejects arrays larger than sixteen 32-bit words with `MIG_ARRAY_TOO_LARGE`
+(-307) before destination lookup. It preserves errno and allocates nothing
+per call, as confirmed in generated C. Oversized requests and affinity hints
+do not read or modify caller policy storage.
+
+Native Mac measurements and host ASAN/UBSAN checks pass. Eight workers per
+runtime make 16,000 guarded affinity calls across two teardowns; live remote,
+dead, wrong-type and destroyed semaphore ports are covered. The ARM64 guest
+independently verifies restoration from native FIFO to ordinary scheduling.
+All seven native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass at this revision. The initial test incorrectly expected a
+surviving reference after semaphore destruction consumed its only send
+reference; it now retains a second reference and verifies its release. That
+failed serial log and VM hashes are retained under `thread-policy-checks`.
+This resolves two more strong imports. The actual Fortnite probe still exits
+with status 1 before entry, now at `utime` in EOSSDK.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,324 | 834 | 81 |
-| EOSSDK | 541 | 121 | 18 |
+| Fortnite executable | 1,325 | 833 | 81 |
+| EOSSDK | 542 | 120 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,925 | 1,071 | 122 |
+| All images | 1,927 | 1,069 | 122 |
 
-The C++/GLES/Text variant reports 1,938 resolved imports, 1,058 unresolved strong
+The C++/GLES/Text variant reports 1,940 resolved imports, 1,056 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1305,9 +1335,10 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 ```
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
-`build/ios/fortnite` (default `select-checks`; the terminal verification uses
-`terminal-checks`). Each mode records its own state path and guest `serial.log`
-there. Regression runs the native V select, semaphore, signal, error, sysctl and terminal checks before the
+`build/ios/fortnite` (default `select-checks`; the thread-policy verification uses
+`thread-policy-checks`). Each mode records its own state path and guest `serial.log`
+there. Regression runs the native V select, semaphore, signal, error, sysctl,
+terminal and thread-policy checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build
