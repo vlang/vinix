@@ -91,6 +91,10 @@ pub:
 	// scenario to mean anything: a self-test compiled into the kernel. Such a
 	// scenario also runs only when it is named, against a kernel built for it.
 	define  string
+	// A way the kernel must have been built that is not a -d flag, as the
+	// make argument that does it: `PROD=false` for a driver only a debug
+	// kernel starts. Such a scenario, too, runs only when it is named.
+	build   string
 	cmdline string // extra kernel command line
 	// How many seconds the machine may run, when that is more than a run
 	// allows every scenario.
@@ -119,6 +123,9 @@ pub:
 	// Pictures of the screen that actions take (`screendump` into {state}),
 	// and whether each must be dark or show something; see screen.v.
 	screens      []Screen
+	// Recordings of what the machine played (`-audiodev wav` into {state}),
+	// and the heights each must hold; see sound.v.
+	sounds       []Sound
 }
 
 // What QEMU's TFTP server serves the guest's network probe; see guest/network.v.
@@ -719,6 +726,107 @@ pub const scenarios = [
 		ending:   .poweroff
 		events:   deep_once
 	},
+	Scenario{
+		name:     'drivers-sleep'
+		about:    'HD Audio and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM'
+		arches:   ['x86_64']
+		qemu:     ['-audiodev', 'wav,id=hwsnd,path={state}/sound.wav,out.frequency=48000', '-device',
+			'intel-hda', '-device', 'hda-output,audiodev=hwsnd,mixer=off', '-device', 'piix3-ide,id=hwide',
+			'-drive', 'if=none,id=hwidedisk,format=raw,file={state}/ide.raw', '-device',
+			'ide-hd,drive=hwidedisk,bus=hwide.0']
+		disks:    [
+			Disk{
+				name:     'ide.raw'
+				size_mib: 16
+				header:   'vinix hardware test disk: not blank'
+			},
+		]
+		required: ['HWTEST START drivers-sleep', 'HWTEST PASS drivers-sleep']
+		ending:   .poweroff
+		events:   deep_once
+		patterns: [
+			DiskPattern{
+				disk:   'ide.raw'
+				offset: 1 << 20
+				length: 65536
+				seed:   0x21
+			},
+			DiskPattern{
+				disk:   'ide.raw'
+				offset: 2 << 20
+				length: 65536
+				seed:   0x42
+			},
+			DiskPattern{
+				disk:   'ide.raw'
+				offset: 3 << 20
+				length: 65536
+				seed:   0x63
+			},
+			DiskPattern{
+				disk:   'ide.raw'
+				offset: 4 << 20
+				length: 65536
+				seed:   0x7c
+			},
+		]
+		// A second and a half of tone at each height is 72000 frames; a
+		// third of that is asked for, which a card that played nothing
+		// after a sleep does not come near.
+		sounds:   [
+			Sound{
+				file:   'sound.wav'
+				levels: [6000, 12000, 18000, 24000]
+				frames: 24000
+			},
+		]
+		timeout:  120
+	},
+	Scenario{
+		name:     'nvme-sleep'
+		about:    'an NVMe disk through a rehearsal, a suspend to idle and a suspend to RAM'
+		arches:   ['x86_64']
+		build:    'PROD=false'
+		qemu:     ['-drive', 'if=none,id=hwnvme,format=raw,file={state}/nvme.raw', '-device',
+			'nvme,drive=hwnvme,serial=hwtest0001']
+		disks:    [
+			Disk{
+				name:     'nvme.raw'
+				size_mib: 16
+				header:   'vinix hardware test disk: not blank'
+			},
+		]
+		required: ['HWTEST START nvme-sleep', 'HWTEST PASS nvme-sleep']
+		ending:   .poweroff
+		events:   deep_once
+		patterns: [
+			DiskPattern{
+				disk:   'nvme.raw'
+				offset: 1 << 20
+				length: 65536
+				seed:   0x21
+			},
+			DiskPattern{
+				disk:   'nvme.raw'
+				offset: 2 << 20
+				length: 65536
+				seed:   0x42
+			},
+			DiskPattern{
+				disk:   'nvme.raw'
+				offset: 3 << 20
+				length: 65536
+				seed:   0x63
+			},
+			DiskPattern{
+				disk:   'nvme.raw'
+				offset: 4 << 20
+				length: 65536
+				seed:   0x7c
+			},
+		]
+		timeout:  120
+	},
 ]
 
 // One sleep that QEMU must have seen begin and end.
@@ -1085,6 +1193,16 @@ pub fn validate_scenarios(all []Scenario) ! {
 				return error('scenario ${scenario.name}: an action that waits for an event names it and says how many')
 			}
 		}
+		for sound in scenario.sounds {
+			// A recording QEMU is not told to make would fail every run.
+			if sound.levels.len == 0 || sound.frames <= 0 {
+				return error('scenario ${scenario.name}: the recording ${sound.file} is asked for nothing')
+			}
+			if !scenario.qemu_arguments('x86_64').any(it.contains('{state}/${sound.file}'))
+				&& !scenario.qemu_arguments('aarch64').any(it.contains('{state}/${sound.file}')) {
+				return error('scenario ${scenario.name}: nothing records ${sound.file}')
+			}
+		}
 		for screen in scenario.screens {
 			if screen.pattern < 0 || (screen.dark && screen.pattern != 0) {
 				return error('scenario ${scenario.name}: the picture ${screen.file} cannot be dark and show a pattern')
@@ -1164,6 +1282,9 @@ pub fn (s Scenario) left_out() string {
 	}
 	if s.define != '' {
 		return 'needs a kernel built with -d ${s.define}'
+	}
+	if s.build != '' {
+		return 'needs a kernel built with ${s.build}'
 	}
 	return ''
 }

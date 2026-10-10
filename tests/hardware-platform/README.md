@@ -47,6 +47,8 @@ here runs any.
 | `suspend-deep-iommu`, `suspend-deep-iommu-amd` | x86_64 | The same behind Intel VT-d and behind AMD-Vi, booted with `vinix.iommu=1`. In addition the unit must say in its own registers that it is translating through the kernel's tables after every sleep, having been found off on the way back each time; the card and the disk controller must still report a domain of their own; and the unit must have recorded no fault. That a device is *stopped* from reaching other memory after a resume is not shown here: the self-tests that make a card try run at boot only. |
 | `suspend-deep-undrawable` | x86_64 | A machine whose screen is on an adapter the kernel cannot set a mode on (QEMU's VirtIO display): `mem_sleep` lists `s2idle` alone, selecting `deep` is refused, `/sys/power/deep_sleep` says the display is why, and `mem` sleeps as suspend to idle. |
 | `suspend-deep-forced`, `suspend-deep-headless` | x86_64 | The same machine with `vinix.deep_sleep=force`, and a machine with no display at all: `deep` is offered, and one suspend to RAM ended by the alarm comes back with QEMU reporting `SUSPEND` and `WAKEUP`. |
+| `drivers-sleep` | x86_64 | A machine with an HD Audio controller, whose output QEMU records to a WAV file, and a PCI IDE controller with a disk. A thread of the guest plays a square wave the whole time and the main thread changes its height after each of three sleeps -- a rehearsal, a suspend to idle ended by the alarm, a suspend to RAM ended by the alarm -- each begun with the tone playing; after each the player must go on handing sound to the card, and the disk must hold what was written before the sleep and take a new write. The machine must offer `deep`, which it did not while either driver could not bring its device back. Afterwards the controller looks for the four heights in the recording, a third of a second and a half of each, and for the four patterns in the disk image, and QEMU must have reported `SUSPEND` and `WAKEUP`. QEMU's codec keeps its settings through a controller reset, so this shows the controller, its rings and its stream coming back and not that the codec was programmed again. |
+| `nvme-sleep` | x86_64 | Needs a kernel built with `PROD=false`: a release kernel does not start the NVMe driver. An NVMe disk through the same three sleeps: before each the controller is flushed and told to shut down, after each it is disabled, enabled and its queues created again; what was written before must be there and a new write must reach the disk image. |
 
 Every scenario also fails on a line containing `KERNEL PANIC`,
 `FATAL EXCEPTION` or `HWTEST FAIL`, and a scenario whose machine is to power
@@ -55,7 +57,10 @@ reset makes QEMU exit as well (it runs with `-no-reboot`) and is not a
 power-off. A scenario can also name QMP events QEMU must have sent before
 the machine ended (`events` in the table; one named twice must have arrived
 twice): what the guest prints is its own account, and an event is the
-machine's.
+machine's. In the same way a scenario can name pictures of the screen
+(`screens`) and recordings of what the machine played (`sounds`: QEMU writes
+them with `-audiodev wav`, and a tone of a height nothing else produces is
+looked for in them).
 
 A scenario can be marked pending: one the kernel of the branch cannot pass
 yet. A default run skips it and says so; naming it with `--scenario` runs it.

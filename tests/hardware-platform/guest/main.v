@@ -31,6 +31,8 @@ fn run_scenario(name string, mut t Test) bool {
 		'cpu-power' { scenario_cpu_power(mut t) }
 		'cpu-power-simulated' { scenario_cpu_power_simulated(mut t) }
 		'devices' { scenario_devices(mut t) }
+		'drivers-sleep' { scenario_drivers_sleep(mut t) }
+		'nvme-sleep' { scenario_nvme_sleep(mut t) }
 		'firmware' { scenario_firmware(mut t) }
 		'iommu-amd' { scenario_iommu_amd(mut t) }
 		'iommu-intel' { scenario_iommu_intel(mut t) }

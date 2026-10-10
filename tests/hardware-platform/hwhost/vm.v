@@ -185,6 +185,9 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	for screen in scenario.screens {
 		check_screen(screen, state)!
 	}
+	for sound in scenario.sounds {
+		check_sound(sound, state)!
+	}
 }
 
 fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout int) ! {
