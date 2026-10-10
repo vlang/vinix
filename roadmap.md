@@ -219,15 +219,24 @@ consistent filesystem; backup restoration preserves content and metadata.
     device](docs/hardware-platform.md#sleep).
   - [x] [The screen dark for a sleep](docs/hardware-platform.md#sleep) where it is
     the boot framebuffer.
-  - [ ] Suspend to RAM, hibernation, backlight and display power control, and
-    the desktop's side of all of it.
+  - [x] [Suspend to RAM on x86-64 (ACPI S3)](docs/hardware-platform.md#suspend-to-ram-x86-64):
+    the processors, interrupt controllers, clocks, PCI configuration, IOMMUs
+    and the display mode put back, tested in QEMU only and offered only where
+    the kernel can bring the display back.
+  - [ ] Suspend to RAM on a physical machine and for the drivers that cannot
+    yet come back from a loss of power; hibernation, backlight and display
+    power control, and the desktop's side of all of it.
 - [ ] Restore all device and security state after sleep, firmware errors and
   hotplug; keep recovery possible when a driver fails.
   - [x] [CPU protection registers compared across every sleep; e1000 and AHCI
     resumed and reset in place; a failing device reset, probed again or set
     aside without taking the machine down](docs/hardware-platform.md#waiting-and-recovery).
-  - [ ] Suspend and resume in the remaining drivers; state after a sleep that
-    powers devices down.
+  - [x] [State after a sleep that powers devices down](docs/hardware-platform.md#suspend-to-ram-x86-64),
+    for what QEMU's PC has: every processor's protection registers compared,
+    PCI configuration and IOMMU units restored before a driver runs.
+  - [ ] Suspend and resume in the remaining drivers (`nvme`, `ata`, `hda`,
+    `xhci`, Apple's), without which a machine that has one is refused a
+    suspend to RAM.
 
 Acceptance: each advertised machine completes a physical hardware checklist;
 passing synthetic fixtures alone does not qualify a driver.

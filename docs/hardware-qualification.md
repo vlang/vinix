@@ -55,7 +55,8 @@ State and evidence for the capabilities of [hardware-platform](hardware-platform
 | Embedded controller | implemented (VM: a simulated controller in a self-test kernel; an ordinary kernel only against ports nothing answers at) | -- (no ACPI on this kernel) | host: the protocol against a simulated controller; untried | -- (Apple's is the SMC) |
 | Lid | implemented (VM: scripted ACPI lid, and one read through the simulated embedded controller) | open | untried; read through the embedded controller on most laptops, and that driver has met only a simulated one | open |
 | Suspend to idle, wake sources, alarm | implemented (VM) | implemented (VM) | untried | open: untried, and the idle loop polls |
-| Suspend to RAM, hibernation | open | open | open | open |
+| Suspend to RAM | implemented (VM: ACPI S3 under OVMF with QEMU's standard VGA; e1000, AHCI, PS/2 and serial only; behind VT-d and AMD-Vi) | open (no platform sleep to ask for) | untried: no firmware's way back has been met, wake-up devices are not armed, and it is offered only where the display can be brought back or `vinix.deep_sleep=force` | open |
+| Hibernation | open | open | open | open |
 | Screen sleep, backlight | partial (VM: the boot framebuffer is dark during a sleep; no backlight or display power control) | partial (VM: the same) | untried | partial: brightness through DCP, opt-in ([M1 AGX](m1-agx-bringup.md)); the panel is not darkened for a sleep |
 | Battery, charger, time left | implemented (VM: scripted ACPI battery, and one read through the simulated embedded controller) | open | untried; read through the embedded controller on most laptops, and that driver has met only a simulated one | partial: percentage, voltage, current, power in `/dev` ([M1 battery](m1-battery.md)); not in `/sys`, no status or time |
 | Charge limit | open | open | open | open |

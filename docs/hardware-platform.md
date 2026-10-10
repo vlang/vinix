@@ -479,23 +479,39 @@ are brought back** (root or device table, command and event rings,
 translation on) and stop the machine if they will not come back; **PCI
 configuration space** of every function is restored
 (`kernel/devcore/pci_state.v`: D0 first, address registers and bridge
-windows before the command register, MSI and the MSI-X control word); and
-the display is restored. `ahci` and `e1000` then reset and reprogram their
-devices as they always have on resume; the keyboard controller, the PS/2
-mouse and the serial ports are set up again only after a loss of power. The
-fixed power and sleep button events are enabled again. A deep sleep is
+windows before the command register, MSI and the MSI-X control word, the
+PCI Express control registers with a port's slot power and lights); and
+the display's mode is set again. `ahci` and `e1000` then reset and reprogram
+their devices as they always have on resume; the keyboard controller, the
+PS/2 mouse and the serial ports are set up again only after a loss of power.
+The fixed power and sleep button events are enabled again. A deep sleep is
 **refused while a bound PCI device's driver has no suspend and resume**
 (`nvme`, `ata`, `hda`, `xhci`): such a device would come back blank.
+
+**Hot-plug slots.** The thread that watches PCI Express slots is kept off
+them from before the devices go down until they are back
+(`pause_pci_hotplug()`): a port without power, or with its bus numbers not
+yet written back, shows cards missing that are there. It finishes the pass
+it is in first, and a sleep is refused if it cannot. When the machine is
+back it looks at every slot at once; since each pass compares a slot with
+what its port says, a card pulled or put in during the sleep is found then.
+A card *exchanged* for another during the sleep is not recognised as new:
+its configuration is found not to match and is left alone, and its driver's
+resume fails into the usual recovery.
 
 **The display.** Firmware does not set the mode again after S3, and the
 kernel has no graphics driver, so `deep` is only offered where the kernel
 can bring the picture back itself: there is no framebuffer, or it is on the
 adapter QEMU's `std` VGA and `bochs-display` have (PCI 1234:1111), whose
-mode registers and pixels are saved and restored. On any other machine with
-a screen `mem_sleep` lists `s2idle` alone, and `/sys/power/deep_sleep` says
-why. `vinix.deep_sleep=force` offers it anyway, for a machine run without a
-screen or whose firmware restores the mode; the screen is then whatever
-firmware leaves.
+mode registers are read out before the sleep and written back after it
+(`kernel/syspower/display_amd64.v`). The picture itself is handled as for
+any sleep: put away and painted black before the machine goes down, and
+copied back once it is awake -- which for a suspend to RAM is after the mode
+is back. On any other machine with a screen `mem_sleep` lists `s2idle`
+alone, and `/sys/power/deep_sleep` says why. `vinix.deep_sleep=force` offers
+it anyway, for a machine run without a screen or whose firmware restores the
+mode; the screen is then whatever firmware leaves. `vinix.deep_sleep=off`
+never offers it.
 
 **What ended it** is read on the way back: the clock's alarm (PM1 status),
 a byte waiting in the keyboard controller (keyboard or pointer), the power
@@ -684,8 +700,9 @@ Beyond the limits stated in each section:
 
 Kernels were built in a git worktree with `make ARCH=aarch64 LIMINE_MP=1` and
 `make ARCH=x86_64`, and run on QEMU 11.1.1 on an Apple Silicon Mac: x86-64
-`q35` under TCG with 2 CPUs, AArch64 `virt` under HVF with 4 CPUs. The two
-are not comparable in speed.
+`q35` under TCG with 2 CPUs (4 for the `suspend-deep` scenarios, with the
+edk2 firmware QEMU ships, which is what resumes the machine from S3),
+AArch64 `virt` under HVF with 4 CPUs. The two are not comparable in speed.
 
 ```sh
 tests/hardware-platform/run --arch x86_64 --kernel build-amd64-kernel/bin/vinix
@@ -709,6 +726,10 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `pci-hotplug`: a card put into a port the kernel watches and taken out, twice; 100 remove/rescan cycles | pass | pass |
 | `pci-hotplug-acpi`: the same, announced and asked back by firmware | pass | -- |
 | `pci-hotplug-iommu`: the same behind Intel VT-d, the card isolated each time it arrives | pass | -- |
+| `suspend-deep`: suspend to RAM with 4 CPUs -- two rehearsals, wakes by `system_wakeup`, alarm and key, five more sleeps; every CPU, memory, disk, network, clocks, keyboard, mouse, power button; the screen dark while down and as drawn afterwards | pass | -- |
+| `suspend-deep-xapic`, `suspend-deep-bridge`: the same without x2APIC, and with the card behind a watched hot-plug port | pass | -- |
+| `suspend-deep-iommu`, `suspend-deep-iommu-amd`: the same behind VT-d and AMD-Vi, the unit found off and brought back each time | pass | -- |
+| `suspend-deep-undrawable`, `suspend-deep-forced`, `suspend-deep-headless`: when deep is offered | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
 | `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` (kernel built with `-d acpiec_selftest`: a simulated embedded controller) | pass | -- |
