@@ -84,6 +84,52 @@ fn test_platform_character_device_flags_and_io() {
 	assert device_errno(C.EIO) == .io
 }
 
+// A directory the way /sys shows a class: the listing keeps names in fixed
+// storage, and a file's mode says whether anyone may write it.
+fn test_platform_lists_a_directory_and_reads_a_files_mode() {
+	root := os.join_path(os.temp_dir(), 'vinix-v-platform-list-${os.getpid()}')
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	for name in ['BAT0', 'AC', '.hidden', 'a'.repeat(device_name_capacity)] {
+		os.mkdir(os.join_path(root, name))!
+	}
+	mut io := PosixDeviceIO{}
+	mut names := DeviceNames{}
+	assert io.list(root, mut names) == .none
+	mut listed := []string{}
+	for index in 0 .. names.count {
+		assert names.names[index][names.lens[index]] == 0
+		listed << unsafe { tos(&names.names[index][0], names.lens[index]) }.clone()
+	}
+	listed.sort()
+	assert listed == ['AC', 'BAT0']
+	// A directory with more entries than a listing holds fills it and stops.
+	for index in 0 .. device_names_capacity + 4 {
+		os.mkdir(os.join_path(root, 'supply${index}'))!
+	}
+	assert io.list(root, mut names) == .none
+	assert names.count == device_names_capacity
+	assert io.list(os.join_path(root, 'absent'), mut names) == .unavailable
+	assert names.count == 0
+
+	path := os.join_path(root, 'profile')
+	os.write_file(path, 'balanced\n')!
+	os.chmod(path, 0o644)!
+	mut fd, mut result := io.open(path, false)
+	assert fd >= 0 && result == .none
+	mut writable, mut stat_result := io.is_writable(fd)
+	assert writable && stat_result == .none
+	assert io.close(fd) == .none
+	os.chmod(path, 0o444)!
+	fd, result = io.open(path, false)
+	assert fd >= 0 && result == .none
+	writable, stat_result = io.is_writable(fd)
+	assert !writable && stat_result == .none
+	assert io.close(fd) == .none
+	writable, stat_result = io.is_writable(-1)
+	assert !writable && stat_result != .none
+}
+
 fn test_platform_terminal_raw_mode_and_restoration() {
 	master := C.posix_openpt(C.O_RDWR | C.O_NOCTTY)
 	assert master >= 0
