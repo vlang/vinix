@@ -3,6 +3,7 @@ module sched
 
 import kbudget
 import cpuidle
+import cpufreq
 import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
@@ -142,6 +143,9 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	// If this interrupt ended an idle, that is where the idle's time stops: the
 	// loop that started it is not returned to. See cpuidle/driver_amd64.v.
 	cpuidle.idle_interrupted(cpu_local.cpu_number)
+	// A frequency request for this CPU is written here, on it: its registers
+	// can be written nowhere else. See cpufreq/driver_amd64.v.
+	cpufreq.cpu_tick(cpu_local.cpu_number)
 
 	// Only our own IRQ may surround a switch. A timer interrupt nested in an
 	// IRQ-enabled hardware handler must leave that handler on its CPU.

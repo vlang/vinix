@@ -238,34 +238,3 @@ pub fn target_khz(governor Governor, preference Preference, utilisation u32, low
 		}
 	}
 }
-
-// The step of a frequency table to use for `wanted`: the slowest that is at
-// least as fast, so that a CPU asked for more is never given less, or the
-// fastest there is. `table` holds `count` frequencies in rising order. -1 for
-// an empty table.
-pub fn table_step(table &u64, count int, wanted u64) int {
-	if count <= 0 {
-		return -1
-	}
-	for i in 0 .. count {
-		if unsafe { table[i] } >= wanted {
-			return i
-		}
-	}
-	return count - 1
-}
-
-// The fastest step of the table that is no faster than `ceiling`, or the
-// slowest there is: a limit may be undershot, never overshot.
-pub fn table_step_below(table &u64, count int, ceiling u64) int {
-	if count <= 0 {
-		return -1
-	}
-	mut step := 0
-	for i in 0 .. count {
-		if unsafe { table[i] } <= ceiling {
-			step = i
-		}
-	}
-	return step
-}

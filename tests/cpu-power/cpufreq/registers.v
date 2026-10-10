@@ -1,0 +1,1 @@
+../../../kernel/cpufreq/registers_amd64.v
