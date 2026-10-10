@@ -43,6 +43,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'hibernate-damaged-header' { scenario_hibernate_damaged_header(mut t) }
 		'hibernate-damaged-pages' { scenario_hibernate_damaged_pages(mut t) }
 		'hibernate-iommu' { scenario_hibernate_iommu(mut t) }
+		'hibernate-iommu-amd' { scenario_hibernate_iommu_amd(mut t) }
 		'hibernate-memory' { scenario_hibernate_memory(mut t) }
 		'hibernate-unnamed' { scenario_hibernate_unnamed(mut t) }
 		'iommu-amd' { scenario_iommu_amd(mut t) }

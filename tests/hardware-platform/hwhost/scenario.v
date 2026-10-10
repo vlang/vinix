@@ -1151,6 +1151,27 @@ pub const scenarios = [
 		timeout:    300
 	},
 	Scenario{
+		name:       'hibernate-iommu-amd'
+		about:      'the same behind AMD-Vi'
+		arches:     ['x86_64']
+		cmdline:    'vinix.iommu=1 vinix.hibernate=sd1'
+		qemu:       ['-smp', '4', '-device', 'amd-iommu,dma-remap=on', '-nic',
+			'user,model=e1000,tftp={state}/tftp', '-drive', 'if=ide,format=raw,file={state}/disk.raw',
+			'-drive', 'if=ide,format=raw,file={state}/image.raw']
+		disks:      [hibernate_data_disk, hibernate_image_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-iommu-amd', 'HWTEST PASS hibernate-iommu-amd']
+		actions:    hibernate_actions
+		reboots:    [Reboot{}, Reboot{}]
+		ending:     .poweroff
+		patterns:   hibernate_patterns
+		disk_bytes: hibernate_no_image
+		screens:    [Screen{
+			file: 'after.ppm'
+		}]
+		timeout:    300
+	},
+	Scenario{
 		name:       'hibernate-cycles'
 		about:      'five suspends to disk one after another, and what the last four leave allocated in the kernel'
 		arches:     ['x86_64']
@@ -1288,6 +1309,10 @@ const hibernate_actions = [
 		after:    'HWTEST STEP screen after the cycles'
 		delay_ms: 200
 		qmp:      screen_picture('after')
+	},
+	Action{
+		after: 'HWTEST STEP waiting for power button'
+		qmp:   '{"execute":"system_powerdown"}'
 	},
 ]
 

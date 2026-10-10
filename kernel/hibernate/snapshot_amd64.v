@@ -74,6 +74,14 @@ __global (
 	hib_count    u64
 	// The page the loading kernel writes its report into, by address.
 	hib_handover u64
+	// What the image is written through: a run of pages to gather pages in,
+	// how long it is, and two pages for the header and its reading back.
+	// Taken before the snapshot, like everything else the writing needs:
+	// after it, a request for memory that had the page cache give some back
+	// could wait for a lock whose holder is being held at the fence.
+	hib_buffer       u64
+	hib_buffer_pages u64
+	hib_scratch      u64
 	// The machine as it was when the copies were prepared, and the clock.
 	hib_machine  Machine
 	hib_taken_at u64
@@ -175,7 +183,9 @@ pub fn prepare() bool {
 		return fail('no memory for the list of pages to save')
 	}
 	hib_handover = one_page()
-	if hib_handover == 0 {
+	hib_scratch = u64(memory.pmm_alloc_fallible(2))
+	hib_buffer, hib_buffer_pages = chunk_buffer()
+	if hib_handover == 0 || hib_scratch == 0 || hib_buffer == 0 {
 		release()
 		return fail('no memory for the list of pages to save')
 	}
@@ -324,8 +334,9 @@ pub fn write_image() bool {
 		}
 	}
 
-	buffer, chunk := chunk_buffer()
-	if buffer == 0 {
+	buffer := hib_buffer
+	chunk := hib_buffer_pages
+	if buffer == 0 || chunk == 0 {
 		return fail('no memory to write the image through')
 	}
 	mut data_sum := image_magic
@@ -342,12 +353,10 @@ pub fn write_image() bool {
 		}
 		if !device_write(header.data_offset + done * block_bytes, voidptr(buffer + higher_half),
 			count * block_bytes) {
-			memory.pmm_free(voidptr(buffer), chunk)
 			return fail('writing the image failed')
 		}
 		done += count
 	}
-	memory.pmm_free(voidptr(buffer), chunk)
 	wake.trace('disk: pages written', pages)
 	if !device_flush() {
 		return fail('the device would not keep the image')
@@ -402,6 +411,15 @@ pub fn release() {
 	if hib_handover != 0 {
 		memory.pmm_free(voidptr(hib_handover), 1)
 		hib_handover = 0
+	}
+	if hib_scratch != 0 {
+		memory.pmm_free(voidptr(hib_scratch), 2)
+		hib_scratch = 0
+	}
+	if hib_buffer != 0 {
+		memory.pmm_free(voidptr(hib_buffer), hib_buffer_pages)
+		hib_buffer = 0
+		hib_buffer_pages = 0
 	}
 	if fence.raised() {
 		fence.lower()

@@ -226,13 +226,19 @@ fn read_header(mut header Header) (Verdict, string) {
 // Write `header` as the device's first block, have the device keep it, and
 // read it back. True when what comes back is what was written.
 fn write_header(header &Header) bool {
-	page := u64(memory.pmm_alloc_fallible(2))
+	// The two pages kept for this while an image is being written, or two
+	// taken for the moment at any other time.
+	borrowed := hib_scratch != 0
+	page := if borrowed { hib_scratch } else { u64(memory.pmm_alloc_fallible(2)) }
 	if page == 0 {
 		return false
 	}
 	defer {
-		memory.pmm_free(voidptr(page), 2)
+		if !borrowed {
+			memory.pmm_free(voidptr(page), 2)
+		}
 	}
+	unsafe { C.memset(voidptr(page + higher_half), 0, 2 * page_size) }
 	block := voidptr(page + higher_half)
 	back := voidptr(page + page_size + higher_half)
 	unsafe { C.memcpy(block, voidptr(header), sizeof(Header)) }

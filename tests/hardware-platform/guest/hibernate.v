@@ -353,6 +353,10 @@ fn hibernate_twice(mut t Test, unit string) {
 		t.check(deep_report('iommu units') == 1 && deep_report('iommu units translating') == 1, 'before any sleep ${deep_report('iommu units')} units are on and ${deep_report('iommu units translating')} translating')
 	}
 	t.check(network_works(20), 'the network does not work before any sleep')
+	os.signal_opt(.usr2, on_power_off_request) or {
+		t.check(false, 'could not install a SIGUSR2 handler: ${err}')
+		return
+	}
 	mut run := HibRun{}
 	if !run.set_up(mut t) {
 		return
@@ -374,7 +378,14 @@ fn hibernate_twice(mut t Test, unit string) {
 	}
 	hib_leave_note('') or { t.check(false, 'clearing the note: ${err.msg()}') }
 	t.step('screen after the cycles')
-	sleep_ms(500)
+	sleep_ms(1000)
+	// ACPI's events were switched on again from the kernel's own record of
+	// them: a press of the power button reaches init as it would have before.
+	t.step('waiting for power button')
+	asked := wait_until(30000, fn () bool {
+		return power_button_asked
+	})
+	t.check(asked, 'after two cycles a power button press did not reach init within 30 s')
 }
 
 fn scenario_hibernate(mut t Test) {
@@ -383,6 +394,10 @@ fn scenario_hibernate(mut t Test) {
 
 fn scenario_hibernate_iommu(mut t Test) {
 	hibernate_twice(mut t, 'dmar0')
+}
+
+fn scenario_hibernate_iommu_amd(mut t Test) {
+	hibernate_twice(mut t, 'ivhd0')
 }
 
 // How many suspends to disk hibernate-cycles measures, after one it does not.
