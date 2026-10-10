@@ -7,10 +7,10 @@ function implementations (347 original lines, 15,469 original bytes).
 consumers independent property buffers. The synchronous `adt:` import boundary
 borrows inputs until return; JSON and optional decompressed binary results use
 the existing explicit release ABI. LZFSE scratch allocations are freed on
-rejection, capacity growth and successful copies. Uncompressed Python inputs
-retain their original identity through a result flag. Python dataclasses,
-callback-based tree iteration and higher recovery families remain counted
-compatibility consumers pending their own ports.
+rejection, capacity growth and successful copies. Uncompressed inputs retain
+their storage during the synchronous call. Native `Node` and `Property` values,
+preorder traversal and predicates serve the complete `recover_t6050_power`
+command. Its Python dataclasses and import adapters have been retired.
 
 Qualification uses the unchanged T6050/T8103 Python fixtures and frozen original
 implementations outside the repository. ARM64 and actual x86-64 each pass 23

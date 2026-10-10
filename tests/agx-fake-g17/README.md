@@ -31,8 +31,8 @@ parser and architecture diagnostic, and `_native.py` transports CLI/import
 requests and typed exceptions. The native controller stages sources, builds the
 production core and both independent fixtures, enforces the original allocator
 import guards and exact scale allocation pair, and runs optional frozen C
-fixtures. `tools/agx-re/compile-v-trace.py` uses the same controller for its
-maintained `Path` import API and CLI. Generated core bytes, compiler arguments,
+fixtures. `tools/agx-re/compile-v-trace` invokes `compile-trace.v` directly with
+the same native controller. Generated core bytes, compiler arguments,
 stdout, inherited stderr and failure order remain covered by original controls.
 
 Host qualification uses actual ARM and x86 V compilers, ASan/UBSan and an

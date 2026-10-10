@@ -1,10 +1,10 @@
 # Independent AGX trace workflow
 
-`python3 run.py` compares the production V trace core with the immutable C core
+`./run` compares the production V trace core with the immutable C core
 at `823aeb116eb3b3ab20463ccb9b1c3fba6f0c41ae` and the original independent C
 fixture at `8f7239d1fd4c593746279699f6ff25df5f4dd7bd`. `--baseline-rev` retains
-its original override. The Python entry keeps the argument parser; the complete
-build, execution, normalization and assertion policy lives in
+its original override. `../agx-fake-g17/test-trace.v` parses arguments and invokes
+the complete native build, execution, normalization and assertion policy in
 `../agx-fake-g17/agxhost/trace*.v`.
 
 The workflow retains all four complete ordered JSON comparisons, original

@@ -7,19 +7,16 @@ sequence checks, authenticated kernel rebases, PC-relative data reads and
 store-span coverage. These predicates intentionally retain the original
 recovery subset's accepted encodings, including reserved instruction forms.
 
-`query.v` is a synchronous compatibility dispatch for the remaining Python
-recovery families. The existing extraction ABI borrows input only until a call
-returns and allocates each JSON response with libc; the adapter copies and
-releases it exactly once. Instruction values preserve unsigned 64-bit fields
+`query.v` provides synchronous native dispatch for recovery families and frozen
+independent fixtures. Instruction values preserve unsigned 64-bit fields
 and arbitrary-width signed local branch addresses. Mach-O names and C strings
 use native UTF-8 replacement with the original decoder's prefix consumption.
-Native V callers import the public functions directly. `_native_g17.py` and
-the original module's wrappers contain only serialization, tuple/set shape,
-slice conversion and error-class handling.
+Native V callers import the public functions directly. `recover_g17_abi` now
+uses the native command layer; the Python serialization adapters are retired.
 
 The foundational port replaces 63 functions (1,056 original Python lines,
-39,334 original function bytes). The remaining recovery algorithms and their
-independent Python fixtures are still maintained and honestly counted.
+39,334 original function bytes). Later ports moved the remaining algorithms,
+independent fixtures and complete command frontend to V.
 
 Validation compares the original Git-controlled Python implementations with
 121,304 native controls on ARM64, x86-64 and ASan/UBSan, including exhaustive

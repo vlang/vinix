@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+support_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec sh "$support_dir/run-v-tool.sh" "$support_dir/../tests/linuxkpi/generate_module.v" "$@"

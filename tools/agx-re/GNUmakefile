@@ -7,19 +7,19 @@ V_ARCH ?= $(if $(filter arm64,$(shell uname -m)),arm64,amd64)
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 test-trace-v:
-	python3 ../../tests/agx-trace/run.py
+	../../tests/agx-trace/run
 
 $(BUILD):
 	mkdir -p $@
 
-$(BUILD)/agx_trace_core.c: tracecore/core.v compile-v-trace.py | $(BUILD)
-	python3 compile-v-trace.py $@ --arch $(V_ARCH)
+$(BUILD)/agx_trace_core.c: tracecore/core.v compile-v-trace ../../tests/agx-fake-g17/compile-trace.v ../../tests/agx-fake-g17/agxhost/build.v | $(BUILD)
+	./compile-v-trace $@ --arch $(V_ARCH)
 
 $(BUILD)/agx_trace_core.o: $(BUILD)/agx_trace_core.c agx_trace_v.h
 	$(CC) $(CFLAGS) -DVINIX_V_RUNTIME -I. -c $< -o $@
 
-$(BUILD)/agx_trace_native.c: nativecore/core.v ../../build-support/compile-v-module.py | $(BUILD)
-	python3 ../../build-support/compile-v-module.py nativecore $@ --arch $(V_ARCH)
+$(BUILD)/agx_trace_native.c: nativecore/core.v ../../build-support/compile-v-module ../../tests/linuxkpi/generate_module.v | $(BUILD)
+	../../build-support/compile-v-module nativecore $@ --arch $(V_ARCH)
 
 $(BUILD)/agx_trace_native.o: $(BUILD)/agx_trace_native.c
 	$(CC) $(CFLAGS) -Wno-unused-function -Wno-unused-label -Wno-unused-parameter -c $< -o $@
@@ -48,7 +48,7 @@ kernel-kexts:
 	./extract_fileset
 
 recover-t6050-power: kernel-kexts pmp-firmware
-	./recover_t6050_power.py
+	./recover_t6050_power
 
 # The base-M1 GPU driver and DeviceTree ship on every Mac, staged under Preboot
 # for restore, so this needs no M1 to run.
@@ -61,7 +61,7 @@ recover-t8103-adt: g13g-kexts
 	mv $(BUILD)/recovered-t8103-adt.json.tmp $(BUILD)/recovered-t8103-adt.json
 
 recover-g17-abi: firmware kernel-kexts
-	./recover_g17_abi.py > $(BUILD)/recovered-g17-abi.json.tmp
+	./recover_g17_abi > $(BUILD)/recovered-g17-abi.json.tmp
 	mv $(BUILD)/recovered-g17-abi.json.tmp $(BUILD)/recovered-g17-abi.json
 
 # The 13.5 firmware ABI layout, computed from m1n1's versioned definitions.
@@ -93,7 +93,7 @@ check-fake-g17-encoder:
 	./generate_fake_g17_3d_encoder --check
 
 test:
-	. ../../build-support/find-v.sh; "$$V" -cc cc test g13layout g13contract traceanalysis imageextract g17plan g17decode g17power appleadt macinspect t8103adt g17expr t6050power
+	. ../../build-support/find-v.sh; "$$V" -cc cc test g13layout g13contract traceanalysis imageextract g17plan g17decode g17power appleadt macinspect t8103adt g17expr t6050power recoverycli
 
 layout: all
 	$(CURDIR)/$(BUILD)/objc_layout > $(BUILD)/objc_layout.jsonl

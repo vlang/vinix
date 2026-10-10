@@ -3,10 +3,10 @@
 This host V module owns the ApplePTD, RTBuddy segment-flag, IODARTFamily,
 AppleT8110DART and T8110 kernel page-table instruction proofs, initial PMP
 publication/readiness ordering, RTBuddy patchbay writes and ASCWrap-v6 mailbox,
-IORVBAR lock and CPU-run sequences. The maintained
-`recover_t6050_power.py` caller keeps its original public API through a narrow
-JSON adapter. Its remaining recovery families are still Python and remain
-counted as Python until their own ports pass qualification.
+IORVBAR lock and CPU-run sequences. The maintained `recover_t6050_power`
+command imports these modules directly through `../recoverycli`. Argument
+parsing, Preboot discovery, DeviceTree handling, file reads and report
+publication are native V; the Python import adapters have been retired.
 
 The PMP dashboard module proves selector/die conversion, request publication,
 status probing, the pre-ready acknowledgement bypass and the ready-gated polling
@@ -31,8 +31,8 @@ strings, tables and proof metadata own their storage.
 The topology module owns T6050 PMGR/PMP DeviceTree validation, both die
 wrappers and DART/mapper bindings, interrupt overlays, gate routes and packed
 SoC-device dashboard layout. Preorder predicates retain the original validation
-order. The public Python node objects are marshalled once; native property
-buffers and returned metadata own their storage. Published bypass keys are
+order. Native property buffers and returned metadata own their storage.
+Published bypass keys are
 visited in numeric order, preserving the original SID-range result even for
 wide counts. `topology_test.v` keeps the complete independently authored
 synthetic topology and both original SGX/AGX rejection fixtures.
@@ -92,9 +92,8 @@ an independent ASan/UBSan C caller verifies borrowed-input and output-release
 lifetimes at the native ABI.
 
 `public_constants.v` supplies the original public symbol, UUID, layout and
-patchbay-input constants, sharing existing native contract values. Python
-provides lazy import, directory and star-import compatibility, including Path
-defaults and the original nested tuple type. Its remaining frontend preserves
-argparse/file I/O, dataclass object identity and lazy traversal callbacks.
+patchbay-input constants, sharing existing native contract values. Native
+callers use owned values and synchronous traversal; the complete command
+retains path defaults, ordered paired-image reads and output schemas.
 `frontend_test.v` retains the final three independent Python fixtures for IMG4
 DeviceTree payload selection, ADT exact consumption and PMGR interrupt records.

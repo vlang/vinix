@@ -4,6 +4,11 @@ This directory contains read-only host tools used to replace guesses in the
 Vinix AGX driver with observations from Apple hardware and software. It does
 not contain or redistribute Apple firmware, kernel collections, or drivers.
 
+All maintained commands, generators and recovery tests in this directory run
+in V. The extraction and G17/T6050 recovery commands import the native parser
+and proof modules directly; their Python frontends and import bridges are
+retired. `recoverycli/README.md` documents the complete command boundaries.
+
 `inspect_macos` collects a sanitized JSON hardware manifest from `arm-io`,
 the `sgx` Apple DeviceTree node, the active GFX/PMP firmware wrappers, the AGX
 accelerator, and the installed driver Info.plist:
@@ -146,7 +151,7 @@ into standalone Mach-Os suitable for `xcrun llvm-nm` and `xcrun llvm-objdump`.
 `IOGPUFamily` is included because `AGXCommandQueue` inherits its device
 binding, and with it the last two channel inputs, from `IOGPUCommandQueue`;
 `IOSurface` identifies the cross-kext shared-event completion target.
-`recover_t6050_power.py` independently parses the local IMG4/LZFSE boot
+`recover_t6050_power` independently parses the local IMG4/LZFSE boot
 DeviceTree and resolves SGX's opaque power/clock handles against PMGR's device
 records. It fails closed unless the installed T6050 image maps them, in order,
 to `GFX_SGX` and `GFX_BUSY`, identifies both GFX ASC handles, and proves that
@@ -270,7 +275,7 @@ the protected subpage encoder. This is sufficient to reject an old
 T8020-style DART implementation, but not to take ownership of iBoot's roots or
 enable PMP execution.
 
-`recover_g17_abi.py` checks those binaries by UUID and independently recovers
+`recover_g17_abi` checks those binaries by UUID and independently recovers
 the shared G17 bootstrap pointer offsets from firmware and
 `AGXArmFirmware::initFirmwareData`, accelerator-ring layouts, the published
 hardware-configuration allocation, host-written table layout and firmware

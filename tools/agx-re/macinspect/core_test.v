@@ -3,6 +3,7 @@ module macinspect
 import json2
 import traceanalysis as j
 import os
+import t6050power
 
 struct OriginalCase {
 	test    string
@@ -140,19 +141,18 @@ fn test_t6050_manifest_requires_both_firmware_roles() {
 }
 
 fn test_patchbay_input_table_matches_the_recovery() {
-	source := os.read_file(os.join_path(os.dir(@FILE), '../recover_t6050_power.py'))!
 	nodes := {
-		'chosen':   'PMP_CHOSEN_PATH'
-		'pmgr':     'PMP_PMGR_PATH'
-		'provider': 'PMP_PROVIDER_NODE'
+		'chosen':   'IODeviceTree:/chosen'
+		'pmgr':     'IODeviceTree:/arm-io/pmgr'
+		'provider': 'the RTBuddy provider nub'
 	}
-	authority := source.all_after('PMP_MANDATORY_PATCHBAY_INPUTS = (').all_before('\n)')
-	for item in pmp_patchbay_inputs {
-		prefix := '("' + item.tag + '", "' + item.name + '", ' + nodes[item.node] + ', "' + item.derivation + '", '
-		ending := ', ' + if item.checked { 'True),' } else { 'False),' }
-		assert authority.split_into_lines().any(it.trim_space().starts_with(prefix) && it.trim_space().ends_with(ending))
+	authority := j.value(t6050power.public_constants(), 'PMP_MANDATORY_PATCHBAY_INPUTS').arr()
+	assert authority.len == pmp_patchbay_inputs.len
+	for index, item in pmp_patchbay_inputs {
+		row := authority[index].arr()
+		assert row == [j.Value(item.tag), j.Value(item.name), j.Value(nodes[item.node]),
+			j.Value(item.derivation), j.Value(200 + 4 * index), j.Value(item.checked)]
 	}
-	assert authority.split_into_lines().filter(it.trim_space().starts_with('(')).len == pmp_patchbay_inputs.len
 }
 
 fn test_uint_preserves_unbounded_little_endian_words_and_bool_types() {

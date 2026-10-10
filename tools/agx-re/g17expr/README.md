@@ -4,8 +4,8 @@ This host V module owns conservative integer-expression tracing, stack-spill
 recovery, reaching definitions, narrow control-flow merges, selector collection,
 and UUID-pinned inline register-record proofs. `Instruction.offset` and spill
 byte ranges use `math.big.Integer`; register words remain AArch64 `u32` values.
-The JSON compatibility entrypoint retains the remaining Python recovery callers.
-It does not invoke Python or change a kernel/generated table.
+The native query entrypoint serves the complete `recover_g17_abi` command and
+frozen independent fixtures. Its Python import adapter has been retired.
 
 `ImageSource` supplies symbol addresses and immutable code bytes synchronously.
 Expression trees, visit histories and alternate CFG instruction streams are
