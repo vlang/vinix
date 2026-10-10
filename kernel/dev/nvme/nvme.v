@@ -337,6 +337,7 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
+	metrics resource.BlockMetrics
 
 	max_prps u64
 	nsid     u64
@@ -350,10 +351,20 @@ __global (
 )
 
 fn (mut dev NVMENamespace) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	result := dev.read_tracked_inner(_handle, buffer, loc, count) or { dev.metrics.failed(); return none }
+	if result > 0 { dev.metrics.completed(u64(result), false) }
+	return result
+}
+fn (mut dev NVMENamespace) read_tracked_inner(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	return dev.transfer(buffer, loc, count, false)
 }
 
 fn (mut dev NVMENamespace) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	result := dev.write_tracked_inner(_handle, buffer, loc, count) or { dev.metrics.failed(); return none }
+	if result > 0 { dev.metrics.completed(u64(result), true) }
+	return result
+}
+fn (mut dev NVMENamespace) write_tracked_inner(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	return dev.transfer(buffer, loc, count, true)
 }
 
@@ -405,6 +416,8 @@ fn (mut dev NVMENamespace) transfer(buffer voidptr, loc u64, count u64, write bo
 }
 
 fn (mut dev NVMENamespace) sync(_handle voidptr) ? {
+	mut completed := false
+	defer { if completed { dev.metrics.flushed() } else { dev.metrics.failed() } }
 	mut command := NVMECommand{}
 	command.opcode = opcode_flush
 	unsafe { command.private.rw.nsid = u32(dev.nsid) }
@@ -414,6 +427,7 @@ fn (mut dev NVMENamespace) sync(_handle voidptr) ? {
 		errno.set(errno.eio)
 		return none
 	}
+	completed = true
 }
 
 fn (mut dev NVMENamespace) ioctl(handle voidptr, request u64, argp voidptr) ?int {
@@ -434,6 +448,14 @@ fn (mut dev NVMENamespace) unlink(_handle voidptr) ? {
 
 fn (mut dev NVMENamespace) grow(_handle voidptr, _new_size u64) ? {
 	return none
+}
+
+fn (mut dev NVMENamespace) block_status() resource.BlockStatus {
+	dev.l.acquire()
+	defer { dev.l.release() }
+	mut flags := resource.block_flush
+	if dev.parent_controller.failed { flags |= resource.block_offline }
+	return dev.metrics.snapshot(u64(dev.stat.size), u64(dev.stat.blksize), flags, dev.block_identity())
 }
 
 fn (dev &NVMENamespace) block_identity() resource.BlockIdentity {

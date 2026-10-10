@@ -149,6 +149,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   [crash and lifetime acceptance tests](tests/fs-journal/README.md).
 - [ ] Add volume management, storage pools/RAID, full-disk encryption, key recovery,
   online capacity management, TRIM/discard and storage health/error reporting.
+  - [x] [Boot-local linear block volumes, raw capacity growth and I/O counters](docs/storage-volumes.md).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

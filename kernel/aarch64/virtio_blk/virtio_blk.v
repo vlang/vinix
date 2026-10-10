@@ -75,6 +75,7 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
+	metrics resource.BlockMetrics
 
 	base            u64
 	hhdm            u64
@@ -249,6 +250,8 @@ fn (mut device VirtioBlockDevice) transfer(buffer voidptr, sector u64, count u64
 }
 
 fn (mut device VirtioBlockDevice) sync(_handle voidptr) ? {
+	mut completed := false
+	defer { if completed { device.metrics.flushed() } else { device.metrics.failed() } }
 	device.l.acquire()
 	defer { device.l.release() }
 	if !device.ready {
@@ -287,10 +290,16 @@ fn (mut device VirtioBlockDevice) sync(_handle voidptr) ? {
 		errno.set(errno.eio)
 		return none
 	}
+	completed = true
 }
 
 fn (mut device VirtioBlockDevice) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
-	if loc % 512 != 0 || count % 512 != 0 || loc + count > u64(device.stat.size) {
+	result := device.read_tracked_inner(_handle, buffer, loc, count) or { device.metrics.failed(); return none }
+	if result > 0 { device.metrics.completed(u64(result), false) }
+	return result
+}
+fn (mut device VirtioBlockDevice) read_tracked_inner(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	if loc % 512 != 0 || count % 512 != 0 || loc > u64(device.stat.size) || count > u64(device.stat.size) - loc {
 		errno.set(errno.eio)
 		return none
 	}
@@ -308,11 +317,16 @@ fn (mut device VirtioBlockDevice) read(_handle voidptr, buffer voidptr, loc u64,
 }
 
 fn (mut device VirtioBlockDevice) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	result := device.write_tracked_inner(_handle, buffer, loc, count) or { device.metrics.failed(); return none }
+	if result > 0 { device.metrics.completed(u64(result), true) }
+	return result
+}
+fn (mut device VirtioBlockDevice) write_tracked_inner(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	if device.read_only {
 		errno.set(errno.erofs)
 		return none
 	}
-	if loc % 512 != 0 || count % 512 != 0 || loc + count > u64(device.stat.size) {
+	if loc % 512 != 0 || count % 512 != 0 || loc > u64(device.stat.size) || count > u64(device.stat.size) - loc {
 		errno.set(errno.eio)
 		return none
 	}
@@ -327,6 +341,16 @@ fn (mut device VirtioBlockDevice) write(_handle voidptr, buffer voidptr, loc u64
 		done += chunk
 	}
 	return i64(count)
+}
+
+fn (mut device VirtioBlockDevice) block_status() resource.BlockStatus {
+	device.l.acquire()
+	defer { device.l.release() }
+	mut flags := u64(0)
+	if !device.ready { flags |= resource.block_offline }
+	if device.flush_supported { flags |= resource.block_flush }
+	if device.read_only { flags |= resource.block_readonly }
+	return device.metrics.snapshot(u64(device.stat.size), u64(device.stat.blksize), flags, device.block_identity())
 }
 
 fn (device &VirtioBlockDevice) block_identity() resource.BlockIdentity {

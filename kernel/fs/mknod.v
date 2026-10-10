@@ -33,16 +33,18 @@ pub mut:
 	can_mmap bool
 
 	backing &resource.Resource = unsafe { nil }
-	// Snapshot the backing capability, never the caller's rdev or mode. In
+	// Retain the actual backing capability, never the caller's rdev or mode. In
 	// particular a basename alias may describe a block disk as a character
 	// node, which must not turn disk writes into unprotected stream writes.
-	block_extent resource.BlockIdentity
 	// The node's own interface value for this, handed to every open that the
 	// backing device does not decide. Making one per open left it behind.
 	boxed &resource.Resource = unsafe { nil }
 }
 
-fn (this &MknodDeviceResource) block_identity() resource.BlockIdentity { return this.block_extent }
+fn (this &MknodDeviceResource) block_identity() resource.BlockIdentity {
+	mut backing := this.backing
+	return resource.block_identity(mut backing)
+}
 
 // A device that decides what an open returns, as /dev/tty and /dev/ptmx do,
 // must decide it for the container's node too.
@@ -222,7 +224,6 @@ fn prepare_device_node(mut parent VFSNode, name string, mode u32, rdev u64, back
 		kernel_charge: wrapper_charge
 		refcount: 1
 		backing:  unsafe { backing }
-		block_extent: resource.block_identity(mut actual_backing)
 	}
 	res.stat.mode = mode
 	res.stat.rdev = rdev
@@ -374,7 +375,7 @@ pub fn syscall_mknodat(_ voidptr, dirfd int, _path charptr, mode u32, dev u64) (
 // Dynamically retired device wrappers cannot be resurrected by a lockless
 // lookup. Other published devices may start with a zero static refcount.
 fn retain_open_origin(mut res resource.Resource) ? {
- if mut res is MknodDeviceResource {
+ if res is MknodDeviceResource || res is LogicalVolume {
   for {
    refs := katomic.load(&res.refcount)
    if refs == 0 { errno.set(errno.enoent); return none }

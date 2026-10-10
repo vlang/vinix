@@ -1,6 +1,8 @@
 @[has_globals]
 module fs
 
+import kbudget
+import proc
 import stat
 import errno
 import klock
@@ -457,7 +459,8 @@ fn detach_device_node(name string, expected &resource.Resource) ?&VFSNode {
 	mut node := unsafe { parent.children[leaf] }
 	// A retired endpoint can finish after its numeric path has been reused.
 	// It must never detach the replacement device.
-	if node.resource != expected { return none }
+	if voidptr(node.resource) != voidptr(expected) { return none }
+	if node.resource is LogicalVolume && pinned(node) { errno.set(errno.ebusy); return none }
 	hold_parent(mut node)
 	parent.children.delete(leaf)
 	node.resource.stat.nlink = 0
@@ -468,4 +471,60 @@ fn detach_device_node(name string, expected &resource.Resource) ?&VFSNode {
 
 pub fn devtmpfs_get_root() &VFSNode {
 	return devtmpfs_root
+}
+
+// The mapper directory and its managed endpoints have stable names. Refuse
+// collisions atomically under the namespace lock; policy registration is
+// owned by the volume registry rather than the permanent driver inventory.
+__global logical_volume_directory &VFSNode
+
+fn managed_volume_node(node &VFSNode) bool {
+	if node == unsafe { nil } { return false }
+	if voidptr(node) == voidptr(logical_volume_directory) { return true }
+	return node.resource != unsafe { nil } && node.resource is LogicalVolume
+}
+
+// Alias wrappers remain removable, but cannot acquire permanent mount pins
+// when their backing endpoint can be detached independently.
+fn volume_mount_node(node &VFSNode) bool {
+ if managed_volume_node(node) { return true }
+ if node == unsafe { nil } || node.resource == unsafe { nil } { return false }
+ mut backing := node.resource
+ for _ in 0 .. 256 {
+  actual := backing
+  if actual == unsafe { nil } { return false }
+  if actual is LogicalVolume { return true }
+  if actual is MknodDeviceResource { backing = actual.backing } else { return false }
+ }
+ return true
+}
+
+fn devtmpfs_add_volume(device &resource.Resource, name string) ? {
+	charge := proc.reserve_kernel(.file, 8192)?
+	mut transferred := false
+	defer { if !transferred { kbudget.release(charge) } }
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	if 'mapper' in devtmpfs_root.children {
+		candidate := unsafe { devtmpfs_root.children['mapper'] }
+		if !stat.isdir(candidate.resource.stat.mode) || voidptr(candidate.filesystem) != voidptr(devtmpfs_root.filesystem)
+			|| candidate.mountpoint != unsafe { nil } || candidate.ns_mounts != 0 {
+			errno.set(errno.enotdir); return none
+		}
+	}
+	mut parent := ensure_devtmpfs_dir(devtmpfs_root, 'mapper')
+	logical_volume_directory = parent
+	leaf := unsafe { tos(name.str + 7, name.len - 7) }
+	if leaf in parent.children { errno.set(errno.eexist); return none }
+	mut node := create_node(parent.filesystem, parent, leaf.clone(), false)
+	node.kernel_charge = charge
+	transferred = true
+	node.resource = unsafe { device }
+	node.resource.stat.dev = devtmpfs_dev_id
+	node.resource.stat.ino = devtmpfs_inode_counter++
+	node.resource.stat.nlink = 1
+	node.resource.stat.atim = realtime_clock
+	node.resource.stat.ctim = realtime_clock
+	node.resource.stat.mtim = realtime_clock
+	unsafe { parent.children[leaf] = node }
 }

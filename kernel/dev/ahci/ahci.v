@@ -178,6 +178,7 @@ pub mut:
 	event    eventstruct.Event
 	status   int
 	can_mmap bool
+	metrics resource.BlockMetrics
 
 	parent_controller &AHCIController
 	volatile regs              &AHCIPortRegisters
@@ -195,14 +196,26 @@ __global (
 )
 
 fn (mut dev AHCIDevice) read(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	result := dev.read_tracked_inner(_handle, buffer, loc, count) or { dev.metrics.failed(); return none }
+	if result > 0 { dev.metrics.completed(u64(result), false) }
+	return result
+}
+fn (mut dev AHCIDevice) read_tracked_inner(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	return dev.transfer(buffer, loc, count, false)
 }
 
 fn (mut dev AHCIDevice) write(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
+	result := dev.write_tracked_inner(_handle, buffer, loc, count) or { dev.metrics.failed(); return none }
+	if result > 0 { dev.metrics.completed(u64(result), true) }
+	return result
+}
+fn (mut dev AHCIDevice) write_tracked_inner(_handle voidptr, buffer voidptr, loc u64, count u64) ?i64 {
 	return dev.transfer(buffer, loc, count, true)
 }
 
 fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
+	mut completed := false
+	defer { if completed { dev.metrics.flushed() } else { dev.metrics.failed() } }
 	dev.l.acquire()
 	defer { dev.l.release() }
 	if dev.failed || dev.flush_command == 0 {
@@ -234,6 +247,7 @@ fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
 		errno.set(errno.eio)
 		return none
 	}
+	completed = true
 }
 
 // Move `count` bytes at `loc` through the bounce buffer, a chunk per
@@ -243,7 +257,8 @@ fn (mut dev AHCIDevice) sync(_handle voidptr) ? {
 // call, a page per sector; once the page cache had filled memory, no run was
 // that long and the allocator panicked.
 fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool) ?i64 {
-	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0 {
+	if loc % dev.stat.blksize != 0 || count % dev.stat.blksize != 0
+        || loc > u64(dev.stat.size) || count > u64(dev.stat.size) - loc {
 		errno.set(errno.eio)
 		return none
 	}
@@ -312,6 +327,15 @@ fn (mut dev AHCIDevice) transfer(buffer voidptr, loc u64, count u64, write bool)
 		done += chunk
 	}
 	return i64(count)
+}
+
+fn (mut dev AHCIDevice) block_status() resource.BlockStatus {
+	dev.l.acquire()
+	defer { dev.l.release() }
+	mut flags := u64(0)
+	if dev.failed { flags |= resource.block_offline }
+	if dev.flush_command != 0 { flags |= resource.block_flush }
+	return dev.metrics.snapshot(u64(dev.stat.size), u64(dev.stat.blksize), flags, dev.block_identity())
 }
 
 fn (dev &AHCIDevice) block_identity() resource.BlockIdentity {

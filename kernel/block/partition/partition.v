@@ -67,6 +67,18 @@ pub mut:
 
 fn (this &Partition) block_identity() resource.BlockIdentity { return this.identity }
 
+fn (mut this Partition) read_only_backend() bool { return resource.backend_is_read_only(mut this.parent_device) }
+
+fn (mut this Partition) block_status() resource.BlockStatus {
+	mut result := resource.block_status(mut this.parent_device) or { return resource.BlockStatus{version: 0} }
+	result.bytes = u64(this.stat.size)
+	result.sector = u64(this.stat.blksize)
+	result.disk_id = this.identity.disk_id
+	result.start = this.identity.start
+	result.flags |= resource.block_parent_counters
+	return result
+}
+
 fn partition_identity(parent resource.BlockIdentity, offset u64, length u64) resource.BlockIdentity {
 	if !parent.valid() || offset > parent.length || length > parent.length - offset {
 		return resource.BlockIdentity{is_block: true}

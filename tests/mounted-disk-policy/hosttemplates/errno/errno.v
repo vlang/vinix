@@ -5,5 +5,6 @@ pub const eperm = 1
 pub const enodev = 19
 pub const ebusy = 16
 pub const eoverflow = 75
+pub const enospc = 28
 pub fn set(value int) { saved = value }
 pub fn get() int { return saved }

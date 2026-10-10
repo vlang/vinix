@@ -499,6 +499,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 
 	_, mut dest_node, _ := walk_path(calling_root(), dest, 0, true)
 	if dest_node == unsafe { nil } { return none }
+	if managed_volume_node(dest_node) { errno.set(errno.ebusy); return none }
 	if read_only(dest_node) { errno.set(errno.erofs); return none }
 	mac_node(dest_node, proc.mac_metadata)?
 	mac_node(parent_of_tgt_node, proc.mac_create)?
@@ -538,6 +539,7 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 	// Nothing here keeps the final component, so it stays a view into `name`.
 	mut parent_of_tgt, mut node, basename := walk_path(parent, name, 0, true)
 	if node == unsafe { nil } || parent_of_tgt == unsafe { nil } { return none }
+	if managed_volume_node(node) { errno.set(errno.ebusy); return none }
 	if !policy_check_name(parent_of_tgt, basename, proc.policy_create) { return none }
 	if read_only(node) || read_only(parent_of_tgt) { errno.set(errno.erofs); return none }
 	// An immutable or append-only file cannot be removed, nor anything from an
@@ -1272,6 +1274,10 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, _request u64, argp voidptr) (u64, u64
 		fd.unref()
 	}
 	fd.handle.mac_check(proc.mac_ioctl) or { return errno.err, errno.get() }
+	if storage_request(request) {
+		if result := storage_ioctl(mut fd, request, argp) { return u64(result), 0 }
+		if errno.get() != errno.enotty { return errno.err, errno.get() }
+	}
 
 	// A handful of requests belong to the descriptor rather than to whatever it
 	// points at, and Linux settles them in do_vfs_ioctl() before any driver is
@@ -1549,6 +1555,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	} else {
 		found_old_node
 	}
+	if managed_volume_node(old_node) { return errno.err, errno.ebusy }
 	if stat.isdir(old_node.resource.stat.mode) {
 		return errno.err, errno.eperm
 	}
@@ -1934,6 +1941,7 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 
 	mut new_parent_of, mut new_node, new_basename := walk_path(newparent, newpath, 0, true)
 	if unsafe { new_parent_of == 0 } { return none }
+	if managed_volume_node(old_node) || (new_node != unsafe { nil } && managed_volume_node(new_node)) { errno.set(errno.ebusy); return none }
 	if !policy_check_name(old_parent_of, old_basename, proc.policy_create)
 		|| !policy_check_name(new_parent_of, new_basename, proc.policy_create) {
 		return none

@@ -38,7 +38,7 @@ def main() -> None:
     declarations = re.sub(r"^import .*\n", "", declarations, flags=re.M)
     imports = "\n".join("import " + name for name in [
         "memory", "lib", "pci", "bitmap", "stat", "klock", "event.eventstruct",
-        "errno", "katomic", "x86.hpet as hpet_clock",
+        "errno", "katomic", "resource", "proc", "x86.hpet as hpet_clock",
     ])
     functions = "\n\n".join(function(source, name) for name in [
         "send_cmd", "send_cmd_and_wait", "fail_controller", "ready_timeout_ns",
@@ -47,10 +47,12 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="vinix-storage-host-") as directory:
         work = Path(directory)
         write(work, "v.mod", "Module { name: 'vinix_storage_host_tests' }\n")
+        write(work, "resource/resource.v", "module resource\npub struct BlockMetrics {}\npub fn (mut m BlockMetrics) failed() {}\npub fn (mut m BlockMetrics) flushed() {}\n")
         write(work, "nvme/nvme.v", declarations.replace("module nvme", "module nvme\n" + imports)
               + "\nconst page_size = u64(4096)\nconst higher_half = u64(0)\n"
               + "#include <stdio.h>\n#define kprintf printf\nfn C.kprintf(&char, ...voidptr) int\n"
               + functions)
+        write(work, "proc/proc.v", "module proc\npub fn account_disk_transfer(_ u64, _ bool) {}\npub fn account_disk_io(_ u64, _ u64, _ bool) {}\n")
         write(work, "pci/pci.v", "module pci\npub struct PCIBar {}\n")
         write(work, "stat/stat.v", """module stat
 pub struct Stat {
@@ -58,6 +60,7 @@ pub mut:
  size i64
  blksize i64
  blocks i64
+ rdev u64
 }
 """)
         write(work, "event/eventstruct/event.v", "module eventstruct\npub struct Event {}\n")
@@ -120,7 +123,7 @@ pub fn set_hook(hook fn ()) { tick_hook = hook; ticks = 0 }
         declarations = re.sub(r"^import .*\n", "", declarations, flags=re.M)
         imports = "\n".join("import " + name for name in [
             "aarch64.cpu", "aarch64.timer", "aarch64.uart", "errno", "klock",
-            "event.eventstruct", "stat",
+            "event.eventstruct", "stat", "resource",
         ])
         functions = "\n\n".join(function(virtio, name) for name in [
             "mmio_r32", "mmio_w32", "write_descriptor", "collect_one", "sync",
@@ -138,7 +141,7 @@ pub fn get_ns() u64 { return hpet_clock.nanoseconds() }
         declarations = ahci[:ahci.index("__global (")]
         declarations = re.sub(r"^import .*\n", "", declarations, flags=re.M)
         imports = "\n".join("import " + name for name in [
-            "pci", "errno", "klock", "event.eventstruct", "stat", "katomic",
+            "pci", "errno", "klock", "event.eventstruct", "stat", "katomic", "resource",
             "x86.hpet as hpet_clock",
         ])
         functions = "\n\n".join(function(ahci, name) for name in [

@@ -206,6 +206,7 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
 # The launchers and settings the desktop's X11 apps and pkg expect, as on arm64.
 # Refresh security utilities when using an existing or custom userland root.
 python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch x86_64 --staging "$STAGING"
+python3 "$SCRIPT_DIR/build-support/storage-tools/stage.py" --arch x86_64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"

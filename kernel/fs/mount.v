@@ -481,6 +481,9 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		return none
 	}
 
+	vfs_lock.acquire()
+	mut resolving := true
+	defer { if resolving { vfs_lock.release() } }
 	mut source_node := &VFSNode(unsafe { nil })
 	if source.len != 0 && kind !in pseudo_filesystems {
 		_, source_node, _ = walk_path(parent, source, 0, true)
@@ -488,6 +491,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 			errno.set(errno.enoent)
 			return none
 		}
+		if volume_mount_node(source_node) { errno.set(errno.ebusy); return none }
 		if stat.isdir(source_node.resource.stat.mode) {
 			errno.set(errno.enotblk)
 			return none
@@ -509,6 +513,9 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 		errno.set(errno.enoent)
 		return none
 	}
+	if volume_mount_node(target_node) { errno.set(errno.ebusy); return none }
+	vfs_lock.release()
+	resolving = false
 	mounting_root := voidptr(target_node) == voidptr(vfs_root)
 	if !mounting_root && !stat.isdir(target_node.resource.stat.mode) {
 		errno.set(errno.enotdir)
@@ -666,6 +673,8 @@ fn mount_devpts(parent &VFSNode, target string, flags u64, options string) ? {
 // below the source is part of what it names, so every bind here behaves as a
 // recursive one.
 fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	source_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	source_node := get_node_and_mount(parent, source, true, source_mount)?
 	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
@@ -680,6 +689,7 @@ fn bind_mount(parent &VFSNode, source string, target string, flags u64) ? {
 		errno.set(errno.enoent)
 		return none
 	}
+	if volume_mount_node(source_node) || volume_mount_node(target_node) { errno.set(errno.ebusy); return none }
 	if stat.isdir(source_node.resource.stat.mode) != stat.isdir(target_node.resource.stat.mode) {
 		errno.set(if stat.isdir(target_node.resource.stat.mode) {
 			errno.enotdir
@@ -767,6 +777,8 @@ fn find_mount(mut table MountTable, root &VFSNode) &Mount {
 }
 
 fn move_mount(parent &VFSNode, source string, target string) ? {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	source_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	source_root := get_node_and_mount(parent, source, true, source_mount)?
 	mut table := table_of(calling_process())
@@ -786,6 +798,7 @@ fn move_mount(parent &VFSNode, source string, target string) ? {
 	if target_node == unsafe { nil } {
 		return none
 	}
+	if volume_mount_node(target_node) { errno.set(errno.ebusy); return none }
 	mut old_covered := entry.covered
 	if voidptr(old_covered) != voidptr(entry.root) {
 		detach_mount(mut table, mut old_covered)
