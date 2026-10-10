@@ -19,10 +19,33 @@
 //       answer a read in /sys at once.
 //   acpi-ec-off
 //       The same table with vinix.ec=off: the driver must stay away.
+@[has_globals]
 module main
 
 import os
 import time
+
+#include <signal.h>
+#include <pthread.h>
+
+fn C.pthread_kill(thread voidptr, signal int) int
+
+__global (
+	ec_signals_taken = u64(0)
+	ec_signals_stop  = false
+)
+
+fn ec_on_signal(_ os.Signal) {
+	ec_signals_taken++
+}
+
+// Sends the thread `target` a signal a few thousand times a second.
+fn ec_signal_storm(target voidptr) {
+	for !ec_signals_stop {
+		C.pthread_kill(target, C.SIGUSR1)
+		C.usleep(200)
+	}
+}
 
 const ec_device = '/sys/bus/acpi/devices/PNP0C09:00/'
 const ec = '/sys/bus/acpi/devices/PNP0C09:00/ec/'
@@ -238,6 +261,7 @@ fn scenario_acpi_ec_selftest(mut t Test) {
 
 	ec_selftest_sleep(mut t)
 	ec_selftest_retention(mut t)
+	ec_selftest_signals(mut t)
 	// With a controller that works nobody has ever waited a second for the
 	// global lock.
 	t.check(ec_sim_count('lock_failures') == 0, 'the lock failed ${ec_sim_count('lock_failures')} times')
@@ -251,7 +275,7 @@ fn scenario_acpi_ec_selftest(mut t Test) {
 
 // Sleep: what the controller says while the machine is asleep.
 fn ec_selftest_sleep(mut t Test) {
-	stats := '/sys/power/suspend_stats/'
+	slept_stats := '/sys/power/suspend_stats/'
 	alarm := '/sys/class/rtc/rtc0/wakealarm'
 	source := '/sys/class/wakeup/wakeup9/'
 	ec_check_word(mut t, source + 'name', 'embedded-controller')
@@ -268,16 +292,16 @@ fn ec_selftest_sleep(mut t Test) {
 	ec_sim(mut t, 'ram 2 0')
 	ec_sim(mut t, 'event 0x22')
 	ec_sim(mut t, 'raise')
-	t.check(ec_wait_word(stats + 'success', '1', 15000), 'the lid shutting did not put the machine to sleep and back')
-	ec_check_word(mut t, stats + 'last_wake', 'lid')
+	t.check(ec_wait_word(slept_stats + 'success', '1', 15000), 'the lid shutting did not put the machine to sleep and back')
+	ec_check_word(mut t, slept_stats + 'last_wake', 'lid')
 	ec_check_word(mut t, ec_lid + 'state', 'open')
 	ec_check_word(mut t, ec_lid + 'closes', '2')
-	slept := read_word(stats + 'last_sleep_ms').i64()
+	slept := read_word(slept_stats + 'last_sleep_ms').i64()
 	t.check(slept >= 1000 && slept < 5000, 'the machine slept ${slept} ms; the lid opened 2500 ms after it shut')
 	t.check(ec_count('sleep_events') > sleep_events, 'no controller event was counted while asleep')
 	t.check(read_word(ec_device + 'power/wakeup_count').i64() >= 1, 'the device counted no wakeup')
 	write_text(alarm, '0') or {}
-	t.info('lid: shut, slept ${slept} ms, woken by ${read_word(stats + 'last_wake')}')
+	t.info('lid: shut, slept ${slept} ms, woken by ${read_word(slept_stats + 'last_wake')}')
 	write_text(ec_lid + 'action', 'ignore') or { t.check(false, 'lid action: ${err}') }
 
 	// An event nothing claims does not end a sleep...
@@ -286,7 +310,7 @@ fn ec_selftest_sleep(mut t Test) {
 	write_text(alarm, '+3') or { t.check(false, 'wakealarm: ${err}') }
 	ec_sim(mut t, 'later 1000 0x30')
 	mut took := sleep_now(mut t, 'freeze')
-	ec_check_word(mut t, stats + 'last_wake', 'alarm')
+	ec_check_word(mut t, slept_stats + 'last_wake', 'alarm')
 	t.check(took >= 2800, 'an unclaimed controller event ended the sleep after ${took} ms')
 	t.check(read_word(source + 'event_count').i64() > events, 'the controller event was not counted')
 	ec_check_word(mut t, source + 'wakeup_count', '0')
@@ -296,7 +320,7 @@ fn ec_selftest_sleep(mut t Test) {
 	write_text(alarm, '+8') or { t.check(false, 'wakealarm: ${err}') }
 	ec_sim(mut t, 'later 1000 0x30')
 	took = sleep_now(mut t, 'freeze')
-	ec_check_word(mut t, stats + 'last_wake', 'embedded-controller')
+	ec_check_word(mut t, slept_stats + 'last_wake', 'embedded-controller')
 	t.check(took < 6000, 'the sleep the controller was to end took ${took} ms')
 	ec_check_word(mut t, source + 'wakeup_count', '1')
 	write_text(source + 'enabled', 'disabled') or { t.check(false, 'disabling the source: ${err}') }
@@ -311,7 +335,7 @@ fn ec_selftest_sleep(mut t Test) {
 	queries := ec_count('queries')
 	ec_sim(mut t, 'later 1000 0x22 2 0')
 	took = sleep_now(mut t, 'freeze')
-	ec_check_word(mut t, stats + 'last_wake', 'alarm')
+	ec_check_word(mut t, slept_stats + 'last_wake', 'alarm')
 	t.check(took >= 2800, 'the controller ended a sleep it was not to end, after ${took} ms')
 	t.check(ec_wait_word(ec_lid + 'state', 'closed', 3000), 'the lid that shut during the sleep is ${read_word(ec_lid +
 		'state')} after it')
@@ -321,8 +345,8 @@ fn ec_selftest_sleep(mut t Test) {
 	ec_sim(mut t, 'event 0x22')
 	ec_sim(mut t, 'raise')
 	t.check(ec_wait_word(ec_lid + 'state', 'open', 3000), 'the lid did not open again')
-	ec_check_word(mut t, stats + 'fail', '0')
-	ec_check_word(mut t, stats + 'success', '4')
+	ec_check_word(mut t, slept_stats + 'fail', '0')
+	ec_check_word(mut t, slept_stats + 'success', '4')
 }
 
 // One write() of `text` to `path`, with nothing allocated in this program:
@@ -403,6 +427,72 @@ fn ec_selftest_retention(mut t Test) {
 	t.check(after.large_pages <= before.large_pages, '${rounds} events left ${after.large_pages - before.large_pages} more large-allocation pages')
 }
 
+// A read in /sys evaluates a method in the context of whoever reads, and a
+// program is sent signals whenever anybody likes. A thread with a signal
+// waiting may not sleep, and the locks on the way to the controller are
+// ones that sleep: a read that arrives while another thread has the
+// controller must wait its turn all the same, not fail. Here this program
+// reads the battery while a second thread of it sends the first a signal a
+// few thousand times a second, and the controller -- slowed down, so that
+// it is usually busy -- is kept at work by events.
+fn ec_selftest_signals(mut t Test) {
+	os.signal_opt(.usr1, ec_on_signal) or {
+		t.check(false, 'could not install a SIGUSR1 handler: ${err}')
+		return
+	}
+	control := c'/sys/bus/acpi/devices/PNP0C09:00/ec/selftest'
+	status := c'/sys/class/power_supply/BAT0/status'
+	ec_sim(mut t, 'latency 500')
+	ec_signals_stop = false
+	ec_signals_taken = 0
+	storm := spawn ec_signal_storm(voidptr(C.pthread_self()))
+	rounds := 150
+	mut wrong := 0
+	mut read := 0
+	mut buffer := [64]u8{}
+	for _ in 0 .. rounds {
+		ec_raw_write(control, c'event 0x20', 10)
+		ec_raw_write(control, c'raise', 5)
+		fd := C.open(status, C.O_RDONLY)
+		if fd < 0 {
+			continue
+		}
+		count := C.read(fd, &buffer[0], usize(63))
+		C.close(fd)
+		if count <= 0 {
+			// Interrupted before it began: not an answer, right or wrong.
+			continue
+		}
+		read++
+		if buffer[0] != `D` {
+			wrong++
+		}
+	}
+	ec_signals_stop = true
+	storm.wait()
+	ec_sim(mut t, 'latency 20')
+	// Events were queued faster than a controller this slow gives them up,
+	// more than once past the limit of one go: have what is left taken
+	// before anything else is counted.
+	mut left := ec_sim_count('waiting')
+	for _ in 0 .. 50 {
+		if left == 0 {
+			break
+		}
+		ec_sim(mut t, 'raise')
+		sleep_ms(100)
+		left = ec_sim_count('waiting')
+	}
+	t.check(left == 0, '${left} events were still in the controller after the signals')
+	sleep_ms(200)
+	t.info('under signals: ${read} reads of the battery, ${wrong} without an answer, ${ec_signals_taken} signals taken')
+	t.check(ec_signals_taken >= 10, 'only ${ec_signals_taken} signals were taken')
+	t.check(read >= rounds / 2, 'only ${read} of ${rounds} reads returned anything')
+	t.check(wrong == 0, '${wrong} of ${read} reads under signals did not say Discharging')
+	sleep_ms(ec_stale_ms)
+	ec_check_word(mut t, ec_battery + 'status', 'Discharging')
+}
+
 // A controller that misbehaves, with the real clock.
 fn ec_selftest_faults(mut t Test) {
 	// A byte left in the output buffer is not an answer.
@@ -414,12 +504,13 @@ fn ec_selftest_faults(mut t Test) {
 
 	// A controller that never runs out of events is left at the limit.
 	sim_queries := ec_sim_count('queries')
+	limits := ec_sim_count('drain_limits')
 	ec_sim(mut t, 'endless 0x30')
 	ec_sim(mut t, 'raise')
 	sleep_ms(1500)
 	asked := ec_sim_count('queries') - sim_queries
 	t.check(asked == 32, 'a controller that always has an event was asked ${asked} times, not 32')
-	t.check(ec_sim_count('drain_limits') == 1, 'drain_limits is ${ec_sim_count('drain_limits')}')
+	t.check(ec_sim_count('drain_limits') == limits + 1, 'drain_limits went from ${limits} to ${ec_sim_count('drain_limits')}')
 	ec_sim(mut t, 'endless 0')
 	// An event bit stuck up with nothing behind it is asked about once, and
 	// not again by the exchanges that see it.

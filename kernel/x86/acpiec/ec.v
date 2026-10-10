@@ -239,7 +239,9 @@ fn ec_enter(_ voidptr) bool {
 			return false
 		}
 	}
-	if acpisync.wait(acpiec_wiring.mutex, 0xffff) != 0 {
+	// acquire(), not wait(): a reader of /sys with a signal coming still gets
+	// its turn.
+	if acpisync.acquire(acpiec_wiring.mutex, 0xffff) != 0 {
 		if taken {
 			uacpi.release_global_lock(sequence)
 		}
@@ -258,7 +260,7 @@ fn ec_leave(_ voidptr) {
 	taken := acpiec_wiring.lock_taken
 	sequence := acpiec_wiring.lock_sequence
 	acpiec_wiring.lock_taken = false
-	acpisync.signal(acpiec_wiring.mutex)
+	acpisync.release(acpiec_wiring.mutex)
 	if taken && !uacpi.release_global_lock(sequence) {
 		katomic.inc(mut &acpiec_wiring.lock_failures)
 	}

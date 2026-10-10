@@ -86,21 +86,32 @@ pub fn wait(handle voidptr, timeout u16) int {
 	return wait_for(handle, timeout, true)
 }
 
-// wait() for uACPI's own mutexes. A thread that waits without limit for a
-// mutex it is recorded as holding is refused by wait(), since it would wait
-// for itself. For uACPI the record is not who holds the mutex: its
-// reader-writer lock has the first reader take the writers' mutex for all
-// readers, so that reader, done reading while another still reads, is still
-// on record when it comes back to write. It has to wait for the other
-// reader like anybody else; refused, the method it was about to run failed
-// with nothing wrong. uACPI keeps its own account of the mutexes that may be
-// taken twice by one thread.
+// wait() for the locks inside the kernel's ACPI code: uACPI's own mutexes,
+// and those of drivers its methods end up in. It differs in two ways.
+//
+// A thread that waits without limit for a mutex it is recorded as holding is
+// refused by wait(), since it would wait for itself. For uACPI the record is
+// not who holds the mutex: its reader-writer lock has the first reader take
+// the writers' mutex for all readers, so that reader, done reading while
+// another still reads, is still on record when it comes back to write. It
+// has to wait for the other reader like anybody else; refused, the method it
+// was about to run failed with nothing wrong. uACPI keeps its own account of
+// the mutexes that may be taken twice by one thread.
+//
+// And a thread with a signal waiting for it may not sleep, so wait() gives
+// up with an error, which is right for a wait a signal should end. A method
+// is evaluated in the context of whoever reads a file in /sys, and whether
+// that program has a signal coming is no reason for the method to fail half
+// way: here such a thread takes turns with the others until the mutex is
+// free, which is as long as its holder needs and no longer.
 @[export: 'vinix_acpi_sync_acquire']
 pub fn acquire(handle voidptr, timeout u16) int {
 	return wait_for(handle, timeout, false)
 }
 
-fn wait_for(handle voidptr, timeout u16, refuse_holder bool) int {
+// `strict` is wait(): refuse the holder on record, and end the wait for a
+// signal.
+fn wait_for(handle voidptr, timeout u16, strict bool) int {
 	if handle == unsafe { nil } {
 		return 7
 	}
@@ -119,7 +130,7 @@ fn wait_for(handle voidptr, timeout u16, refuse_holder bool) int {
 		gate.lock.release()
 		return 18
 	}
-	if refuse_holder && gate.mutex && gate.owner == identity && timeout == 0xffff {
+	if strict && gate.mutex && gate.owner == identity && timeout == 0xffff {
 		gate.lock.release()
 		return 20
 	}
@@ -177,12 +188,24 @@ fn wait_for(handle voidptr, timeout u16, refuse_holder bool) int {
 		if finite {
 			mut storage := [&gate.wake, &timer.event]!
 			mut events := unsafe { event.stack_list(&storage[0], storage.len) }
-			which := event.await_from_generation(mut events, true, 0, generation) or { return 10 }
+			which := event.await_from_generation(mut events, true, 0, generation) or {
+				if strict {
+					return 10
+				}
+				sched.reschedule()
+				continue
+			}
 			timer_expired = which == 1
 		} else {
 			mut storage := [&gate.wake]!
 			mut events := unsafe { event.stack_list(&storage[0], storage.len) }
-			event.await_from_generation(mut events, true, 0, generation) or { return 10 }
+			event.await_from_generation(mut events, true, 0, generation) or {
+				if strict {
+					return 10
+				}
+				sched.reschedule()
+				continue
+			}
 		}
 	}
 	return 10
