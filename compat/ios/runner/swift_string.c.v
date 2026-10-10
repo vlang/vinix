@@ -184,6 +184,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
 		'_$sSSN' { swift_string_metadata() }
 		'_$sSSMn' { read64(swift_string_metadata() + 8) }

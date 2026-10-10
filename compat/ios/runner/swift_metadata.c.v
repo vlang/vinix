@@ -125,7 +125,8 @@ fn swift_string_metadata() u64 {
 		write32(module_descriptor + 8, u32(i32(i64(data + 208) - i64(module_descriptor + 8))))
 		C.memcpy(unsafe { voidptr(data + 208) }, c'Swift', 6)
 		C.memcpy(unsafe { voidptr(data + 216) }, c'String', 7)
-		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 24) })
+		swift_string_protocols_emit(base, data)
+		C.__builtin___clear_cache(arena, unsafe { voidptr(base + 152) })
 		if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 			|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 			C.munmap(arena, usize(page * 2))

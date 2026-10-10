@@ -1583,22 +1583,55 @@ unestablished. Serial logs and VM hashes for both failures and the diagnostic
 run are retained, along with matching generated timestamp helper bodies from
 the prior passing build.
 
-Two more strong imports resolve. Fortnite still exits with status 1 before
-entry, now at String's `TextOutputStreamable` protocol witness table
-`_$sSSs20TextOutputStreamablesWP` in EOSSDK. Protocol conformances and generic
-interpolation remain incomplete.
+Two more strong imports resolved. That probe exited with status 1 before
+entry at String's `TextOutputStreamable` protocol witness table
+`_$sSSs20TextOutputStreamablesWP` in EOSSDK.
+
+String's `TextOutputStreamable` and `CustomStringConvertible` conformances now
+resolve with real protocol/conformance descriptors and witness tables. V emits
+their ARM64 adapters into the existing accessor page and their relative records
+into the read-only metadata page before publication. The stream witness forwards
+the borrowed String to the caller's generic target `write` requirement, preserving
+its metadata, table and inout context. The description witness returns the same
+String words with an acquired bridge owner. Copies retained by a stream remain
+the stream's responsibility. The layouts follow Swift's
+[protocol metadata definitions](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/include/swift/ABI/Metadata.h);
+installed callback instructions and native calls establish their register and
+ownership conventions.
+
+V research uses this Mac's Swift library and installed LLVM C disassembler.
+Native/V ASAN/UBSAN checks compare both descriptors, two independent generic
+target metadata/table/context addresses, unchanged borrowed inputs and reference
+counts inside callbacks, owned descriptions, preserved Swift contexts and nested
+calls from another worker. Small, immortal and Cocoa bridge Strings are covered;
+native owned Swift Strings are measured on native witnesses only. Two V teardowns
+leave the object, buffer and metadata registries empty. Native instructions,
+installed interfaces, fixed-version primary sources, generated bodies and guest
+evidence are retained under `swift-protocol-checks`.
+
+All eighteen native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. The first attempt passed all eighteen checks but the unchanged
+stdio directory-enumeration fixture returned 73; an identical retry failed the
+timestamp fixture's successful-`utime` assertion. The third identical full build
+passes. Both failed serial logs and VM hashes are retained; their causes remain
+unestablished.
+
+Three more strong imports resolve. Fortnite still exits with status 1 before
+entry, now at the generic `RawRepresentable.hashValue` getter in EOSSDK,
+`_$sSYsSHRzSH8RawValueSYRpzrlE04hashB0Sivg`. Runtime-wide conformance lookup,
+generic interpolation and application Swift heap support remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,360 | 798 | 81 |
-| EOSSDK | 571 | 91 | 18 |
+| Fortnite executable | 1,361 | 797 | 81 |
+| EOSSDK | 573 | 89 | 18 |
 | MarketplaceKitWrapper | 69 | 107 | 23 |
-| All images | 2,000 | 996 | 122 |
+| All images | 2,003 | 993 | 122 |
 
-The C++/GLES/Text variant reports 2,013 resolved imports, 983 unresolved strong
+The C++/GLES/Text variant reports 2,016 resolved imports, 980 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
