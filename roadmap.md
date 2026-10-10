@@ -174,16 +174,45 @@ consistent filesystem; backup restoration preserves content and metadata.
 
 - [ ] Publish a qualification matrix for Intel and AMD PCs, base M1 machines,
   AArch64 VMs and x86-64 VMs; expand Apple Silicon and ARM coverage by actual model.
+  - [x] [Matrix by machine and by device family, vendor dependencies and the
+    physical checklist](docs/hardware-qualification.md). No machine is qualified
+    yet: no checklist has been completed.
 - [ ] Provide common device enumeration, driver binding/removal, firmware loading,
   DMA mappings, IOMMU isolation and safe timeout/reset infrastructure.
+  - [x] [Device core, bounded waits and failure recovery, DMA domains, Intel VT-d
+    and AMD-Vi (opt-in), firmware loader](docs/hardware-platform.md), tested in
+    [QEMU guests](tests/hardware-platform/README.md) on both architectures.
+  - [ ] PCI hotplug and rescan; a USB core; Apple's drivers in the device list and
+    behind the DMA layer; an IOMMU on by default once a PC has been tried.
 - [ ] Support the common storage, Ethernet, wireless, graphics and audio device
   families needed by the reference PC/laptop set; identify vendor dependencies.
+  - [x] [What each machine class needs, the driver that is or is not there, and
+    the vendor dependencies](docs/hardware-qualification.md#device-families-by-machine).
+  - [ ] The drivers themselves: release-fit NVMe, the Ethernet and wireless cards
+    PCs have, USB on x86-64, qualified graphics and audio.
 - [ ] Implement CPU idle/frequency control, thermal management, fan/sensor APIs,
   battery/charging policy and accurate remaining-time/energy reporting.
+  - [x] [Idle states and frequency policies with Intel, AMD and Apple drivers;
+    thermal zones with the processor's sensors and energy counters; ACPI battery
+    and charger with a smoothed time-left estimate and low/critical
+    policy](docs/hardware-platform.md#power-supplies). Hardware registers are
+    covered by host tests only.
+  - [ ] Fan control, ACPI thermal zones, an embedded controller driver, Apple's
+    SMC battery and sensors in the same interfaces, a charge limit.
 - [ ] Add reliable suspend/resume, lid behavior, wake sources, screen sleep,
   hibernation and shutdown/reboot that flushes storage and quiesces devices.
+  - [x] [Suspend to idle with wake sources, an alarm and a rehearsal mode; lid
+    and power button; power off and restart that flush storage and stop every
+    device](docs/hardware-platform.md#sleep).
+  - [ ] Suspend to RAM, hibernation, screen sleep and the desktop's side of all
+    of it.
 - [ ] Restore all device and security state after sleep, firmware errors and
   hotplug; keep recovery possible when a driver fails.
+  - [x] [CPU protection registers compared across every sleep; e1000 and AHCI
+    resumed and reset in place; a failing device reset, probed again or set
+    aside without taking the machine down](docs/hardware-platform.md#waiting-and-recovery).
+  - [ ] Suspend and resume in the remaining drivers; state after a sleep that
+    powers devices down; hotplug.
 
 Acceptance: each advertised machine completes a physical hardware checklist;
 passing synthetic fixtures alone does not qualify a driver.
