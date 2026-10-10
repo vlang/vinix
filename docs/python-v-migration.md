@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `951bf9739af41795392341fe4d61e59d227431f2`,
-Linguist 7.27.0 reports **Python 6.31%** (488 files, 2,249,788 bytes) and
-**V 74.65%** (2,424 files, 26,627,416 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `a99c83e8ba1d5b9f236327f3a18d4f4da180da68`,
+Linguist 7.27.0 reports **Python 6.24%** (486 files, 2,239,388 bytes) and
+**V 74.84%** (2,453 files, 26,863,647 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,956,497 Python bytes**. All remaining
-2,249,788 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **2,966,897 Python bytes**. All remaining
+2,239,388 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 21 stages below remove **44 Python files / 111,560 original bytes** and
+The 22 stages below remove **46 Python files / 121,960 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -52,6 +52,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Native header boundary differential runner | `tests/native-boundaries/boundarycheck`, `run.v` | 4,283 / 81 | `0caa1c87` |
 | VMX checker frontend, ELF reader and subprocess leaf | `tests/hypervisor/vmxcheck`, `check-vmx.v` | 5,665 / 118 | `05d938f0` |
 | Limine compatibility patch test and command fixtures | `tests/limine-aarch64/test-patch.v`, `commandfixture` | 4,292 / 108 | `951bf973` |
+| ANS read-only reference verifier and independent tests | `tools/apple-ans/ansreads`, two V entrypoints | 10,400 / 252 | `a99c83e8` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -289,12 +290,42 @@ Between `0caa1c87` and `951bf973`, counted Python declined by exactly 9,957
 bytes, matching these two stages. Concurrent V source changes affect the
 language shares independently.
 
+The ANS reference verifier and its independent tests remove two Python files /
+10,400 bytes. Both command entrypoints now compile and invoke V directly, and
+all three documented callers use them. The native implementation keeps a single
+read-only, close-on-exec source descriptor, checks its actual file type, streams
+SHA-256 in the original chunk/pass/range order, and retains mismatch and EOF
+rejection. New manifests use exclusive, no-follow creation with mode 0600,
+complete writes and fsync; existing images, devices and symlinks cannot be
+overwritten. Manifest reads remain bounded to 1 MiB. Numeric JSON tokens remain
+exact above 2^53 and outside machine widths, while Boolean, float and quoted
+range values are rejected. UTF-8/16/32 input detection and Unicode labels and
+integer syntax are covered. Informational system strings now use uname; usage
+text and OS/JSON error wording are native.
+
+Fresh ARM, Rosetta x86 and ARM ASan/UBSan builds pass all nine native test groups,
+including the seven original scenarios, independent shasum comparisons, full
+megabyte streaming, signed offset bounds, overlap/order/adjacency, exclusive
+publication and dangling links, malformed and oversized manifests, CLI status
+and 100 repeated success/error cycles with no descriptor growth. Native suite
+compiler-selection failures also retire their private directories. Cold
+launchers pass a fresh suite build and record/check from an unrelated directory,
+preserving source bytes and clearing temporary files after success and an
+exclusive-create failure. Logs are `/tmp/vinix-ans-reads-{arm,x86,asan}-final.log`
+and `/tmp/vinix-ans-reads-cold-final.log`. No Python was run. Only synthetic
+regular files and device/type rejection were tested; this establishes no ANS
+hardware identity, guest execution or power-loss persistence.
+
+Between `951bf973` and `a99c83e8`, counted Python declined by exactly 10,400
+bytes, matching this stage. Concurrent V changes affect the language shares
+independently.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 21 stages.
+or hidden in these 22 stages.
 
 ## Earlier completed stages
 

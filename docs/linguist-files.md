@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `951bf9739af41795392341fe4d61e59d227431f2`,
+at source commit `a99c83e8ba1d5b9f236327f3a18d4f4da180da68`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,778 | 6.57% |
-| Python | 488 | 2,249,788 | 6.31% |
-| Shell | 365 | 1,345,539 | 3.77% |
+| C | 563 | 2,343,778 | 6.53% |
+| Python | 486 | 2,239,388 | 6.24% |
+| Shell | 368 | 1,346,419 | 3.75% |
 
-All `.v` files are classified as V. The resulting V share is 74.65%, with no
+All `.v` files are classified as V. The resulting V share is 74.84%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,249,788 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,239,388 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 951bf9739af41795392341fe4d61e59d227431f2 --breakdown --json
+github-linguist --rev a99c83e8ba1d5b9f236327f3a18d4f4da180da68 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -1096,8 +1096,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/recover_g17_abi.py` | 2,516 |
 | `tools/agx-re/recover_t6050_power.py` | 7,411 |
 | `tools/agx-re/test_extract_firmware.py` | 212 |
-| `tools/apple-ans/test_verify_reads.py` | 3,352 |
-| `tools/apple-ans/verify_reads.py` | 7,048 |
 | `tools/build-qemu-module-iso.py` | 3,021 |
 | `tools/dota2/_ext2_native.py` | 8,261 |
 | `tools/dota2/ext2_export.py` | 6,288 |
@@ -1284,6 +1282,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/run-iso-virtualbox.sh` | 8,448 |
 | `scripts/test-gpu-kekvm.sh` | 274 |
 | `scripts/test-iso.sh` | 18,878 |
+| `tests/acpi-ec/run.sh` | 649 |
 | `tests/acpi-sync/compile-v-native` | 191 |
 | `tests/agx-fake-g17/run.sh` | 942 |
 | `tests/agx-g13-abi/run.sh` | 785 |
@@ -1480,6 +1479,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/agx-re/map_g17_resource_descriptors` | 174 |
 | `tools/agx-re/recover_t8103_adt` | 163 |
 | `tools/agx-re/trace_diff` | 156 |
+| `tools/apple-ans/test-verify-reads` | 118 |
+| `tools/apple-ans/verify-reads` | 113 |
 | `tools/apple-backlight/test.sh` | 415 |
 | `tools/hwcheck/build` | 1,429 |
 | `tools/m1-wifi/get-v.sh` | 2,538 |
