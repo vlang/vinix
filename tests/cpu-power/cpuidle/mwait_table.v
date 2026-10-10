@@ -1,0 +1,1 @@
+../../../kernel/cpuidle/mwait_table_amd64.v

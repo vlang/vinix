@@ -27,6 +27,48 @@
 // interrupt that becomes pending there stays pending until the STI, which is
 // still followed at once by the HLT.
 //
+// MWAIT
+//
+// A state entered with MWAIT has two forms, and which a state uses is
+// decided once, in mwait_table_amd64.v.
+//
+// Where the processor can treat a masked interrupt as a reason to wake
+// (CPUID.5:ECX[1]) the wait is made with interrupts off throughout:
+//
+//	cli ... monitor; look again; mwait with ECX[0] = 1 ... note the time; sti
+//
+// An interrupt that is pending when MWAIT executes, or becomes pending while
+// it waits, ends it although it cannot be delivered yet; it is delivered at
+// the STI. Nothing can slip in between the look and the wait, because nothing
+// is delivered at all until the wait is over. "Look again" is the scheduler's
+// own note that a reschedule interrupt is on its way to this CPU: with that
+// set there is no point in stopping, and the state is counted as rejected.
+// The deep states are entered this way and only this way, as intel_idle
+// enters them.
+//
+// Without that bit MWAIT is used as it was first defined, no hints and no
+// extensions, and exactly as HLT is: `monitor; sti; mwait`. The STI again
+// takes effect only after the instruction behind it, and a pending interrupt
+// that is no longer masked ends an MWAIT as it ends a HLT.
+//
+// MONITOR needs an address to watch, and gets a word of this CPU's record
+// that nothing writes: wake-ups stay what they were, interrupts. The address
+// only has to be valid.
+//
+// On the command line
+//
+//	vinix.cpuidle=off     no driver: the scheduler idles as it did before
+//	vinix.cpuidle=halt    HLT even where MWAIT would be used
+//	vinix.cpuidle=mwait   MWAIT for C1 although CPUID enumerates no C1
+//	                      sub-state; for trying the MWAIT path in an emulator
+//	vinix.max_cstate=N    offer only the first N states
+//
+// Under QEMU's emulation (-accel tcg) the default is HLT although MONITOR is
+// advertised, and has to be: its MWAIT does not wait when the machine has more
+// than one CPU, so an idle CPU would spin, and it faults on ECX[0] = 1 while
+// advertising the interrupt-break bit. Its CPUID leaf 5 enumerates no C1
+// sub-state, which is the case mwait_table() answers with HLT, as Linux does.
+//
 // Who closes the books
 //
 // The interrupt that ends an idle usually does not come back: the scheduler's
@@ -37,6 +79,8 @@
 // the next turn of the loop closes the idle it ended before it starts another.
 // Both run with interrupts off on the CPU the record belongs to, so they never
 // meet.
+// A masked MWAIT is the exception: it returns here before any handler has run,
+// so its time is taken on the spot and is exact.
 module cpuidle
 
 import katomic
@@ -92,13 +136,77 @@ pub fn idle_loop(cpu_number u64, timer_us u64, wake_pending &u32) {
 			}
 			continue
 		}
+		flags := cpuidle_states[state].flags
+		if flags & state_mwait == 0 {
+			idle_begin(cpu_number, state, now)
+			asm volatile amd64 {
+				sti
+				hlt
+				cli
+				; ; ; memory
+			}
+			continue
+		}
+		hint := cpuidle_states[state].hint
+		monitor_arm(&cpuidle_cpus[cpu_number].watched)
+		if flags & state_masked == 0 {
+			// MWAIT in HLT's place, EAX and ECX both zero.
+			idle_begin(cpu_number, state, now)
+			unmasked := u32(0)
+			asm volatile amd64 {
+				sti
+				mwait
+				cli
+				; ; a (hint)
+				  c (unmasked)
+				; memory
+			}
+			continue
+		}
+		if katomic.load(wake_pending) != 0 {
+			// A reschedule interrupt is already on its way here. Let it in
+			// instead of stopping, as for the case with no state at all.
+			idle_reject(cpu_number, state)
+			asm volatile amd64 {
+				sti
+				pause
+				cli
+				; ; ; memory
+			}
+			continue
+		}
 		idle_begin(cpu_number, state, now)
+		break_on_interrupt := u32(1)
+		asm volatile amd64 {
+			mwait
+			; ; a (hint)
+			  c (break_on_interrupt)
+			; memory
+		}
+		idle_account(cpu_number, cpu.rdtsc())
+		// Now the interrupt that ended it. STI holds it back for one more
+		// instruction, so there has to be one before the CLI: `sti; cli`
+		// would let nothing in.
 		asm volatile amd64 {
 			sti
-			hlt
+			nop
 			cli
 			; ; ; memory
 		}
+	}
+}
+
+// Arm MONITOR on `address`, with no extensions and no hints.
+@[inline]
+fn monitor_arm(address voidptr) {
+	extensions := u32(0)
+	hints := u32(0)
+	asm volatile amd64 {
+		monitor
+		; ; a (address)
+		  c (extensions)
+		  d (hints)
+		; memory
 	}
 }
 
@@ -140,12 +248,66 @@ fn driver_start() {
 	}
 	cpuidle_tick_hz = hz
 
-	// What every x86-64 processor has. Linux's figures for a C1 entered by
-	// HLT (drivers/acpi/processor_idle.c): out again in a microsecond.
-	add_state('C1', 'HLT', 1, 1, 0, 0)
-	cpuidle_driver_name = 'halt'
-
-	C.kprintf(c'cpuidle: driver %s, %llu states, TSC %llu Hz\n', cpuidle_driver_name.str,
-		u64(cpuidle_state_count), hz)
+	mut described := describe_cpu()
+	if choice := devcore.boot_option('vinix.cpuidle=') {
+		if choice == 'halt' {
+			described.monitor = false
+		} else if choice == 'mwait' {
+			described.forced = true
+		}
+	}
+	if limit := devcore.boot_option('vinix.max_cstate=') {
+		described.limit = small_number(limit)
+	}
+	table := mwait_table(described)
+	for i in 0 .. table.count {
+		s := table.states[i]
+		add_state(s.name, s.desc, s.exit_latency_us, s.target_residency_us, s.hint, s.flags)
+	}
+	cpuidle_driver_name = table.driver
+	C.kprintf(c'cpuidle: driver %s, %llu states (%s), TSC %llu Hz\n', table.driver.str,
+		u64(cpuidle_state_count), table.reason.str, hz)
 	katomic.store(mut &cpuidle_ready, u32(1))
+}
+
+// What CPUID says about this processor's idle states. Read on the CPU that
+// publishes /sys and taken to hold for all of them, as intel_idle takes the
+// boot CPU's.
+fn describe_cpu() MwaitCpu {
+	mut c := MwaitCpu{}
+	_, _, vendor_b, vendor_c, vendor_d := cpu.cpuid(0, 0)
+	// "GenuineIntel" and "AuthenticAMD", four letters a register.
+	c.intel = vendor_b == 0x756e6547 && vendor_d == 0x49656e69 && vendor_c == 0x6c65746e
+	c.amd = vendor_b == 0x68747541 && vendor_d == 0x69746e65 && vendor_c == 0x444d4163
+	_, signature, _, features, _ := cpu.cpuid(1, 0)
+	c.family = (signature >> 8) & 0xf
+	c.model = (signature >> 4) & 0xf
+	if c.family == 0xf {
+		c.family += (signature >> 20) & 0xff
+	}
+	if c.family == 6 || c.family >= 0xf {
+		c.model += ((signature >> 16) & 0xf) << 4
+	}
+	c.monitor = features & (u32(1) << 3) != 0
+	leaf5, _, _, extensions, substates := cpu.cpuid(5, 0)
+	c.leaf5 = leaf5
+	c.extensions = extensions
+	c.substates = substates
+	leaf6, thermal, _, _, _ := cpu.cpuid(6, 0)
+	c.arat = leaf6 && thermal & (u32(1) << 2) != 0
+	advanced, _, _, _, power := cpu.cpuid(0x80000007, 0)
+	c.nonstop_tsc = advanced && power & (u32(1) << 8) != 0
+	return c
+}
+
+// A command-line value as a small number: 0 for anything that is not one.
+fn small_number(text string) int {
+	mut value := 0
+	for i in 0 .. text.len {
+		if text[i] < `0` || text[i] > `9` || value > 1000 {
+			return 0
+		}
+		value = value * 10 + int(text[i] - `0`)
+	}
+	return value
 }
