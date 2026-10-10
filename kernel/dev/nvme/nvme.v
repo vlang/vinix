@@ -2,6 +2,8 @@
 module nvme
 
 import pci
+import devcore
+import dma
 import proc
 import memory
 import lib
@@ -1006,19 +1008,38 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 	return 0
 }
 
-pub fn initialise() {
-	for device in scanned_devices {
-		if device.class == nvme_class && device.subclass == nvme_subclass
-			&& device.prog_if == nvme_progif {
-			mut nvme_device := &NVMEController{
-				regs:          unsafe { nil }
-				controller_id: unsafe { nil }
-				admin_queue:   unsafe { nil }
-			}
+fn controller_matches(dev &devcore.Device) bool {
+	return dev.is_pci_class(nvme_class, nvme_subclass, nvme_progif)
+}
 
-			if nvme_device.initialise(device) != -1 {
-				controller_list << nvme_device
-			}
-		}
+fn controller_probe(mut dev devcore.Device) bool {
+	mut nvme_device := &NVMEController{
+		regs:          unsafe { nil }
+		controller_id: unsafe { nil }
+		admin_queue:   unsafe { nil }
 	}
+	// The controller is told physical addresses of this driver's choosing --
+	// its queues, and a request's pages as they come; behind an IOMMU it has
+	// to be allowed all of memory to follow them.
+	dma.allow_all(mut dev)
+	if nvme_device.initialise(dev.pci) == -1 {
+		// A controller that did not come up may still own the memory it was
+		// given; the record is kept with it. See fail_controller().
+		return false
+	}
+	dev.driver_data = voidptr(nvme_device)
+	controller_list << nvme_device
+	return true
+}
+
+// Register with the device core, which hands over every NVMe controller the
+// machine has.
+pub fn initialise() {
+	devcore.register_driver(devcore.Driver{
+		name:     'nvme'
+		bus:      .pci
+		matches:  controller_matches
+		probe:    controller_probe
+		shutdown: controller_shutdown
+	}) or { return }
 }

@@ -1,6 +1,8 @@
 module ata
 
 import pci
+import devcore
+import dma
 import stat
 import klock
 import memory
@@ -62,12 +64,26 @@ pub mut:
 	prdt_cache        &u8
 }
 
+fn controller_matches(dev &devcore.Device) bool {
+	return dev.is_pci_class(pci_class, pci_subclass, pci_progif)
+}
+
+// Register with the device core, which hands over the machine's IDE
+// controller if it has one.
 pub fn initialise() {
-	// Fetch and setup the PCI device.
-	mut dev := pci.get_device_by_class(pci_class, pci_subclass, pci_progif, 0) or {
-		print('ata: No suitable PCI devices found\n')
-		return
-	}
+	devcore.register_driver(devcore.Driver{
+		name:    'ata'
+		bus:     .pci
+		matches: controller_matches
+		probe:   controller_probe
+	}) or { return }
+}
+
+fn controller_probe(mut core devcore.Device) bool {
+	mut dev := core.pci
+	// The drives are told physical addresses of this driver's choosing; behind
+	// an IOMMU the controller has to be allowed all of memory to follow them.
+	dma.allow_all(mut core)
 	dev.enable_bus_mastering()
 
 	// Probe ports and add devices.
@@ -84,6 +100,8 @@ pub fn initialise() {
 			name.str, i64(drive.stat.size))
 		index += 1
 	}
+	// A controller with no drive on it is still this driver's.
+	return true
 }
 
 fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
@@ -146,7 +164,10 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		return none
 	}
 
-	mut timeout := 0
+	// By the clock: this loop used to count to a number it never counted
+	// towards, and waited for ever on a port that neither errored nor asked
+	// for data. A drive answers IDENTIFY in milliseconds.
+	identify_wait := devcore.deadline(devcore.second)
 	for {
 		status := kio.port_in[u8](dev.cmd_port)
 		if status & 0b00000001 != 0 {
@@ -156,7 +177,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 		if status & 0b00001000 != 0 {
 			break
 		}
-		if timeout == 100000 {
+		if identify_wait.expired() {
 			C.kprintf(c'ata: Port %lld hanged\n', i64(port_index))
 			return none
 		}

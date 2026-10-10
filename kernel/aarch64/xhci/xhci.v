@@ -19,6 +19,8 @@
 module xhci
 
 import pci
+import devcore
+import dma
 import memory
 import aarch64.cpu
 import aarch64.timer
@@ -484,8 +486,30 @@ fn attach(port u32) {
 }
 
 // Bring the controller up. Returns false if there is none.
+fn controller_matches(dev &devcore.Device) bool {
+	return dev.is_pci_class(0x0c, 0x03, 0x30)
+}
+
+fn controller_probe(mut core devcore.Device) bool {
+	// The controller is told physical addresses of this driver's choosing;
+	// behind an IOMMU it has to be allowed all of memory to follow them.
+	dma.allow_all(mut core)
+	return start(core.pci)
+}
+
+// Register with the device core, which hands over an xHCI controller if the
+// machine has one. Returns whether the driver ended up with one working.
 pub fn initialise() bool {
-	dev := pci.get_device_by_class(0x0c, 0x03, 0x30, 0) or { return false }
+	driver := devcore.register_driver(devcore.Driver{
+		name:    'xhci'
+		bus:     .pci
+		matches: controller_matches
+		probe:   controller_probe
+	}) or { return false }
+	return driver.bound > 0
+}
+
+fn start(dev &pci.PCIDevice) bool {
 	bar := dev.get_bar(0)
 	if !bar.is_mmio || bar.base == 0 {
 		println('xhci: controller has no memory BAR')

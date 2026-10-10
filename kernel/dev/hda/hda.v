@@ -2,6 +2,8 @@
 module hda
 
 import pci
+import devcore
+import dma
 import memory
 import time.sys
 import dev.oss
@@ -925,10 +927,17 @@ fn (mut c HDAController) submit_verb_long(cid u8, nid u8, cmd u8, data u16) u8 {
 }
 
 fn (mut c HDAController) wait_for_verb(index u8) HDAResponseDescriptor {
+	// A controller takes a command in microseconds. One that has not after a
+	// tenth of a second -- it was unplugged, or lost power in a sleep -- is
+	// not going to, and this used to wait for it for ever.
+	limit := devcore.deadline(100 * devcore.millisecond)
 	for {
 		cur_index := (c.regs.corbwp >> corbwp_wp_shift) & corbwp_wp_mask
 		if cur_index == index {
 			break
+		}
+		if limit.expired() {
+			return HDAResponseDescriptor{}
 		}
 	}
 
@@ -1173,23 +1182,39 @@ pub fn (mut c HDAController) initialise(pci_device &pci.PCIDevice) int {
 	return 0
 }
 
-pub fn initialize() {
-	for device in scanned_devices {
-		if (device.class == hda_class && device.subclass == hda_subclass)
-			|| (device.vendor_id == tgl_sst_vendor && device.device_id == tgl_sst_device) {
-			mut hda_device := unsafe {
-				&HDAController{
-					regs:    0
-					index:   i32(hda_controller_list.len)
-					corb:    0
-					rirb:    0
-					dma_pos: 0
-				}
-			}
+fn controller_matches(dev &devcore.Device) bool {
+	return dev.bus == .pci && ((dev.class == hda_class && dev.subclass == hda_subclass)
+		|| (dev.vendor == tgl_sst_vendor && dev.device == tgl_sst_device))
+}
 
-			if hda_device.initialise(device) != -1 {
-				hda_controller_list << hda_device
-			}
+fn controller_probe(mut dev devcore.Device) bool {
+	mut hda_device := unsafe {
+		&HDAController{
+			regs:    0
+			index:   i32(hda_controller_list.len)
+			corb:    0
+			rirb:    0
+			dma_pos: 0
 		}
 	}
+	// The controller is told physical addresses of this driver's choosing;
+	// behind an IOMMU it has to be allowed all of memory to follow them.
+	dma.allow_all(mut dev)
+	if hda_device.initialise(dev.pci) == -1 {
+		return false
+	}
+	dev.driver_data = voidptr(hda_device)
+	hda_controller_list << hda_device
+	return true
+}
+
+// Register with the device core, which hands over every HD Audio controller
+// the machine has.
+pub fn initialize() {
+	devcore.register_driver(devcore.Driver{
+		name:    'hda'
+		bus:     .pci
+		matches: controller_matches
+		probe:   controller_probe
+	}) or { return }
 }

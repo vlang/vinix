@@ -366,6 +366,11 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	console.initialise()
 	tty.initialise()
 	print('kmain_thread: console done\n')
+	// Every VirtIO driver has had its turn: list what is in the slots and
+	// which of it has a working driver.
+	if qemu_platform {
+		devcore.enumerate_virtio_mmio(memory.get_hhdm_offset())
+	}
 
 	// ANS is independent of the GPU, and disabled unless explicitly requested.
 	// Keep the initramfs root and recovery console even if storage bring-up fails.
