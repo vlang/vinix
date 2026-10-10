@@ -27,3 +27,11 @@ x86 speaker support.
 
 `build-guest.sh` creates the separate physical-M1 sound test image; it requires
 real hardware and is independent of the injected model.
+
+The argparse and temporary-directory frontend delegates the host comparison,
+allocation audit, receipts and selected native command to `run.v`. Frozen C
+and V fixture bodies and their assertions remain independent inputs. Paths use
+literal Unix bytes, including caller-supplied backslashes and newlines. The
+unchanged platform, fixture and serial producers remain separate dependencies.
+Controller qualification compares original/native command and file policies;
+it makes no new physical-speaker or kernel-boot claim.
