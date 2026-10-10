@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `defd59e44af0a2b2a5cd07bbfc56e29690294745`,
-Linguist 7.27.0 reports **Python 5.64%** (433 files, 2,062,883 bytes) and
-**V 75.74%** (2,587 files, 27,717,571 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `e7e2b61527ebda3cd8b734ecd851ab2f541e05c4`,
+Linguist 7.27.0 reports **Python 5.54%** (426 files, 2,041,785 bytes) and
+**V 75.96%** (2,623 files, 27,988,489 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,143,402 Python bytes**. All remaining
-2,062,883 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,164,500 Python bytes**. All remaining
+2,041,785 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 32 stages below remove **99 Python files / 298,465 original bytes** and
+The 33 stages below remove **106 Python files / 319,563 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -63,6 +63,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | QEMU firmware test launcher | `tests/qemu-ovmf/test-patch`, existing `ovmffixture` | 1,565 / 49 | `170f9cf6` |
 | Scheduler, TLB and CPU policy host launchers | `tests/host-policy/policyhost`, four native commands | 4,174 / 93 | `6a533e64` |
 | Generated policy fixtures, CPU assembly and linked ELF checks | `tests/generated-policy-host/policyhost`, four native fixture commands and `tests/cpu-mitigations/linkedcheck` | 9,359 / 258 | `defd59e4` |
+| Production init, tracker, console, fault, CPU and network host commands | `tests/native-policy-tools/nativepolicy`, seven native entrypoints | 21,098 / 378 | `e7e2b615` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -519,12 +520,37 @@ or hardware validation is claimed. See
 for input hashes and native commands. No Python was run. Between `2a663317` and
 `defd59e4`, counted Python declines by exactly 9,359 bytes and six files.
 
+The next batch retires **seven Python files / 21,098 bytes**. Init, allocation
+tracking, console output, stack diagnostics, CPU arithmetic and the network
+producer/controller now use native V commands. Production policies, independent
+fixture assertions, compiler flags and allocator guards remain. Both CPU V
+templates retain the original literal bytes. An independent replay of the
+retired network producer's compiler recipe emits byte-identical C.
+
+Fresh ARM, Rosetta x86 and ARM ASan/UBSan hosts pass the tracker, both console
+profiles, both serial diagnostic adapters, CPU arithmetic and the init host/ARM
+link suite. The original C init recorder and three original C policies also
+pass both echo variants through the native reference adapter. Native guard tests
+verify Unicode allocation boundaries and fixture timeout kill/reap behavior;
+twenty-one forced compiler failures retire all private owners. All seven cold
+shell entrypoints pass their expected outcomes outside the checkout. The console
+adapter supplies the current panic-terminal recorder and adapts ELF section and
+symbol directives for Darwin x86 without changing assembly instructions.
+
+The four network fixtures still fail at the existing undeclared `memdup` calls
+introduced by the selected compiler for stack records. Source generation and
+all failure/cleanup paths pass; successful network fixture execution is not
+claimed. No kernel build, guest boot or physical hardware evidence is added.
+See [the native policy qualification](../tests/native-policy-tools/README.md).
+No Python was run. Between `defd59e4` and `e7e2b615`, counted Python declines by
+exactly 21,098 bytes and seven files; concurrent changes affect other languages.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 32 stages.
+or hidden in these 33 stages.
 
 ## Earlier completed stages
 

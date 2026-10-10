@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `defd59e44af0a2b2a5cd07bbfc56e29690294745`,
+at source commit `e7e2b61527ebda3cd8b734ecd851ab2f541e05c4`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 564 | 2,344,457 | 6.41% |
-| Python | 433 | 2,062,883 | 5.64% |
-| Shell | 411 | 1,353,688 | 3.70% |
+| C | 564 | 2,345,798 | 6.37% |
+| Python | 426 | 2,041,785 | 5.54% |
+| Shell | 420 | 1,355,790 | 3.68% |
 
-All `.v` files are classified as V. The resulting V share is 75.74%, with no
+All `.v` files are classified as V. The resulting V share is 75.96%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,062,883 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,041,785 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev defd59e44af0a2b2a5cd07bbfc56e29690294745 --breakdown --json
+github-linguist --rev e7e2b61527ebda3cd8b734ecd851ab2f541e05c4 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -124,7 +124,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/apple_ans_ext2.h` | 2,708 |
 | `kernel/c/apple_display_hotplug.h` | 2,865 |
 | `kernel/c/apple_platform_io.h` | 514 |
-| `kernel/c/apple_smc.h` | 2,642 |
+| `kernel/c/apple_smc.h` | 3,983 |
 | `kernel/c/apple_speakers.h` | 5,692 |
 | `kernel/c/apple_spi_keyboard.h` | 1,718 |
 | `kernel/c/arch/cc.h` | 883 |
@@ -815,7 +815,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/test_kmod_info.py` | 4,484 |
 | `tests/alloc-bench/test_v_bench.py` | 3,853 |
 | `tests/alloc-bench/test_v_sampler.py` | 2,841 |
-| `tests/alloc-track/run.py` | 2,493 |
 | `tests/alloc-track/run_guest.py` | 1,101 |
 | `tests/alloc-track/run_native.py` | 3,834 |
 | `tests/amd64-console/run.py` | 1,040 |
@@ -909,13 +908,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/hypervisor/run-vm.py` | 1,208 |
 | `tests/init-policy/compile-guest.py` | 1,044 |
 | `tests/init-policy/run-vm.py` | 4,345 |
-| `tests/init-policy/run.py` | 6,979 |
 | `tests/ios/desktop.py` | 7,962 |
 | `tests/ios/game2048.py` | 3,080 |
 | `tests/ios/run.py` | 20,826 |
 | `tests/ios/uikit.py` | 5,993 |
 | `tests/ipv6-multicast/run_vm.py` | 3,835 |
-| `tests/kernel-cpu/logic.py` | 3,346 |
 | `tests/kernel-cpu/run.py` | 4,763 |
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/compile-v-fixture.py` | 2,092 |
@@ -923,7 +920,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-gaps/test_runner.py` | 4,085 |
 | `tests/kernel-job-control/run.py` | 5,293 |
 | `tests/kernel-print/compile-policy.py` | 2,197 |
-| `tests/kernel-print/run.py` | 3,333 |
 | `tests/kernel-print/run_native.py` | 5,163 |
 | `tests/kernel-resources/run.py` | 1,696 |
 | `tests/kernel-retention/run.py` | 5,204 |
@@ -968,8 +964,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/n64/run.py` | 7,152 |
 | `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/net-random/run.py` | 6,889 |
-| `tests/network-options/compile-v-core.py` | 918 |
-| `tests/network-options/run-host.py` | 2,136 |
 | `tests/network-options/run.py` | 3,864 |
 | `tests/numa/_native.py` | 969 |
 | `tests/numa/run_vm.py` | 5,369 |
@@ -1026,7 +1020,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/speculation-policy/run.py` | 7,078 |
 | `tests/stack-policy/run.py` | 3,792 |
 | `tests/stack-protector/compile-v-diagnostic.py` | 888 |
-| `tests/stack-protector/diagnostic.py` | 1,893 |
 | `tests/stack-protector/run.py` | 5,134 |
 | `tests/stack-protector/run_diagnostic.py` | 4,230 |
 | `tests/steam/run-robust-vm.py` | 5,456 |
@@ -1249,6 +1242,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/validate-kernel` | 161 |
+| `tests/alloc-track/run` | 170 |
 | `tests/android/guest-init.sh` | 25,551 |
 | `tests/android/run-activity-dispatch-test.sh` | 1,212 |
 | `tests/android/run-cookie-store-test.sh` | 1,299 |
@@ -1260,6 +1254,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple-spi-keyboard/compile-fixture` | 190 |
 | `tests/apple_display_hotplug/run.sh` | 131 |
 | `tests/apple_smc/compile-fixture` | 186 |
+| `tests/apple_smc/run-host.sh` | 641 |
 | `tests/apple_smc/run.sh` | 158 |
 | `tests/application-sandbox/run-native.sh` | 1,281 |
 | `tests/application-sandbox/test-host.sh` | 4,343 |
@@ -1306,6 +1301,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/hypervisor/check-vmx` | 110 |
 | `tests/hypervisor/run.sh` | 124 |
 | `tests/hyprland/smoke.sh` | 413 |
+| `tests/init-policy/run` | 169 |
 | `tests/ios/build-2048-model.sh` | 1,128 |
 | `tests/ios/build-cxx-fixture.sh` | 1,856 |
 | `tests/ios/build-cxx-native.sh` | 1,434 |
@@ -1317,13 +1313,15 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/reference-modules.sh` | 1,436 |
 | `tests/ios/run-objc-calculator.sh` | 674 |
 | `tests/ipv6-multicast/check-generated` | 146 |
-| `tests/ipv6-multicast/run-host.sh` | 137 |
+| `tests/ipv6-multicast/run-host.sh` | 126 |
 | `tests/ipv6-multicast/run.sh` | 2,131 |
 | `tests/java/smoke.sh` | 652 |
 | `tests/kernel-allocs/copy-sources` | 187 |
 | `tests/kernel-allocs/run.sh` | 4,115 |
 | `tests/kernel-allocs/sites` | 180 |
+| `tests/kernel-cpu/logic` | 168 |
 | `tests/kernel-link-layout/check` | 180 |
+| `tests/kernel-print/run` | 170 |
 | `tests/kernel-resources/run-host.sh` | 1,620 |
 | `tests/krandom/run.sh` | 1,747 |
 | `tests/limine-aarch64/test-patch` | 111 |
@@ -1348,9 +1346,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/n64/frame` | 180 |
 | `tests/native-boundaries/run` | 104 |
 | `tests/net-random/run.sh` | 294 |
-| `tests/network-ipv6/run-host.sh` | 135 |
-| `tests/network-options/run-host.sh` | 138 |
-| `tests/network-tcp-lifetime/run-host.sh` | 143 |
+| `tests/network-ipv6/run-host.sh` | 124 |
+| `tests/network-options/compile-core` | 177 |
+| `tests/network-options/run-host` | 172 |
+| `tests/network-options/run-host.sh` | 127 |
+| `tests/network-tcp-lifetime/run-host.sh` | 132 |
 | `tests/network/guest-tools-boot.sh` | 1,623 |
 | `tests/network/tools-smoke.sh` | 393 |
 | `tests/numa/run.sh` | 1,476 |
@@ -1418,6 +1418,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/smt-policy/run-host.sh` | 1,181 |
 | `tests/socket-io/check-generated` | 146 |
 | `tests/sound/run.sh` | 1,419 |
+| `tests/stack-protector/diagnostic` | 175 |
 | `tests/steam/hosted-test.sh` | 3,480 |
 | `tests/steam/launcher-test.sh` | 6,952 |
 | `tests/steam/run.sh` | 1,573 |
@@ -1467,6 +1468,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/apple-ans/test-verify-reads` | 118 |
 | `tools/apple-ans/verify-reads` | 113 |
 | `tools/apple-backlight/test.sh` | 415 |
+| `tools/apple-smc/smcprobe` | 304 |
 | `tools/build-qemu-module-iso` | 164 |
 | `tools/hwcheck/build` | 1,429 |
 | `tools/m1-wifi/compile-v` | 155 |
