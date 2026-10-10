@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_condattr_destroy
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_equal
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -820,8 +820,26 @@ blocked, then exits the process without unloading a live image. ASAN/UBSAN
 checks two image loads/unloads with joined workers and explicit rejection of
 foreign scheduling fields; the fork lifetime tests also pass with the new
 creation/join adapters. The full ARM64 C++/GLES/PPSSPP regression passes. This
-resolves nine more strong imports across Fortnite and EOSSDK; the actual game
-still exits before entry at `pthread_condattr_destroy`.
+resolves nine more strong imports across Fortnite and EOSSDK.
+
+The installed Mac pthread library uses a 16-byte condition attribute object.
+Init writes its signature and private sharing bits while preserving opaque
+padding; getters/setters validate the signature, and repeated destroy clears
+only the signature and succeeds. Private and shared values are 2 and 1. Native
+condition initialization reads these bits even from a destroyed attribute.
+V implements the four attribute operations with the measured layout and guarded
+32-bit outputs, without allocating. Private condition initialization accepts
+copied attributes and uses real native conditions. Shared initialization returns
+Darwin `ENOTSUP` (45) before modifying the condition because the current registry
+stores process-private native state. Condition operations preserve caller errno
+and return 32-bit Darwin errors.
+
+The shared Mac/iOS fixture checks copying, opaque bytes, invalid and destroyed
+attributes, timed waits and eight rounds of eight real workers using signals and
+broadcasts. ASAN/UBSAN checks two image loads/unloads with all workers joined and
+conditions destroyed. The full ARM64 C++/GLES/PPSSPP regression passes. This
+resolves two more strong imports in EOSSDK; the actual game still exits before
+entry at `pthread_equal`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -829,11 +847,11 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,297 | 861 | 81 |
-| EOSSDK | 510 | 152 | 18 |
+| EOSSDK | 512 | 150 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,860 | 1,136 | 122 |
+| All images | 1,862 | 1,134 | 122 |
 
-The C++/GLES/Text variant reports 1,873 resolved imports, 1,123 unresolved strong
+The C++/GLES/Text variant reports 1,875 resolved imports, 1,121 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

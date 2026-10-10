@@ -11,12 +11,12 @@ fn C.pthread_mutex_destroy(voidptr) int
 fn C.pthread_mutex_lock(voidptr) int
 fn C.pthread_mutex_trylock(voidptr) int
 fn C.pthread_mutex_unlock(voidptr) int
-fn C.pthread_cond_init(voidptr, voidptr) int
-fn C.pthread_cond_destroy(voidptr) int
-fn C.pthread_cond_signal(voidptr) int
-fn C.pthread_cond_broadcast(voidptr) int
-fn C.pthread_cond_wait(voidptr, voidptr) int
-fn C.pthread_cond_timedwait(voidptr, voidptr, voidptr) int
+fn C.pthread_cond_init(voidptr, voidptr) i32
+fn C.pthread_cond_destroy(voidptr) i32
+fn C.pthread_cond_signal(voidptr) i32
+fn C.pthread_cond_broadcast(voidptr) i32
+fn C.pthread_cond_wait(voidptr, voidptr) i32
+fn C.pthread_cond_timedwait(voidptr, voidptr, voidptr) i32
 fn C.pthread_once(voidptr, voidptr) int
 fn C.pthread_self() usize
 
@@ -124,43 +124,58 @@ fn pthread_cond_native(object u64, initialize bool) !voidptr {
 	return pointer
 }
 
-fn darwin_cond_init(object u64, attributes u64) int {
-	if object == 0 || attributes != 0 { return 22 }
+fn darwin_cond_init(object u64, attributes u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
+	if object == 0 { return 22 }
+	// Native Darwin initialization reads the sharing bits without checking
+	// the attribute signature. The registry cannot hold shared process state.
+	if attributes != 0 && read32(attributes + 8) & 3 == 1 { return 45 }
 	pthread_cond_native(object, true) or { return 22 }
 	unsafe { *(&u64(object)) = 0x3cb0b1bb }
 	return 0
 }
 
-fn darwin_cond_wait(object u64, mutex u64) int {
+fn darwin_cond_wait(object u64, mutex u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	cond := pthread_cond_native(object, false) or { return 22 }
 	native_mutex := pthread_mutex_native(mutex, -1) or { return 22 }
-	return pthread_error(C.pthread_cond_wait(cond, native_mutex))
+	return i32(pthread_error(int(C.pthread_cond_wait(cond, native_mutex))))
 }
 
-fn darwin_cond_timedwait(object u64, mutex u64, deadline voidptr) int {
+fn darwin_cond_timedwait(object u64, mutex u64, deadline voidptr) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	if deadline == unsafe { nil } { return 22 }
 	cond := pthread_cond_native(object, false) or { return 22 }
 	native_mutex := pthread_mutex_native(mutex, -1) or { return 22 }
-	return pthread_error(C.pthread_cond_timedwait(cond, native_mutex, deadline))
+	return i32(pthread_error(int(C.pthread_cond_timedwait(cond, native_mutex, deadline))))
 }
 
-fn darwin_cond_signal(object u64) int {
+fn darwin_cond_signal(object u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	cond := pthread_cond_native(object, false) or { return 22 }
-	return pthread_error(C.pthread_cond_signal(cond))
+	return i32(pthread_error(int(C.pthread_cond_signal(cond))))
 }
 
-fn darwin_cond_broadcast(object u64) int {
+fn darwin_cond_broadcast(object u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	cond := pthread_cond_native(object, false) or { return 22 }
-	return pthread_error(C.pthread_cond_broadcast(cond))
+	return i32(pthread_error(int(C.pthread_cond_broadcast(cond))))
 }
 
-fn darwin_cond_destroy(object u64) int {
+fn darwin_cond_destroy(object u64) i32 {
+	previous := unsafe { *C.ios_errno_address() }
+	defer { darwin_set_errno(previous) }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	cond := pthread_cond_native(object, false) or { return 22 }
 	result := C.pthread_cond_destroy(cond)
 	if result == 0 { system_data.conditions.delete(object); C.free(cond); unsafe { *(&u64(object)) = 0 } }
-	return pthread_error(result)
+	return i32(pthread_error(int(result)))
 }
 
 fn darwin_once(control u64, function voidptr) int {
@@ -185,6 +200,7 @@ fn darwin_thread_name(name &char) int { return pthread_error(C.ios_thread_name(n
 
 fn pthread_symbol(symbol string) ?u64 {
 	if address := pthread_attr_symbol(symbol) { return address }
+	if address := pthread_condattr_symbol(symbol) { return address }
 	return match symbol {
 		'_pthread_atfork' { u64(unsafe { voidptr(darwin_pthread_atfork) }) }
 		'_pthread_mutex_init' { u64(unsafe { voidptr(darwin_mutex_init) }) }

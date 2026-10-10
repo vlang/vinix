@@ -213,6 +213,9 @@ int main(void) {
     run("/opt/ios/pthread-attr","--detached",NULL,NULL,0,
         "IOS-PTHREAD-ATTR: real detached thread rejects joining\n");
     puts("iOS PASS: Darwin thread attributes, native user stacks and detached creation");
+    run("/opt/ios/pthread-condattr","--adapter",NULL,NULL,0,
+        "IOS-CONDATTR: guarded attributes, native sharing bits, repeated destruction, copied private conditions, timed waits, signals, broadcasts and eight threads\n");
+    puts("iOS PASS: Darwin condition attributes and native private synchronization");
     run("/opt/ios/ioctl", NULL, NULL, NULL, 0,
         "IOS-IOCTL: descriptor flags, shared nonblocking I/O, queued bytes, native interfaces and eight threads\n");
     puts("iOS PASS: Darwin ioctl controls, socket bytes and interface queries");
