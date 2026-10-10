@@ -67,6 +67,7 @@ fn block_release(block u64) {
 		helper := unsafe { BlockDisposeHelper(voidptr(read64(descriptor + 24))) }
 		helper(block)
 	}
+	objc_remove_associated(block)
 	C.free(unsafe { voidptr(block) })
 }
 

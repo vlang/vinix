@@ -342,6 +342,9 @@ fn objc_runtime_symbol(symbol string) ?u64 {
 		'_objc_disposeClassPair' { u64(unsafe { voidptr(objc_dispose_class) }) }
 		'_objc_constructInstance' { u64(unsafe { voidptr(objc_construct_instance) }) }
 		'_objc_destructInstance' { u64(unsafe { voidptr(objc_destruct_instance) }) }
+		'_objc_setAssociatedObject' { u64(unsafe { voidptr(objc_set_associated) }) }
+		'_objc_getAssociatedObject' { u64(unsafe { voidptr(objc_get_associated) }) }
+		'_objc_removeAssociatedObjects' { u64(unsafe { voidptr(objc_remove_associated) }) }
 		'_class_addIvar' { u64(unsafe { voidptr(objc_add_ivar) }) }
 		'_class_getInstanceVariable' { u64(unsafe { voidptr(objc_find_ivar) }) }
 		'_class_copyIvarList' { u64(unsafe { voidptr(objc_copy_ivars) }) }

@@ -124,6 +124,7 @@ struct ObjRuntime {
 mut:
 	classes      map[u64]&ObjClass
 	objects map[u64]&ObjHeader // Object address -> owned metadata; protected by the recursive runtime lock.
+	associations map[u64]&ObjAssociations // Object -> key/value table, under the same recursive lock.
 	names        map[string]u64
 	pool_key u64
 	graphics_key u64
@@ -362,11 +363,18 @@ fn objc_stop() {
 	objc_release(ios_runtime.defaults)
 	objc_release(ios_runtime.locale)
 	objc_release(ios_runtime.run_loop)
+	objc_associations_stop()
 	// Keep the immortal empty dictionary available through all collection and
 	// autorelease teardown. Release its cache reference after those users stop.
 	for object in ios_runtime.framework_objects { if object != ios_runtime.empty_dictionary { objc_release(object) } }
 	for _, address in ios_runtime.framework_data { C.free(unsafe { voidptr(address) }) }
-	objc_pool_pop(1)
+	// Association releases and pool destructors can themselves autorelease or
+	// attach values to immortal objects. Drain both before deleting the TLS pool.
+	for {
+		objc_associations_stop()
+		objc_pool_pop(1)
+		if ios_runtime.associations.len == 0 { break }
+	}
 	objc_pool_free(C.pthread_getspecific(ios_runtime.pool_key))
 	$if ios_text ? { text_stop() }
 	C.pthread_setspecific(ios_runtime.pool_key, unsafe { nil })
@@ -380,6 +388,7 @@ fn objc_stop() {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}
 	if ios_runtime.objects.len == 0 { unsafe { ios_runtime.objects.free() } }
+	unsafe { ios_runtime.associations.free() }
 	if ios_runtime.block_refs.len != 0 { eprintln('iOS: heap blocks still owned at shutdown') }
 	for _, text in ios_runtime.constant_utf8 { unsafe { text.free() } }
 	for address, info in ios_runtime.classes {

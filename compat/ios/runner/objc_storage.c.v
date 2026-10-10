@@ -61,6 +61,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 		}
 		if cls != 0 { panic('iOS: cyclic destructor superclass chain') }
 	}
+	objc_remove_associated(object)
 	C.ios_objc_initialize_lock()
 	for location, referent in ios_runtime.weak {
 		if referent == object { unsafe { *(&u64(location)) = 0 }; ios_runtime.weak[location] = 0 }
