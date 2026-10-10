@@ -237,6 +237,7 @@ fn scenario_acpi_ec_selftest(mut t Test) {
 	t.check(ec_count('methods_missing') == missing + 1, 'methods_missing went from ${missing} to ${ec_count('methods_missing')}')
 
 	ec_selftest_sleep(mut t)
+	ec_selftest_retention(mut t)
 	// With a controller that works nobody has ever waited a second for the
 	// global lock.
 	t.check(ec_sim_count('lock_failures') == 0, 'the lock failed ${ec_sim_count('lock_failures')} times')
@@ -322,6 +323,84 @@ fn ec_selftest_sleep(mut t Test) {
 	t.check(ec_wait_word(ec_lid + 'state', 'open', 3000), 'the lid did not open again')
 	ec_check_word(mut t, stats + 'fail', '0')
 	ec_check_word(mut t, stats + 'success', '4')
+}
+
+// One write() of `text` to `path`, with nothing allocated in this program:
+// its own heap growing costs the kernel objects too, and would be counted.
+fn ec_raw_write(path &char, text &char, length int) bool {
+	fd := C.open(path, C.O_WRONLY)
+	if fd < 0 {
+		return false
+	}
+	written := C.write(fd, text, usize(length))
+	C.close(fd)
+	return written == length
+}
+
+// Reads `path` to its end into a buffer on the stack and returns how much
+// there was.
+fn ec_raw_read(path &char) int {
+	mut buffer := [1024]u8{}
+	fd := C.open(path, C.O_RDONLY)
+	if fd < 0 {
+		return -1
+	}
+	mut total := 0
+	for {
+		count := C.read(fd, &buffer[0], usize(1024))
+		if count <= 0 {
+			break
+		}
+		total += int(count)
+	}
+	C.close(fd)
+	return total
+}
+
+// `count` times: an event that has the battery read again, raised by the
+// self-test, and a read of the battery through /sys.
+fn ec_event_rounds(mut t Test, count int) {
+	queries := ec_count('queries')
+	control := c'/sys/bus/acpi/devices/PNP0C09:00/ec/selftest'
+	uevent := c'/sys/class/power_supply/BAT0/uevent'
+	mut failed := 0
+	for _ in 0 .. count {
+		if !ec_raw_write(control, c'event 0x20', 10) || !ec_raw_write(control, c'raise', 5) {
+			failed++
+		}
+		if ec_raw_read(uevent) <= 0 {
+			failed++
+		}
+		C.usleep(10000)
+	}
+	t.check(failed == 0, '${failed} writes or reads failed in ${count} rounds')
+	t.check(ec_wait_count('queries', queries + count, 5000), 'only ${ec_count('queries') - queries} of ${count} events were taken')
+}
+
+// Nothing may stay allocated for an exchange, a query, a method or a
+// Notify: a laptop does these all day. The kernel's heap is measured over
+// three hundred rounds, after enough rounds for what is meant to stay
+// allocated to have been.
+fn ec_selftest_retention(mut t Test) {
+	rounds := 300
+	ec_event_rounds(mut t, 60)
+	sleep_ms(2000)
+	before := heap_usage() or {
+		t.check(false, err.msg())
+		return
+	}
+	exchanges := ec_count('transactions')
+	ec_event_rounds(mut t, rounds)
+	sleep_ms(2000)
+	after := heap_usage() or {
+		t.check(false, err.msg())
+		return
+	}
+	done := ec_count('transactions') - exchanges
+	t.info('${rounds} events and ${done} exchanges: live heap objects ${before.objects} -> ${after.objects}, large pages ${before.large_pages} -> ${after.large_pages}')
+	t.check(done >= rounds * 8, 'only ${done} exchanges in ${rounds} rounds')
+	t.check(after.objects - before.objects <= heap_noise_objects, '${rounds} events left ${after.objects - before.objects} more heap objects allocated (limit ${heap_noise_objects})')
+	t.check(after.large_pages <= before.large_pages, '${rounds} events left ${after.large_pages - before.large_pages} more large-allocation pages')
 }
 
 // A controller that misbehaves, with the real clock.
