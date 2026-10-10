@@ -335,8 +335,10 @@ fn sysfs_remove_entry(mut parent VFSNode, name string) bool {
 		}
 		mut inner := &VFSNode(unsafe { nil })
 		if node.children != unsafe { nil } {
-			for key, child in node.children {
-				if key != '.' && key != '..' {
+			// By the nodes' own names: asking the loop for the map's keys
+			// makes it hand out a copy of each, which nothing frees.
+			for _, child in node.children {
+				if child.name != '.' && child.name != '..' {
 					inner = unsafe { child }
 					break
 				}
