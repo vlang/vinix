@@ -143,7 +143,13 @@ fn take_work() ?Work {
 fn worker() {
 	for {
 		generation := event.generation(mut devcore_work_event)
+		// Taken and carried out with the gate held. A device another thread
+		// removes -- a card pulled from its slot -- takes its queued work
+		// with it (forget_work), and must not be able to go between its work
+		// being taken here and being done.
+		gate_enter()
 		work := take_work() or {
+			gate_leave()
 			event.await_one_from_generation(mut devcore_work_event, true, generation) or {}
 			continue
 		}
@@ -166,6 +172,7 @@ fn worker() {
 				}
 			}
 		}
+		gate_leave()
 	}
 }
 

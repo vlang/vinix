@@ -360,6 +360,10 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	// network card is on PCIe too.
 	if qemu_platform || acpi_platform {
 		start_pci()
+		// Cards that are put in and taken out while the machine runs.
+		// Only an emulated machine's ports are watched unasked: what the
+		// slot power of a port on real hardware feeds is not known here.
+		devcore.start_pci_hotplug(qemu_platform)
 	}
 	if qemu_platform {
 		virtio_gpu.initialise(memory.get_hhdm_offset())

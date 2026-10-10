@@ -105,6 +105,7 @@ pub fn publish() {
 			publish_binding(dev)
 		}
 	}
+	publish_slots()
 }
 
 fn publish_driver(driver &Driver) {

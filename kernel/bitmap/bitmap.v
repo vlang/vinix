@@ -29,3 +29,13 @@ pub fn (bmp GenericBitmap) free_entry(index u64) {
 		lib.bitreset(bmp.raw_bitmap, index)
 	}
 }
+
+// Give the bitmap's memory back. The bitmap is then empty, and can be
+// initialised again.
+pub fn (mut bmp GenericBitmap) release() {
+	if bmp.raw_bitmap != unsafe { nil } {
+		memory.free(bmp.raw_bitmap)
+	}
+	bmp.raw_bitmap = unsafe { nil }
+	bmp.entry_cnt = 0
+}

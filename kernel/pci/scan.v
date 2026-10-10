@@ -19,7 +19,8 @@ pub fn native_topology_read(bdf u32, offset u16, width u8) (u32, int) {
 
 pub fn initialise() {
 	// Devices escape to drivers and uACPI as permanent borrowed pointers. This
-	// is boot publication, never live replacement or a hotplug/rescan interface.
+	// is boot publication, never live replacement; what arrives or leaves
+	// afterwards goes through hotadd.v, which keeps every record in place.
 	if boot_scan_done { return }
 	print('pci: Building device scan\n')
 	// Existing platform setup supports domain-zero root bus zero. Neither a
@@ -31,8 +32,10 @@ pub fn initialise() {
 		C.kprintf(c'pci: read-only topology failed, status=%lld\n', i64(status))
 		panic('pci: cannot construct a valid configured topology')
 	}
-	// The exact capacity prevents growth from retaining old array buffers.
-	mut boot_records := []&PCIDevice{cap: int(snapshot.function_count())}
+	// The capacity is fixed here for good: growth would retain the old
+	// buffer, and move the list under a reader. The room beyond the boot
+	// scan's own count is for functions that arrive later (hotadd.v).
+	mut boot_records := []&PCIDevice{cap: int(snapshot.function_count()) + arrival_room}
 	boot_records.flags |= .noslices
 	mut function := snapshot.first_function()
 	for function != unsafe { nil } {
@@ -109,7 +112,8 @@ pub fn get_device_by_vendor(vendor_id u16, device_id u16, index u32) ?&PCIDevice
 pub fn get_device_by_coordinates(bus u8, slot u8, function u8, index u32) ?&PCIDevice {
 	mut count := 0
 	for device in scanned_devices {
-		if device.bus == bus && device.slot == slot && device.function == function {
+		if device.bus == bus && device.slot == slot && device.function == function
+			&& device.present() {
 			if count == index {
 				return unsafe { device }
 			} else {

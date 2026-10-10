@@ -419,7 +419,9 @@ fn unbind_locked(mut dev Device) bool {
 // The device has left the machine. Its driver is told, its files go, and the
 // record is freed -- unless its driver cannot let go of it, in which case the
 // record is kept, marked removed, for the driver's stale pointers to land on.
-pub fn remove(mut dev Device) {
+// Returns whether the record was let go of: false means a driver still holds
+// it, and whatever the bus kept for the device must stay as it is too.
+pub fn remove(mut dev Device) bool {
 	gate_enter()
 	// Children first: what hangs off a bridge goes before the bridge.
 	for {
@@ -469,6 +471,7 @@ pub fn remove(mut dev Device) {
 			free(dev)
 		}
 	}
+	return !pinned
 }
 
 pub fn device_count() int {

@@ -20,6 +20,7 @@ import stat
 import dev.console
 import userland
 import syspower
+import x86.acpihp
 import x86.acpipm
 import pipe
 import futex
@@ -87,12 +88,16 @@ fn kmain_thread() {
 	socket.initialise()
 	// Failure reports and removals are carried out by a thread of the core's.
 	devcore.start_worker()
+	// Cards that are put in and taken out while the machine runs. Firmware
+	// says whether it watches the ports itself or hands them over.
+	devcore.start_pci_hotplug(acpihp.initialise())
 	// IOMMUs come before the first driver that does DMA: a unit that is on
 	// decides what every device behind it may reach.
 	dma.initialise()
-	if e1000.initialise() {
-		sched.set_device_poll_callback(voidptr(poll_network))
-	}
+	// Polled whether or not a card was found: one can arrive later, in a
+	// slot, and with none the poll costs a test of a flag.
+	e1000.initialise()
+	sched.set_device_poll_callback(voidptr(poll_network))
 	pipe.initialise()
 	futex.initialise()
 	fs.initialise()
