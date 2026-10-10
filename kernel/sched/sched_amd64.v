@@ -2,6 +2,7 @@
 module sched
 
 import kbudget
+import cpuidle
 import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
@@ -138,6 +139,9 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	apic.lapic_timer_stop()
 
 	mut cpu_local := cpulocal.current()
+	// If this interrupt ended an idle, that is where the idle's time stops: the
+	// loop that started it is not returned to. See cpuidle/driver_amd64.v.
+	cpuidle.idle_interrupted(cpu_local.cpu_number)
 
 	// Only our own IRQ may surround a switch. A timer interrupt nested in an
 	// IRQ-enabled hardware handler must leave that handler on its CPU.
@@ -848,7 +852,42 @@ pub fn await() {
 	} else {
 		idle_max_wakeup_us
 	}
-	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, idle_wakeup_us(wakeup))
+	sleep_us := idle_wakeup_us(wakeup)
+	apic.lapic_timer_oneshot(mut cpu_local, scheduler_vector, sleep_us)
+	// With a table of idle states the wait is cpuidle's: it chooses one,
+	// keeps the same `sti; hlt` (or its MWAIT counterpart) and does not come
+	// back. Interrupts stay off from the CLI above until it halts.
+	//
+	// It waits on this CPU's own idle stack, not on the one it was called on.
+	// The loop below keeps nothing on its stack across the HLT, and cpuidle's
+	// does: the CPU's number, when its timer is due. When the caller is the
+	// scheduler's interrupt handler the stack is that vector's IST stack,
+	// which the processor starts again from the top on every scheduler
+	// interrupt -- including one that arrives inside another device's
+	// handler, is turned away, and returns into the wait it interrupted.
+	// The frames it wrote on the way would lie where the wait's are.
+	if cpuidle.active() && cpu_local.cpu_number < max_preemption_cpus {
+		C.vinix_enter_idle(cpu_local.idle_int_stack, voidptr(await_in_idle_states), voidptr(sleep_us))
+	}
+	// Without one, as ever. STI takes effect after the instruction that
+	// follows it, so there is no moment with interrupts on and the CPU not
+	// yet halted: an interrupt that came while they were off ends the HLT.
+	asm volatile amd64 {
+		sti
+		1:
+		hlt
+		jmp b1
+		; ; ; memory
+	}
+}
+
+// await(), continued on the idle stack with interrupts off and the timer
+// armed for `sleep_us`.
+fn await_in_idle_states(sleep_us voidptr) {
+	cpu_number := cpulocal.current().cpu_number
+	cpuidle.idle_loop(cpu_number, u64(sleep_us), &cpu_reschedule_pending[cpu_number])
+	// Only a CPU cpuidle keeps no record for comes back, and await() sends
+	// none here.
 	asm volatile amd64 {
 		sti
 		1:

@@ -30,6 +30,7 @@ import apple.speakers
 import devicetree
 import devcore
 import fwload
+import cpuidle
 import pci
 import initramfs
 import numa
@@ -268,6 +269,8 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	devcore.publish()
 	syspower.publish()
 	fwload.publish()
+	// The idle states of this machine's CPUs, which they use from here on.
+	cpuidle.publish()
 	print('kmain_thread: sysfs done\n')
 
 	if enable_fake_g17 {

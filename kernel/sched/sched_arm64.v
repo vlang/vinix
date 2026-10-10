@@ -2,6 +2,7 @@
 module sched
 
 import kbudget
+import cpuidle
 import aarch64.cpu
 import aarch64.cpu.local as cpulocal
 import aarch64.gic
@@ -1428,6 +1429,12 @@ pub fn configure_virtual_idle(enabled bool, fast_timer bool) {
 	virtual_idle_hz = if fast_timer { idle_tick_hz } else { u64(250) }
 }
 
+// Whether the idle loop runs in a virtual machine, where it waits in WFI.
+// For cpuidle, which offers that state only where the loop uses it.
+pub fn idle_is_virtual() bool {
+	return virtual_idle
+}
+
 pub fn await() {
 	await_impl(false)
 }
@@ -1533,8 +1540,18 @@ fn await_impl(trace_gpu_handoff bool) {
 			}
 		}
 
-		if virtual_idle && !proc.scheduling_policies_in_use() {
-			cpu.wfi()
+		if cpuidle.waits(virtual_idle) && !proc.scheduling_policies_in_use() {
+			if !virtual_idle {
+				// WFI on hardware, asked for with vinix.apple_idle=wfi: the
+				// input this loop polls is looked at once per wake instead
+				// of continuously, and the idle timer wakes it every tick.
+				poll_platform_input()
+			}
+			// The WFI this loop has always executed here, now chosen, timed
+			// and counted by cpuidle. Interrupts are still masked, so one
+			// that arrives before the WFI ends it at once; see
+			// cpuidle/driver_arm64.v. `ticks` is what the timer was armed for.
+			cpuidle.idle_wait(cpu.read_tpidr_el1(), ticks * 1000000 / freq)
 		} else {
 			// The physical bring-up path still polls input without IRQs.
 			poll_platform_input()

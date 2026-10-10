@@ -26,6 +26,7 @@ import futex
 import pci
 import devcore
 import fwload
+import cpuidle
 import dma
 import dev.ata
 import dev.fbdev
@@ -143,6 +144,8 @@ fn kmain_thread() {
 	devcore.publish()
 	syspower.publish()
 	fwload.publish()
+	// The idle states of this machine's CPUs, which they use from here on.
+	cpuidle.publish()
 
 	streams.initialise()
 	random.initialise()
