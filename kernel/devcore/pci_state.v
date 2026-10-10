@@ -23,7 +23,14 @@
 //
 // An MSI-X table lives in the device's memory, not in configuration space.
 // Only its enable and mask bits are restored here; the entries are the
-// driver's to write again, as it wrote them.
+// driver's to write again, as it wrote them. The control registers of the
+// PCI Express capability are restored as well: a hot-plug port's slot power
+// and lights are among them.
+//
+// A function that left the machine before the sleep is not saved, and one
+// that left during it is found not to be what it was and is left alone: its
+// driver's resume fails and recovery deals with it, or the hot-plug thread
+// notices the empty slot.
 //
 // A driver that has no suspend and resume leaves its device running through
 // a sleep, which is right for suspend to idle. Through a loss of power it is
@@ -55,6 +62,15 @@ const pci_power_pme_status = u16(0x8000)
 const pci_msi_64bit = u16(1) << 7
 const pci_msi_maskable = u16(1) << 8
 
+// PCI Express capability: the control registers pci/express.v does not name,
+// and the one kind of function that has no link registers in version 1.
+const pci_express_device_control = u32(0x08)
+const pci_express_link_control = u32(0x10)
+const pci_express_root_control = u32(0x1c)
+const pci_express_device_control_2 = u32(0x28)
+const pci_express_link_control_2 = u32(0x30)
+const pci_express_integrated_endpoint = u16(9)
+
 // A function takes this long to leave D3, and a register this many tries to
 // accept its value while the function is still coming up.
 const pci_d0_settle_ms = u64(10)
@@ -78,10 +94,17 @@ __global (
 	devcore_pci_rewritten u64
 )
 
+// Whether `dev` is a PCI function that is there to be saved and restored. A
+// function that has left the machine keeps its record, marked absent, for
+// whoever still holds it: nothing answers at its address.
+fn pci_function_present(dev &Device) bool {
+	return dev.bus == .pci && dev.state != .removed && dev.pci != unsafe { nil } && dev.pci.present()
+}
+
 fn pci_device_count() int {
 	mut count := 0
 	for i := 0; i < devcore_device_count; i++ {
-		if devcore_devices[i].bus == .pci && devcore_devices[i].pci != unsafe { nil } {
+		if pci_function_present(devcore_devices[i]) {
 			count++
 		}
 	}
@@ -125,7 +148,7 @@ pub fn pci_save_all() bool {
 	mut count := 0
 	for i := 0; i < devcore_device_count && count < devcore_pci_capacity; i++ {
 		dev := devcore_devices[i]
-		if dev.bus != .pci || dev.pci == unsafe { nil } {
+		if !pci_function_present(dev) {
 			continue
 		}
 		mut record := unsafe { &devcore_pci_saved[count] }
@@ -237,6 +260,41 @@ fn pci_restore_msi(p &pci.PCIDevice, saved &PciSaved) {
 	}
 }
 
+// The control registers of a PCI Express function: what it may report and
+// how, its link's settings, and for a port with a slot the slot's power
+// switch and lights. Which of them a function has goes by the version of
+// the capability and the kind of function, both in the saved image. Without
+// this a slot the kernel had switched off comes back powered, and a card
+// that was taken out of use is live again with nobody driving it.
+fn pci_restore_express(p &pci.PCIDevice, saved &PciSaved) {
+	express := saved.capability(pci.capability_express)
+	if express == 0 {
+		return
+	}
+	flags := saved.word_at(express + pci.express_flags)
+	version := flags & 0xf
+	kind := (flags >> 4) & 0xf
+	has_link := version > 1 || kind != pci_express_integrated_endpoint
+	is_port := kind == pci.express_type_root_port || kind == pci.express_type_downstream
+	has_slot := is_port && flags & pci.express_flag_slot != 0
+	p.write[u16](express + pci_express_device_control, saved.word_at(express + pci_express_device_control))
+	if has_link {
+		p.write[u16](express + pci_express_link_control, saved.word_at(express + pci_express_link_control))
+	}
+	if has_slot {
+		p.write[u16](express + pci.express_slot_control, saved.word_at(express + pci.express_slot_control))
+	}
+	if kind == pci.express_type_root_port {
+		p.write[u16](express + pci_express_root_control, saved.word_at(express + pci_express_root_control))
+	}
+	if version > 1 && express + pci_express_link_control_2 + 2 <= 0x100 {
+		p.write[u16](express + pci_express_device_control_2, saved.word_at(express + pci_express_device_control_2))
+		if has_link {
+			p.write[u16](express + pci_express_link_control_2, saved.word_at(express + pci_express_link_control_2))
+		}
+	}
+}
+
 // One function. False when it is not there any more, or is not what it was.
 fn pci_restore_function(p &pci.PCIDevice, saved &PciSaved) bool {
 	if p.read[u32](0) != saved.words[0] {
@@ -270,6 +328,7 @@ fn pci_restore_function(p &pci.PCIDevice, saved &PciSaved) bool {
 	p.write[u8](pci_cache_line, saved.byte_at(pci_cache_line))
 	p.write[u8](pci_latency, saved.byte_at(pci_latency))
 	pci_restore_msi(p, saved)
+	pci_restore_express(p, saved)
 	// Last: decoding and bus mastering as they were, now that there is
 	// something to decode. Sixteen bits, leaving the status register alone.
 	if p.read[u16](pci_command) != saved.word_at(pci_command) {
@@ -287,7 +346,7 @@ pub fn pci_restore_all() int {
 	devcore_pci_rewritten = 0
 	for i := 0; i < devcore_device_count; i++ {
 		dev := devcore_devices[i]
-		if dev.bus != .pci || dev.pci == unsafe { nil } {
+		if !pci_function_present(dev) {
 			continue
 		}
 		saved := pci_saved_for(pci_bdf(dev.pci))

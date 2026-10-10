@@ -183,6 +183,18 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	// What userspace wrote before it stopped.
 	pagecache.sync_all()
 
+	if going_deep {
+		// The thread that watches hot-plug slots stays off them from here
+		// until the buses are back: a port without power, or with its
+		// registers not yet written back, shows cards missing that are
+		// there. Asked before the bindings are frozen, so that a card on its
+		// way in or out can get there.
+		if !devcore.pause_pci_hotplug() {
+			fail_sleep('devices', '', 'a PCI hot-plug operation would not finish')
+			sched.thaw_userspace()
+			return false
+		}
+	}
 	devcore.freeze_bindings()
 	if going_deep {
 		// A device whose driver cannot bring it back from nothing would come
@@ -193,6 +205,7 @@ pub fn enter_sleep(kind SleepDepth) bool {
 				blocker.name.str, i32(blocker.driver.name.len), blocker.driver.name.str)
 			fail_sleep('devices', blocker.name, 'its driver cannot resume a device that lost power')
 			devcore.thaw_bindings()
+			devcore.resume_pci_hotplug()
 			sched.thaw_userspace()
 			return false
 		}
@@ -201,6 +214,9 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	if refused != unsafe { nil } {
 		fail_sleep('devices', refused.name, 'its driver refused')
 		devcore.thaw_bindings()
+		if going_deep {
+			devcore.resume_pci_hotplug()
+		}
 		sched.thaw_userspace()
 		return false
 	}
@@ -238,6 +254,11 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	devcore.resume_all()
 	devcore.set_power_lost(false)
 	devcore.thaw_bindings()
+	if going_deep {
+		// The slots are looked at again, now: a card pulled or put in while
+		// the machine slept is found by comparing each slot with its port.
+		devcore.resume_pci_hotplug()
+	}
 	mut woken_by := if rehearsing || rehearsing_platform { 'rehearsal' } else { 'unknown' }
 	if source := wakesrc.disarm() {
 		if !rehearsing && !rehearsing_platform {

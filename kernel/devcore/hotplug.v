@@ -120,6 +120,9 @@ const slot_drain_ms = u64(1000)
 // A thread with no port to poll still wakes for a rescan; otherwise it has
 // nothing to wake for.
 const idle_wait_ms = u64(3_600_000)
+// How long a pass in progress is given to finish before a sleep that cuts
+// the power: a card being brought in takes a little over two seconds.
+const hotplug_pause_ns = 6 * second
 
 __global (
 	devcore_slots          [max_slots]Slot
@@ -128,6 +131,10 @@ __global (
 	devcore_hotplug_alive  bool
 	devcore_rescan_wanted  u32
 	devcore_rescans        u64
+	// Nonzero while the ports are not to be touched, and once the thread has
+	// seen that and is waiting between passes.
+	devcore_hotplug_paused  u32
+	devcore_hotplug_resting u32
 )
 
 fn (slot &Slot) status() u16 {
@@ -603,6 +610,14 @@ fn serve_places() {
 fn hotplug_thread() {
 	for {
 		generation := event.generation(mut devcore_hotplug_event)
+		if katomic.load(&devcore_hotplug_paused) != 0 {
+			// Between passes, with nothing begun: this is where the thread
+			// stays while the buses are without power. See pause_pci_hotplug().
+			katomic.store(mut &devcore_hotplug_resting, u32(1))
+			wait_event(mut devcore_hotplug_event, generation, idle_wait_ms)
+			continue
+		}
+		katomic.store(mut &devcore_hotplug_resting, u32(0))
 		if katomic.cas(mut &devcore_rescan_wanted, u32(1), u32(0)) {
 			rescan_buses()
 		}
@@ -617,6 +632,46 @@ fn hotplug_thread() {
 			idle_wait_ms
 		})
 	}
+}
+
+fn hotplug_resting(_ voidptr) bool {
+	return katomic.load(&devcore_hotplug_resting) != 0
+}
+
+// Keep the hot-plug thread off the ports and the buses: the machine is about
+// to be suspended to RAM. A port that has lost power answers with all ones
+// or with what power-on left in it, and its bus numbers and windows are gone
+// until its configuration space has been written back; a pass over the slots
+// in that state would find cards missing that are there. The thread finishes
+// the pass it is in -- a card being brought in or taken out is not left half
+// done -- and then waits. False if it does not get there in the time given,
+// with the thread let go again: the sleep is then not to happen. Call it
+// before the bindings are frozen, since a pass that adds or removes a device
+// needs the gate to finish.
+pub fn pause_pci_hotplug() bool {
+	if !devcore_hotplug_alive {
+		return true
+	}
+	katomic.store(mut &devcore_hotplug_paused, u32(1))
+	event.trigger(mut devcore_hotplug_event, false)
+	if sleep_until(hotplug_resting, unsafe { nil }, hotplug_pause_ns, 5) {
+		return true
+	}
+	resume_pci_hotplug()
+	return false
+}
+
+// Let the thread look again, and have it do so now. Each slot is compared
+// with what its port says on every pass, so a card that was pulled or put in
+// while the machine slept is found by the first one: nothing has to be
+// remembered for it.
+pub fn resume_pci_hotplug() {
+	if !devcore_hotplug_alive {
+		return
+	}
+	katomic.store(mut &devcore_hotplug_resting, u32(0))
+	katomic.store(mut &devcore_hotplug_paused, u32(0))
+	event.trigger(mut devcore_hotplug_event, false)
 }
 
 // What the recovery worker calls for a rescan: pass it on.
