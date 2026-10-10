@@ -134,6 +134,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		'_readdir' { unsafe { voidptr(darwin_readdir) } }
 		'_closedir' { unsafe { voidptr(darwin_closedir) } }
 		'_sysconf' { unsafe { voidptr(darwin_sysconf) } }
+		'_sysctl' { unsafe { voidptr(darwin_sysctl) } }
 		'_sysctlbyname' { unsafe { voidptr(darwin_sysctlbyname) } }
 		'___error' { unsafe { voidptr(darwin_errno) } }
 		'_abort' { unsafe { voidptr(C.abort) } }

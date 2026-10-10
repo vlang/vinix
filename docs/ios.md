@@ -722,7 +722,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _sysctl
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _tcgetattr
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1190,19 +1190,57 @@ seven guarded buffer sizes and truncation results. Adapter checks also exercise
 teardowns. ASAN verifies that terminated workers' buffers were freed; host
 ASAN/UBSAN and the full ARM64 C++/GLES/PPSSPP regression pass. These adapters
 resolve four more strong imports across Fortnite and EOSSDK. The actual game
-still exits with status 1 before entry, now at `sysctl` in EOSSDK.
+still exited with status 1 before entry, at `sysctl` in EOSSDK, in that probe.
+
+The V numeric `sysctl` adapter now supports the hardware MIBs for configured
+CPUs `{6,3}`, byte order `{6,4}`, page size `{6,7}`, physical memory `{6,24}`
+and active CPUs `{6,25}`. EOSSDK directly requests `{6,25}` with a four-byte
+destination; the main executable also requests `{6,24}` with eight bytes.
+Counts and memory come from native libc, and page size comes from the running
+kernel. Other MIBs, including process records and hardware strings, return
+`ENOENT`; resolving the import does not establish support for every query.
+
+Numeric and named hardware queries now share the measured Darwin buffer rules.
+Short destinations remain untouched, return `ENOMEM` (12), and report length
+zero. Size-only queries report the full width and preserve errno. Named page
+size and physical memory use eight bytes; a four-byte destination receives a
+narrowed value when it fits, otherwise `ERANGE` (34) leaves both outputs
+untouched. Numeric page size remains four bytes. Nonempty writes to supported
+leaves return `EPERM`; zero-length or null new values are reads. Invalid MIB
+counts return `EINVAL`, and extra components on a supported leaf return
+`EISDIR`. Named queries compare C strings directly and allocate nothing per
+call, as confirmed in generated C. The existing physical-CPU names still use
+logical native counts because separate topology reporting is unavailable;
+CPU subtype/family remain generic zero values.
+
+Native Mac comparisons cover nine guarded buffer capacities, numeric/name
+widths, errno, invalid counts, omitted outputs and rejected writes. Host
+ASAN/UBSAN and the full four-core ARM64 C++/GLES/PPSSPP regression pass;
+eight workers per runtime exercise 16,000 query pairs across two teardowns.
+The first full regression exposed a stale length-four assertion in the legacy
+stdio fixture. The V staging tool checks the complete compiled fixture's hash
+and surrounding instructions, then changes only that comparison immediate to
+zero; its other checks remain intact. Two further attempts hit poisoned kernel
+map keys during permissions/readlink checks. Those failed serial logs and VM
+hashes are retained alongside the passing run under `sysctl-checks`.
+
+The V monitor also rejects QEMU exit without a guest PASS marker and detects
+interleaved kernel exception output. Direct host checks verify both failures
+and successful completion. The hardware-query adapter resolves two more strong
+imports. The actual game still exits with status 1 before entry, now at
+`tcgetattr` in EOSSDK.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,321 | 837 | 81 |
-| EOSSDK | 538 | 124 | 18 |
+| Fortnite executable | 1,322 | 836 | 81 |
+| EOSSDK | 539 | 123 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,919 | 1,077 | 122 |
+| All images | 1,921 | 1,075 | 122 |
 
-The C++/GLES/Text variant reports 1,932 resolved imports, 1,064 unresolved strong
+The C++/GLES/Text variant reports 1,934 resolved imports, 1,062 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1234,12 +1272,13 @@ v -nocache -cc clang run tests/ios/native-checks.v regression
 v -nocache -cc clang run tests/ios/native-checks.v probe
 v -nocache -cc clang run tests/ios/native-checks.v audit
 v -nocache -cc clang run tests/ios/native-checks.v static-audit
+v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 ```
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
-`build/ios/fortnite` (default `select-checks`; the error-message verification uses
-`error-checks`). Each mode records its own state path and guest `serial.log`
-there. Regression runs the native V select, semaphore, signal and error checks before the
+`build/ios/fortnite` (default `select-checks`; the hardware-query verification uses
+`sysctl-checks`). Each mode records its own state path and guest `serial.log`
+there. Regression runs the native V select, semaphore, signal, error and sysctl checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

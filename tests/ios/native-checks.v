@@ -5,6 +5,7 @@ module main
 import os
 import time
 import crypto.sha256
+import encoding.binary
 
 const llvm = '/opt/homebrew/opt/llvm/bin/clang'
 
@@ -63,7 +64,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn build(root string, out string, only string) {
 	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'signal-checks',
-		'error-checks', 'native-init'] {
+		'error-checks', 'sysctl-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -82,8 +83,10 @@ fn build(root string, out string, only string) {
 					'mach_semaphore_test.v'
 				} else if item == 'signal-checks' {
 					'signals_test.v'
-				} else {
+				} else if item == 'error-checks' {
 					'errors_test.v'
+				} else {
+					'sysctl_test.v'
 				}
 			} else {
 				'/compat/ios/runner'
@@ -93,6 +96,27 @@ fn build(root string, out string, only string) {
 		compile_c(root, generated, out + '/' + item, item == 'run-ios-gles')
 		println('Built ${item}')
 	}
+}
+
+fn correct_legacy_stdio_sysctl(fs string, out string) {
+	// Reuse the compiled Mach-O fixture while fixing its old short-buffer
+	// expectation. Native Mac sysctl leaves the output untouched and reports
+	// length zero on ENOMEM; the original fixture expected length four.
+	// Pin the complete input and surrounding instructions before changing only
+	// CMP x8,#4 to CMP x8,#0. All its return-value/errno/stdio checks remain.
+	path := fs + '/opt/ios/stdio'
+	mut bytes := os.read_bytes(path) or { panic(err) }
+	original := sha256.sum(bytes).hex()
+	assert original == '3cde2164c6bc81d4d509afc36254d456160717693716631bc646779c1cb91cfa'
+	assert binary.little_endian_u32(bytes[0x4b28..0x4b2c]) == 0xf940ffe8
+	assert binary.little_endian_u32(bytes[0x4b2c..0x4b30]) == 0xf100111f
+	assert binary.little_endian_u32(bytes[0x4b30..0x4b34]) == 0x54ffab41
+	bytes[0x4b2d] = 0x01
+	assert binary.little_endian_u32(bytes[0x4b2c..0x4b30]) == 0xf100011f
+	os.write_file_array(path, bytes) or { panic(err) }
+	os.write_file(out + '/stdio-expectation.log', 'Native Mac ENOMEM old length: 0\n'
+		+ 'Changed only instruction at file offset 0x4b2c: CMP x8,#4 -> CMP x8,#0\n'
+		+ 'Original SHA256: ' + original + '\nCorrected SHA256: ' + sha256.sum(bytes).hex() + '\n') or { panic(err) }
 }
 
 fn regression_root(root string, out string, fs string) {
@@ -110,6 +134,7 @@ fn regression_root(root string, out string, fs string) {
 		os.write_file(fs + '/etc/' + name, value) or { panic(err) }
 	}
 	tree(base + '/fixtures', fs + '/opt/ios')
+	correct_legacy_stdio_sysctl(fs, out)
 	copy_file(out + '/run-ios-gles', fs + '/opt/ios/run-ios')
 	tree(base + '/staging/usr/lib/vinix/ios-gles', fs + '/usr/lib/vinix/ios-gles')
 	copy_file(base + '/objc/Calculator.app/Calculator', fs + '/opt/ios/UIKitCalculator')
@@ -154,6 +179,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/semaphore-checks', fs + '/opt/ios/semaphore-checks')
 	copy_file(out + '/signal-checks', fs + '/opt/ios/signal-checks')
 	copy_file(out + '/error-checks', fs + '/opt/ios/error-checks')
+	copy_file(out + '/sysctl-checks', fs + '/opt/ios/sysctl-checks')
 	sysroot := root + '/build-aarch64-userland/sysroot'
 	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
 		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
@@ -166,14 +192,44 @@ fn await_checks(mut p os.Process, log string, marker string) ! {
 		text := os.read_file(log) or { '' }
 		if text.contains('iOS FAIL:') || text.contains('IOS-NATIVE: FAIL')
 			|| text.contains('KERNEL PANIC') || text.contains('FATAL EXCEPTION')
+			|| (text.contains('EXCEPTION') && text.contains('pc=0xffffffff'))
 			|| (marker != 'VINIX iOS GUEST: PASS' && text.contains('V panic:')) {
 			return error(text)
 		}
 		if text.contains(marker) { return }
-		if !p.is_alive() { return error(p.stderr_slurp()) }
+		if !p.is_alive() { return error('QEMU exited before ' + marker + ': ' + p.stderr_slurp()) }
 		time.sleep(200 * time.millisecond)
 	}
 	return error('VM timeout: ' + log)
+}
+
+fn verify_monitor(out string) {
+	mut process := os.new_process('/usr/bin/true')
+	process.set_redirect_stdio()
+	process.run()
+	process.wait()
+	defer { process.close() }
+	log := out + '/monitor-fixture.log'
+	defer { os.rm(log) or { panic(err) } }
+	marker := 'VINIX iOS GUEST: PASS'
+	os.write_file(log, '') or { panic(err) }
+	mut rejected_exit := false
+	await_checks(mut process, log, marker) or {
+		assert err.msg().starts_with('QEMU exited before ' + marker)
+		rejected_exit = true
+	}
+	assert rejected_exit
+	interleaved := 'FATASlab: object freed L EXCEPTION interleaved pc=0xffffffff80149b2c\n'
+	os.write_file(log, interleaved) or { panic(err) }
+	mut rejected_fault := false
+	await_checks(mut process, log, marker) or {
+		assert err.msg() == interleaved
+		rejected_fault = true
+	}
+	assert rejected_fault
+	os.write_file(log, marker + '\n') or { panic(err) }
+	await_checks(mut process, log, marker) or { panic(err) }
+	println('IOS-MONITOR: rejects unmarked QEMU exit and interleaved kernel faults; accepts guest PASS')
 }
 
 fn vm(root string, out string, mode string) {
@@ -242,7 +298,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|regression|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|verify-monitor|regression|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -267,6 +323,10 @@ fn main() {
 		build(root, out, 'signal-checks')
 	} else if mode == 'build-error' {
 		build(root, out, 'error-checks')
+	} else if mode == 'build-sysctl' {
+		build(root, out, 'sysctl-checks')
+	} else if mode == 'verify-monitor' {
+		verify_monitor(out)
 	} else if mode == 'hash' {
 		if os.args.len != 3 { panic('usage: native-checks hash FILE') }
 		println(sha256.sum(os.read_bytes(os.args[2]) or { panic(err) }).hex())
