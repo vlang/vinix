@@ -1,0 +1,1 @@
+../../../kernel/x86/acpiec/sim_d_acpiec_selftest.v
