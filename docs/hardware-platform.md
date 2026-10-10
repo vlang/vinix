@@ -330,8 +330,27 @@ and `/sys/class/powercap/` follow Linux.
 
 Sensor drivers: Intel's digital thermal sensors (coretemp), AMD's k10temp,
 and RAPL energy counters, each read through an MSR accessor that fails
-instead of faulting. QEMU has none of these registers. There are no ACPI
-thermal zones, no fan control, and no Apple (SMC) sensors.
+instead of faulting. QEMU has none of these registers.
+
+The zones and fans a PC's firmware describes (`kernel/x86/acpipm/thermal.v`):
+every ACPI thermal zone with a `_TMP` becomes a zone of type `acpitz`, its
+`_PSV`, `_HOT` and `_CRT` the zone's passive, hot and critical trips. Its
+active trips (`_AC0` to `_AC9`) drive the fans their `_ALx` list each time
+the zone is read: a fan runs for the hottest trip at or below the
+temperature that lists it -- flat out for `_AC0`, a step slower for each
+trip below -- and stops two degrees under the last. Fans (`PNP0C0B`) of
+both kinds are driven: one that takes a level (`_FSL`; a percentage where
+`_FIF` allows any value, otherwise the nearest level `_FPS` lists) and
+reports its speed (`_FST`, shown as `fanN_input`), and one that is on or
+off through `_PS0`/`_PS3` or the power resources of `_PR0`. Each is among
+the zone's fans in hwmon and can be set by hand through `pwmN` until the
+zone next changes its mind; `/sys/class/thermal/acpi_fans` lists what each
+was last told. A `Notify` that trips or fan lists changed reads them again.
+
+Not done: the zone's own passive constants (`_TC1`, `_TC2`, `_TSP` -- the
+stepping above is used), `_TZD`, `_TZP`, counting the users of a power
+resource two fans share, fans a laptop's embedded controller runs without
+telling ACPI (most laptops), and Apple's sensors and fans (SMC).
 
 ## Boot options
 
@@ -382,6 +401,7 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `qmp-powerdown`, `power-button-init`, `restart` | pass | pass |
 | `suspend`: rehearsal, alarm, key, power button, a source not allowed to wake | pass | pass |
 | `acpi-power`: scripted battery, charger and lid | pass | -- |
+| `acpi-thermal`: a scripted thermal zone, four fans of every kind, the passive limit, critical power-off | pass | -- |
 | `iommu-intel`, `iommu-amd`, `iommu-off` | pass | -- |
 | `cpu-power`, `cpu-power-simulated` | pass | pass |
 | `thermal` | pass | pass |
