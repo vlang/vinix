@@ -61,9 +61,7 @@ fn answer_tlb_shootdown() {
 	if me >= max_tlb_cpus || katomic.load(&tlb_pending[me]) == 0 {
 		return
 	}
-	if tlb_request_everywhere || cpu.read_cr3() == tlb_request_cr3 {
-		cpu.invlpg(tlb_request_virt)
-	}
+	memory.invalidate_local_tlb(tlb_request_cr3, tlb_request_virt, tlb_request_everywhere)
 	katomic.store(mut &tlb_pending[me], u32(0))
 }
 

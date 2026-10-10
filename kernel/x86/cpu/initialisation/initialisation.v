@@ -63,6 +63,7 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	// tables, just as the BSP does during vmm_init().
 	memory.enable_nx()
 	kernel_pagemap.switch_to()
+	memory.enable_pcid()
 
 	unsafe {
 		stack_size := u64(0x200000)

@@ -160,6 +160,26 @@ fn queue_dequeue(t &proc.Thread) bool {
 	return true
 }
 
+// ARM changes to the idle stack before dispatching its selected candidate.
+// Its next scan must reach that candidate before the thread that just yielded.
+// The caller still owns t.l; the queue lock serializes concurrent removal.
+fn retry_run_queue_candidate(t &proc.Thread) {
+	mut task := unsafe { t }
+	number := task.queue_cpu
+	mut q := unsafe { &runqueues[number] }
+	q.lock.acquire()
+	defer { q.lock.release() }
+	if !katomic.load(&task.is_in_queue) || task.queue_cpu != number { return }
+	queue_unlink(mut q, mut task)
+	task.queue_next = q.head
+	if q.head == unsafe { nil } {
+		q.tail = task
+	} else {
+		q.head.queue_previous = task
+	}
+	q.head = task
+}
+
 // Selection holds at most one queue lock. Taking t.l while its queue is
 // locked transfers the queue's lifetime guarantee into scheduler ownership;
 // teardown drains t.l before freeing storage. Stealing needs no node move:

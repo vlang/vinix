@@ -279,6 +279,12 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		// This path abandons the thunk instead of returning to its exit.
 		cpulocal.maskable_irq_exit(u32(scheduler_vector))
 		cpu.set_gs_base(u64(&cpu_local.cpu_number))
+		// The saved CR3 belongs to the outgoing thread, but this CPU must stop
+		// translating through it before another CPU can observe the thread as
+		// stopped and retire its map. Tagged contexts remain cached for reuse.
+		if cpu.read_cr3() != u64(kernel_pagemap.top_level) {
+			kernel_pagemap.switch_to()
+		}
 		katomic.store(mut &current_thread.running_on, u64(-1))
 		// Capture the destination before releasing the thread: another CPU can
 		// take it immediately after the unlock. An earlier affinity IPI may have
@@ -369,7 +375,7 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 	// Recorded before it is loaded; see memory.note_active_pagemap().
 	memory.note_active_pagemap(cpu_local.cpu_number, current_thread.cr3)
 	if cpu.read_cr3() != current_thread.cr3 {
-		cpu.write_cr3(current_thread.cr3)
+		memory.switch_cr3(current_thread.cr3)
 	}
 
 	fpu_restore(current_thread.fpu_storage)
@@ -670,7 +676,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	unsafe { *t = proc.Thread{
 		kernel_charge: charge
 		process:      process
-		cr3:          u64(process.pagemap.top_level)
+		cr3:          process.pagemap.tagged_root()
 		gpr_state:    gpr_state
 		timeslice:    5000
 		running_on:   u64(-1)
@@ -785,7 +791,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	unsafe { *t = proc.Thread{
 		kernel_charge: charge
 		process:        process
-		cr3:            u64(process.pagemap.top_level)
+		cr3:            process.pagemap.tagged_root()
 		gpr_state:      *state
 		not_started:    true
 		timeslice:      source.timeslice

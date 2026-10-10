@@ -56,6 +56,7 @@ fn poll_network() {
 }
 
 fn kmain_thread() {
+	$if largepage_selftest ? { sched.selftest_largepage_smp() }
 	acpisync.scheduler_ready()
 	acpisync.test_native()
 	term.framebuffer_init()

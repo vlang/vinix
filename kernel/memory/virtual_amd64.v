@@ -54,6 +54,7 @@ pub fn new_pagemap() &Pagemap {
 	}
 	mut pagemap := &Pagemap{
 		top_level:   top_level
+		tlb_tag: take_pcid()
 		track_residency: true
 		mmap_ranges: []voidptr{}
 	}
@@ -85,6 +86,7 @@ pub fn new_user_pagemap(owner kbudget.Owner) ?&Pagemap {
  kernel_owner: owner
  kernel_charge: charge
 		top_level:   top_level
+		tlb_tag: take_pcid()
 		track_residency: true
 		mmap_ranges: []voidptr{}
 	} @[freed] // mmap.delete_pagemap owns this detached address space.
@@ -111,12 +113,15 @@ pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	}
 	pml3 := get_next_level(pagemap, pml4, pml4_entry, allocate) or { return none }
 	pml2 := get_next_level(pagemap, pml3, pml3_entry, allocate) or { return none }
-	pml1 := get_next_level(pagemap, pml2, pml2_entry, allocate) or { return none }
+	pml1 := amd64_leaf_level(pagemap, pml2, pml2_entry, virt, allocate) or { return none }
 
 	return unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
 }
 
 pub fn (pagemap &Pagemap) virt2phys(virt u64) ?u64 {
+	if virt >= user_address_limit() {
+		return pagemap.kernel_leaf_phys(virt)
+	}
 	pte_p := pagemap.virt2pte(virt, false) or { return none }
 	if unsafe { *pte_p } & 1 == 0 {
 		return none
@@ -146,13 +151,7 @@ pub fn (pagemap &Pagemap) user_page_phys(virt u64, write bool) ?u64 {
 }
 
 pub fn (mut pagemap Pagemap) switch_to() {
-	top_level := pagemap.top_level
-
-	asm volatile amd64 {
-		mov cr3, top_level
-		; ; r (top_level)
-		; memory
-	}
+	switch_cr3(pagemap.tagged_root())
 }
 
 fn get_next_level(owner &Pagemap, current_level &u64, index u64, allocate bool) ?&u64 {
@@ -162,6 +161,7 @@ fn get_next_level(owner &Pagemap, current_level &u64, index u64, allocate bool) 
 
 	// Check if entry is present
 	if unsafe { *entry } & 0x01 != 0 {
+		if unsafe { *entry } & amd64_large_page != 0 { return none }
 		// If present, return pointer to it
 		ret = unsafe { &u64(*entry & pte_flags_mask) }
 	} else {
@@ -211,7 +211,7 @@ pub fn (mut pagemap Pagemap) unmap_page_unlocked(virt u64) ? {
 	mut pml3_p := unsafe { &u64(u64(pml3) + higher_half) }
 	mut pml2 := get_next_level(pagemap, pml3, pml3_entry, false) or { return none }
 	mut pml2_p := unsafe { &u64(u64(pml2) + higher_half) }
-	mut pml1 := get_next_level(pagemap, pml2, pml2_entry, false) or { return none }
+	mut pml1 := amd64_leaf_level(pagemap, pml2, pml2_entry, virt, true) or { return none }
 	mut pml1_p := unsafe { &u64(u64(pml1) + higher_half) }
 
 	mut pte_p := unsafe { &u64(u64(&pml1[pml1_entry]) + higher_half) }
@@ -290,6 +290,7 @@ fn table_empty_after_clear(table &u64, index u64) bool {
 // Change the protection of a page that is mapped. One that is not is left
 // alone: rewriting its empty entry would map physical page 0 in its place.
 pub fn (mut pagemap Pagemap) flag_page(virt u64, flags u64) ? {
+	pagemap.split_kernel_leaf(virt)?
 	pte_p := pagemap.virt2pte(virt, false) or { return none }
 	if unsafe { *pte_p } & 1 == 0 {
 		return none
@@ -317,6 +318,7 @@ pub fn (mut pagemap Pagemap) map_page(virt u64, phys u64, flags u64) ? {
 }
 
 pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? {
+	if pagemap.kernel_block_matches(virt, phys, flags) { return }
 	pml5_entry := (virt & (u64(0x1ff) << 48)) >> 48
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
@@ -331,7 +333,7 @@ pub fn (mut pagemap Pagemap) map_page_unlocked(virt u64, phys u64, flags u64) ? 
 	}
 	pml3 := get_next_level(pagemap, pml4, pml4_entry, true) or { return none }
 	pml2 := get_next_level(pagemap, pml3, pml3_entry, true) or { return none }
-	mut pml1 := get_next_level(pagemap, pml2, pml2_entry, true) or { return none }
+	mut pml1 := amd64_leaf_level(pagemap, pml2, pml2_entry, virt, true) or { return none }
 
 	entry := unsafe { &u64(u64(pml1) + higher_half + pml1_entry * 8) }
 
@@ -411,11 +413,8 @@ pub fn vmm_init() {
 	data_len := u64(voidptr(C.data_end)) - data_virt
 	map_kernel_span(data_virt, data_phys, data_len, pte_present | pte_noexec | pte_writable)
 
-	for i := u64(0); i < 0x100000000; i += page_size {
-		kernel_pagemap.map_page(i + higher_half, i, pte_present | pte_noexec | pte_writable) or {
-			panic('vmm init failure')
-		}
-	}
+	init_direct_cache_types()
+	map_direct_span(0, 0x100000000)
 
 	memmap := memmap_req.response
 
@@ -426,21 +425,17 @@ pub fn vmm_init() {
 		if top <= u64(0x100000000) {
 			continue
 		}
-		for j := base; j < top; j += page_size {
-			if j < u64(0x100000000) {
-				continue
-			}
-			kernel_pagemap.map_page(j + higher_half, j, pte_present | pte_noexec | pte_writable) or {
-				panic('vmm init failure')
-			}
-		}
+		map_direct_span(if base < 0x100000000 { u64(0x100000000) } else { base }, top)
 	}
 
 	protect_kernel_image_alias(text_phys, u64(voidptr(C.rodata_end)) - text_virt)
 
 	kernel_pagemap.switch_to()
+	enable_pcid()
 
 	vmm_initialised = true
+	$if tlb_selftest ? { pcid_selftest() }
+	$if largepage_selftest ? { largepage_selftest() }
 
 	$if vmap_selftest ? {
 		vmap_selftest()
@@ -458,7 +453,7 @@ fn (pagemap &Pagemap) leaf_table(virt u64) (&u64, u64) {
 	mut shift := if la57 { u64(48) } else { u64(39) }
 	for shift > 12 {
 		entry := unsafe { table[(virt >> shift) & 0x1ff] }
-		if entry & 1 == 0 {
+		if entry & 1 == 0 || entry & amd64_large_page != 0 {
 			return unsafe { nil }, (virt | ((u64(1) << shift) - 1)) + 1
 		}
 		table = unsafe { &u64((entry & pte_flags_mask) + higher_half) }
@@ -563,17 +558,6 @@ pub fn (pagemap &Pagemap) next_present(start u64, end u64) u64 {
 	return end
 }
 
-// The flush that follows tearing down a page map no CPU runs any more. Loading
-// another CR3 dropped its translations on each of them already: user pages are
-// not global, and there are no PCIDs.
-pub fn flush_tlb_everywhere() {}
-
-// No retained address-space tags on this architecture yet. Loading another
-// CR3 on every former user of the map already dropped its translations.
-pub fn (pagemap &Pagemap) prepare_tlb_teardown() {}
-
-pub fn (mut pagemap Pagemap) release_tlb_tag() {}
-
 // ── TLB shootdown ────────────────────────────────────────────────────────────
 //
 // x86 has no broadcast invalidation, as arm64's TLBI ...IS has: INVLPG drops a
@@ -587,9 +571,8 @@ pub fn (mut pagemap Pagemap) release_tlb_tag() {}
 const max_tlb_cpus = 256
 
 __global (
-	// The CR3 each CPU loaded last, as far as a shootdown needs to know: a
-	// CPU whose entry is not a page map's has loaded another CR3 since, which
-	// dropped that page map's translations.
+	// The last loaded CR3 excludes inactive CPUs only for tag zero, whose
+	// translations are flushed on switch. Nonzero PCIDs target every CPU.
 	tlb_active_cr3 [max_tlb_cpus]u64
 	tlb_shootdown  fn (u64, u64, bool)
 )
@@ -617,22 +600,20 @@ pub fn note_active_pagemap(cpu_number u64, cr3 u64) {
 }
 
 pub fn pagemap_may_be_active_on(cpu_number u64, cr3 u64) bool {
-	return cpu_number >= max_tlb_cpus || katomic.load(&tlb_active_cr3[cpu_number]) == cr3
+	return cr3 & 0xfff != 0 || cpu_number >= max_tlb_cpus || katomic.load(&tlb_active_cr3[cpu_number]) == cr3
 }
 
 // Drop the translation of `virt` from every CPU that may hold one. A page map
-// being torn down runs on no CPU. A change to the kernel's own mappings, which
-// every page map shares, is dropped everywhere.
+// being torn down has already invalidated its retained context. A change to
+// the kernel's own mappings, which every page map shares, is dropped everywhere.
 fn (pagemap &Pagemap) invalidate(virt u64) {
 	if pagemap.dying {
 		return
 	}
-	top_level := u64(pagemap.top_level)
+	top_level := pagemap.tagged_root()
 	// A kernel mapping is cached whichever page map a CPU is on.
 	everywhere := voidptr(pagemap) == voidptr(&kernel_pagemap)
-	if everywhere || cpu.read_cr3() == top_level {
-		cpu.invlpg(virt)
-	}
+	invalidate_local_tlb(top_level, virt, everywhere)
 	if tlb_shootdown != unsafe { nil } {
 		full_fence()
 		tlb_shootdown(top_level, virt, everywhere)

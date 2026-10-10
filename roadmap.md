@@ -129,8 +129,10 @@ upgrade, rollback and recovery are repeatable from published images.
   QoS, heterogeneous-core placement and deadline-driven idle/timer coalescing.
   See [implementation and limits](docs/scheduler-qos.md) and
   [acceptance tests](tests/scheduler-qos/README.md).
-- [ ] Complete architecture-specific address-space/TLB work and large-page
+- [x] Complete architecture-specific address-space/TLB work and large-page
   support where useful; verify protection and teardown during concurrent access.
+  See [implementation and limits](docs/address-space-tlb.md) and
+  [qualification](tests/tlb/README.md).
 - [ ] Eliminate measured per-operation retention and close unresolved kernel
   stress failures; audit generated V-to-C allocations and every new lifetime.
 

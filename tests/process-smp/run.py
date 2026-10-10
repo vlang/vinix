@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--expect", default="PROCESS-SMP PASS")
     parser.add_argument("--fail", action="append", default=[])
     parser.add_argument("--define", action="append", default=[])
+    parser.add_argument("--cpu", default="max", help="x86 QEMU CPU model and feature overrides")
     parser.add_argument("--smp", type=int, default=4)
     parser.add_argument("--memory", type=int, default=4096,
                         help="guest RAM in MiB; full fixture needs 40 concurrent x86 processes")
@@ -74,7 +75,7 @@ def main():
         if not qemu:
             parser.error("qemu-system-x86_64 is missing")
         firmware = os.environ.get("VINIX_OVMF_CODE", str(Path(qemu).parent.parent / "share/qemu/edk2-x86_64-code.fd"))
-        command = [qemu, "-machine", "q35,smm=off", "-accel", "tcg", "-cpu", "max", "-m", str(args.memory),
+        command = [qemu, "-machine", "q35,smm=off", "-accel", "tcg", "-cpu", args.cpu, "-m", str(args.memory),
                    "-smp", str(args.smp), "-drive", f"if=pflash,format=raw,unit=0,readonly=on,file={firmware}",
                    "-cdrom", str(iso), "-nic", "none", "-display", "none", "-monitor", "none",
                    "-serial", "mon:stdio", "-no-reboot"]

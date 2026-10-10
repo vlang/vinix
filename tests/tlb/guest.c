@@ -12,6 +12,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -135,6 +136,58 @@ static void process_isolation(void) {
     if (munmap((void *)value, page)) fail("fork cleanup");
     puts("TLB: fork COW and 300 map recycling cycles PASS");
 }
+
+/* A non-thread CLONE_VM child shares this map, then stops on CPU 1. That CPU
+ * switches away while retaining its tag. Mutations must invalidate inactive
+ * contexts too, even though the parent continues to run the map on CPU 0. */
+static atomic_int inactive_mode;
+static int inactive_reader(void *unused) {
+    (void)unused;
+    pin(1);
+    if (*shared != 17) fail("inactive context warmup");
+    /* CLONE_VM shares musl's cached thread ID; ask the kernel for this PID. */
+    if (syscall(SYS_kill, syscall(SYS_getpid), SIGSTOP)) fail("inactive context stop");
+    if (atomic_load(&inactive_mode)) {
+        if (*shared != 29) fail("inactive translation survived address replacement");
+    } else {
+        if (sigsetjmp(fault, 1) == 0) {
+            expected_fault = 1;
+            *shared = 42;
+            expected_fault = 0;
+            fail("inactive writable translation survived protection");
+        }
+    }
+    return 0;
+}
+static void inactive_contexts(void) {
+    size_t stack_size = 1024 * 1024;
+    char *stack = mmap(NULL, stack_size, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (stack == MAP_FAILED) fail("inactive clone stack");
+    pin(0);
+    for (unsigned round = 0; round < 64; round++) {
+        shared = mmap(NULL, page, PROT_READ | PROT_WRITE,
+                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+        if (shared == MAP_FAILED) fail("inactive mmap");
+        *shared = 17;
+        atomic_store(&inactive_mode, round & 1);
+        int child = clone(inactive_reader, stack + stack_size, CLONE_VM | SIGCHLD, NULL);
+        if (child < 0) fail("inactive CLONE_VM");
+        int status;
+        if (waitpid(child, &status, WUNTRACED) != child || !WIFSTOPPED(status)) fail("inactive stopped status");
+        if (round & 1) {
+            if (munmap((void *)shared, page)) fail("inactive unmap");
+            if (mmap((void *)shared, page, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0) != (void *)shared) fail("inactive address replacement");
+            *shared = 29;
+        } else if (mprotect((void *)shared, page, PROT_READ)) fail("inactive protection");
+        if (kill(child, SIGCONT)) fail("inactive resume");
+        check_child(child);
+        if (munmap((void *)shared, page)) fail("inactive cleanup");
+    }
+    if (munmap(stack, stack_size)) fail("inactive stack cleanup");
+    puts("TLB: inactive remote contexts protection and replacement PASS");
+}
 static void exec_recycling(void) {
     for (unsigned round = 0; round < 32; round++) {
         pid_t child = fork();
@@ -178,7 +231,12 @@ static unsigned long slab_live(int fd, unsigned long live[2049]) {
 static void switch_pong(struct switch_state *state, unsigned rounds) {
     for (unsigned i = 0; i < rounds; i++) {
         atomic_store_explicit(&state->turn, 1, memory_order_release);
-        while (atomic_load_explicit(&state->turn, memory_order_acquire)) sched_yield();
+        for (unsigned n = 0; atomic_load_explicit(&state->turn, memory_order_acquire); n++) {
+            if (n == 2000000) fail("context-switch coordination timeout");
+            sched_yield();
+        }
+        if (rounds == 20000 && (i + 1) % 5000 == 0)
+            printf("TLB: context-switch rounds completed=%u\n", i + 1);
     }
 }
 static void switch_retention(void) {
@@ -190,6 +248,8 @@ static void switch_retention(void) {
     struct switch_state *state = mmap(NULL, page, PROT_READ | PROT_WRITE,
                                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (state == MAP_FAILED) fail("switch state");
+    atomic_init(&state->turn, 0);
+    atomic_init(&state->stop, 0);
     pid_t child = fork();
     if (child < 0) fail("switch fork");
     if (child == 0) {
@@ -202,7 +262,9 @@ static void switch_retention(void) {
         _exit(0);
     }
     pin(0);
+    puts("TLB: context-switch retention warmup");
     switch_pong(state, 1000);
+    puts("TLB: context-switch retention measurement");
     slab_live(fd, before); /* Warm both the reader and the parsing path. */
     unsigned long before_large = slab_live(fd, before);
     switch_pong(state, 20000);
@@ -245,6 +307,7 @@ int main(int argc, char **argv) {
     sigemptyset(&action.sa_mask);
     if (sigaction(SIGSEGV, &action, NULL)) fail("sigaction");
     shared_protection();
+    inactive_contexts();
     process_isolation();
     exec_recycling();
     switch_retention();

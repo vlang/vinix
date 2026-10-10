@@ -44,6 +44,10 @@ fn thread_exit(status int, group bool) {
 	if !proc.claim_thread_exit(current_thread) {
 		sched.park_stopped_thread()
 	}
+	// Once removed from the thread list, this thread may outlive a sibling's
+	// teardown and the parent's wait. Keep its Process until the final bill
+	// and namespace-dependent tid release, then detach before giving it back.
+	proc.pin_process(current_process)
 	if group {
 		exit_process(mut current_process, mut current_thread, encode_exit_status(status), false)
 	}
@@ -54,12 +58,17 @@ fn thread_exit(status int, group bool) {
 	clear_child_tid(mut current_thread)
 	fs.release_thread_fs(mut current_thread)
 
+	// List removal lets the last sibling retire this map. Switch first so
+	// preemption after removal can never save or reload its freed root.
+	kernel_pagemap.switch_to()
 	if !group && !leave_process(mut current_process, current_thread) {
 		proc.free_tid(current_thread.tid)
 		event.trigger(mut &current_thread.exited, false)
-		// Off the process's page tables before the thread goes: a sibling's
-		// exit may free them while this CPU is still on its way out.
-		kernel_pagemap.switch_to()
+		proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+		current_thread.process = kernel_process
+		proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+		proc.cpu_enter_kernel()
+		proc.unpin_process(current_process)
 		sched.dequeue_and_die()
 	}
 
@@ -85,6 +94,7 @@ pub fn exit_with_fatal_signal(signal u8) {
 	if !proc.claim_thread_exit(current_thread) {
 		sched.park_stopped_thread()
 	}
+	proc.pin_process(current_process)
 
 	exit_process(mut current_process, mut current_thread, encode_fatal_signal(signal), false)
 }
@@ -142,6 +152,8 @@ fn abort_exec(mut process proc.Process, mut old_thread proc.Thread) {
 
 @[noreturn]
 fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread, status int, thread_released bool) {
+	// Both entry paths transfer their Process pin here. Every terminal branch
+	// detaches the Thread's pointer before releasing that pin.
 	// The descriptor belongs to this owned Thread frame across teardown. A
 	// fixed alloca avoids V promotion and carries no child/adopter pointers.
 	mut orphan_change := unsafe { &proc.OrphanChange(C.__builtin_alloca(sizeof(proc.OrphanChange))) }
@@ -154,8 +166,14 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 		}
 		// Somebody else got here first. Step out of the thread list before
 		// dying so the thread doing the teardown never has to reach us.
+		kernel_pagemap.switch_to()
 		leave_process(mut current_process, current_thread)
 		proc.free_tid(current_thread.tid)
+		proc.charge_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+		current_thread.process = kernel_process
+		proc.begin_cpu_time(mut current_thread, proc.cpu_time_now_ns())
+		proc.cpu_enter_kernel()
+		proc.unpin_process(current_process)
 		sched.dequeue_and_die()
 	}
 
@@ -296,6 +314,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	// ...and tells one that is not waiting yet, which is how a daemon reaps.
 	notify_parent(current_process)
 	if publish_ref != unsafe { nil } { proc.unpin_process(publish_ref) }
+	proc.unpin_process(current_process)
 
 	sched.dequeue_and_die()
 }

@@ -159,8 +159,8 @@ pub mut:
 	inspection_refs int
 	pageout_cursor u64
 	inspection_drained eventstruct.Event
-	// ARM64: exclusive ownership of a nonzero 8-bit ASID until destruction.
-	// Zero uses the conservative flush-on-switch path; x86 does not use it.
+	// Exclusive ARM ASID or x86 PCID ownership until destruction. Zero uses
+	// conservative flush-on-switch behavior when unavailable or exhausted.
 	tlb_tag u16
 }
 
