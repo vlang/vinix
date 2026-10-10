@@ -160,6 +160,18 @@ fn test_procfs_complete_guard_and_each_ownership_rejection() {
 	}
 }
 
+fn test_procfs_creation_uses_the_first_unicode_line() {
+	for separator in ['\n', '\v', '\f', '\x1c', '\x1d', '\x1e', '\u0085', '\u2028', '\u2029'] {
+		assert creation_line('prefix${separator}fs__create_node(._object = this)${separator}tail') == 'fs__create_node(._object = this)'
+		bad := procfs_fixture().replace('fs__create_node((Resource){._object = this})', 'fs__create_node((Resource){._object = temporary})${separator}._object = this')
+		procfs_check(parse(bad)!) or {
+			assert err.msg() == 'constructed roots must retain the persistent receiver'
+			continue
+		}
+		assert false, 'later line hid a temporary root receiver'
+	}
+}
+
 fn test_cli_success_partial_stdout_errors_and_usage() {
 	tools := os.getenv('VINIX_GUARD_TOOLS')
 	if tools == '' { return }

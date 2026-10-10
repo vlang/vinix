@@ -10,6 +10,17 @@ pub const accounting_functions = ['sys__syscall_getrusage', 'userland__write_chi
 pub const pagecache_functions = ['resource__advise_resource', 'file__Handle__sequential_read',
 	'ext2__EXT2Resource__advise', 'pagecache__Cache__prefetch']
 
+fn creation_line(body string) string {
+	mut text := body
+	for delimiter in ['\v', '\f', '\x1c', '\x1d', '\x1e', '\u0085', '\u2028', '\u2029'] {
+		text = text.replace(delimiter, '\n')
+	}
+	for line in text.split('\n') {
+		if line.contains('fs__create_node(') { return line }
+	}
+	return ''
+}
+
 pub fn allocation_check(generated Generated, name string, family string) !string {
 	body := generated.body(name, family)!
 	if hidden_allocation(body) { return error('hidden allocation in ${name}') }
@@ -68,8 +79,8 @@ pub fn procfs_check(generated Generated) ! {
 	if !generated.body('fs__ProcFS__mount', 'procfs')!.contains('fs__ProcFS__mount_checked(this, parent, name, NULL)') {
 		return error('interface mount must preserve the nil-target delegate')
 	}
-	creation := generated.body('fs__ProcFS__build_root', 'procfs')!.split('\n').filter(it.contains('fs__create_node('))
-	if creation.len == 0 || !creation[0].contains('._object = this') {
+	creation := creation_line(generated.body('fs__ProcFS__build_root', 'procfs')!)
+	if !creation.contains('._object = this') {
 		return error('constructed roots must retain the persistent receiver')
 	}
 	ancestry := generated.body('fs__is_beneath', 'procfs')!
