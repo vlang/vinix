@@ -170,18 +170,28 @@ hwcheck --rehearse-sleep > report.md
    no filesystem repair.
 6. **Sleep rehearsal.** `hwcheck --rehearse-sleep` reports every device
    suspended and resumed and none failed; then use every device again.
-7. **Sleep.** Fifty cycles, by menu, by lid and by idle timer, woken by key,
-   by lid, by power button and by `wakealarm`. After each: display, input,
-   network, audio and storage work; `suspend_stats/fail` and
-   `security_changes` are 0. Leave one sleep overnight and record the charge
-   lost.
+7. **Sleep.** Fifty cycles of each depth the machine offers
+   (`/sys/power/mem_sleep`: `s2idle`, and `deep` where it is listed -- where
+   it is not, record what `/sys/power/deep_sleep` gives as the reason), by
+   menu, by lid and by idle timer, woken by key, by lid, by power button and
+   by `wakealarm`, some of them with sound playing. After each: display,
+   input, network, audio and storage work, the sound goes on;
+   `suspend_stats/fail` and `security_changes` are 0. Leave one sleep of each
+   depth overnight and record the charge lost.
 8. **Battery.** Compare `capacity`, `status`, `energy_now` and
    `time_to_empty_now` with the firmware's own figures (or another operating
-   system on the same machine) at 100%, 50% and 10%. Run to the critical
-   threshold: the machine must shut down cleanly before it dies.
+   system on the same machine) at 100%, 50% and 10%. Pull and replace the
+   charger and shut the lid: each must be noticed within a second. Run to
+   the critical threshold: the machine must shut down cleanly before it
+   dies. On a laptop with an embedded controller, record the counters under
+   `/sys/bus/acpi/devices/PNP0C09:00/ec/` afterwards: no timeouts, and not
+   failed.
 9. **Heat.** Compare each temperature with another operating system's
    reading. Under sustained full load the limit must come down before the
    firmware's own protection acts, and the machine must not shut itself off.
+   Where firmware describes fans (`/sys/class/thermal/acpi_fans`), they must
+   be heard to speed up under load and slow down after it, and `fanN_input`
+   must agree with what is heard.
 10. **Idle.** Ten minutes idle with the display on: record power drawn (from
     the battery's `power_now`), each CPU's deepest idle state and the time in
     it.
