@@ -1,0 +1,11 @@
+{
+    "downloads/x86_wine-9.17-r1.apk": "e8b169c211284fb2fe60d05b710074b4f3504d90a6267f0227e6e89012544dab",
+    "downloads/x86_64_wine-9.17-r1.apk": "df8914e18479410821157883519a98dc1e41f1e47f457b60a3fb20ccecd7e072",
+    "staging/usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-unix/ntdll.so": "0d2c95650eb6eff9e7a539d08cb118068b102d812cb505156d3525369dd1ec75",
+    "staging/usr/libexec/vinix-i386/root/usr/lib/wine/i386-unix/ntdll.so": "5c36cb8f85533544a10d6f2c8801eb641d2842327a2fd684d4a21aee71ad4030",
+    "staging/usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-windows/ntdll.dll": "d93bffca52cbb1b730cb2e2e01dc7fe902abc22fe3b2d08190eba1c7f5c7e29f",
+    "staging/usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-windows/msxml3.dll": "b0dadac13e9541878ff26ab52ee93e6b01d4814010822036d06851ec76aa2317",
+    "staging/usr/libexec/vinix-i386/root/usr/lib/wine/i386-windows/msxml3.dll": "8819caa35c9280603d97906e9291a13d06dcba84d3c8ad2c348fc96e98b4c8e7",
+    "staging/usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-windows/services.exe": "f8c99117891a16195442db3b95c48322ea63c961f668ca7c08c811e5c0866a36",
+    "staging/usr/libexec/vinix-i386/root/usr/lib/wine/i386-windows/services.exe": "9d58200d7f9f04834ff9517895984a7451d58b77d32fdb17c70458f4a13ba1f5"
+}

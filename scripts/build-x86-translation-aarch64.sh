@@ -265,35 +265,35 @@ ln -snf usr/share "$I386_ROOT/share"
 if [ "$WITH_WINE" -eq 1 ]; then
     # Windows MSXML treats encoding="unicode" as UTF-16/UCS-2. Office 2013
     # uses that declaration, while Alpine's libxml2 rejects it by default.
-    python3 "$SCRIPT_DIR/build-support/x86-translation/patch-msxml-unicode.py" \
+    "$SCRIPT_DIR/build-support/x86-translation/patch-msxml-unicode" \
         "$X86_ROOT/usr/lib/wine/x86_64-windows/msxml3.dll"
-    python3 "$SCRIPT_DIR/build-support/x86-translation/patch-msxml-unicode.py" \
+    "$SCRIPT_DIR/build-support/x86-translation/patch-msxml-unicode" \
         "$I386_ROOT/usr/lib/wine/i386-windows/msxml3.dll"
 
     # qemu-user also leaves x86-64 REG_TRAPNO at -1. Apply the amd64 variant
     # of Wine's trap-inference fix before starting any Win64 application.
-    python3 "$SCRIPT_DIR/build-support/x86-translation/patch-wine-x86_64-qemu.py" \
+    "$SCRIPT_DIR/build-support/x86-translation/patch-wine-x86_64-qemu" \
         "$X86_ROOT/usr/lib/wine/x86_64-unix/ntdll.so"
 
     # Office passes eight-byte-aligned context and jump buffers through its
     # error-reporting path. Use Wine's unaligned-safe x86-64 instruction forms
     # at the exact Alpine 9.17 PE sites that consume those buffers.
-    python3 "$SCRIPT_DIR/build-support/x86-translation/patch-wine-x86_64-context.py" \
+    "$SCRIPT_DIR/build-support/x86-translation/patch-wine-x86_64-context" \
         "$X86_ROOT/usr/lib/wine/x86_64-windows/ntdll.dll"
 
     # qemu-user leaves the i386 REG_TRAPNO field at -1. Backport Wine's
     # upstream trap-inference fix so routine PE module page faults are handled
     # instead of surfacing as illegal-instruction crashes.
-    python3 "$SCRIPT_DIR/build-support/x86-translation/patch-wine-i386-qemu.py" \
+    "$SCRIPT_DIR/build-support/x86-translation/patch-wine-i386-qemu" \
         "$I386_ROOT/usr/lib/wine/i386-unix/ntdll.so"
 
     # Translated service executables need longer than Wine's native ten-second
     # default to load their PE modules and connect to services.exe.  Without
     # this, RpcSs and the device services time out just before they call the
     # service dispatcher, leaving complex Office applications blocked on RPC.
-    python3 "$SCRIPT_DIR/build-support/x86-translation/patch-wine-service-timeout.py" \
+    "$SCRIPT_DIR/build-support/x86-translation/patch-wine-service-timeout" \
         "$X86_ROOT/usr/lib/wine/x86_64-windows/services.exe"
-    python3 "$SCRIPT_DIR/build-support/x86-translation/patch-wine-service-timeout.py" \
+    "$SCRIPT_DIR/build-support/x86-translation/patch-wine-service-timeout" \
         "$I386_ROOT/usr/lib/wine/i386-windows/services.exe"
 
     # run-x86-64 starts Wine through the private musl loader so translated
