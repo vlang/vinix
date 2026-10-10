@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Standard-library calls for the native Dota preparation controller."""
 import atexit
+import builtins as _builtins
+import importlib.util as _library_util
 import json
 import os
 from pathlib import Path
@@ -17,6 +19,28 @@ import threading
 
 _BINARY = None
 _LOCK = threading.Lock()
+
+
+_library_spec = _library_util.spec_from_file_location(
+    "dota_preparation_objects", Path(__file__).resolve().parents[2] / "build-support/dota2/_vulkan_native.py")
+_objects_sdk = _library_util.module_from_spec(_library_spec)
+_library_spec.loader.exec_module(_objects_sdk)
+
+
+def _objects(operation, row, context, args):
+    return _objects_sdk._entry(b"preparation", _builtins.globals(), operation, row, context, args,
+                              _objects_sdk._vulkan_invoke)
+
+
+def _objects_take(token, index):
+    try:
+        return _objects_sdk._TAKE(token, index)
+    finally:
+        token = None
+
+
+def _objects_identity(value):
+    return value
 
 
 def _text(value):
@@ -84,7 +108,8 @@ def _binary():
 
 def _primitive(operation, row, context):
     args = [_untext(value) for value in row.get("args", [])]
-    if operation == "next":
+    selected = _objects("select", operation, context, args)
+    if selected == 'next':
         if "iterator" not in context:
             context["iterator"] = iter(context["iterable"])
         try:
@@ -92,26 +117,22 @@ def _primitive(operation, row, context):
         except StopIteration:
             return {"ended": True}
         return {"ended": False}
-    if operation == "reference_path":
-        return _text(getattr(context["current"], row["function"])(*args))
-    if operation == "open_read":
+    if selected == 'open_read':
         manager = Path(args[0]).open("rb")
         handle = manager.__enter__()
         ident = str(id(handle))
         context["handles"][ident] = (manager, handle)
         return ident
-    if operation == "read_handle":
+    if selected == 'read_handle':
         try:
             return context["handles"][row["handle"]][1].read(row["limit"]).hex()
         except BaseException as error:
             context["handle_errors"][row["handle"]] = error
             raise
-    if operation == "close_handle":
+    if selected == 'close_handle':
         manager, handle = context["handles"].pop(row["handle"])
         return _exit_stream(manager, context["handle_errors"].pop(row["handle"], None))
-    if operation == "attribute":
-        return _pack(getattr(context["namespace"], row["name"]))
-    if operation == "sequence":
+    if selected == 'sequence':
         sequence = context["sequence"]
         if row["function"] == "len":
             return len(sequence)
@@ -119,71 +140,35 @@ def _primitive(operation, row, context):
             return _text(sequence.pop())
         sequence.append(Path(args[0]))
         return None
-    if operation == "path":
+    if selected == 'path':
         path = Path(args[0])
         value = getattr(path, row["function"])
         return _text(value(*args[1:]) if callable(value) else value)
-    if operation == "test":
-        return getattr(Path(args[0]), row["function"])()
-    if operation == "list":
+    if selected == 'list':
         path = Path(args[0])
         return [_text(value) for value in getattr(path, row["function"])(*args[1:])]
-    if operation == "read":
+    if selected == 'read':
         with Path(args[0]).open("rb") as stream:
             return stream.read(row["limit"]).hex()
-    if operation == "read_text":
-        return _text(Path(args[0]).read_text())
-    if operation == "write_text":
-        Path(args[0]).write_text(args[1])
-    elif operation == "write_bytes":
-        Path(args[0]).write_bytes(bytes.fromhex(row["data"]))
-    elif operation == "mkdir":
-        Path(args[0]).mkdir(parents=row["parents"], exist_ok=row["exist_ok"])
-    elif operation == "unlink":
-        Path(args[0]).unlink()
-    elif operation == "symlink":
-        Path(args[0]).symlink_to(args[1])
-    elif operation == "readlink":
-        return _text(os.readlink(args[0]))
-    elif operation == "rmtree":
-        shutil.rmtree(Path(args[0]))
-    elif operation == "copy2":
-        shutil.copy2(Path(args[0]), Path(args[1]))
-    elif operation == "copytree":
-        shutil.copytree(Path(args[0]), Path(args[1]), symlinks=row["symlinks"])
-    elif operation == "rename":
-        Path(args[0]).rename(Path(args[1]))
-    elif operation == "chmod":
-        Path(args[0]).chmod(row["mode"])
-    elif operation == "size":
-        return Path(args[0]).stat().st_size
-    elif operation == "access":
-        return os.access(args[0], row["mode"])
-    elif operation == "system":
-        return _text(platform.system())
-    elif operation == "pid":
-        return os.getpid()
-    elif operation == "executable":
-        return _text(sys.executable)
-    elif operation == "run":
-        subprocess.run(args, check=row["check"])
-    elif operation == "output":
-        return _text(subprocess.check_output(args, text=row["text"]))
-    elif operation == "regex":
+    if selected == 'regex':
         if row["function"] == "fullmatch":
             return re.fullmatch(*args) is not None
         return [_text(value) for value in re.findall(*args)]
-    elif operation == "quote":
-        return _text(shlex.quote(args[0]))
-    elif operation == "archive":
+    if selected == 'archive':
         with tarfile.open(Path(args[0]), row["mode"], compresslevel=row["level"], format=row["format"]) as archive:
             archive.add(Path(args[1]), arcname=args[2])
-    elif operation == "truncate":
+        return None
+    if selected == 'truncate':
         with Path(args[0]).open(row["mode"]) as stream:
             stream.truncate(row["size"])
-    else:
+        return None
+    if selected == 'unknown':
         raise RuntimeError("unknown Dota preparation primitive: " + operation)
-    return None
+    token = _objects(selected, row, context, args)
+    try:
+        return _objects_take(token, 0)(_objects_take(token, 1))
+    finally:
+        token = None
 
 
 def call(operation, *arguments, namespace=None, sequence=None, iterable=None, repo=None):

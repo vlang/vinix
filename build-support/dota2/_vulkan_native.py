@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """Synchronous imported API and exception transport for the native stager."""
 import atexit
+import builtins as _builtins
+import ctypes as _ctypes
 import dataclasses
 import importlib.util
 import json
@@ -18,33 +20,79 @@ ROOT = Path(__file__).resolve().parents[2]
 _LOCK = threading.RLock()
 _BINARY = None
 
+_LIBRARY = None
+_TAKE = None
+_LIBRARY_LOCK = threading.Lock()
+_LIBRARY_SUPPORT = (os, Path, subprocess, sys, tempfile, atexit)
+
+
+def _entry(operation, *arguments):
+    global _LIBRARY, _TAKE
+    library_os, library_Path, library_process, library_sys, library_temp, library_exit = _LIBRARY_SUPPORT
+    with _LIBRARY_LOCK:
+        if _LIBRARY is None:
+            library_path = library_os.environ.get("VINIX_DOTA_VULKAN_LIBRARY")
+            if library_path is None:
+                owner = library_temp.TemporaryDirectory(prefix="vinix-vulkan-sdk-")
+                try:
+                    library_path = _builtins.str(library_Path(owner.name) / ("library.dylib" if library_sys.platform == "darwin" else "library.so"))
+                    library_process.run([_builtins.str(ROOT / "build-support/build-v-host-library.sh"),
+                                    _builtins.str(ROOT / "build-support/dota2/vulkan_sdk_library.v"), library_path,
+                                    "-d", "cpython_vulkan", "-d", "use_bundled_libgc"],
+                                   check=True, stdout=library_process.DEVNULL,
+                                   env={**library_os.environ, "VINIX_HOST_PYTHON": library_sys.executable})
+                    library = _ctypes.PyDLL(library_path)
+                except _builtins.BaseException:
+                    owner.cleanup()
+                    raise
+                library_exit.register(owner.cleanup)
+            else:
+                library = _ctypes.PyDLL(library_path)
+            target = library.vinix_vulkan_sdk
+            target.argtypes = (_ctypes.c_char_p, _ctypes.py_object, _ctypes.py_object, _ctypes.py_object)
+            target.restype = _ctypes.py_object
+            take = library.vinix_vulkan_prepare_take
+            take.argtypes = (_ctypes.py_object, _ctypes.c_int)
+            take.restype = _ctypes.py_object
+            _TAKE = take
+            _LIBRARY = target
+    pins = []
+    try:
+        return _LIBRARY(operation, _builtins.globals(), arguments, pins)
+    finally:
+        arguments = None
+
+
+def _vulkan_invoke(target, values, keywords):
+    try:
+        return target(*values, **keywords)
+    except _builtins.BaseException:
+        target = values = keywords = None
+        raise
+
+
+def _vulkan_triplet(value):
+    try:
+        first, second, third = value
+        return first, second, third
+    except _builtins.BaseException:
+        value = None
+        raise
+
+
+def _vulkan_raise(error):
+    try:
+        raise error
+    finally:
+        error = None
+
+
 class ArgumentError(ValueError):
     pass
 
 
 def _failure(failure, errors):
-    if "binding_error" in failure:
-        return errors[failure["binding_error"]]
-    kind = failure["kind"]
-    if kind == "OSError":
-        args = [failure["errno"], os.strerror(failure["errno"])]
-        if failure.get("filename"):
-            args.append(os.fsdecode(bytes.fromhex(failure["filename"])))
-        if "filename2" in failure:
-            if len(args) == 2:
-                args.append(None)
-            args += [None, os.fsdecode(bytes.fromhex(failure["filename2"]))]
-        return OSError(*args)
-    if kind == "CopyError":
-        return shutil.Error([(os.fsdecode(bytes.fromhex(source)), os.fsdecode(bytes.fromhex(target)), message)
-                            for source, target, message in failure["entries"]])
-    if kind == "UnicodeDecodeError":
-        return UnicodeDecodeError("utf-8", bytes.fromhex(failure["data"]), failure["start"], failure["end"], failure["reason"])
-    if kind == "StopIteration":
-        return StopIteration()
-    return {"SystemExit": SystemExit, "ArgumentError": ArgumentError,
-           "ValueError": ValueError, "RuntimeError": RuntimeError,
-           "StopIteration": StopIteration, "AttributeError": AttributeError}[kind](failure["message"])
+    return _entry(b"failure", failure, errors)
 
 def query(operation, arguments, namespace):
     global _BINARY
@@ -127,6 +175,7 @@ def query(operation, arguments, namespace):
                 return {key: decode(item, borrowed) for key, item in value.items()}
             return value
 
+
         def primitive(row):
             kind = row["kind"]
             values = decode(row.get("arguments", []))
@@ -147,32 +196,8 @@ def query(operation, arguments, namespace):
                 return getattr(decode(row["target"]), row["name"])
             if kind == "keys":
                 return list(decode(row["target"]))
-            if kind == "resolver":
-                spec = importlib.util.spec_from_file_location("vinix_debian_root", ROOT / "build-support/debian-root.py")
-                result = importlib.util.module_from_spec(spec)
-                sys.modules[spec.name] = result
-                spec.loader.exec_module(result)
-                return result
-            if kind == "run":
-                return namespace["subprocess"].run(*values, **keywords)
-            if kind == "check_output":
-                return namespace["subprocess"].check_output(*values, **keywords)
-            if kind == "json_loads":
-                return json.loads(bytes.fromhex(row["data_hex"]).decode())
-            if kind == "json_dumps":
-                return json.dumps(*values, **keywords)
-            if kind == "equal":
-                return operator.eq(*values)
-            if kind == "symlink":
-                return values[1].symlink_to(values[0])
-            if kind == "copy2":
-                return namespace["shutil"].copy2(*values)
-            if kind == "temporary":
-                owner = tempfile.TemporaryDirectory(**keywords)
-                entered = owner.__enter__()
-                owners[id(owner)] = owner
-                return {"owner": owner, "entered": entered}
-            if kind == "retire":
+            selected = _entry(b"select", kind)
+            if selected == "retire":
                 owner = owners.pop(id(values[0]))
                 context = row.get("context")
                 if context is None:
@@ -189,7 +214,7 @@ def query(operation, arguments, namespace):
                     finally:
                         if error.__traceback__ is replay:
                             error.__traceback__ = traceback
-            if kind == "context_exit":
+            if selected == "context_exit":
                 manager = decode(row["target"])
                 context = row.get("context")
                 if context is None:
@@ -207,10 +232,9 @@ def query(operation, arguments, namespace):
                     finally:
                         if error.__traceback__ is replay:
                             error.__traceback__ = traceback
-            if kind == "print":
-                print(*values, **keywords)
-                return None
-            raise RuntimeError("unknown Vulkan primitive: " + kind)
+            return _entry(b"primitive", kind, row, namespace, values, keywords, decode,
+                          _vulkan_invoke, _vulkan_raise, owners, selected)
+
 
         child = subprocess.Popen([_BINARY], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                  text=True, env=os.environ, restore_signals=False)
@@ -220,28 +244,22 @@ def query(operation, arguments, namespace):
                         "builder_hex": os.fsencode(namespace["__file__"]).hex(),
                         "python_hex": os.fsencode(sys.executable).hex(),
                         "platform": namespace["sys"].platform, "pid": os.getpid()}
-            child.stdin.write(json.dumps(metadata) + "\n")
-            child.stdin.flush()
+            _entry(b"send", child, metadata)
             while True:
                 line = child.stdout.readline()
-                if not line:
-                    child.wait()
-                    raise RuntimeError("native Vulkan stager ended before returning a result")
-                row = json.loads(line)
-                if "callback" not in row:
-                    if "error" in row:
+                row = _entry(b"received", line, child, _vulkan_raise)
+                if not _entry(b"contains", row, "callback"):
+                    if _entry(b"contains", row, "error"):
                         failure = row["error"]
                         raise _failure(failure, errors)
                     # Public results contain data; only synchronous callbacks
                     # may borrow importer-owned Paths or API objects.
                     return decode(row["value"], borrowed=False)
                 try:
-                    reply = {"value": encode(primitive(row["callback"]))}
+                    reply = _entry(b"value", encode(primitive(row["callback"])))
                 except BaseException as error:
-                    errors.append(error)
-                    reply = {"error": {"binding_error": len(errors) - 1}}
-                child.stdin.write(json.dumps(reply) + "\n")
-                child.stdin.flush()
+                    reply = _entry(b"failed", errors, error)
+                _entry(b"send", child, reply)
         finally:
             main_thread = threading.current_thread() is threading.main_thread()
             previous = signal.signal(signal.SIGINT, signal.SIG_IGN) if main_thread else None
