@@ -143,7 +143,7 @@ the guest, the harness runs `e2fsck -f -n` on the real disk image.
 Both tracked architecture builds and guests pass: the first 1 KiB read caches
 4 KiB; the second caches 0/128/256 KiB with RANDOM/NORMAL/SEQUENTIAL. The
 measured slab remains 1,408 KiB on ARM and 1,084 KiB on x86 across both churn
-rounds. Both generated-C outputs pass `check-generated.py`, which rejects
+rounds. Both generated-C outputs pass `check-generated`, which rejects
 hidden interface copies and repeated stack-slot allocation in the fill loop.
 These measurements establish the read-ahead paths; unrelated kernel allocation
 sites remain subject to the repository's existing allocation audit.

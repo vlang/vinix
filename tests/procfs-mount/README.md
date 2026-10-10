@@ -28,8 +28,8 @@ architectures. The VM drivers and ARM sysroot can come from the main checkout.
 make -C kernel ARCH=aarch64 ALLOC_TRACK=1 LIMINE_MP=1 CC=clang \
   AR=/opt/homebrew/opt/llvm/bin/llvm-ar V=/path/to/v -j4
 ALLOC_TRACK=1 NPROC=4 V=/path/to/v ./scripts/build-amd64.sh --no-userland --no-iso
-python3 tests/procfs-mount/check-generated.py kernel/obj/blob.c
-python3 tests/procfs-mount/check-generated.py build-amd64-kernel/obj/blob.c
+tests/procfs-mount/check-generated kernel/obj/blob.c
+tests/procfs-mount/check-generated build-amd64-kernel/obj/blob.c
 
 VINIX_VM_RUNNER_ROOT=/path/to/main-checkout VINIX_QEMU_RT_NO_BUILD=1 \
   VINIX_KERNEL_DIR="$PWD/kernel" VINIX_QEMU_TIMEOUT=600 \
