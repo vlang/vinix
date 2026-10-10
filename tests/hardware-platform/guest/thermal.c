@@ -126,6 +126,17 @@ static int exists(const char *p) {
     return lstat(p, &st) == 0;
 }
 
+// A file of several lines, each printed as its own.
+static void dump(const char *p) {
+    char b[4096];
+    int n = readfile(p, b, sizeof b);
+    if (n < 0) {
+        sayf("THERMAL   %s: errno %d\n", p, -n);
+        return;
+    }
+    for (char *line = strtok(b, "\n"); line; line = strtok(0, "\n")) sayf("THERMAL   %s: %s\n", strrchr(p, '/') + 1, line);
+}
+
 static void walk(const char *path, int depth) {
     DIR *d = opendir(path);
     if (!d) {
@@ -150,6 +161,8 @@ static void walk(const char *path, int depth) {
         } else if (S_ISDIR(st.st_mode)) {
             sayf("THERMAL   %s/\n", p);
             if (depth < 6) walk(p, depth + 1);
+        } else if (strcmp(e->d_name, "x86_probe") == 0) {
+            dump(p);
         } else {
             char b[400];
             int n = (st.st_mode & 0444) ? readfile(p, b, sizeof b) : 0;
