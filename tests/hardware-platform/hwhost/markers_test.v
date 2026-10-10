@@ -164,3 +164,59 @@ fn test_one_line_triggers_one_action() {
 	}
 	assert !cursor.done()
 }
+
+fn test_an_action_can_wait_for_an_event_as_well_as_its_marker() {
+	mut cursor := new_action_cursor([
+		Action{
+			after:          'STEP asleep'
+			qmp:            '{"execute":"system_wakeup"}'
+			event:          'SUSPEND'
+			event_count:    2
+			event_delay_ms: 500
+		},
+	])
+	// An earlier sleep of the same machine: the event has arrived once.
+	mut events := EventLog{}
+	events.note('SUSPEND')
+	events.note('WAKEUP')
+	// No event is enough before the marker has been seen.
+	if _ := cursor.take_ready(0, &events) {
+		assert false, 'an action ran before its marker'
+	}
+	cursor.line('HWTEST STEP asleep', 100)
+	assert cursor.waiting_for() == ''
+	assert cursor.waiting_for_event() == 'SUSPEND (number 2)'
+	// The marker alone is not enough either: the machine has suspended once.
+	if _ := cursor.take_ready(5000, &events) {
+		assert false, 'an action ran before its event'
+	}
+	events.note('SUSPEND')
+	// The event has come; its delay starts when that is noticed.
+	if _ := cursor.take_ready(6000, &events) {
+		assert false, 'an action ran before the delay after its event'
+	}
+	assert cursor.waiting_for_event() == ''
+	if _ := cursor.take_ready(6499, &events) {
+		assert false, 'an action ran before the delay after its event had passed'
+	}
+	action := cursor.take_ready(6500, &events) or { panic('the action is ready') }
+	assert action.qmp == '{"execute":"system_wakeup"}'
+	assert cursor.done()
+}
+
+fn test_an_action_without_an_event_is_ready_when_it_is_due() {
+	mut cursor := new_action_cursor([
+		Action{
+			after:    'STEP'
+			qmp:      '{"execute":"stop"}'
+			delay_ms: 50
+		},
+	])
+	cursor.line('HWTEST STEP', 0)
+	nothing := EventLog{}
+	if _ := cursor.take_ready(49, &nothing) {
+		assert false, 'an action ran before its delay'
+	}
+	cursor.take_ready(50, &nothing) or { panic('the action is ready') }
+	assert cursor.done()
+}

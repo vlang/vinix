@@ -91,3 +91,66 @@ fn test_a_picture_is_judged_from_its_file() {
 	}
 	assert false, 'a picture that was never taken passed'
 }
+
+// A picture `width` by `height` whose top-left `block` square is the guest's
+// pattern and whose rest is grey.
+fn patterned(width int, height int, block int) []u8 {
+	mut pixels := []u8{cap: width * height * 3}
+	for y in 0 .. height {
+		for x in 0 .. width {
+			if x < block && y < block {
+				red, green, blue := screen_pattern(x, y)
+				pixels << [red, green, blue]
+			} else {
+				pixels << [u8(0xaa), 0xaa, 0xaa]
+			}
+		}
+	}
+	return pixmap('P6\n# made by a test\n${width} ${height}\n255\n', pixels)
+}
+
+fn test_the_guests_pattern_is_found_pixel_by_pixel() {
+	mut data := patterned(300, 280, 256)
+	whole := read_picture(data)!
+	assert whole.pixels.len == 300 * 280 * 3
+	assert whole.judge_pattern(256) == ''
+	// One channel of the pixel in column 7 of row 3.
+	header := data.len - whole.pixels.len
+	data[header + (3 * 300 + 7) * 3 + 1] ^= 0x40
+	damaged := read_picture(data)!
+	assert damaged.judge_pattern(256).contains('column 7 of row 3')
+	// A screen that came back blank fails at the first pixel of the pattern
+	// that is not black.
+	blank := read_picture(pixmap('P6\n300 280\n255\n', []u8{len: 300 * 280 * 3}))!
+	assert blank.judge_pattern(256).contains('column 1 of row 0')
+	small := read_picture(patterned(100, 100, 100))!
+	assert small.judge_pattern(256).contains('smaller than')
+}
+
+fn test_a_picture_can_be_held_to_another_ones_mode_and_to_the_pattern() {
+	state := os.join_path(os.temp_dir(), 'vinix-hwtest-pattern-${os.getpid()}')
+	os.mkdir_all(state)!
+	defer {
+		os.rmdir_all(state) or {}
+	}
+	os.write_file_array(os.join_path(state, 'before.ppm'), patterned(300, 280, 256))!
+	os.write_file_array(os.join_path(state, 'after.ppm'), patterned(300, 280, 256))!
+	os.write_file_array(os.join_path(state, 'other.ppm'), patterned(320, 280, 256))!
+	os.write_file_array(os.join_path(state, 'plain.ppm'), patterned(300, 280, 0))!
+	check_screen(Screen{ file: 'after.ppm', like: 'before.ppm', pattern: 256 }, state)!
+	check_screen(Screen{ file: 'other.ppm', like: 'before.ppm' }, state) or {
+		assert err.msg().contains('another mode')
+		check_screen(Screen{ file: 'plain.ppm', pattern: 256 }, state) or {
+			assert err.msg().contains('the guest drew')
+			check_screen(Screen{ file: 'after.ppm', like: 'missing.ppm' }, state) or {
+				assert err.msg() == 'missing.ppm: the picture was not taken'
+				return
+			}
+			assert false, 'a comparison with a picture never taken passed'
+			return
+		}
+		assert false, 'a screen without the pattern passed'
+		return
+	}
+	assert false, 'a screen in another mode passed'
+}

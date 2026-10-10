@@ -50,6 +50,13 @@ fn test_every_real_scenario_runs_somewhere() {
 	assert 'ahci' !in names_of(arm.run)
 	assert 'ahci' in names_of(x86.run)
 	assert 'restart' in names_of(x86.run)
+	// Suspend to RAM is a PC's: every flavour of it runs there by default,
+	// and none on the other architecture.
+	for name in ['suspend-deep', 'suspend-deep-xapic', 'suspend-deep-iommu', 'suspend-deep-iommu-amd',
+		'suspend-deep-undrawable', 'suspend-deep-forced', 'suspend-deep-headless'] {
+		assert name in names_of(x86.run)
+		assert name !in names_of(arm.run)
+	}
 }
 
 fn test_named_scenarios_keep_their_order_and_run_once() {
@@ -174,4 +181,74 @@ fn test_a_state_path_that_would_need_quoting_is_refused() {
 		check_state_path(bad) or { continue }
 		assert false, 'accepted ${bad}'
 	}
+}
+
+fn test_an_action_that_waits_for_an_event_says_which_and_how_many() {
+	good := Scenario{
+		name:     'one'
+		arches:   ['x86_64']
+		required: ['HWTEST START one']
+	}
+	assert rejected([Scenario{
+		...good
+		actions: [Action{
+			after:       'HWTEST STEP x'
+			qmp:         '{"execute":"system_wakeup"}'
+			event:       'SUSPEND'
+			event_count: 1
+		}]
+	}]) == ''
+	assert rejected([Scenario{
+		...good
+		actions: [Action{
+			after: 'HWTEST STEP x'
+			qmp:   '{"execute":"system_wakeup"}'
+			event: 'SUSPEND'
+		}]
+	}]).contains('names it and says how many')
+	shot := Action{
+		after: 'HWTEST STEP y'
+		qmp:   '{"execute":"screendump","arguments":{"filename":"{state}/a.ppm"}}'
+	}
+	assert rejected([Scenario{
+		...good
+		actions: [shot]
+		screens: [Screen{
+			file:    'a.ppm'
+			pattern: 16
+		}]
+	}]) == ''
+	assert rejected([Scenario{
+		...good
+		actions: [shot]
+		screens: [Screen{
+			file:    'a.ppm'
+			dark:    true
+			pattern: 16
+		}]
+	}]).contains('cannot be dark and show a pattern')
+	assert rejected([Scenario{
+		...good
+		actions: [shot]
+		screens: [Screen{
+			file: 'a.ppm'
+			like: 'b.ppm'
+		}]
+	}]).contains('not one of its pictures')
+}
+
+fn test_the_deep_sleep_scenarios_wake_the_machine_only_once_it_is_suspended() {
+	deep := find_scenario(scenarios, 'suspend-deep') or { panic('no suspend-deep scenario') }
+	mut wakes := 0
+	for action in deep.actions {
+		if action.qmp.contains('system_wakeup') {
+			assert action.event == 'SUSPEND' && action.event_count > 0
+			wakes++
+		}
+	}
+	assert wakes == 1
+	assert deep.events.filter(it == 'SUSPEND').len == 8
+	assert deep.events.filter(it == 'WAKEUP').len == 8
+	// What the guest reads once each was put there by the host.
+	assert deep.disks[0].prefill.len == 4
 }
