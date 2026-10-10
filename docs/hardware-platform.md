@@ -608,12 +608,42 @@ it anyway, for a machine run without a screen or whose firmware restores the
 mode; the screen is then whatever firmware leaves. `vinix.deep_sleep=off`
 never offers it.
 
+**What may end it** is the platform's to carry out, and has to be arranged
+before the machine goes down: every firmware event is switched off for a
+suspend to RAM but those marked as able to wake the machine. The lid, the
+power and sleep buttons that are devices, and the keyboard say in `_PRW`
+which event that is and from how deep a sleep. Each is found once and its
+event marked (`kernel/x86/acpipm/wake.v`, after Linux's
+`acpi_enable_wakeup_devices()`); then, before firmware is told of a suspend
+to RAM, each whose wake source is allowed (`/sys/class/wakeup`) and which
+can end a sleep that deep has its power resources switched on, is told
+through `_DSW` (or the older `_PSW`), and has its event left enabled; after
+the machine is back it is told it need not any more. A power resource
+switched on for this is left on. The embedded controller's event is marked
+by its own driver. `/sys/power/acpi_wakeup` lists the devices, how each is
+told and how often it has been armed; `vinix.acpi_wake=off` leaves all of it
+undone. After every sleep a lid is asked where it is: firmware does not
+always say that it was opened while the machine was down.
+
+QEMU's PC cannot be woken through such an event, so no test wakes a machine
+by its lid. What is tested (`suspend-deep-wake`) is what would let one: a
+table gives the machine a lid (from S3, `_PSW`), a sleep button (from S4,
+`_DSW`) and a power button that can only end S1; while the machine is
+suspended the test's controller reads the event enable register, which
+holds the lid's and the sleep button's bits and no other, and with the lid
+not allowed only the button's; the methods write what they were called with
+to a port QEMU records, and the record is compared. With
+`vinix.acpi_wake=off` the register holds nothing and no method runs
+(`suspend-deep-wake-off`). PCI devices are not armed (PME), and a wake-up
+by USB needs a USB core.
+
 **What ended it** is read on the way back: the clock's alarm (PM1 status),
 a byte waiting in the keyboard controller (keyboard or pointer), the power
-or sleep button. In a deep sleep it is the platform that decides what may
-wake the machine; the `enabled` setting of a wake source only decides
-whether the alarm is armed. QEMU reports its `system_wakeup` command as the
-power button.
+or sleep button; a lid found open that was shut is taken for the cause
+when none of those is. The `enabled` setting of a wake source decides
+whether the alarm is armed and whether a device is armed as above; the
+fixed power button and the keyboard controller wake the machine whatever
+it says. QEMU reports its `system_wakeup` command as the power button.
 
 `/sys/power/deep_sleep` also counts the suspends to RAM and says what the
 way back from the last one had to write back (PCI registers, interrupt
@@ -627,11 +657,10 @@ What this is not:
 - **Not tried on a physical machine.** Suspend to RAM has run only in QEMU
   (q35, OVMF, TCG). On real hardware nothing here is known to work: the
   firmware's resume path, the A20 gate (assumed open), low memory surviving
-  firmware, MTRRs and microcode on the other processors, wake-up from
-  devices that need a wake event armed (no device's `_PRW` is read; the one
-  event left on for a sleep is the embedded controller's, which its driver
-  marks), and the AMD IOMMU's own PCI capability are all untested
-  assumptions.
+  firmware, MTRRs and microcode on the other processors, a wake-up by the
+  lid or a key (their events are armed as firmware describes them, and no
+  machine has been woken that way), and the AMD IOMMU's own PCI capability
+  are all untested assumptions.
 - **Not hibernation.** There is no memory image and no `disk` state. The
   suspend to RAM above supplies what a resume from an image would share with
   it -- devices quiesced and refused when they cannot come back, the other
@@ -793,6 +822,7 @@ telling ACPI (most laptops), and Apple's sensors and fans (SMC).
 | `vinix.ec=dsdt-gpe` | where the ECDT and `_GPE` name different events, use `_GPE` (Linux's `EC_FLAGS_TRUST_DSDT_GPE`); untried. The three combine with commas |
 | `vinix.deep_sleep=force\|off` | x86-64: offer suspend to RAM although the kernel cannot bring the display back; never offer it |
 | `vinix.pci_d3=off` | keep every PCI function in D0 through a sleep |
+| `vinix.acpi_wake=off` | x86-64: do not arm the lid, buttons and keyboard to end a suspend to RAM |
 
 ## What is not done
 
@@ -812,8 +842,8 @@ Beyond the limits stated in each section:
 - Suspend to RAM on anything but QEMU's PC: see its section for what is
   untested. Hibernation, backlight and display power control.
 - Coming back from a loss of power for `xhci` and Apple's drivers;
-  restoring a display the kernel has no mode-setting for; wake-up GPEs
-  (`_PRW`) for devices; an RTC alarm more than a day ahead.
+  restoring a display the kernel has no mode-setting for; wake-up by a PCI
+  device (PME) or over USB; an RTC alarm more than a day ahead.
 - **Desktop.** The native desktop uses these interfaces now, and none of
   that has run against a kernel: it is tested on the host, against the text
   the kernel writes and a machine the tests stand in for. Settings and the
@@ -879,6 +909,7 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `suspend-deep-arrival`: a card put into a watched slot while the machine is suspended to RAM, found after the wake; a sleep with it in; the slot gives it up afterwards | pass | -- |
 | `suspend-deep-departure`: with firmware keeping the ports, a card taken during one sleep is removed after it, and a card put in during the next is found | pass | -- |
 | `suspend-deep-undrawable`, `suspend-deep-forced`, `suspend-deep-headless`: when deep is offered | pass | -- |
+| `suspend-deep-wake`, `suspend-deep-wake-off`: a lid and a sleep button armed to end a suspend to RAM -- their events left enabled, firmware told, the lid found open afterwards -- and none of it with `vinix.acpi_wake=off` | pass | -- |
 | `drivers-sleep`: HD Audio playing and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM; the recording and the disk image checked afterwards | pass | -- |
 | `thermal-selftest` (kernel built with `-d thermal_selftest`) | pass | pass |
 | `iommu-intel-selftest`, `iommu-amd-selftest` (25 and 21 checks) | pass | -- |
