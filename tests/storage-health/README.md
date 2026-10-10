@@ -1,4 +1,4 @@
-# ATA and NVMe health qualification
+# ATA, NVMe and Apple ANS health qualification
 
 The host controller and fixtures are V throughout:
 
@@ -35,10 +35,52 @@ BAR page addresses, uncached flags, interval bounds and mapping failures; real
 queue creation must leave completion interrupts disabled. Utility tests retain
 all 128 counter bits and sanitize NVMe identity without ATA's byte swap.
 
-The optional `--generated` check rejects heap allocation in every generated
-health/mapping function and NVMe read/flush commands (two on ARM, twelve on AMD64);
+ANS tests copy the complete production transport/media policy up to the
+privileged hardware callback boundary, plus the complete health backend and
+resource method. The MMIO/DMA model checks both cleared transfer lengths, cache
+synchronization, fixed admin tag, NVMMU direction/PRPs, exact Get Log encoding,
+controller scope through two namespace indices, full payloads and output guards.
+Every bit of every non-tag command byte is mutated and rejected before submission.
+Tests cover all warning bits, ordinary completion errors with successful retry,
+timeouts with running/stopped clocks, wrong CID/queue/head, failed NVMMU
+invalidation, fatal controller status, shutdown, null outputs and invalid indices.
+Two hundred successful queries wrap the two-entry admin completion queue;
+two hundred calls after each fatal failure neither submit nor clear owned DMA.
+ANS partitions reject queries, and the architecture's production dispatcher is
+exercised under ASan/UBSan.
+
+The optional `--generated` check rejects heap allocation in generated
+health/mapping functions, the ANS transport and NVMe read/flush commands;
 it detects compiler promotion of borrowed reports, interface slots and command
 temporaries as well as explicit allocation.
+For AMD64, use a development (`PROD=false`) blob so the compiler retains the
+NVMe boot-only mapping functions.
+
+For a kernel allocation measurement, create a separate ARM git worktree and link
+its untracked kernel build dependencies as for an ordinary build. The following
+V producer installs only the maintained hardware model and a boot self-test into
+that worktree; the production transport, health method and dispatcher run against
+the real kernel allocator. It rejects the main checkout and modified ANS boot
+source. No test hook or model is added to an ordinary kernel.
+
+```sh
+V=/path/to/v build-support/run-v-tool.sh tests/storage-health/ans_fixture.v /path/to/ans-worktree
+make -C /path/to/ans-worktree/kernel ARCH=aarch64 CC=clang V=/path/to/v \
+  VFLAGS='-nocache -d ans_health_fixture' ALLOC_TRACK=1
+V=/path/to/v build-support/run-v-tool.sh tests/storage-volumes/plan_run.v \
+  --arch aarch64 --kernel /path/to/ans-worktree/kernel/bin/vinix --work /tmp/ans-kernel-model
+V=/path/to/v build-support/run-v-tool.sh tests/storage-health/ans_fixture.v \
+  --log /tmp/ans-kernel-model/first-boot.log
+V=/path/to/v build-support/run-v-tool.sh tests/storage-health/ans_fixture.v \
+  --log /tmp/ans-kernel-model/second-boot.log
+```
+
+The kernel self-test warms the path, then makes 200 resource-dispatched queries
+and compares every slab class and large-allocation page count. Reports include
+an unknown warning bit and payload tail bytes. Its synchronous software model
+is freed before normal ANS initialization. The guest also runs the existing
+storage-plan/health/reboot suite. This tests kernel dispatch and allocation
+behavior, without claiming physical Apple hardware or health-log accuracy.
 
 Build ordinary kernels in isolated worktrees, then run the existing native V
 storage controller against each built kernel:

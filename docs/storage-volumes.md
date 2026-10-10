@@ -211,8 +211,8 @@ volume counters unchanged. These are request failure counters, not a hardware
 diagnostic classification. A partition reports parent counters with flag 16;
 a logical view tracks its own forwarded operations and inherits parent
 offline/flush/discard capability. Large syscalls can comprise several backend
-operations. AHCI and the development PCI NVMe driver provide the health queries below. ANS health logs,
-vendor-specific wear and temperature interpretation, predictive monitoring and
+operations. AHCI, Apple ANS and the development PCI NVMe driver provide the health queries below.
+Vendor-specific wear and temperature interpretation, predictive monitoring and
 real-hardware qualification remain future work. Unsupported status backends return
 `ENOTTY`. Geometry also supports `BLKGETSIZE64`, `BLKGETSIZE`, `BLKSSZGET`, and
 `BLKROGET` without allowing destructive ioctl passthrough.
@@ -274,7 +274,7 @@ vinix-volume health /dev/nvme0n0
 Whole native PCI NVMe namespaces support the same read-only health ioctl and
 descriptor/MAC policy. The driver retains its existing development-build
 activation policy (`PROD=false`); production probing and physical-controller
-qualification remain separate work. Apple ANS, VirtIO, partitions and linear
+qualification remain separate work. VirtIO, partitions and linear
 views remain unsupported. The query accepts no admin command passthrough.
 
 Protocol 2 uses the existing 1088-byte version-one ABI: its identity payload is
@@ -316,6 +316,44 @@ Protocol references are the
 [libnvme SMART/Health and identity definitions](https://github.com/linux-nvme/libnvme/blob/master/src/nvme/types.h)
 and [QEMU's NVMe controller implementation](https://github.com/qemu/qemu/blob/master/hw/nvme/ctrl.c).
 See [native health qualification](../tests/storage-health/README.md).
+
+## Apple ANS SMART/Health
+
+```sh
+vinix-volume health /dev/ans0n1
+```
+
+Whole namespaces published by the opt-in base-M1 ANS2 driver support protocol 2
+and the same controller-wide identity, SMART log, warning flags and utility
+output described above. Namespace names use the actual namespace ID. ANS GPT
+partitions and logical views return `ENOTTY`. The query requires readable access
+and passes through the same descriptor/MAC checks and output-only usercopy.
+
+The ANS operation lock covers both fresh admin commands and both payload copies,
+serializing them with namespace I/O and shutdown. Identify uses 4096 bytes of the
+existing permanently pinned DMA bounce buffer; Get Log Page uses 512 bytes.
+Each transfer is cleared and synchronized before submission, then synchronized
+for CPU access after a validated completion. The lowest submission layer permits
+only SMART/Health LID 2, controller-wide NSID, RAE=1, exactly 128 dwords, zero
+offset/extensions and the driver's fixed bounce address. No passthrough or
+write-policy change is exposed.
+
+Ordinary command completion errors return `EIO` without publishing a partial
+report and allow a later query to retry. Timeouts, firmware failures and invalid
+completions retain the existing failed-controller policy: DMA stays pinned and
+later health calls neither clear it nor submit. Stopping/stopped controllers
+also reject calls before touching DMA. Reports, command bytes and interface
+dispatch use the caller's stack; queries allocate no heap or physical pages and
+do not charge completed disk transfers. ANS does not yet expose per-device block
+error metrics.
+
+The driver still requires explicit ANS boot opt-in and its existing clean
+handoff/platform checks. Host transport faults and an isolated ARM kernel model
+qualify command encoding, cache ownership, dispatch and 200-query retention;
+they do not qualify health-log accuracy or firmware support on a physical M1.
+See [ANS boot and hardware acceptance](apple-ans-rw-root.md) and
+[native health qualification](../tests/storage-health/README.md). The ANS NVMMU
+layout follows the [Linux Apple NVMe driver](https://github.com/torvalds/linux/blob/master/drivers/nvme/host/apple.c).
 
 ## TRIM/discard
 
@@ -402,6 +440,6 @@ DMA payloads retain the existing completion/reset ownership rules.
 
 The encompassing roadmap item stays open: storage pools/RAID, full-disk
 encryption and recovery, online filesystem resize,
-filesystem-aware trimming, ANS health logs and predictive health monitoring are not
+filesystem-aware trimming and predictive health monitoring are not
 implemented by this increment. The anonymous pager's encrypted swap remains a
 separate feature.

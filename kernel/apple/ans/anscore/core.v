@@ -900,6 +900,17 @@ pub fn a_command_allowed(q u32, c &u8) i32 {
 			return 0
 		}
 		match i32(c[0]) {
+			2 {
+				// Only a controller-wide, 512-byte SMART/Health log. Retain
+				// events; reject offsets, other logs and command extensions.
+				if c[1] != 0 || a_le32(c + 4) != u32(-1)
+					|| a_le64(c + 32) != 0 || a_le32(c + 40) != 0x007f8002 {
+					return 0
+				}
+				for j := 8; j < 24; j++ { if c[j] != 0 { return 0 } }
+				for j := 44; j < 64; j++ { if c[j] != 0 { return 0 } }
+				return 1
+			}
 			0, 4, 1, 5 {
 				return i32(i32(a_le16(c + 40)) == 1)
 				// Create I/O SQ/CQ 1
@@ -929,6 +940,9 @@ pub fn a_authorize(a &Ans, q u32, c &u8) i32 {
 			return 0
 		}
 		if !q {
+			if c[0] == 2 {
+				return i32(!a.stopping && a_le64(c + 24) == a.physical + u64(131072))
+			}
 			if i32(c[0]) == 0 || i32(c[0]) == 4 {
 				return i32(a.stopping && a.ioq_active)
 			}

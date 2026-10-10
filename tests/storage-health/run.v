@@ -47,9 +47,9 @@ fn host(root string, work string) ! {
 	put(work, 'resource/base.v', 'module resource\nimport stat\n#define vinix_stack_alloc __builtin_alloca\nfn C.vinix_stack_alloc(usize) voidptr\npub interface Resource { mut: stat stat.Stat }\npub struct BlockMetrics { pub mut: failures int }\npub fn (mut m BlockMetrics) failed() { m.failures++ }\npub fn (mut m BlockMetrics) flushed() {}\npub const o_rdonly=0\npub const o_rdwr=2\npub const o_accmode=3|0o10000000\n'
 		+ function(os.read_file(root + '/kernel/resource/block_discard.v')!, 'discard_range_valid')!)!
 	os.cp(root + '/kernel/resource/block_health.v', work + '/resource/health.v')!
-	// Select the production AHCI dispatcher explicitly so the same simulated
-	// AMD64 backend is exercised on ARM and AMD64 development hosts.
-	os.cp(root + '/kernel/resource/block_health_amd64.v', work + '/resource/dispatch.v')!
+	// Exercise the development host architecture's production dispatcher.
+	dispatch := $if arm64 { 'arm64' } $else { 'amd64' }
+	os.cp(root + '/kernel/resource/block_health_${dispatch}.v', work + '/resource/dispatch.v')!
 	put(work, 'proc/proc.v', 'module proc\npub const mac_read=u64(1)\n')!
 	put(work, 'file/file.v', '@[has_globals]\nmodule file\nimport resource\nimport errno\n__global pub deny bool\npub struct Handle { pub mut: resource &resource.Resource flags int }\npub fn (mut h Handle) mac_check(_ u64) ? { if deny { errno.set(errno.eperm); return none } }\npub struct FD { pub mut: handle &Handle }\n')!
 	put(work, 'usercopy/copy.v', 'module usercopy\nimport klock\npub fn copy_to_user(to u64, from voidptr, count u64) bool { assert klock.depth==0; if to==0 { return false }; unsafe { C.memcpy(voidptr(to),from,count) }; return true }\n')!
@@ -68,13 +68,13 @@ fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
 	print(command([v, '-nocache', '-enable-globals', '-cc', 'clang', '-cflags', '-fsanitize=address,undefined',
-		'-ldflags', '-fsanitize=address,undefined', 'test', work + '/ahci', work + '/fs', work + '/nvme'])!)
+		'-ldflags', '-fsanitize=address,undefined', 'test', work + '/ahci', work + '/fs', work + '/nvme', work + '/anscore', work + '/ans'])!)
 	cli := work + '/health-cli-host'
 	command([v, '-nocache', '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
 		'-fsanitize=address,undefined', '-o', cli, root + '/tools/volumes/volumecli/health_test.v'])!
 	print(command([cli])!)
-	println('PASS: production ATA/NVMe health, completion and DMA ownership, descriptor policy and copying under sanitizers')
+	println('PASS: production ATA/NVMe/ANS health, completion and DMA ownership, descriptor policy and copying under sanitizers')
 }
 
 fn nvme_host(root string, work string) ! {
@@ -99,6 +99,25 @@ fn nvme_host(root string, work string) ! {
 	put(work, 'bitmap/bitmap.v', 'module bitmap\npub struct GenericBitmap { mut: slots []bool }\npub fn (mut b GenericBitmap) initialise(count u64) { b.slots=[]bool{len:int(count)} }\npub fn (b GenericBitmap) alloc() ?u64 { for i,busy in b.slots { if !busy { unsafe { b.slots[i]=true }; return u64(i) } }; return none }\npub fn (b GenericBitmap) free_entry(index u64) { unsafe { b.slots[index]=false } }\n')!
 	put(work, 'x86/hpet/hpet.v', '@[has_globals]\nmodule hpet\n__global tick_hook=fn () {}\n__global ticks=u64(0)\npub fn nanoseconds() u64 { ticks+=1_000_000_000; tick_hook(); return ticks }\npub fn set_hook(hook fn ()) { tick_hook=hook; ticks=0 }\n')!
 	put(work, 'memory/memory.v', '@[has_globals]\nmodule memory\n#include <stdlib.h>\nfn C.posix_memalign(&voidptr,usize,usize) int\n__global live_pages=u64(0)\n__global pub fail_alloc bool\npub fn pmm_alloc_nozero_fallible(pages u64) voidptr { if fail_alloc { return unsafe { nil } }; mut pointer:=unsafe { nil }; if C.posix_memalign(&pointer,4096,usize(pages*4096))!=0 { return unsafe { nil } }; live_pages+=pages; unsafe { C.memset(pointer,0x5a,usize(pages*4096)) }; return pointer }\npub fn pmm_alloc(pages u64) voidptr { pointer:=pmm_alloc_nozero_fallible(pages); assert pointer!=unsafe { nil }; unsafe { C.memset(pointer,0,usize(pages*4096)) }; return pointer }\npub fn pmm_free(pointer voidptr,pages u64) { assert live_pages>=pages; live_pages-=pages; unsafe { free(pointer) } }\npub fn allocated_pages() u64 { return live_pages }\npub const pte_present=u64(1)\npub const pte_writable=u64(2)\npub const pte_noexec=u64(1)<<63\npub fn get_hhdm_offset() u64 { return 0xffff800000000000 }\npub struct Pagemap { pub mut: calls int last_virt u64 last_phys u64 flags u64 fail bool }\npub fn (mut p Pagemap) map_page(virt u64,phys u64,flags u64) ? { p.calls++; if p.fail { return none }; p.last_virt=virt; p.last_phys=phys; p.flags=flags }\n')!
+	ans_host(root, work)!
+}
+
+fn ans_host(root string, work string) ! {
+	// Preserve the production transport and media policy. Only privileged
+	// hardware callbacks and boot-only globals are omitted on the host.
+	source := os.read_file(root + '/kernel/apple/ans/anscore/core.v')!
+	end := source.index('fn C.vinix_mmio_read32(') or { return error('Missing ANS hardware boundary') }
+	put(work, 'anscore/core.v', source[..end].replace('module anscore',
+		'module anscore\nimport ext2core as _\n#flag -iquote ${root}/kernel/c\n#flag -DVINIX_V_RUNTIME\n')
+		+ '\n__global ans_controller Ans\n')!
+	os.cp(root + '/kernel/apple/ans/anscore/health.v', work + '/anscore/health.v')!
+	put(work, 'anscore/model.v', os.read_file(root + '/tests/storage-health/ans_model.v')!)!
+	os.cp(root + '/tests/storage-health/ans_core_test.v', work + '/anscore/health_test.v')!
+	put(work, 'ext2core/core.v', os.read_file(root + '/kernel/apple/ans/ext2core/core.v')!)!
+	put(work, 'ans/health.v', os.read_file(root + '/kernel/apple/ans/health.v')!
+		.replace('import apple.ans.anscore', 'import anscore'))!
+	put(work, 'ans/base.v', '@[has_globals]\nmodule ans\nimport stat\nimport klock\n__global ans_lock=klock.Lock{}\n__global ans_ready=true\nstruct AnsBlock { mut: stat stat.Stat ns_index u32 partition int=-1 }\n')!
+	os.cp(root + '/tests/storage-health/ans_test.v', work + '/ans/health_test.v')!
 }
 
 fn audit_generated(path string) ! {
@@ -107,7 +126,11 @@ fn audit_generated(path string) ! {
 	for name in ['fs__storage_health', 'resource__block_health', 'ahci__AHCIDevice__block_health',
 		'ahci__AHCIDevice__health_command', 'ahci__ata_word', 'ahci__smart_checksum', 'ahci__smart_status',
 		'nvme__NVMENamespace__block_health', 'nvme__map_registers', 'nvme__map_doorbells',
-		'nvme__NVMENamespace__rw_lba', 'nvme__NVMENamespace__sync'] {
+		'nvme__NVMENamespace__rw_lba', 'nvme__NVMENamespace__sync',
+		'ans__AnsBlock__block_health', 'anscore__a_health',
+		'anscore__health', 'anscore__a_submit', 'anscore__a_command_allowed', 'anscore__a_authorize',
+		'anscore__a_pump', 'anscore__a_begin', 'anscore__a_expired', 'anscore__a_fail',
+		'anscore__a_sync', 'anscore__a_copy', 'anscore__a_zero'] {
 		mut start := 0
 		mut body := ''
 		for line in text.split_into_lines() {
@@ -126,6 +149,8 @@ fn audit_generated(path string) ! {
 			start+=line.len+1
 		}
 		if body=='' {
+			if (name.starts_with('ans__') || name.starts_with('anscore__'))
+				&& !text.contains('ans__AnsBlock') { continue }
 			if name.starts_with('ahci__') && !text.contains('ahci__AHCIDevice') { continue }
 			if name.starts_with('nvme__') && !text.contains('nvme__NVMENamespace') { continue }
 			return error('Missing generated ${name}')
