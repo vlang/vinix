@@ -134,6 +134,17 @@ fn test_png_rejects_truncation_and_unsupported_geometry() {
 	assert false
 }
 
+fn test_zero_height_png_still_bounds_its_scanline_width() {
+	mut data := encoded_png(0, 0, 3, []u8{}, 0)!
+	data[16] = 0x7f
+	for offset in 17 .. 20 { data[offset] = 0xff }
+	png(data) or {
+		assert err.msg() == 'image dimensions are too large'
+		return
+	}
+	assert false
+}
+
 fn desktop_pixels() []u8 {
 	mut pixels := []u8{len: 168 * 3}
 	for pixel in 0 .. 168 {

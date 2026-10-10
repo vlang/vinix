@@ -104,7 +104,9 @@ pub fn png(data []u8) !Image {
 		}
 	}
 	if !header { return error('missing PNG header') }
-	if u64(size) + u64(height) > 0x7fffffff { return error('image dimensions are too large') }
+	if u64(size) + u64(height) > 0x7fffffff || i64(width) * channels > 0x7fffffff {
+		return error('image dimensions are too large')
+	}
 	raw := zlib.decompress(idat)!
 	stride := width * channels
 	if u64(raw.len) < u64(size) + u64(height) { return error('truncated PNG pixels') }
