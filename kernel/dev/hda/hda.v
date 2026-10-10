@@ -445,32 +445,26 @@ fn (c HDACodec) name() string {
 
 // The formats refine_fmt() settles on.
 fn (c HDACodec) formats() u32 {
-	return oss.afmt_u8 | oss.afmt_u16_le
+	return oss.afmt_u8 | oss.afmt_s16_le
 }
 
 fn (c HDACodec) refine_rate(rate u32) u32 {
 	return rate
 }
 
+// What the link carries at sixteen bits is signed: a program told its samples
+// would be played as unsigned shifts every one of them by half the range, and
+// the codec plays the result as the signed samples it takes them for.
 fn (c HDACodec) refine_fmt(fmt u32) u32 {
 	match fmt {
 		oss.afmt_u8 {
 			return oss.afmt_u8
 		}
-		oss.afmt_s16_le {
-			return oss.afmt_u16_le
-		}
 		oss.afmt_s8 {
 			return oss.afmt_u8
 		}
-		oss.afmt_u16_le {
-			return oss.afmt_u16_le
-		}
-		oss.afmt_s32_le {
-			return oss.afmt_u16_le
-		}
 		else {
-			return oss.afmt_u16_le
+			return oss.afmt_s16_le
 		}
 	}
 }
@@ -1212,9 +1206,12 @@ fn controller_probe(mut dev devcore.Device) bool {
 // the machine has.
 pub fn initialize() {
 	devcore.register_driver(devcore.Driver{
-		name:    'hda'
-		bus:     .pci
-		matches: controller_matches
-		probe:   controller_probe
+		name:     'hda'
+		bus:      .pci
+		matches:  controller_matches
+		probe:    controller_probe
+		suspend:  controller_suspend
+		resume:   controller_resume
+		shutdown: controller_shutdown
 	}) or { return }
 }

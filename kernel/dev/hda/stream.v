@@ -30,6 +30,15 @@ pub mut:
 	cur_volume     u32
 	channels       u8
 	is_output      bool
+	// For a sleep (power.v): the last format a program set, which the codecs
+	// are told again afterwards, and what the stream was doing when the
+	// machine went down.
+	configured    bool
+	kept_rate     u32
+	kept_bits     u8
+	kept_channels u8
+	kept_format   u16
+	was_playing   bool
 }
 
 fn (mut s HDAStream) initialize_output() {
@@ -123,6 +132,10 @@ fn (mut s HDAStream) setup_params(fmt u32, rate u32, channels u8) {
 	hda_fmt.set_bits_per_sample(bits)
 	hda_fmt.set_num_channels(channels)
 	s.hda_set_format(hda_fmt)
+	s.configured = true
+	s.kept_rate = rate
+	s.kept_bits = bits
+	s.kept_channels = channels
 
 	for mut codec in s.controller.codecs {
 		codec.setup_all_output_paths(rate, bits, channels)
