@@ -253,3 +253,36 @@ fn test_the_deep_sleep_scenarios_wake_the_machine_only_once_it_is_suspended() {
 	// What the guest reads once each was put there by the host.
 	assert deep.disks[0].prefill.len == 4
 }
+
+fn test_an_action_can_hold_qemu_to_its_answer() {
+	look := Action{
+		after:      'HWTEST STEP look'
+		qmp:        '{"execute":"human-monitor-command","arguments":{"command-line":"info mtree -f"}}'
+		answer_has: 'e1000e-mmio'
+	}
+	assert answer_fault(look, '{"return": "  00000000fea00000-00000000fea1ffff (prio 1, i/o): e1000e-mmio\\r\\n"}') == ''
+	assert answer_fault(look, '{"return": "  00000000fea00000-00000000fea1ffff (prio 1, i/o): vga.mmio\\r\\n"}').contains('does not hold "e1000e-mmio"')
+	gone := Action{
+		...look
+		answer_has:   ''
+		answer_lacks: 'e1000e-mmio'
+	}
+	assert answer_fault(gone, '{"return": "vga.mmio"}') == ''
+	assert answer_fault(gone, '{"return": "e1000e-mmio"}').contains('holds "e1000e-mmio"')
+	// An action that asks nothing of the answer takes any.
+	assert answer_fault(Action{ after: 'x', qmp: '{"execute":"stop"}' }, '{"return": {}}') == ''
+}
+
+fn test_the_d3_scenarios_look_at_the_card_in_the_middle_of_each_sleep() {
+	d3 := find_scenario(scenarios, 'pci-d3') or { panic('no pci-d3 scenario') }
+	asleep := d3.actions.filter(it.answer_lacks != '')
+	awake := d3.actions.filter(it.answer_has != '')
+	assert asleep.len == 2 && awake.len == 3
+	for action in asleep {
+		assert action.delay_ms == d3_look_after_ms && action.answer_lacks == d3_card_memory
+	}
+	// The same machine told not to: the card must still be there.
+	off := find_scenario(scenarios, 'pci-d3-off') or { panic('no pci-d3-off scenario') }
+	assert off.cmdline.contains('vinix.pci_d3=off')
+	assert off.actions.len == 1 && off.actions[0].answer_has == d3_card_memory
+}

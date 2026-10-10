@@ -114,6 +114,18 @@ fn bound_devices(driver string) int {
 	return entries.filter(os.is_link('/sys/bus/pci/drivers/${driver}/${it}')).len
 }
 
+// How many sleeps the device bound to `driver` has spent in D3hot, as /sys
+// gives it: a device with no power management capability spends none there.
+fn sleeps_in_d3(driver string) string {
+	entries := list_dir('/sys/bus/pci/drivers/${driver}') or { return '?' }
+	for entry in entries {
+		if os.is_link('/sys/bus/pci/drivers/${driver}/${entry}') {
+			return read_word('/sys/bus/pci/drivers/${driver}/${entry}/power/d3_count')
+		}
+	}
+	return '?'
+}
+
 fn scenario_drivers_sleep(mut t Test) {
 	t.check(bound_devices('hda') == 1, '${bound_devices('hda')} devices are bound to hda, not one')
 	t.check(bound_devices('ata') == 1, '${bound_devices('ata')} devices are bound to ata, not one')
@@ -178,6 +190,7 @@ fn scenario_drivers_sleep(mut t Test) {
 	C.ioctl(fd, dsp_sync, unsafe { nil })
 	C.close(fd)
 	t.info('${stdatomic.load_u64(&tone_chunks)} tenths of a second of tone handed to the card')
+	t.info('sleeps spent in D3hot: the sound card ${sleeps_in_d3('hda')}, the IDE controller ${sleeps_in_d3('ata')}, the SATA controller ${sleeps_in_d3('ahci')}, the network card ${sleeps_in_d3('e1000')} (? where the machine has none)')
 }
 
 // nvme-sleep: an NVMe disk through the same three sleeps. A release kernel
@@ -220,4 +233,8 @@ fn scenario_nvme_sleep(mut t Test) {
 	disk_still_has(mut t, disk, 3, 0x63, 'after the suspend to RAM')
 	disk_write(mut t, disk, 4, 0x7c, 'after the suspend to RAM')
 	t.check(stat_word('fail') == '0', '${stat_word('fail')} sleeps failed')
+	// QEMU's controller has a power management capability: it was switched
+	// nearly off each time, and the checks above are of a disk that came back
+	// from that.
+	t.check(sleeps_in_d3('nvme') == '3', 'the NVMe controller spent ${sleeps_in_d3('nvme')} of the three sleeps in D3hot')
 }

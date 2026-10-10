@@ -230,7 +230,11 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 		} else {
 			if action := actions.take_ready(now, &m.qmp.events) {
 				command := substitute(action.qmp, state)!
-				m.qmp.execute(command)!
+				answer := m.qmp.execute(command)!
+				fault := answer_fault(action, answer.text)
+				if fault != '' {
+					return error(fault)
+				}
 				if action.end_within > 0 {
 					end_deadline = now_ms() + i64(action.end_within) * 1000
 					end_reason = '${action.end_within} s after ${command}'

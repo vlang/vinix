@@ -38,6 +38,9 @@ fn run_scenario(name string, mut t Test) bool {
 		'iommu-intel' { scenario_iommu_intel(mut t) }
 		'iommu-amd-selftest', 'iommu-intel-selftest' { scenario_iommu_selftest(mut t) }
 		'iommu-off' { scenario_iommu_off(mut t) }
+		'pci-d3' { scenario_pci_d3(mut t) }
+		'pci-d3-off' { scenario_pci_d3_off(mut t) }
+		'pci-d3-selftest' { scenario_pci_d3_selftest(mut t) }
 		'pci-hotplug' { scenario_pci_hotplug(mut t) }
 		'pci-hotplug-acpi' { scenario_pci_hotplug_acpi(mut t) }
 		'pci-hotplug-iommu' { scenario_pci_hotplug_iommu(mut t) }

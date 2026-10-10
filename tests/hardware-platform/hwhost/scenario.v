@@ -77,6 +77,22 @@ pub:
 	event          string
 	event_count    int
 	event_delay_ms int
+	// What QEMU's answer to the command must contain, and what it must not:
+	// how the host reads something out of the machine rather than doing
+	// something to it. Compared with the answer as it was received.
+	answer_has   string
+	answer_lacks string
+}
+
+// What is wrong with QEMU's `answer` to `action`, or nothing.
+pub fn answer_fault(action Action, answer string) string {
+	if action.answer_has != '' && !answer.contains(action.answer_has) {
+		return 'after "${action.after}", QEMU\'s answer to ${action.qmp} does not hold "${action.answer_has}"'
+	}
+	if action.answer_lacks != '' && answer.contains(action.answer_lacks) {
+		return 'after "${action.after}", QEMU\'s answer to ${action.qmp} holds "${action.answer_lacks}"'
+	}
+	return ''
 }
 
 pub struct Scenario {
@@ -148,6 +164,58 @@ const hotplug_machine = ['-nic', 'none', '-device', 'pcie-root-port,id=hwport0,c
 // The same machine with an Intel IOMMU.
 const hotplug_machine_isolated = ['-device', 'intel-iommu', '-nic', 'none', '-device',
 	'pcie-root-port,id=hwport0,chassis=1,bus=pcie.0', '-netdev', 'user,id=hwhot0,tftp={state}/tftp']
+
+// pci-d3: an Intel 82574L, the one card in these machines that QEMU gives a
+// power management capability and whose power state QEMU acts on: put into
+// D3hot it is taken off the bus (its registers are no longer in the machine's
+// memory map). What the host asks QEMU for is the memory map as it is laid
+// out at that moment, in which the card's registers are named when they can
+// be reached and are not there when they cannot.
+//
+// QEMU's card forgets nothing on the way back to D0, which most real ones
+// do. pci-d3-selftest is the same machine with a kernel that clears the
+// card's address and command registers while it is down, so that writing
+// them back is what makes the card work again.
+const d3_card = ['-netdev', 'user,id=hwn0,tftp={state}/tftp', '-device', 'e1000e,netdev=hwn0,id=hwcard0']
+const d3_look = '{"execute":"human-monitor-command","arguments":{"command-line":"info mtree -f"}}'
+const d3_card_memory = 'e1000e-mmio'
+// How long after the guest says it is going down the host looks: the guest
+// stays down for twice this (guest/pci_d3.v), so the look lands in the
+// middle of the sleep with three seconds to spare on either side.
+const d3_look_after_ms = 3000
+
+const d3_actions = [
+	Action{
+		after:      'HWTEST STEP the card is awake'
+		delay_ms:   100
+		qmp:        d3_look
+		answer_has: d3_card_memory
+	},
+	Action{
+		after:        'HWTEST STEP a rehearsal, the card asleep'
+		delay_ms:     d3_look_after_ms
+		qmp:          d3_look
+		answer_lacks: d3_card_memory
+	},
+	Action{
+		after:      'HWTEST STEP awake after the rehearsal'
+		delay_ms:   100
+		qmp:        d3_look
+		answer_has: d3_card_memory
+	},
+	Action{
+		after:        'HWTEST STEP a suspend to idle, the card asleep'
+		delay_ms:     d3_look_after_ms
+		qmp:          d3_look
+		answer_lacks: d3_card_memory
+	},
+	Action{
+		after:      'HWTEST STEP awake after the suspend to idle'
+		delay_ms:   100
+		qmp:        d3_look
+		answer_has: d3_card_memory
+	},
+]
 
 const hotplug_add = '{"execute":"device_add","arguments":{"driver":"e1000","bus":"hwport0","id":"hwcard0","netdev":"hwhot0"}}'
 const hotplug_remove = '{"execute":"device_del","arguments":{"id":"hwcard0"}}'
@@ -470,6 +538,45 @@ pub const scenarios = [
 			},
 		]
 		ending:       .poweroff
+	},
+	Scenario{
+		name:     'pci-d3'
+		about:    'a network card put into D3 for every kind of sleep and brought back; the host watches it leave the bus'
+		arches:   ['aarch64', 'x86_64']
+		qemu:     d3_card
+		files:    [tftp_probe]
+		required: ['HWTEST START pci-d3', 'HWTEST PASS pci-d3']
+		actions:  d3_actions
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'pci-d3-selftest'
+		about:    'the same, with a card made to forget its configuration in D3 as real ones do; a kernel built with -d pci_d3_selftest'
+		arches:   ['aarch64', 'x86_64']
+		define:   'pci_d3_selftest'
+		qemu:     d3_card
+		files:    [tftp_probe]
+		required: ['HWTEST START pci-d3-selftest', 'HWTEST PASS pci-d3-selftest']
+		actions:  d3_actions
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'pci-d3-off'
+		about:    'vinix.pci_d3=off: the same card stays in D0, and on the bus, through a sleep'
+		arches:   ['aarch64', 'x86_64']
+		cmdline:  'vinix.pci_d3=off'
+		qemu:     d3_card
+		files:    [tftp_probe]
+		required: ['HWTEST START pci-d3-off', 'HWTEST PASS pci-d3-off']
+		actions:  [
+			Action{
+				after:      'HWTEST STEP a rehearsal, the card left awake'
+				delay_ms:   d3_look_after_ms
+				qmp:        d3_look
+				answer_has: d3_card_memory
+			},
+		]
+		ending:   .poweroff
 	},
 	Scenario{
 		name:     'screen-sleep'
