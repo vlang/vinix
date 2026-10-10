@@ -17,6 +17,39 @@ FLAGS = ["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-fno-builtin",
          "-ffreestanding", "-fno-stack-protector", "-mno-red-zone", "-mno-80387",
          "-mno-mmx", "-mno-sse", "-mno-sse2"]
 
+import importlib.util as _import_util
+from sys import _getframe as _frame
+_namespace = globals
+_spec = _import_util.spec_from_file_location("_alloc_kernel_vinix_binding", Path(__file__).with_name("_kernel_vinix_native.py"))
+_binding = _import_util.module_from_spec(_spec)
+_spec.loader.exec_module(_binding)
+_LITERAL_CACHE = {}
+_ATTRIBUTE = getattr
+_TRUTH = bool
+def _FORMAT(value):
+    try:
+        return f"{value}"
+    finally:
+        value = None
+_REPR = repr
+_ITER = iter
+_tuple = lambda *values: values
+_LIST = list
+_list = lambda *values: _LIST(values)
+_named = lambda *pairs: {key: value for key, value in pairs}
+_NAMES = ('parser', 'args', 'kernel', 'source', 'qemu', 'cc', 'firmware', 'path', 'compiler', 'state', 'generated', 'rootfs', 'name', 'init_source', 'initramfs', 'archive', 'iso', 'env', 'boot_kernel', 'log', 'kernel_hash', 'serial', 'machine', 'accelerator', 'cpu', 'smp', 'command', 'config', 'process', 'deadline', 'output')
+
+def _policy(operation, state, *operands):
+    return _binding.call(operation, _namespace(), _frame(1).f_builtins, state, *operands)
+
+def _init_text():
+    return "#include <unistd.h>\nint main(void) { for (;;) sleep(60); }\n"
+
+def _raise_value(value):
+    try:
+        raise value
+    finally:
+        value = None
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -33,98 +66,42 @@ def main() -> int:
     args = parser.parse_args()
     if args.timeout <= 0 or not 1 <= args.cpus <= 256:
         parser.error("timeout must be positive and cpus must be 1..256")
-    kernel = args.kernel.resolve()
-    source = ROOT / "kernel/heapbench/core.v"
-    qemu = Path(shutil.which(args.qemu) or args.qemu).resolve()
-    cc = Path(shutil.which(args.cc) or args.cc).resolve()
-    firmware = (args.firmware or qemu.parent.parent / "share/qemu/edk2-x86_64-code.fd").resolve()
-    for path in [kernel, source, qemu, cc, firmware]:
-        if not path.is_file():
-            parser.error(f"required input missing: {path}")
-    compiler = subprocess.check_output([str(cc), "--version"], text=True)
-    if "clang" in compiler.lower() or "gcc" not in compiler.lower():
-        parser.error("--cc must be genuine GNU GCC")
-    state = args.state_dir.resolve()
-    state.mkdir(parents=True, exist_ok=False)
-    generated = state / "heap_benchmark.c"
-    subprocess.run(["python3", str(ROOT / "tests/alloc-bench/compile-v-sampler.py"),
-                    str(generated)], check=True)
-    rootfs = state / "rootfs"
-    for name in ["sbin", "dev", "tmp", "proc"]:
-        (rootfs / name).mkdir(parents=True, exist_ok=True)
-    init_source = state / "init.c"
-    init_source.write_text("#include <unistd.h>\nint main(void) { for (;;) sleep(60); }\n")
-    subprocess.run([str(cc), "-std=c11", "-O2", "-static", "-Wall", "-Wextra", "-Werror",
-                    str(init_source), "-o", str(rootfs / "sbin/init")], check=True)
-    initramfs = state / "initramfs.tar"
-    with tarfile.open(initramfs, "w", format=tarfile.USTAR_FORMAT) as archive:
-        archive.add(rootfs, arcname=".")
-    iso = state / "vinix.iso"
-    env = dict(os.environ, VINIX_AMD64_ISO_BUILD_DIR=str(state / "iso-build"),
-               VINIX_AMD64_KERNEL=str(kernel), VINIX_AMD64_INITRAMFS=str(initramfs),
-               VINIX_AMD64_ISO=str(iso))
-    boot_kernel = state / "boot-kernel"
-    with (state / "image-build.log").open("wb") as log:
-        subprocess.run([str(ROOT / "build-support/build-amd64-iso.sh")], env=env,
-                       check=True, stdout=log, stderr=log)
-        subprocess.run(["xorriso", "-osirrox", "on", "-indev", str(iso),
-                        "-extract", "/boot/vinix", str(boot_kernel)],
-                       check=True, stdout=log, stderr=log)
-    kernel_hash = hashlib.sha256(boot_kernel.read_bytes()).hexdigest()
-    if kernel_hash != hashlib.sha256(kernel.read_bytes()).hexdigest():
-        raise RuntimeError("kernel embedded in completed ISO differs from supplied kernel")
-    serial = state / "serial.log"
-    machine = "q35,vmport=off"
-    accelerator = "tcg,thread=single,tb-size=1024"
-    cpu = "Penryn,kvm=on,vendor=GenuineIntel,+ssse3,+sse4.2,+popcnt"
-    smp = f"{args.cpus},sockets=1,cores={args.cpus},threads=1"
-    command = [str(qemu), "-machine", machine, "-accel", accelerator, "-cpu", cpu,
-               "-smp", smp, "-m", "4096", "-display", "none", "-monitor", "none",
-               "-drive", f"if=pflash,format=raw,readonly=on,file={firmware}",
-               "-cdrom", str(iso), "-serial", f"file:{serial}", "-no-reboot"]
-    config = {
-        "qemu_version": subprocess.check_output([str(qemu), "--version"], text=True).splitlines()[0],
-        "machine": machine, "accelerator": accelerator, "cpu": cpu, "smp": smp,
-        "memory_mb": 4096, "source_sha256": hashlib.sha256(generated.read_bytes()).hexdigest(),
-        "sampler_header_sha256": hashlib.sha256((ROOT / "kernel/c/heap_benchmark_v.h").read_bytes()).hexdigest(),
-        "sampler_language": "V",
-        "kernel_sha256": kernel_hash,
-        "kernel_verification": "extracted from completed ISO and matched supplied kernel",
-        "compile_flags": FLAGS, "platform_compile_flags": ["-fno-PIC", "-mcmodel=kernel"],
-        "sampler_build_provenance": "caller must verify supplied kernel used the recorded source and flags",
-        "execution_context": "pre-scheduler", "argv": command,
-    }
-    (state / "config.json").write_text(json.dumps(config, indent=2) + "\n")
-    print(f"Booting kernel sampler; output: {serial}", flush=True)
-    with (state / "qemu.log").open("wb") as log:
-        process = subprocess.Popen(command, stdout=log, stderr=log)
+    _state = {name: None for name in _NAMES}
+    _state.update(parser=parser, args=args)
+    del parser, args
+    _policy("prepare", _state)
+    with tarfile.open(_state["initramfs"], "w", format=tarfile.USTAR_FORMAT) as archive:
+        _state["archive"] = archive
+        del archive
+        _state["archive"].add(_state["rootfs"], arcname=".")
+    _policy("image_paths", _state)
+    with (_state["state"] / "image-build.log").open("wb") as log:
+        _state["log"] = log
+        del log
+        _policy("image", _state)
+    _policy("config", _state)
+    output: str
+    def snapshot(value):
+        nonlocal output
+        output = value
+    def failed():
+        return (marker in output for marker in ["KALLOC-ERROR", "KERNEL PANIC", "FATAL EXCEPTION"])
+    def lines():
+        return (line[line.index("KALLOC-"):] for line in output.splitlines() if "KALLOC-" in line)
+    with (_state["state"] / "qemu.log").open("wb") as log:
+        _state["log"] = log
+        del log
+        _policy("launch", _state)
         try:
-            deadline = time.monotonic() + args.timeout
-            while time.monotonic() < deadline:
-                output = serial.read_text(errors="replace") if serial.exists() else ""
-                if any(marker in output for marker in ["KALLOC-ERROR", "KERNEL PANIC", "FATAL EXCEPTION"]):
-                    raise RuntimeError(f"guest failed; see {serial}")
-                if "KALLOC-DONE" in output:
-                    subprocess.run([str(Path(__file__).with_name("validate-kernel")),
-                                    "--stdin", "vinix"], input=output, text=True,
-                                   check=True, capture_output=True)
-                    print("\n".join(line[line.index("KALLOC-"):]
-                                    for line in output.splitlines() if "KALLOC-" in line), flush=True)
-                    return 0
-                if process.poll() is not None:
-                    raise RuntimeError(f"QEMU exited; see {state / 'qemu.log'}")
-                time.sleep(0.1)
-            raise RuntimeError(f"kernel sampler timed out; see {serial}")
+            return _policy("capture", _state, snapshot, failed, lines)
         finally:
-            if process.poll() is None:
-                process.terminate()
+            if _state["process"].poll() is None:
+                _state["process"].terminate()
                 try:
-                    process.wait(timeout=5)
+                    _state["process"].wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
-    return 1
-
+                    _state["process"].kill()
+                    _state["process"].wait()
 
 if __name__ == "__main__":
     raise SystemExit(main())
