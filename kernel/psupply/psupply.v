@@ -93,6 +93,9 @@ pub mut:
 	to_full   u64
 	// The alarm already acted on, so that each is acted on once per discharge.
 	alarmed Alarm
+	// When the battery was first seen critical in the run of readings that
+	// still say so; zero when the last reading did not.
+	critical_since u64
 	refs    [attribute_count]AttributeRef
 }
 
@@ -103,6 +106,13 @@ pub const max_supplies = 8
 const fresh_ns = u64(1000000000)
 // How often every supply is read whether or not anybody asked.
 const poll_ms = u64(30000)
+// A battery that says it is about to give out is asked again every two
+// seconds, and believed once it has said so for five: what follows is the
+// machine being shut down, and one reading from a gauge or a controller that
+// was busy must not be enough for that. At the threshold there are minutes
+// left, not seconds.
+const confirm_poll_ms = u64(2000)
+const confirm_ns = u64(5) * 1000000000
 
 struct Policy {
 mut:
@@ -122,6 +132,8 @@ __global (
 	psupply_published bool
 	// Whether the machine last ran from a battery, and whether that is known.
 	psupply_on_battery u32
+	// A battery's critical reading is waiting to be borne out; see confirm_ns.
+	psupply_confirming bool
 )
 
 fn gate() voidptr {
@@ -336,6 +348,9 @@ fn apply_policy() {
 		}
 		alarm := alarm_of(supply.percent, supply.reading.status, supply.reading.critical,
 			psupply_policy.low_percent, psupply_policy.critical_percent)
+		if alarm != .critical {
+			supply.critical_since = 0
+		}
 		if alarm == .none {
 			// Charging again, or above the thresholds: the next discharge
 			// starts with a clean slate.
@@ -344,6 +359,16 @@ fn apply_policy() {
 		}
 		if alarm == supply.alarmed || (alarm == .low && supply.alarmed == .critical) {
 			continue
+		}
+		if alarm == .critical {
+			// Not on one reading's word: see confirm_ns.
+			if supply.critical_since == 0 {
+				supply.critical_since = supply.read_ns
+			}
+			if supply.read_ns - supply.critical_since < confirm_ns {
+				psupply_confirming = true
+				continue
+			}
 		}
 		supply.alarmed = alarm
 		if alarm == .low {
@@ -371,9 +396,12 @@ fn poll_thread() {
 			}
 		}
 		if any {
+			psupply_confirming = false
 			apply_policy()
-			// Until changed() says otherwise, or poll_ms have passed.
-			devcore.wait_event(mut psupply_wake, generation, poll_ms)
+			// Until changed() says otherwise, or poll_ms have passed -- sooner
+			// while a battery that said it is critical is being asked again.
+			wait_ms := if psupply_confirming { confirm_poll_ms } else { poll_ms }
+			devcore.wait_event(mut psupply_wake, generation, wait_ms)
 		} else {
 			// A machine with no battery and no charger to read: nothing to
 			// do until a driver registers one.

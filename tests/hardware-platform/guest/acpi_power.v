@@ -102,6 +102,11 @@ fn scenario_acpi_power(mut t Test) {
 			}
 		}
 		if read_word(battery + 'capacity_level') == 'Low' {
+			if !saw_low {
+				// Long after the one reading that claimed to be critical with
+				// most of the charge left, and before the battery really is.
+				t.check(!acpi_power_off_asked, 'one critical reading from a battery that was not asked for a power off')
+			}
 			saw_low = true
 		}
 		if !saw_lid_sleep && read_word('/sys/power/lid/closes') == '1'

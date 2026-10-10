@@ -648,7 +648,11 @@ from how its charge moves.
 A battery at the low threshold (10%) is logged and shows `Low` in
 `capacity_level`. One at the critical threshold (3%) while discharging, or
 that says so itself, asks for the shutdown the power button asks for -- once
-per discharge, waking the machine first if it sleeps. The thresholds are in
+per discharge, waking the machine first if it sleeps. It is not taken at one
+reading's word: the battery is asked again every two seconds and believed
+once it has said so for five, because a gauge or an embedded controller that
+was busy can return one wrong answer, and the answer to this one is the
+machine going off. The thresholds are in
 `/sys/class/power_supply/policy/`. Going onto the battery selects the
 power-saving CPU profile and back onto the charger the balanced one, unless
 `/sys/power/profile_policy` is `manual`.

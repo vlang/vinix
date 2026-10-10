@@ -11,6 +11,10 @@
 //   asks 1-3    on the charger, charging: 42, 44, 46 Wh of 48
 //   ask 4       the charger is pulled (Notify to it); from here discharging
 //               at 12 W, 4 Wh less with every ask
+//   ask 5       the battery says something changed (Notify to it), and to
+//   ask 6       whoever asks next it says, once, that it is critical -- with
+//               38 Wh left. A gauge has bad moments, and one must not
+//               cost the machine its session.
 //   ask 7       the lid closes (Notify to it)
 //   ask 9       the lid opens
 //   ask 15      2 Wh left, 4%: low
@@ -90,6 +94,9 @@ fn power_bench() []u8 {
 					aml_if(aml_equal(tick, aml_integer(4)), [
 						aml_notify(aml_name('\\_SB.ADP0'), changed),
 					]),
+					aml_if(aml_equal(tick, aml_integer(5)), [
+						aml_notify(aml_name('\\_SB.BAT0'), changed),
+					]),
 					aml_if(aml_equal(tick, aml_integer(7)), [
 						aml_store(aml_integer(0), lid_open),
 						aml_notify(aml_name('\\_SB.LID0'), changed),
@@ -108,6 +115,10 @@ fn power_bench() []u8 {
 					]),
 					aml_store(aml_subtract(aml_integer(46000), aml_local(0)), aml_index(state,
 						aml_integer(2))),
+					aml_if(aml_equal(tick, aml_integer(6)), [
+						// Once: critical, with most of the charge left.
+						aml_store(aml_integer(5), aml_index(state, aml_integer(0))),
+					]),
 					aml_return(state),
 				]),
 			]),
