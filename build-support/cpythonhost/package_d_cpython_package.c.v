@@ -11,6 +11,8 @@ fn C.PyDict_DelItemString(voidptr, &char) i32
 fn C.PyDict_SetItem(voidptr, voidptr, voidptr) i32
 fn C.PyObject_GetAttr(voidptr, voidptr) voidptr
 fn C.PyObject_SetAttr(voidptr, voidptr, voidptr) i32
+fn C.PyDict_GetItemWithError(voidptr, voidptr) voidptr
+fn C.PyUnicode_InternFromString(&char) voidptr
 
 @[c_extern]
 __global C.PyExc_KeyError voidptr
@@ -123,10 +125,12 @@ fn (s &PackageSession) arguments(values []ah.Value) voidptr {
 	return result
 }
 
-fn (s &PackageSession) keywords(values map[string]ah.Value) voidptr {
+fn (s &PackageSession) keywords(values map[string]ah.Value, intern_names bool) voidptr {
 	result := C.PyDict_New()
+	if result == unsafe { nil } { return result }
 	for name, value in values {
-		key := py_string(name)
+		key := if intern_names { unsafe { C.PyUnicode_InternFromString(name.str) } } else { py_string(name) }
+		if key == unsafe { nil } { drop(result); return key }
 		entry := s.operand(value)
 		if entry == unsafe { nil } {
 			drop(key)
@@ -142,6 +146,35 @@ fn (s &PackageSession) keywords(values map[string]ah.Value) voidptr {
 		}
 	}
 	return result
+}
+
+// Only an explicit finite literal pool borrows objects across sessions. Normal
+// wire operands retain their existing per-call construction and ownership.
+fn (mut s PackageSession) literal(row map[string]ah.Value) ah.Value {
+	if 'constant_cache' !in row { return s.retained(s.operand(ah.field(row, 'value'))) }
+	cache := s.context.borrowed(ah.field(row, 'constant_cache').text())
+	if C.PyDict_Check(cache) == 0 {
+		package_error('literal constant cache must be a dictionary')
+		return null()
+	}
+	key := py_string(ah.field(row, 'constant_key').text())
+	if key == unsafe { nil } { return null() }
+	defer { drop(key) }
+	cached := C.PyDict_GetItemWithError(cache, key)
+	if cached != unsafe { nil } { return s.retained(own(cached)) }
+	if C.PyErr_Occurred() != unsafe { nil } { return null() }
+	operand := ah.field(row, 'value')
+	parts := operand.items()
+	value := if 'intern' in row && ah.field(row, 'intern') as bool {
+		text := parts[1].text()
+		unsafe { C.PyUnicode_InternFromString(text.str) }
+	} else { s.operand(operand) }
+	if value == unsafe { nil } { return null() }
+	if C.PyDict_SetItem(cache, key, value) != 0 {
+		drop(value)
+		return null()
+	}
+	return s.retained(value)
 }
 
 fn py_item(p voidptr, name string) voidptr {
@@ -269,7 +302,7 @@ fn (s &PackageSession) require_id(id string) bool {
 }
 
 fn (s &PackageSession) check_ids(row map[string]ah.Value) bool {
-	for key in ['owner', 'target', 'kwargs_owner', 'class'] {
+	for key in ['owner', 'target', 'kwargs_owner', 'class', 'constant_cache'] {
 		if key in row && !s.require_id(row[key].text()) { return false }
 	}
 	for key in ['args', 'value'] {
@@ -300,7 +333,7 @@ fn (mut s PackageSession) add_owner(id string, row map[string]ah.Value, entered 
 	mut kwargs := C.PyDict_New()
 	if 'kwargs' in row {
 		drop(kwargs)
-		kwargs = s.keywords(ah.field(row, 'kwargs').object())
+		kwargs = s.keywords(ah.field(row, 'kwargs').object(), false)
 	}
 	method := if 'method' in row { to_python(ah.field(row, 'method')) } else { py_none() }
 	function := if 'function' in row {
@@ -511,7 +544,7 @@ fn (mut s PackageSession) function(row map[string]ah.Value) ah.Value {
 		ah.field(row, 'kwargs').object()
 	} else {
 		map[string]ah.Value{}
-	})
+	}, 'intern_keywords' in row && ah.field(row, 'intern_keywords') as bool)
 	if kwargs == unsafe { nil } { return null() }
 	defer { drop(kwargs) }
 	result := if 'kwargs_owner' in row {
@@ -727,7 +760,7 @@ fn (mut s PackageSession) primitive(name string, row map[string]ah.Value) ah.Val
 			drop(result)
 			return null()
 		}
-		'literal' { return s.retained(s.operand(ah.field(row, 'value'))) }
+		'literal' { return s.literal(row) }
 		'attribute' {
 			return s.retained(py_attr(s.context.borrowed(ah.field(row, 'owner').text()),
 				ah.field(row, 'name').text()))

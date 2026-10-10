@@ -24,6 +24,13 @@ Binding error IDs and the exported error-list slots belong to one active call.
 Finishing the session consumes those slots; separately retained exception and
 traceback objects keep their original ownership.
 
+Native controllers may explicitly supply a module-owned finite literal cache
+to the `literal` callback. Its values retain the original code's constant
+lifetime across sessions; dynamic caller operands use the normal uncached
+path. Fixed identifier literals and keyword names can opt into CPython
+interning. The controller determines those finite literals and constant-folded
+values in V; the dictionary remains owned by its counted Python module.
+
 The counted Python adapter supplies double keyword expansion, exact pair
 unpacking, dynamically named unbound locals, exception-raising syntax and the
 upstream `contextlib.ExitStack` callback interface. These bindings contain no
