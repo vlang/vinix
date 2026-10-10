@@ -464,40 +464,65 @@ way whether or not the power went, so a sleep that firmware refused runs the
 same code as one that happened.
 
 **Time.** The counter the kernel keeps time with stops or starts again with
-the power; the battery-backed clock does not. It is read before and after,
-and the counter is made to carry on from where it was plus the difference,
-so neither the monotonic nor the wall clock stops or goes back, and both
-move on by the time asleep -- **to within a second**, which is what that
-clock counts in. As in a suspend to idle, the monotonic clock includes the
-sleep. The time asleep is not billed to the thread that asked for the sleep
-as processor time. An alarm more than a day ahead cannot be given to the
-clock and does not wake the machine from S3.
+the power; the battery-backed clock does not. The counter is made to carry
+on from exactly where it stopped, so the monotonic clock never goes back and
+**does not include the time the machine was away**: no deadline in the
+kernel -- a watchdog, a network timeout, a driver's wait -- finds hours gone
+by at once, and nothing is billed to the thread that asked for the sleep as
+processor time. (A suspend to idle is different: the counter keeps running
+there and the monotonic clock includes the sleep.) The battery-backed clock
+is read before and after, and the difference is added to the wall clock
+alone (`time.advance_realtime()`), **to within a second**, which is what
+that clock counts in; timers set for a time of day are looked at straight
+away. `last_sleep_ms` includes it. An alarm is handed to that clock at least
+two seconds ahead, and set again if getting the machine down used the time
+up; its day and month registers, where the FADT names any, are set to match
+any day. An alarm more than a day ahead cannot be given to the clock and
+does not wake the machine from S3.
 
-**Devices.** Before any driver resumes: the 8259s are masked and every I/O
-APIC redirection entry written back; the PIT is reprogrammed; **IOMMU units
-are brought back** (root or device table, command and event rings,
-translation on) and stop the machine if they will not come back; **PCI
-configuration space** of every function is restored
-(`kernel/devcore/pci_state.v`: D0 first, address registers and bridge
-windows before the command register, MSI and the MSI-X control word, the
-PCI Express control registers with a port's slot power and lights); and
-the display's mode is set again. `ahci` and `e1000` then reset and reprogram
-their devices as they always have on resume; the keyboard controller, the
-PS/2 mouse and the serial ports are set up again only after a loss of power.
-The fixed power and sleep button events are enabled again. A deep sleep is
-**refused while a bound PCI device's driver has no suspend and resume**
-(`nvme`, `ata`, `hda`, `xhci`): such a device would come back blank.
+**Devices,** in the order they come back. With interrupts still off and one
+processor running: the 8259s are masked and every I/O APIC redirection entry
+written back; the PIT is reprogrammed; the counter is set going; and **IOMMU
+units are brought back** (root or device table, command and event rings,
+translation on) -- before anything on the bus can move, and stopping the
+machine if one will not come back. While that one processor has interrupts
+off, an ACPI lock that is held is not waited for. Then the other processors
+are started and interrupts go on, and before firmware's wake method (`_WAK`)
+runs, since it may reach for any device: **PCI configuration space** of
+every function is restored (`kernel/devcore/pci_state.v`: D0 first, address
+registers and bridge windows before the command register, MSI and the MSI-X
+control word, the PCI Express control registers with a port's slot power
+and lights), and the display's mode is set again. After `_WAK` the fixed
+power and sleep button events are enabled again, and the drivers resume:
+`ahci` and `e1000` reset and reprogram their devices as they always have on
+resume; the keyboard controller, the PS/2 mouse and the serial ports are set
+up again only after a loss of power. A deep sleep is **refused while a bound
+PCI device's driver has no suspend and resume** (`nvme`, `ata`, `hda`,
+`xhci`): such a device would come back blank.
 
-**Hot-plug slots.** The thread that watches PCI Express slots is kept off
-them from before the devices go down until they are back
-(`pause_pci_hotplug()`): a port without power, or with its bus numbers not
-yet written back, shows cards missing that are there. It finishes the pass
-it is in first, and a sleep is refused if it cannot. When the machine is
-back it looks at every slot at once; since each pass compares a slot with
-what its port says, a card pulled or put in during the sleep is found then.
-A card *exchanged* for another during the sleep is not recognised as new:
-its configuration is found not to match and is left alone, and its driver's
-resume fails into the usual recovery.
+**Hot-plug slots, and what changed during the sleep.** The thread that
+watches PCI Express slots is kept off them from before the devices go down
+until they are back (`pause_pci_hotplug()`): a port without power, or with
+its bus numbers not yet written back, shows cards missing that are there. It
+finishes the pass it is in first, and a sleep is refused if it cannot.
+
+Nothing reports what happened on the buses while the power was off: a port
+loses the events it latched, and firmware sends no `Notify` for what it saw
+with no system running. So after such a sleep (`compare_buses()` in
+`kernel/devcore/hotplug.v`):
+
+- a function that no longer answers with the vendor and device it had is
+  not written to, **its driver is not asked to resume it**, and the thread
+  removes it as it removes a card pulled without warning;
+- a watched slot left with nothing on its bus is treated as empty, so a card
+  now in it -- another card, or one put into a slot that was empty -- is
+  brought in by the pass over the slots that follows;
+- every bus is then scanned, as a write to `/sys/bus/pci/rescan` does, which
+  is what finds a device firmware would have announced.
+
+A slot whose presence bit differs from before the sleep does not get its old
+power switch and lights written back with the rest of its port: that setting
+was for what was in it then.
 
 **The display.** Firmware does not set the mode again after S3, and the
 kernel has no graphics driver, so `deep` is only offered where the kernel
@@ -543,9 +568,22 @@ What this is not:
   recorded and compared on every online processor, each asked by an
   interrupt, for both kinds of sleep. On AArch64 they are checked on the
   CPU that carries out the sleep only.
-- A processor that does not start again after a sleep is logged and left
-  out; the machine carries on without it, and threads that may only run
-  there do not run.
+- A processor that does not start again after a sleep is logged, counted
+  once and left out; the machine carries on without it, later sleeps do not
+  wait for it or try it again, and threads that may only run there do not
+  run. This path has never run: no processor has failed to start here.
+- **If firmware accepts the request for S3 and then neither sleeps nor
+  returns**, the machine hangs with interrupts off: uACPI polls the
+  wake-status bit without a limit, and that code is shared with other work
+  and was not changed.
+- Of what can change on the buses during a sleep, QEMU allows two things to
+  be tried, and both are: a card put into a slot the kernel watches, and a
+  device firmware manages being taken away or put in. A card pulled from, or
+  exchanged in, a watched slot follows the same code and has not run.
+- The wall clock is only as good as the battery-backed clock's seconds: each
+  sleep can put it up to a second out.
+- With no HPET the kernel keeps time by the TSC, and that way through a
+  sleep has not run.
 - The VMX part (leaving and entering VMX operation around a sleep) has not
   executed: no emulator used here has VT-x.
 - The dark screen is a black picture, not a display switched off: there is
