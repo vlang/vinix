@@ -16,6 +16,7 @@ __global (
 	devices_wifi             WifiState
 	devices_wifi_result      WifiResult
 	devices_battery_percent  int
+	devices_battery_supply   BatteryReading
 )
 
 fn devices_read_backlight(mut out BacklightState) BacklightResult {
@@ -50,6 +51,10 @@ fn devices_read_battery(force bool) int {
 
 fn devices_battery_history() BatteryHistory {
 	return BatteryHistory{}
+}
+
+fn devices_battery_reading() BatteryReading {
+	return devices_battery_supply
 }
 
 fn devices_rect() ui2.Rect {
@@ -420,9 +425,43 @@ fn test_every_device_pane_text_fits_its_frame() {
 			size: 19
 			bold: true
 		})
-		for estimate in -4 .. battery_estimate_maximum_hours + 2 {
+		for estimate in battery_estimate_not_charging .. battery_estimate_maximum_hours + 2 {
 			text := battery_remaining_text(estimate)
 			assert estimate_face.text_width(text) <= (455 - 16) / 2, '${language} «${text}»'
+		}
+		// What a power supply adds: each state the pane can name, the heading
+		// that counts to full and the footer that names /sys.
+		battery.battery_reading = devices_battery_reading
+		for status in [BatteryStatus.unknown, .charging, .discharging, .not_charging, .full] {
+			for online in [false, true] {
+				devices_battery_percent = 73
+				devices_battery_supply = BatteryReading{
+					percent:      73
+					source:       .supply
+					status:       status
+					to_empty_s:   7200
+					to_full_s:    7200
+					mains:        true
+					mains_online: online
+				}
+				devices_assert_pane_fits(&desktop, mut battery, 'battery supply ${status}')
+			}
+		}
+		// The taskbar flyout's one line, for every count of hours to full.
+		line_face := desktop.face_for(ui2.TextStyle{
+			size: 12
+		})
+		for hours in 0 .. battery_estimate_maximum_hours + 1 {
+			line := battery_outlook_line(BatteryOutlook{
+				estimate: hours
+				to_full:  true
+			})
+			assert line_face.text_width(line) <= tray_flyout_width - 28, '${language} «${line}»'
+			unsafe { line.free() }
+		}
+		for power in [BatteryPower.on_battery, .charging, .full, .not_charging, .plugged_in] {
+			text := battery_power_text(power)
+			assert text.len > 0 && line_face.text_width(text) <= tray_flyout_width - 28
 		}
 	}
 }

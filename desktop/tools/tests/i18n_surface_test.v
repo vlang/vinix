@@ -196,3 +196,88 @@ fn test_disk_usage_rewords_a_failed_scan_after_the_language_changes() {
 	assert i18n_surface_has_text(spanish, 'No se puede abrir /vinix-disk-usage-does-not-exist')
 	assert i18n_surface_has_text(spanish, 'SIN ACCESO')
 }
+
+fn i18n_surface_battery(percent int, power BatteryPower, estimate int, to_full bool) TraySample {
+	return TraySample{
+		battery:  percent
+		charging: power == .charging
+		power:    power
+		outlook:  BatteryOutlook{
+			estimate: estimate
+			to_full:  to_full
+		}
+	}
+}
+
+fn i18n_surface_battery_flyout(mut d Desktop) ui2.Element {
+	d.tray.flyout = .battery
+	return d.tray_flyout_element() or { panic('no battery flyout') }
+}
+
+// The taskbar says how the machine is powered when the kernel has said, and
+// counts the hours the way the kernel counts them.
+fn test_tray_battery_says_what_a_power_supply_reports() {
+	defer {
+		set_desktop_language(.en)
+	}
+	set_desktop_language(.en)
+	mut d := Desktop{}
+	d.tray.preferences_loaded = true
+
+	d.apply_tray_sample(i18n_surface_battery(37, .charging, 2, true))
+	assert d.tray.battery_tip == 'Battery: 37%, charging'
+	assert d.tray.battery_line == 'About 2 hours until full'
+	assert d.tray_glyph(.battery) == 'builtin:battery_charging_40'
+	assert i18n_surface_has_text(i18n_surface_battery_flyout(mut d), 'About 2 hours until full')
+	// A new estimate alone rewords the line; the percentage need not move.
+	d.apply_tray_sample(i18n_surface_battery(37, .charging, 1, true))
+	assert d.tray.battery_line == 'About 1 hour until full'
+	d.apply_tray_sample(i18n_surface_battery(37, .charging, 0, true))
+	assert d.tray.battery_line == 'Less than 1 hour until full'
+	// Charging with no estimate from the kernel.
+	d.apply_tray_sample(i18n_surface_battery(37, .charging, battery_estimate_charging, false))
+	assert i18n_surface_has_text(i18n_surface_battery_flyout(mut d), 'Charging')
+
+	d.apply_tray_sample(i18n_surface_battery(41, .on_battery, 3, false))
+	assert d.tray.battery_tip == 'Battery: 41% remaining'
+	assert d.tray.battery_line == 'About 3 hours'
+	assert d.tray_glyph(.battery) == 'builtin:battery_40'
+	assert i18n_surface_has_text(i18n_surface_battery_flyout(mut d), 'About 3 hours')
+
+	d.apply_tray_sample(i18n_surface_battery(100, .full, battery_estimate_full, false))
+	assert d.tray.battery_tip == 'Battery: 100%, fully charged'
+	assert d.tray.battery_line == 'Fully charged'
+	assert d.tray_glyph(.battery) == 'builtin:battery_100'
+
+	d.apply_tray_sample(i18n_surface_battery(80, .not_charging, battery_estimate_not_charging,
+		false))
+	assert d.tray.battery_tip == 'Battery: 80%, plugged in'
+	assert d.tray.battery_line == 'Not charging'
+	assert i18n_surface_has_text(i18n_surface_battery_flyout(mut d), 'Not charging')
+	d.apply_tray_sample(i18n_surface_battery(80, .plugged_in, battery_estimate_unavailable,
+		false))
+	assert d.tray.battery_tip == 'Battery: 80%, plugged in'
+
+	// /dev/battery says nothing about power: a rise is still only "charging".
+	d.apply_tray_sample(TraySample{
+		battery:  37
+		charging: true
+	})
+	assert d.tray.battery_tip == 'Battery: 37%, charging'
+	assert i18n_surface_has_text(i18n_surface_battery_flyout(mut d), 'Charging')
+
+	set_desktop_language(.ru)
+	d.apply_tray_sample(i18n_surface_battery(37, .charging, 1, true))
+	assert d.tray.battery_line == 'Около 1 часа до полной зарядки'
+	d.apply_tray_sample(i18n_surface_battery(37, .charging, 2, true))
+	assert d.tray.battery_line == 'Около 2 часов до полной зарядки'
+	d.apply_tray_sample(i18n_surface_battery(37, .charging, 21, true))
+	assert d.tray.battery_line == 'Около 21 часа до полной зарядки'
+	d.apply_tray_sample(i18n_surface_battery(100, .full, battery_estimate_full, false))
+	assert d.tray.battery_tip == 'Аккумулятор: 100%, полностью заряжен'
+	set_desktop_language(.es)
+	d.apply_tray_sample(i18n_surface_battery(80, .not_charging, battery_estimate_not_charging,
+		false))
+	assert d.tray.battery_tip == 'Batería: 80%, enchufada'
+	assert d.tray.battery_line == 'No se está cargando'
+}
