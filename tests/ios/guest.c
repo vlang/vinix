@@ -208,6 +208,11 @@ int main(void) {
     puts("iOS PASS: Darwin process credentials, signal delivery and allocation sizes");
     test_memory_budget();
     test_atfork();
+    run("/opt/ios/pthread-attr",NULL,NULL,NULL,0,
+        "IOS-PTHREAD-ATTR: guarded layouts, copied attributes, rounded sizes, real user stacks, 256 KiB frames, errno and eight threads\n");
+    run("/opt/ios/pthread-attr","--detached",NULL,NULL,0,
+        "IOS-PTHREAD-ATTR: real detached thread rejects joining\n");
+    puts("iOS PASS: Darwin thread attributes, native user stacks and detached creation");
     run("/opt/ios/ioctl", NULL, NULL, NULL, 0,
         "IOS-IOCTL: descriptor flags, shared nonblocking I/O, queued bytes, native interfaces and eight threads\n");
     puts("iOS PASS: Darwin ioctl controls, socket bytes and interface queries");

@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_attr_destroy
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_condattr_destroy
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -784,20 +784,56 @@ The guest also forces a real `EAGAIN` using its enforced PID quota and checks
 parent callbacks and subsequent registration. ASAN/UBSAN checks two Mach-O
 loads/unloads, a real fork after unmapping and teardown blocked on an active
 prepare callback. The full ARM64 C++/GLES/PPSSPP regression passes. This resolves
-two more strong imports across Fortnite and EOSSDK; the actual game still exits
-before entry at `pthread_attr_destroy`.
+two more strong imports across Fortnite and EOSSDK.
+
+The installed ARM64 Mac pthread library's attribute object is 64 bytes. Its
+defaults are a joinable thread, inherited scheduling, a 512 KiB stack and a
+16 KiB guard. Stack-size and guard setters accept legacy 4 KiB multiples and
+round them to 16 KiB pages; explicit user stacks require both address and size
+to align to 16 KiB. A user stack is stored as its top plus its size, so changing
+the size keeps the top fixed. Destroy clears only the signature. These layouts,
+defaults, mutations, invalid states and errno behavior were measured against
+the installed `libsystem_pthread.dylib`.
+
+V adapters now implement attribute init/destroy and stack, size, guard and
+detach getters/setters in the inline Darwin object, with no per-object
+allocation or registry. Getters leave output untouched on invalid signatures.
+`pthread_create` translates the fields into a stack-local native attribute
+object and creates a real thread, including caller-provided stacks and detached
+state. Null attributes also use the measured 512 KiB default. Successful
+creation writes a native 64-bit handle; failures preserve its output and caller
+errno. Non-default scheduling/QoS fields return `ENOTSUP` (45) explicitly.
+
+The `pthread_join` adapter uses native joining, preserves errno and returns
+Darwin `EDEADLK` for self-join. On Vinix it first reads a live thread's native
+detach state and returns `EINVAL` for detached joins, matching the Mac; direct
+musl joining faults on that unsupported operation. Callers must provide valid
+thread handles. App threads must finish before the app returns from its entry
+point; unloading an image with active detached threads remains unsupported.
+
+Shared Mac/iOS fixtures check guarded 64-byte attributes and 32-bit getter
+outputs, copying, size rounding, fixed-top resizing, destruction and errors.
+Eight real threads touch 256 KiB stack frames, check image TLS and use both
+allocated native stacks and caller-provided 1 MiB stacks, verifying their local
+addresses. The detached fixture verifies joining rejection while its worker is
+blocked, then exits the process without unloading a live image. ASAN/UBSAN
+checks two image loads/unloads with joined workers and explicit rejection of
+foreign scheduling fields; the fork lifetime tests also pass with the new
+creation/join adapters. The full ARM64 C++/GLES/PPSSPP regression passes. This
+resolves nine more strong imports across Fortnite and EOSSDK; the actual game
+still exits before entry at `pthread_condattr_destroy`.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,293 | 865 | 81 |
-| EOSSDK | 505 | 157 | 18 |
+| Fortnite executable | 1,297 | 861 | 81 |
+| EOSSDK | 510 | 152 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,851 | 1,145 | 122 |
+| All images | 1,860 | 1,136 | 122 |
 
-The C++/GLES/Text variant reports 1,864 resolved imports, 1,132 unresolved strong
+The C++/GLES/Text variant reports 1,873 resolved imports, 1,123 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

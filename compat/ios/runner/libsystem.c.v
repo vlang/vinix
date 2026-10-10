@@ -98,13 +98,6 @@ fn darwin_bzero(pointer voidptr, size usize) {
 	C.memset(pointer, 0, size)
 }
 
-fn darwin_pthread_create(thread_id voidptr, attributes voidptr, start voidptr, argument voidptr) int {
-	// Darwin's opaque pthread_attr_t is not a musl pthread_attr_t. The
-	// default attributes need no conversion; other attributes fail explicitly.
-	if attributes != unsafe { nil } { return C.EINVAL }
-	return pthread_error(C.pthread_create(thread_id, attributes, start, argument))
-}
-
 // Fixed-argument AAPCS64 calls with compatible Apple and musl layouts.
 // Varargs, Darwin FILE*, errno/TLS and pthread objects use explicit adapters.
 fn libsystem_symbol(library string, symbol string) !u64 {
@@ -144,7 +137,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 		'_abort' { unsafe { voidptr(C.abort) } }
 		'dyld_stub_binder' { unsafe { voidptr(darwin_lazy_binder) } }
 		'_pthread_create' { unsafe { voidptr(darwin_pthread_create) } }
-		'_pthread_join' { unsafe { voidptr(C.pthread_join) } }
+		'_pthread_join' { unsafe { voidptr(darwin_pthread_join) } }
 		'__tlv_bootstrap' { unsafe { voidptr(C.ios_tlv_get_addr) } }
 		'___cxa_atexit' { unsafe { voidptr(image_cxa_atexit) } }
 		'___cxa_finalize' { unsafe { voidptr(image_cxa_finalize) } }

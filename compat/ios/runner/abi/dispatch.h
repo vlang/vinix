@@ -144,6 +144,42 @@ static int *ios_errno_address(void) { return &errno; }
 static size_t ios_sizeof_mutex(void) { return sizeof(pthread_mutex_t); }
 static size_t ios_sizeof_cond(void) { return sizeof(pthread_cond_t); }
 static size_t ios_sizeof_once(void) { return sizeof(pthread_once_t); }
+/* Construct/destroy the actual native object on the stack. Darwin attribute
+ * layout, defaults, validation and flag conversion are implemented in V. */
+static int ios_thread_create(void *output, size_t size, uint64_t top, size_t guard,
+                             int detached, void *start, void *argument) {
+    pthread_attr_t attributes;
+    pthread_t thread;
+    int result = pthread_attr_init(&attributes);
+    if (result) return result;
+    result = pthread_attr_setdetachstate(&attributes, detached ? PTHREAD_CREATE_DETACHED : PTHREAD_CREATE_JOINABLE);
+    if (!result) result = pthread_attr_setguardsize(&attributes, guard);
+    if (!result) result = top ? pthread_attr_setstack(&attributes, (void *)(uintptr_t)(top - size), size) : pthread_attr_setstacksize(&attributes, size);
+    if (!result) result = pthread_create(&thread, &attributes, (void *(*)(void *))start, argument);
+    pthread_attr_destroy(&attributes);
+    if (!result) *(uint64_t *)output = (uintptr_t)thread;
+    return result;
+}
+static int ios_thread_join(uint64_t thread, void *output) {
+    return pthread_join((pthread_t)(uintptr_t)thread, (void **)output);
+}
+/* Read native detach state. V rejects a live detached join before musl's
+ * undefined-operation trap. Caller still must provide a live thread handle. */
+static int ios_thread_detached(uint64_t thread, int32_t *output) {
+#ifdef __linux__
+    extern int pthread_getattr_np(pthread_t, pthread_attr_t *);
+    pthread_attr_t attributes;
+    int result = pthread_getattr_np((pthread_t)(uintptr_t)thread, &attributes);
+    if (result) return result;
+    int state = 0;
+    result = pthread_attr_getdetachstate(&attributes, &state);
+    pthread_attr_destroy(&attributes);
+    if (!result) *output = state == PTHREAD_CREATE_DETACHED;
+    return result;
+#else
+    (void)thread; (void)output; return ENOTSUP;
+#endif
+}
 /* Return native stack bounds; the Darwin containment policy lives in V. */
 static int ios_current_stack_bounds(uint64_t *bounds) {
 #ifdef __APPLE__
