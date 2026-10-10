@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `e89a298a35be958500a57bc91f275e6f8156a0df`,
-Linguist 7.27.0 reports **Python 5.94%** (460 files, 2,155,528 bytes) and
-**V 75.31%** (2,525 files, 27,336,831 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `1eb8dcc829fa812dc5b222964f74a0320ce0ca1d`,
+Linguist 7.27.0 reports **Python 5.76%** (449 files, 2,092,608 bytes) and
+**V 75.50%** (2,546 files, 27,443,046 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,050,757 Python bytes**. All remaining
-2,155,528 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,113,677 Python bytes**. All remaining
+2,092,608 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 25 stages below remove **72 Python files / 205,820 original bytes** and
+The 28 stages below remove **83 Python files / 268,740 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -56,6 +56,9 @@ changes remain separate from this per-stage scope and the measured graph.
 | Complete AGX extraction/recovery command and trace boundaries | `tools/agx-re/recoverycli`, native extraction modules and trace entrypoints | 36,385 / 959 | `3b2c914d` |
 | Eight QEMU syscall comparison commands and fixture generator | `tests/qemu-core/fixturecli`, nine V entrypoints | 22,028 / 593 | `ad94fe98` |
 | Base/memory and futex comparison tools and final fixture import bridge | `tests/qemu-core/fixturehost`, three V entrypoints | 25,447 / 517 | `e89a298a` |
+| QEMU/desktop archive splitting, module ISO construction and independent tests | `tools/archivehost`, three native commands, `tests/archive-tools/archivetest` | 24,812 / 639 | `fd303029` |
+| Build archive pruning and desktop launcher bootstrap tests | `tools/prunehost`, `tests/build-cache/test_prune_build_artifacts.v`, `tests/desktop-bootstrap/test_runner.v` | 19,696 / 446 | `52b0601a` |
+| Desktop image preparation and disk-root recovery suites | `tests/desktop-bootstrap/bootstraptest`, two native tests and `run.sh` | 18,412 / 412 | `1eb8dcc8` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -400,12 +403,53 @@ Between `ad94fe98` and `e89a298a`, counted Python declined by exactly 25,447
 bytes and five files. The three larger batches together retire 26 Python files
 and 83,860 bytes. Concurrent source changes affect the relative graph separately.
 
+The next three complete batches retire **11 Python files / 62,920 bytes**.
+The archive commands retain member order and USTAR metadata, size limits,
+streamed root-seed gzip, exact source identities, locks, cache hits and publication
+order. Native checked closes expose pending write failures before publication;
+old outputs survive failed rebuilds. System tar and real xorriso independently
+verify payloads. Tests also cover malformed archives, unsafe names, shrink cleanup,
+symlink targets, one-nanosecond cache invalidation, lock contention and repeated
+descriptor retirement. All three production binaries and their native suites pass
+on ARM, Rosetta x86 and ARM ASan/UBSan. Cold launchers pass from `/tmp`.
+See [the archive qualification](../tests/archive-tools/README.md) for commands,
+logs and platform limits. Frozen benchmark drivers that name historical commands
+remain counted and await their own complete workflow translation.
+
+The pruning command preserves shallow selection, allocated-block accounting,
+age/ctime retention, repeated keeps, markers and environment overrides. Native
+process/open-file inspection protects active inputs; inspection failures prevent
+deletion, and automatic opt-out remains effective. The cutoff is computed after
+the lock, with nanosecond file-state checks before removal. Native tests verify
+real ps/lsof protection, redacted failures, concurrent replacement, lock contention
+and descriptor retirement. Unique fixture archive names prevent concurrent suites'
+root-relative input protection from interfering with each other. Make, build and
+desktop callers now invoke V directly. ARM, Rosetta x86 and ARM ASan/UBSan tests
+pass for the command and separately compiled frontends, together with cold entry
+and the full cache suite. See [the pruning qualification](../tools/prunehost/README.md).
+
+All three desktop bootstrap suites now use V, including their fake commands.
+The launcher preserves help, dependency ordering, warm reuse, no-build behavior
+and compiler selection. Image preparation retains all eight original scenarios.
+Recovery tests exercise current production function bodies, failure cleanup,
+publication lifetimes and preserved existing payloads. Every host profile builds
+and inspects a real AArch64 recovery ELF, then compares its exact archived bytes.
+The recovery launcher uses the existing native init producer through `compile-init`;
+the older init-policy Python runners and their generator remain counted. The
+desktop cache fingerprints the native producer. All native suites and the complete
+cold launcher pass. See [the bootstrap checks](../tests/desktop-bootstrap/README.md).
+No Python was run in these three batches, and no new guest boot is claimed.
+
+Between `e89a298a` and `1eb8dcc8`, counted Python declines by exactly 62,920 bytes
+and 11 files, matching these stages. Concurrent source changes affect the relative
+language shares separately.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 25 stages.
+or hidden in these 28 stages.
 
 ## Earlier completed stages
 
