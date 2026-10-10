@@ -43,6 +43,9 @@ pub:
 	// Written at offset 0. The kernel installs the system onto a disk that is
 	// blank, so a test disk that must be left alone starts with something.
 	header string
+	// Patterns the host writes before the boot, for a guest to read: data on
+	// the disk that the guest's kernel cannot have in a cache.
+	prefill []DiskPattern
 }
 
 // Bytes the guest is expected to have left on a disk, checked on the host
@@ -67,6 +70,13 @@ pub:
 	// With a value, the machine must end the way the scenario expects within
 	// this many seconds of the command, rather than by the scenario timeout.
 	end_within int
+	// With an event, the command is held back until QEMU has reported that
+	// event `event_count` times since it started, and `event_delay_ms` more
+	// have passed: a machine can only be woken once QEMU says it is
+	// suspended, however long the guest took to get there.
+	event          string
+	event_count    int
+	event_delay_ms int
 }
 
 pub struct Scenario {
@@ -541,6 +551,152 @@ pub const scenarios = [
 		events:   ['DEVICE_DELETED', 'DEVICE_DELETED']
 		ending:   .poweroff
 	},
+	Scenario{
+		name:     'suspend-deep'
+		about:    'suspend to RAM (ACPI S3): three ways to wake, every CPU, memory, disk, network, clocks, screen'
+		arches:   ['x86_64']
+		qemu:     ['-smp', '4', '-nic', 'user,model=e1000,tftp={state}/tftp', '-drive',
+			'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [deep_disk]
+		files:    [tftp_probe]
+		required: ['HWTEST START suspend-deep', 'HWTEST PASS suspend-deep']
+		actions:  deep_actions
+		ending:   .poweroff
+		patterns: deep_patterns
+		events:   deep_events
+		screens:  deep_screens
+		timeout:  600
+	},
+	Scenario{
+		name:     'suspend-deep-iommu'
+		about:    'the same behind Intel VT-d: the unit is brought back before any device may use the bus'
+		arches:   ['x86_64']
+		cmdline:  'vinix.iommu=1'
+		qemu:     ['-smp', '4', '-device', 'intel-iommu', '-nic', 'user,model=e1000,tftp={state}/tftp',
+			'-drive', 'if=ide,format=raw,file={state}/disk.raw']
+		disks:    [deep_disk]
+		files:    [tftp_probe]
+		required: ['HWTEST START suspend-deep-iommu', 'HWTEST PASS suspend-deep-iommu']
+		actions:  deep_actions
+		ending:   .poweroff
+		patterns: deep_patterns
+		events:   deep_events
+		screens:  deep_screens
+		timeout:  600
+	},
+]
+
+// What the two suspend-to-RAM scenarios share. guest/suspend_deep.v reads the
+// parts of the disk filled here, each once, and writes the patterns looked
+// for afterwards.
+const deep_disk = Disk{
+	name:     'disk.raw'
+	size_mib: 32
+	header:   'vinix hardware test disk: not blank'
+	prefill:  [
+		DiskPattern{
+			offset: 17 << 20
+			length: 65536
+			seed:   0x41
+		},
+		DiskPattern{
+			offset: 18 << 20
+			length: 65536
+			seed:   0x42
+		},
+		DiskPattern{
+			offset: 19 << 20
+			length: 65536
+			seed:   0x43
+		},
+		DiskPattern{
+			offset: 24 << 20
+			length: 65536
+			seed:   0x48
+		},
+	]
+}
+
+const deep_patterns = [
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 1 << 20
+		length: 65536
+		seed:   0x31
+	},
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 3 << 20
+		length: 65536
+		seed:   0x71
+	},
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 4 << 20
+		length: 65536
+		seed:   0x72
+	},
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 5 << 20
+		length: 65536
+		seed:   0x73
+	},
+	DiskPattern{
+		disk:   'disk.raw'
+		offset: 10 << 20
+		length: 65536
+		seed:   0x78
+	},
+]
+
+// The machine is woken by the host only once QEMU has said it is suspended:
+// `system_wakeup` is refused for a machine that is running. The sleep in
+// between the two is ended by the clock's alarm, inside the machine, and so
+// are the five that follow.
+const deep_actions = [
+	Action{
+		after:    'HWTEST STEP screen drawn'
+		delay_ms: 200
+		qmp:      '{"execute":"screendump","arguments":{"filename":"{state}/screen-before.ppm"}}'
+	},
+	Action{
+		after:          'HWTEST STEP deep sleep for a wakeup'
+		event:          'SUSPEND'
+		event_count:    1
+		event_delay_ms: 2000
+		qmp:            '{"execute":"system_wakeup"}'
+	},
+	Action{
+		after:          'HWTEST STEP deep sleep for a key'
+		event:          'SUSPEND'
+		event_count:    3
+		event_delay_ms: 2000
+		qmp:            '{"execute":"send-key","arguments":{"keys":[{"type":"qcode","data":"shift"}]}}'
+	},
+	Action{
+		after:    'HWTEST STEP screen after the sleeps'
+		delay_ms: 200
+		qmp:      '{"execute":"screendump","arguments":{"filename":"{state}/screen-after.ppm"}}'
+	},
+]
+
+// Eight sleeps, each of which QEMU must have seen begin and end.
+const deep_events = ['SUSPEND', 'SUSPEND', 'SUSPEND', 'SUSPEND', 'SUSPEND', 'SUSPEND', 'SUSPEND',
+	'SUSPEND', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP', 'WAKEUP']
+
+// What the guest drew before the first sleep must be what the display
+// adapter shows after the last, in the same mode.
+const deep_screens = [
+	Screen{
+		file:    'screen-before.ppm'
+		pattern: 256
+	},
+	Screen{
+		file:    'screen-after.ppm'
+		like:    'screen-before.ppm'
+		pattern: 256
+	},
 ]
 
 // The scenarios one invocation deals with: those it boots, and those it names
@@ -660,6 +816,17 @@ pub fn validate_scenarios(all []Scenario) ! {
 			}
 			qmp_frame(action.qmp) or {
 				return error('scenario ${scenario.name}: ${err.msg()}')
+			}
+			if (action.event == '') != (action.event_count == 0) || action.event_count < 0 {
+				return error('scenario ${scenario.name}: an action that waits for an event names it and says how many')
+			}
+		}
+		for screen in scenario.screens {
+			if screen.pattern < 0 || (screen.dark && screen.pattern != 0) {
+				return error('scenario ${scenario.name}: the picture ${screen.file} cannot be dark and show a pattern')
+			}
+			if screen.like != '' && !scenario.screens.any(it.file == screen.like) {
+				return error('scenario ${scenario.name}: the picture ${screen.file} is compared with ${screen.like}, which is not one of its pictures')
 			}
 		}
 		for screen in scenario.screens {

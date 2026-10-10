@@ -139,12 +139,18 @@ pub fn create_disk(disk Disk, state string) ! {
 	path := os.join_path(state, disk.name)
 	os.write_file(path, '')!
 	os.truncate(path, u64(disk.size_mib) << 20)!
-	if disk.header == '' {
+	if disk.header == '' && disk.prefill.len == 0 {
 		return
 	}
 	mut file := os.open_file(path, 'r+')!
 	defer {
 		file.close()
+	}
+	for fill in disk.prefill {
+		file.write_to(fill.offset, pattern_bytes(fill.seed, fill.length))!
+	}
+	if disk.header == '' {
+		return
 	}
 	file.write_to(0, disk.header.bytes())!
 }

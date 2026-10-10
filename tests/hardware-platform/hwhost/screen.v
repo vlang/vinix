@@ -20,6 +20,14 @@ pub:
 	// Every pixel black; otherwise, enough pixels not black for something
 	// to be on the screen.
 	dark bool
+	// Another of the scenario's pictures this one must be the size of: the
+	// display is in the mode it was in when that one was taken.
+	like string
+	// With a value, the top-left `pattern` by `pattern` pixels must be what
+	// a guest draws there with its screen pattern (guest/framebuffer.v): in
+	// column x of row y red is x, green is y and blue their sum, each as a
+	// byte. That is a picture nothing but the guest's drawing puts there.
+	pattern int
 }
 
 pub struct Picture {
@@ -28,6 +36,31 @@ pub:
 	height int
 	// How many pixels are not black.
 	lit int
+	// Three bytes a pixel: red, green, blue.
+	pixels []u8
+}
+
+// The colour the guest's pattern gives the pixel in column x of row y.
+pub fn screen_pattern(x int, y int) (u8, u8, u8) {
+	return u8(x), u8(y), u8(x + y)
+}
+
+// What is wrong with the top-left `size` by `size` pixels as the guest's
+// pattern; '' if nothing.
+pub fn (p &Picture) judge_pattern(size int) string {
+	if p.width < size || p.height < size {
+		return 'it is ${p.width} by ${p.height}, smaller than the ${size} by ${size} pattern'
+	}
+	for y in 0 .. size {
+		for x in 0 .. size {
+			red, green, blue := screen_pattern(x, y)
+			at := (y * p.width + x) * 3
+			if p.pixels[at] != red || p.pixels[at + 1] != green || p.pixels[at + 2] != blue {
+				return 'the pixel in column ${x} of row ${y} is (${p.pixels[at]}, ${p.pixels[at + 1]}, ${p.pixels[at + 2]}), not the (${red}, ${green}, ${blue}) the guest drew'
+			}
+		}
+	}
+	return ''
 }
 
 // A screen with a console's text on it has a few pixels in a hundred lit;
@@ -97,6 +130,7 @@ pub fn read_picture(data []u8) !Picture {
 		width:  width
 		height: height
 		lit:    lit
+		pixels: data[pixels..pixels + width * height * 3]
 	}
 }
 
@@ -123,5 +157,20 @@ pub fn check_screen(screen Screen, state string) ! {
 	problem := judge_picture(picture, screen.dark)
 	if problem != '' {
 		return error('${screen.file}: ${problem}')
+	}
+	if screen.like != '' {
+		other_data := os.read_bytes(os.join_path(state, screen.like)) or {
+			return error('${screen.like}: the picture was not taken')
+		}
+		other := read_picture(other_data) or { return error('${screen.like}: ${err.msg()}') }
+		if other.width != picture.width || other.height != picture.height {
+			return error('${screen.file} is ${picture.width} by ${picture.height}, but ${screen.like} was ${other.width} by ${other.height}: the display is in another mode')
+		}
+	}
+	if screen.pattern > 0 {
+		wrong := picture.judge_pattern(screen.pattern)
+		if wrong != '' {
+			return error('${screen.file}: ${wrong}')
+		}
 	}
 }

@@ -191,6 +191,10 @@ mut:
 	triggered bool // its marker has been seen
 	due_at    i64  // when to send it, in the caller's milliseconds
 	held      []HeldLine
+	// For an action that waits for an event: it has been seen often enough,
+	// and when that was first noticed.
+	event_seen bool
+	event_at   i64
 }
 
 // A line printed while an action was being delayed. It belongs to the action
@@ -242,6 +246,31 @@ pub fn (mut c ActionCursor) take_due(now_ms i64) ?Action {
 	return action
 }
 
+// The same, for actions that also wait for the machine: one that names an
+// event is only returned once QEMU has reported that event as often as the
+// action says, and the action's further delay has passed since this was first
+// found to be so. `events` is what the machine has sent so far.
+pub fn (mut c ActionCursor) take_ready(now_ms i64, events &EventLog) ?Action {
+	if c.next >= c.actions.len || !c.triggered || now_ms < c.due_at {
+		return none
+	}
+	action := c.actions[c.next]
+	if action.event != '' {
+		if events.count(action.event) < action.event_count {
+			return none
+		}
+		if !c.event_seen {
+			c.event_seen = true
+			c.event_at = now_ms
+		}
+		if now_ms - c.event_at < action.event_delay_ms {
+			return none
+		}
+	}
+	c.event_seen = false
+	return c.take_due(now_ms)
+}
+
 pub fn (c &ActionCursor) done() bool {
 	return c.next >= c.actions.len
 }
@@ -252,4 +281,14 @@ pub fn (c &ActionCursor) waiting_for() string {
 		return ''
 	}
 	return c.actions[c.next].after
+}
+
+// The event the next action is still waiting for, its marker seen: "SUSPEND
+// (number 2)", or '' when it waits for no event.
+pub fn (c &ActionCursor) waiting_for_event() string {
+	if c.next >= c.actions.len || !c.triggered || c.event_seen || c.actions[c.next].event == '' {
+		return ''
+	}
+	action := c.actions[c.next]
+	return '${action.event} (number ${action.event_count})'
 }

@@ -44,6 +44,8 @@ fn run_scenario(name string, mut t Test) bool {
 		'restart' { scenario_restart(mut t) }
 		'screen-sleep' { scenario_screen_sleep(mut t) }
 		'suspend' { scenario_suspend(mut t) }
+		'suspend-deep' { scenario_suspend_deep(mut t) }
+		'suspend-deep-iommu' { scenario_suspend_deep_iommu(mut t) }
 		'thermal' { scenario_thermal(mut t) }
 		'thermal-selftest' { scenario_thermal_selftest(mut t) }
 		else { return false }

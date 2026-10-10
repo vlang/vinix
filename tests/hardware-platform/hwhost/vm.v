@@ -225,7 +225,7 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 				break
 			}
 		} else {
-			if action := actions.take_due(now) {
+			if action := actions.take_ready(now, &m.qmp.events) {
 				command := substitute(action.qmp, state)!
 				m.qmp.execute(command)!
 				if action.end_within > 0 {
@@ -241,6 +241,10 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 			return error('the machine was still running ${end_reason}')
 		}
 		if now >= deadline {
+			event := actions.waiting_for_event()
+			if event != '' {
+				return error('timed out after ${timeout} s: QEMU never reported the event ${event}')
+			}
 			missing := markers.missing()
 			if missing.len > 0 {
 				return error('timed out after ${timeout} s without ${quoted(missing)}')
