@@ -50,6 +50,8 @@ fn main() {
 		require_child('/opt/ios/sysctl-checks')
 		require_child('/opt/ios/terminal-checks')
 		require_child('/opt/ios/thread-policy-checks')
+		require_child('/opt/ios/file-time-checks')
+		require_child('/opt/ios/uuid-checks')
 		require_child('/opt/ios/regression')
 	} else {
 		args := if mode == 'audit' {

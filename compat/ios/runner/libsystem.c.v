@@ -124,6 +124,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := mach_memory_symbol(symbol) { return address }
 	if address := common_crypto_symbol(symbol) { return address }
 	address := match symbol {
+		'_uuid_generate' { unsafe { voidptr(darwin_uuid_generate) } }
 		'___assert_rtn' { unsafe { voidptr(darwin_assert_rtn) } }
 		'___chkstk_darwin' { unsafe { voidptr(C.ios_chkstk_darwin) } }
 		'___maskrune' { unsafe { voidptr(darwin_maskrune) } }

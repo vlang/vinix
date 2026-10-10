@@ -116,6 +116,7 @@ fn files_symbol(symbol string) ?u64 {
 		'_fsync' { u64(unsafe { voidptr(darwin_fsync) }) }
 		'_chmod' { u64(unsafe { voidptr(darwin_chmod) }) }
 		'_fchmod' { u64(unsafe { voidptr(darwin_fchmod) }) }
+		'_utime' { u64(unsafe { voidptr(darwin_utime) }) }
 		'_readlink' { u64(unsafe { voidptr(darwin_readlink) }) }
 		'_symlink' { u64(unsafe { voidptr(darwin_symlink) }) }
 		'_stat', '_stat$INODE64' { u64(unsafe { voidptr(darwin_stat) }) }

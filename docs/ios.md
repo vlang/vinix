@@ -75,7 +75,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit` termination |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
-| libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases and 144-byte stat records; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread, `dispatch_once`, main/global/serial dispatch queues, delayed work and synchronous callbacks |
+| libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases, 144-byte stat records and native `utime` timestamps; version-4 UUIDs from native entropy; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread, `dispatch_once`, main/global/serial dispatch queues, delayed work and synchronous callbacks |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
@@ -1289,17 +1289,46 @@ failed serial log and VM hashes are retained under `thread-policy-checks`.
 This resolves two more strong imports. The actual Fortnite probe still exits
 with status 1 before entry, now at `utime` in EOSSDK.
 
+V now implements `utime` with real native filesystem updates. Its Darwin
+input has two signed 64-bit seconds, preserving EOSSDK's existing access
+time while changing modification time. A null timestamp pointer sets both
+times to now. Native errors are translated, successful calls preserve errno,
+and input storage remains unchanged. Native component lookup retries an
+`ENOENT` result to handle the kernel's absolute-symlink lookup limitation
+and recover `ELOOP` for a self-referencing link.
+
+`uuid_generate` now fills precisely sixteen bytes from native `getentropy`,
+setting the version-4 and RFC variant bits measured on the installed Mac.
+It preserves thread-local errno and fails if native entropy is unavailable.
+Both adapters allocate no V heap storage per call, as checked in generated C.
+Native Mac ASAN/UBSAN checks pass. Eight workers over two runtime teardowns
+verify timestamps with independent native stat reads, epoch/pre-1970/post-2038
+values, symlinks, set-to-now behavior, unchanged file contents and guarded
+inputs. UUID checks verify 16,000 distinct values, every random bit varying,
+guarded outputs and thread-local errno. Both new checks also pass in Vinix.
+
+The final four-core ARM64 run passes all nine native V checks and the full
+C++/UIKit/GLES/PPSSPP regression. The first run exposed the symlink-loop
+error above; a second run passed the native checks but hit an intermittent
+`ENOENT` in the existing concurrent readlink fixture's regular-file lookup.
+Both failed serial logs and VM hashes are retained under `file-time-checks`,
+alongside the passing run and native Mac measurements. Four more strong
+imports now resolve. The actual Fortnite probe still exits with status 1
+before entry, at AVFAudio's `AVAudioSessionInterruptionOptionKey` in EOSSDK.
+Its native Mac string value and the other imported audio-session constants
+have been measured; audio-session configuration and output remain unsupported.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,325 | 833 | 81 |
-| EOSSDK | 542 | 120 | 18 |
+| Fortnite executable | 1,327 | 831 | 81 |
+| EOSSDK | 544 | 118 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,927 | 1,069 | 122 |
+| All images | 1,931 | 1,065 | 122 |
 
-The C++/GLES/Text variant reports 1,940 resolved imports, 1,056 unresolved strong
+The C++/GLES/Text variant reports 1,944 resolved imports, 1,052 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1335,10 +1364,10 @@ v -nocache -cc clang run tests/ios/native-checks.v verify-monitor
 ```
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
-`build/ios/fortnite` (default `select-checks`; the thread-policy verification uses
-`thread-policy-checks`). Each mode records its own state path and guest `serial.log`
+`build/ios/fortnite` (default `select-checks`; the timestamp/UUID verification uses
+`file-time-checks`). Each mode records its own state path and guest `serial.log`
 there. Regression runs the native V select, semaphore, signal, error, sysctl,
-terminal and thread-policy checks before the
+terminal, thread-policy, file timestamp and UUID checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build
