@@ -171,7 +171,7 @@ pub fn set_thresholds(low int, critical int) bool {
 // own and stays good until unregister(). None when the table is full or the
 // name is taken.
 pub fn register(supply Supply) ?&Supply {
-	acpisync.wait(gate(), 0xffff)
+	acpisync.acquire(gate(), 0xffff)
 	mut slot := &Supply(unsafe { nil })
 	for i in 0 .. max_supplies {
 		if psupply_table[i].used && psupply_table[i].name == supply.name {
@@ -218,7 +218,7 @@ pub fn unregister(mut supply Supply) {
 		return
 	}
 	unpublish_supply(mut supply)
-	acpisync.wait(gate(), 0xffff)
+	acpisync.acquire(gate(), 0xffff)
 	supply.used = false
 	supply.read = unsafe { nil }
 	unsafe { supply.name.free() }
@@ -243,7 +243,7 @@ fn refresh(mut supply Supply, force bool) {
 	if !force && supply.read_ns != 0 && now - supply.read_ns < fresh_ns {
 		return
 	}
-	acpisync.wait(gate(), 0xffff)
+	acpisync.acquire(gate(), 0xffff)
 	defer {
 		acpisync.signal(psupply_gate)
 	}

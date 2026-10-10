@@ -79,7 +79,9 @@ fn enter() {
 	if fwload_gate == unsafe { nil } {
 		fwload_gate = acpisync.create(true)
 	}
-	acpisync.wait(fwload_gate, 0xffff)
+	// acquire(), not wait(), which gives up for a caller with a signal coming
+	// and would let it in without the gate.
+	acpisync.acquire(fwload_gate, 0xffff)
 }
 
 fn leave() {

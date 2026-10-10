@@ -158,7 +158,10 @@ fn gate_enter() {
 		devcore_gate_depth++
 		return
 	}
-	acpisync.wait(devcore_gate, 0xffff)
+	// acquire(), not wait(): this is entered from a write to a file in /sys,
+	// and wait() gives up for a caller with a signal coming. The caller would
+	// then have gone on without the gate.
+	acpisync.acquire(devcore_gate, 0xffff)
 	devcore_gate_owner = me
 	devcore_gate_depth = 1
 }
