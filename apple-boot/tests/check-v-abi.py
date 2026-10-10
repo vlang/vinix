@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory(prefix="vinix-apple-abi-") as directory:
     work = Path(directory)
     generated = arguments.source or work / "core.c"
     if not arguments.source:
-        subprocess.run(["python3", str(loader / "compile-v.py"), "--host", str(generated)], check=True)
+        subprocess.run([str(loader / "compile-v"), "--host", str(generated)], check=True)
     text = generated.read_text()
     # Use only compiler-emitted storage declarations, so libc and wrappers
     # cannot affect this comparison or redeclare the independent C prototypes.

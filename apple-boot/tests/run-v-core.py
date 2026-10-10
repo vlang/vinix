@@ -14,7 +14,7 @@ cc = os.environ.get("CC", "clang")
 with tempfile.TemporaryDirectory(prefix="vinix-apple-host-") as directory:
     work = Path(directory)
     source, object_file = work / "core.c", work / "core.o"
-    subprocess.run(["python3", str(loader / "compile-v.py"), "--host", str(source)], check=True)
+    subprocess.run([str(loader / "compile-v"), "--host", str(source)], check=True)
     subprocess.run(["python3", str(here / "check-v-abi.py"), "--source", str(source)], check=True)
     flags = ["-O2", "-g", "-Wall", "-Wextra", "-Werror", "-fsanitize=address,undefined",
              "-fno-omit-frame-pointer"]
@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix="vinix-apple-host-") as directory:
     for fixture, module in (("converter", "convertercore"), ("boot", "bootfixture"),
                             ("helpers", "helperfixture")):
         fixture_source, fixture_object = work / (fixture + ".c"), work / (fixture + ".o")
-        subprocess.run(["python3", str(here / "compile-fixture.py"), fixture,
+        subprocess.run([str(here / "compile-fixture"), fixture,
                         str(fixture_source)], check=True)
         subprocess.run([cc, "-std=gnu11", *flags, "-Wno-unused-function",
                         "-Wno-unused-parameter", "-Wno-unused-label", "-fwrapv", "-fno-strict-aliasing",

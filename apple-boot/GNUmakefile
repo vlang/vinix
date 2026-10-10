@@ -34,9 +34,9 @@ $(BUILD)/obj/%.o: src/%.c src/*.h
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD)/obj/vcore.c: $(VFILES) compile-v.py
+$(BUILD)/obj/vcore.c: $(VFILES) compile-v compile-v.v hostcompiler/core.v
 	@mkdir -p $(dir $@)
-	python3 compile-v.py $@
+	./compile-v $@
 
 $(BUILD)/obj/vcore.o: $(BUILD)/obj/vcore.c src/v_abi.h
 	$(CC) $(CFLAGS) $(V_CFLAGS) -c $< -o $@
@@ -51,9 +51,9 @@ $(BUILD)/vinix-apple-loader.elf: $(OBJECTS) apple-boot.ld
 $(BUILD)/vinix-apple-loader.bin: $(BUILD)/vinix-apple-loader.elf
 	$(OBJCOPY) -O binary --strip-debug $< $@
 
-$(BUILD)/obj/vcore-host.c: $(VFILES) compile-v.py
+$(BUILD)/obj/vcore-host.c: $(VFILES) compile-v compile-v.v hostcompiler/core.v
 	@mkdir -p $(dir $@)
-	python3 compile-v.py --host $@
+	./compile-v --host $@
 
 $(BUILD)/obj/vcore-host.o: $(BUILD)/obj/vcore-host.c src/v_abi.h
 	$(HOSTCC) -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function \
@@ -63,9 +63,9 @@ $(BUILD)/obj/vcore-host.o: $(BUILD)/obj/vcore-host.c src/v_abi.h
 comma := ,
 HOST_GC := $(if $(filter Darwin,$(shell uname -s)),-Wl$(comma)-dead_strip,-Wl$(comma)--gc-sections)
 
-$(BUILD)/obj/converter-fixture.c: tests/convertercore/core.v tests/converter-v-abi.h tests/compile-fixture.py ../build-support/compile-v-module.py
+$(BUILD)/obj/converter-fixture.c: tests/convertercore/core.v tests/converter-v-abi.h tests/compile-fixture tests/compile-fixture.v ../tests/linuxkpi/hosttest/module.v
 	@mkdir -p $(dir $@)
-	python3 tests/compile-fixture.py converter $@
+	tests/compile-fixture converter $@
 
 $(BUILD)/obj/converter-fixture.o: $(BUILD)/obj/converter-fixture.c tests/converter-v-abi.h src/*.h
 	$(HOSTCC) -std=gnu11 -O2 -g -Wall -Wextra -Werror -Wno-unused-function \

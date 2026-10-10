@@ -34,7 +34,7 @@ def main():
                  "-fno-strict-aliasing", "-I" + str(LOADER / "src"), "-I" + str(HERE)]
     gc = "-Wl,-dead_strip" if platform.system() == "Darwin" else "-Wl,--gc-sections"
     core = work / "core.c"
-    run([sys.executable, LOADER / "compile-v.py", "--host", core])
+    run([LOADER / "compile-v", "--host", core])
     run([cc, "-std=gnu11", *flags, *generated, "-ffreestanding", "-fno-builtin",
          "-c", core, "-o", work / "core.o"])
     receipts = {"original_revision": ORIGINAL, "cases": []}
@@ -48,7 +48,7 @@ def main():
         run([cc, "-std=gnu11", *flags, "-DAPPLE_BOOT_HOST", "-I" + str(HERE), gc,
              frozen, work / "core.o", "-o", work / (fixture + "-c")])
         source, obj = work / (fixture + ".c"), work / (fixture + ".o")
-        run([sys.executable, HERE / "compile-fixture.py", fixture, source])
+        run([HERE / "compile-fixture", fixture, source])
         run([cc, "-std=gnu11", *flags, *generated, "-c", source, "-o", obj])
         symbols = subprocess.check_output(["nm", "-u", str(obj)], text=True)
         assert not re.search(r"\b_?(?:calloc|realloc|memdup|new_array\w*)\b", symbols), symbols
