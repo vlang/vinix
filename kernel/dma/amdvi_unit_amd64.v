@@ -505,6 +505,34 @@ fn amdvi_start_unit(mut unit AmdviUnit) bool {
 		C.kprintf(c'amdvi: %.*s: firmware left translation on; restarting it with tables of our own\n',
 			i32(unit.name.len), unit.name.str)
 	}
+	unit.command_sequence = 0
+	amdvi_program(mut unit)
+
+	// Both rings report that they run once the unit is on. Whether they do
+	// is settled by the flush below, which needs a command carried out; this
+	// only gives a slow unit its time first.
+	devcore.spin_until(amdvi_rings_running, voidptr(unit), amdvi_register_timeout_ns)
+
+	// Whatever the unit remembers from before -- firmware's tables, or a
+	// kernel started from another -- must go before a device is given a
+	// domain under an id that was in use then.
+	if !amdvi_flush_everything(mut unit) {
+		C.kprintf(c'amdvi: %.*s: the unit does not carry out commands (status 0x%llx); switched off again\n',
+			i32(unit.name.len), unit.name.str, u64(amdvi_read32(unit, amdvi_reg_status)))
+		amdvi_quiesce(unit)
+		amdvi_free_unit_memory(mut unit)
+		return false
+	}
+	unit.on = true
+	return true
+}
+
+// Write the unit's registers from what the kernel keeps of it: everything
+// off, the control bits, the device table, both rings empty, and translation
+// on. At boot, and again when the unit has been without power: the tables and
+// the rings are memory and are as they were, the registers that point at
+// them are not.
+fn amdvi_program(mut unit AmdviUnit) {
 	amdvi_quiesce(unit)
 
 	// The control bits firmware asks for, and Linux's two: memory the unit
@@ -533,7 +561,6 @@ fn amdvi_start_unit(mut unit AmdviUnit) bool {
 	amdvi_write32(unit, amdvi_reg_command_tail, 0)
 	unit.command_head = 0
 	unit.command_tail = 0
-	unit.command_sequence = 0
 	amdvi_control_set(unit, amdvi_control_command_buffer)
 
 	amdvi_write64(unit, amdvi_reg_event_base, unit.events | amdvi_ring_size_code)
@@ -543,22 +570,4 @@ fn amdvi_start_unit(mut unit AmdviUnit) bool {
 
 	// From here every device behind the unit is blocked.
 	amdvi_control_set(unit, amdvi_control_enable)
-
-	// Both rings report that they run once the unit is on. Whether they do
-	// is settled by the flush below, which needs a command carried out; this
-	// only gives a slow unit its time first.
-	devcore.spin_until(amdvi_rings_running, voidptr(unit), amdvi_register_timeout_ns)
-
-	// Whatever the unit remembers from before -- firmware's tables, or a
-	// kernel started from another -- must go before a device is given a
-	// domain under an id that was in use then.
-	if !amdvi_flush_everything(mut unit) {
-		C.kprintf(c'amdvi: %.*s: the unit does not carry out commands (status 0x%llx); switched off again\n',
-			i32(unit.name.len), unit.name.str, u64(amdvi_read32(unit, amdvi_reg_status)))
-		amdvi_quiesce(unit)
-		amdvi_free_unit_memory(mut unit)
-		return false
-	}
-	unit.on = true
-	return true
 }
