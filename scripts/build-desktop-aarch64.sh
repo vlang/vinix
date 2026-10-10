@@ -1213,7 +1213,7 @@ if [ "$REUSE_STAGING" -eq 0 ]; then
         cp -a "$CHROMIUM_STAGING"/usr/lib/*.so* "$chromium_runtime/"
         install -m755 "$CHROMIUM_STAGING/lib/ld-musl-aarch64.so.1" \
             "$STAGING/lib/ld-chromium.so.1"
-        python3 "$SCRIPT_DIR/build-support/patch-elf-interpreter.py" \
+        "$SCRIPT_DIR/build-support/patch-elf-interpreter" \
             "$STAGING/usr/lib/chromium/chrome" \
             /lib/ld-musl-aarch64.so.1 /lib/ld-chromium.so.1
         touch "$chromium_runtime/.complete"

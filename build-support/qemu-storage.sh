@@ -202,7 +202,7 @@ vinix_storage_create_ext2() {
     # and enforces Unix permissions; Firefox, for one, refuses to start when it
     # finds that $HOME belongs to somebody else.
     if [ -n "$seed_dir" ]; then
-        root_owner_tool="${VINIX_EXT2_ROOT_OWNER_TOOL:-$(dirname "${BASH_SOURCE[0]}")/ext2-set-root-owner.py}"
+        root_owner_tool="${VINIX_EXT2_ROOT_OWNER_TOOL:-$(dirname "${BASH_SOURCE[0]}")/ext2-set-root-owner}"
         if ! "$root_owner_tool" "$temp_disk"; then
             echo "ERROR: could not give the new volume to root" >&2
             rm -rf "$seed_dir"

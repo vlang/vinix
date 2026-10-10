@@ -28,7 +28,7 @@ python3 -c 'with open("build/root.ext2", "xb") as image: image.truncate(128 << 2
 mke2fs -q -F -t ext2 -b 4096 -I 128 \
     -O filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum \
     -d build/root-staging build/root.ext2
-python3 build-support/ext2-set-root-owner.py build/root.ext2
+build-support/ext2-set-root-owner build/root.ext2
 
 python3 tools/verified-root/build.py build \
     --data build/root.ext2 --output build/root.verity > build/root.verity.json

@@ -331,7 +331,7 @@ fn main_workflow(args string, work string) ! {
 	sweep(mark, state)!
 	mark = checkpoint()!
 	owner := global('command')!
-	cmd(owner, [lit('python3')!, join(global('ROOT')!, 'build-support/ext2-set-root-owner.py')!,
+	cmd(owner, [join(global('ROOT')!, 'build-support/ext2-set-root-owner')!,
 		source], {
 		'stdout': devnull()!
 	})!
