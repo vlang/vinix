@@ -828,6 +828,7 @@ with its own reason when it differs:
 | --- | --- |
 | the kernel: its length and a digest of its code and constants | the image is entered at an address in the kernel |
 | the kernel command line | the two kernels were configured alike: an IOMMU on in one is on in the other |
+| the SATA and IDE disks and the partitions on them, each by name and size | a filesystem the image holds in memory belongs to the disk it was on |
 | the memory the machine has, as runs of addresses | every saved page goes back into its frame |
 | every region that is not such memory -- firmware's, ACPI's, the framebuffer -- by place, length and kind | the kernel inside believes its own map |
 | where the kernel is mapped, the direct map's offset, the depth of the page tables | pointers |
@@ -945,6 +946,9 @@ What this is not:
   keeps there is this boot's, and the methods of a kernel put back from an
   image run against it.
 - **The image is not encrypted or signed.** See the device, above.
+- **What is on the disks is not compared**, only which disks there are and
+  how large. One exchanged for another of the same size while the machine
+  was off is used as if it were the one the image knew.
 - **Only this kernel knows to leave a waiting image's disks alone.** A
   start of another system, or of a kernel from before this, mounts and
   writes what it likes; started with the option again afterwards, the
@@ -1228,7 +1232,7 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `hibernate-xapic`: the same with page tables four levels deep and no x2APIC | pass | -- |
 | `hibernate-iommu`, `hibernate-iommu-amd`: the same behind VT-d and AMD-Vi, which the kernel that loads the image has switched on as well | pass | -- |
 | `hibernate-cycles`: five suspends to disk one after another, six boots; the kernel heap after the last four as after the first | pass | -- |
-| `hibernate-damaged-header`, `hibernate-damaged-pages`, `hibernate-memory`: an image damaged while the machine was off, and a machine with less memory, start afresh, say why, discard the image and work | pass | -- |
+| `hibernate-damaged-header`, `hibernate-damaged-pages`, `hibernate-memory`, `hibernate-disks`: an image damaged while the machine was off, a machine with less memory, and one with a disk more, start afresh, say why, discard the image and work | pass | -- |
 | `hibernate-unnamed`, `hibernate-foreign`: with no device named, or one that holds something else, there is no `disk` and both disks are byte for byte as they were made | pass | -- |
 | `hibernate-root`: the system installed on a disk; a file written before the image is taken, another by the resumed kernel, both read back by a third start afresh from the disk | pass | -- |
 | `hibernate-waiting`: the same, started once without the option in between: the image is found waiting and left whole, the system's disk is not mounted, no disk is written to; the next start goes back into the image | pass | -- |

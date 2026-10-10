@@ -18,8 +18,10 @@
 module hibernate
 
 import acpi
+import fs
 import limine
 import memory
+import stat
 import x86.cpu
 import x86.wake
 
@@ -190,8 +192,29 @@ fn command_line_digest() u64 {
 	return sum_bytes(image_magic, text, length)
 }
 
+// The disks the SATA and IDE drivers have brought up, and the partitions
+// found on them, each by name and size, in whatever order /dev has them. An
+// NVMe disk is left out: its driver starts after an image has been looked
+// for, so a boot could never answer the same.
+fn disks_digest() u64 {
+	dev := fs.get_node(vfs_root, '/dev', true) or { return mix(image_magic, 0) }
+	mut sum := u64(0)
+	mut count := u64(0)
+	for name, node in dev.children {
+		if (name.starts_with('sd') || name.starts_with('ata')) && node.resource != unsafe { nil }
+			&& stat.isblk(node.resource.stat.mode) {
+			// Added, not chained: the order of a table is not an order.
+			sum += mix(sum_bytes(image_magic, name.str, u64(name.len)), u64(node.resource.stat.size))
+			count++
+		}
+		// Each turn of the loop is given a copy of the name.
+		unsafe { name.free() }
+	}
+	return mix(sum, count)
+}
+
 // The machine as it is now. Not cheap -- the kernel's code is read through --
-// and not allocating.
+// and allocating nothing it does not free.
 fn this_machine() Machine {
 	mut machine := Machine{}
 	if kaddr_req.response != unsafe { nil } {
@@ -239,6 +262,7 @@ fn this_machine() Machine {
 	machine.framebuffer, machine.framebuffer_layout = framebuffer_digest()
 	machine.processors, machine.processor_digest = processor_digest()
 	machine.command_line = command_line_digest()
+	machine.disks = disks_digest()
 	machine.low_base, machine.low_pages = memory.low_pages()
 	wake.trace('machine: kernel at', machine.kernel_physical)
 	wake.trace('machine: kernel mapped at', machine.kernel_virtual)
@@ -253,6 +277,7 @@ fn this_machine() Machine {
 	wake.trace('machine: framebuffer layout', machine.framebuffer_layout)
 	wake.trace('machine: processors', machine.processor_digest)
 	wake.trace('machine: command line', machine.command_line)
+	wake.trace('machine: disks', machine.disks)
 	wake.trace('machine: low pages', machine.low_base)
 	return machine
 }

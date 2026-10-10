@@ -72,6 +72,9 @@ pub mut:
 	processor_digest u64
 	// The kernel command line.
 	command_line u64
+	// The SATA and IDE disks and the partitions found on them: each by its
+	// name and its size. Not what is on them.
+	disks u64
 	// The pages under 1 MiB processors are started on.
 	low_base  u64
 	low_pages u64
@@ -261,6 +264,12 @@ pub fn machine_difference(image &Machine, here &Machine) string {
 	}
 	if image.command_line != here.command_line {
 		return 'the kernel command line has changed'
+	}
+	// A filesystem the image holds in memory belongs to the disk it was
+	// on. A disk taken out, put in or exchanged for one of another size, or
+	// partitioned differently, is not the machine the image was taken on.
+	if image.disks != here.disks {
+		return 'the disks have changed'
 	}
 	if image.map_memory != here.map_memory || image.memory_top != here.memory_top {
 		return 'the memory of the machine has changed'

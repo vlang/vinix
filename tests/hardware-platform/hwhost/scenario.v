@@ -1286,6 +1286,31 @@ pub const scenarios = [
 		timeout:    180
 	},
 	Scenario{
+		name:       'hibernate-disks'
+		about:      'nor by a machine with a disk more than the image was taken with'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       hibernate_machine
+		disks:      [hibernate_data_disk, hibernate_image_disk,
+			Disk{
+				name:     'extra.raw'
+				size_mib: 16
+				header:   'vinix hardware test disk: not blank'
+			}]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-disks', 'HWTEST PASS hibernate-disks']
+		// Last, so that the two the image knew keep their places and names.
+		reboots:    [
+			Reboot{
+				qemu: ['-drive', 'if=ide,format=raw,file={state}/extra.raw']
+			},
+		]
+		ending:     .poweroff
+		patterns:   hibernate_refusal_patterns
+		disk_bytes: hibernate_no_image
+		timeout:    180
+	},
+	Scenario{
 		name:       'hibernate-root'
 		about:      'suspend to disk with the system on a disk: resumed, used again, and found whole by a third start'
 		arches:     ['x86_64']

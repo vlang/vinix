@@ -25,6 +25,7 @@ fn sample_machine() Machine {
 		processors:         4
 		processor_digest:   0xa8beea74343eeb2a
 		command_line:       0x402a470928f955d6
+		disks:              0x5d1c9f0b3e7a6c21
 		low_base:           0x98000
 		low_pages:          8
 	}
@@ -212,6 +213,14 @@ fn test_every_other_difference_is_named() {
 	here = sample_machine()
 	here.command_line++
 	assert machine_difference(&image, &here).contains('command line')
+	here = sample_machine()
+	here.disks++
+	assert machine_difference(&image, &here).contains('disks')
+	// Named before the memory: a disk more moves firmware's memory too, and
+	// the disk is the reason somebody can do something about.
+	here.map_memory++
+	here.map_fixed++
+	assert machine_difference(&image, &here).contains('disks')
 	here = sample_machine()
 	here.map_memory++
 	assert machine_difference(&image, &here).contains('memory of the machine')

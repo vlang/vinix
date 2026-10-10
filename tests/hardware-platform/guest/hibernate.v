@@ -531,6 +531,11 @@ fn scenario_hibernate_memory(mut t Test) {
 	hibernate_refused(mut t, 'memory')
 }
 
+// A disk more in the second boot than the image was taken with.
+fn scenario_hibernate_disks(mut t Test) {
+	hibernate_refused(mut t, 'the disks have changed')
+}
+
 // No device named: nothing is offered, and nothing is written anywhere. The
 // controller compares both disks with what it made, byte for byte, so this
 // writes to neither.

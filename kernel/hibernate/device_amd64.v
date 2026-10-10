@@ -99,7 +99,7 @@ fn open_device() bool {
 		hib_device_problem = 'no device was named for the image (vinix.hibernate=)'
 		return false
 	}
-	path := '/dev/' + name
+	path := '/dev/' + name @[freed]
 	defer {
 		unsafe { path.free() }
 	}
@@ -120,7 +120,7 @@ fn open_device() bool {
 	// And the disk a partition is on, whose node shows the same bytes.
 	dash := name.index_u8(`-`)
 	if dash > 0 {
-		parent_path := '/dev/' + unsafe { tos(name.str, dash) }
+		parent_path := '/dev/' + unsafe { tos(name.str, dash) } @[freed]
 		if mut parent := fs.get_node(vfs_root, parent_path, true) {
 			if parent.resource != unsafe { nil } && stat.isblk(parent.resource.stat.mode) {
 				restrict(mut parent)
