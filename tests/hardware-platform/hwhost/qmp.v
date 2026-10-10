@@ -110,3 +110,50 @@ pub fn qmp_parse(line string) QmpMessage {
 		text: text
 	}
 }
+
+// Which events a machine has sent, and how often: what a scenario that names
+// events it must have seen is judged by.
+pub struct EventLog {
+mut:
+	names  []string
+	counts []int
+}
+
+pub fn (mut log EventLog) note(event string) {
+	if event == '' {
+		return
+	}
+	for i, name in log.names {
+		if name == event {
+			log.counts[i]++
+			return
+		}
+	}
+	log.names << event
+	log.counts << 1
+}
+
+// How many times the event arrived.
+pub fn (log &EventLog) count(event string) int {
+	for i, name in log.names {
+		if name == event {
+			return log.counts[i]
+		}
+	}
+	return 0
+}
+
+// The events of `wanted` that did not arrive as often as it lists them: an
+// event named twice must have arrived twice.
+pub fn (log &EventLog) missing(wanted []string) []string {
+	mut missing := []string{}
+	for event in wanted {
+		if event in missing {
+			continue
+		}
+		if log.count(event) < wanted.filter(it == event).len {
+			missing << event
+		}
+	}
+	return missing
+}

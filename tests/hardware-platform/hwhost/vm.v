@@ -182,6 +182,9 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	for pattern in scenario.patterns {
 		check_pattern(pattern, state)!
 	}
+	for screen in scenario.screens {
+		check_screen(screen, state)!
+	}
 }
 
 fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout int) ! {
@@ -261,6 +264,10 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 	}
 	if !actions.done() {
 		return error('the machine ended (${how}) before an action could run; its marker was "${actions.waiting_for()}"')
+	}
+	unseen := m.qmp.events.missing(scenario.events)
+	if unseen.len > 0 {
+		return error('the machine ended (${how}) without QEMU reporting ${quoted(unseen)} as often as expected')
 	}
 	if scenario.ending == .running {
 		return error('the machine ended (${how}); it was expected to stay up')

@@ -72,3 +72,21 @@ fn test_half_a_message_is_not_a_message() {
 	assert splitter.feed('{}}'.bytes()) == []string{}
 	assert splitter.feed('\r\n'.bytes()) == ['{"return": {}}\r']
 }
+
+fn test_events_are_counted_by_name() {
+	mut log := EventLog{}
+	assert log.count('DEVICE_DELETED') == 0
+	assert log.missing(['DEVICE_DELETED']) == ['DEVICE_DELETED']
+	deleted := qmp_parse('{"timestamp": {"seconds": 1, "microseconds": 2}, "event": "DEVICE_DELETED", "data": {"device": "hwhot0", "path": "/machine/peripheral/hwhot0"}}')
+	assert deleted.kind == .event
+	log.note(deleted.event)
+	log.note('RESUME')
+	log.note('')
+	assert log.count('DEVICE_DELETED') == 1
+	assert log.missing(['DEVICE_DELETED', 'RESUME']) == []
+	// Named twice, it must have arrived twice.
+	assert log.missing(['DEVICE_DELETED', 'DEVICE_DELETED']) == ['DEVICE_DELETED']
+	log.note('DEVICE_DELETED')
+	assert log.missing(['DEVICE_DELETED', 'DEVICE_DELETED']) == []
+	assert log.missing(['SUSPEND']) == ['SUSPEND']
+}

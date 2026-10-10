@@ -1,0 +1,22 @@
+#!/bin/sh
+# Test on the host how a newly arrived PCI device's registers are given
+# addresses: kernel/pci/window.v, the arithmetic of bridge windows and
+# placement behind PCI hotplug.
+#
+# That file is plain arithmetic with no kernel in it. It is copied, unchanged,
+# next to its tests in a scratch module, because the rest of its own module
+# only builds as part of the kernel.
+set -eu
+
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+. "$repo/build-support/find-v.sh"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-pci-hotplug.XXXXXX")
+trap 'rm -rf "$work"' 0
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+mkdir "$work/pci"
+cp "$repo/kernel/pci/window.v" "$repo/tests/pci-hotplug/window_test.v" "$work/pci/"
+"$V" -cc cc test "$work/pci"

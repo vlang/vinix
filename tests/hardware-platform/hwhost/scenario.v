@@ -97,8 +97,15 @@ pub:
 	required     []string // every one must appear on some serial line
 	forbidden    []string // besides always_forbidden
 	actions      []Action
+	// QMP events QEMU must have sent by the time the machine ends; one named
+	// twice must have arrived twice. This is how the host knows that the
+	// machine, and not only the guest's own account of it, changed.
+	events       []string
 	ending       Ending
 	patterns     []DiskPattern
+	// Pictures of the screen that actions take (`screendump` into {state}),
+	// and whether each must be dark or show something; see screen.v.
+	screens      []Screen
 }
 
 // What QEMU's TFTP server serves the guest's network probe; see guest/network.v.
@@ -111,6 +118,41 @@ const iommu_disk = Disk{
 	name:     'disk.raw'
 	size_mib: 32
 	header:   'vinix hardware test disk: not blank'
+}
+
+// A machine with an empty PCI Express port, no network card, and the network
+// a card put into the port will be on.
+const hotplug_machine = ['-nic', 'none', '-device', 'pcie-root-port,id=hwport0,chassis=1,bus=pcie.0',
+	'-netdev', 'user,id=hwhot0,tftp={state}/tftp']
+
+const hotplug_add = '{"execute":"device_add","arguments":{"driver":"e1000","bus":"hwport0","id":"hwcard0","netdev":"hwhot0"}}'
+const hotplug_remove = '{"execute":"device_del","arguments":{"id":"hwcard0"}}'
+
+// The card goes in when the guest waits for it, and is asked back when the
+// guest says it is in use; then both again.
+const hotplug_actions = [
+	Action{
+		after: 'HWTEST STEP waiting for the card'
+		qmp:   hotplug_add
+	},
+	Action{
+		after: 'HWTEST STEP card in use'
+		qmp:   hotplug_remove
+	},
+	Action{
+		after: 'HWTEST STEP waiting for the card again'
+		qmp:   hotplug_add
+	},
+	Action{
+		after: 'HWTEST STEP card in use again'
+		qmp:   hotplug_remove
+	},
+]
+
+// The command that has QEMU write a picture of the screen, `<name>.ppm`, into
+// the state directory.
+fn screen_picture(name string) string {
+	return '{"execute":"screendump","arguments":{"filename":"{state}/${name}.ppm"}}'
 }
 
 pub const scenarios = [
@@ -318,6 +360,81 @@ pub const scenarios = [
 		]
 		ending:       .poweroff
 	},
+	Scenario{
+		name:     'screen-sleep'
+		about:    'the screen is dark while the machine sleeps, and as it was afterwards'
+		arches:   ['aarch64', 'x86_64']
+		required: ['HWTEST START screen-sleep', 'HWTEST PASS screen-sleep']
+		actions:  [
+			Action{
+				after: 'HWTEST STEP screen before the sleep'
+				qmp:   screen_picture('before')
+			},
+			Action{
+				after:    'HWTEST STEP asleep for the screen'
+				delay_ms: 1500
+				qmp:      screen_picture('asleep')
+			},
+			Action{
+				after: 'HWTEST STEP screen after the sleep'
+				qmp:   screen_picture('after')
+			},
+			Action{
+				after:    'HWTEST STEP rehearsing for the screen'
+				delay_ms: 1500
+				qmp:      screen_picture('rehearsing')
+			},
+			Action{
+				after: 'HWTEST STEP screen after the rehearsal'
+				qmp:   screen_picture('rehearsed')
+			},
+		]
+		screens:  [
+			Screen{
+				file: 'before.ppm'
+			},
+			Screen{
+				file: 'asleep.ppm'
+				dark: true
+			},
+			Screen{
+				file: 'after.ppm'
+			},
+			Screen{
+				file: 'rehearsing.ppm'
+				dark: true
+			},
+			Screen{
+				file: 'rehearsed.ppm'
+			},
+		]
+		ending:   .poweroff
+	},
+	Scenario{
+		name:        'pci-hotplug'
+		about:       'a network card put into a port the kernel watches, and taken out, twice'
+		arches:      ['aarch64', 'x86_64']
+		qemu:        hotplug_machine
+		// QEMU's PC keeps its ports to itself unless told otherwise; see
+		// pci-hotplug-acpi for that.
+		qemu_x86_64: ['-global', 'ICH9-LPC.acpi-pci-hotplug-with-bridge-support=off']
+		files:       [tftp_probe]
+		required:    ['HWTEST START pci-hotplug', 'HWTEST PASS pci-hotplug']
+		actions:     hotplug_actions
+		events:      ['DEVICE_DELETED', 'DEVICE_DELETED']
+		ending:      .poweroff
+	},
+	Scenario{
+		name:     'pci-hotplug-acpi'
+		about:    'the same card announced and asked back by firmware through ACPI'
+		arches:   ['x86_64']
+		qemu:     hotplug_machine
+		files:    [tftp_probe]
+		required: ['HWTEST START pci-hotplug-acpi', 'HWTEST PASS pci-hotplug-acpi']
+		actions:  hotplug_actions
+		events:   ['DEVICE_DELETED', 'DEVICE_DELETED']
+		ending:   .poweroff
+	},
 ]
 
 // The scenarios one invocation deals with: those it boots, and those it names
@@ -437,6 +554,20 @@ pub fn validate_scenarios(all []Scenario) ! {
 			}
 			qmp_frame(action.qmp) or {
 				return error('scenario ${scenario.name}: ${err.msg()}')
+			}
+		}
+		for screen in scenario.screens {
+			// A picture nobody takes would fail every run for a reason that
+			// has nothing to do with the kernel.
+			if !scenario.actions.any(it.qmp.contains('"screendump"')
+				&& it.qmp.contains('{state}/${screen.file}"')) {
+				return error('scenario ${scenario.name}: no action takes the picture ${screen.file}')
+			}
+		}
+		for event in scenario.events {
+			// SHUTDOWN is judged by how the scenario is to end, not listed.
+			if event == '' || event == 'SHUTDOWN' || event != event.to_upper() {
+				return error('scenario ${scenario.name}: "${event}" is not an event a scenario can require')
 			}
 		}
 		for pattern in scenario.patterns {

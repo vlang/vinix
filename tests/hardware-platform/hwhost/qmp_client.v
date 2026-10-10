@@ -6,7 +6,9 @@
 // QEMU listens on a unix socket in the state directory. The controller is
 // its only client: it sends the commands a scenario's actions name, and it
 // reads the events, of which one matters to every scenario -- SHUTDOWN says
-// whether the guest powered the machine off or something else ended it.
+// whether the guest powered the machine off or something else ended it. The
+// names of the others are kept, for a scenario that must have seen one:
+// DEVICE_DELETED is QEMU saying the guest let go of a device.
 //
 // Every line in either direction goes to qmp.log with the time since QEMU
 // started, so a run can be read afterwards as a conversation.
@@ -26,6 +28,8 @@ mut:
 pub mut:
 	// From the SHUTDOWN event: guest-shutdown, guest-reset, host-signal...
 	shutdown_reason string
+	// Every event that arrived, by name.
+	events EventLog
 }
 
 // Connects to a QEMU that has just been started. Its socket appears a moment
@@ -98,8 +102,11 @@ fn (mut q QmpClient) receive(wait_ms int) []QmpMessage {
 			continue
 		}
 		q.record('<-', message.text)
-		if message.kind == .event && message.event == 'SHUTDOWN' {
-			q.shutdown_reason = message.reason
+		if message.kind == .event {
+			q.events.note(message.event)
+			if message.event == 'SHUTDOWN' {
+				q.shutdown_reason = message.reason
+			}
 		}
 		messages << message
 	}
