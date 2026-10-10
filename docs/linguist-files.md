@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `12d47222462ad41d7b8c5cbd325dddd8400a5948`,
+at source commit `0caa1c87e96cfecf06e433ab2a8929ac9afc9808`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,478 | 6.66% |
-| Python | 491 | 2,264,028 | 6.43% |
-| Shell | 361 | 1,343,784 | 3.82% |
+| C | 563 | 2,343,778 | 6.65% |
+| Python | 490 | 2,259,745 | 6.41% |
+| Shell | 362 | 1,343,888 | 3.81% |
 
-All `.v` files are classified as V. The resulting V share is 74.27%, with no
+All `.v` files are classified as V. The resulting V share is 74.31%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,264,028 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,259,745 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 12d47222462ad41d7b8c5cbd325dddd8400a5948 --breakdown --json
+github-linguist --rev 0caa1c87e96cfecf06e433ab2a8929ac9afc9808 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -619,7 +619,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/security-audit/collector_v.h` | 2,306 |
 | `tools/security-mac/mac.h` | 526 |
 | `tools/security-mac/mac_v.h` | 759 |
-| `tools/volumes/volumecli/volume.h` | 760 |
+| `tools/volumes/volumecli/volume.h` | 1,060 |
 
 ## Python files
 
@@ -981,7 +981,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/n64/desktop.py` | 9,741 |
 | `tests/n64/rsp-budget.py` | 3,714 |
 | `tests/n64/run.py` | 7,152 |
-| `tests/native-boundaries/run.py` | 4,283 |
 | `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/net-random/run.py` | 6,889 |
 | `tests/network-options/compile-v-core.py` | 918 |
@@ -1385,6 +1384,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/minecraft/test-launcher.sh` | 8,276 |
 | `tests/mount-policy/run.sh` | 2,110 |
 | `tests/n64/frame` | 180 |
+| `tests/native-boundaries/run` | 104 |
 | `tests/net-random/run.sh` | 294 |
 | `tests/network-ipv6/run-host.sh` | 135 |
 | `tests/network-options/run-host.sh` | 138 |

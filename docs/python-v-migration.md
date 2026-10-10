@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `12d47222462ad41d7b8c5cbd325dddd8400a5948`,
-Linguist 7.27.0 reports **Python 6.43%** (491 files, 2,264,028 bytes) and
-**V 74.27%** (2,357 files, 26,138,152 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `0caa1c87e96cfecf06e433ab2a8929ac9afc9808`,
+Linguist 7.27.0 reports **Python 6.41%** (490 files, 2,259,745 bytes) and
+**V 74.31%** (2,377 files, 26,183,859 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,942,257 Python bytes**. All remaining
-2,264,028 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **2,946,540 Python bytes**. All remaining
+2,259,745 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The eighteen stages below remove **41 Python files / 97,320 original bytes** and
+The nineteen stages below remove **42 Python files / 101,603 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -49,6 +49,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Kernel archiver selection and archive test | `tests/compiler-selection/test-kernel-ar.v`, `archivercheck` | 3,039 / 68 | `fb58af4e` |
 | Procfs, IPv6, socket, POSIX timer and process-churn generated-C guards | `tests/generated-source-guards/guardcore`, five V entrypoints | 10,860 / 220 | `03b19974` |
 | Process-churn report checker and callback bridge | `tests/process-churn/churncheck`, `check-results.v` | 5,355 / 170 | `12d47222` |
+| Native header boundary differential runner | `tests/native-boundaries/boundarycheck`, `run.v` | 4,283 / 81 | `0caa1c87` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -225,12 +226,34 @@ Between `d99bfe83` and `12d47222`, counted Python declined by exactly 5,355
 bytes, matching this stage. Concurrent V source changes affect the language
 shares independently.
 
+The next stage retires the Python native-boundary differential runner. The
+native V command directly uses the shared V module producer to compare pinned
+original C headers with maintained V UART tracing, callback, stack-pointer and
+SMC-counter implementations. The independent fixture and all production kernel
+sources are unchanged. Both C and V fixture executables pass the ten UART traces,
+256 callbacks, stack alignment and monotonic-counter checks, with identical
+stdout and stderr under Clang ASan/UBSan and stack-use-after-return detection.
+
+Ordinary ARM and ASan/UBSan host builds pass real-compilation tests for success,
+compiler failure, allocator-import rejection, fixture failure and output mismatch.
+Each case checks status, streams and removal of all temporary source/object
+directories. The Rosetta x86 runner correctly refuses the unsupported host before
+creating work; its assembly and architecture tests pass. The cold launcher also
+passes from an unrelated working directory and cleans up after a missing compiler.
+No Python was run, and no new kernel build or guest boot is established. Logs are
+`/tmp/vinix-boundary-{arm,asan,x86}-final.log` and
+`/tmp/vinix-boundary-cold-final.log`.
+
+Between `12d47222` and `0caa1c87`, counted Python declined by exactly 4,283
+bytes, matching this stage. Concurrent V and C changes affect the language
+shares independently.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these eighteen stages.
+or hidden in these nineteen stages.
 
 ## Earlier completed stages
 
