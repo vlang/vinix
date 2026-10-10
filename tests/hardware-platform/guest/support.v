@@ -292,3 +292,11 @@ fn heap_usage() !HeapUsage {
 		large_pages: large_pages
 	}
 }
+
+// How many more live heap objects a measured loop may leave without it being
+// a leak. Taking the measurement is not free: reading and taking apart
+// /proc/slabinfo grows this program's own heap, which nothing here ever
+// frees, and each new page of it costs the kernel an object or two. That has
+// been a dozen objects at most; a loop of fifty or a hundred rounds that
+// loses one object per round is far over this.
+const heap_noise_objects = 30

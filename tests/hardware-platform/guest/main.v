@@ -25,6 +25,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'acpi-power' { scenario_acpi_power(mut t) }
 		'ahci' { scenario_ahci(mut t) }
 		'devices' { scenario_devices(mut t) }
+		'firmware' { scenario_firmware(mut t) }
 		'power-button-init' { scenario_power_button_init(mut t) }
 		'qmp-powerdown' { scenario_qmp_powerdown(mut t) }
 		'restart' { scenario_restart(mut t) }

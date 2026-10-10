@@ -15,13 +15,10 @@ import os
 const pci_devices = '/sys/bus/pci/devices'
 const e1000_driver = '/sys/bus/pci/drivers/e1000'
 
-// How many more live heap objects the measured cycles may leave. A cycle
-// makes and frees a few dozen -- two links in /sys, the device's DMA domain
-// and its buffer records -- so one object lost per cycle is three times
-// this. The allowance is for this program itself: reading and taking apart
-// /proc/slabinfo grows its own heap, and each page of that costs the kernel
-// an object or two.
-const leaked_objects_limit = 30
+// How many unbind/bind cycles are measured. A cycle makes and frees a few
+// dozen heap objects -- two links in /sys, the device's DMA domain and its
+// buffer records -- so one object lost per cycle is more than three times
+// what heap_noise_objects allows.
 const measured_cycles = 100
 
 // The kernel frees a removed /sys entry only after a grace period of five
@@ -105,7 +102,7 @@ fn scenario_devices(mut t Test) {
 	}
 	free_after := meminfo_kb('MemFree') or { 0 }
 	t.info('${measured_cycles} unbind/bind cycles: live heap objects ${before.objects} -> ${after.objects}, large pages ${before.large_pages} -> ${after.large_pages}, MemFree ${free_after - free_before:+} kB')
-	t.check(after.objects - before.objects <= leaked_objects_limit, '${measured_cycles} unbind/bind cycles left ${after.objects - before.objects} more heap objects allocated (limit ${leaked_objects_limit})')
+	t.check(after.objects - before.objects <= heap_noise_objects, '${measured_cycles} unbind/bind cycles left ${after.objects - before.objects} more heap objects allocated (limit ${heap_noise_objects})')
 	t.check(after.large_pages <= before.large_pages, '${measured_cycles} unbind/bind cycles left ${after.large_pages - before.large_pages} more large-allocation pages')
 	t.check(read_word('${device}/state') == 'bound', 'state after the cycles is "${read_word(device +
 		'/state')}"')

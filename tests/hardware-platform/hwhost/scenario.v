@@ -154,6 +154,13 @@ pub const scenarios = [
 		ending:   .poweroff
 	},
 	Scenario{
+		name:     'firmware'
+		about:    'the firmware loader: reads, updates/, refused names, no retained memory'
+		arches:   ['aarch64', 'x86_64']
+		required: ['HWTEST START firmware', 'HWTEST PASS firmware']
+		ending:   .poweroff
+	},
+	Scenario{
 		name:     'acpi-power'
 		about:    'ACPI battery, charger and lid: readings, time left, lid sleep, low and critical'
 		arches:   ['x86_64']
