@@ -48,23 +48,32 @@ const park_timeout_ns = 2 * devcore.second
 // INIT to startup, and startup to startup, by the specification.
 const init_settle_ns = 10 * devcore.millisecond
 const startup_settle_ns = 200 * devcore.microsecond
-// How long a started processor may take to set itself up and say so.
-const start_timeout_ns = 5 * devcore.second
-// How long a processor that was late to park is given to finish parking.
-const straggler_settle_ns = 20 * devcore.millisecond
+// How long a started processor may take to set itself up and say so. It is
+// waited for with interrupts off, on the only processor running.
+const start_timeout_ns = 2 * devcore.second
+// How long a processor that has gone offline may take to say it has parked:
+// there is nothing between the two but reading out its APIC.
+const commit_timeout_ns = devcore.second
 
 const max_cpus = 256
 
+// Where a processor is in being parked and started again.
+const state_running = u32(0)
+// Online when parking began, and asked to park.
+const state_asked = u32(1)
+// Parked: offline, its APIC read out, halted.
+const state_parked = u32(2)
+// It parked and did not start again. It is not asked or started a second
+// time: nothing is known about what it is doing.
+const state_lost = u32(3)
+
 __global (
-	// Set by each processor once it has parked; cleared when it is back.
-	x86wake_parked [max_cpus]u32
+	x86wake_state [max_cpus]u32
 	// Each processor's local APIC as it read it out when it parked.
 	x86wake_lapics      &apic.LocalState
 	x86wake_lapic_count u64
 	// Processors that did not come back, over the life of the machine.
 	x86wake_lost u64
-	// The last parking ran out of time with a processor still on its way.
-	x86wake_park_incomplete bool
 )
 
 // Runs on a processor as it parks: offline, interrupts off, about to halt.
@@ -76,7 +85,7 @@ fn parking_processor(cpu_number u64) {
 	}
 	hypervisor.leave_cpu(cpu_number)
 	if cpu_number < max_cpus {
-		katomic.store(mut &x86wake_parked[cpu_number], u32(1))
+		katomic.store(mut &x86wake_state[cpu_number], state_parked)
 	}
 }
 
@@ -102,26 +111,33 @@ fn prepare_secondaries() bool {
 
 fn all_parked(_ voidptr) bool {
 	for entry in cpu_locals {
-		if entry.cpu_number != 0 && katomic.load(&x86wake_parked[entry.cpu_number]) == 0 {
+		if katomic.load(&x86wake_state[entry.cpu_number]) == state_asked {
 			return false
 		}
 	}
 	return true
 }
 
-// Park every processor but this one, the boot processor. False if one would
-// not within the time allowed; the ones that did are parked all the same and
+// Park every processor but this one, the boot processor, that is running: one
+// that was lost in an earlier sleep is not waited for. False if one would not
+// within the time allowed; the ones that did are parked all the same and
 // start_secondaries() is what brings them back.
 pub fn park_secondaries() bool {
 	for entry in cpu_locals {
-		katomic.store(mut &x86wake_parked[entry.cpu_number], u32(0))
+		number := entry.cpu_number
+		if number == 0 || katomic.load(&x86wake_state[number]) == state_lost {
+			continue
+		}
+		katomic.store(mut &x86wake_state[number], if katomic.load(&entry.online) != 0 {
+			state_asked
+		} else {
+			state_running
+		})
 	}
 	sched.park_others(0)
 	// Sleeping, not spinning: this processor has the threads the others put
 	// down to run.
-	parked := devcore.sleep_until(all_parked, unsafe { nil }, park_timeout_ns, 1)
-	x86wake_park_incomplete = !parked
-	return parked
+	return devcore.sleep_until(all_parked, unsafe { nil }, park_timeout_ns, 1)
 }
 
 fn is_online(context voidptr) bool {
@@ -131,7 +147,7 @@ fn is_online(context voidptr) bool {
 
 fn has_parked(context voidptr) bool {
 	cpu_local := unsafe { &cpulocal.Local(context) }
-	return katomic.load(&x86wake_parked[cpu_local.cpu_number]) != 0
+	return katomic.load(&x86wake_state[cpu_local.cpu_number]) == state_parked
 }
 
 // Start one parked processor and wait for it to be scheduling again.
@@ -152,42 +168,43 @@ fn start_secondary(mut cpu_local cpulocal.Local) bool {
 	return started
 }
 
-// Start every processor that parked, one after another: the trampoline has
-// one stack and one argument to hand over at a time. Returns how many did not
-// come back. Called on the boot processor; it does not need interrupts.
+// End the parking and start every processor that parked, one after another:
+// the trampoline has one stack and one argument to hand over at a time.
+// Returns how many did not come back. Called on the boot processor; it does
+// not need interrupts. Calling it again when all are back does nothing.
 pub fn start_secondaries() int {
+	// From here no processor goes offline that has not already.
 	sched.end_parking()
-	if x86wake_park_incomplete {
-		// One that was slow to park may have been told to just before the
-		// line above, and be on its way down now: let it get there, so that
-		// it is found parked below and started with the others.
-		x86wake_park_incomplete = false
-		devcore.stall(straggler_settle_ns)
-	}
 	mut missing := 0
 	for mut entry in cpu_locals {
-		if entry.cpu_number == 0 {
+		number := entry.cpu_number
+		if number == 0 {
 			continue
 		}
-		if katomic.load(&entry.online) == 0 && katomic.load(&x86wake_parked[entry.cpu_number]) == 0 {
-			// Offline and not yet parked: between the two. Not for long.
-			devcore.spin_until(has_parked, voidptr(entry), straggler_settle_ns)
+		if katomic.load(&x86wake_state[number]) == state_asked {
+			if katomic.load(&entry.online) != 0 {
+				// It never got as far as parking, and now will not.
+				katomic.store(mut &x86wake_state[number], state_running)
+				continue
+			}
+			// Offline and not yet parked: between the two, with only its
+			// APIC to read out in between.
+			devcore.spin_until(has_parked, voidptr(entry), commit_timeout_ns)
 		}
-		if katomic.load(&entry.online) != 0 {
+		state := katomic.load(&x86wake_state[number])
+		if state != state_parked && state != state_asked {
 			continue
 		}
-		if katomic.load(&x86wake_parked[entry.cpu_number]) == 0 {
-			// Not online and never parked: it was not running before the
-			// sleep either, and nothing is known about it. Left alone.
+		if state == state_parked && start_secondary(mut entry) {
+			katomic.store(mut &x86wake_state[number], state_running)
 			continue
 		}
-		if start_secondary(mut entry) {
-			katomic.store(mut &x86wake_parked[entry.cpu_number], u32(0))
-		} else {
-			missing++
-			katomic.inc(mut &x86wake_lost)
-			C.kprintf(c'wake: CPU %llu did not start again\n', entry.cpu_number)
-		}
+		// It parked and did not start, or went offline and never said it
+		// had parked. Either way it is gone, and is counted once.
+		katomic.store(mut &x86wake_state[number], state_lost)
+		missing++
+		katomic.inc(mut &x86wake_lost)
+		C.kprintf(c'wake: CPU %llu did not start again\n', number)
 	}
 	return missing
 }

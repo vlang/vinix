@@ -27,9 +27,7 @@
 module sched
 
 import katomic
-import proc
 import x86.apic
-import x86.cpu
 import x86.cpu.local as cpulocal
 
 __global (
@@ -65,16 +63,27 @@ pub fn park_others(keeper u64) {
 }
 
 // Threads may run everywhere again. The parked processors themselves are
-// started by the platform.
+// started by the platform. Taken with the lock a processor goes offline
+// under: when this returns, one that had been on its way to park either is
+// offline already -- and will say so through the hook in a moment -- or will
+// find that parking is over and carry on. None goes offline afterwards.
 pub fn end_parking() {
+	for !tlb_lock.test_and_acquire() {
+		answer_tlb_shootdown()
+		asm volatile amd64 {
+			pause
+			; ; ; memory
+		}
+	}
 	katomic.store(mut &sched_parking, u32(0))
+	tlb_lock.release()
 }
 
 // The end of this processor's part in the scheduler until it is started
 // again. Interrupts off, no thread, on a stack of the processor's own.
-@[noreturn]
+// Returns only if parking ended before the processor got as far as going
+// offline: it then idles as usual.
 fn park_here(mut cpu_local cpulocal.Local) {
-	apic.lapic_timer_stop()
 	// A shootdown counts the processors it asks while it holds this lock,
 	// and waits for each of them: go offline between two of them, not in
 	// the middle of one.
@@ -85,6 +94,11 @@ fn park_here(mut cpu_local cpulocal.Local) {
 			; ; ; memory
 		}
 	}
+	if !parking(cpu_local.cpu_number) {
+		tlb_lock.release()
+		return
+	}
+	apic.lapic_timer_stop()
 	katomic.store(mut &cpu_local.online, u64(0))
 	tlb_lock.release()
 	if sched_park_hook != unsafe { nil } {
@@ -98,22 +112,4 @@ fn park_here(mut cpu_local cpulocal.Local) {
 			; ; ; memory
 		}
 	}
-}
-
-// The clock has been moved on over a suspend to RAM. The thread that asked
-// for it has been on this processor all along as far as the accounts go, and
-// did nothing for as long as the machine was away: leave that stretch out of
-// its bill, and out of this processor's real-time bandwidth.
-pub fn skip_sleep_time() {
-	ints := cpu.interrupt_toggle(false)
-	now := clock_ns()
-	number := cpulocal.current().cpu_number
-	if number < max_rt_cpus {
-		rt_account_last_ns[number] = now
-	}
-	mut me := proc.current_thread()
-	if me != unsafe { nil } {
-		proc.skip_cpu_time(mut me, now)
-	}
-	cpu.interrupt_toggle(ints)
 }

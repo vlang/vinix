@@ -151,20 +151,6 @@ pub fn tick_cpu_time(mut t Thread, _now_ns u64) {
 	update_cpu_time(mut t, cpu_time_now_ns(), false, t.cpu_in_kernel, false)
 }
 
-// The clocks have just been moved on over a stretch in which this thread,
-// though it was on a CPU, ran nothing: the machine was suspended to RAM, and
-// the thread is the one that asked. Its turn is taken to start now, so that
-// the hours the machine was away are not billed to it as hours of running --
-// which would spend its cgroup's quota and its CPU time limit for it.
-// `now_ns` is the scheduler's clock, as for begin_cpu_time().
-pub fn skip_cpu_time(mut t Thread, now_ns u64) {
-	if t.process == unsafe { nil } { return }
-	t.process.cpu_lock.acquire()
-	if t.scheduled_at_ns != 0 { t.scheduled_at_ns = cpu_time_now_ns() }
-	if t.cgroup_charged_ns != 0 { t.cgroup_charged_ns = now_ns }
-	t.process.cpu_lock.release()
-}
-
 pub fn charge_cpu_time(mut t Thread, now_ns u64) {
 	charge_cgroup_cpu(mut t, now_ns)
 	t.cgroup_charged_ns = 0
