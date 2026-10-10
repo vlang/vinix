@@ -63,6 +63,9 @@ PY
     "$repo/tests/ios/sockets.c" -o "$output/sockets"
 "$output/sockets"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/socket-messages.c" -o "$output/socket-messages"
+"$output/socket-messages"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/exit-handlers.c" -o "$output/exit-handlers"
 "$output/exit-handlers"
 exit_status=0

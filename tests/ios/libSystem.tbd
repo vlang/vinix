@@ -6,7 +6,7 @@ current-version: 1
 exports:
   - targets:     [ arm64-ios ]
     symbols:     [ _socket, _socketpair, _bind, _connect, _listen, _accept, _getsockname, _getpeername, _shutdown,
-                   _send, _recv, _sendto, _recvfrom, _setsockopt, _getsockopt, _inet_pton, _inet_ntop, _inet_addr,
+                   _send, _recv, _sendto, _recvfrom, _sendmsg, _recvmsg, _setsockopt, _getsockopt, _inet_pton, _inet_ntop, _inet_addr,
                    _htons, _ntohs, _htonl, _ntohl, _getaddrinfo, _freeaddrinfo, _getnameinfo,
                    _getifaddrs, _freeifaddrs, _if_nametoindex,
                    _getdtablesize, _getuid, _getgid, _getegid, _gethostname, _getpwuid, _getprotobyname, _getrusage, _in6addr_loopback,

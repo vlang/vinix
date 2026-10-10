@@ -189,6 +189,7 @@ fn socket_option(level int, option int) (int, int) {
 			0x10 { int(C.SO_DONTROUTE) } 0x20 { int(C.SO_BROADCAST) }
 			0x1080 { socket_linger_seconds_option() } 0x100 { int(C.SO_OOBINLINE) }
 			0x200 { int(C.SO_REUSEPORT) }
+			0x400 { int(C.SO_TIMESTAMP) }
 			0x1001 { int(C.SO_SNDBUF) } 0x1002 { int(C.SO_RCVBUF) }
 			0x1003 { int(C.SO_SNDLOWAT) } 0x1004 { int(C.SO_RCVLOWAT) }
 			0x1005 { int(C.SO_SNDTIMEO) } 0x1006 { int(C.SO_RCVTIMEO) }
@@ -225,6 +226,10 @@ fn darwin_getsockopt(fd int, level int, option int, value voidptr, length &u32) 
 	mut size := u32(sizeof(storage))
 	result := socket_result(C.getsockopt(fd, native_level, native_option, unsafe { &storage[0] }, unsafe { &size }))
 	if result < 0 { return int(result) }
+	if level == 0xffff && option == 0x400 && size == 4 {
+		// Darwin returns the enabled SO_TIMESTAMP bit, rather than Linux's 1.
+		write32(u64(unsafe { &storage[0] }), if u32(storage[0]) != 0 { u32(0x400) } else { u32(0) })
+	}
 	if level == 0xffff && option == 0x1007 { write32(u64(unsafe { &storage[0] }), u32(darwin_native_error(int(storage[0])))) }
 	if level == 0xffff && option in [0x1005, 0x1006] {
 		$if linux { storage[1] = i64(u32(storage[1])) }
@@ -267,6 +272,8 @@ fn sockets_symbol(symbol string) ?u64 {
 		'_recv' { u64(unsafe { voidptr(darwin_recv) }) }
 		'_sendto' { u64(unsafe { voidptr(darwin_sendto) }) }
 		'_recvfrom' { u64(unsafe { voidptr(darwin_recvfrom) }) }
+		'_sendmsg' { u64(unsafe { voidptr(darwin_sendmsg) }) }
+		'_recvmsg' { u64(unsafe { voidptr(darwin_recvmsg) }) }
 		'_setsockopt' { u64(unsafe { voidptr(darwin_setsockopt) }) }
 		'_getsockopt' { u64(unsafe { voidptr(darwin_getsockopt) }) }
 		'_inet_pton' { u64(unsafe { voidptr(darwin_inet_pton) }) }

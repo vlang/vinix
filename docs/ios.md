@@ -720,7 +720,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _recvmsg
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _select
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1022,17 +1022,55 @@ guest fixture. ASAN/UBSAN checks two image loads/unloads, and the full ARM64
 C++/GLES/PPSSPP regression passes. The actual game gets past two more strong
 imports but still exits before entry, now at `recvmsg`.
 
+The V `recvmsg` and `sendmsg` adapters now use real native scatter/gather socket
+I/O with the 48-byte Darwin header and signed 64-bit results. Native errors
+translate immediately, successful calls preserve thread errno, and failure
+leaves the caller's header untouched. Address and control conversion uses
+bounded stack storage; generated C confirms no adapter heap allocations.
+Null name/control pointers retain their input lengths, and buffer guards survive
+short addresses, datagrams and partial control headers.
+
+SCM_RIGHTS uses actual native descriptor passing. The adapter delivers complete
+descriptor integers and closes every installed descriptor that cannot reach the
+caller, including zero capacity and partial words. This deliberately avoids the
+inaccessible descriptor leaks measured in the native Mac reference. Ancillary
+storage is limited to 8 KiB; unsupported send controls fail before socket I/O.
+Real native timestamps translate to Darwin's four-byte-aligned 28-byte
+SCM_TIMESTAMP record, using unaligned-safe copies for seconds and microseconds.
+SO_TIMESTAMP maps to the native option, including Darwin's enabled option bit
+on reads. The preserved Vinix kernel reports ENOPROTOOPT for receive timestamps;
+the adapter does not invent arrival timestamps or report successful enabling.
+
+The native guest recvmsg backend also rejects MSG_PEEK with ENOTSUP; rejected
+calls preserve queued data and buffers. Other native flag combinations beyond
+flags zero and DONTWAIT remain outside the verified guest subset. For datagrams
+with fewer than 1,024 vectors, a private one-byte vector detects truncation in
+the same atomic receive when the native INET backend omits MSG_TRUNC. Truncated
+INET messages at the 1,024-vector boundary retain the native backend's flag
+limitation. EOSSDK's traced call uses one vector, flags zero, and optional
+128-byte name and 28-byte timestamp buffers.
+
+Shared Mac/iOS checks cover real UNIX and IPv4/IPv6 traffic, scatter/gather,
+guarded truncation, invalid headers/counts, native descriptor identity and eight
+concurrent workers. ASAN/UBSAN checks two image loads/unloads, independent Linux
+timestamp-layout bytes and 32 rounds of partial/absent descriptor storage with
+unchanged native descriptor availability. The full ARM64 C++/GLES/PPSSPP
+regression passes. These checks run inside the sockets guest fixture using the
+previously verified host harness, leaving the concurrent host-controller
+migration untouched. The actual game resolves one additional strong EOSSDK
+import and still exits before entry, now at `select`.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,314 | 844 | 81 |
-| EOSSDK | 528 | 134 | 18 |
+| EOSSDK | 529 | 133 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,902 | 1,094 | 122 |
+| All images | 1,903 | 1,093 | 122 |
 
-The C++/GLES/Text variant reports 1,915 resolved imports, 1,081 unresolved strong
+The C++/GLES/Text variant reports 1,916 resolved imports, 1,080 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

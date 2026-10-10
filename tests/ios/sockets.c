@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Identical Darwin ABI calls run against Apple's libraries and the V bridge.
+#include "socket-messages.h"
 typedef unsigned int socklen;
 struct address4 { unsigned char length,family; unsigned short port; unsigned int address; unsigned char zero[8]; };
 struct address6 { unsigned char length,family; unsigned short port; unsigned int flow; unsigned char address[16]; unsigned int scope; };
@@ -138,6 +139,7 @@ static void *worker(void *context) {
  return 0;
 }
 int main(void) {
+ int message_error=socket_message_checks();if(message_error)return message_error;
  CHECK(htons(0x1234)==0x3412&&ntohs(0x3412)==0x1234,1);
  CHECK(htonl(0x12345678)==0x78563412&&ntohl(0x78563412)==0x12345678,2);
  unsigned char value[16];char text[64];
