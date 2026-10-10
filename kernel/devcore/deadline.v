@@ -15,6 +15,9 @@
 module devcore
 
 import acpisync
+import event
+import event.eventstruct
+import time
 
 pub const microsecond = u64(1000)
 pub const millisecond = u64(1000000)
@@ -91,4 +94,17 @@ pub fn stall(ns u64) {
 // Let `ms` pass, sleeping when the scheduler allows it.
 pub fn sleep_ms(ms u64) {
 	acpisync.sleep(ms)
+}
+
+// Wait until `e` is triggered again, counting from when `generation` was
+// read off it, or until `ms` have passed. True if it was triggered. For a
+// thread that does something periodically and can also be told to do it now.
+pub fn wait_event(mut e eventstruct.Event, generation u64, ms u64) bool {
+	mut timer := time.new_timer(time.TimeSpec{i64(ms / 1000), i64(ms % 1000) * 1000000})
+	mut storage := [unsafe { &e }, &timer.event]!
+	mut events := unsafe { event.stack_list(&storage[0], storage.len) }
+	which := event.await_from_generation(mut events, true, 0, generation) or { u64(1) }
+	timer.disarm()
+	unsafe { free(timer) }
+	return which == 0
 }

@@ -10,6 +10,8 @@
 //	/sys/power/suspend_stats/     success fail last_failed_dev last_failed_step,
 //	                              and Vinix's last_wake, last_*_ms and
 //	                              security_checks, security_changes
+//	/sys/power/lid/               state (open, closed, unknown), closes, and
+//	                              action: suspend or ignore
 //	/sys/class/wakeup/wakeupN/    name event_count wakeup_count, and Vinix's
 //	                              enabled, which may be written
 //	/sys/class/rtc/rtc0/wakealarm seconds since the epoch, or +seconds from
@@ -26,6 +28,7 @@ import event.eventstruct
 import fs
 import katomic
 import lib
+import psupply
 import sched
 import time
 import wakesrc
@@ -82,6 +85,11 @@ pub fn publish() {
 			context)
 		unsafe { directory.free() }
 	}
+
+	fs.sysfs_attribute('power/lid/state', 0o444, show_lid_state, unsafe { nil }, unsafe { nil })
+	fs.sysfs_attribute('power/lid/action', 0o644, show_lid_action, store_lid_action, unsafe { nil })
+	fs.sysfs_attribute('power/lid/closes', 0o444, show_lid_closes, unsafe { nil }, unsafe { nil })
+	psupply.publish()
 
 	fs.sysfs_attribute('class/rtc/rtc0/wakealarm', 0o644, show_alarm, store_alarm, unsafe { nil })
 	fs.sysfs_attribute('class/rtc/rtc0/since_epoch', 0o444, show_epoch, unsafe { nil }, unsafe { nil })
@@ -324,4 +332,31 @@ fn alarm_thread() {
 		timer.disarm()
 		unsafe { free(timer) }
 	}
+}
+
+// ── The lid ─────────────────────────────────────────────────────────────────
+
+fn show_lid_state(_ voidptr, mut text lib.Text) {
+	text.add(lid_state_name())
+	text.add_byte(`\n`)
+}
+
+fn show_lid_action(_ voidptr, mut text lib.Text) {
+	text.add(if lid_action() == .ignore { 'suspend [ignore]\n' } else { '[suspend] ignore\n' })
+}
+
+fn store_lid_action(_ voidptr, data &u8, length u64) u64 {
+	word := fs.sysfs_word(data, length)
+	if word == 'suspend' {
+		set_lid_action(.suspend)
+	} else if word == 'ignore' {
+		set_lid_action(.ignore)
+	} else {
+		return errno.einval
+	}
+	return 0
+}
+
+fn show_lid_closes(_ voidptr, mut text lib.Text) {
+	number_line(mut text, lid_closes())
 }

@@ -20,6 +20,7 @@ import stat
 import dev.console
 import userland
 import syspower
+import x86.acpipm
 import pipe
 import futex
 import pci
@@ -168,6 +169,8 @@ fn kmain_thread() {
 	// first, which the signal code -- above syspower -- does for it.
 	syspower.set_init_signal(userland.signal_init_if_handled)
 	syspower.start()
+	// The batteries, charger, lid and buttons firmware describes.
+	acpipm.initialise()
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',
 		'/dev/console', '/dev/console') or { panic('Could not start init process') }

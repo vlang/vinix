@@ -28,9 +28,11 @@ pub enum Source {
 	alarm
 	network
 	usb
+	// A battery about to give out: the machine wakes to shut down properly.
+	battery
 }
 
-pub const source_count = 8
+pub const source_count = 9
 
 __global (
 	// One bit per source that may end a sleep.
@@ -56,6 +58,7 @@ pub fn name(source Source) string {
 		.alarm { 'alarm' }
 		.network { 'network' }
 		.usb { 'usb' }
+		.battery { 'battery' }
 	}
 }
 
@@ -63,7 +66,7 @@ pub fn name(source Source) string {
 // A pointer is left out, since a mouse nudged on a desk should not light the
 // room at night, and the network, since being woken by it is asked for.
 fn defaults() u32 {
-	return (u32(1) << u32(Source.power_button)) | (u32(1) << u32(Source.sleep_button)) | (u32(1) << u32(Source.lid)) | (u32(1) << u32(Source.keyboard)) | (u32(1) << u32(Source.alarm))
+	return (u32(1) << u32(Source.power_button)) | (u32(1) << u32(Source.sleep_button)) | (u32(1) << u32(Source.lid)) | (u32(1) << u32(Source.keyboard)) | (u32(1) << u32(Source.alarm)) | (u32(1) << u32(Source.battery))
 }
 
 fn ensure() {

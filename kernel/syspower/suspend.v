@@ -201,6 +201,11 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	}
 	sched.thaw_userspace()
 	done := devcore.now_ns()
+	// Woken by a battery about to give out: now that init runs again, ask
+	// for the shutdown the battery woke the machine for.
+	if katomic.cas(mut &syspower_critical_wake, u32(1), u32(0)) {
+		request_power_off()
+	}
 
 	if !slept {
 		fail_sleep('platform', '')
