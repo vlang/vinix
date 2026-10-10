@@ -186,9 +186,46 @@ fn (mut domain Domain) open(phys u64, pages u64) bool {
 	return domain.iommu.map(domain.cookie, phys, phys, pages * page_size)
 }
 
+// Whether a run still on the list covers the page at `phys`.
+fn (mut domain Domain) still_covers(phys u64) bool {
+	domain.lock.acquire()
+	defer {
+		domain.lock.release()
+	}
+	for mapping := domain.mappings; mapping != unsafe { nil }; mapping = mapping.next {
+		if phys >= mapping.phys && phys < mapping.phys + mapping.pages * page_size {
+			return true
+		}
+	}
+	return false
+}
+
+// Stop the device reaching `pages` pages at `phys`, whose record has just come
+// off the list -- except the pages another record still covers. Two requests
+// that were mapped separately can share a page, and taking it from the device
+// when the first of them finishes would take it from the second.
 fn (mut domain Domain) close(phys u64, pages u64) {
-	if domain.iommu != unsafe { nil } && domain.cookie != unsafe { nil } && !domain.identity {
-		domain.iommu.unmap(domain.cookie, phys, pages * page_size)
+	if domain.iommu == unsafe { nil } || domain.cookie == unsafe { nil } || domain.identity {
+		return
+	}
+	mut start := u64(0)
+	mut run := u64(0)
+	for i := u64(0); i < pages; i++ {
+		page := phys + i * page_size
+		if domain.still_covers(page) {
+			if run != 0 {
+				domain.iommu.unmap(domain.cookie, start, run * page_size)
+				run = 0
+			}
+			continue
+		}
+		if run == 0 {
+			start = page
+		}
+		run++
+	}
+	if run != 0 {
+		domain.iommu.unmap(domain.cookie, start, run * page_size)
 	}
 }
 
