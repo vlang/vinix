@@ -26,6 +26,8 @@ FEATURES = (
     b"iOS PASS: Darwin name resolution, address ownership and network I/O",
     b"iOS PASS: Darwin network interfaces, snapshots and address ownership",
     b"iOS PASS: Darwin system queries, account records and resource usage",
+    b"iOS PASS: Darwin process credentials, signal delivery and allocation sizes",
+    b"iOS PASS: Darwin ioctl controls, socket bytes and interface queries",
     b"iOS PASS: Mach-O arithmetic and libSystem imports",
     b"iOS PASS: legacy dyld imports and image/TLS lifecycle",
     b"iOS PASS: native chained and legacy pointer tags",
@@ -180,6 +182,8 @@ def main() -> int:
         (rootfs / "etc/protocols").write_text("icmp 1 ICMP\ntcp 6 TCP\nudp 17 UDP\n")
         (rootfs / "etc/passwd").write_text("root:*:0:0:Vinix iOS root:/root:/bin/sh\n"
             + "ios-fixture:*:1001:37:" + "G" * 8192 + ":/var/empty:/bin/false\n")
+        (rootfs / "etc/group").write_text("root:*:0:\nbase:*:37:\nfirst:*:8:ios-fixture\n"
+            + "unrelated:*:9:someone\nsecond:*:11:ios-fixture\n")
         destination = rootfs / "opt/ios"
         (destination / "launch name#é%?.bin").write_bytes(b"native file launch fixture\n")
         shutil.copy2(build / "staging/usr/bin" / ("run-ios-gles" if arguments.with_gles else "run-ios"), destination / "run-ios")
@@ -190,7 +194,7 @@ def main() -> int:
             shutil.copy2(build / "fixtures/compression", destination / "compression")
             shutil.copytree(build / "fixtures/TextFixture.app", destination / "TextFixture.app")
             shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf", destination / "TextFixture.app/font.ttf")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "exit-handlers", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "provider-images", "geometry", "game-constants", "security", "security-trust", "cfnetwork", "keychain", "common-crypto", "atomic-queue", "assertions", "stack-probe", "libsystem-safety", "runes", "sockets", "numeric", "permissions", "dispatch", "fcntl", "netdb", "interfaces", "system-queries", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "exit-handlers", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "provider-images", "geometry", "game-constants", "security", "security-trust", "cfnetwork", "keychain", "common-crypto", "atomic-queue", "assertions", "stack-probe", "libsystem-safety", "runes", "sockets", "numeric", "permissions", "dispatch", "fcntl", "netdb", "interfaces", "system-queries", "process", "ioctl", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         (destination / "permissions-loop").symlink_to("permissions-loop")
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")

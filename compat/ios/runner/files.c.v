@@ -110,6 +110,7 @@ fn darwin_mmap(address voidptr, size usize, protection i32, flags i32, file i32,
 fn files_symbol(symbol string) ?u64 {
 	return match symbol {
 		'_fcntl' { u64(unsafe { voidptr(C.ios_fcntl) }) }
+		'_ioctl' { u64(unsafe { voidptr(C.ios_ioctl) }) }
 		'_fsync' { u64(unsafe { voidptr(darwin_fsync) }) }
 		'_chmod' { u64(unsafe { voidptr(darwin_chmod) }) }
 		'_fchmod' { u64(unsafe { voidptr(darwin_fchmod) }) }

@@ -123,6 +123,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := netdb_symbol(symbol) { return address }
 	if address := interfaces_symbol(symbol) { return address }
 	if address := system_queries_symbol(symbol) { return address }
+	if address := process_symbol(symbol) { return address }
 	if address := mach_memory_symbol(symbol) { return address }
 	if address := common_crypto_symbol(symbol) { return address }
 	address := match symbol {

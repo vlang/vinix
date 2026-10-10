@@ -93,6 +93,19 @@ test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permission
 "${IOS_CLANG:-clang}" -DIOS_SYSTEM_QUERIES_REFERENCE -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/system-queries.c" -o "$output/system-queries"
 "$output/system-queries"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/process.c" -o "$output/process"
+"$output/process"
+python3 - "$output/process" <<'PY'
+import subprocess, sys
+for mode, number in [("usr1", 30), ("usr2", 31), ("bus", 10)]:
+    result = subprocess.run([sys.argv[1], mode], capture_output=True)
+    assert result.returncode == -number, (mode, result.returncode, result.stdout, result.stderr)
+print("IOS-PROCESS-REFERENCE: native Darwin SIGUSR1, SIGUSR2 and SIGBUS delivery")
+PY
+"${IOS_CLANG:-clang}" -DIOS_IOCTL_REFERENCE -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/ioctl.c" -o "$output/ioctl"
+"$output/ioctl"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

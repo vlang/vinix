@@ -145,6 +145,18 @@ int main(void) {
     run("/opt/ios/system-queries", "--database-fixture", NULL, NULL, 0,
         "IOS-SYSTEM-QUERIES: native limits, credentials, hostname, account/protocol ownership and Darwin resource usage\n");
     puts("iOS PASS: Darwin system queries, account records and resource usage");
+    run("/opt/ios/process", "--database-fixture", NULL, NULL, 0,
+        "IOS-PROCESS: real groups, permission failures, signal queries and eight-thread allocation capacities\n");
+    run("/opt/ios/process", "usr1", NULL, NULL, -SIGUSR1,
+        "IOS-PROCESS: delivering Darwin SIGUSR1\n");
+    run("/opt/ios/process", "usr2", NULL, NULL, -SIGUSR2,
+        "IOS-PROCESS: delivering Darwin SIGUSR2\n");
+    run("/opt/ios/process", "bus", NULL, NULL, -SIGBUS,
+        "IOS-PROCESS: delivering Darwin SIGBUS\n");
+    puts("iOS PASS: Darwin process credentials, signal delivery and allocation sizes");
+    run("/opt/ios/ioctl", NULL, NULL, NULL, 0,
+        "IOS-IOCTL: descriptor flags, shared nonblocking I/O, queued bytes, native interfaces and eight threads\n");
+    puts("iOS PASS: Darwin ioctl controls, socket bytes and interface queries");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");

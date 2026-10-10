@@ -10,6 +10,7 @@ exports:
                    _htons, _ntohs, _htonl, _ntohl, _getaddrinfo, _freeaddrinfo, _getnameinfo,
                    _getifaddrs, _freeifaddrs, _if_nametoindex,
                    _getdtablesize, _getuid, _getgid, _getegid, _gethostname, _getpwuid, _getprotobyname, _getrusage, _in6addr_loopback,
+                   _initgroups, _getgroups, _setgroups, _setuid, _setgid, _kill, _malloc_size, _realloc, _ioctl,
                    _usleep, _atof, _atoll, _chmod, _fchmod, _getpid, _fcntl, _fsync, _read,
                    _puts, _atoi, _malloc, _calloc, _free, _strlen, _strcmp, _memcpy, _memset, _printf, _abort, _mach_msg_server,
                    _CC_SHA1, _CC_SHA224, _CC_SHA256, _CC_SHA384, _CC_SHA512, _CCHmac, _CCCrypt, _CCRandomGenerateBytes,

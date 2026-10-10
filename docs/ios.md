@@ -632,6 +632,37 @@ isolated guest supplies real account/protocol files for these checks. The full
 ARM64 C++/GLES/PPSSPP regression passes. These eight entries resolve 16 additional
 strong imports across Fortnite and EOSSDK.
 
+V adapters for `initgroups`, `getgroups`, `setgroups`, `setuid` and `setgid`
+use the native group database and process credentials. Successful calls retain
+the caller's errno; failures translate the native error immediately. `kill`
+uses native process existence/permission checks and maps Darwin signal numbers
+to Linux numbers. Darwin `SIGEMT` and `SIGINFO` have no Linux counterpart and
+fail explicitly. Signal-handler registration remains the existing limited
+subset. `malloc_size` reports the native allocator's usable capacity for NULL
+or allocation base pointers from `malloc`, `calloc` and `realloc`. Allocation
+rounding differs between the native allocators; arbitrary/interior pointers
+and other allocation zones remain unsupported.
+
+`ioctl` has a small ARM64 variadic entry and V adapters for close-on-exec,
+nonblocking mode, queued byte counts and IPv4 interface queries for flags,
+metric, address, broadcast address, netmask and MTU. These controls act on real
+native descriptors and interfaces. The Linux backend keeps its 40-byte `ifreq`
+inside a stack buffer and copies only the selected result into Darwin's
+32-byte structure. It preserves unused bytes, converts multicast flags and
+sockaddr headers, and follows the Mac's shortened netmask lengths and missing
+interface errors. Other requests fail explicitly without reading a missing
+variadic argument; terminal controls and interface mutation remain unsupported.
+
+Shared Mac/iOS fixtures check actual credential failures, signal queries,
+descriptor aliases, queued socket bytes, guarded interface buffers and eight
+concurrent clients. The isolated guest checks group-database membership,
+credential changes and real delivery of Darwin `SIGUSR1`, `SIGUSR2` and `SIGBUS`.
+Allocator checks write every reported usable byte and verify reallocation
+contents. ASAN checks two loads/unloads of both fixtures. Workers are joined
+before reporting failures, including partial thread creation. The full ARM64
+C++/GLES/PPSSPP regression passes. These eight entries resolve 13 additional
+strong imports across Fortnite and its bundled frameworks.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -645,7 +676,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _initgroups
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _mktime
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -653,12 +684,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,279 | 879 | 81 |
-| EOSSDK | 493 | 169 | 18 |
-| MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,824 | 1,172 | 122 |
+| Fortnite executable | 1,285 | 873 | 81 |
+| EOSSDK | 499 | 163 | 18 |
+| MarketplaceKitWrapper | 53 | 123 | 23 |
+| All images | 1,837 | 1,159 | 122 |
 
-The C++/GLES/Text variant reports 1,837 resolved imports, 1,159 unresolved strong
+The C++/GLES/Text variant reports 1,850 resolved imports, 1,146 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
