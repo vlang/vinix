@@ -209,3 +209,15 @@ FullMAC firmware download/security behavior also references Linux's
 properties are from Linux `arch/arm64/boot/dts/apple/t8103*.dts*`. These are
 protocol/register references, not evidence that this implementation works on
 real hardware.
+
+## Control fixture host controller
+
+`run-control.py` keeps the original argument parser and temporary-directory
+ownership. `run-control.v` owns immutable oracle recovery, metadata copies,
+compiler arguments, allocator import checks, bundle generation, all eleven
+stdout/stderr/status comparisons and the host/native receipt files. Both
+captured streams preserve raw bytes and are drained together before reaping
+the child. The original utility, independent device fixture, ABI assembly and
+serial producer remain the inputs to the build. Native guest commands retain
+the original marker and timeout. Host controller tests alone do not verify a
+fresh kernel build, guest boot or physical Wi-Fi operation.
