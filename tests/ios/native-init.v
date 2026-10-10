@@ -69,6 +69,7 @@ fn main() {
 		require_child('/opt/ios/swift-integer-hash-checks')
 		require_child('/opt/ios/swift-fatal-checks')
 		require_child('/opt/ios/swift-interpolation-checks')
+		require_child('/opt/ios/swift-array-storage-checks')
 		require_child('/opt/ios/regression')
 	} else {
 		args := if mode == 'audit' {

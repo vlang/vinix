@@ -2,9 +2,8 @@
 module main
 
 // Array's frozen payload is one BridgeObject. Its witnesses do not inspect
-// Element or the storage class. Storage ARC currently accepts registered
-// UTF-8 buffers, ObjC owners and immortal references; allocating arbitrary
-// Swift array storage is a separate, unsupported operation.
+// Element or the storage class. Storage ARC accepts registered UTF-8 buffers,
+// typed value-element tails, ObjC owners and immortal references.
 fn swift_array_copy(destination u64, source u64, _metadata u64) u64 {
 	owner := read64(source)
 	swift_bridge_retain(owner)
@@ -149,6 +148,7 @@ fn swift_array_arena() u64 {
 
 fn swift_array_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_$ss27_allocateUninitializedArrayySayxG_BptBwlF' { u64(unsafe { voidptr(swift_array_allocate) }) }
 		'_$sSaMa' { swift_array_arena() }
 		'_$sSaMn' { swift_array_arena() + u64(C.getpagesize()) + 160 }
 		else { none }

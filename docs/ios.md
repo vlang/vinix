@@ -1887,25 +1887,72 @@ All twenty-six native V checks and the full four-core ARM64
 C++/UIKit/GLES/PPSSPP regression pass. Eight more strong imports resolve across
 the executable and EOSSDK.
 
-The Fortnite probe now stops before entry at EOSSDK's uninitialized Array
-allocator, `_$ss27_allocateUninitializedArrayySayxG_BptBwlF`, with exit status 1.
+The interpolation layer's Fortnite probe stopped before entry at EOSSDK's
+uninitialized Array allocator, `_$ss27_allocateUninitializedArrayySayxG_BptBwlF`,
+with exit status 1.
 Interpolation evidence is retained under `swift-interpolation-checks`, including
 native measurements of that next allocator's ABI and typed/empty storage.
 Unconstrained interpolation, other associated-type manglings, Hasher metadata,
 additional conformances, runtime-wide conformance discovery and arbitrary
 application Swift heap classes remain incomplete.
 
+The uninitialized Array allocator now resolves in V. It accepts complete
+value-element metadata, returns an owner and aligned element pointer, and
+checks count, size, stride, alignment and allocation overflow before allocating.
+The measured 32-byte header records the live element count and exact capacity.
+One sealed, canonical empty owner is immortal and never unique. Its zero-length
+element pointer follows the native header-offset rule even for over-aligned types.
+The implementation follows the installed SDK's Array allocation/adoption contract
+and [Swift's value witness flags](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/include/swift/ABI/MetadataValues.h).
+
+Typed storage has its own registry. Last release marks it deinitializing and
+removes the entry before dropping the lock and invoking each non-POD Element's
+actual destroy witness in element order. Storage stays alive until every witness
+returns. Array aliases retain their shared storage without copying elements;
+String and nested Array elements release their real owners. A cleared live count
+allows an uninitialized allocation to be discarded without destroying its tail.
+Private storage descriptors do not implement Swift class metadata, reflection,
+casts or ObjC bridging. Class and class-constrained elements reject explicitly.
+
+Native-library and V typed Array tests, existing String ARC, Array metadata and
+interpolation suites pass ASAN/UBSAN in both seed modes. Cases cover empty and
+zero-sized values, POD, Unicode/NUL and owned String tails, foreign String owners,
+nested Arrays, retained aliases, alignments through 256, invalid/incomplete
+layouts and count/refcount overflow. Custom destroy callbacks wait for another
+resolver worker, eight workers allocate concurrently, and two drained runtime
+cycles leave no owners and prove the empty mapping unmapped. Seven generated
+allocation/ARC bodies have no hidden V allocations on valid paths. Explicit
+storage and registry allocations are owned; rejected-input Result errors box.
+
+The rebuilt Fortnite probe gets past the allocator import and exits with status
+1 before entry at EOSSDK's `CVarArg` protocol descriptor, `_$ss7CVarArgMp`.
+Evidence is retained under `swift-array-storage-checks`, including native
+measurements of that descriptor, Int's conformance/witness and the forty-byte
+`CVarArg` existential layout. Verification helpers keep assertions enabled;
+a deliberate failing assertion confirms that they reject failures with this
+Mac's compiler, whose production mode removes assertions.
+
+All twenty-seven native guest checks pass in both full regression attempts.
+The broader regression then fails in the existing concurrent permissions fixture:
+first `chmod` reports ENOENT (status 768), then duplicate `symlink` unexpectedly
+succeeds (status 512). A comparison using the previously published runner hits
+a poisoned kernel pointer in `fs__reduce_node_on_mount` during the file-time
+check, before reaching the new allocator test. Full regression has not passed.
+All three serial/config logs and VM image hashes are retained. The new runner
+binaries remain in the evidence directory; the five published runners retain
+their previous verified hashes pending a passing full regression.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,384 | 774 | 81 |
-| EOSSDK | 594 | 68 | 18 |
-| MarketplaceKitWrapper | 88 | 88 | 23 |
-| All images | 2,066 | 930 | 122 |
+| Fortnite executable | 1,385 | 773 | 81 |
+| EOSSDK | 595 | 67 | 18 |
+| MarketplaceKitWrapper | 89 | 87 | 23 |
+| All images | 2,069 | 927 | 122 |
 
-The C++/GLES/Text variant reports 2,079 resolved imports, 917 unresolved strong
+The C++/GLES/Text variant reports 2,082 resolved imports, 914 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

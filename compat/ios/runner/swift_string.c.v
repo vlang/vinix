@@ -11,8 +11,8 @@ mut:
 }
 
 // A private descriptor for buffers owned by this implementation. It is NOT
-// Swift class/type metadata: generic array storage reflection, casts and
-// allocation remain unsupported exports. The measured array body and ARC
+// Swift class/type metadata: generic array storage reflection and casts
+// remain unsupported exports. The measured array body and ARC
 // entry points below are the supported operations on these buffers.
 struct SwiftUTF8BufferDescriptor {
 	name &char = c'Vinix Swift UTF-8 buffer'
@@ -106,29 +106,43 @@ fn swift_string_utf8_cstring(first u64, second u64) u64 {
 fn swift_buffer_refs(object u64, delta i64) !u64 {
 	if object == 0 { return 0 }
 	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
-	if object !in ios_runtime.swift_buffers && object !in ios_runtime.swift_strings {
+	if object == ios_runtime.swift_empty_array {
+		C.ios_objc_initialize_unlock()
+		return swift_strong_limit // Immortal storage never reports unique.
+	}
+	if object !in ios_runtime.swift_buffers && object !in ios_runtime.swift_strings && object !in ios_runtime.swift_arrays {
+		C.ios_objc_initialize_unlock()
 		return error('iOS: Swift ARC for application heap objects is not implemented')
 	}
 	location := unsafe { &u64(object + 8) }
 	bits := C.ios_load_pointer(location)
 	refs := (bits >> 33) + 1
 	if delta > 0 && u64(delta) > swift_strong_limit - refs {
+		C.ios_objc_initialize_unlock()
 		return error('iOS: Swift reference count overflow')
 	}
-	if delta < 0 && u64(-delta) > refs { return error('iOS: Swift reference count underflow') }
+	if delta < 0 && u64(-(delta + 1)) + 1 > refs {
+		C.ios_objc_initialize_unlock()
+		return error('iOS: Swift reference count underflow')
+	}
 	updated := u64(i64(refs) + delta)
 	if updated == 0 {
-		// The last strong reference retires the entry before freeing the bytes.
-		// All supported ARC operations use this lock; there are no weak/unowned
-		// readers or application deinit callbacks for these byte buffers.
+		// Retire before callbacks. Keep the bytes alive until all Element
+		// witnesses return; callbacks may resolve symbols or release other owners.
 		C.ios_store_pointer(location, 3 | (u64(1) << 32))
+		if storage := ios_runtime.swift_arrays[object] {
+			ios_runtime.swift_arrays.delete(object)
+			C.ios_objc_initialize_unlock()
+			swift_array_dispose(object, storage)
+			return 0
+		}
 		ios_runtime.swift_buffers.delete(object)
 		ios_runtime.swift_strings.delete(object)
 		C.free(unsafe { voidptr(object) })
 	} else {
 		C.ios_store_pointer(location, 3 | ((updated - 1) * swift_strong_step))
 	}
+	C.ios_objc_initialize_unlock()
 	return updated
 }
 
@@ -161,7 +175,8 @@ fn swift_bridge_release(object u64) { swift_bridge_release_n(object, 1) }
 fn swift_unknown_is_native(object u64) bool {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	if object in ios_runtime.swift_buffers || object in ios_runtime.swift_strings { return true }
+	if object == ios_runtime.swift_empty_array || object in ios_runtime.swift_buffers
+		|| object in ios_runtime.swift_strings || object in ios_runtime.swift_arrays { return true }
 	if object in ios_runtime.objects || object in ios_runtime.classes || object in ios_runtime.constants
 		|| object in ios_runtime.block_refs { return false }
 	panic('iOS: Swift unknown-object ARC for unregistered objects is not implemented')
@@ -182,6 +197,7 @@ fn swift_buffers_stop() {
 	if ios_runtime.swift_strings.len != 0 { panic('iOS: Swift Strings still owned at shutdown') }
 	unsafe { ios_runtime.swift_buffers.free() }
 	unsafe { ios_runtime.swift_strings.free() }
+	swift_array_storage_stop()
 	swift_arc_stop()
 	swift_metadata_stop()
 	swift_hash_stop()

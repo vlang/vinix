@@ -275,5 +275,5 @@ fn test_swift_array_metadata_and_witnesses() {
 		for address in retired { array_retired(address) }
 		for offset in 0 .. 3 { array_retired(arena + u64(offset * C.getpagesize())) }
 	}
-	println('IOS-SWIFT-ARRAY: canonical sealed metadata per Element, genuine generic descriptor/accessor/pattern, eight ownership and enum witnesses, reentrant assignment destruction, concurrent publication, unsupported application storage allocation and two empty teardowns')
+	println('IOS-SWIFT-ARRAY: canonical sealed metadata per Element, genuine generic descriptor/accessor/pattern, eight ownership and enum witnesses, reentrant assignment destruction, concurrent publication, unsupported arbitrary heap-class allocation and two empty teardowns')
 }
