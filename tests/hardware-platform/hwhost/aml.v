@@ -210,19 +210,93 @@ pub fn aml_local(number int) []u8 {
 	return [u8(0x60 + number)]
 }
 
-// A whole table: the 36-byte header every ACPI table starts with, then the
-// definition block, with the checksum that makes all its bytes sum to zero.
-pub fn aml_table(signature string, table_id string, body [][]u8) []u8 {
-	code := aml_join(body)
+// A buffer holding `bytes`.
+pub fn aml_buffer(bytes []u8) []u8 {
+	mut inner := aml_integer(u64(bytes.len))
+	inner << bytes
+	return aml_block([u8(0x11)], inner)
+}
+
+// One I/O port, as a descriptor of a resource template: sixteen-bit decode,
+// a range of exactly that port.
+pub fn aml_io_port(port u16) []u8 {
+	return [u8(0x47), 0x01, u8(port), u8(port >> 8), u8(port), u8(port >> 8), 0x01, 0x01]
+}
+
+// What _CRS returns: the descriptors and the tag that ends them.
+pub fn aml_resources(descriptors [][]u8) []u8 {
+	mut bytes := aml_join(descriptors)
+	bytes << [u8(0x79), 0x00]
+	return aml_buffer(bytes)
+}
+
+// The address space of an embedded controller's registers.
+pub const aml_embedded_control = u8(3)
+
+// OperationRegion (name, space, offset, length).
+pub fn aml_region(name string, space u8, offset u64, length u64) []u8 {
+	mut out := [u8(0x5b), 0x80]
+	out << aml_name(name)
+	out << space
+	out << aml_integer(offset)
+	out << aml_integer(length)
+	return out
+}
+
+// How a field reaches its region, and whether the global lock is taken for
+// it: the low bits of a field's flags.
+pub const aml_byte_access = u8(1)
+pub const aml_word_access = u8(2)
+pub const aml_dword_access = u8(3)
+pub const aml_field_lock = u8(0x10)
+
+// A count of bits in a field list: written the way a package length is, but
+// counting only what it says.
+fn aml_bits(bits int) []u8 {
+	if bits < 0x40 {
+		return [u8(bits)]
+	}
+	if bits < 0x1000 {
+		return [u8(0x40 | (bits & 0xf)), u8(bits >> 4)]
+	}
+	return [u8(0x80 | (bits & 0xf)), u8((bits >> 4) & 0xff), u8(bits >> 12)]
+}
+
+// `bits` bits of a region under a name.
+pub fn aml_field_unit(name string, bits int) []u8 {
+	mut out := aml_segment(name)
+	out << aml_bits(bits)
+	return out
+}
+
+// `bits` bits of a region that have no name.
+pub fn aml_field_gap(bits int) []u8 {
+	mut out := [u8(0x00)]
+	out << aml_bits(bits)
+	return out
+}
+
+// Field (region, flags) { units }: the units lie one after the other from
+// the start of the region.
+pub fn aml_field(region string, flags u8, units [][]u8) []u8 {
+	mut inner := aml_name(region)
+	inner << flags
+	inner << aml_join(units)
+	return aml_block([u8(0x5b), 0x81], inner)
+}
+
+// A whole table: the 36-byte header every ACPI table starts with, then
+// `content`, with the checksum that makes all its bytes sum to zero.
+pub fn acpi_blob(signature string, revision u8, table_id string, content []u8) []u8 {
 	mut out := []u8{len: 36}
 	for i in 0 .. 4 {
 		out[i] = signature[i]
 	}
-	length := u32(36 + code.len)
+	length := u32(36 + content.len)
 	for i in 0 .. 4 {
 		out[4 + i] = u8(length >> (8 * i))
 	}
-	out[8] = 2 // revision: 64-bit integers
+	out[8] = revision
 	oem := 'VINIX '
 	for i in 0 .. 6 {
 		out[10 + i] = oem[i]
@@ -236,11 +310,36 @@ pub fn aml_table(signature string, table_id string, body [][]u8) []u8 {
 		out[28 + i] = creator[i]
 	}
 	out[32] = 1 // creator revision
-	out << code
+	out << content
 	mut sum := u8(0)
 	for b in out {
 		sum += b
 	}
 	out[9] = u8(0) - sum
 	return out
+}
+
+// A table of AML: a definition block, revision 2 for 64-bit integers.
+pub fn aml_table(signature string, table_id string, body [][]u8) []u8 {
+	return acpi_blob(signature, 2, table_id, aml_join(body))
+}
+
+// An I/O port as a table gives it: a generic address, twelve bytes.
+fn acpi_io_address(port u16) []u8 {
+	return [u8(1), 8, 0, 1, u8(port), u8(port >> 8), 0, 0, 0, 0, 0, 0]
+}
+
+// An ECDT (ACPI 6.5, 5.2.15): where the embedded controller is, for a
+// kernel that has not loaded the namespace yet. `path` is the controller's
+// device in the namespace.
+pub fn ecdt_table(command u16, data u16, uid u32, gpe u8, path string) []u8 {
+	mut content := acpi_io_address(command)
+	content << acpi_io_address(data)
+	for i in 0 .. 4 {
+		content << u8(uid >> (8 * i))
+	}
+	content << gpe
+	content << path.bytes()
+	content << 0
+	return acpi_blob('ECDT', 1, 'HWTESTEC', content)
 }

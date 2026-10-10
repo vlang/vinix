@@ -298,7 +298,8 @@ fn run_selection(host Host, selection Selection, kernel string, work string, tim
 			kernel:  kernel
 			guest:   guest
 			state:   os.join_path(work, scenario.name)
-			timeout: timeout
+			// A scenario that says it needs longer than the run allows gets it.
+			timeout: if scenario.timeout > timeout { scenario.timeout } else { timeout }
 			keep:    keep
 		})
 		if outcome.interrupted {

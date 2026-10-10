@@ -82,6 +82,9 @@ pub:
 	// scenario also runs only when it is named, against a kernel built for it.
 	define  string
 	cmdline string // extra kernel command line
+	// How many seconds the machine may run, when that is more than a run
+	// allows every scenario.
+	timeout int
 	// Extra QEMU arguments, for every architecture and for one. `{state}`
 	// stands for the scenario's state directory.
 	qemu         []string
@@ -158,6 +161,38 @@ const hotplug_actions = [
 fn screen_picture(name string) string {
 	return '{"execute":"screendump","arguments":{"filename":"{state}/${name}.ppm"}}'
 }
+
+// The machine of the embedded controller self-test: the tables that describe
+// the controller, and a generation id device, whose only part here is that
+// changing the id makes QEMU's chipset raise general purpose event 5 -- the
+// event the tables give the controller.
+fn ec_selftest_qemu(table string, early bool) []string {
+	mut extra := ['-acpitable', 'file={state}/' + table + '.aml']
+	if early {
+		extra << ['-acpitable', 'file={state}/ec-ecdt.aml']
+	}
+	extra << ['-device', 'vmgenid,guid=auto,id=hwgen']
+	return extra
+}
+
+const ec_raise = '{"execute":"qom-set","arguments":{"path":"/machine/peripheral/hwgen","property":"guid","value":"auto"}}'
+
+// Each time the guest has put an event into the simulated controller and
+// says so, the host has the chipset raise the controller's event.
+const ec_selftest_actions = [
+	Action{
+		after: 'HWTEST STEP controller event 1'
+		qmp:   ec_raise
+	},
+	Action{
+		after: 'HWTEST STEP controller event 2'
+		qmp:   ec_raise
+	},
+	Action{
+		after: 'HWTEST STEP controller event 3'
+		qmp:   ec_raise
+	},
+]
 
 pub const scenarios = [
 	Scenario{
@@ -335,6 +370,49 @@ pub const scenarios = [
 		tables:   ['thermal-bench']
 		qemu:     ['-acpitable', 'file={state}/thermal-bench.aml']
 		required: ['HWTEST START acpi-thermal', 'HWTEST PASS acpi-thermal', 'HWTEST STEP going critical']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'acpi-ec-absent'
+		about:    'an embedded controller nothing answers for is given up on, and the machine goes on'
+		arches:   ['x86_64']
+		tables:   ['ec-absent']
+		qemu:     ['-acpitable', 'file={state}/ec-absent.aml']
+		required: ['HWTEST START acpi-ec-absent', 'HWTEST PASS acpi-ec-absent']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'acpi-ec-off'
+		about:    'vinix.ec=off leaves an embedded controller alone'
+		arches:   ['x86_64']
+		cmdline:  'vinix.ec=off'
+		tables:   ['ec-absent']
+		qemu:     ['-acpitable', 'file={state}/ec-absent.aml']
+		required: ['HWTEST START acpi-ec-off', 'HWTEST PASS acpi-ec-off']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'acpi-ec-selftest'
+		about:    'a simulated embedded controller: fields, events, sleep, and giving up'
+		arches:   ['x86_64']
+		define:   'acpiec_selftest'
+		timeout:  240
+		tables:   ['ec-bench', 'ec-ecdt']
+		qemu:     ec_selftest_qemu('ec-bench', true)
+		required: ['HWTEST START acpi-ec-selftest', 'HWTEST PASS acpi-ec-selftest']
+		actions:  ec_selftest_actions
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'acpi-ec-selftest-dsdt'
+		about:    'the same with no ECDT: the controller is found in the namespace alone'
+		arches:   ['x86_64']
+		define:   'acpiec_selftest'
+		timeout:  240
+		tables:   ['ec-bench-dsdt']
+		qemu:     ec_selftest_qemu('ec-bench-dsdt', false)
+		required: ['HWTEST START acpi-ec-selftest-dsdt', 'HWTEST PASS acpi-ec-selftest-dsdt']
+		actions:  ec_selftest_actions
 		ending:   .poweroff
 	},
 	Scenario{

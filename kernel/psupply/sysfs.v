@@ -204,7 +204,11 @@ fn add_value(mut text lib.Text, supply &Supply, attribute Attribute) {
 		.kind { text.add(if supply.kind == .battery { 'Battery' } else { 'Mains' }) }
 		.online { text.add_unsigned(if reading.online { u64(1) } else { u64(0) }) }
 		.present { text.add_unsigned(if reading.present { u64(1) } else { u64(0) }) }
-		.status { text.add(status_name(reading.status)) }
+		.status {
+			// A supply that could not be read just now is not known to be
+			// doing what it was doing when it last could.
+			text.add(status_name(if supply.read_ok { reading.status } else { Status.unknown }))
+		}
 		.capacity { text.add_decimal(i64(if supply.percent < 0 { 0 } else { supply.percent })) }
 		.capacity_level {
 			text.add(level_name(level_of(supply.percent, reading.status, psupply_policy.low_percent,

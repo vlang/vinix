@@ -22,6 +22,9 @@ module main
 // Runs the named scenario. False when this program has no such scenario.
 fn run_scenario(name string, mut t Test) bool {
 	match name {
+		'acpi-ec-absent' { scenario_acpi_ec_absent(mut t) }
+		'acpi-ec-off' { scenario_acpi_ec_off(mut t) }
+		'acpi-ec-selftest', 'acpi-ec-selftest-dsdt' { scenario_acpi_ec_selftest(mut t) }
 		'acpi-power' { scenario_acpi_power(mut t) }
 		'acpi-thermal' { scenario_acpi_thermal(mut t) }
 		'ahci' { scenario_ahci(mut t) }
