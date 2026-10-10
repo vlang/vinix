@@ -61,7 +61,7 @@ fi
 OUT="${OUT:-$(mktemp -d "${TMPDIR:-/tmp}/vinix-iso-test.XXXXXX")}"
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
-CHECK="$SCRIPT_DIR/build-support/check-screenshot.py"
+CHECK="$SCRIPT_DIR/build-support/check-screenshot"
 
 HOST_OS="$(uname -s)"
 case "$(uname -m)" in
@@ -232,7 +232,7 @@ check_boot() {
         if [ "$SECONDS" -ge "$next_shot" ]; then
             next_shot=$((SECONDS + 10))
             if vm_shoot "$shot" >/dev/null 2>&1 &&
-                verdict="$(python3 "$CHECK" "$(vm_image "$shot")")"; then
+                verdict="$("$CHECK" "$(vm_image "$shot")")"; then
                 drawn=1
                 echo "    $name: no marker on serial, but the screen shows the desktop"
                 break
@@ -250,7 +250,7 @@ check_boot() {
         while [ "$SECONDS" -lt "$deadline" ]; do
             sleep 10
             vm_shoot "$shot" >/dev/null 2>&1 || continue
-            if verdict="$(python3 "$CHECK" "$(vm_image "$shot")")"; then
+            if verdict="$("$CHECK" "$(vm_image "$shot")")"; then
                 drawn=1
                 break
             fi
@@ -268,7 +268,7 @@ check_boot() {
     vm_type "$TEST_TEXT"
     sleep 4
     vm_shoot "$shot-typed" >/dev/null
-    if ! verdict="$(python3 "$CHECK" --changed "$(vm_image "$shot-before")" "$(vm_image "$shot-typed")" 120)"; then
+    if ! verdict="$("$CHECK" --changed "$(vm_image "$shot-before")" "$(vm_image "$shot-typed")" 120)"; then
         echo "    $name: typing did not reach the desktop ($verdict)" >&2
         return 1
     fi
@@ -277,7 +277,7 @@ check_boot() {
         vm_point
         sleep 4
         vm_shoot "$shot-pointer" >/dev/null
-        if ! verdict="$(python3 "$CHECK" --changed "$(vm_image "$shot-typed")" "$(vm_image "$shot-pointer")" 120)"; then
+        if ! verdict="$("$CHECK" --changed "$(vm_image "$shot-typed")" "$(vm_image "$shot-pointer")" 120)"; then
             echo "    $name: the pointer did not move ($verdict)" >&2
             return 1
         fi
