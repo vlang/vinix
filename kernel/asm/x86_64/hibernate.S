@@ -7,12 +7,20 @@
 // Every page of the image is in memory by now. Most are in the frames they
 // were saved from; the rest could not be put there, because this kernel was
 // using those frames, and wait in frames the image has no use for. What is
-// left is to copy those into place -- over this kernel's own data, stacks
-// and page tables -- and to jump into the image. So nothing from here on may
-// depend on any of that: the code that copies, the list it copies from, its
-// stack, the page table it runs under and the block of values below are all
-// in frames the image does not want, and are found through the direct map,
-// which the page table made for this maps the same way the kernel's does.
+// left is to copy those into place -- over this kernel's own code, data,
+// stacks and page tables -- and to jump into the image. So nothing from here
+// on may depend on any of that: the code that copies, the list it copies
+// from, its stack, the page table it runs under and the block of values
+// below are all in frames the image does not want, and are found through the
+// direct map, which the page table made for this maps the same way the
+// kernel's does.
+//
+// That goes for this kernel's own code too. The boot loader does not put the
+// kernel in the same frames every time, so the image's kernel may lie where
+// this one's does, or beside it, or across it. The code below is therefore
+// copied to a frame of its own and run there, at its direct-map address,
+// which the caller has made executable; and the page table it switches to
+// maps the kernel's addresses to where the image's kernel is.
 //
 // The block, at its direct-map address:
 
@@ -29,24 +37,12 @@
 
 // void x86_hibernate_enter(Jump *block)
 //
-// In the kernel's own text, which the new page table maps where the old one
-// did, so that the instruction after the switch is still this code.
 // Interrupts off, every other processor stopped. Does not return.
 .global x86_hibernate_enter
 .type x86_hibernate_enter, @function
 x86_hibernate_enter:
     cli
     movq %rdi, %rbx
-    movq JUMP_CR3(%rbx), %rax
-    movq %rax, %cr3
-    // Global pages and tagged address spaces off: with them goes every
-    // translation the processor has cached, under any tag. What the image's
-    // kernel finds cached must be nothing, as after power-on; it believes
-    // its own record of which address spaces are still cached, and that
-    // record is from before the machine was switched off.
-    movq JUMP_CR4(%rbx), %rax
-    movq %rax, %cr4
-    movq JUMP_STACK(%rbx), %rsp
     movq JUMP_COPY(%rbx), %rax
     jmpq *%rax
 .size x86_hibernate_enter, .-x86_hibernate_enter
@@ -61,6 +57,18 @@ x86_hibernate_enter:
 .global x86_hibernate_copy
 .type x86_hibernate_copy, @function
 x86_hibernate_copy:
+    // The page table for this: all of memory where the direct map has it,
+    // this page among it, and the kernel's addresses on the image's kernel.
+    movq JUMP_CR3(%rbx), %rax
+    movq %rax, %cr3
+    // Global pages and tagged address spaces off: with them goes every
+    // translation the processor has cached, under any tag. What the image's
+    // kernel finds cached must be nothing, as after power-on; it believes
+    // its own record of which address spaces are still cached, and that
+    // record is from before the machine was switched off.
+    movq JUMP_CR4(%rbx), %rax
+    movq %rax, %cr4
+    movq JUMP_STACK(%rbx), %rsp
     cld
     movq JUMP_LIST(%rbx), %r8
     movq JUMP_DIRECT(%rbx), %r9
@@ -85,10 +93,9 @@ x86_hibernate_copy:
     decq %r11
     jmp 2b
 3:
-    // Every page of the image is where it belongs. Its kernel's text is the
-    // text this was called from, at the same address; the entry is the one a
-    // processor woken from a suspend to RAM arrives at, and takes it from
-    // here: its own page table first.
+    // Every page of the image is where it belongs, its kernel's code among
+    // them. The entry is the one a processor woken from a suspend to RAM
+    // arrives at, and takes it from here: its own page table first.
     movq JUMP_CONTEXT(%rbx), %rdi
     movq JUMP_ENTRY(%rbx), %rax
     jmpq *%rax

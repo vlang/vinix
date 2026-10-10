@@ -239,7 +239,7 @@ fn (mut run HibRun) check_waiting(mut t Test, when string) {
 	t.check(C.waitpid(i32(run.child), &status, 1) == 0, '${when}: the child that was waiting has gone')
 	b := [u8(2)]!
 	C.write(run.child_end, &b[0], 1)
-	t.check(C.waitpid(i32(run.child), &status, 0) == run.child && (status >> 8) & 0xff == 42 && status & 0x7f == 0, '${when}: the child ended with status 0x${status.hex()}, not by exiting with 42')
+	t.check(C.waitpid(i32(run.child), &status, 0) == run.child && (status >> 8) & 0xff == 42 && status & 0x7f == 0, '${when}: the child ended with status ${status}, not by exiting with 42')
 }
 
 fn (mut run HibRun) check_machine(mut t Test, when string, seed u8, offset i64) {

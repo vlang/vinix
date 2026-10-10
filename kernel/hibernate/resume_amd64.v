@@ -51,7 +51,6 @@ import block.fence
 import devcore
 import dma
 import katomic
-import limine
 import memory
 import proc
 import sched
@@ -138,8 +137,10 @@ mut:
 	// were not free when its frames were taken: kept out of the way.
 	extra Chain
 	aside Chain
-	// The page table for the last step.
-	top u64
+	// The page table for the last step, and the page its code is on once
+	// that has been made a page code may run from.
+	top  u64
+	code u64
 	// Where the image's page for the report is now.
 	handover_at u64
 	direct_pages    u64
@@ -230,6 +231,11 @@ fn free_chain(mut chain Chain, entries bool) {
 
 // Give back everything taken. The image is not going to be entered.
 fn (mut loader Loader) release() {
+	if loader.code != 0 {
+		// As the rest of the direct map is, before it is anybody's again.
+		kernel_pagemap.map_page(loader.code + higher_half, loader.code, memory.pte_present | memory.pte_writable | memory.pte_noexec) or {}
+		loader.code = 0
+	}
 	// The pairs: the second word of each is a frame that was taken; the
 	// first is where the page belongs, which was never ours.
 	mut page := loader.pairs.head
@@ -259,13 +265,15 @@ fn (mut loader Loader) release() {
 	loader.direct.release()
 }
 
-// Whether every frame the image wants is memory this kernel has, each in
-// one piece and in ascending order. The memory map was compared already; this
-// is the same question asked of each page, since a page put where there is
-// no memory, or where firmware lives, cannot be taken back.
+// Whether every frame the image wants is memory this kernel has, all of it,
+// and the frames are in ascending order. The memory of the two boots was
+// compared already; this is the same question asked of each page against
+// this boot's own map, since a page put where there is no memory, or where
+// firmware lives, cannot be taken back. Which of the three kinds of memory a
+// frame is in this boot does not matter: that only decides whether its page
+// can be read straight into it.
 fn (loader &Loader) frames_are_memory() bool {
 	entries := map_entries()
-	limit := memory.pmm_page_count()
 	mut entry := u64(0)
 	mut previous := u64(0)
 	for index in u64(0) .. loader.header.pages {
@@ -275,27 +283,31 @@ fn (loader &Loader) frames_are_memory() bool {
 		}
 		previous = frame
 		start := frame * page_size
-		mut found := false
+		end := start + page_size
+		// Entries that end before this page are of no use to a later one.
 		for entry < entries {
-			base, length, kind := map_entry(entry)
-			if start + page_size <= base {
-				return false
+			base, length, _ := map_entry(entry)
+			if base + length > start {
+				break
 			}
-			if start >= base + length {
-				entry++
-				continue
+			entry++
+		}
+		mut covered := u64(0)
+		for look := entry; look < entries; look++ {
+			base, length, kind := map_entry(look)
+			if base >= end {
+				break
 			}
 			if !is_ram(kind) {
 				return false
 			}
-			if kind == u64(limine.limine_memmap_usable) && (start < base || start + page_size > base + length
-				|| frame >= limit) {
-				return false
+			from := if base > start { base } else { start }
+			to := if base + length < end { base + length } else { end }
+			if to > from {
+				covered += to - from
 			}
-			found = true
-			break
 		}
-		if !found {
+		if covered != page_size {
 			return false
 		}
 	}
@@ -440,8 +452,9 @@ fn (mut loader Loader) map(virt u64, phys u64, large bool) bool {
 }
 
 // The page table the last step runs under: all of memory where the direct
-// map has it, and the kernel where the kernel is. Returns the block of
-// values the last step works from, or 0.
+// map has it, and the kernel's addresses on the frames the image's kernel
+// is saved from -- which need not be where this kernel is. Returns the block
+// of values the last step works from, or 0.
 fn (mut loader Loader) last_step() u64 {
 	loader.top = loader.take_extra()
 	if loader.top == 0 || higher_half % large_bytes != 0 {
@@ -472,6 +485,12 @@ fn (mut loader Loader) last_step() u64 {
 		return 0
 	}
 	unsafe { C.memcpy(voidptr(code + higher_half), voidptr(start), length) }
+	// It is entered while this kernel's page table is still the one in
+	// use, and the direct map does not let code run: this one page may.
+	kernel_pagemap.map_page(code + higher_half, code, memory.pte_present | memory.pte_writable) or {
+		return 0
+	}
+	loader.code = code
 	mut jump := unsafe { &Jump(block + higher_half) }
 	jump.cr3 = loader.top
 	jump.cr4 = cr4_pae | if la57 { cr4_la57 } else { u64(0) }
@@ -492,6 +511,7 @@ fn on_boot_cpu(context voidptr) bool {
 // Say why the image is not being entered, and see that it never is.
 fn refuse(why string) {
 	hib_boot_verdict = why
+	wake.trace('disk: the image is refused', 0)
 	C.kprintf(c'hibernate: the image on %.*s is not resumed: %.*s\n', i32(hib_device_name.len),
 		hib_device_name.str, i32(why.len), why.str)
 	if write_empty_header(0) {
@@ -535,6 +555,7 @@ pub fn resume_at_boot() {
 	}
 	hib_boot_found = true
 	hib_device_ours = true
+	wake.trace('disk: an image is on the device, pages', loader.header.pages)
 	if verdict == .damaged {
 		refuse(damage)
 		return
@@ -566,6 +587,7 @@ pub fn resume_at_boot() {
 	if problem.len == 0 {
 		problem = loader.read_pages()
 	}
+	wake.trace('disk: image read, pages moved aside', loader.relocated_pages)
 	mut block := u64(0)
 	if problem.len == 0 {
 		block = loader.last_step()
@@ -637,6 +659,7 @@ pub fn resume_at_boot() {
 		return
 	}
 	cpu.interrupt_toggle(false)
+	wake.trace('disk: entering the image at', loader.header.entry)
 	report.loader_uptime = devcore.now_ns()
 	apic.lapic_timer_stop()
 	// As after power-on, which is what the image's kernel expects to find:

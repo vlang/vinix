@@ -105,6 +105,15 @@ fn platform_hibernate_supported() bool {
 	return true
 }
 
+// Whether the device named for the image is, now, one that may be written.
+fn platform_hibernate_ready() bool {
+	if hibernate.device_ready() {
+		return true
+	}
+	syspower_hibernate_failure = hibernate.failure()
+	return false
+}
+
 fn platform_hibernate_failure() string {
 	return syspower_hibernate_failure
 }
@@ -139,6 +148,7 @@ fn hibernate_here() HibernateOutcome {
 	mut slept := false
 	mut why := ''
 	mut away_seconds := u64(0)
+	wake.trace('disk: copies taken, parking', 0)
 	if !wake.park_secondaries() {
 		why = 'a processor would not park'
 	} else if !devcore.sleep_until(events_quiet, unsafe { nil }, quiet_timeout_ns, 1) {
@@ -155,7 +165,9 @@ fn hibernate_here() HibernateOutcome {
 		} else {
 			before_ns := hpet_clock.nanoseconds()
 			hibernate.set_taken_at(before_clock)
+			wake.trace('disk: taking the snapshot', before_clock)
 			slept = wake.sleep_processor(hibernate.take_snapshot)
+			wake.trace('disk: processor back, from an image', if slept { u64(1) } else { u64(0) })
 			if slept {
 				// The kernel inside the image, in a machine that has been
 				// switched off and started since. Nobody else is running to
@@ -180,6 +192,7 @@ fn hibernate_here() HibernateOutcome {
 			}
 		}
 		wake.start_secondaries()
+		wake.trace('disk: processors started, lost', wake.lost_processors())
 		cpu.interrupt_toggle(ints)
 	}
 	// Those that parked while another would not; nothing when all are back.
@@ -200,6 +213,7 @@ fn hibernate_here() HibernateOutcome {
 		// The enable bits of ACPI's events, which this kernel had set and a
 		// later boot did not, or not yet.
 		uacpi.resume_events()
+		wake.trace('disk: devices restored', 0)
 		alarm_skipped(syspower_hibernate_away_ns)
 		C.kprintf(c'syspower: back from disk after about %llu s\n', away_seconds)
 		if wake.lost_processors() != 0 {
@@ -220,6 +234,7 @@ fn hibernate_here() HibernateOutcome {
 // did not happen, with nothing held, no image on the device, and the reason
 // kept.
 fn platform_hibernate_finish() {
+	wake.trace('disk: devices resumed, writing', 0)
 	if !hibernate.write_image() {
 		why := hibernate.failure()
 		hibernate.release()
@@ -230,6 +245,7 @@ fn platform_hibernate_finish() {
 	// reaches a disk after the snapshot is what the image must never find
 	// changed. They were flushed before the snapshot; the devices' own
 	// caches are flushed by their shutdown.
+	wake.trace('disk: image written, switching off', 0)
 	carry_out(.power_off)
 	// Still here. The image describes a machine this kernel is about to
 	// carry on changing; it must not be entered later.

@@ -121,20 +121,33 @@ fn fixed_pages() u64 {
 	return pages
 }
 
+// Look at the device once more, while it can still be read: before the
+// devices are suspended, and so before prepare(). False, with the reason
+// kept, when it is not there or has been given to something else since it
+// was last looked at.
+pub fn device_ready() bool {
+	hib_failure = ''
+	if hib_device == unsafe { nil } {
+		return fail(unavailable_reason())
+	}
+	if !device_is_ours() {
+		return fail(hib_device_problem)
+	}
+	return true
+}
+
 // Make the tables and take a page for every page that will be saved. False,
-// with nothing left taken, when the device cannot be used or there is no
-// room. Interrupts on, the machine running.
+// with nothing left taken, when there is no room. The devices are suspended
+// by now, the image's among them: nothing here reads or writes it.
+// Interrupts on, the machine running.
 pub fn prepare() bool {
 	hib_failure = ''
 	release()
 	if page_size != block_bytes {
 		return fail('pages are not the size the image is written in')
 	}
-	if hib_device == unsafe { nil } {
+	if hib_device == unsafe { nil } || !hib_device_ours {
 		return fail(unavailable_reason())
-	}
-	if !device_is_ours() {
-		return fail(hib_device_problem)
 	}
 	device_pages := hib_device_bytes / block_bytes
 	fixed := fixed_pages()
@@ -184,6 +197,7 @@ pub fn prepare() bool {
 		return fail('not enough free memory to hold a copy of what is in use')
 	}
 	hib_machine = this_machine()
+	wake.trace('disk: prepared, room for pages', capacity)
 	return true
 }
 
@@ -241,6 +255,7 @@ pub fn take_snapshot() {
 	// reads: only the copies, this function's own stack, and what the
 	// kernel that goes on running needs.
 	hib_count = count
+	wake.trace('disk: pages to copy', count)
 	for index in u64(0) .. count {
 		unsafe {
 			C.memcpy(voidptr(hib_copies.get(index) * page_size + higher_half), voidptr(
@@ -333,6 +348,7 @@ pub fn write_image() bool {
 		done += count
 	}
 	memory.pmm_free(voidptr(buffer), chunk)
+	wake.trace('disk: pages written', pages)
 	if !device_flush() {
 		return fail('the device would not keep the image')
 	}

@@ -117,6 +117,10 @@ fn platform_hibernate_available() bool {
 	return false
 }
 
+fn platform_hibernate_ready() bool {
+	return false
+}
+
 fn platform_hibernate_reason() string {
 	return 'no machine this kernel runs on can be put back from a disk'
 }

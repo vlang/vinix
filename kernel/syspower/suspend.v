@@ -176,6 +176,12 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		fail_sleep('platform', '', platform_hibernate_reason())
 		return false
 	}
+	// Whether the device is still the image's is asked now, while it can
+	// be read: its driver is about to be suspended with the rest.
+	if kind == .disk && syspower_rehearsal == .none && !platform_hibernate_ready() {
+		fail_sleep('platform', '', platform_hibernate_failure())
+		return false
+	}
 	if !pagecache.sync_all() {
 		fail_sleep('sync', '', '')
 		return false

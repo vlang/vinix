@@ -40,7 +40,8 @@ pub const format_version = u64(1)
 // own page tables, and a processor's saved registers.
 pub struct Machine {
 pub mut:
-	// Where the kernel is, how long, and a digest of its code and constants.
+	// Where the kernel is mapped and where it lies in memory, how long it
+	// is, and a digest of its code and constants.
 	kernel_virtual  u64
 	kernel_physical u64
 	kernel_bytes    u64
@@ -48,11 +49,17 @@ pub mut:
 	// The offset of the direct map, and the depth of the page tables.
 	direct_map    u64
 	paging_levels u64
-	// The boot loader's memory map: how many entries, a digest of those that
-	// are not free memory and one of those that are.
-	map_entries u64
-	map_fixed   u64
-	map_free    u64
+	// The boot loader's memory map, as two digests. One is of the memory
+	// the kernel has, as the runs of addresses it comes to: usable, the boot
+	// loader's own and the kernel's together, since where the boot loader
+	// draws the lines between those three moves from one boot to the next
+	// and an image does not depend on it. The other is of every entry that
+	// is not such memory -- firmware's regions, ACPI's, the framebuffer --
+	// each by where it is, how long and what kind.
+	map_memory u64
+	map_fixed  u64
+	// One past the last byte of memory the kernel has.
+	memory_top u64
 	// ACPI: where the root pointer is, and a digest of every table's address
 	// and contents.
 	acpi_root   u64
@@ -251,14 +258,18 @@ pub fn machine_difference(image &Machine, here &Machine) string {
 	if image.command_line != here.command_line {
 		return 'the kernel command line has changed'
 	}
-	if image.map_entries != here.map_entries || image.map_fixed != here.map_fixed {
-		return 'the memory map has changed'
+	if image.map_memory != here.map_memory || image.memory_top != here.memory_top {
+		return 'the memory of the machine has changed'
 	}
-	if image.map_free != here.map_free {
-		return 'the free memory of the machine has changed'
+	if image.map_fixed != here.map_fixed {
+		return 'the regions of memory firmware keeps have changed'
 	}
-	if image.kernel_virtual != here.kernel_virtual || image.kernel_physical != here.kernel_physical {
-		return 'the kernel was loaded somewhere else'
+	// Where in memory the boot loader put the kernel is not compared: it
+	// moves by a few pages from one boot of the same machine to the next,
+	// and the image is entered through a page table that maps the kernel's
+	// addresses to where the image's kernel is.
+	if image.kernel_virtual != here.kernel_virtual {
+		return 'the kernel is mapped somewhere else'
 	}
 	if image.direct_map != here.direct_map || image.paging_levels != here.paging_levels {
 		return 'the address space is laid out differently'

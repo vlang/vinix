@@ -21,6 +21,7 @@ import acpi
 import limine
 import memory
 import x86.cpu
+import x86.wake
 
 fn C.text_start()
 fn C.rodata_end()
@@ -31,6 +32,10 @@ const fadt_firmware_ctrl = u64(36)
 const fadt_dsdt = u64(40)
 const fadt_x_firmware_ctrl = u64(132)
 const fadt_x_dsdt = u64(140)
+
+// "BGRT" and "FPDT", as the first four bytes of a table read.
+const acpi_bgrt = u32(0x54524742)
+const acpi_fpdt = u32(0x54445046)
 
 // The types of the boot loader's memory map that are memory the kernel has.
 fn is_ram(kind u64) bool {
@@ -69,8 +74,17 @@ fn table_digest(sum u64, table voidptr) u64 {
 		return mix(sum, 0)
 	}
 	length := u64(unsafe { *&u32(u64(table) + 4) })
+	signature := unsafe { *&u32(table) }
 	mut next := mix(sum, u64(table))
 	next = mix(next, length)
+	next = mix(next, u64(signature))
+	// Two tables describe the boot and not the machine, and differ from one
+	// start of the same machine to the next: where firmware left its logo,
+	// and how long it took to start. The kernel reads neither. They are
+	// told apart by where they are and how long, not by what they say.
+	if signature == acpi_bgrt || signature == acpi_fpdt {
+		return next
+	}
 	// A table longer than this is not a table; its address and what it
 	// claims are enough to tell it from another.
 	if length >= 36 && length <= 16 * 1024 * 1024 {
@@ -79,9 +93,10 @@ fn table_digest(sum u64, table voidptr) u64 {
 	return next
 }
 
-// Every table the root names, by address and contents, and the two the FADT
-// names: the DSDT by address and contents, and the FACS -- which firmware and
-// the kernel both write to -- by address alone.
+// Every table the root names, by address, length, name and contents, and the
+// two the FADT names: the DSDT likewise, and the FACS -- which firmware and
+// the kernel both write to -- by address alone. The kernel inside an image
+// has pointers into these tables and runs their methods where they lie.
 fn acpi_digest() u64 {
 	mut sum := mix(image_magic, u64(acpi.table_count()))
 	for index in 0 .. acpi.table_count() {
@@ -190,19 +205,34 @@ fn this_machine() Machine {
 	machine.direct_map = higher_half
 	machine.paging_levels = if la57 { u64(5) } else { u64(4) }
 
-	machine.map_entries = map_entries()
+	// Memory as runs: an entry that starts where the one before it ended
+	// carries the run on, whichever of the three kinds each is.
 	mut fixed := image_magic
-	mut free := image_magic
-	for index in u64(0) .. machine.map_entries {
+	mut memory_sum := image_magic
+	mut run_base := u64(0)
+	mut run_end := u64(0)
+	for index in u64(0) .. map_entries() {
 		base, length, kind := map_entry(index)
-		if kind == u64(limine.limine_memmap_usable) {
-			free = mix(mix(free, base), length)
-		} else {
+		if !is_ram(kind) {
 			fixed = mix(mix(mix(fixed, base), length), kind)
+			continue
 		}
+		if run_end != 0 && base == run_end {
+			run_end = base + length
+			continue
+		}
+		if run_end != 0 {
+			memory_sum = mix(mix(memory_sum, run_base), run_end)
+		}
+		run_base = base
+		run_end = base + length
+	}
+	if run_end != 0 {
+		memory_sum = mix(mix(memory_sum, run_base), run_end)
 	}
 	machine.map_fixed = fixed
-	machine.map_free = free
+	machine.map_memory = memory_sum
+	machine.memory_top = ram_top()
 
 	machine.acpi_root = acpi.root_address()
 	machine.acpi_tables = acpi_digest()
@@ -210,5 +240,19 @@ fn this_machine() Machine {
 	machine.processors, machine.processor_digest = processor_digest()
 	machine.command_line = command_line_digest()
 	machine.low_base, machine.low_pages = memory.low_pages()
+	wake.trace('machine: kernel at', machine.kernel_physical)
+	wake.trace('machine: kernel mapped at', machine.kernel_virtual)
+	wake.trace('machine: kernel bytes', machine.kernel_bytes)
+	wake.trace('machine: kernel digest', machine.kernel_digest)
+	wake.trace('machine: direct map', machine.direct_map)
+	wake.trace('machine: memory', machine.map_memory)
+	wake.trace('machine: firmware regions', machine.map_fixed)
+	wake.trace('machine: acpi root', machine.acpi_root)
+	wake.trace('machine: acpi tables', machine.acpi_tables)
+	wake.trace('machine: framebuffer', machine.framebuffer)
+	wake.trace('machine: framebuffer layout', machine.framebuffer_layout)
+	wake.trace('machine: processors', machine.processor_digest)
+	wake.trace('machine: command line', machine.command_line)
+	wake.trace('machine: low pages', machine.low_base)
 	return machine
 }
