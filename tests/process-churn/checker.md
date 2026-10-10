@@ -1,0 +1,9 @@
+# Process-churn report checker
+
+`check-results.py` keeps the existing CLI and dispatches `fields`/`inspect` policy to `churncheck`. The checker uses the shared Package Session ABI to borrow actual Python objects. Regular expressions, arbitrary-precision/Unicode integer conversion, genuine comprehension/generator syntax, exception raising and the original CLI remain counted Python. Cohort name data remains Python and receives no translation credit.
+
+V checks duplicate fields, cohorts, filesystem identity, tracking overflow, six-second grace, timed-workload coverage, 300 ms sleep evidence, slab descriptor settlement and small-object limits. All thresholds, original diagnostics and guest fixtures are unchanged. A single ordered mapping owns original named locals; errors keep that mapping through a genuine saved traceback. Successful calls retire its values in original local/cell order. A retained `any` generator shares the final line cell without retaining the surrounding scope.
+
+The native transport captures the caller's actual builtins table, resolves current public globals before operands, and returns original object aliases/errors. Finite literal/slot names remain alive for implementation lifetime. Private bridge frames and replacements of translated private implementation bodies are outside the compatibility contract; near-limit arbitrary callback recursion budgets can differ. This is host report validation: it does not establish new guest memory, kernel, hardware or QEMU results. Kernel and independent fixtures remain intact.
+
+Override `VINIX_CHURN_CHECK_QUERY` and `VINIX_PACKAGE_STORE_LIBRARY` to select qualified binaries. Without overrides, the existing shared installers compile isolated private executables/libraries and clean their temporary directories at process exit.
