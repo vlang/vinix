@@ -7,7 +7,7 @@ import fs
 import pagecache
 import pipe
 import errno
-import aarch64.cpu
+import syspower
 import memory.mmap
 import security
 
@@ -69,15 +69,10 @@ fn storage_reboot(_ voidptr, magic1 u32, magic2 u32, command u32, _arg voidptr) 
 	//
 	// Nothing restarts a machine with unwritten data. A reset that dropped the
 	// page cache is exactly the reboot that loses the file just created, so a
-	// failed flush refuses the transition rather than completing it.
-	if !pagecache.sync_all() { return errno.err, errno.eio }
-	if !ans.shutdown() { return errno.err, errno.eio }
-	if command == 0x01234567 {
-		cpu.psci_call(cpu.psci_system_reset)
-	} else {
-		cpu.psci_call(cpu.psci_system_off)
-	}
-	// A successful power transition does not return. Do not tell init that
-	// a failed/unsupported PSCI call powered the machine off.
+	// failed flush -- of the caches, or of Apple's NVMe -- refuses the
+	// transition rather than completing it: syspower returns then, with the
+	// machine as it was. Past that point every device is stopped and it does
+	// not return.
+	syspower.transition(reboot_action(command))
 	return errno.err, errno.eio
 }

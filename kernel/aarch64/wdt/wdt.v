@@ -17,6 +17,7 @@ module wdt
 // reference clock.
 
 import aarch64.kio
+import aarch64.timer
 import memory
 
 const wd0_cur_time = u32(0x00)
@@ -76,4 +77,27 @@ pub fn pet() {
 		return
 	}
 	wr(wd1_cur_time, 0)
+}
+
+// Reset the machine through the watchdog: arm it with no time left. This is
+// how an Apple SoC is restarted -- there is no firmware call for it -- and the
+// sequence is Linux's apple_wdt_restart(). The reset is queued at once but
+// has been seen to take 20 to 25 ms to happen. False when there is no
+// watchdog, or the reset did not come.
+pub fn restart() bool {
+	if wdt_base == 0 {
+		return false
+	}
+	wr(wd1_ctrl, ctrl_reset_en)
+	wr(wd1_bite_time, 0)
+	wr(wd1_cur_time, 0)
+	// Read back to make sure the writes have reached the device.
+	_ := rd(wd1_cur_time)
+	timer.busywait_us(50000)
+	return false
+}
+
+// Whether the machine has an Apple watchdog.
+pub fn present() bool {
+	return wdt_base != 0
 }
