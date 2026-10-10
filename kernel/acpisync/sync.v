@@ -215,6 +215,30 @@ pub fn signal(handle voidptr) bool {
 	return true
 }
 
+// Give a held mutex back, whichever thread took it. signal() refuses a
+// release by anybody but the owner, which is right for a lock one thread
+// takes and gives back. uACPI's reader-writer lock is not that: the first
+// reader in takes the writers' mutex and the last reader out gives it back,
+// and with two threads reading at once those are different threads. Refused,
+// that mutex stayed taken for good and every later evaluation waited on it
+// for ever. False when the mutex is not held at all.
+@[export: 'vinix_acpi_sync_release']
+pub fn release(handle voidptr) bool {
+	if handle == unsafe { nil } {
+		return false
+	}
+	mut gate := unsafe { &Gate(handle) }
+	gate.lock.acquire()
+	defer { gate.lock.release() }
+	if !gate.mutex || gate.owner == 0 {
+		return false
+	}
+	gate.owner = 0
+	gate.permits = 1
+	event.trigger(mut gate.wake, true)
+	return true
+}
+
 // Whether the calling thread holds the mutex `handle`: for a caller that may
 // be reached both with and without it, and must not wait for itself.
 pub fn held_by_caller(handle voidptr) bool {

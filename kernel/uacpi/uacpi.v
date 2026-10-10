@@ -133,8 +133,10 @@ pub fn uacpi_kernel_acquire_mutex(handle voidptr, timeout u16) UACPIStatus {
 
 @[export: 'uacpi_kernel_release_mutex']
 pub fn uacpi_kernel_release_mutex(handle voidptr) {
-	if !acpisync.signal(handle) {
-		C.kprintf(c'uacpi: rejected mutex release by a non-owner\n')
+	// Not signal(): uACPI gives back mutexes from threads that did not take
+	// them. See acpisync.release().
+	if !acpisync.release(handle) {
+		C.kprintf(c'uacpi: release of a mutex that is not held\n')
 	}
 }
 
