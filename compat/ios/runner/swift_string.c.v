@@ -186,6 +186,7 @@ fn swift_buffers_stop() {
 
 fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_array_symbol(symbol) { return address }
+	if address := swift_integer_symbol(symbol) { return address }
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {

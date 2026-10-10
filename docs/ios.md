@@ -1777,13 +1777,29 @@ bodies. Measurements, primary sources and verification evidence are retained
 under `swift-array-checks`.
 
 All twenty-two native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
-regression pass. Three more strong imports resolve. Fortnite still exits with
+regression pass. Three more strong imports resolved. Its probe exited with
 status 1 before entry at EOSSDK's `Int.init(bitPattern: OpaquePointer?)`,
 `_$sSi10bitPatternSis13OpaquePointerVSg_tcfC`. The installed initializer is a
 single return instruction; native calls preserve all 64 bits, including nil and
-the signed boundary. Other associated-type manglings, Hasher metadata, concrete
-standard-library Hashable conformances, conformance discovery, generic
-interpolation and application Swift heap support remain incomplete.
+the signed boundary.
+
+That initializer now resolves in V and preserves the raw pointer word as signed
+64-bit Int. It reads no pointed-to memory and performs no ownership operations.
+Native/V ASAN/UBSAN checks pass in both seed modes, covering nil, signed limits,
+every single and complemented bit, Swift context preservation and 32,768 inputs
+across eight concurrent workers. Two runtime cycles leave no owners or metadata
+allocations. The existing Array checks also pass under sanitizers. Both compiled
+ARM64 runners contain the same single `ret` instruction as the native initializer;
+generated C checks verify no hidden allocations.
+
+All twenty-three native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. One more strong import resolves. Fortnite still exits with status
+1 before entry at EOSSDK's Int Hashable witness table, `_$sSiSHsWP`. Native table
+layouts and concrete Int hashing instructions are captured for the next layer.
+Evidence is retained under `swift-integer-checks`. Other associated-type manglings,
+Hasher metadata, concrete standard-library Hashable conformances, conformance
+discovery, generic interpolation and application Swift heap support remain
+incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -1791,11 +1807,11 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,369 | 789 | 81 |
-| EOSSDK | 581 | 81 | 18 |
+| EOSSDK | 582 | 80 | 18 |
 | MarketplaceKitWrapper | 77 | 99 | 23 |
-| All images | 2,027 | 969 | 122 |
+| All images | 2,028 | 968 | 122 |
 
-The C++/GLES/Text variant reports 2,040 resolved imports, 956 unresolved strong
+The C++/GLES/Text variant reports 2,041 resolved imports, 955 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
