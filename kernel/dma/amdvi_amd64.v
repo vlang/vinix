@@ -9,6 +9,7 @@
 //	amdvi_amd64.v           this file: find the table and start each unit
 //	amdvi_unit_amd64.v      a unit's registers and tables, and switching it on
 //	amdvi_commands_amd64.v  the command buffer: making a unit forget
+//	amdvi_domain_amd64.v    page tables for a device, and the DMA layer's six calls
 module dma
 
 import acpi
@@ -62,13 +63,24 @@ fn amdvi_initialise() {
 			i32(unit.name.len), unit.name.str, unit.mmio_phys, u64(unit.devid >> 8), u64((unit.devid >> 3) & 31),
 			u64(unit.devid & 7), u64(unit.kind), u64(unit.last_devid), u64(unit.levels),
 			unit.features)
+		unit.iommu = register_iommu(Iommu{
+			name:    unit.name
+			covers:  amdvi_covers
+			attach:  amdvi_attach
+			detach:  amdvi_detach
+			map:     amdvi_map
+			unmap:   amdvi_unmap
+			map_all: amdvi_map_all
+			data:    voidptr(unit)
+		}) or {
+			// Checked for above; but a unit nobody can ask for a domain
+			// must not stay on, with every device behind it cut off.
+			amdvi_quiesce(unit)
+			unit.on = false
+			continue
+		}
 		amdvi_units[amdvi_unit_count] = unit
 		amdvi_unit_count++
-		// No domains yet: a unit left on would cut every device off for
-		// good. It is stopped again until there is a way to let one through.
-		amdvi_quiesce(unit)
-		C.kprintf(c'amdvi: %.*s answered and was switched off again: devices cannot be given domains yet\n',
-			i32(unit.name.len), unit.name.str)
 	}
 }
 

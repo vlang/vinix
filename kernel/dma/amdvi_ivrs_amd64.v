@@ -499,7 +499,11 @@ fn amdvi_subject(entries []AmdviEntry, devid u16) AmdviSubject {
 		if devid < entry.first || devid > entry.last {
 			continue
 		}
-		subject.covered = true
+		// The I/O APIC and the HPET send interrupts under an id; that does
+		// not put the PCI function with the same number behind the unit.
+		if entry.special == 0 {
+			subject.covered = true
+		}
 		subject.settings |= entry.settings
 		if entry.aliased {
 			subject.alias = entry.alias

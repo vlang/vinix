@@ -176,6 +176,15 @@ mut:
 
 	// How many levels a device's page tables have here.
 	levels u8
+
+	// One record per device that has ever had a domain; under domain_lock.
+	domains     &AmdviDomain = unsafe { nil }
+	domain_lock klock.Lock
+	next_domain u32
+	// Pages of page table in use, and pages given up on because the unit
+	// would not confirm that it had let go of them.
+	table_pages  u64
+	leaked_pages u64
 	// The record of this unit in the DMA layer's list.
 	iommu &Iommu = unsafe { nil }
 }
@@ -459,6 +468,8 @@ fn amdvi_start_unit(mut unit AmdviUnit) bool {
 		return false
 	}
 	amdvi_fill_device_table(mut unit)
+	unit.next_domain = 1
+	amdvi_unity_domains(mut unit)
 
 	if before & amdvi_control_enable != 0 {
 		// Firmware that guards against DMA before the system starts leaves
