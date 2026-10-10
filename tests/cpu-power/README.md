@@ -25,26 +25,43 @@ this way; anything that touches a register or the scheduler is elsewhere.
 
 ## In a guest: the kernel
 
-`guest.c` is a C program to boot as `/sbin/init`. It
+The guest half is two scenarios of `tests/hardware-platform`, written in V
+like the rest of that suite (`guest/cpu_power.v`):
 
-- runs timed sleeps and pairs of threads waking each other through pipes,
-  first on idle CPUs and then beside threads of arithmetic whose answer is
-  known: a wake-up the idle path lost stops it for good;
-- reads `/sys/devices/system/cpu/cpuidle` and every CPU's states, checks that
-  each CPU's `usage` and `time` grow across two idle seconds and that the time
-  in its states is within 20 % of the idle time `/proc/stat` reports, and that
-  a state switched off through `disable` is no longer entered;
-- reads every CPU's `cpufreq` files and checks them against each other and
-  against `/proc/cpuinfo`; with the driver `none` it checks that every write is
-  refused and changes nothing, and with a driver that governors, ranges and
-  profiles are taken and put into effect on every CPU;
-- runs the workload again, prints `CPUTEST DONE failures=N` and powers off.
+    tests/hardware-platform/run --arch x86_64 --kernel build-amd64-kernel/bin/vinix --scenario cpu-power --scenario cpu-power-simulated
+    tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix --scenario cpu-power --scenario cpu-power-simulated
 
-Every line it prints starts with `CPUTEST`, and a failed check has `FAIL` in
-it. Build it statically for the guest (`-pthread`, and
-`-DCONSOLE='"/dev/com1"'` on x86-64, where the console is the serial port),
-put it in an initramfs as `/sbin/init`, and boot with the serial port
-captured; a run that does not reach `CPUTEST DONE` within a minute has hung.
+`cpu-power`
+
+- reads `/sys/devices/system/cpu/cpuidle` and every CPU's states, and checks
+  that each CPU's `usage` and `time` grow across an idle second, that the
+  busiest CPU still spent at least half of it waiting, and that a state
+  switched off through `disable` is no longer entered until it is switched on
+  again;
+- runs 1,600 timed sleeps on four threads and 2,000 pipe round trips between
+  two processes beside two threads of arithmetic whose answer is known: a
+  wake-up the idle path lost stops one of them for good, and the scenario
+  ends by its deadline instead of passing;
+- checks that a machine with nothing to set says its frequency driver is
+  `none` and refuses a governor and a profile.
+
+`cpu-power-simulated` boots with `vinix.cpufreq=simulate` and checks that
+`performance`, `powersave` and a profile each reach every CPU.
+
+Recorded on QEMU 11.1.1 (TCG for x86-64, HVF for AArch64):
+
+```
+PASS x86_64 cpu-power (12.4s)
+  idle: driver halt, 1 state(s) on 2 CPUs; the busiest CPU waited 937 ms of a second
+  wake-ups: 1600 timed sleeps, 2000 pipe round trips and two computing threads done in 2728 ms
+PASS x86_64 cpu-power-simulated (7.4s)
+  simulated driver: 2 CPUs between 800000 and 3000000 kHz followed performance, powersave and the profile
+PASS aarch64 cpu-power (10.0s)
+  idle: driver wfi, 1 state(s) on 4 CPUs; the busiest CPU waited 973 ms of a second
+  wake-ups: 1600 timed sleeps, 2000 pipe round trips and two computing threads done in 1111 ms
+PASS aarch64 cpu-power-simulated (6.9s)
+  simulated driver: 4 CPUs between 600000 and 2088000 kHz followed performance, powersave and the profile
+```
 
 Kernel command lines worth a run each:
 

@@ -77,6 +77,10 @@ pub:
 	// A reason the scenario cannot pass yet. Such a scenario runs only when it
 	// is named, so the default run stays a statement about what works.
 	pending string
+	// A flag the kernel must have been built with (-d <define>) for the
+	// scenario to mean anything: a self-test compiled into the kernel. Such a
+	// scenario also runs only when it is named, against a kernel built for it.
+	define  string
 	cmdline string // extra kernel command line
 	// Extra QEMU arguments, for every architecture and for one. `{state}`
 	// stands for the scenario's state directory.
@@ -212,6 +216,57 @@ pub const scenarios = [
 		ending:   .poweroff
 	},
 	Scenario{
+		name:     'iommu-intel-selftest'
+		about:    'the kernel makes a card reach past its domain behind Intel VT-d'
+		arches:   ['x86_64']
+		define:   'vtd_selftest'
+		cmdline:  'vinix.iommu=1'
+		qemu:     ['-device', 'intel-iommu', '-nic', 'user,model=e1000']
+		required: ['HWTEST START iommu-intel-selftest', 'HWTEST PASS iommu-intel-selftest']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'iommu-amd-selftest'
+		about:    'the kernel makes a card reach past its domain behind AMD-Vi'
+		arches:   ['x86_64']
+		define:   'amdvi_selftest'
+		cmdline:  'vinix.iommu=1'
+		qemu:     ['-device', 'amd-iommu,dma-remap=on', '-nic', 'user,model=e1000']
+		required: ['HWTEST START iommu-amd-selftest', 'HWTEST PASS iommu-amd-selftest']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'cpu-power'
+		about:    'idle states counted and switchable, wake-ups kept, no frequency control claimed'
+		arches:   ['aarch64', 'x86_64']
+		required: ['HWTEST START cpu-power', 'HWTEST PASS cpu-power']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'cpu-power-simulated'
+		about:    'governors and profiles reach every CPU through a made-up frequency driver'
+		arches:   ['aarch64', 'x86_64']
+		cmdline:  'vinix.cpufreq=simulate'
+		required: ['HWTEST START cpu-power-simulated', 'HWTEST PASS cpu-power-simulated']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'thermal'
+		about:    'no sensors invented; a missing register fails cleanly instead of faulting'
+		arches:   ['aarch64', 'x86_64']
+		required: ['HWTEST START thermal', 'HWTEST PASS thermal']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'thermal-selftest'
+		about:    'the limit follows a made-up temperature; critical turns the machine off'
+		arches:   ['aarch64', 'x86_64']
+		define:   'thermal_selftest'
+		required: ['HWTEST START thermal-selftest', 'HWTEST PASS thermal-selftest',
+			'HWTEST STEP going critical']
+		ending:   .poweroff
+	},
+	Scenario{
 		name:     'firmware'
 		about:    'the firmware loader: reads, updates/, refused names, no retained memory'
 		arches:   ['aarch64', 'x86_64']
@@ -296,7 +351,7 @@ pub fn select_scenarios(all []Scenario, arch string, names []string) !Selection 
 			if arch !in scenario.arches {
 				continue
 			}
-			if scenario.pending != '' {
+			if scenario.left_out() != '' {
 				skipped << scenario
 			} else {
 				chosen << scenario
@@ -432,4 +487,15 @@ pub fn check_state_path(path string) ! {
 			return error('the state directory path may not contain , " \\ { } or control characters: ${path}')
 		}
 	}
+}
+
+// Why a default run leaves the scenario out, or '' when it does not.
+pub fn (s Scenario) left_out() string {
+	if s.pending != '' {
+		return 'pending: ${s.pending}'
+	}
+	if s.define != '' {
+		return 'needs a kernel built with -d ${s.define}'
+	}
+	return ''
 }

@@ -24,15 +24,20 @@ fn run_scenario(name string, mut t Test) bool {
 	match name {
 		'acpi-power' { scenario_acpi_power(mut t) }
 		'ahci' { scenario_ahci(mut t) }
+		'cpu-power' { scenario_cpu_power(mut t) }
+		'cpu-power-simulated' { scenario_cpu_power_simulated(mut t) }
 		'devices' { scenario_devices(mut t) }
 		'firmware' { scenario_firmware(mut t) }
 		'iommu-amd' { scenario_iommu_amd(mut t) }
 		'iommu-intel' { scenario_iommu_intel(mut t) }
+		'iommu-amd-selftest', 'iommu-intel-selftest' { scenario_iommu_selftest(mut t) }
 		'iommu-off' { scenario_iommu_off(mut t) }
 		'power-button-init' { scenario_power_button_init(mut t) }
 		'qmp-powerdown' { scenario_qmp_powerdown(mut t) }
 		'restart' { scenario_restart(mut t) }
 		'suspend' { scenario_suspend(mut t) }
+		'thermal' { scenario_thermal(mut t) }
+		'thermal-selftest' { scenario_thermal_selftest(mut t) }
 		else { return false }
 	}
 	return true

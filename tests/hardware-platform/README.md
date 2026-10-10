@@ -19,6 +19,11 @@ here runs any.
 | `ahci` | x86_64 | A 64 KiB pattern written to `/dev/sd0` at 1 MiB, synced and read back; the controller reset through its sysfs `reset`, `health` showing `resets: 1`; a second pattern at 2 MiB. After the machine is off, the controller finds both patterns in the disk image, and the image still starts with the bytes it was created with. |
 | `iommu-intel`, `iommu-amd` | x86_64 | The machine has an Intel VT-d or an AMD-Vi unit (`-device intel-iommu`, or `-device amd-iommu,dma-remap=on` -- QEMU's AMD unit translates nothing without the option) and is booted with `vinix.iommu=1`. The unit must be on; the e1000 and the AHCI controller must each report a domain of their own (`domain: dmar0 isolated`); the network must work, shown by a read from QEMU's built-in TFTP server, which needs nothing outside QEMU; a pattern must go to the disk and come back; twenty unbind/bind cycles of the card must leave it isolated and working; and the unit must have recorded no fault. |
 | `iommu-off` | x86_64 | The same machine without `vinix.iommu=1`: no unit is listed, both devices report `domain: direct`, and network and disk work. |
+| `iommu-intel-selftest`, `iommu-amd-selftest` | x86_64 | Need a kernel built with `-d vtd_selftest` or `-d amdvi_selftest`. At boot that kernel makes a card try what the plain scenarios cannot show: DMA to a page outside its domain, which must fault, name the card, and leave the page intact; the same page once mapped, which must be reached; and once unmapped, not. The scenario reads the verdict from the unit's `selftest` file. |
+| `cpu-power` | aarch64, x86_64 | Every CPU has its idle states in `/sys`; each CPU's `usage` and `time` grow across an idle second, and the busiest still waited at least half of it; a state switched off through `disable` is not entered until it is switched on again; 1,600 timed sleeps, 2,000 pipe round trips and two computing threads all finish with the right totals, which a lost wake-up would prevent; and a machine with no frequency control says `none` and refuses a governor and a profile. |
+| `cpu-power-simulated` | aarch64, x86_64 | Booted with `vinix.cpufreq=simulate`, a frequency driver with memory in place of registers: `performance`, `powersave` and a profile each reach every CPU's own register write. |
+| `thermal` | aarch64, x86_64 | A machine with no sensors has no zones, a limit of 100 and no polling thread. On x86-64, a model-specific register that does not exist fails cleanly when read, here and on another CPU, instead of faulting. |
+| `thermal-selftest` | aarch64, x86_64 | Needs a kernel built with `-d thermal_selftest`, which has a zone whose temperature the guest sets. Heating past the passive trip lowers the limit on CPU performance ten points per rising reading (90, 80, 70, 60); a steady reading costs nothing more; cooling gives it back; the hot trip drops it to 10 at once; a sensor that stops answering disables the zone and leaves the limit alone. The guest then reports and takes the zone past its critical trip, and the kernel must turn the machine off by itself. |
 | `firmware` | aarch64, x86_64 | The firmware loader, driven through `/sys/firmware/loader`: a 100 KiB image under `/lib/firmware` is read whole and unchanged (name, size, checksum and holder count in `loaded`); keeping it twice changes nothing; a copy under `updates/` is the one read; names that leave the directory, are absolute, have an empty component or an odd character are refused, as are an image that is not there, a link to a device, and one over the 64 MiB limit; fifty load/drop cycles leave the kernel heap's live objects and large pages where they were. |
 | `acpi-power` | x86_64 | QEMU's PC has no battery, charger or lid, so the controller writes an ACPI table describing all three (`hwhost/acpi_bench.v`, assembled by `hwhost/aml.v`) and QEMU loads it with `-acpitable`. They act out a script, advanced each time the battery is asked for its state: charging, the charger pulled, a steady 12 W drain to 2%, the lid shut and opened on the way. The guest checks what the battery is (capacities, voltage, chemistry, maker, cycle count), `Charging` with the charger online then `Discharging` with it offline, a charge that only falls, `time_to_empty_now` within 2% of charge over rate, a sleep when the lid shuts (ended by the wake alarm), `capacity_level` `Low`, and finally the request to power off that a critical battery makes of init. |
 | `qmp-powerdown` | aarch64, x86_64 | The guest waits, with no handler for the power-off request; the controller sends `system_powerdown`; the kernel powers the machine off within 30 s. |
@@ -182,3 +187,38 @@ Two further limits:
   port byte by byte. The guest waits a moment before its verdict so that a
   driver's message does not land inside it; a line the kernel did interleave
   is not matched, and the scenario fails with that line shown.
+
+## Scenarios that need a kernel built for them
+
+Three scenarios read the verdict of a self-test compiled into the kernel, and
+are left out of a default run with the reason. Build such a kernel beside the
+ordinary one and name the scenario:
+
+```sh
+# x86-64: all three self-tests in one kernel
+mkdir -p build-amd64-selftest/obj
+rsync -a --delete --exclude /bin/ --exclude /obj/ --exclude /cc-runtime-x86_64/ \
+    --exclude /cc-runtime-aarch64/ kernel/ build-amd64-selftest/
+make -C build-amd64-selftest ARCH=x86_64 CC=clang AR=llvm-ar LD_X86_64="$(command -v ld.lld)" V="$V" \
+    "VFLAGS=-d thermal_selftest -d vtd_selftest -d amdvi_selftest" -j8
+tests/hardware-platform/run --arch x86_64 --kernel build-amd64-selftest/bin/vinix \
+    --scenario thermal-selftest --scenario iommu-intel-selftest --scenario iommu-amd-selftest
+
+# AArch64
+mkdir -p build-aarch64-selftest/obj
+rsync -a --delete --exclude /bin/ --exclude /obj/ --exclude /cc-runtime-x86_64/ kernel/ build-aarch64-selftest/
+make -C build-aarch64-selftest ARCH=aarch64 CC=clang LIMINE_MP=1 V="$V" "VFLAGS=-d thermal_selftest" -j8
+tests/hardware-platform/run --arch aarch64 --kernel build-aarch64-selftest/bin/vinix --scenario thermal-selftest
+```
+
+```
+PASS x86_64 thermal-selftest (23.1s)
+  heating gave limits [90, 80, 70, 60]; hot gave 10; a failed sensor held 90
+PASS x86_64 iommu-intel-selftest (14.4s)
+  dmar0 result: PASS
+  dmar0 checks: 25
+PASS x86_64 iommu-amd-selftest (14.9s)
+  ivhd0 result: PASS
+PASS aarch64 thermal-selftest (20.9s)
+  heating gave limits [90, 80, 70, 60]; hot gave 10; a failed sensor held 90
+```

@@ -126,8 +126,8 @@ pub fn list_text(all []Scenario, arch string) string {
 			continue
 		}
 		mut about := scenario.about
-		if scenario.pending != '' {
-			about += ' (pending: ${scenario.pending})'
+		if scenario.left_out() != '' {
+			about += ' (${scenario.left_out()})'
 		}
 		padding := ' '.repeat(width - scenario.name.len)
 		lines << '${scenario.name}${padding}  ${scenario.arches.join(',')}  ${about}'
@@ -320,7 +320,7 @@ fn run_selection(host Host, selection Selection, kernel string, work string, tim
 		return 130
 	}
 	for scenario in selection.skipped {
-		println('SKIP ${host.arch} ${scenario.name} (pending: ${scenario.pending})')
+		println('SKIP ${host.arch} ${scenario.name} (${scenario.left_out()})')
 	}
 	println('hardware-platform ${host.arch}: ${passed} passed, ${failed} failed, ${selection.skipped.len} skipped')
 	return if failed == 0 { 0 } else { 1 }
