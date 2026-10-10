@@ -25,6 +25,7 @@ import pipe
 import futex
 import pci
 import devcore
+import fwload
 import dma
 import dev.ata
 import dev.fbdev
@@ -141,6 +142,7 @@ fn kmain_thread() {
 	// Devices and drivers so far, and every change from here on.
 	devcore.publish()
 	syspower.publish()
+	fwload.publish()
 
 	streams.initialise()
 	random.initialise()

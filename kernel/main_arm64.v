@@ -29,6 +29,7 @@ import apple.typec
 import apple.speakers
 import devicetree
 import devcore
+import fwload
 import pci
 import initramfs
 import numa
@@ -266,6 +267,7 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	// Devices and drivers so far, and every change from here on.
 	devcore.publish()
 	syspower.publish()
+	fwload.publish()
 	print('kmain_thread: sysfs done\n')
 
 	if enable_fake_g17 {
