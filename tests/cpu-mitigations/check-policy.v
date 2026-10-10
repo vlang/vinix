@@ -125,6 +125,7 @@ int main(void) {
 '
 
 struct Config {
+ text_encoding string
  root string
  work string
  caller string
@@ -175,14 +176,18 @@ fn (c Config) execute() ! {
  fixturehost.write(c.output('host_ports.h'), '#include <stddef.h>\nint kprintf(const char *, ...);\nvoid *vinix_mitigation_test_calloc(size_t, size_t);\n')!
  common := [cc,'-std=gnu11','-O1','-g','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-fno-omit-frame-pointer','-iquote',c.path('kernel/c')]
  c.inherited([...common, '-I',c.path('kernel/c'),'-Wno-unused-function','-ffreestanding','-fno-builtin','-Dcalloc=vinix_mitigation_test_calloc','-fno-strict-aliasing','-include',c.output('host_ports.h'),'-c',c.output('policy.c'),'-o',c.output('policy.o')], c.environment)!
- imports := c.capture(['nm','-u',c.output('policy.o')])!
+ // Decode nm with the actual invoking Python codec and newline policy.
+ // This mechanical text/process leaf receives zero migration credit.
+ decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
+ wire := c.capture(['python3','-c',decode,c.text_encoding,'nm','-u',c.output('policy.o')])!
+ imports := hosttest.decode_json(wire)!.str()
  if imports_forbidden(imports) { return error('unexpected allocator import in CPU policy:\n' + imports) }
  fixturehost.write(c.output('test.c'), '#include "x86_mitigations.h"\n' + adapters + tests)!
  c.inherited([...common, c.output('test.c'),c.output('policy.o'),'-o',c.output('test')], c.environment)!
  c.inherited([c.output('test')], c.environment)!
 }
 fn main() {
- parsed := hosttest.parse_arguments(os.args[1..], [hosttest.Option{'--root',true,[]},hosttest.Option{'--work',true,[]},hosttest.Option{'--caller-arch',true,['arm64','amd64']},hosttest.Option{'--parent-stdin',true,[]}], 0, 'CPU policy host controller', 'Private frontend-owned source and output directories') or { eprintln(err); exit(2) }
+ parsed := hosttest.parse_arguments(os.args[1..], [hosttest.Option{'--root',true,[]},hosttest.Option{'--work',true,[]},hosttest.Option{'--caller-arch',true,['arm64','amd64']},hosttest.Option{'--parent-stdin',true,[]},hosttest.Option{'--text-encoding',true,[]}], 0, 'CPU policy host controller', 'Private frontend-owned source and output directories') or { eprintln(err); exit(2) }
  v := parsed.options
  if '--root' !in v || '--work' !in v { eprintln('Missing root/work directory'); exit(2) }
  input := fixturehost.read('/dev/stdin') or { eprintln(err.msg()); exit(1) }
@@ -199,6 +204,6 @@ fn main() {
   if C.dup2(i32(descriptor), 0) < 0 { eprintln('Unable to restore parent stdin'); exit(1) }
   C.close(i32(descriptor))
  } else { C.close(0) }
- c := Config{root:v['--root'],work:v['--work'],caller:v['--caller-arch'],environment:environment}
+ c := Config{text_encoding:v['--text-encoding'],root:v['--root'],work:v['--work'],caller:v['--caller-arch'],environment:environment}
  c.execute() or { eprintln(err.msg()); exit(1) }
 }

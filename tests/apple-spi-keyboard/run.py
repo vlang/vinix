@@ -5,6 +5,7 @@ import argparse
 from contextlib import nullcontext
 import hashlib
 import json
+import locale
 import os
 from pathlib import Path
 import re
@@ -35,7 +36,8 @@ context = nullcontext(str(a.state_dir.resolve())) if a.state_dir else tempfile.T
 with context as directory:
     command = [str(ROOT / 'build-support/run-v-tool.sh'), str(HERE / 'run.v'),
                '--root=' + str(ROOT), '--work=' + directory, '--suite=' + a.suite,
-               '--host-arch=' + a.host_arch, '--caller-arch=' + ('arm64' if os.uname().machine in ('arm64', 'aarch64') else 'amd64')]
+               '--host-arch=' + a.host_arch, '--caller-arch=' + ('arm64' if os.uname().machine in ('arm64', 'aarch64') else 'amd64'),
+               '--text-encoding=' + locale.getpreferredencoding(False)]
     if a.arch:
         command += ['--arch=' + a.arch, '--kernel-dir=' + str(a.kernel_dir), '--guest-state-dir=' + str(a.guest_state_dir)]
     if a.build_only:

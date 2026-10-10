@@ -13,6 +13,7 @@ const scenarios = ['status', 'on', 'off', 'networks', 'invalid', 'scan', 'join',
 const quiet = ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-label', '-fwrapv', '-fno-strict-aliasing']
 
 struct Config {
+ text_encoding string
 	root string
 	work string
 	host_arch string
@@ -105,7 +106,11 @@ fn imports_forbidden(text string) bool {
 }
 
 fn (c Config) audit(path string, nm string) !json2.Any {
-	imports := c.capture([nm, '-u', path], '', false)!
+	// Decode nm with the actual invoking Python codec and newline policy.
+ // This mechanical text/process leaf receives zero migration credit.
+ decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
+ wire := c.capture(['python3', '-c', decode, c.text_encoding, nm, '-u', path], '', true)!
+ imports := hosttest.decode_json(wire)!.str()
 	if imports_forbidden(imports) { return error('Allocator imports: ' + imports) }
 	return strings(text_lines(imports))
 }
@@ -248,13 +253,14 @@ fn (c Config) native_build(quotes []string) ! {
 
 fn main() {
 	parsed := hosttest.parse_arguments(os.args[1..], [
-		hosttest.Option{'--root', true, []}, hosttest.Option{'--work', true, []},
+		hosttest.Option{'--root', true, []},
+  hosttest.Option{'--text-encoding', true, []}, hosttest.Option{'--work', true, []},
 		hosttest.Option{'--host-arch', true, ['arm64', 'amd64']}, hosttest.Option{'--caller-arch', true, ['arm64', 'amd64']},
 		hosttest.Option{'--arch', true, ['aarch64', 'x86_64']}, hosttest.Option{'--build-only', false, []},
 		hosttest.Option{'--kernel-dir', true, []}, hosttest.Option{'--guest-state-dir', true, []}, hosttest.Option{'--timeout', true, []},
 	], 0, 'Wi-Fi control fixture controller', 'Validated original argparse frontend options') or { eprintln(err); exit(2) }
 	v := parsed.options
 	if '--root' !in v || '--work' !in v { eprintln('Missing root/work directory'); exit(2) }
-	c := Config{root: v['--root'], work: v['--work'], host_arch: v['--host-arch'], caller_arch: v['--caller-arch'], arch: v['--arch'], build_only: '--build-only' in v, kernel: v['--kernel-dir'], guest: v['--guest-state-dir'], timeout: v['--timeout']}
+	c := Config{text_encoding:v['--text-encoding'],root: v['--root'], work: v['--work'], host_arch: v['--host-arch'], caller_arch: v['--caller-arch'], arch: v['--arch'], build_only: '--build-only' in v, kernel: v['--kernel-dir'], guest: v['--guest-state-dir'], timeout: v['--timeout']}
 	c.execute() or { eprintln(err.msg()); exit(1) }
 }

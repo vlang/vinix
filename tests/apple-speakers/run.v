@@ -16,6 +16,7 @@ const quiet = ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-lab
 	'-fno-strict-aliasing']
 
 struct Config {
+ text_encoding string
 	root        string
 	work        string
 	host_arch   string
@@ -113,7 +114,11 @@ fn imports_forbidden(text string, fixture bool) bool {
 }
 
 fn (c Config) audit(path string, fixture bool, nm string) !json2.Any {
-	imports := c.capture([nm, '-u', path], '', false)!
+	// Decode nm with the actual invoking Python codec and newline policy.
+ // This mechanical text/process leaf receives zero migration credit.
+ decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
+ wire := c.capture(['python3', '-c', decode, c.text_encoding, nm, '-u', path], '', true)!
+ imports := hosttest.decode_json(wire)!.str()
 	if imports_forbidden(imports, fixture) { return error('Allocator imports: ' + imports) }
 	return strings(lines(imports, true))
 }
@@ -358,6 +363,7 @@ fn (c Config) execute() ! {
 fn main() {
 	parsed := hosttest.parse_arguments(os.args[1..], [
 		hosttest.Option{'--root', true, []},
+  hosttest.Option{'--text-encoding', true, []},
 		hosttest.Option{'--work', true, []},
 		hosttest.Option{'--host-arch', true, ['arm64', 'amd64']},
 		hosttest.Option{'--caller-arch', true, ['arm64', 'amd64']},
@@ -374,7 +380,7 @@ fn main() {
 		eprintln('Missing root/work directory')
 		exit(2)
 	}
-	config := Config{ root: values['--root'], work: values['--work'], host_arch: values['--host-arch'], caller_arch: values['--caller-arch'], arch: values['--arch'], build_only: '--build-only' in values, kernel: values['--kernel-dir'], guest: values['--guest-state-dir'] }
+	config := Config{ text_encoding: values['--text-encoding'], root: values['--root'], work: values['--work'], host_arch: values['--host-arch'], caller_arch: values['--caller-arch'], arch: values['--arch'], build_only: '--build-only' in values, kernel: values['--kernel-dir'], guest: values['--guest-state-dir'] }
 	config.execute() or {
 		eprintln(err.msg())
 		exit(1)

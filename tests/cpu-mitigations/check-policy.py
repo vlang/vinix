@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run exact production CPUID/MSR policy with only hardware-port adapters."""
 from pathlib import Path
+import locale
 import os
 import errno
 import fcntl
@@ -25,7 +26,8 @@ def main():
                         str(ROOT / 'tests/cpu-mitigations/check-policy.v'),
                         '--root=' + str(ROOT), '--work=' + directory,
                         '--caller-arch=' + ('arm64' if os.uname().machine in ('arm64', 'aarch64') else 'amd64'),
-                        '--parent-stdin=' + str(descriptor)],
+                        '--parent-stdin=' + str(descriptor),
+                        '--text-encoding=' + locale.getpreferredencoding(False)],
                         input=json.dumps([[os.fsencode(key).hex(), os.fsencode(value).hex()]
                             for key, value in os.environ.items()]).encode(),
                         pass_fds=(descriptor,) if descriptor >= 0 else (), check=True)

@@ -3,6 +3,7 @@
 """Compare the original control fixture and run all native target scenarios."""
 import argparse
 from contextlib import nullcontext
+import locale
 import os
 from pathlib import Path
 import subprocess
@@ -28,7 +29,7 @@ with context as directory:
     command = [str(ROOT / "build-support/run-v-tool.sh"), str(HERE / "run-control.v"),
                "--root=" + str(ROOT), "--work=" + directory, "--host-arch=" + a.host_arch,
                "--caller-arch=" + ("arm64" if os.uname().machine in ("arm64", "aarch64") else "amd64"),
-               "--timeout=" + str(a.timeout)]
+               "--timeout=" + str(a.timeout), "--text-encoding=" + locale.getpreferredencoding(False)]
     if a.arch:
         command += ["--arch=" + a.arch, "--kernel-dir=" + str(a.kernel_dir), "--guest-state-dir=" + str(a.guest_state_dir)]
     if a.build_only:
