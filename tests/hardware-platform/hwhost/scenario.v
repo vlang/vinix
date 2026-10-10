@@ -325,6 +325,15 @@ pub const scenarios = [
 		ending:   .poweroff
 	},
 	Scenario{
+		name:     'acpi-thermal'
+		about:    'an ACPI thermal zone and fans: speeds follow a scripted heat, critical powers off'
+		arches:   ['x86_64']
+		tables:   ['thermal-bench']
+		qemu:     ['-acpitable', 'file={state}/thermal-bench.aml']
+		required: ['HWTEST START acpi-thermal', 'HWTEST PASS acpi-thermal', 'HWTEST STEP going critical']
+		ending:   .poweroff
+	},
+	Scenario{
 		name:         'restart'
 		about:        'reboot(2) resets the machine, devices stopped first'
 		arches:       ['aarch64', 'x86_64']

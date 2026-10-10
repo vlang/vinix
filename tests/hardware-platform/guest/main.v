@@ -23,6 +23,7 @@ module main
 fn run_scenario(name string, mut t Test) bool {
 	match name {
 		'acpi-power' { scenario_acpi_power(mut t) }
+		'acpi-thermal' { scenario_acpi_thermal(mut t) }
 		'ahci' { scenario_ahci(mut t) }
 		'cpu-power' { scenario_cpu_power(mut t) }
 		'cpu-power-simulated' { scenario_cpu_power_simulated(mut t) }

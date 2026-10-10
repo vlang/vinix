@@ -117,6 +117,9 @@ fn power_bench() []u8 {
 
 // The table called `name`, or an error for a name no scenario should use.
 pub fn acpi_table(name string) ![]u8 {
+	if name == 'thermal-bench' {
+		return thermal_bench()
+	}
 	if name == 'power-bench' {
 		return power_bench()
 	}
