@@ -24,7 +24,10 @@ fn run_scenario(name string, mut t Test) bool {
 	match name {
 		'ahci' { scenario_ahci(mut t) }
 		'devices' { scenario_devices(mut t) }
+		'power-button-init' { scenario_power_button_init(mut t) }
 		'qmp-powerdown' { scenario_qmp_powerdown(mut t) }
+		'restart' { scenario_restart(mut t) }
+		'suspend' { scenario_suspend(mut t) }
 		else { return false }
 	}
 	return true

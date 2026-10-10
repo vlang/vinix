@@ -47,12 +47,20 @@ fn test_mistakes_are_named() {
 
 fn test_the_list_names_what_is_pending() {
 	all := list_text(scenarios, '')
-	assert all.contains('devices        aarch64,x86_64  ')
-	assert all.contains('ahci           x86_64  ')
-	assert all.contains('(pending: ')
+	assert all.contains('devices ')
+	assert all.contains('aarch64,x86_64  ')
+	assert all.contains('ahci ')
 	arm := list_text(scenarios, 'aarch64')
 	assert !arm.contains('ahci')
 	assert arm.contains('qmp-powerdown')
+	later := [
+		Scenario{
+			name:    'later'
+			arches:  ['aarch64']
+			pending: 'not written yet'
+		},
+	]
+	assert list_text(later, '').contains('(pending: not written yet)')
 }
 
 fn test_a_pass_is_one_line_and_what_the_guest_measured() {

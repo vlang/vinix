@@ -9,19 +9,47 @@ fn test_the_table_is_valid() {
 	validate_scenarios(scenarios)!
 }
 
+// A table of its own, so that what these say about pending scenarios does not
+// depend on which real ones happen to be pending today.
+const sample = [
+	Scenario{
+		name:   'both'
+		arches: ['aarch64', 'x86_64']
+	},
+	Scenario{
+		name:   'pc'
+		arches: ['x86_64']
+	},
+	Scenario{
+		name:    'later'
+		arches:  ['aarch64', 'x86_64']
+		pending: 'not written yet'
+	},
+]
+
 fn test_default_selection_is_what_applies_and_is_not_pending() {
-	arm := select_scenarios(scenarios, 'aarch64', []string{})!
-	assert names_of(arm.run) == ['devices']
-	assert names_of(arm.skipped) == ['qmp-powerdown']
-	x86 := select_scenarios(scenarios, 'x86_64', []string{})!
-	assert names_of(x86.run) == ['devices', 'ahci']
-	assert names_of(x86.skipped) == ['qmp-powerdown']
+	arm := select_scenarios(sample, 'aarch64', []string{})!
+	assert names_of(arm.run) == ['both']
+	assert names_of(arm.skipped) == ['later']
+	x86 := select_scenarios(sample, 'x86_64', []string{})!
+	assert names_of(x86.run) == ['both', 'pc']
+	assert names_of(x86.skipped) == ['later']
 }
 
 fn test_a_named_scenario_runs_even_when_pending() {
-	selection := select_scenarios(scenarios, 'aarch64', ['qmp-powerdown'])!
-	assert names_of(selection.run) == ['qmp-powerdown']
+	selection := select_scenarios(sample, 'aarch64', ['later'])!
+	assert names_of(selection.run) == ['later']
 	assert selection.skipped.len == 0
+}
+
+fn test_every_real_scenario_runs_somewhere() {
+	arm := select_scenarios(scenarios, 'aarch64', []string{})!
+	x86 := select_scenarios(scenarios, 'x86_64', []string{})!
+	assert 'devices' in names_of(arm.run)
+	assert 'suspend' in names_of(arm.run)
+	assert 'ahci' !in names_of(arm.run)
+	assert 'ahci' in names_of(x86.run)
+	assert 'restart' in names_of(x86.run)
 }
 
 fn test_named_scenarios_keep_their_order_and_run_once() {

@@ -35,6 +35,8 @@ const console_path = $if arm64 {
 
 // RB_POWER_OFF, as reboot(2) takes it.
 const reboot_power_off = 0x4321fedc
+// RB_AUTOBOOT.
+const reboot_restart = 0x01234567
 
 struct Test {
 mut:
@@ -42,6 +44,8 @@ mut:
 	console  int = 1
 	failures int
 	stays_up bool
+	// End by resetting the machine instead of turning it off.
+	restarts bool
 }
 
 fn new_test() Test {
@@ -117,6 +121,13 @@ fn (mut t Test) finish() {
 		t.say('HWTEST FAIL ${t.scenario}')
 	}
 	if t.stays_up {
+		idle()
+	}
+	if t.restarts && t.failures == 0 {
+		C.sync()
+		C.reboot(reboot_restart)
+		// Still here: the machine did not reset, and the host sees that it
+		// is still running.
 		idle()
 	}
 	power_off()
@@ -248,5 +259,36 @@ fn write_pattern(path string, offset i64, seed u8, length int) ! {
 		if found[i] != written[i] {
 			return error('byte ${i} read back as 0x${found[i].hex()}, written as 0x${written[i].hex()}')
 		}
+	}
+}
+
+// What the kernel heap holds, from /proc/slabinfo: the objects allocated in
+// every size class, and the pages behind allocations too big for a class.
+struct HeapUsage {
+	objects     int
+	large_pages int
+}
+
+fn heap_usage() !HeapUsage {
+	text := read_text('/proc/slabinfo')!
+	mut objects := 0
+	mut large_pages := -1
+	for line in text.split_into_lines() {
+		words := line.fields()
+		if words.len != 4 || words[0].starts_with('#') {
+			continue
+		}
+		if words[0] == 'large' {
+			large_pages = words[3].int()
+		} else {
+			objects += words[2].int()
+		}
+	}
+	if objects == 0 || large_pages < 0 {
+		return error('/proc/slabinfo is not in the form this expects')
+	}
+	return HeapUsage{
+		objects:     objects
+		large_pages: large_pages
 	}
 }

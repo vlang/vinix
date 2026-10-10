@@ -260,6 +260,12 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 	if m.child.exit_code() != 0 {
 		return error('QEMU failed: ${m.child.outcome()}')
 	}
+	if scenario.ending == .restart {
+		if m.qmp.shutdown_reason != 'guest-reset' {
+			return error('the machine ended by ${how}, not by the guest restarting it')
+		}
+		return
+	}
 	if m.qmp.shutdown_reason != 'guest-shutdown' {
 		return error('the machine ended by ${how}, not by the guest powering it off')
 	}

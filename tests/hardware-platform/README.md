@@ -15,9 +15,12 @@ here runs any.
 
 | Scenario | Architectures | What must hold |
 | --- | --- | --- |
-| `devices` | aarch64, x86_64 | Every link in `/sys/bus/pci/devices` leads to a device with `vendor`, `device`, `class` and `state`. The e1000 is `bound` and has a `driver` link; unbinding makes it `unbound`, removes the link and leaves `dma` at `domain: none`; unbinding again fails; binding restores it. After three warm-up cycles, twenty more unbind/bind cycles may not shrink `MemFree` by more than 1 MiB. `reset` shows as `resets: 1` in `health` with the device `bound` again; `remove` makes the device's directory disappear. |
+| `devices` | aarch64, x86_64 | Every link in `/sys/bus/pci/devices` leads to a device with `vendor`, `device`, `class` and `state`. The e1000 is `bound` and has a `driver` link; unbinding makes it `unbound`, removes the link and leaves `dma` at `domain: none`; unbinding again fails; binding restores it. After 105 warm-up cycles and the kernel's grace period for deferred frees, 100 more unbind/bind cycles may leave at most 30 more live kernel heap objects (the allowance is the test program's own growing heap; one object lost per cycle would be 100) and no more large-allocation pages. `reset` shows as `resets: 1` in `health` with the device `bound` again; `remove` makes the device's directory disappear. |
 | `ahci` | x86_64 | A 64 KiB pattern written to `/dev/sd0` at 1 MiB, synced and read back; the controller reset through its sysfs `reset`, `health` showing `resets: 1`; a second pattern at 2 MiB. After the machine is off, the controller finds both patterns in the disk image, and the image still starts with the bytes it was created with. |
-| `qmp-powerdown` | aarch64, x86_64 | The guest waits; the controller sends `system_powerdown`; the machine powers off within 30 s. **Pending**: see below. |
+| `qmp-powerdown` | aarch64, x86_64 | The guest waits, with no handler for the power-off request; the controller sends `system_powerdown`; the kernel powers the machine off within 30 s. |
+| `power-button-init` | aarch64, x86_64 | The guest is an init that handles the power-off request (`SIGUSR2`). The controller sends `system_powerdown`; the press must reach init as that signal instead of turning the machine off under it, and init then powers off. |
+| `restart` | aarch64, x86_64 | `reboot(2)` with the restart command resets the machine: QEMU's `SHUTDOWN` event must say `guest-reset`. |
+| `suspend` | aarch64, x86_64 | Suspend to idle through `/sys/power/state`: a rehearsal (`pm_test` = `devices`) that suspends and resumes every device; a sleep ended by the wake alarm after 2 s, during which a counting thread of the guest must stand still; a sleep ended by a key the controller sends; a sleep ended by the power button, which must wake the machine and not turn it off; and a sleep with the keyboard not allowed to wake, where the key is ignored and the alarm ends it after 3 s. After each, `suspend_stats` must name the right wake source; at the end it must show five successes, no failure, and five comparisons of the CPU's protection registers with no change. |
 
 Every scenario also fails on a line containing `KERNEL PANIC`,
 `FATAL EXCEPTION` or `HWTEST FAIL`, and a scenario whose machine is to power
@@ -25,34 +28,13 @@ off passes only if QEMU's `SHUTDOWN` event says the guest shut it down: a
 reset makes QEMU exit as well (it runs with `-no-reboot`) and is not a
 power-off.
 
-A scenario marked pending is one the kernel of this branch cannot pass yet.
-A default run skips it and says so; naming it with `--scenario` runs it.
-`qmp-powerdown` is pending because this branch's kernel ignores the power
-button. Its other purpose is fulfilled either way: it takes a host action
-through the whole path -- a marker from the guest, a QMP command from the
-host, an expectation with its own deadline -- and `qmp.log` of a run shows
-the conversation.
-
-## Running it
-
-The kernel is an input: build it first, for the architecture named.
-
-```sh
-tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
-tests/hardware-platform/run --arch x86_64 --kernel build-amd64-kernel/bin/vinix
-```
-
-One scenario, or several, in the order given:
-
-```sh
-tests/hardware-platform/run --arch x86_64 --kernel build-amd64-kernel/bin/vinix --scenario ahci
-tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix --scenario qmp-powerdown
-```
-
-Other options: `--list` prints the scenarios (with `--arch`, those for one
-architecture); `--timeout SECONDS` is how long one scenario's machine may run
-(default 120); `--qemu PATH` names the QEMU binary; `--state-dir DIR` keeps
-everything, see below.
+A scenario can be marked pending: one the kernel of the branch cannot pass
+yet. A default run skips it and says so; naming it with `--scenario` runs it.
+None is pending today. `qmp-powerdown` was while the kernel ignored the power
+button, and its other purpose still holds: it takes a host action through the
+whole path -- a marker from the guest, a QMP command from the host, an
+expectation with its own deadline -- and `qmp.log` of a run shows the
+conversation.
 
 Each scenario prints one line, `PASS <arch> <scenario> (<seconds>s)` or
 `FAIL ...`, followed by what the guest measured (its `HWTEST INFO` lines) and,
@@ -62,11 +44,18 @@ passed, 1 when one failed, 2 when the run could not start, and 130 when it
 was interrupted.
 
 ```
-PASS aarch64 devices (7.3s)
+PASS aarch64 devices (21.1s)
   3 PCI devices in sysfs
-  MemFree before 20 unbind/bind cycles 923760 kB, after 923632 kB (-128 kB)
-SKIP aarch64 qmp-powerdown (pending: the kernel on this branch does not handle the power button yet)
-hardware-platform aarch64: 1 passed, 0 failed, 1 skipped
+  100 unbind/bind cycles: live heap objects 2377 -> 2380, large pages 58 -> 58, MemFree -112 kB
+PASS aarch64 qmp-powerdown (6.5s)
+PASS aarch64 power-button-init (6.6s)
+PASS aarch64 restart (6.5s)
+PASS aarch64 suspend (17.4s)
+  rehearsal: 550 ms, devices down in 50 ms, back in 0 ms
+  frozen: 1990 counts in 2000 ms asleep, 50391137 per 300 ms awake
+  key: woke after 1594 ms
+  power button: woke after 1763 ms
+hardware-platform aarch64: 5 passed, 0 failed, 0 skipped
 ```
 
 The unit tests of the controller need no machine:

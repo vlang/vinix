@@ -21,6 +21,9 @@ pub const always_forbidden = ['KERNEL PANIC', 'FATAL EXCEPTION', 'HWTEST FAIL']
 pub enum Ending {
 	// QEMU exits by itself because the guest powered the machine off.
 	poweroff
+	// QEMU exits by itself because the guest reset the machine: it runs
+	// with -no-reboot, which turns a reset into an exit that says so.
+	restart
 	// The guest stays up: the controller stops QEMU once every marker is seen.
 	running
 }
@@ -124,7 +127,6 @@ pub const scenarios = [
 		name:     'qmp-powerdown'
 		about:    'the power button powers the machine off'
 		arches:   ['aarch64', 'x86_64']
-		pending:  'the kernel on this branch does not handle the power button yet'
 		required: ['HWTEST START qmp-powerdown', 'HWTEST STEP waiting for power button']
 		actions:  [
 			Action{
@@ -134,6 +136,55 @@ pub const scenarios = [
 			},
 		]
 		ending:   .poweroff
+	},
+	Scenario{
+		name:     'power-button-init'
+		about:    'the power button asks an init that handles the request'
+		arches:   ['aarch64', 'x86_64']
+		required: ['HWTEST START power-button-init', 'HWTEST PASS power-button-init']
+		actions:  [
+			Action{
+				after: 'HWTEST STEP waiting for power button'
+				qmp:   '{"execute":"system_powerdown"}'
+			},
+		]
+		ending:   .poweroff
+	},
+	Scenario{
+		name:         'restart'
+		about:        'reboot(2) resets the machine, devices stopped first'
+		arches:       ['aarch64', 'x86_64']
+		qemu_aarch64: ['-device', 'e1000,netdev=hwn0', '-netdev', 'user,id=hwn0']
+		qemu_x86_64:  ['-nic', 'user,model=e1000']
+		required:     ['HWTEST START restart', 'HWTEST PASS restart']
+		ending:       .restart
+	},
+	Scenario{
+		name:         'suspend'
+		about:        'suspend to idle: rehearsal, alarm, key and power button wakeups'
+		arches:       ['aarch64', 'x86_64']
+		qemu_aarch64: ['-device', 'e1000,netdev=hwn0', '-netdev', 'user,id=hwn0']
+		qemu_x86_64:  ['-nic', 'user,model=e1000']
+		required:     ['HWTEST START suspend', 'HWTEST PASS suspend']
+		// A modifier, so that nothing is echoed into the guest's own lines.
+		actions:      [
+			Action{
+				after:    'HWTEST STEP asleep for a key'
+				delay_ms: 1500
+				qmp:      '{"execute":"send-key","arguments":{"keys":[{"type":"qcode","data":"shift"}]}}'
+			},
+			Action{
+				after:    'HWTEST STEP asleep for the power button'
+				delay_ms: 1500
+				qmp:      '{"execute":"system_powerdown"}'
+			},
+			Action{
+				after:    'HWTEST STEP asleep, keys ignored'
+				delay_ms: 1000
+				qmp:      '{"execute":"send-key","arguments":{"keys":[{"type":"qcode","data":"shift"}]}}'
+			},
+		]
+		ending:       .poweroff
 	},
 ]
 
