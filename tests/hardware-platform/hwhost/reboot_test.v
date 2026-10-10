@@ -265,14 +265,7 @@ fn test_bytes_expected_on_a_disk_at_the_end() {
 	assert false
 }
 
-fn test_the_suspend_to_disk_scenarios_are_x86_and_run_by_default() {
-	x86 := select_scenarios(scenarios, 'x86_64', []string{})!
-	arm := select_scenarios(scenarios, 'aarch64', []string{})!
-	for name in ['hibernate', 'hibernate-iommu', 'hibernate-iommu-amd', 'hibernate-cycles',
-		'hibernate-damaged-header', 'hibernate-damaged-pages', 'hibernate-memory', 'hibernate-unnamed'] {
-		assert x86.run.any(it.name == name)
-		assert !arm.run.any(it.name == name)
-	}
+fn test_what_the_suspend_to_disk_scenarios_ask_of_the_controller() {
 	// One that goes back into its image names the device for it and boots
 	// again; one that must find no way to has both disks compared with
 	// what they were made as.
@@ -283,4 +276,15 @@ fn test_the_suspend_to_disk_scenarios_are_x86_and_run_by_default() {
 	assert !unnamed.cmdline.contains('vinix.hibernate')
 	assert unnamed.boots() == 1
 	assert unnamed.disks.len == 2 && unnamed.disks.all(it.untouched)
+	foreign := find_scenario(scenarios, 'hibernate-foreign') or { panic('no hibernate-foreign') }
+	assert foreign.cmdline.contains('vinix.hibernate=sd1')
+	assert foreign.disks.len == 2 && foreign.disks.all(it.untouched)
+	// An image is damaged in the device it is on, with the machine off.
+	for name in ['hibernate-damaged-header', 'hibernate-damaged-pages'] {
+		damaged := find_scenario(scenarios, name) or { panic('no ${name}') }
+		assert damaged.boots() == 2
+		assert damaged.reboots[0].damage.len == 1 && damaged.reboots[0].damage[0].disk == 'image.raw'
+	}
+	// The device an image goes to is not kept once its scenario has passed.
+	assert hibernate.disks.any(it.name == 'image.raw' && it.bulky)
 }

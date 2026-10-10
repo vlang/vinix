@@ -58,6 +58,13 @@ fn test_every_real_scenario_runs_somewhere() {
 		assert name in names_of(x86.run)
 		assert name !in names_of(arm.run)
 	}
+	// So is suspend to disk.
+	for name in ['hibernate', 'hibernate-xapic', 'hibernate-iommu', 'hibernate-iommu-amd', 'hibernate-cycles',
+		'hibernate-damaged-header', 'hibernate-damaged-pages', 'hibernate-memory', 'hibernate-unnamed',
+		'hibernate-foreign'] {
+		assert name in names_of(x86.run)
+		assert name !in names_of(arm.run)
+	}
 }
 
 // The Apple SMC scenarios need a kernel with a simulated SMC in it: none is
