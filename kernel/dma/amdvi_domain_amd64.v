@@ -5,40 +5,42 @@
 //
 // A domain is a set of page tables in AMD's I/O format, a number the unit
 // tags its remembered translations with, and the device table entries that
-// point at the tables. Each device has its own. The tables look like the
-// CPU's: 512 eight-byte entries to a page, nine bits of address a level, the
-// last level naming 4 KiB pages. Every entry also says what the level below
-// it is, which is how an entry one level up can name 2 MiB directly; that is
-// used only for map_all(), where it turns half a megabyte of tables per
-// gigabyte of RAM into one page.
+// point at the tables. The tables look like the CPU's: 512 eight-byte entries
+// to a page, nine bits of address a level, the last level naming 4 KiB pages.
+// Every entry also says what the level below it is, which is how an entry one
+// level up can name 2 MiB directly; that is used only for map_all(), where it
+// turns half a megabyte of tables per gigabyte of RAM into one page.
 //
-// A device is in one of three states:
+// The unit knows a device by the id on its requests, so that is what a domain
+// is kept by. For nearly every device that is its own bus, device and
+// function number, and the domain is the device's alone. Devices behind a
+// bridge to conventional PCI send under the bridge's id -- the IVRS table
+// gives it as their alias -- and the unit cannot tell them apart: they have
+// one domain between them, and one of them at a time can have a driver that
+// maps memory into it. A second is refused until the first is detached.
 //
-//	blocked    its table entry is valid and names no tables: every access
-//	           faults. Every device is here until something below happens.
-//	firmware   it has tables holding only the memory the IVRS table says it
-//	           must go on reaching (a "unity" range), made at boot
-//	driver     a driver asked for memory for it: attach() gave it tables,
-//	           holding firmware's ranges if it has any and then whatever the
-//	           driver maps
+// An id is in one of three states:
+//
+//	blocked    its table entry allows neither reads nor writes and names
+//	           tables that map nothing: every access faults. Every id is
+//	           here until something below happens.
+//	firmware   it has tables holding only the memory the IVRS table says its
+//	           devices must go on reaching (a "unity" range), made at boot
+//	driver     a driver asked for memory for a device: attach() gave the id
+//	           tables, holding firmware's ranges if there are any and then
+//	           whatever the driver maps
 //
 // detach() takes it back to blocked, or to firmware's ranges alone. The
 // device is never without valid tables on the way: new ones are built first,
 // the table entry is switched to them in one store, and the old ones are
 // freed only after the unit has confirmed that it has forgotten them.
 //
-// Two devices that send under one id -- they sit behind the same bridge to
-// conventional PCI, and the IVRS table gives both the bridge's id as their
-// alias -- cannot be told apart by the unit, so they cannot have a domain
-// each. The first to be attached has the id; the second is refused until the
-// first is detached. Firmware's ranges for all of them are in whichever
-// domain holds the id.
-//
 // Locking: a table's lock guards its entries and its root. Table pages are
 // allocated with no lock held, since the allocator may have to reclaim; a
 // walk that needs a page it was not handed gives up, and its caller comes
-// back with one. The unit's domain_lock guards the list of domains, whose
-// records are made once per device and never freed, so a cookie stays good.
+// back with one. The unit's domain_lock guards additions to the list of
+// domains, whose records are made once per id and never freed, so a cookie
+// stays good and the list can be read without the lock.
 module dma
 
 import devcore
@@ -79,16 +81,18 @@ struct AmdviDomain {
 mut:
 	next &AmdviDomain = unsafe { nil }
 	unit &AmdviUnit   = unsafe { nil }
-	// The device's own id, the one it sends as, and the domain's number.
-	devid u16
-	alias u16
-	id    u16
+	// The id its devices send under, which the record is kept by; the
+	// device whose driver holds it, or the same id when none does; and the
+	// domain's number.
+	sender u16
+	holder u16
+	id     u16
 	table AmdviTable
 	// A driver has it, between attach() and detach().
 	driver bool
 	// All of RAM is mapped.
 	identity bool
-	// The IVRS table keeps memory reachable for it.
+	// The IVRS table keeps memory reachable for a device that sends under it.
 	has_unity bool
 	// Accesses the unit turned away, and how often it has been attached.
 	faults   u64
@@ -330,7 +334,7 @@ fn amdvi_table_unmap(mut unit AmdviUnit, mut table AmdviTable, iova u64, bytes u
 		}
 		if unsafe { *slot.entry } & amdvi_pte_present != 0 {
 			kept := if owner != unsafe { nil } && owner.has_unity {
-				amdvi_unity_rights(unit, owner.devid, owner.alias, at)
+				amdvi_unity_rights(unit, owner.sender, at)
 			} else {
 				u64(0)
 			}
@@ -358,39 +362,37 @@ fn amdvi_table_unmap(mut unit AmdviUnit, mut table AmdviTable, iova u64, bytes u
 
 // ── Firmware's memory ───────────────────────────────────────────────────────
 
-// Whether a unity range is meant for the device `devid`, which sends as
-// `alias`. The tables are per id sent, so a range for any device that sends
-// as one of the two is this domain's as well.
-fn amdvi_unity_names(unit &AmdviUnit, range &AmdviUnity, devid u16, alias u16) bool {
-	if (devid >= range.first && devid <= range.last) || (alias >= range.first && alias <= range.last) {
+// Whether a unity range is the business of the id `sender`: it names the id,
+// or a device that sends under it.
+fn amdvi_unity_names(unit &AmdviUnit, range &AmdviUnity, sender u16) bool {
+	if sender >= range.first && sender <= range.last {
 		return true
 	}
 	for entry in unit.entries {
-		if entry.aliased && (entry.alias == devid || entry.alias == alias)
-			&& entry.first <= range.last && entry.last >= range.first {
+		if entry.aliased && entry.alias == sender && entry.first <= range.last
+			&& entry.last >= range.first {
 			return true
 		}
 	}
 	return false
 }
 
-fn amdvi_unity_any(unit &AmdviUnit, devid u16, alias u16) bool {
+fn amdvi_unity_any(unit &AmdviUnit, sender u16) bool {
 	for i in 0 .. amdvi_ivrs.unity.len {
-		if amdvi_unity_names(unit, unsafe { &amdvi_ivrs.unity[i] }, devid, alias) {
+		if amdvi_unity_names(unit, unsafe { &amdvi_ivrs.unity[i] }, sender) {
 			return true
 		}
 	}
 	return false
 }
 
-// The rights firmware asks for the device at `address`, as entry bits; 0 when
-// it asks for none.
-fn amdvi_unity_rights(unit &AmdviUnit, devid u16, alias u16, address u64) u64 {
+// The rights firmware asks for the id at `address`, as entry bits; 0 when it
+// asks for none.
+fn amdvi_unity_rights(unit &AmdviUnit, sender u16, address u64) u64 {
 	mut rights := u64(0)
 	for i in 0 .. amdvi_ivrs.unity.len {
 		range := unsafe { &amdvi_ivrs.unity[i] }
-		if address < range.start || address >= range.end
-			|| !amdvi_unity_names(unit, range, devid, alias) {
+		if address < range.start || address >= range.end || !amdvi_unity_names(unit, range, sender) {
 			continue
 		}
 		if range.read {
@@ -403,11 +405,11 @@ fn amdvi_unity_rights(unit &AmdviUnit, devid u16, alias u16, address u64) u64 {
 	return rights
 }
 
-// Map every unity range of the device into `table`, each at its own address.
-fn amdvi_map_unity(mut unit AmdviUnit, mut table AmdviTable, devid u16, alias u16) bool {
+// Map every unity range of the id into `table`, each at its own address.
+fn amdvi_map_unity(mut unit AmdviUnit, mut table AmdviTable, sender u16) bool {
 	for i in 0 .. amdvi_ivrs.unity.len {
 		range := unsafe { &amdvi_ivrs.unity[i] }
-		if !amdvi_unity_names(unit, range, devid, alias) {
+		if !amdvi_unity_names(unit, range, sender) {
 			continue
 		}
 		mut rights := u64(0)
@@ -427,42 +429,79 @@ fn amdvi_map_unity(mut unit AmdviUnit, mut table AmdviTable, devid u16, alias u1
 
 // ── Device table entries ────────────────────────────────────────────────────
 
-// Point the entry of `devid` at tables. The domain number goes in first: an
-// entry read between the two stores is the blocked one with a number that
-// does not matter yet, or the old tables under their own number.
-fn amdvi_point_entry(unit &AmdviUnit, devid u16, root u64, levels u8, id u16) {
+// Point the entry of `devid` at tables, or with no root block it. The domain
+// number goes in first when pointing and comes out last when blocking, so an
+// entry read between the two stores is a blocked one with a number that does
+// not matter, or tables under their own number.
+fn amdvi_write_entry(unit &AmdviUnit, devid u16, root u64, levels u8, id u16) {
 	mut words := amdvi_dte(unit, u32(devid))
 	unsafe {
-		words[1] = (words[1] & ~amdvi_dte_domain_mask) | u64(id)
-		words[0] = root | (u64(levels) << amdvi_dte_mode_shift) | amdvi_dte_read | amdvi_dte_write | amdvi_dte_translation_valid | amdvi_dte_valid
+		if root != 0 {
+			words[1] = (words[1] & ~amdvi_dte_domain_mask) | u64(id)
+			words[0] = root | (u64(levels) << amdvi_dte_mode_shift) | amdvi_dte_read | amdvi_dte_write | amdvi_dte_translation_valid | amdvi_dte_valid
+		} else {
+			words[0] = amdvi_blocked_word(unit, words[1])
+			words[1] &= ~amdvi_dte_domain_mask
+		}
 	}
 }
 
-fn amdvi_block_entry(unit &AmdviUnit, devid u16) {
-	mut words := amdvi_dte(unit, u32(devid))
-	unsafe {
-		words[0] = amdvi_blocked_word(unit, words[1])
-		words[1] &= ~amdvi_dte_domain_mask
+// Whether the device `devid` sends under `sender` without being it.
+fn amdvi_sends_as(unit &AmdviUnit, devid u16, sender u16) bool {
+	if devid == sender || devid == unit.devid {
+		return false
 	}
+	subject := amdvi_subject(unit.entries, devid)
+	return subject.covered && subject.alias == sender
 }
 
-// Have the unit forget the device's entries and everything it remembers
-// under the domain's number. False if it did not confirm.
+// Every table entry that has to say what the domain says: the id its devices
+// send under, the device whose driver holds it, and every device present that
+// sends under the id -- some bridges forward a request under the device's own
+// id and some under theirs, and Linux writes both for that reason. With
+// `forget` the unit is told to forget each instead of each being written.
+fn amdvi_each_entry(mut unit AmdviUnit, domain &AmdviDomain, root u64, levels u8, forget bool) bool {
+	mut done := true
+	if forget {
+		done = amdvi_forget_device(mut unit, domain.sender)
+	} else {
+		amdvi_write_entry(unit, domain.sender, root, levels, domain.id)
+	}
+	if domain.holder != domain.sender {
+		if forget {
+			done = amdvi_forget_device(mut unit, domain.holder) && done
+		} else {
+			amdvi_write_entry(unit, domain.holder, root, levels, domain.id)
+		}
+	}
+	for function in scanned_devices {
+		devid := amdvi_devid(function)
+		if devid == domain.holder || !amdvi_sends_as(unit, devid, domain.sender) {
+			continue
+		}
+		if forget {
+			done = amdvi_forget_device(mut unit, devid) && done
+		} else {
+			amdvi_write_entry(unit, devid, root, levels, domain.id)
+		}
+	}
+	return done
+}
+
+// Have the unit forget the domain's table entries and everything it
+// remembers under the domain's number. False if it did not confirm.
 fn amdvi_forget(mut unit AmdviUnit, domain &AmdviDomain) bool {
 	if !unit.on {
 		// Not switched on yet: it remembers nothing.
 		return true
 	}
-	mut queued := amdvi_forget_device(mut unit, domain.devid)
-	if domain.alias != domain.devid {
-		queued = amdvi_forget_device(mut unit, domain.alias) && queued
-	}
+	mut queued := amdvi_each_entry(mut unit, domain, 0, 0, true)
 	queued = amdvi_forget_domain(mut unit, domain.id, true) && queued
 	return amdvi_sync(mut unit) && queued
 }
 
 // Put `fresh` in place of the domain's tables -- or nothing, when it has no
-// root, which blocks the device -- and free the old ones once the unit has
+// root, which blocks its devices -- and free the old ones once the unit has
 // let go of them. `fresh` is the caller's own and unpublished until now. False
 // when the unit did not confirm that it has taken the change in.
 fn amdvi_replace_tables(mut unit AmdviUnit, mut domain AmdviDomain, fresh &AmdviTable) bool {
@@ -477,17 +516,7 @@ fn amdvi_replace_tables(mut unit AmdviUnit, mut domain AmdviDomain, fresh &Amdvi
 	domain.table.splits = 0
 	domain.table.lock.release()
 
-	if fresh.root != 0 {
-		amdvi_point_entry(unit, domain.devid, fresh.root, fresh.levels, domain.id)
-		if domain.alias != domain.devid {
-			amdvi_point_entry(unit, domain.alias, fresh.root, fresh.levels, domain.id)
-		}
-	} else {
-		amdvi_block_entry(unit, domain.devid)
-		if domain.alias != domain.devid {
-			amdvi_block_entry(unit, domain.alias)
-		}
-	}
+	amdvi_each_entry(mut unit, domain, fresh.root, fresh.levels, false)
 	confirmed := amdvi_forget(mut unit, domain)
 	if old_root == 0 {
 		return confirmed
@@ -501,23 +530,28 @@ fn amdvi_replace_tables(mut unit AmdviUnit, mut domain AmdviDomain, fresh &Amdvi
 		unit.leaked_pages += old_pages
 		unit.lock.release()
 		C.kprintf(c'amdvi: %.*s: %llu pages of table for %02llx:%02llx.%llx not freed: the unit did not confirm it had let go of them\n',
-			i32(unit.name.len), unit.name.str, old_pages, u64(domain.devid >> 8), u64((domain.devid >> 3) & 31),
-			u64(domain.devid & 7))
+			i32(unit.name.len), unit.name.str, old_pages, u64(domain.sender >> 8), u64((domain.sender >> 3) & 31),
+			u64(domain.sender & 7))
 	}
 	return confirmed
 }
 
 // ── Domains ─────────────────────────────────────────────────────────────────
 
-// The record for the device `devid`, made the first time it is needed and
-// kept from then on: it is what attach() hands out as the cookie.
-fn amdvi_domain_of(mut unit AmdviUnit, devid u16, alias u16) &AmdviDomain {
-	unit.domain_lock.acquire()
+// The record for the id `sender`, or nil. Records are only ever added, at the
+// head of the list and complete, so the list is read without its lock.
+fn amdvi_find_domain(unit &AmdviUnit, sender u16) &AmdviDomain {
 	mut found := unit.domains
-	for found != unsafe { nil } && found.devid != devid {
+	for found != unsafe { nil } && found.sender != sender {
 		found = found.next
 	}
-	unit.domain_lock.release()
+	return found
+}
+
+// The same, made if it is not there yet. It is kept from then on: it is what
+// attach() hands out as the cookie.
+fn amdvi_domain_of(mut unit AmdviUnit, sender u16) &AmdviDomain {
+	mut found := amdvi_find_domain(unit, sender)
 	if found != unsafe { nil } {
 		return found
 	}
@@ -528,18 +562,15 @@ fn amdvi_domain_of(mut unit AmdviUnit, devid u16, alias u16) &AmdviDomain {
 	mut domain := unsafe { &AmdviDomain(allocation) }
 	unsafe {
 		*domain = AmdviDomain{
-			devid: devid
-			alias: alias
+			sender: sender
+			holder: sender
 		}
 	}
 	domain.unit = unsafe { unit }
 
 	unit.domain_lock.acquire()
-	found = unit.domains
-	for found != unsafe { nil } && found.devid != devid {
-		found = found.next
-	}
-	// Domain numbers are sixteen bits, and 0 is left to mean "none".
+	found = amdvi_find_domain(unit, sender)
+	// Domain numbers are sixteen bits, and 0 is left to the blocked devices.
 	if found == unsafe { nil } && unit.next_domain <= 0xffff {
 		domain.id = u16(unit.next_domain)
 		unit.next_domain++
@@ -555,44 +586,15 @@ fn amdvi_domain_of(mut unit AmdviUnit, devid u16, alias u16) &AmdviDomain {
 	return found
 }
 
-fn amdvi_find_domain(mut unit AmdviUnit, devid u16) &AmdviDomain {
-	unit.domain_lock.acquire()
-	mut found := unit.domains
-	for found != unsafe { nil } && found.devid != devid {
-		found = found.next
-	}
-	unit.domain_lock.release()
-	return found
-}
-
-// Whether another domain with tables already has one of the ids this one
-// would be written under.
-fn amdvi_ids_taken(mut unit AmdviUnit, domain &AmdviDomain) bool {
-	unit.domain_lock.acquire()
-	mut taken := false
-	mut other := unit.domains
-	for other != unsafe { nil } {
-		if voidptr(other) != voidptr(domain) && other.table.root != 0
-			&& (other.devid == domain.devid || other.devid == domain.alias
-			|| other.alias == domain.devid || other.alias == domain.alias) {
-			taken = true
-			break
-		}
-		other = other.next
-	}
-	unit.domain_lock.release()
-	return taken
-}
-
-// Give a blocked device tables that hold firmware's ranges for it and
+// Give an id that has no tables ones that hold firmware's ranges for it and
 // nothing else.
 fn amdvi_domain_build(mut unit AmdviUnit, mut domain AmdviDomain) bool {
-	domain.has_unity = amdvi_unity_any(unit, domain.devid, domain.alias)
+	domain.has_unity = amdvi_unity_any(unit, domain.sender)
 	mut fresh := AmdviTable{}
 	if !amdvi_table_create(mut unit, mut fresh) {
 		return false
 	}
-	if !amdvi_map_unity(mut unit, mut fresh, domain.devid, domain.alias) {
+	if !amdvi_map_unity(mut unit, mut fresh, domain.sender) {
 		amdvi_table_destroy(mut unit, fresh.root, fresh.levels)
 		return false
 	}
@@ -606,9 +608,9 @@ fn amdvi_domain_build(mut unit AmdviUnit, mut domain AmdviDomain) bool {
 	return true
 }
 
-// At boot, before the unit is on: every device present that firmware keeps
-// memory reachable for gets tables holding just that. A device added later
-// gets its ranges when a driver attaches to it.
+// At boot, before the unit is on: every id that a device present sends under
+// and that firmware keeps memory reachable for gets tables holding just that.
+// A device added later gets its ranges when a driver attaches to it.
 fn amdvi_unity_domains(mut unit AmdviUnit) {
 	if amdvi_ivrs.unity.len == 0 {
 		return
@@ -616,12 +618,12 @@ fn amdvi_unity_domains(mut unit AmdviUnit) {
 	for function in scanned_devices {
 		devid := amdvi_devid(function)
 		subject := amdvi_subject(unit.entries, devid)
-		if !subject.covered || devid == unit.devid || !amdvi_unity_any(unit, devid, subject.alias) {
+		if !subject.covered || devid == unit.devid || !amdvi_unity_any(unit, subject.alias) {
 			continue
 		}
-		mut domain := amdvi_domain_of(mut unit, devid, subject.alias)
-		if domain == unsafe { nil } || domain.table.root != 0 || amdvi_ids_taken(mut unit, domain) {
-			// With the id taken, the ranges are in the domain that has it.
+		mut domain := amdvi_domain_of(mut unit, subject.alias)
+		if domain == unsafe { nil } || domain.table.root != 0 {
+			// Already made, for another device that sends under the id.
 			continue
 		}
 		if !amdvi_domain_build(mut unit, mut domain) {
@@ -655,23 +657,30 @@ fn amdvi_attach(iommu &Iommu, mut dev devcore.Device) voidptr {
 	if !subject.covered || devid == unit.devid {
 		return unsafe { nil }
 	}
-	mut domain := amdvi_domain_of(mut unit, devid, subject.alias)
-	if domain == unsafe { nil } || domain.driver {
+	mut domain := amdvi_domain_of(mut unit, subject.alias)
+	if domain == unsafe { nil } {
 		return unsafe { nil }
 	}
-	if domain.table.root == 0 {
-		if amdvi_ids_taken(mut unit, domain) {
-			C.kprintf(c'amdvi: %.*s sends as %02llx:%02llx.%llx, which another device has a domain under; it stays blocked\n',
-				i32(dev.name.len), dev.name.str, u64(subject.alias >> 8), u64((subject.alias >> 3) & 31),
-				u64(subject.alias & 7))
-			return unsafe { nil }
-		}
-		if !amdvi_domain_build(mut unit, mut domain) {
-			return unsafe { nil }
-		}
+	if domain.driver {
+		C.kprintf(c'amdvi: %.*s sends as %02llx:%02llx.%llx, and the driver of %02llx:%02llx.%llx has the domain of that id; it stays out of it\n',
+			i32(dev.name.len), dev.name.str, u64(subject.alias >> 8), u64((subject.alias >> 3) & 31),
+			u64(subject.alias & 7), u64(domain.holder >> 8), u64((domain.holder >> 3) & 31),
+			u64(domain.holder & 7))
+		return unsafe { nil }
 	}
-	// Otherwise it has had tables since boot, with firmware's ranges in
-	// them; the driver's memory joins those.
+	domain.holder = devid
+	if domain.table.root == 0 {
+		if !amdvi_domain_build(mut unit, mut domain) {
+			domain.holder = domain.sender
+			return unsafe { nil }
+		}
+	} else {
+		// The id has had tables since boot, with firmware's ranges in them;
+		// the driver's memory joins those. The device's own entry is pointed
+		// at them, in case it was not there at boot to be found.
+		amdvi_each_entry(mut unit, domain, domain.table.root, domain.table.levels, false)
+		amdvi_forget(mut unit, domain)
+	}
 	domain.driver = true
 	domain.attaches++
 	return voidptr(domain)
@@ -690,17 +699,18 @@ fn amdvi_detach(cookie voidptr) {
 	mut fresh := AmdviTable{}
 	if domain.has_unity {
 		if !amdvi_table_create(mut unit, mut fresh) || !amdvi_map_unity(mut unit, mut fresh,
-			domain.devid, domain.alias) {
+			domain.sender) {
 			if fresh.root != 0 {
 				amdvi_table_destroy(mut unit, fresh.root, fresh.levels)
 			}
 			fresh = AmdviTable{}
 			C.kprintf(c'amdvi: %.*s: no memory to keep firmware ranges reachable for %02llx:%02llx.%llx; it is blocked\n',
-				i32(unit.name.len), unit.name.str, u64(domain.devid >> 8), u64((domain.devid >> 3) & 31),
-				u64(domain.devid & 7))
+				i32(unit.name.len), unit.name.str, u64(domain.sender >> 8), u64((domain.sender >> 3) & 31),
+				u64(domain.sender & 7))
 		}
 	}
 	amdvi_replace_tables(mut unit, mut domain, unsafe { &fresh })
+	domain.holder = domain.sender
 }
 
 fn amdvi_map(cookie voidptr, iova u64, phys u64, bytes u64) bool {
@@ -772,7 +782,7 @@ fn amdvi_map_all(cookie voidptr) bool {
 	if !amdvi_table_create(mut unit, mut fresh) {
 		return false
 	}
-	mut built := amdvi_map_unity(mut unit, mut fresh, domain.devid, domain.alias)
+	mut built := amdvi_map_unity(mut unit, mut fresh, domain.sender)
 	entries := memmap.entries
 	for i := u64(0); built && i < memmap.entry_count; i++ {
 		entry := unsafe { entries[i] }

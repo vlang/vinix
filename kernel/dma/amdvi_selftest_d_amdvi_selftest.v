@@ -399,14 +399,15 @@ fn amdvi_selftest_entries(bytes &u8, parsed &AmdviIvrs, first_found bool, third_
 	good = good && some.first == 0x0100 && some.last == 0x01ff && some.read && !some.write
 	every := parsed.unity[2]
 	good = good && every.first == 0 && every.last == 0xffff && every.read && every.write
-	// A range for a device is also the business of the id the device sends
-	// as: the tables are that id's.
+	// A range for a device is the business of the id the device sends as:
+	// the tables are that id's.
 	mut unit := &AmdviUnit{}
 	unit.entries = entries
-	good = good && amdvi_unity_names(unit, unsafe { &parsed.unity[0] }, 0x0018, 0x0018)
-		&& amdvi_unity_names(unit, unsafe { &parsed.unity[0] }, 0x0210, 0x0018)
-		&& !amdvi_unity_names(unit, unsafe { &parsed.unity[0] }, 0x0008, 0x0008)
-		&& amdvi_unity_names(unit, unsafe { &parsed.unity[1] }, 0x0150, 0x0150)
+	good = good && amdvi_unity_names(unit, unsafe { &parsed.unity[0] }, 0x0018)
+		&& amdvi_unity_names(unit, unsafe { &parsed.unity[0] }, 0x0210)
+		&& !amdvi_unity_names(unit, unsafe { &parsed.unity[0] }, 0x0008)
+		&& amdvi_unity_names(unit, unsafe { &parsed.unity[1] }, 0x0150)
+		&& !amdvi_unity_names(unit, unsafe { &parsed.unity[1] }, 0x0020)
 	unsafe { free(unit) }
 	return good
 }
@@ -832,7 +833,8 @@ fn amdvi_selftest_firmware(mut unit AmdviUnit, mut nic AmdviNic) {
 
 	// What boot does for a device with such a range.
 	amdvi_unity_domains(mut unit)
-	mut held := amdvi_find_domain(mut unit, own)
+	// The range names the card; the tables are kept by the id it sends as.
+	mut held := amdvi_find_domain(unit, nic.devid)
 	mut good := held != unsafe { nil } && held.table.root != 0 && !held.driver
 		&& held.table.mapped == 3 * amdvi_page_bytes
 	mut probe := AmdviProbe{}

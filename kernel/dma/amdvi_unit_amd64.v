@@ -305,7 +305,8 @@ fn amdvi_blocked_word(unit &AmdviUnit, second u64) u64 {
 	mut word := unit.nothing | (u64(unit.levels) << amdvi_dte_mode_shift) | amdvi_dte_valid | amdvi_dte_translation_valid
 	// AMD erratum 63: a device whose system management setting is 01 has its
 	// management messages dropped unless the entry allows writes. It is the
-	// southbridge of a 2009 chipset; Linux makes the same exception.
+	// southbridge of a 2009 chipset; Linux makes the same exception. Its
+	// writes to memory still end in the empty table.
 	if second & amdvi_dte_sysmgt1 != 0 && second & amdvi_dte_sysmgt2 == 0 {
 		word |= amdvi_dte_write
 	}

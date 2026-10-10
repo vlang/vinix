@@ -81,6 +81,7 @@ fn amdvi_initialise() {
 			// must not stay on, with every device behind it cut off.
 			amdvi_quiesce(unit)
 			unit.on = false
+			amdvi_free_unit_memory(mut unit)
 			continue
 		}
 		amdvi_units[amdvi_unit_count] = unit

@@ -183,17 +183,15 @@ fn amdvi_drain_events(mut unit AmdviUnit) u64 {
 	return seen
 }
 
-// The domain of the device that sends as `id`, or nil. Records are only ever
-// added, at the head and complete, so the list is read without its lock.
+// The domain a request under `id` belongs to, or nil: the one kept by that
+// id, or, for a device whose own id got through a bridge, by the id the IVRS
+// table says it sends under.
 fn amdvi_domain_sending(unit &AmdviUnit, id u16) &AmdviDomain {
-	mut domain := unit.domains
-	for domain != unsafe { nil } {
-		if domain.devid == id || (domain.alias == id && domain.table.root != 0) {
-			return domain
-		}
-		domain = domain.next
+	domain := amdvi_find_domain(unit, id)
+	if domain != unsafe { nil } {
+		return domain
 	}
-	return unsafe { nil }
+	return amdvi_find_domain(unit, amdvi_subject(unit.entries, id).alias)
 }
 
 fn amdvi_poll_thread(arg voidptr) {
@@ -319,16 +317,17 @@ fn amdvi_show_events(context voidptr, mut text lib.Text) {
 	}
 }
 
-// One line per device that has tables: who, under which number, how much.
+// One line per id that has tables: the device whose driver holds them, the
+// id it sends under when that is another, the domain's number, how much.
 fn amdvi_show_domains(context voidptr, mut text lib.Text) {
 	unit := unsafe { &AmdviUnit(context) }
 	mut domain := unit.domains
 	for domain != unsafe { nil } {
 		if domain.table.root != 0 {
-			amdvi_add_device(mut text, domain.devid)
-			if domain.alias != domain.devid {
+			amdvi_add_device(mut text, domain.holder)
+			if domain.holder != domain.sender {
 				text.add(' as ')
-				amdvi_add_device(mut text, domain.alias)
+				amdvi_add_device(mut text, domain.sender)
 			}
 			text.add(' id ')
 			text.add_unsigned(u64(domain.id))
