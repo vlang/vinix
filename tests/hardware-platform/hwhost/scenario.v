@@ -124,7 +124,7 @@ pub const scenarios = [
 		name:     'qmp-powerdown'
 		about:    'the power button powers the machine off'
 		arches:   ['aarch64', 'x86_64']
-		pending:  'the kernel does not handle the power button yet'
+		pending:  'the kernel on this branch does not handle the power button yet'
 		required: ['HWTEST START qmp-powerdown', 'HWTEST STEP waiting for power button']
 		actions:  [
 			Action{
