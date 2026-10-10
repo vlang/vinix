@@ -46,7 +46,8 @@ const app_feature_close_guard = u8(2)
 const app_feature_desktop_services = u8(4)
 const app_feature_text_copy = u8(8)
 const app_feature_capture_cursor = u8(16)
-const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy | app_feature_capture_cursor
+const app_feature_horizontal_scroll = u8(32)
+const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy | app_feature_capture_cursor | app_feature_horizontal_scroll
 // Header byte 7 was reserved and zero in version 10. Bit 0 now requests a
 // cursor-free Capture frame, with the unchanged header/state sizes. Older
 // compositors do not advertise the feature, so new Capture clients send zero.
@@ -1112,7 +1113,7 @@ fn run_app_process(options AppProcessOptions) {
 				mut pointer := AppPointerPayload{}
 				unsafe { C.memcpy(&pointer, payload.str, sizeof(AppPointerPayload)) }
 				if pointer.kind < int(AppPointerPhase.move)
-					|| pointer.kind > int(AppPointerPhase.scroll)
+					|| pointer.kind > int(AppPointerPhase.horizontal_scroll)
 					|| pointer.button < int(AppPointerButton.no_button)
 					|| pointer.button > int(AppPointerButton.back) || pointer.width <= 0
 					|| pointer.height <= 0 {
@@ -1460,6 +1461,11 @@ fn (a &RemoteApp) pointer_input_enabled() bool {
 
 fn (mut a RemoteApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
 	if !a.pointer || a.closed {
+		return
+	}
+	// Older app binaries validate the previous phase range. Negotiation keeps
+	// a horizontal swipe from becoming a protocol error during live updates.
+	if phase == .horizontal_scroll && a.peer_features & app_feature_horizontal_scroll == 0 {
 		return
 	}
 	pointer := AppPointerPayload{

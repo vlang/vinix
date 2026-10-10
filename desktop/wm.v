@@ -2467,13 +2467,21 @@ fn (mut d Desktop) on_app_pointer_button(x int, y int, phase AppPointerPhase, bu
 }
 
 fn (mut d Desktop) on_app_pointer_scroll(x int, y int, scroll int) {
+	d.on_app_pointer_wheel(x, y, scroll, .scroll)
+}
+
+fn (mut d Desktop) on_app_pointer_horizontal_scroll(x int, y int, scroll int) {
+	d.on_app_pointer_wheel(x, y, scroll, .horizontal_scroll)
+}
+
+fn (mut d Desktop) on_app_pointer_wheel(x int, y int, scroll int, phase AppPointerPhase) {
 	if d.window_overlay_active() {
 		return
 	}
 	if scroll == 0 || d.switcher.active || d.start_menu_open {
 		return
 	}
-	if d.forward_pointer_to_app(x, y, .scroll, .no_button, scroll) {
+	if d.forward_pointer_to_app(x, y, phase, .no_button, scroll) {
 		d.dirty = true
 	}
 }

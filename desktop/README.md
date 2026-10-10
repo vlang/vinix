@@ -978,6 +978,15 @@ The host runner builds the kernel and packaged desktop with `-prod` and uses
 Clang for cross compilation. A warm run reuses cached build outputs. For quick
 desktop edits inside the running VM, use `vinix-desktop-build` below.
 
+In Files' column view, a horizontal trackpad swipe over the columns scrolls
+the whole strip; vertical scrolling still moves the rows in the column under
+the pointer. The macOS runner builds and caches a private QEMU with the
+horizontal VirtIO wheel mapping that stock QEMU lacks. This first host build
+uses Ninja, pkg-config and QEMU's GLib, Pixman and libslirp dependencies;
+`scripts/build-qemu-input.sh` can prepare it ahead of a launch. An explicit
+`VINIX_QEMU_BIN` continues to select your own emulator. Restart the VM after
+updating this input path so the kernel and compositor receive the new axis.
+
 For Files, Activity Monitor and Settings changes,
 `./scripts/cross-compile-app.sh files activity settings` (or `./scripts/cross-compile-files.sh`,
 `./scripts/cross-compile-activity.sh`, `./scripts/cross-compile-settings.sh`) builds the

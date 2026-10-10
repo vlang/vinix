@@ -16,7 +16,7 @@ mut:
 	// This is a kernel ABI, so keep its scalar widths explicit. The desktop's
 	// v3 compiler represents `int` as 64 bits while the kernel compiler uses a
 	// 32-bit C int; spelling these as i32 keeps both sides at the same 32-byte
-	// packet layout.
+	// packet prefix; newer kernels append horizontal scrolling.
 	x        i32
 	y        i32
 	max_x    i32
@@ -25,6 +25,7 @@ mut:
 	pressed  u32
 	released u32
 	scroll   i32
+	scroll_x i32
 }
 
 // Button bits, in the order the kernel pointer ABI reports them.
@@ -56,7 +57,10 @@ fn (mut p PointerDevice) poll() ?PointerPacket {
 		return none
 	}
 	mut packet := PointerPacket{}
-	if desktop_read(p.fd, &packet, u64(sizeof(PointerPacket))) != i64(sizeof(PointerPacket)) {
+	n := desktop_read(p.fd, &packet, u64(sizeof(PointerPacket)))
+	// Older kernels (and PS/2) return the original 32-byte prefix. The zeroed
+	// trailing axis keeps those devices working during an app/kernel upgrade.
+	if n != 32 && n != i64(sizeof(PointerPacket)) {
 		return none
 	}
 	return packet

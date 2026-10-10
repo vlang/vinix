@@ -511,7 +511,7 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	// button is no longer held.
 	d.buttons = packet.buttons
 	d.on_pointer_move(pointer_x, pointer_y)
-	if packet.pressed != 0 || packet.released != 0 || packet.scroll != 0 {
+	if packet.pressed != 0 || packet.released != 0 || packet.scroll != 0 || packet.scroll_x != 0 {
 		// A click or a scroll recomposes everything, including the pointer
 		// the move above would otherwise have redrawn by itself.
 		d.pointer_moved_only = false
@@ -520,7 +520,7 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 
 	mut click := titlebar_click
 	// A different pointer gesture breaks a pending double-click sequence.
-	if packet.pressed & (button_middle | button_right | button_back) != 0 || packet.scroll != 0 {
+	if packet.pressed & (button_middle | button_right | button_back) != 0 || packet.scroll != 0 || packet.scroll_x != 0 {
 		click = TitlebarClick{}
 	}
 	if packet.pressed & button_left != 0 {
@@ -571,6 +571,9 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	}
 	if packet.scroll != 0 {
 		d.on_app_pointer_scroll(pointer_x, pointer_y, int(packet.scroll))
+	}
+	if packet.scroll_x != 0 {
+		d.on_app_pointer_horizontal_scroll(pointer_x, pointer_y, int(packet.scroll_x))
 	}
 	return click
 }

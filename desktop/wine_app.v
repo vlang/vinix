@@ -626,6 +626,7 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointer
 				else { return }
 			}
 		}
+		.horizontal_scroll { return }
 		.scroll {
 			if scroll == 0 {
 				return

@@ -157,6 +157,12 @@ cp "$root/desktop/tools/tests/files_settings_process_integration.v" "$work/ui/ma
 "$work/files-settings-process"
 rm -f "$work/ui/main.v"
 
+cp "$root/desktop/tools/tests/files_scroll_process_integration.v" "$work/ui/main.v"
+"$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -d ui2_headless \
+    -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" -o "$work/files-scroll-process" "$work/ui"
+"$work/files-scroll-process"
+rm -f "$work/ui/main.v"
+
 cp "$root/desktop/tools/tests/files_quicklook_test.v" "$work/ui/"
 "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/files_quicklook_test.v"

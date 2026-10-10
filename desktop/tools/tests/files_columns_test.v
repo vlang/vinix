@@ -168,6 +168,88 @@ fn test_miller_row_actions_keep_column_identity() {
 	}
 }
 
+fn test_horizontal_swipes_pan_columns_in_both_themes_without_scrolling_rows() {
+	root := os.join_path(os.temp_dir(), 'vinix-files-horizontal-scroll-test')
+	os.mkdir_all(os.join_path(root, 'child')) or { panic(err) }
+	for index in 0 .. 20 {
+		os.write_file(os.join_path(root, 'item-${index}.txt'), 'hello') or { panic(err) }
+	}
+	defer {
+		files_follow_theme(.default_)
+		os.rmdir_all(root) or {}
+	}
+	for theme in [ThemeKind.default_, .macos] {
+		files_follow_theme(theme)
+		mut app := FilesContextApp{}
+		app.files.browser.read(root.clone())
+		app.files.set_view_mode(.columns)
+		free_tree(app.build(ui2.rect(0, 0, 700, 400))!)
+		maximum := app.files.max_column_offset()
+		assert maximum > 48
+		x := files_content_left(700) + 10
+		y := app.files.rows_top + 10
+		last := app.files.columns.len - 1
+		app.files.columns[last].browser.scroll = 2
+		path := app.files.current_path().clone()
+		app.pointer_event(.horizontal_scroll, .no_button, -1, x, y, 700, 400)
+		assert app.files.column_offset == maximum - 48
+		free_tree(app.build(ui2.rect(0, 0, 700, 400))!)
+		assert app.files.column_offset == maximum - 48
+		assert app.files.columns[last].browser.scroll == 2
+		assert app.files.current_path() == path
+		app.pointer_event(.horizontal_scroll, .no_button, 1, x, y, 700, 400)
+		assert app.files.column_offset == maximum
+		app.pointer_event(.horizontal_scroll, .no_button, 100, x, y, 700, 400)
+		assert app.files.column_offset == maximum
+		app.pointer_event(.horizontal_scroll, .no_button, -100, x, y, 700, 400)
+		assert app.files.column_offset == 0
+		app.pointer_event(.horizontal_scroll, .no_button, 1, 700 - 10, y, 700, 400)
+		assert app.files.column_offset == 48
+
+		// The sidebar, toolbar and open overlays do not pan the column strip.
+		app.pointer_event(.horizontal_scroll, .no_button, 1, 10, y, 700, 400)
+		app.pointer_event(.horizontal_scroll, .no_button, 1, x, app.files.rows_top - 1, 700, 400)
+		assert app.files.column_offset == 48
+		app.trash_open = true
+		app.pointer_event(.horizontal_scroll, .no_button, 1, x, y, 700, 400)
+		assert app.files.column_offset == 48
+		app.trash_open = false
+		app.files.column_offset = maximum
+		// Vertical wheels still scroll just the column beneath the pointer.
+		app.pointer_event(.scroll, .no_button, -1, 700 - 30, y, 700, 400)
+		assert app.files.column_offset == maximum
+		assert app.files.columns[last].browser.scroll == 4
+		app.files.set_view_mode(.list)
+		free_tree(app.build(ui2.rect(0, 0, 700, 400))!)
+		app.files.browser.scroll = 2
+		app.pointer_event(.horizontal_scroll, .no_button, 1, x, y, 700, 400)
+		assert app.files.browser.scroll == 2
+		unsafe { path.free() }
+		app.close_app()
+	}
+}
+
+fn test_pointer_poll_accepts_legacy_and_horizontal_packets() {
+	for length in [32, 36] {
+		mut descriptors := [2]i32{}
+		assert C.pipe(&descriptors[0]) == 0
+		mut device := PointerDevice{fd: int(descriptors[0])}
+		packet := PointerPacket{x: 123, y: 456, max_x: 32767, max_y: 32767, scroll: -2, scroll_x: 3}
+		assert desktop_write(int(descriptors[1]), &packet, u64(length)) == length
+		read := device.poll() or { panic('pointer packet lost') }
+		assert read.x == 123 && read.y == 456 && read.scroll == -2
+		assert read.scroll_x == if length == 36 { 3 } else { 0 }
+		device.close()
+		desktop_close(int(descriptors[1]))
+	}
+}
+
+fn test_horizontal_scroll_keeps_older_app_transports_alive() {
+	mut app := RemoteApp{pointer: true, tree_stale: false}
+	app.pointer_event(.horizontal_scroll, .no_button, 1, 10, 10, 700, 400)
+	assert !app.closed && !app.tree_stale
+}
+
 fn test_file_browser_up_keeps_an_owned_parent_path() {
 	root := os.join_path(os.temp_dir(), 'vinix-files-up-test')
 	child := os.join_path(root, 'child')

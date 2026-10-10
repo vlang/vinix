@@ -1,0 +1,53 @@
+--- a/hw/input/virtio-input-hid.c
++++ b/hw/input/virtio-input-hid.c
+@@ -102,6 +102,14 @@
+             event.value = cpu_to_le32(evt->btn.button == INPUT_BUTTON_WHEEL_UP
+                                       ? 1 : -1);
+             virtio_input_send(vinput, &event);
++        } else if ((evt->btn.button == INPUT_BUTTON_WHEEL_LEFT ||
++                    evt->btn.button == INPUT_BUTTON_WHEEL_RIGHT) &&
++                   evt->btn.down) {
++            event.type  = cpu_to_le16(EV_REL);
++            event.code  = cpu_to_le16(REL_HWHEEL);
++            event.value = cpu_to_le32(evt->btn.button == INPUT_BUTTON_WHEEL_RIGHT
++                                      ? 1 : -1);
++            virtio_input_send(vinput, &event);
+         } else if (keymap_button[evt->btn.button]) {
+             event.type  = cpu_to_le16(EV_KEY);
+             event.code  = cpu_to_le16(keymap_button[evt->btn.button]);
+@@ -345,7 +353,7 @@
+         .subsel    = EV_REL,
+         .size      = 2,
+         .u.bitmap  = {
+-            (1 << REL_X) | (1 << REL_Y),
++            (1 << REL_X) | (1 << REL_Y) | (1 << REL_HWHEEL),
+             (1 << (REL_WHEEL - 8))
+         },
+     },
+@@ -406,7 +414,7 @@
+         .subsel    = EV_REL,
+         .size      = 2,
+         .u.bitmap  = {
+-            0,
++            (1 << REL_HWHEEL),
+             (1 << (REL_WHEEL - 8))
+         },
+     },{
+--- a/ui/cocoa.m
++++ b/ui/cocoa.m
+@@ -926,10 +926,10 @@
+-            /* Determine if this is a scroll up or scroll down event */
+-            if ([event deltaY] != 0) {
++            /* A horizontal swipe can include a small vertical delta. */
++            if (fabs([event deltaX]) > fabs([event deltaY])) {
++                button = ([event deltaX] > 0) ?
++                    INPUT_BUTTON_WHEEL_LEFT : INPUT_BUTTON_WHEEL_RIGHT;
++            } else if ([event deltaY] != 0) {
+                 button = ([event deltaY] > 0) ?
+                     INPUT_BUTTON_WHEEL_UP : INPUT_BUTTON_WHEEL_DOWN;
+-            } else if ([event deltaX] != 0) {
+-                button = ([event deltaX] > 0) ?
+-                    INPUT_BUTTON_WHEEL_LEFT : INPUT_BUTTON_WHEEL_RIGHT;
+             } else {
+                 /*
+                  * We shouldn't have got a scroll event when deltaY and delta Y

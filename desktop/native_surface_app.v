@@ -194,6 +194,7 @@ fn (mut app NativeSurfaceApp) pointer_event(phase AppPointerPhase, button AppPoi
 		.down { VinixInputEventKind.button_down }
 		.up { VinixInputEventKind.button_up }
 		.scroll { VinixInputEventKind.wheel }
+		.horizontal_scroll { return }
 	}
 	value := if phase == .scroll { scroll } else { int(button) }
 	app.send_input_event(kind, surface_x, surface_y, value, '')

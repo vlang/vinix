@@ -1028,7 +1028,7 @@ fn test_pointer_wire_records_have_fixed_cross_compiler_layouts() {
 	// The kernel is built with the established compiler while the desktop uses
 	// v3, whose `int` has a different width. These records cross into kernel and
 	// C code and must therefore retain their explicit ABI sizes.
-	assert sizeof(PointerPacket) == 32
+	assert sizeof(PointerPacket) == 36
 	assert sizeof(AppPointerPayload) == 28
 	assert sizeof(WineHostEvent) == 20
 	assert int(WineHostEventKind.wheel_down) == 10

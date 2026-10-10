@@ -26,7 +26,8 @@ import apple.spi_keyboard
 // `buttons` is the level: bit 0 left, bit 1 right, bit 2 middle. `pressed` and
 // `released` are the edges seen since the previous read, so a click that both
 // starts and ends between two reads is still reported. `scroll` is the wheel
-// delta accumulated over the same interval.
+// delta accumulated over the same interval. The optional trailing `scroll_x`
+// reports horizontal wheel motion (positive to the right).
 pub struct PointerPacket {
 pub mut:
 	// /dev/pointer is a userspace ABI. Fixed-width fields keep it stable across
@@ -39,6 +40,7 @@ pub mut:
 	pressed  u32
 	released u32
 	scroll   i32
+	scroll_x i32
 }
 
 struct Pointer {
@@ -60,7 +62,8 @@ fn (mut this Pointer) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 }
 
 fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
-	if count < sizeof(PointerPacket) {
+	// Retain the original 32-byte read for existing compositors.
+	if count < 32 {
 		errno.set(errno.einval)
 		return none
 	}
@@ -91,20 +94,23 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 			pressed: vi_ptr_pressed
 			released: vi_ptr_released
 			scroll: i32(vi_ptr_scroll)
+			scroll_x: i32(vi_ptr_scroll_x)
 		}
 		vi_ptr_pressed = 0
 		vi_ptr_released = 0
 		vi_ptr_scroll = 0
+		vi_ptr_scroll_x = 0
 	}
 	this.status &= ~file.pollin
 
 	this.l.release()
 
+	length := if count >= sizeof(PointerPacket) { sizeof(PointerPacket) } else { u32(32) }
 	unsafe {
-		C.memcpy(buf, &packet, sizeof(PointerPacket))
+		C.memcpy(buf, &packet, length)
 	}
 
-	return i64(sizeof(PointerPacket))
+	return i64(length)
 }
 
 fn pointer_changed() {

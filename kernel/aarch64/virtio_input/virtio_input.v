@@ -108,6 +108,7 @@ const abs_x = u16(0)
 const abs_y = u16(1)
 const rel_x = u16(0)
 const rel_y = u16(1)
+const rel_hwheel = u16(6)
 const rel_wheel = u16(8)
 
 // MMIO accessors with compiler barriers to prevent LDP/STP generation.
@@ -172,6 +173,7 @@ __global (
 	vi_ptr_pressed   = u32(0)
 	vi_ptr_released  = u32(0)
 	vi_ptr_scroll    = int(0)
+	vi_ptr_scroll_x  = int(0)
 	vi_ptr_callback  = voidptr(0)
 	// Another input driver polled alongside these devices; see
 	// set_extra_poller().
@@ -373,6 +375,10 @@ fn process_rel(code u16, value u32) {
 		}
 		rel_wheel {
 			vi_ptr_scroll += delta
+			notify_pointer_event()
+		}
+		rel_hwheel {
+			vi_ptr_scroll_x += delta
 			notify_pointer_event()
 		}
 		else {}

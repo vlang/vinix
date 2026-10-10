@@ -1299,6 +1299,16 @@ fn (mut a FileBrowserApp) clamp_scroll() {
 	}
 }
 
+fn (mut a FileBrowserApp) horizontal_scroll_at(x int, y int, steps int, width int) {
+	if steps == 0 || a.view_mode != .columns || x < width - a.viewport_width
+		|| x >= width || y < a.rows_top || y >= a.rows_top + a.rows_height + files_horizontal_bar_height {
+		return
+	}
+	// REL_HWHEEL is positive toward later columns. Move in small increments
+	// so swiping over any column pans the whole strip without changing rows.
+	a.column_offset = files_clamp(a.column_offset + steps * 48, a.max_column_offset())
+}
+
 fn (mut a FileBrowserApp) scroll_at(x int, y int, steps int, width int) {
 	content_left := width - a.viewport_width
 	if steps == 0 {
@@ -1399,6 +1409,10 @@ fn (mut a FileBrowserApp) begin_vertical_drag(id int, y int, total int, current 
 
 fn (mut a FileBrowserApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, _ int) {
 	if a.info.open { return }
+	if phase == .horizontal_scroll {
+		a.horizontal_scroll_at(x, y, scroll, width)
+		return
+	}
 	if phase == .down {
 		// A press anywhere takes the keyboard from the search field; one on
 		// the field gives it back as the press's action.

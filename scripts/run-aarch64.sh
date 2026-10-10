@@ -1290,6 +1290,11 @@ mcopy -o -i "$BOOT_DISK" "$KERNEL_DIR/bin/vinix" ::/boot/vinix
 
 # ── Launch QEMU ──
 QEMU_BIN="${VINIX_QEMU_BIN:-qemu-system-aarch64}"
+if [ "$(uname -s)" = Darwin ] && [ "$VIRTIO_GPU" -lt 2 ] && [ -z "${VINIX_QEMU_BIN:-}" ]; then
+    # Stock QEMU's VirtIO tablet drops Cocoa's wheel-left/right events.
+    "$SCRIPT_DIR/scripts/build-qemu-input.sh" || exit 1
+    QEMU_BIN="$SCRIPT_DIR/build/qemu-horizontal/bin/qemu-system-aarch64"
+fi
 if [ "$VIRTIO_GPU" -ge 2 ]; then
     kekvm_dir="${VINIX_KEKVM_DIR:-$SCRIPT_DIR/../kekvm}"
     QEMU_BIN="${VINIX_VIRGL_QEMU:-$kekvm_dir/.tools/qemu-virgl/bin/kekvm-qemu-system-aarch64}"

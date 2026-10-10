@@ -43,6 +43,7 @@ enum AppPointerPhase {
 	down
 	up
 	scroll
+	horizontal_scroll
 }
 
 enum AppPointerButton {
