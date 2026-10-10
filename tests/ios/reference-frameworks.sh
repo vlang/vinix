@@ -90,6 +90,9 @@ test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permission
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/interfaces.c" -o "$output/interfaces"
 "$output/interfaces"
+"${IOS_CLANG:-clang}" -DIOS_SYSTEM_QUERIES_REFERENCE -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/system-queries.c" -o "$output/system-queries"
+"$output/system-queries"
 "${IOS_CLANG:-clang}" -fno-objc-arc -O1 -Wall -Wextra -Werror -framework Security -framework Foundation \
     "$repo/tests/ios/security.m" -o "$output/security"
 "$output/security"

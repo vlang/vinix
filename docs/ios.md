@@ -603,6 +603,35 @@ fixture uses a permanently invalid descriptor for its closed-file check because
 another worker can reuse a recently closed number. Worker failures are reported
 after all clients have been joined, preserving mapped code until the threads end.
 
+`getdtablesize`, `getgid` and `getegid` expose actual native limits and group IDs.
+V adapters for `gethostname`, `getpwuid`, `getprotobyname` and `getrusage` use
+the native hostname, account database, protocol configuration and process
+accounting. Hostname truncation follows the Mac's successful, terminated prefix
+behavior. Zero-capacity calls leave the buffer untouched; the measured Mac
+implementation instead writes just before the supplied buffer in that case.
+Account records use Darwin's 72-byte layout and grow a native reentrant lookup
+buffer as needed. Password-change, class and expiration metadata unavailable in
+the Linux account record are zero/empty. Account and protocol results belong to
+the calling thread and are reclaimed at thread exit or runtime shutdown.
+
+On Linux, the V protocol adapter reads `/etc/protocols` because musl's built-in
+protocol list omits aliases and ignores that file. Names, numbers and all aliases
+come from the guest's configuration, including custom records. The Mac backend
+copies its native records. Resource usage copies native fields into Darwin's
+144-byte layout, including 32-bit microseconds and peak memory in bytes. This
+also keeps musl's larger native structure out of the application's buffer.
+Darwin's self/children selectors are supported; Linux's additional thread
+selector fails with `EINVAL`. The IPv6 loopback constant is also available.
+
+Shared Mac/iOS fixtures check hostname boundaries, real identities and limits,
+missing records, independent account/protocol records across eight synchronized
+threads, long account fields, resource-usage buffer guards and memory units.
+ASAN checks two loads/unloads, account-buffer growth, protocol aliases, custom
+numbers, long records, comments, malformed entries and missing files. The
+isolated guest supplies real account/protocol files for these checks. The full
+ARM64 C++/GLES/PPSSPP regression passes. These eight entries resolve 16 additional
+strong imports across Fortnite and EOSSDK.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -616,7 +645,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _getdtablesize
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _initgroups
 ```
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
@@ -624,12 +653,12 @@ the executable, without mapping or executing app code. The static C++ runner rep
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,271 | 887 | 81 |
-| EOSSDK | 485 | 177 | 18 |
+| Fortnite executable | 1,279 | 879 | 81 |
+| EOSSDK | 493 | 169 | 18 |
 | MarketplaceKitWrapper | 52 | 124 | 23 |
-| All images | 1,808 | 1,188 | 122 |
+| All images | 1,824 | 1,172 | 122 |
 
-The C++/GLES/Text variant reports 1,821 resolved imports, 1,175 unresolved strong
+The C++/GLES/Text variant reports 1,837 resolved imports, 1,159 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

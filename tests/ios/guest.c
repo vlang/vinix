@@ -142,6 +142,9 @@ int main(void) {
     run("/opt/ios/interfaces", NULL, NULL, NULL, 0,
         "IOS-INTERFACES: real native snapshots, Darwin link addresses, flags, masks, indices and eight-thread ownership\n");
     puts("iOS PASS: Darwin network interfaces, snapshots and address ownership");
+    run("/opt/ios/system-queries", "--database-fixture", NULL, NULL, 0,
+        "IOS-SYSTEM-QUERIES: native limits, credentials, hostname, account/protocol ownership and Darwin resource usage\n");
+    puts("iOS PASS: Darwin system queries, account records and resource usage");
     run("/opt/ios/mach-memory", NULL, NULL, NULL, 0,
         "IOS-MACH-VM: aliases, offsets, occupied targets, real errors and independent mapping lifetimes");
     puts("iOS PASS: native Mach VM aliases and mapping lifetime");
