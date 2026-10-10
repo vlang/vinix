@@ -90,7 +90,7 @@ done
 # assembled here from Alpine's statically linked busybox.
 echo "=== assembling the offline busybox test image ==="
 stage_packages "$IMAGE_ROOT" "$BUILD_DIR/image-packages" busybox-static
-python3 "$SCRIPT_DIR/build-support/make-docker-image.py" \
+"$SCRIPT_DIR/build-support/make-docker-image" \
     --busybox "$IMAGE_ROOT/bin/busybox.static" \
     --output "$BUILD_DIR/busybox-rootfs.tar"
 
