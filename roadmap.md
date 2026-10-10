@@ -222,6 +222,9 @@ consistent filesystem; backup restoration preserves content and metadata.
     device](docs/hardware-platform.md#sleep).
   - [x] [The screen dark for a sleep](docs/hardware-platform.md#sleep) where it is
     the boot framebuffer.
+  - [x] [PCI devices put into D3hot for a sleep](docs/hardware-platform.md#pci-power-states)
+    and given their configuration again, where the driver can bring the
+    device back from nothing. Tested with the one card QEMU powers down.
   - [x] [Suspend to RAM on x86-64 (ACPI S3)](docs/hardware-platform.md#suspend-to-ram-x86-64):
     the processors, interrupt controllers, clocks, PCI configuration, IOMMUs
     and the display mode put back, tested in QEMU only and offered only where

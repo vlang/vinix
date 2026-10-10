@@ -169,7 +169,12 @@ hwcheck --rehearse-sleep > report.md
    twenty by the power button. The machine must go off, and come back with
    no filesystem repair.
 6. **Sleep rehearsal.** `hwcheck --rehearse-sleep` reports every device
-   suspended and resumed and none failed; then use every device again.
+   suspended and resumed and none failed, and which PCI functions were put
+   into D3hot and that each came back (`/sys/power/pci_d3`: none refused,
+   none not back); then use every device again. If one does not work,
+   repeat the rehearsal with `vinix.pci_d3=off` on the command line: if it
+   works then, the fault is D3hot's and not its driver's resume. Record
+   which.
 7. **Sleep.** Fifty cycles of each depth the machine offers
    (`/sys/power/mem_sleep`: `s2idle`, and `deep` where it is listed -- where
    it is not, record what `/sys/power/deep_sleep` gives as the reason), by

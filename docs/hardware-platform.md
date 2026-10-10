@@ -392,7 +392,8 @@ unless suspend to RAM has been selected (below):
 2. userspace is frozen (every thread parks at its next return to userspace;
    kernel threads continue);
 3. devices are suspended last to first -- a driver that refuses stops the
-   sleep;
+   sleep -- and PCI functions that can come back from it are put into D3hot
+   (below);
 4. the CPU's protection registers are recorded (CR0, CR4, EFER; SCTLR_EL1,
    TCR_EL1), the screen goes dark, and wake sources start being listened to;
 5. the machine waits for a wake source;
@@ -428,6 +429,53 @@ the whole way down for a suspend to RAM -- processors parked, everything
 read out -- and comes back after the delay without asking firmware. It is the
 way back from a sleep that firmware refused, with nothing having lost power.
 A wake source that reports during it ends it as a failed sleep.
+
+### PCI power states
+
+A driver's suspend makes its device quiet; it is still fully powered. Between
+steps 3 and 4 above, each PCI function that can come back from it is put into
+D3hot, in which it answers in configuration space and nowhere else, and
+before the first driver resumes in step 6 it is brought back to D0 and given
+its configuration space again, as after a loss of power: a function need keep
+nothing across D3hot, and most forget their address registers
+(`kernel/devcore/pci_power.v`, after Linux's `pci_set_power_state()`).
+
+Which functions: those with a power management capability, bound to a driver
+that has both a suspend and a resume (the test that decides whether the
+machine may be suspended to RAM at all), in D0, and not allowed to wake the
+machine -- nothing arms a function to signal from D3. Bridges stay in D0. A
+function that does not take the state is left in D0; one that does not come
+back is not resumed, and is handed to recovery like any device that stopped
+answering. The same is done before a suspend to RAM, where D3hot is what the
+platform expects to find when it cuts the power.
+
+`/sys/bus/pci/devices/<address>/power_state` is the state a function says it
+is in, `power/d3_count` how many sleeps it has spent in D3hot, and
+`/sys/power/pci_d3` what the last sleep and all sleeps did: functions put
+down, functions that refused, functions that did not come back, registers
+found changed and written back. `vinix.pci_d3=off` keeps every function in
+D0.
+
+What is tested, and what is not:
+
+- QEMU's 82574L (`e1000e`) is the one card in these machines with the
+  capability whose state QEMU acts on. While the machine sleeps, the test's
+  controller asks QEMU for its memory map, and the card's registers are not
+  in it; before and after, they are (`pci-d3`, both architectures, for a
+  rehearsal and a suspend to idle, and on x86-64 a suspend to RAM entered
+  from D3hot). With `vinix.pci_d3=off` they stay (`pci-d3-off`).
+- QEMU's NVMe controller has the capability too: `nvme-sleep` takes it
+  through the same three sleeps in D3hot. Its AHCI, IDE and HD Audio
+  controllers and its 82540EM have none and stay in D0.
+- QEMU's card forgets nothing on the way back, so there the writing back
+  finds nothing to do. A kernel built with `-d pci_d3_selftest` clears the
+  card's address and command registers while it is down, which is what a
+  real one does to itself; the card works afterwards only because they were
+  written back (`pci-d3-selftest`).
+- No real device has been through it. Devices that misbehave in D3hot exist
+  -- Linux carries a list -- and there is no list here, only the option.
+  D1, D2 and D3cold (power resources, `_PS3`) are not used, nothing is put
+  down while the machine runs, and no function is armed to wake it (PME).
 
 ### Suspend to RAM (x86-64)
 
@@ -744,6 +792,7 @@ telling ACPI (most laptops), and Apple's sensors and fans (SMC).
 | `vinix.ec=clear` | at start and on resume, query the controller until it names no event, whatever its event bit says (Linux's `EC_FLAGS_CLEAR_ON_RESUME`); untried |
 | `vinix.ec=dsdt-gpe` | where the ECDT and `_GPE` name different events, use `_GPE` (Linux's `EC_FLAGS_TRUST_DSDT_GPE`); untried. The three combine with commas |
 | `vinix.deep_sleep=force\|off` | x86-64: offer suspend to RAM although the kernel cannot bring the display back; never offer it |
+| `vinix.pci_d3=off` | keep every PCI function in D0 through a sleep |
 
 ## What is not done
 
@@ -755,7 +804,8 @@ Beyond the limits stated in each section:
   can let go of a device.
 - USB: no core, no hubs, no hotplug; xHCI drives boot keyboards and pointers
   on AArch64 PCI only.
-- Device power states (D3), runtime power management, wake-on-LAN.
+- Device power states beyond D3hot for a sleep: D1, D2 and D3cold, runtime
+  power management, PME and wake-on-LAN.
 - Behind the embedded controller: a second controller, the SMBus host and
   Smart Batteries, controllers not on I/O ports, events in a block of their
   own. And the controller itself on any real laptop.
@@ -821,6 +871,8 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `pci-hotplug`: a card put into a port the kernel watches and taken out, twice; 100 remove/rescan cycles | pass | pass |
 | `pci-hotplug-acpi`: the same, announced and asked back by firmware | pass | -- |
 | `pci-hotplug-iommu`: the same behind Intel VT-d, the card isolated each time it arrives | pass | -- |
+| `pci-d3`: a card put into D3hot for a rehearsal, a suspend to idle and (x86-64) a suspend to RAM; QEMU asked for its memory map while the machine is down; 40 more sleeps leave the heap flat | pass | pass |
+| `pci-d3-off`: `vinix.pci_d3=off`, the card left in D0 and on the bus | pass | pass |
 | `suspend-deep`: suspend to RAM with 4 CPUs -- two rehearsals, wakes by `system_wakeup`, alarm and key, five more sleeps; every CPU, memory, disk, network, clocks, keyboard, mouse, power button; the screen dark while down and as drawn afterwards | pass | -- |
 | `suspend-deep-xapic`, `suspend-deep-bridge`: the same without x2APIC, and with the card behind a watched hot-plug port | pass | -- |
 | `suspend-deep-iommu`, `suspend-deep-iommu-amd`: the same behind VT-d and AMD-Vi, the unit found off and brought back each time | pass | -- |
@@ -833,6 +885,7 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `acpi-ec-selftest`, `acpi-ec-selftest-dsdt` (kernel built with `-d acpiec_selftest`: a simulated embedded controller) | pass | -- |
 | `suspend-deep-ec` (the same kernel): the controller's driver through two suspends to RAM | pass | -- |
 | `nvme-sleep` (kernel built with `PROD=false`): an NVMe disk through the same three sleeps | pass | -- |
+| `pci-d3-selftest` (kernel built with `-d pci_d3_selftest`): the same card made to forget its address and command registers in D3hot, which are written back | pass | pass |
 
 Host unit tests: `tests/hardware-platform/hwhost` (9 files),
 `tests/power-supply/run`, `sh tests/cpu-power/run.sh`, `sh tests/thermal/run.sh`,
