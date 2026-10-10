@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `0caa1c87e96cfecf06e433ab2a8929ac9afc9808`,
-Linguist 7.27.0 reports **Python 6.41%** (490 files, 2,259,745 bytes) and
-**V 74.31%** (2,377 files, 26,183,859 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `951bf9739af41795392341fe4d61e59d227431f2`,
+Linguist 7.27.0 reports **Python 6.31%** (488 files, 2,249,788 bytes) and
+**V 74.65%** (2,424 files, 26,627,416 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,946,540 Python bytes**. All remaining
-2,259,745 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **2,956,497 Python bytes**. All remaining
+2,249,788 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The nineteen stages below remove **42 Python files / 101,603 original bytes** and
+The 21 stages below remove **44 Python files / 111,560 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -50,6 +50,8 @@ changes remain separate from this per-stage scope and the measured graph.
 | Procfs, IPv6, socket, POSIX timer and process-churn generated-C guards | `tests/generated-source-guards/guardcore`, five V entrypoints | 10,860 / 220 | `03b19974` |
 | Process-churn report checker and callback bridge | `tests/process-churn/churncheck`, `check-results.v` | 5,355 / 170 | `12d47222` |
 | Native header boundary differential runner | `tests/native-boundaries/boundarycheck`, `run.v` | 4,283 / 81 | `0caa1c87` |
+| VMX checker frontend, ELF reader and subprocess leaf | `tests/hypervisor/vmxcheck`, `check-vmx.v` | 5,665 / 118 | `05d938f0` |
+| Limine compatibility patch test and command fixtures | `tests/limine-aarch64/test-patch.v`, `commandfixture` | 4,292 / 108 | `951bf973` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -248,12 +250,51 @@ Between `12d47222` and `0caa1c87`, counted Python declined by exactly 4,283
 bytes, matching this stage. Concurrent V and C changes affect the language
 shares independently.
 
+The following two stages remove two Python files / 9,957 bytes. The VMX command
+now owns the CLI, source/object directory, ELF64 reader and subprocess text
+handling in V. It removes the private phase protocol and embedded Python leaf
+while retaining compiler recipes, allocator guards, instruction/CF/ZF checks,
+operand order and clobber checks. All 7,680 C ABI cases and the ARM no-op fixture
+pass under Clang ASan/UBSan. Optimized x86 controls pass inspection, and every
+entry byte matches the pre-port C at `bf2fdd33^:kernel/c/vmx.c`. A changed entry
+is rejected after the earlier instruction report. Production VMX sources,
+assembly and the independent C fixture are unchanged.
+
+ARM, Rosetta x86 and ARM ASan/UBSan builds pass all four native test files,
+covering malformed/truncated ELF ranges, full-width addresses, Unicode names,
+instruction regressions, compiler search, all 27 standard-descriptor states,
+100 repeated captures, decoding-error precedence, descriptor retirement,
+CLI status/streams and temporary cleanup. Captured tool text now uses native
+strict UTF-8 with universal newlines and native errors; arbitrary Python locale
+codecs and exception classes are retired. The cold launcher checks exact real
+fixture reports from an unrelated working directory and cleanup after a missing
+compiler. Logs are `/tmp/vinix-vmx-{arm,x86,asan}-final.log` and
+`/tmp/vinix-vmx-cold-final.log`. These host checks establish no privileged VMX,
+nested VT-x, new kernel build or QEMU boot.
+
+The Limine test preserves all three original independent patch scenarios:
+fresh patching before build/install, an idempotent rerun with identical source
+bytes, and incompatible-source rejection before build without modifying it.
+The maintained builder and patch are unchanged in isolated copies. Configure,
+make and tool-discovery substitutes are native V, and the actual Git patch
+logic runs. ARM, Rosetta x86 and ARM ASan/UBSan builds pass these scenarios,
+forced configure/make failures, help/status checks and private scratch cleanup.
+The cold launcher also compiles fresh native fixtures from an unrelated working
+directory and cleans up after success or a forced make failure. No source is
+downloaded and no real UEFI loader is compiled or deployed. Logs are
+`/tmp/vinix-limine-{arm,x86,asan}-final.log` and
+`/tmp/vinix-limine-cold-final.log`. No Python was run for either stage.
+
+Between `0caa1c87` and `951bf973`, counted Python declined by exactly 9,957
+bytes, matching these two stages. Concurrent V source changes affect the
+language shares independently.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these nineteen stages.
+or hidden in these 21 stages.
 
 ## Earlier completed stages
 

@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `0caa1c87e96cfecf06e433ab2a8929ac9afc9808`,
+at source commit `951bf9739af41795392341fe4d61e59d227431f2`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,778 | 6.65% |
-| Python | 490 | 2,259,745 | 6.41% |
-| Shell | 362 | 1,343,888 | 3.81% |
+| C | 563 | 2,343,778 | 6.57% |
+| Python | 488 | 2,249,788 | 6.31% |
+| Shell | 365 | 1,345,539 | 3.77% |
 
-All `.v` files are classified as V. The resulting V share is 74.31%, with no
+All `.v` files are classified as V. The resulting V share is 74.65%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,259,745 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,249,788 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 0caa1c87e96cfecf06e433ab2a8929ac9afc9808 --breakdown --json
+github-linguist --rev 951bf9739af41795392341fe4d61e59d227431f2 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -913,7 +913,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/generated-policy-host/vinix_policy_native.py` | 4,635 |
 | `tests/gl-triangle/run-vm.py` | 5,439 |
 | `tests/gl-triangle/run.py` | 2,728 |
-| `tests/hypervisor/check-vmx.py` | 5,665 |
 | `tests/hypervisor/host-test.py` | 3,871 |
 | `tests/hypervisor/run-abi.py` | 1,082 |
 | `tests/hypervisor/run-vm.py` | 1,208 |
@@ -942,7 +941,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/compile-v-hooks.py` | 1,548 |
 | `tests/krandom/run_hooks.py` | 3,876 |
 | `tests/krandom/run_native.py` | 2,478 |
-| `tests/limine-aarch64/test_patch.py` | 4,292 |
 | `tests/linuxkpi/_audit_native.py` | 7,668 |
 | `tests/linuxkpi/_guest_native.py` | 6,611 |
 | `tests/linuxkpi/_host_native.py` | 4,257 |
@@ -1202,11 +1200,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/startx` | 2,994 |
 | `desktop/tools/screenshot.sh` | 2,055 |
 | `desktop/tools/test-activity.sh` | 2,473 |
-| `desktop/tools/test-battery.sh` | 575 |
+| `desktop/tools/test-battery.sh` | 673 |
 | `desktop/tools/test-clipboard.sh` | 1,824 |
 | `desktop/tools/test-execinfo.sh` | 834 |
 | `desktop/tools/test-new-utilities.sh` | 3,734 |
-| `desktop/tools/test-settings.sh` | 4,677 |
+| `desktop/tools/test-settings.sh` | 5,252 |
 | `desktop/tools/test-utilities.sh` | 10,641 |
 | `desktop/tools/test-utility-parity.sh` | 2,891 |
 | `desktop/tools/test-window-experience.sh` | 2,116 |
@@ -1348,6 +1346,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/go/smoke.sh` | 558 |
 | `tests/hardware-platform/run` | 178 |
+| `tests/hypervisor/check-vmx` | 110 |
 | `tests/hypervisor/run.sh` | 124 |
 | `tests/hyprland/smoke.sh` | 413 |
 | `tests/ios/build-2048-model.sh` | 1,128 |
@@ -1370,6 +1369,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-link-layout/check` | 180 |
 | `tests/kernel-resources/run-host.sh` | 1,620 |
 | `tests/krandom/run.sh` | 1,747 |
+| `tests/limine-aarch64/test-patch` | 111 |
 | `tests/linuxkpi/run.sh` | 11,272 |
 | `tests/m1-deploy/run.sh` | 2,686 |
 | `tests/m1-wifi/build.sh` | 2,625 |
@@ -1414,6 +1414,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/paging/run-host.sh` | 178 |
 | `tests/pci-config/run.sh` | 5,477 |
 | `tests/pci-config/topology` | 169 |
+| `tests/pci-hotplug/run` | 757 |
 | `tests/posix-timer/check-generated` | 146 |
 | `tests/power-supply/run` | 748 |
 | `tests/private-pages/run-host.sh` | 16,215 |
