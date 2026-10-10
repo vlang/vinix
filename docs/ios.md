@@ -1616,10 +1616,49 @@ timestamp fixture's successful-`utime` assertion. The third identical full build
 passes. Both failed serial logs and VM hashes are retained; their causes remain
 unestablished.
 
-Three more strong imports resolve. Fortnite still exits with status 1 before
-entry, now at the generic `RawRepresentable.hashValue` getter in EOSSDK,
-`_$sSYsSHRzSH8RawValueSYRpzrlE04hashB0Sivg`. Runtime-wide conformance lookup,
-generic interpolation and application Swift heap support remain incomplete.
+Three more strong imports resolved. That probe exited with status 1 before
+entry at the generic `RawRepresentable.hashValue` getter in EOSSDK,
+`_$sSYsSHRzSH8RawValueSYRpzrlE04hashB0Sivg`.
+
+The getter, generic `_hashValue(for:)` function and three Hashable requirement
+dispatch entries now resolve in V. Generic hashing calls the caller's
+`Self._rawHashValue(seed: 0)` witness; requirement dispatch selects `hashValue`,
+`hash(into:)` or `_rawHashValue(seed:)` from that conformance. The
+[Swift Hashable implementation](https://github.com/swiftlang/swift/blob/swift-6.3-RELEASE/stdlib/public/core/Hashable.swift)
+and installed interfaces establish the zero-seed behavior. Native instructions
+and callback probes establish the argument order and witness slots.
+
+These entries borrow opaque receivers without inspecting or copying them.
+Methods preserve Swift's context register, while the free function temporarily
+sets it to the value address and restores the caller's context after the callback.
+Signed 64-bit seeds/results and the original inout pointer pass through unchanged.
+One V-emitted code page is sealed RX before publication under the runtime lock;
+callbacks hold no lock and quiescent teardown unmaps it. Hashing dispatch does
+not allocate String metadata or provide a hashing algorithm itself.
+
+Native/V ASAN/UBSAN checks exercise all five entries with exact one-byte,
+16-byte and Objective-C-reference receivers, distinct generic tables, separate
+getter/raw-hash callbacks, `INT64_MIN/MAX` seed/result boundaries, guarded inout
+state and unchanged ownership inside callbacks. Eight workers check concurrent
+publication and another eight exercise callbacks. Reentrant callbacks wait for
+a worker that resolves the same runtime symbol and hashes another value.
+Two runtime cycles leave objects, buffers and code mappings empty. Native LLVM
+instruction captures, fixed-version primary sources, installed SDK interfaces,
+generated bodies and guest evidence are retained under `swift-hash-checks`.
+
+All nineteen native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
+regression pass. The initial attempt failed the unchanged timestamp fixture's
+successful-`utime` assertion. An identical retry passed all nineteen checks but
+the stdio directory-enumeration fixture returned 73; the third identical full
+suite passes. Both failed serial logs and VM hashes are retained; causes remain
+unestablished.
+
+Two more strong imports resolve. Fortnite still exits with status 1 before
+entry, now at the `RawRepresentable._rawHashValue(seed:)` default in EOSSDK,
+`_$sSYsSHRzSH8RawValueSYRpzrlE08_rawHashB04seedS2i_tF`. Native instructions for
+that next blocker are captured, but its implementation, Swift Hasher, concrete
+standard-library Hashable conformances, runtime-wide conformance lookup, generic
+interpolation and application Swift heap support remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -1627,11 +1666,11 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,361 | 797 | 81 |
-| EOSSDK | 573 | 89 | 18 |
-| MarketplaceKitWrapper | 69 | 107 | 23 |
-| All images | 2,003 | 993 | 122 |
+| EOSSDK | 574 | 88 | 18 |
+| MarketplaceKitWrapper | 70 | 106 | 23 |
+| All images | 2,005 | 991 | 122 |
 
-The C++/GLES/Text variant reports 2,016 resolved imports, 980 unresolved strong
+The C++/GLES/Text variant reports 2,018 resolved imports, 978 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

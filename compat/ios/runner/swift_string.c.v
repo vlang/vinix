@@ -181,9 +181,11 @@ fn swift_buffers_stop() {
 	unsafe { ios_runtime.swift_buffers.free() }
 	swift_arc_stop()
 	swift_metadata_stop()
+	swift_hash_stop()
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
 		'_$sSSN' { swift_string_metadata() }
