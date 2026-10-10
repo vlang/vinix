@@ -20,9 +20,9 @@ import ui2
 import os
 
 const app_protocol_magic = u32(0x56415050) // VAPP
-const app_protocol_version = u8(10)
-const app_request_header_size = 136
-const app_response_header_size = 128
+const app_protocol_version = u8(11)
+const app_request_header_size = 152
+const app_response_header_size = 144
 const app_protocol_max_payload = 16 * 1024 * 1024
 const app_protocol_max_string = 64 * 1024
 const app_protocol_max_elements = 16 * 1024
@@ -244,6 +244,10 @@ fn wire_put_state(mut out []u8, state AppWireState) {
 	wire_put_u32(mut out, state.settings.keyboard_layouts)
 	wire_put_i32(mut out, int(state.settings.keyboard_layout))
 	wire_put_i32(mut out, int(state.settings.language))
+	wire_put_i32(mut out, state.settings.display_off_minutes)
+	wire_put_i32(mut out, state.settings.sleep_minutes)
+	wire_put_i32(mut out, int(state.settings.lid_action))
+	wire_put_i32(mut out, int(state.settings.power_profile))
 	wire_put_i32(mut out, state.requested_scale)
 	wire_put_u32(mut out, state.capture_request.sequence)
 	wire_put_i32(mut out, int(state.capture_request.command))
@@ -277,6 +281,10 @@ fn wire_take_state_flags(mut reader WireReader, state_flags u8) !AppWireState {
 	keyboard_mask := reader.take_u32()!
 	keyboard_layout := reader.take_i32()!
 	language := reader.take_i32()!
+	display_off_minutes := reader.take_i32()!
+	sleep_minutes := reader.take_i32()!
+	lid_action := reader.take_i32()!
+	power_profile := reader.take_i32()!
 	requested_scale := reader.take_i32()!
 	capture_sequence := reader.take_u32()!
 	capture_command := reader.take_i32()!
@@ -301,6 +309,10 @@ fn wire_take_state_flags(mut reader WireReader, state_flags u8) !AppWireState {
 		|| keyboard_layout < int(KeyboardLayout.us) || keyboard_layout > int(KeyboardLayout.portuguese)
 		|| !keyboard_settings_valid(keyboard_mask, unsafe { KeyboardLayout(keyboard_layout) })
 		|| language < 0 || language >= desktop_languages.len
+		|| !idle_timeouts_valid(display_off_minutes, sleep_minutes)
+		|| lid_action < int(LidAction.suspend) || lid_action > int(LidAction.ignore)
+		|| power_profile < int(PowerProfile.automatic)
+		|| power_profile > int(PowerProfile.power_saver)
 		|| !desktop_scale_valid(requested_scale)
 		|| capture_command < int(CaptureCommand.none_)
 		|| capture_command > int(CaptureCommand.stop) || capture_delay < 0
@@ -325,6 +337,10 @@ fn wire_take_state_flags(mut reader WireReader, state_flags u8) !AppWireState {
 			wallpaper_image:    wallpaper_image
 			keyboard_layouts:   keyboard_mask
 			keyboard_layout:    unsafe { KeyboardLayout(keyboard_layout) }
+			display_off_minutes: display_off_minutes
+			sleep_minutes:       sleep_minutes
+			lid_action:          unsafe { LidAction(lid_action) }
+			power_profile:       unsafe { PowerProfile(power_profile) }
 		}
 		requested_scale: requested_scale
 		capture_request: CaptureRequest{
