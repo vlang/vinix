@@ -83,6 +83,24 @@ pub fn destroy(handle voidptr) bool {
 // TIMEOUT=18, DENIED=20. A timeout of zero never allocates or schedules.
 @[export: 'vinix_acpi_sync_wait']
 pub fn wait(handle voidptr, timeout u16) int {
+	return wait_for(handle, timeout, true)
+}
+
+// wait() for uACPI's own mutexes. A thread that waits without limit for a
+// mutex it is recorded as holding is refused by wait(), since it would wait
+// for itself. For uACPI the record is not who holds the mutex: its
+// reader-writer lock has the first reader take the writers' mutex for all
+// readers, so that reader, done reading while another still reads, is still
+// on record when it comes back to write. It has to wait for the other
+// reader like anybody else; refused, the method it was about to run failed
+// with nothing wrong. uACPI keeps its own account of the mutexes that may be
+// taken twice by one thread.
+@[export: 'vinix_acpi_sync_acquire']
+pub fn acquire(handle voidptr, timeout u16) int {
+	return wait_for(handle, timeout, false)
+}
+
+fn wait_for(handle voidptr, timeout u16, refuse_holder bool) int {
 	if handle == unsafe { nil } {
 		return 7
 	}
@@ -101,7 +119,7 @@ pub fn wait(handle voidptr, timeout u16) int {
 		gate.lock.release()
 		return 18
 	}
-	if gate.mutex && gate.owner == identity && timeout == 0xffff {
+	if refuse_holder && gate.mutex && gate.owner == identity && timeout == 0xffff {
 		gate.lock.release()
 		return 20
 	}
