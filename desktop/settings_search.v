@@ -140,6 +140,38 @@ const settings_search_entries = [
 		'',
 		'',
 	]!},
+	SettingsSearchEntry{.power, 'settings.power.display_off', [
+		'settings.power.idle_note',
+		'settings.power.video_note',
+		'settings.power.never',
+		'',
+		'',
+		'',
+	]!},
+	SettingsSearchEntry{.power, 'settings.power.sleep', [
+		'settings.power.idle_note',
+		'settings.power.never',
+		'',
+		'',
+		'',
+		'',
+	]!},
+	SettingsSearchEntry{.power, 'settings.power.lid', [
+		'settings.power.lid.sleep',
+		'settings.power.lid.nothing',
+		'',
+		'',
+		'',
+		'',
+	]!},
+	SettingsSearchEntry{.power, 'settings.power.performance', [
+		'settings.power.profile.automatic',
+		'settings.power.profile.balanced',
+		'settings.power.profile.power_saver',
+		'settings.power.profile_note',
+		'',
+		'',
+	]!},
 	SettingsSearchEntry{.keyboard, 'settings.keyboard.sources', [
 		'settings.keyboard.sources_note',
 		'settings.keyboard.menu_hint',
@@ -232,7 +264,7 @@ const settings_search_entries = [
 
 const settings_category_actions = ['settings.category.0', 'settings.category.1', 'settings.category.2',
 	'settings.category.3', 'settings.category.4', 'settings.category.5', 'settings.category.6',
-	'settings.category.7', 'settings.category.8', 'settings.category.9']!
+	'settings.category.7', 'settings.category.8', 'settings.category.9', 'settings.category.10']!
 const settings_search_actions = ['settings.search.result.0', 'settings.search.result.1',
 	'settings.search.result.2', 'settings.search.result.3', 'settings.search.result.4',
 	'settings.search.result.5', 'settings.search.result.6', 'settings.search.result.7',
@@ -307,6 +339,11 @@ fn (mut a SettingsApp) choose_category(category SettingsCategory) {
 	match category {
 		.about { a.about.refresh() }
 		.battery { a.battery_read(true) }
+		.power {
+			a.power_result = .ok
+			a.power_profile_refused = false
+			a.refresh_power()
+		}
 		.wifi {
 			a.wifi_action_result = .ok
 			a.refresh_wifi()

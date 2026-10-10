@@ -227,7 +227,7 @@ fn test_settings_search_escape_expires_and_clear_or_category_returns_to_controls
 	assert app.search.len == 0
 	app.key_input('\x06')
 	app.paste_input('theme')
-	app.handle('settings.category.8')!
+	app.handle('settings.category.9')!
 	assert app.category == .keyboard && app.search.len == 0
 	app.handle('settings.category.invalid')!
 	app.handle('settings.category.99')!

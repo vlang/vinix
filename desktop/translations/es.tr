@@ -4699,3 +4699,60 @@ Reiniciar
 power.sleep_failed
 El equipo no pudo entrar en reposo.
 -----
+settings.category.power
+Energía
+-----
+settings.power.display_off
+Apagar la pantalla tras
+-----
+settings.power.sleep
+Suspender el equipo tras
+-----
+settings.power.never
+Nunca
+-----
+settings.power.minutes
+{0} min
+-----
+settings.power.idle_note
+Se cuenta desde la última pulsación o movimiento del puntero.
+-----
+settings.power.video_note
+Reproducir vídeo todavía no mantiene la pantalla encendida.
+-----
+settings.power.no_sleep
+Este equipo no puede suspenderse; este ajuste no se usa.
+-----
+settings.power.lid
+Al cerrar la tapa
+-----
+settings.power.lid.sleep
+Suspender
+-----
+settings.power.lid.nothing
+No hacer nada
+-----
+settings.power.performance
+Rendimiento
+-----
+settings.power.profile.automatic
+Automático
+-----
+settings.power.profile.performance
+Rendimiento
+-----
+settings.power.profile.balanced
+Equilibrado
+-----
+settings.power.profile.power_saver
+Ahorro
+-----
+settings.power.profile_note
+Automático: equilibrado con cargador, ahorro con batería.
+-----
+settings.power.profile_refused
+Este equipo no controla la frecuencia de la CPU; el perfil no se puede cambiar.
+-----
+settings.power.write_failed
+El núcleo rechazó el cambio.
+-----

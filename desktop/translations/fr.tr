@@ -4698,3 +4698,60 @@ Redémarrer
 power.sleep_failed
 L'ordinateur n'a pas pu se mettre en veille.
 -----
+settings.category.power
+Énergie
+-----
+settings.power.display_off
+Éteindre l'écran après
+-----
+settings.power.sleep
+Mettre en veille après
+-----
+settings.power.never
+Jamais
+-----
+settings.power.minutes
+{0} min
+-----
+settings.power.idle_note
+Compté depuis la dernière frappe ou le dernier mouvement du pointeur.
+-----
+settings.power.video_note
+La lecture vidéo ne maintient pas encore l'écran allumé.
+-----
+settings.power.no_sleep
+Cet ordinateur ne peut pas se mettre en veille ; réglage inutilisé.
+-----
+settings.power.lid
+À la fermeture du capot
+-----
+settings.power.lid.sleep
+Veille
+-----
+settings.power.lid.nothing
+Ne rien faire
+-----
+settings.power.performance
+Performances
+-----
+settings.power.profile.automatic
+Automatique
+-----
+settings.power.profile.performance
+Performances
+-----
+settings.power.profile.balanced
+Équilibré
+-----
+settings.power.profile.power_saver
+Économie
+-----
+settings.power.profile_note
+Automatique : équilibré sur secteur, économie sur batterie.
+-----
+settings.power.profile_refused
+Cette machine ne règle pas la fréquence du processeur ; profil non modifiable.
+-----
+settings.power.write_failed
+Le noyau a refusé la modification.
+-----

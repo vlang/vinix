@@ -4699,3 +4699,60 @@ Restart
 power.sleep_failed
 This computer could not go to sleep.
 -----
+settings.category.power
+Power
+-----
+settings.power.display_off
+Turn display off after
+-----
+settings.power.sleep
+Sleep after
+-----
+settings.power.never
+Never
+-----
+settings.power.minutes
+{0} min
+-----
+settings.power.idle_note
+Counted from the last key press or pointer movement.
+-----
+settings.power.video_note
+Playing video does not keep the display on yet.
+-----
+settings.power.no_sleep
+This computer cannot sleep, so this is not used.
+-----
+settings.power.lid
+When the lid is closed
+-----
+settings.power.lid.sleep
+Sleep
+-----
+settings.power.lid.nothing
+Do nothing
+-----
+settings.power.performance
+Performance
+-----
+settings.power.profile.automatic
+Automatic
+-----
+settings.power.profile.performance
+Performance
+-----
+settings.power.profile.balanced
+Balanced
+-----
+settings.power.profile.power_saver
+Power saver
+-----
+settings.power.profile_note
+Automatic: balanced on the charger, power saver on battery.
+-----
+settings.power.profile_refused
+This machine has no CPU frequency control, so the profile cannot be changed.
+-----
+settings.power.write_failed
+The kernel refused the change.
+-----

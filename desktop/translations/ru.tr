@@ -4699,3 +4699,60 @@ start.restart
 power.sleep_failed
 Компьютер не смог перейти в режим сна.
 -----
+settings.category.power
+Питание
+-----
+settings.power.display_off
+Выключать дисплей через
+-----
+settings.power.sleep
+Переходить в режим сна через
+-----
+settings.power.never
+Никогда
+-----
+settings.power.minutes
+{0} мин
+-----
+settings.power.idle_note
+Отсчёт идёт от последнего нажатия клавиши или движения указателя.
+-----
+settings.power.video_note
+Воспроизведение видео пока не удерживает дисплей включённым.
+-----
+settings.power.no_sleep
+Этот компьютер не поддерживает режим сна, настройка не используется.
+-----
+settings.power.lid
+При закрытии крышки
+-----
+settings.power.lid.sleep
+Сон
+-----
+settings.power.lid.nothing
+Ничего не делать
+-----
+settings.power.performance
+Производительность
+-----
+settings.power.profile.automatic
+Авто
+-----
+settings.power.profile.performance
+Быстродействие
+-----
+settings.power.profile.balanced
+Баланс
+-----
+settings.power.profile.power_saver
+Экономия
+-----
+settings.power.profile_note
+Авто: баланс от сети, экономия от аккумулятора.
+-----
+settings.power.profile_refused
+Частотой процессора здесь управлять нельзя, поэтому профиль не меняется.
+-----
+settings.power.write_failed
+Ядро отклонило изменение.
+-----

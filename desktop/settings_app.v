@@ -24,12 +24,13 @@ enum SettingsCategory {
 	wifi
 	display
 	battery
+	power
 	keyboard
 	about
 }
 
 const settings_categories = [SettingsCategory.appearance, .date_time, .language, .theme, .wallpaper,
-	.wifi, .display, .battery, .keyboard, .about]
+	.wifi, .display, .battery, .power, .keyboard, .about]
 
 fn (c SettingsCategory) title() string {
 	return match c {
@@ -41,6 +42,7 @@ fn (c SettingsCategory) title() string {
 		.wifi { tr('settings.category.wifi') }
 		.display { tr('settings.category.display') }
 		.battery { tr('settings.category.battery') }
+		.power { tr('settings.category.power') }
 		.keyboard { tr('settings.category.keyboard') }
 		.about { tr('settings.category.about') }
 	}
@@ -63,6 +65,9 @@ const settings_language_actions = ['settings.language.0', 'settings.language.1',
 const settings_sidebar_width = 132
 const settings_padding = 16
 const settings_row_gap = 8
+// From one category to the next in the sidebar. Eleven of them end just
+// inside the window Settings opens at.
+const settings_category_pitch = 29
 
 struct SettingsApp {
 mut:
@@ -98,6 +103,18 @@ mut:
 	wifi_names         [32]string
 	wifi_details       [32]string
 	wifi_offset        int
+	// Power shows what the kernel's power files say beside the desktop's own
+	// timeouts. `power_result` is how the last write to the kernel went.
+	power              PowerControls
+	power_result       PowerResult
+	// The kernel refused a profile although the file's mode had let it be
+	// tried. The control stays off until the page is opened again.
+	power_profile_refused bool
+	power_last_poll_ms u64
+	power_initialized  bool
+	power_read         fn (mut PowerControls) = read_power_controls
+	power_set_lid      fn (LidAction) PowerResult = set_lid_action
+	power_set_profile  fn (PowerProfile) PowerResult = set_power_profile
 	// Owned, cached labels. Replaced only when a readback changes, never per
 	// frame: the framebuffer renderer frees child arrays, not strings.
 	level_text     string
@@ -111,7 +128,7 @@ mut:
 	// Only the bounded query owns storage; result indices and input fragments
 	// are inline. Frame labels borrow the query and translation table.
 	search []u8
-	search_results [27]int
+	search_results [31]int
 	search_count int
 	search_selected int
 	search_page int
@@ -166,6 +183,15 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 			a.refresh_wifi()
 		}
 	}
+	// Power rereads the kernel's files on the same cadence, so a lid action
+	// or profile changed from a shell shows here too.
+	if !a.searching() && a.category == .power {
+		now := desktop_monotonic_ms()
+		if !a.power_initialized || (now != ~u64(0) && (now < a.power_last_poll_ms
+			|| now - a.power_last_poll_ms >= 1000)) {
+			a.refresh_power()
+		}
+	}
 	if !a.searching() && a.category == .about && !a.about.initialized { a.about.refresh() }
 	content := if a.searching() { a.search_pane(pane_width, height) } else { a.pane(pane_width, height) }
 
@@ -179,8 +205,9 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 }
 
 // Display and Battery report a device and change nothing here, so they draw
-// without a desktop behind them. The remaining panes are desktop preferences
-// and have nothing to show without one.
+// without a desktop behind them, and Power shows the kernel's side of itself
+// the same way. The remaining panes are desktop preferences and have nothing
+// to show without one.
 fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 	match a.category {
 		.about { return a.about.pane(width) }
@@ -192,6 +219,9 @@ fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
 		}
 		.battery {
 			return a.battery_pane(width, height)
+		}
+		.power {
+			return a.power_pane(width)
 		}
 		else {}
 	}
@@ -214,7 +244,7 @@ fn (a &SettingsApp) category_rows() []ui2.Element {
 	rows << a.search_field()
 	for index, category in settings_categories {
 		selected := category == a.category
-		y := 56 + index * 30
+		y := 56 + index * settings_category_pitch
 		mut label := frame_elements(1)
 		label << ui2.label('', category.title(), ui2.rect(18, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
 			color: if selected { body_heading } else { body_text }
@@ -481,6 +511,10 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 	}
 	if a.category == .display || a.category == .battery {
 		a.handle_device(event_id)
+		return
+	}
+	if a.category == .power {
+		a.handle_power(event_id)
 		return
 	}
 	// Everything below writes a preference, which needs a desktop to write to.
