@@ -525,6 +525,44 @@ pub const scenarios = [
 		ending:   .poweroff
 	},
 	Scenario{
+		name:     'apple-smc-selftest'
+		about:    'a simulated Apple SMC: battery, charger, sensors, a fan, the charge limit, a sleep, and giving up'
+		arches:   ['aarch64']
+		define:   'applesmc_selftest'
+		timeout:  240
+		required: ['HWTEST START apple-smc-selftest', 'HWTEST PASS apple-smc-selftest',
+			'apple-smc: self-test kernel: the SMC is simulated', 'apple-smc: battery service stopped']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'apple-smc-selftest-bare'
+		about:    'the same SMC with no fan and no charge limit: neither has files'
+		arches:   ['aarch64']
+		define:   'applesmc_selftest'
+		cmdline:  'vinix.apple_smc_sim=bare'
+		required: ['HWTEST START apple-smc-selftest-bare', 'HWTEST PASS apple-smc-selftest-bare']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'apple-smc-selftest-options'
+		about:    'vinix.apple_smc=nosensors,nolimit: the battery and charger alone'
+		arches:   ['aarch64']
+		define:   'applesmc_selftest'
+		cmdline:  'vinix.apple_smc=nosensors,nolimit'
+		required: ['HWTEST START apple-smc-selftest-options', 'HWTEST PASS apple-smc-selftest-options']
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'apple-smc-selftest-legacy'
+		about:    'vinix.apple_smc=legacy: /dev/battery and /dev/battery-power and nothing else'
+		arches:   ['aarch64']
+		define:   'applesmc_selftest'
+		cmdline:  'vinix.apple_smc=legacy'
+		required: ['HWTEST START apple-smc-selftest-legacy', 'HWTEST PASS apple-smc-selftest-legacy',
+			'left out by vinix.apple_smc=legacy']
+		ending:   .poweroff
+	},
+	Scenario{
 		name:         'restart'
 		about:        'reboot(2) resets the machine, devices stopped first'
 		arches:       ['aarch64', 'x86_64']
