@@ -18,6 +18,48 @@ PREFIX = "opt/vinix-android-aarch64"
 RECEIPT = "usr/share/vinix/roblox/runtime-manifest.json"
 COMMANDS = ("run-roblox", "run-roblox-client")
 
+import builtins as _intrinsics
+import sys as _sys
+import importlib.util as _loader
+
+_LITERAL_CACHE = {}
+_SLOT_KEYS = {name: _sys.intern(name) for name in ('join', 'is_file', 'is_symlink', 'is_dir', 'access', 'X_OK', 'read_manifest', 'read_bionic_manifest', 'read_atl_manifest', 'validate_atl_art_pair', 'loads', 'read_text', 'get', 'strip', '_elf', 'rglob', 'add', 'relative_to', 'as_posix', 'items', 'S_ISREG', 'stat', 'st_mode', 'resolve', 'parents', 'mkdir', 'copy2', 'chmod', 'parent', 'write_text', 'dumps', 'exists', 'rename')}
+_ATTRIBUTE, _TRUTH, _ITER = _intrinsics.getattr, _intrinsics.bool, _intrinsics.iter
+_namespace = _intrinsics.globals
+_frame = _sys._getframe
+_spec = _loader.spec_from_file_location('roblox_staging_binding', SUPPORT / '_native.py')
+_library = _loader.module_from_spec(_spec)
+_spec.loader.exec_module(_library)
+
+
+def _native(operation, state):
+    try:
+        return _library.call(operation, _namespace(), _frame(1).f_builtins, state)
+    finally:
+        state = None
+
+
+def _tuple(*values):
+    return (*values,)
+
+
+def _singleton(value):
+    return {value}
+
+
+def _FORMAT(value):
+    try:
+        return f"{value}"
+    finally:
+        value = None
+
+
+def _raise_actual(error):
+    try:
+        raise error
+    finally:
+        error = None
+
 
 def digest(path: Path) -> str:
     result = hashlib.sha256()
@@ -47,109 +89,76 @@ def musl_tools():
 
 def provenance(android_stage: Path) -> dict:
     """Require the same verified native Android layer used by other APKs."""
-    android_stage = Path(android_stage)
-    runtime = android_stage / PREFIX
-    android_launcher = android_stage / "usr/bin/run-android"
-    if not android_launcher.is_file() or not os.access(android_launcher, os.X_OK):
-        raise RuntimeError("Build the native Android runtime with ./scripts/build-android-aarch64.sh first")
-    if digest(android_launcher) != digest(ROOT / "build-support/android/run-android"):
-        raise RuntimeError("Android runtime has a stale launcher; rebuild the Android layer")
-    art = art_tools()
-    art_manifest = art.read_manifest(runtime)
-    bionic_manifest = art.read_bionic_manifest(runtime)
-    atl_manifest = art.read_atl_manifest(runtime)
-    musl_manifest = musl_tools().read_manifest(runtime)
-    art.validate_atl_art_pair(art_manifest, atl_manifest)
-    receipt = runtime / "runtime-manifest.json"
-    manifest = json.loads(receipt.read_text())
-    if (not isinstance(manifest, dict) or manifest.get("architecture") != "aarch64"
-            or manifest.get("execution") != "native" or manifest.get("page_size") != 16384
-            or manifest.get("runtime_prefix") != "/" + PREFIX
-            or (runtime / "architecture").read_text().strip() != "aarch64"
-            or manifest.get("art") != art_manifest or not art_manifest.get("bootclasspath")
-            or manifest.get("bionic") != bionic_manifest or manifest.get("atl") != atl_manifest
-            or manifest.get("musl") != musl_manifest):
-        raise RuntimeError("Roblox requires the verified native ARM64 Android runtime")
-    compatibility = runtime / "usr/lib/libvinix-android-compat.so"
-    if not compatibility.is_file():
-        raise RuntimeError("Android runtime is missing its native compatibility library")
-    art._elf(runtime / "lib/ld-musl-aarch64.so.1", required=True)
-    art._elf(compatibility, required=True)
-    return {
-        "format": 1, "architecture": "aarch64", "execution": "native", "page_size": 16384,
-        "runtime": "Android Translation Layer / ART", "runtime_prefix": "/" + PREFIX,
-        "android_runtime_manifest_sha256": digest(receipt),
-        "android_launcher_sha256": digest(android_launcher),
-        "android_compatibility_sha256": digest(compatibility),
-        "android_libc_sha256": musl_manifest["libc_so_sha256"],
-        "art_source_commit": art_manifest["source_commit"],
-        "art_patch_sha256": art_manifest["patch_sha256"],
-        "bionic_source_commit": bionic_manifest["source_commit"],
-        "bionic_patch_sha256": bionic_manifest["patch_sha256"],
-        "atl_source_commit": atl_manifest["source_commit"],
-        "atl_builder_sha256": atl_manifest["builder_sha256"],
-        "files": {"usr/bin/" + name: digest(SUPPORT / name) for name in COMMANDS},
-        "apk_bundled": False,
-    }
+    _state = {'android_stage': android_stage}
+    android_stage = None
+    try:
+        return _native('provenance', _state)
+    finally:
+        _state = None
 
 
 def validate_stage(stage: Path, android_stage: Path) -> dict:
     """Check the launcher layer against current sources and its shared runtime."""
-    stage = Path(stage)
-    if stage.is_symlink() or not stage.is_dir():
-        raise RuntimeError(f"Roblox staging must be a directory: {stage}")
-    expected = provenance(android_stage)
-    required = set(expected["files"]) | {RECEIPT}
-    actual = set()
-    for path in stage.rglob("*"):
-        if path.is_symlink():
-            raise RuntimeError(f"Roblox staging contains a symlink: {path}")
-        if path.is_file():
-            actual.add(path.relative_to(stage).as_posix())
-    if actual != required:
-        raise RuntimeError("Roblox staging must contain only its native APK launchers and manifest")
+    _state = {'stage': stage, 'android_stage': android_stage}
+    stage = android_stage = None
     try:
-        manifest = json.loads((stage / RECEIPT).read_text())
-    except (OSError, ValueError, UnicodeError) as error:
-        raise RuntimeError("Roblox staging has an invalid manifest") from error
-    if manifest != expected:
-        raise RuntimeError("Roblox staging does not match its native Android runtime; rebuild the Roblox layer")
-    for name, checksum in expected["files"].items():
-        path = stage / name
-        if not stat.S_ISREG(path.stat().st_mode) or not os.access(path, os.X_OK) or digest(path) != checksum:
-            raise RuntimeError(f"Roblox launcher is stale or not executable: {path}")
-    return manifest
+        return _native('validate_stage', _state)
+    finally:
+        _state = None
 
 
 def stage_launchers(build: Path, android_stage: Path) -> Path:
-    manifest = provenance(android_stage)
-    build, android_stage = Path(build).resolve(), Path(android_stage).resolve()
-    staging = build / "staging"
-    if staging == android_stage or staging in android_stage.parents or android_stage in staging.parents:
-        raise RuntimeError("Roblox launcher staging must be separate from the shared Android runtime")
-    build.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="roblox-stage-", dir=build) as directory:
-        output = Path(directory) / "staging"
-        commands = output / "usr/bin"
-        commands.mkdir(parents=True)
-        for name in COMMANDS:
-            shutil.copy2(SUPPORT / name, commands / name)
-            (commands / name).chmod(0o755)
-        receipt = output / RECEIPT
-        receipt.parent.mkdir(parents=True)
-        receipt.write_text(json.dumps(manifest, indent=2) + "\n")
-        # Recheck payloads and source provenance before replacing an old stage.
-        validate_stage(output, android_stage)
-        previous = Path(directory) / "previous"
-        if staging.exists() or staging.is_symlink():
-            staging.rename(previous)
+    _state = {'build': build, 'android_stage': android_stage}
+    build = android_stage = None
+    try:
+        return _native('stage_launchers', _state)
+    finally:
+        _state = None
+
+
+def _launcher_files():
+    return {"usr/bin/" + name: digest(SUPPORT / name) for name in COMMANDS}
+
+
+def _dict(*pairs):
+    return {key: value for key, value in pairs}
+
+
+
+
+def _read_receipt(stage):
+    try:
+        try:
+            return json.loads((stage / RECEIPT).read_text())
+        except (OSError, ValueError, UnicodeError) as error:
+            raise RuntimeError("Roblox staging has an invalid manifest") from error
+    finally:
+        stage = None
+
+
+def _stage_directory(_state):
+    try:
+        with tempfile.TemporaryDirectory(prefix="roblox-stage-", dir=_state['build']) as directory:
+            _state['directory'] = directory
+            _native('stage_directory', _state)
+        return _state['staging']
+    finally:
+        directory = _state = None
+
+
+def _publish(_state):
+    output = _state['output']
+    staging = _state['staging']
+    previous = _state['previous']
+    try:
         try:
             output.replace(staging)
         except BaseException:
             if previous.exists() or previous.is_symlink():
                 previous.rename(staging)
             raise
-    return staging
+    finally:
+        output = staging = previous = _state = None
 
 
 def main() -> int:
