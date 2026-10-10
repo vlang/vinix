@@ -3,8 +3,8 @@
 Build both architectures in isolated worktrees and run:
 
 ```sh
-V=/path/to/v python3 tests/scheduler-qos/policy.py
-V=/path/to/v python3 tests/scheduler-preemption/policy.py
+V=/path/to/v tests/scheduler-qos/policy
+V=/path/to/v tests/scheduler-preemption/policy
 V=/path/to/v tests/kernel-resources/run-host.sh
 python3 tests/scheduler-qos/run.py --arch aarch64 --kernel-dir /path/to/arm/kernel
 python3 tests/scheduler-qos/run.py --arch x86_64 --kernel-dir /path/to/x86/kernel

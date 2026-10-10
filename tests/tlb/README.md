@@ -31,7 +31,7 @@ python3 tests/tlb/run.py --arch x86_64 --kernel-dir /work/x86/kernel \
   --cpu max,pcid=off,invpcid=off --state-dir /tmp/tlb-fallback --timeout 1200
 python3 tests/tlb/run.py --arch x86_64 --kernel-dir /work/x86/kernel \
   --cpu max,la57=off,pcid=off,invpcid=off --state-dir /tmp/tlb-la48 --timeout 1200
-V=/Users/alex/code/v/v python3 tests/tlb/policy.py
+V=/Users/alex/code/v/v tests/tlb/policy
 ```
 
 The disposable native guest uses four CPUs, a static musl fixture and 4096 MiB
@@ -71,7 +71,7 @@ and acknowledgment storage is static; no test actor Thread is allocated.
 Require `VMM: SMP large-page split, remap, neighbor survival and teardown PASS`
 in the transcript of an x86 self-test build.
 
-`policy.py` extracts production functions, replacing hardware and allocator
+`policy` extracts production functions, replacing hardware and allocator
 ports with host adapters. It verifies all 4095 exclusive PCIDs, ownership until
 remote acknowledgment, inactive-tag invalidation, fallback switching, PAT
 conversion, MTRR and firmware-entry rejection, exact child remap/protection,

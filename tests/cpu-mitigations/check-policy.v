@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-import encoding.hex
 import fixturehost
 import hosttest
 import os
+import policyhost
 
 #include <fcntl.h>
 #include <unistd.h>
+
 fn C.fcntl(i32, i32, ...i32) i32
 fn C.open(&char, i32, ...i32) i32
 fn C.dup2(i32, i32) i32
@@ -125,85 +126,102 @@ int main(void) {
 '
 
 struct Config {
- text_encoding string
- root string
- work string
- caller string
- environment map[string]string
+	root        string
+	work        string
+	caller      string
+	environment map[string]string
 }
+
 fn append_path(parent string, name string) string { return parent.trim_right('/') + '/' + name }
+
 fn (c Config) path(name string) string { return append_path(c.root, name) }
+
 fn (c Config) output(name string) string { return append_path(c.work, name) }
+
 fn (c Config) inherited(argv []string, environment map[string]string) ! {
- fixturehost.inherited_command_environment_preferred(argv, environment, c.caller)!
+	fixturehost.inherited_command_environment_preferred(argv, environment, c.caller)!
 }
+
 fn (c Config) capture(argv []string) !string {
- // Reserve a closed stdout while the unchanged single-stream capture owns
- // its pipes. This leaves caller stdin and inherited command slots intact.
- closed := C.fcntl(1, C.F_GETFD) < 0
- if closed {
-  descriptor := C.open(c'/dev/null', C.O_WRONLY)
-  if descriptor < 0 { return error('Unable to reserve closed stdout') }
-  if descriptor != 1 {
-   if C.dup2(descriptor, 1) < 0 { C.close(descriptor); return error('Unable to reserve closed stdout') }
-   C.close(descriptor)
-  }
-  if C.fcntl(1, C.F_SETFD, C.FD_CLOEXEC) != 0 { C.close(1); return error('Unable to protect stdout reservation') }
- }
- defer { if closed { C.close(1) } }
- return fixturehost.capture_in_preferred(argv, '', c.environment, false, '', false, c.caller)!
+	// Reserve a closed stdout while the unchanged single-stream capture owns
+	// its pipes. This leaves caller stdin and inherited command slots intact.
+	closed := C.fcntl(1, C.F_GETFD) < 0
+	if closed {
+		descriptor := C.open(c'/dev/null', C.O_WRONLY)
+		if descriptor < 0 { return error('Unable to reserve closed stdout') }
+		if descriptor != 1 {
+			if C.dup2(descriptor, 1) < 0 {
+				C.close(descriptor)
+				return error('Unable to reserve closed stdout')
+			}
+			C.close(descriptor)
+		}
+		if C.fcntl(1, C.F_SETFD, C.FD_CLOEXEC) != 0 {
+			C.close(1)
+			return error('Unable to protect stdout reservation')
+		}
+	}
+	defer { if closed { C.close(1) } }
+	return fixturehost.capture_in_preferred(argv, '', c.environment, false, '', false, c.caller)!
 }
+
 fn imports_forbidden(text string) bool {
- mut word := ''
- for ch in (text + ' ').runes() {
-  if hosttest.module_word_rune(ch) { word += ch.str(); continue }
-  name := if word.starts_with('_') { word[1..] } else { word }
-  if name in ['malloc','calloc','realloc','free','memdup'] || name.starts_with('new_array') { return true }
-  word = ''
- }
- return false
+	mut word := ''
+	for ch in (text + ' ').runes() {
+		if hosttest.module_word_rune(ch) {
+			word += ch.str()
+			continue
+		}
+		name := if word.starts_with('_') { word[1..] } else { word }
+		if name in ['malloc', 'calloc', 'realloc', 'free', 'memdup'] || name.starts_with('new_array') {
+			return true
+		}
+		word = ''
+	}
+	return false
 }
+
 fn (c Config) execute() ! {
- fixturehost.write(c.output('v.mod'), "Module { name: 'vinix_cpu_policy_tests' }\n")!
- source := c.path('kernel/x86/cpu/initialisation')
- hosttest.module_copy_tree(append_path(source, 'mitigations_amd64.v'), c.output('policy.v'))!
- hosttest.module_copy_tree(append_path(source, 'mitigation_ports_amd64.v'), c.output('ports.v'))!
- compiler := c.capture(['sh','-c','. "$1/build-support/find-v.sh"; printf "%s" "$V"','find-v',c.root])!
- mut environment := c.environment.clone()
- environment['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
- c.inherited([compiler,'-shared','-no-builtin','-os','vinix','-target-libc-headers','-nofloat','-gc','none','-manualfree','-d','mitigation_test','-o',c.output('policy.c'),c.work], environment)!
- cc := hosttest.env_default('CC','clang')
- fixturehost.write(c.output('host_ports.h'), '#include <stddef.h>\nint kprintf(const char *, ...);\nvoid *vinix_mitigation_test_calloc(size_t, size_t);\n')!
- common := [cc,'-std=gnu11','-O1','-g','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-fno-omit-frame-pointer','-iquote',c.path('kernel/c')]
- c.inherited([...common, '-I',c.path('kernel/c'),'-Wno-unused-function','-ffreestanding','-fno-builtin','-Dcalloc=vinix_mitigation_test_calloc','-fno-strict-aliasing','-include',c.output('host_ports.h'),'-c',c.output('policy.c'),'-o',c.output('policy.o')], c.environment)!
- // Decode nm with the actual invoking Python codec and newline policy.
- // This mechanical text/process leaf receives zero migration credit.
- decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
- wire := c.capture(['python3','-c',decode,c.text_encoding,'nm','-u',c.output('policy.o')])!
- imports := hosttest.decode_json(wire)!.str()
- if imports_forbidden(imports) { return error('unexpected allocator import in CPU policy:\n' + imports) }
- fixturehost.write(c.output('test.c'), '#include "x86_mitigations.h"\n' + adapters + tests)!
- c.inherited([...common, c.output('test.c'),c.output('policy.o'),'-o',c.output('test')], c.environment)!
- c.inherited([c.output('test')], c.environment)!
+	fixturehost.write(c.output('v.mod'), "Module { name: 'vinix_cpu_policy_tests' }\n")!
+	source := c.path('kernel/x86/cpu/initialisation')
+	hosttest.module_copy_tree(append_path(source, 'mitigations_amd64.v'), c.output('policy.v'))!
+	hosttest.module_copy_tree(append_path(source, 'mitigation_ports_amd64.v'), c.output('ports.v'))!
+	compiler := c.capture(['sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"', 'find-v',
+		c.root])!
+	mut environment := c.environment.clone()
+	environment['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
+	c.inherited([compiler, '-shared', '-no-builtin', '-os', 'vinix', '-target-libc-headers', '-nofloat',
+		'-gc', 'none', '-manualfree', '-d', 'mitigation_test', '-o', c.output('policy.c'), c.work], environment)!
+	cc := hosttest.env_default('CC', 'clang')
+	fixturehost.write(c.output('host_ports.h'), '#include <stddef.h>\nint kprintf(const char *, ...);\nvoid *vinix_mitigation_test_calloc(size_t, size_t);\n')!
+	common := [cc, '-std=gnu11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
+		'-fsanitize=address,undefined', '-fno-omit-frame-pointer', '-iquote', c.path('kernel/c')]
+	c.inherited([...common, '-I', c.path('kernel/c'), '-Wno-unused-function', '-ffreestanding',
+		'-fno-builtin', '-Dcalloc=vinix_mitigation_test_calloc', '-fno-strict-aliasing', '-include',
+		c.output('host_ports.h'), '-c', c.output('policy.c'), '-o', c.output('policy.o')], c.environment)!
+	imports := c.capture(['nm', '-u', c.output('policy.o')])!
+	if imports_forbidden(imports) {
+		return error('unexpected allocator import in CPU policy:\n' + imports)
+	}
+	fixturehost.write(c.output('test.c'), '#include "x86_mitigations.h"\n' + adapters + tests)!
+	c.inherited([...common, c.output('test.c'), c.output('policy.o'), '-o', c.output('test')], c.environment)!
+	c.inherited([c.output('test')], c.environment)!
 }
+
 fn main() {
- parsed := hosttest.parse_arguments(os.args[1..], [hosttest.Option{'--root',true,[]},hosttest.Option{'--work',true,[]},hosttest.Option{'--caller-arch',true,['arm64','amd64']},hosttest.Option{'--parent-stdin',true,[]},hosttest.Option{'--text-encoding',true,[]}], 0, 'CPU policy host controller', 'Private frontend-owned source and output directories') or { eprintln(err); exit(2) }
- v := parsed.options
- if '--root' !in v || '--work' !in v { eprintln('Missing root/work directory'); exit(2) }
- input := fixturehost.read('/dev/stdin') or { eprintln(err.msg()); exit(1) }
- request := hosttest.decode_json(input) or { eprintln(err.msg()); exit(1) }
- mut environment := map[string]string{}
- for value in request.as_array() {
-  pair := value.as_array()
-  key := hex.decode(pair[0].str()) or { eprintln(err.msg()); exit(1) }
-  content := hex.decode(pair[1].str()) or { eprintln(err.msg()); exit(1) }
-  environment[key.bytestr()] = content.bytestr()
- }
- descriptor := (v['--parent-stdin'] or { eprintln('Missing parent descriptor'); exit(2) }).int()
- if descriptor >= 0 {
-  if C.dup2(i32(descriptor), 0) < 0 { eprintln('Unable to restore parent stdin'); exit(1) }
-  C.close(i32(descriptor))
- } else { C.close(0) }
- c := Config{text_encoding:v['--text-encoding'],root:v['--root'],work:v['--work'],caller:v['--caller-arch'],environment:environment}
- c.execute() or { eprintln(err.msg()); exit(1) }
+	hosttest.parse_arguments(os.args[1..], []hosttest.Option{}, 0, 'usage: check-policy', 'Run exact production CPUID/MSR policy with only hardware-port adapters.') or {
+		eprintln(err)
+		exit(2)
+	}
+	run_native() or {
+		eprintln(err)
+		exit(1)
+	}
+}
+
+fn run_native() ! {
+	work := hosttest.work_dir('', 'vinix-cpu-policy-')!
+	defer { hosttest.remove_work_dir(work) or { eprintln(err) } }
+	c := Config{ root: hosttest.root(), work: work, caller: policyhost.caller_arch(), environment: policyhost.environment() }
+	c.execute()!
 }

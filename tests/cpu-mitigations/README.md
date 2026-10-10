@@ -2,7 +2,7 @@
 
 See [the policy contract and hardware limits](../../docs/x86-cpu-mitigations.md).
 
-`check-policy.py` compiles the actual production V policy under ASan/UBSan,
+`check-policy` compiles the actual production V policy under ASan/UBSan,
 adapting only the CPUID/RDMSR/WRMSR ports. Independent C callers check its
 preserved ABI and 12,288 vendor, leaf, subleaf,
 and feature combinations, independent MSR capability gates, persistent and
@@ -28,7 +28,7 @@ scheduler stub is present. It also covers linked C dependencies and handwritten
 assembly, which compiler flags alone would not rewrite.
 
 ```sh
-python3 tests/cpu-mitigations/check-policy.py
+tests/cpu-mitigations/check-policy
 python3 tests/cpu-mitigations/check-assembly.py
 python3 tests/cpu-mitigations/check-linked.py build-amd64-kernel/bin/vinix
 VINIX_VM_RUNNER_ROOT=/Users/alex/code/vinix \

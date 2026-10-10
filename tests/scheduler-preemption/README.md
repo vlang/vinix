@@ -25,7 +25,7 @@ Compatibility preemption guards and bounded timer fallback remain active.
 Run the production policy selection checks:
 
 ```sh
-VEXE=/path/to/v V=/path/to/v python3 tests/scheduler-preemption/policy.py
+V=/path/to/v tests/scheduler-preemption/policy
 ```
 
 The host test extracts the production target-selection functions and models

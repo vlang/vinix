@@ -7,9 +7,11 @@ still come from `kernel/proc/priority.v`, `kernel/sched/runqueue.v` and
 `kernel/time/time.v`. All original capacity, donation, pin-lifetime, saturation
 and timer assertions remain independent fixtures.
 
-`policy.py` retains the original disposable owner and actual compiler launch,
-including `VEXE` precedence over `V`, empty overrides and inherited environment.
-The normal path builds its generator through `build-support/run-v-tool.sh`.
+`policy` invokes V directly. With no arguments its native disposable owner
+generates, builds and runs every original assertion. `VEXE` retains precedence
+over `V` for the fixture compiler, and empty overrides fail. Temporary files
+are removed on success and returned failures. The maintained shell entry
+selects its own compiler through `build-support/find-v.sh`.
 `VINIX_SCHEDULER_QOS_GENERATOR` can select an already compiled generator.
 The generator also exposes `--extract SOURCE NAME` for independent comparisons.
 Source reads preserve strict UTF-8 and universal newline behavior, and the
