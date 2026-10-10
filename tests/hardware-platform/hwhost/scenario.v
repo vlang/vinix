@@ -610,9 +610,9 @@ const deep_disk = Disk{
 			seed:   0x43
 		},
 		DiskPattern{
-			offset: 24 << 20
+			offset: 20 << 20
 			length: 65536
-			seed:   0x48
+			seed:   0x44
 		},
 	]
 }
@@ -644,21 +644,44 @@ const deep_patterns = [
 	},
 	DiskPattern{
 		disk:   'disk.raw'
-		offset: 10 << 20
+		offset: 6 << 20
 		length: 65536
-		seed:   0x78
+		seed:   0x74
 	},
 ]
 
-// The machine is woken by the host only once QEMU has said it is suspended:
-// `system_wakeup` is refused for a machine that is running. The sleep in
-// between the two is ended by the clock's alarm, inside the machine, and so
-// are the five that follow.
+// What the host does to a machine going through the suspend-to-RAM scenarios,
+// in the order the guest asks for it. The machine is woken by the host only
+// once QEMU has said it is suspended: `system_wakeup` is refused for a
+// machine that is running. The sleep between the two woken from here is
+// ended by the clock's alarm, inside the machine, and so are the five that
+// follow them.
+const deep_type_a = '{"execute":"send-key","arguments":{"keys":[{"type":"qcode","data":"a"},{"type":"qcode","data":"ret"}]}}'
+const deep_press_shift = '{"execute":"send-key","arguments":{"keys":[{"type":"qcode","data":"shift"}]}}'
+const deep_move_mouse = '{"execute":"input-send-event","arguments":{"events":[{"type":"rel","data":{"axis":"x","value":40}},{"type":"rel","data":{"axis":"y","value":25}}]}}'
+
 const deep_actions = [
+	Action{
+		after:    'HWTEST STEP type on the keyboard'
+		delay_ms: 300
+		qmp:      deep_type_a
+	},
+	Action{
+		after:    'HWTEST STEP move the pointer'
+		delay_ms: 300
+		qmp:      deep_move_mouse
+	},
 	Action{
 		after:    'HWTEST STEP screen drawn'
 		delay_ms: 200
 		qmp:      '{"execute":"screendump","arguments":{"filename":"{state}/screen-before.ppm"}}'
+	},
+	// While the machine is down in a rehearsal, which this must end as a
+	// sleep that failed.
+	Action{
+		after:    'HWTEST STEP rehearsal for a key'
+		delay_ms: 1000
+		qmp:      deep_press_shift
 	},
 	Action{
 		after:          'HWTEST STEP deep sleep for a wakeup'
@@ -672,12 +695,26 @@ const deep_actions = [
 		event:          'SUSPEND'
 		event_count:    3
 		event_delay_ms: 2000
-		qmp:            '{"execute":"send-key","arguments":{"keys":[{"type":"qcode","data":"shift"}]}}'
+		qmp:            deep_press_shift
+	},
+	Action{
+		after:    'HWTEST STEP type on the keyboard'
+		delay_ms: 300
+		qmp:      deep_type_a
+	},
+	Action{
+		after:    'HWTEST STEP move the pointer'
+		delay_ms: 300
+		qmp:      deep_move_mouse
 	},
 	Action{
 		after:    'HWTEST STEP screen after the sleeps'
 		delay_ms: 200
 		qmp:      '{"execute":"screendump","arguments":{"filename":"{state}/screen-after.ppm"}}'
+	},
+	Action{
+		after: 'HWTEST STEP waiting for power button'
+		qmp:   '{"execute":"system_powerdown"}'
 	},
 ]
 

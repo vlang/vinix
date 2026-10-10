@@ -36,18 +36,25 @@
 @[has_globals]
 module main
 
+import os
 import sync.stdatomic
 import time
 
 #include <time.h>
 #include <unistd.h>
+#include <fenv.h>
 
 fn C.clock_gettime(clock i32, value voidptr) i32
 fn C.syscall(number i64, a voidptr, b voidptr, c voidptr) i64
+fn C.fesetround(mode i32) i32
+fn C.fegetround() i32
 
 const sys_sched_setaffinity = i64(203)
 const sys_getcpu = i64(309)
 const clock_realtime = i32(0)
+// FE_TONEAREST and FE_UPWARD, as x86-64 numbers them.
+const fe_tonearest = i32(0)
+const fe_upward = i32(0x800)
 
 const deep_stats = '/sys/power/suspend_stats/'
 const deep_memory_bytes = 32 << 20
@@ -57,6 +64,8 @@ const deep_pattern_bytes = 65536
 // part read once: hwhost's deep_disk has the same.
 const deep_prefill_base = i64(16) << 20
 const deep_max_cpus = 16
+// How many sleeps follow the three that are each ended another way.
+const deep_more_sleeps = 5
 
 __global (
 	// One counter for each pinned thread, the CPU it last found itself on,
@@ -212,18 +221,64 @@ fn read_pattern(path string, offset i64, seed u8, length int) ! {
 
 struct DeepRun {
 mut:
-	cpus    int
-	memory  []u64
-	screen  Screen
-	drawn   bool
-	sleeps  int // suspends to RAM that worked
-	iommu   bool
-	card    string
+	cpus       int
+	memory     []u64
+	screen     Screen
+	drawn      bool
+	sleeps     int // suspends to RAM that worked
+	checks     int // times check_machine() has run after one
+	iommu      bool
+	card       string
 	controller string
+	keyboard   int // /dev/console, to read what is typed
+	pointer    int // /dev/pointer
+}
+
+// Where the pointer is, as /dev/pointer says: its first two words.
+fn (run &DeepRun) pointer_at() (int, int) {
+	mut packet := []u8{len: 32}
+	if C.read(run.pointer, packet.data, usize(packet.len)) < 8 {
+		return -1, -1
+	}
+	return u32_at(packet, 0), u32_at(packet, 4)
+}
+
+// The host moves the mouse; the pointer must follow.
+fn (mut run DeepRun) check_pointer(mut t Test, when string) {
+	x, y := run.pointer_at()
+	t.step('move the pointer')
+	moved := wait_until(5000, fn [run, x, y] () bool {
+		now_x, now_y := run.pointer_at()
+		return now_x != x || now_y != y
+	})
+	now_x, now_y := run.pointer_at()
+	t.check(moved, '${when}: the pointer stayed at ${x}, ${y} when the mouse moved')
+	if moved {
+		t.info('${when}: the pointer went from ${x}, ${y} to ${now_x}, ${now_y}')
+	}
+}
+
+// The host types `a` and Enter; the console must hand over that line.
+fn (mut run DeepRun) check_keyboard(mut t Test, when string) {
+	t.step('type on the keyboard')
+	mut waiting := PollFd{
+		fd:     i32(run.keyboard)
+		events: pollin
+	}
+	mut typed := ''
+	if C.poll(voidptr(&waiting), 1, 5000) > 0 {
+		mut line := []u8{len: 64}
+		count := C.read(run.keyboard, line.data, usize(line.len))
+		if count > 0 {
+			typed = line[..count].bytestr().trim_space()
+		}
+	}
+	t.check(typed == 'a', '${when}: typing "a" and Enter gave "${typed}"')
 }
 
 // What must hold after every sleep, whichever way it ended.
-fn (mut run DeepRun) check_machine(mut t Test, when string, thorough bool) {
+fn (mut run DeepRun) check_machine(mut t Test, when string) {
+	run.checks++
 	check_every_cpu(mut t, run.cpus, when)
 	t.check(network_works(20), '${when}: the network does not work')
 	// The pattern written before the first sleep, which may come from the
@@ -232,16 +287,16 @@ fn (mut run DeepRun) check_machine(mut t Test, when string, thorough bool) {
 	read_pattern(deep_disk, 1 << 20, 0x31, deep_pattern_bytes) or {
 		t.check(false, '${when}: the pattern from before the sleep: ${err.msg()}')
 	}
-	fresh := deep_prefill_base + (i64(run.sleeps) << 20)
-	read_pattern(deep_disk, fresh, u8(0x40 + run.sleeps), deep_pattern_bytes) or {
+	fresh := deep_prefill_base + (i64(run.checks) << 20)
+	read_pattern(deep_disk, fresh, u8(0x40 + run.checks), deep_pattern_bytes) or {
 		t.check(false, '${when}: disk never read before: ${err.msg()}')
 	}
-	write_pattern(deep_disk, i64(2 + run.sleeps) << 20, u8(0x70 + run.sleeps), deep_pattern_bytes) or {
+	write_pattern(deep_disk, i64(2 + run.checks) << 20, u8(0x70 + run.checks), deep_pattern_bytes) or {
 		t.check(false, '${when}: a new pattern: ${err.msg()}')
 	}
 	if run.drawn {
 		wrong := run.screen.pattern_errors()
-		t.check(wrong == 0, "${when}: ${wrong} pixels of what was drawn on the screen are gone; ${run.screen.first_error()}; ${run.screen.error_map()}")
+		t.check(wrong == 0, '${when}: ${wrong} pixels of what was drawn on the screen are gone; ${run.screen.first_error()}; ${run.screen.error_map()}')
 	}
 	if run.iommu {
 		t.check(dma_line(run.card) == 'domain: dmar0 isolated', '${when}: the card says "${dma_line(run.card)}"')
@@ -249,16 +304,28 @@ fn (mut run DeepRun) check_machine(mut t Test, when string, thorough bool) {
 		state := read_text('/sys/class/iommu/dmar0/state') or { '' }
 		t.check(state.contains('on'), '${when}: dmar0 is not on: "${state.replace('\n', ' | ')}"')
 	}
-	if thorough {
-		damaged := memory_damage(run.memory)
-		t.check(damaged < 0, '${when}: memory differs from what was written at word ${damaged} of ${run.memory.len}')
+	damaged := memory_damage(run.memory)
+	t.check(damaged < 0, '${when}: memory differs from what was written at word ${damaged} of ${run.memory.len}')
+}
+
+// One line of /sys/power/deep_sleep, as a number; -1 when it is not there.
+fn deep_report(name string) i64 {
+	text := read_text('/sys/power/deep_sleep') or { return -1 }
+	for line in text.split_into_lines() {
+		if line.starts_with(name + ': ') {
+			return line.all_after(': ').i64()
+		}
 	}
+	return -1
 }
 
 // One suspend to RAM: writes `mem`, and checks what the clocks and the
 // kernel's account say about it. `least_ms` and `most_ms` bound how long the
 // machine may have been away by the wall clock.
 fn (mut run DeepRun) sleep(mut t Test, what string, wake string, least_ms i64, most_ms i64) {
+	// The floating point environment is the thread's, and lives in the
+	// processor while the thread is in the kernel asking for the sleep.
+	C.fesetround(fe_upward)
 	frozen_from := stdatomic.load_u64(&deep_free_count)
 	mono_before := monotonic_ms()
 	real_before := realtime_ms()
@@ -266,10 +333,13 @@ fn (mut run DeepRun) sleep(mut t Test, what string, wake string, least_ms i64, m
 	mono_after := monotonic_ms()
 	real_after := realtime_ms()
 	frozen := stdatomic.load_u64(&deep_free_count) - frozen_from
+	rounding := C.fegetround()
+	C.fesetround(fe_tonearest)
 	run.sleeps++
 
 	mono := mono_after - mono_before
 	real := real_after - real_before
+	t.check(rounding == fe_upward, '${what}: the rounding mode set before the sleep came back as ${rounding}')
 	t.check(mono >= 0, '${what}: the monotonic clock went back ${-mono} ms')
 	t.check(real >= least_ms && real <= most_ms, '${what}: the wall clock moved on ${real} ms; between ${least_ms} and ${most_ms} was expected')
 	// Both clocks are moved on by the same amount; they are read a moment
@@ -280,12 +350,22 @@ fn (mut run DeepRun) sleep(mut t Test, what string, wake string, least_ms i64, m
 	t.check(deep_stat('deep') == run.sleeps.str(), '${what}: ${deep_stat('deep')} suspends to RAM counted, not ${run.sleeps}')
 	t.check(deep_stat('security_changes') == '0', '${what}: CPU protections changed across the sleep')
 	t.check(deep_stat('security_cpus') == run.cpus.str(), '${what}: the protections of ${deep_stat('security_cpus')} CPUs were compared, not of ${run.cpus}')
+	// What the way back found: a machine that had lost power, put right.
+	t.check(deep_report('cycles') == run.sleeps, '${what}: deep_sleep counts ${deep_report('cycles')} cycles, not ${run.sleeps}')
+	t.check(deep_report('pci registers rewritten') > 0, '${what}: no PCI register had to be written back: nothing lost power')
+	t.check(deep_report('pci functions not restored') == 0, '${what}: ${deep_report('pci functions not restored')} PCI functions were not restored')
+	t.check(deep_report('interrupt routes rewritten') > 0, '${what}: no interrupt route had to be written back')
+	t.check(deep_report('processors lost') == 0, '${what}: ${deep_report('processors lost')} processors did not come back')
+	if run.drawn {
+		t.check(deep_report('display found off') == run.sleeps && deep_report('display restored') == run.sleeps
+			&& deep_report('display failures') == 0, '${what}: the display was found off ${deep_report('display found off')} times, restored ${deep_report('display restored')} times, and would not take its mode ${deep_report('display failures')} times, after ${run.sleeps} sleeps')
+	}
 	asleep := deep_stat('last_sleep_ms').i64()
 	// Awake, the free thread counts about this much in the time the machine
 	// was down; frozen and then powered off, a small part of it.
 	rate := free_rate()
 	t.check(frozen < u64(rate) * u64(asleep) / 300 / 4 || asleep < 300, '${what}: userspace ran while asleep: ${frozen} counts in ${asleep} ms, ${rate} per 300 ms awake')
-	t.info('${what}: woke by ${deep_stat('last_wake')} after ${asleep} ms; wall clock +${real} ms; down in ${deep_stat('last_suspend_ms')} ms, back in ${deep_stat('last_resume_ms')} ms')
+	t.info('${what}: woke by ${deep_stat('last_wake')} after ${asleep} ms; wall clock +${real} ms; down in ${deep_stat('last_suspend_ms')} ms, back in ${deep_stat('last_resume_ms')} ms; ${deep_report('pci registers rewritten')} PCI registers and ${deep_report('interrupt routes rewritten')} interrupt routes written back')
 }
 
 // How far the free thread counts in 300 ms awake.
@@ -293,6 +373,41 @@ fn free_rate() i64 {
 	from := stdatomic.load_u64(&deep_free_count)
 	sleep_ms(300)
 	return i64(stdatomic.load_u64(&deep_free_count) - from)
+}
+
+// The whole way down and back without asking firmware: the processors are
+// parked and started again and everything is read out, with nothing lost.
+// Once left alone, which must count as a rehearsal that worked; and once with
+// a key pressed while the machine is down, which is a wake source reporting
+// before firmware could be asked, and must count as a sleep that failed.
+fn (mut run DeepRun) rehearse(mut t Test) {
+	write_text('/sys/power/pm_test', 'platform') or { t.check(false, 'pm_test: ${err.msg()}') }
+	t.check(read_word('/sys/power/pm_test') == 'none devices [platform]', 'pm_test reads "${read_word('/sys/power/pm_test')}"')
+	write_text('/sys/power/pm_test_delay_ms', '1000') or { t.check(false, 'pm_test_delay_ms: ${err.msg()}') }
+	started := monotonic_ms()
+	write_text('/sys/power/state', 'mem') or { t.check(false, 'the rehearsal: ${err.msg()}') }
+	took := monotonic_ms() - started
+	t.check(took >= 1000 && took < 20000, 'the rehearsal took ${took} ms')
+	t.check(deep_stat('success') == '1' && deep_stat('fail') == '0', 'after the rehearsal success is ${deep_stat('success')} and fail ${deep_stat('fail')}')
+	t.check(deep_stat('last_wake') == 'rehearsal' && deep_stat('last_depth') == 'rehearsal', 'the rehearsal is recorded as ${deep_stat('last_depth')}, woken by ${deep_stat('last_wake')}')
+	t.check(deep_stat('deep') == '0' && deep_report('cycles') == 0, 'the rehearsal was counted as a suspend to RAM')
+	t.check(deep_stat('security_cpus') == run.cpus.str(), 'the rehearsal compared the protections of ${deep_stat('security_cpus')} CPUs')
+	check_every_cpu(mut t, run.cpus, 'after the rehearsal')
+	t.info('rehearsal: ${took} ms; every processor parked and started again with nothing lost')
+
+	write_text('/sys/power/pm_test_delay_ms', '3000') or { t.check(false, 'pm_test_delay_ms: ${err.msg()}') }
+	t.step('rehearsal for a key')
+	mut refused := false
+	write_text('/sys/power/state', 'mem') or { refused = true }
+	t.check(refused, 'a sleep a key came in the way of was reported as having worked')
+	t.check(deep_stat('success') == '1' && deep_stat('fail') == '1', 'after the interrupted rehearsal success is ${deep_stat('success')} and fail ${deep_stat('fail')}')
+	t.check(deep_stat('last_failed_step') == 'platform', 'last_failed_step is ${deep_stat('last_failed_step')}')
+	t.check(deep_stat('last_failed_reason').contains('wake source'), 'last_failed_reason is "${deep_stat('last_failed_reason')}"')
+	t.check(deep_stat('security_changes') == '0', 'CPU protections changed across the failed sleep')
+	check_every_cpu(mut t, run.cpus, 'after the failed sleep')
+	t.check(network_works(20), 'after the failed sleep: the network does not work')
+	t.info('failed sleep: ${deep_stat('last_failed_step')}: ${deep_stat('last_failed_reason')}')
+	write_text('/sys/power/pm_test', 'none') or { t.check(false, 'pm_test: ${err.msg()}') }
 }
 
 fn deep_scenario(mut t Test, iommu bool) {
@@ -305,7 +420,7 @@ fn deep_scenario(mut t Test, iommu bool) {
 		run.cpus = deep_max_cpus
 	}
 	offered := read_word('/sys/power/mem_sleep')
-	t.info('mem_sleep: ${offered}; deep_sleep: ${read_word('/sys/power/deep_sleep')}')
+	t.info('mem_sleep: ${offered}; deep_sleep: ${read_word('/sys/power/deep_sleep').all_before('\n')}')
 	if !t.check(offered.contains('deep'), 'mem_sleep does not offer deep: "${offered}"') {
 		return
 	}
@@ -318,6 +433,13 @@ fn deep_scenario(mut t Test, iommu bool) {
 		run.controller = bound_device('ahci')
 		t.check(run.card != '' && run.controller != '', 'the card or the disk controller is not bound')
 	}
+	os.signal_opt(.usr2, on_power_off_request) or {
+		t.check(false, 'could not install a SIGUSR2 handler: ${err}')
+		return
+	}
+	run.keyboard = C.open(c'/dev/console', C.O_RDONLY)
+	run.pointer = C.open(c'/dev/pointer', C.O_RDONLY)
+	t.check(run.keyboard >= 0 && run.pointer >= 0, 'cannot open the console or the pointer')
 
 	// What is to be found again afterwards.
 	run.memory = []u64{len: deep_memory_bytes / 8}
@@ -328,8 +450,8 @@ fn deep_scenario(mut t Test, iommu bool) {
 		run.screen = screen
 		run.screen.draw_pattern()
 		run.drawn = true
-		t.check(run.screen.pattern_errors() == 0, "what was drawn on the screen does not read back: ${run.screen.pattern_errors()} pixels differ")
-		t.info("screen: ${screen.width} by ${screen.height}, pattern drawn")
+		t.check(run.screen.pattern_errors() == 0, 'what was drawn on the screen does not read back: ${run.screen.pattern_errors()} pixels differ')
+		t.info('screen: ${screen.width} by ${screen.height}, pattern drawn')
 	} else {
 		t.check(false, 'the screen: ${err.msg()}')
 	}
@@ -339,43 +461,85 @@ fn deep_scenario(mut t Test, iommu bool) {
 	spawn count_freely()
 	sleep_ms(200)
 	check_every_cpu(mut t, run.cpus, 'before any sleep')
+	run.check_keyboard(mut t, 'before any sleep')
+	run.check_pointer(mut t, 'before any sleep')
 	t.step('screen drawn')
 	sleep_ms(1000)
+
+	run.rehearse(mut t)
 
 	// Ended by the host, once QEMU says the machine is suspended. QEMU's
 	// ACPI reports that as the power button.
 	t.step('deep sleep for a wakeup')
 	run.sleep(mut t, 'wakeup', 'power-button', 1000, 60000)
-	run.check_machine(mut t, 'after the wakeup', true)
+	run.check_machine(mut t, 'after the wakeup')
 
 	// Ended by the clock's alarm.
 	write_text('/sys/class/rtc/rtc0/wakealarm', '+4') or { t.check(false, 'wakealarm: ${err.msg()}') }
 	run.sleep(mut t, 'alarm', 'alarm', 2500, 60000)
 	t.check(read_word('/sys/class/rtc/rtc0/wakealarm') == '', 'the alarm that went off still reads back')
-	run.check_machine(mut t, 'after the alarm', true)
+	run.check_machine(mut t, 'after the alarm')
 
-	// Ended by a key.
+	// Ended by a key. The keyboard and the mouse must be what they were.
 	t.step('deep sleep for a key')
 	run.sleep(mut t, 'key', 'keyboard', 1000, 60000)
-	run.check_machine(mut t, 'after the key', true)
+	run.check_machine(mut t, 'after the key')
+	run.check_keyboard(mut t, 'after three sleeps')
+	run.check_pointer(mut t, 'after three sleeps')
 
-	// And five more, one after another.
-	for cycle in 0 .. 5 {
-		write_text('/sys/class/rtc/rtc0/wakealarm', '+2') or { t.check(false, 'wakealarm: ${err.msg()}') }
-		run.sleep(mut t, 'cycle ${cycle + 1}', 'alarm', 500, 60000)
+	// And five more, one after another, which must cost the kernel no
+	// memory. Nothing is looked at in between: a program that reads files
+	// grows its own heap, and each new page of that is an object or two of
+	// the kernel's, which would be measured with the rest.
+	alarm := '/sys/class/wakeup/wakeup5/'
+	t.check(read_word(alarm + 'name') == 'alarm', 'wakeup5 is ${read_word(alarm + 'name')}')
+	alarms_before := read_word(alarm + 'wakeup_count').i64()
+	sleep_ms(grace_ms)
+	before := heap_usage() or {
+		t.check(false, err.msg())
+		return
 	}
-	run.check_machine(mut t, 'after five more sleeps', true)
+	mut refused := 0
+	for _ in 0 .. deep_more_sleeps {
+		write_text('/sys/class/rtc/rtc0/wakealarm', '+2') or { refused++ }
+		write_text('/sys/power/state', 'mem') or { refused++ }
+	}
+	run.sleeps += deep_more_sleeps
+	sleep_ms(grace_ms)
+	after := heap_usage() or {
+		t.check(false, err.msg())
+		return
+	}
+	alarms := read_word(alarm + 'wakeup_count').i64() - alarms_before
+	t.check(refused == 0, '${refused} writes failed in ${deep_more_sleeps} sleeps one after another')
+	t.check(deep_stat('deep') == run.sleeps.str() && deep_report('cycles') == run.sleeps, 'after ${deep_more_sleeps} more sleeps ${deep_stat('deep')} suspends to RAM are counted, not ${run.sleeps}')
+	t.check(alarms == deep_more_sleeps, 'the alarm ended ${alarms} of ${deep_more_sleeps} sleeps')
+	t.check(deep_stat('security_changes') == '0', 'CPU protections changed across a sleep')
+	t.check(deep_report('processors lost') == 0 && deep_report('pci functions not restored') == 0
+		&& deep_report('display failures') == 0, 'after ${deep_more_sleeps} more sleeps: ${deep_report('processors lost')} processors lost, ${deep_report('pci functions not restored')} PCI functions not restored, ${deep_report('display failures')} display failures')
+	t.check(after.objects - before.objects <= heap_noise_objects && after.large_pages <= before.large_pages, '${deep_more_sleeps} sleeps left ${after.objects - before.objects} more heap objects and ${after.large_pages - before.large_pages} more large pages allocated')
+	t.info('${deep_more_sleeps} more sleeps: live heap objects ${before.objects} -> ${after.objects}, large pages ${before.large_pages} -> ${after.large_pages}')
+	run.check_machine(mut t, 'after ${deep_more_sleeps} more sleeps')
 
-	t.check(deep_stat('success') == run.sleeps.str(), 'success is ${deep_stat('success')}, not ${run.sleeps}')
-	t.check(deep_stat('fail') == '0', 'fail is ${deep_stat('fail')}')
+	t.check(deep_stat('success') == (run.sleeps + 1).str(), 'success is ${deep_stat('success')}, not ${run.sleeps + 1}')
+	t.check(deep_stat('fail') == '1', 'fail is ${deep_stat('fail')}, not the one rehearsal a key interrupted')
 	t.check(deep_stat('security_changes') == '0', 'CPU protections changed across a sleep')
 	if iommu {
 		caught := read_text('/sys/class/iommu/dmar0/faults') or { 'unreadable' }
 		t.check(caught.contains('count: 0'), 'dmar0 recorded a fault: "${caught.replace('\n', ' | ')}"')
+		t.check(deep_report('iommu units') == 1, 'deep_sleep counts ${deep_report('iommu units')} IOMMU units on')
 		t.info('dmar0: card and disk controller isolated after ${run.sleeps} suspends to RAM; faults says count: 0')
 	}
 	t.step('screen after the sleeps')
 	sleep_ms(1500)
+
+	// The firmware's event interrupt came back with the rest: a press of the
+	// power button reaches init as it did before any sleep.
+	t.step('waiting for power button')
+	asked := wait_until(30000, fn () bool {
+		return power_button_asked
+	})
+	t.check(asked, 'after the sleeps a power button press did not reach init within 30 s')
 }
 
 fn scenario_suspend_deep(mut t Test) {
