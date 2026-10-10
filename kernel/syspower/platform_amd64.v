@@ -68,6 +68,10 @@ fn platform_start() {
 	uacpi.on_fixed_button(fixed_button)
 	uacpi.start_events()
 	register_serial_ports()
+	// Whether suspend to RAM is offered is settled here, before any program
+	// runs: finding the display adapter measures its address registers,
+	// which is not to be done under a program that is drawing.
+	platform_deep_available()
 }
 
 // Suspend to RAM is ACPI's S3: deep_amd64.v.

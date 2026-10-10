@@ -241,8 +241,9 @@ fn deep_sleep_here(rehearse bool) bool {
 		why = 'a processor would not park'
 	} else if !devcore.sleep_until(events_quiet, unsafe { nil }, quiet_timeout_ns, 1) {
 		why = 'firmware events would not fall quiet'
+	} else if !deep_save_devices() {
+		why = 'no memory to keep the PCI configuration in'
 	} else {
-		deep_save_devices()
 		if rehearse {
 			// Down, as far as a rehearsal goes: one processor, the others
 			// parked. A wake source that reports now ends it as it would
@@ -273,6 +274,9 @@ fn deep_sleep_here(rehearse bool) bool {
 					away_seconds = after_clock - before_clock
 				}
 				hpet_clock.resume(before_ns + away_seconds * devcore.second)
+				// The stretch just added to the clock is not time anything
+				// ran for.
+				sched.skip_sleep_time()
 				cause = wake_cause()
 				wake.trace('woken by', u64(cause))
 			} else if !rehearse {
@@ -319,10 +323,15 @@ fn deep_sleep_here(rehearse bool) bool {
 	return slept || rehearse
 }
 
-// What must be read out of the devices while they still have power.
-fn deep_save_devices() {
-	devcore.pci_save_all()
+// What must be read out of the devices while they still have power. False
+// when there is nowhere to keep it: drivers that resumed to find their
+// devices' address registers empty would be worse than not sleeping.
+fn deep_save_devices() bool {
+	if !devcore.pci_save_all() {
+		return false
+	}
 	display_save()
+	return true
 }
 
 // And put back before any driver's resume runs: the IOMMUs first, so that no

@@ -27,7 +27,9 @@
 module sched
 
 import katomic
+import proc
 import x86.apic
+import x86.cpu
 import x86.cpu.local as cpulocal
 
 __global (
@@ -96,4 +98,22 @@ fn park_here(mut cpu_local cpulocal.Local) {
 			; ; ; memory
 		}
 	}
+}
+
+// The clock has been moved on over a suspend to RAM. The thread that asked
+// for it has been on this processor all along as far as the accounts go, and
+// did nothing for as long as the machine was away: leave that stretch out of
+// its bill, and out of this processor's real-time bandwidth.
+pub fn skip_sleep_time() {
+	ints := cpu.interrupt_toggle(false)
+	now := clock_ns()
+	number := cpulocal.current().cpu_number
+	if number < max_rt_cpus {
+		rt_account_last_ns[number] = now
+	}
+	mut me := proc.current_thread()
+	if me != unsafe { nil } {
+		proc.skip_cpu_time(mut me, now)
+	}
+	cpu.interrupt_toggle(ints)
 }

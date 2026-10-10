@@ -52,6 +52,7 @@ fn C.fegetround() i32
 const sys_sched_setaffinity = i64(203)
 const sys_getcpu = i64(309)
 const clock_realtime = i32(0)
+const clock_process_cputime = i32(2)
 // FE_TONEAREST and FE_UPWARD, as x86-64 numbers them.
 const fe_tonearest = i32(0)
 const fe_upward = i32(0x800)
@@ -86,6 +87,15 @@ mut:
 fn realtime_ms() i64 {
 	mut now := TimeSpec{}
 	C.clock_gettime(clock_realtime, voidptr(&now))
+	return now.seconds * 1000 + now.nanoseconds / 1000000
+}
+
+// The processor time this program has been billed, or -1.
+fn process_cpu_ms() i64 {
+	mut now := TimeSpec{}
+	if C.clock_gettime(clock_process_cputime, voidptr(&now)) != 0 {
+		return -1
+	}
 	return now.seconds * 1000 + now.nanoseconds / 1000000
 }
 
@@ -333,7 +343,9 @@ fn (mut run DeepRun) sleep(mut t Test, what string, wake string, least_ms i64, m
 	frozen_from := stdatomic.load_u64(&deep_free_count)
 	mono_before := monotonic_ms()
 	real_before := realtime_ms()
+	billed_before := process_cpu_ms()
 	write_text('/sys/power/state', 'mem') or { t.check(false, '${what}: writing mem to state: ${err.msg()}') }
+	billed := process_cpu_ms() - billed_before
 	mono_after := monotonic_ms()
 	real_after := realtime_ms()
 	frozen := stdatomic.load_u64(&deep_free_count) - frozen_from
@@ -345,6 +357,9 @@ fn (mut run DeepRun) sleep(mut t Test, what string, wake string, least_ms i64, m
 	real := real_after - real_before
 	t.check(rounding == fe_upward, '${what}: the rounding mode set before the sleep came back as ${rounding}')
 	t.check(mono >= 0, '${what}: the monotonic clock went back ${-mono} ms')
+	// The thread that asked was in the kernel for all of it and ran for very
+	// little of it: the time the machine was away is nobody's processor time.
+	t.check(billed_before >= 0 && billed < real / 2, '${what}: the program was billed ${billed} ms of processor time for a sleep of ${real} ms')
 	t.check(real >= least_ms && real <= most_ms, '${what}: the wall clock moved on ${real} ms; between ${least_ms} and ${most_ms} was expected')
 	// Both clocks are moved on by the same amount; they are read a moment
 	// apart.

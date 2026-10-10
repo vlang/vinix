@@ -12,6 +12,8 @@
 @[has_globals]
 module memory
 
+import lib
+
 pub const low_memory_limit = u64(0x100000)
 
 __global (
@@ -35,14 +37,35 @@ pub fn reserve_low_pages(count u64) u64 {
 	if limit > pmm_avl_page_count {
 		limit = pmm_avl_page_count
 	}
-	found := inner_alloc_range(count, 1, limit)
-	if found == unsafe { nil } {
+	if limit < count + 1 {
 		return 0
 	}
-	free_pages -= count
-	lowmem_base = u64(found)
-	lowmem_pages = count
-	return lowmem_base
+	// The highest run there is. The bottom of the megabyte is where firmware
+	// keeps its own data, and some firmware writes there on its way back
+	// from a sleep, whatever the memory map says about who owns it.
+	for first := limit - count; first >= 1; first-- {
+		mut free := true
+		for page := first; page < first + count; page++ {
+			if lib.bittest(pmm_bitmap, page) {
+				free = false
+				break
+			}
+		}
+		if !free {
+			continue
+		}
+		for page := first; page < first + count; page++ {
+			lib.bitset(pmm_bitmap, page)
+			unsafe {
+				(&u32(pmm_refcounts))[page] = 1
+			}
+		}
+		free_pages -= count
+		lowmem_base = first * page_size
+		lowmem_pages = count
+		return lowmem_base
+	}
+	return 0
 }
 
 // The pages reserve_low_pages() took: their address and how many, or 0, 0.
