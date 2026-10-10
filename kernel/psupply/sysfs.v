@@ -278,8 +278,9 @@ fn store_charge_limit(context voidptr, data &u8, length u64) u64 {
 	if percent < 50 || percent > 100 || supply.set_charge_limit == unsafe { nil } {
 		return errno.einval
 	}
-	if !supply.set_charge_limit(supply.context, percent) {
-		return errno.eio
+	refused := supply.set_charge_limit(supply.context, percent)
+	if refused != 0 {
+		return refused
 	}
 	supply.read_ns = 0
 	return 0

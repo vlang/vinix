@@ -60,6 +60,12 @@ pub mut:
 	// Percent the battery stops charging at, when the driver can say; zero
 	// when it cannot.
 	charge_limit u64
+	// The battery's own figure for how full it is, in percent, where it gives
+	// one: what its maker shows the user, which need not be `amount` over
+	// `full`. It is what `capacity` reads then, and what the thresholds are
+	// held against.
+	has_percent bool
+	percent     int
 	technology     [text_bytes]u8
 	technology_len int
 	model          [text_bytes]u8
@@ -78,8 +84,10 @@ pub mut:
 	// Fill in `reading`. False when the supply could not be read at all, which
 	// is not the same as a battery that is not there.
 	read fn (context voidptr, mut reading Reading) bool = unsafe { nil }
-	// Stop charging at `percent`. Nil when the hardware has no such thing.
-	set_charge_limit fn (context voidptr, percent u64) bool = unsafe { nil }
+	// Stop charging at `percent`: 0, or the errno that says why not -- EINVAL
+	// for a limit this hardware cannot be given. Nil when the hardware has no
+	// such thing.
+	set_charge_limit fn (context voidptr, percent u64) u64 = unsafe { nil }
 	context          voidptr
 
 	used      bool
@@ -283,6 +291,9 @@ fn refresh(mut supply Supply, force bool) {
 		return
 	}
 	supply.percent = percent_of(reading.amount, reading.full)
+	if reading.has_percent && reading.percent >= 0 && reading.percent <= 100 {
+		supply.percent = reading.percent
+	}
 	supply.estimator.sample(reading.status, reading.amount, reading.rate, supply.read_ns)
 	// Firmware that makes its own estimate knows things this cannot: how the
 	// cells behave near empty, what the charger will taper to.
