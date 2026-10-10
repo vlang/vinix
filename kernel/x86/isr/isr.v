@@ -7,6 +7,7 @@ import event.eventstruct
 import x86.apic
 import x86.cpu
 import x86.cpu.local as cpulocal
+import x86.msr
 import memory.mmap
 import memory
 import katomic
@@ -153,6 +154,22 @@ fn fix_segment_reload(num u32, mut gpr_state cpulocal.GPRState) bool {
 	return true
 }
 
+// A model-specific register this CPU does not have, read or written through
+// msr.read_safe() or msr.write_safe(): the access is skipped and its caller
+// told so, as Linux's exception table has it for rdmsr_safe(). Only the two
+// instructions those are made of; a #GP anywhere else is still a panic.
+fn fix_msr_access(num u32, mut gpr_state cpulocal.GPRState) bool {
+	if num != 13 {
+		return false
+	}
+	resume := msr.fault_resume(gpr_state.rip)
+	if resume == 0 {
+		return false
+	}
+	gpr_state.rip = resume
+	return true
+}
+
 fn exception_handler(num u32, mut gpr_state cpulocal.GPRState) {
 	exception_handler_at(num, mut gpr_state, if num == 14 { cpu.read_cr2() } else { u64(0) })
 }
@@ -227,6 +244,9 @@ fn exception_handler_at(num u32, mut gpr_state cpulocal.GPRState, cr2 u64) {
 		userland.exit_with_fatal_signal(signal)
 	} else {
 		if fix_segment_reload(num, mut gpr_state) {
+			return
+		}
+		if fix_msr_access(num, mut gpr_state) {
 			return
 		}
 		lib.kpanic(gpr_state, exception_names[num])
