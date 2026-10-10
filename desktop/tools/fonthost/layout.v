@@ -4,6 +4,7 @@
 module fonthost
 
 import crypto.sha256
+import compress.zlib
 import encoding.base64
 import encoding.hex
 import fixturehost
@@ -146,6 +147,8 @@ fn (mut e Engine) generate(args map[string]json2.Any) !json2.Any {
 			face := raw.as_array()
 			name := face[0].str(); file := face[1].str(); size := int(face[2].i64()); bold := face[3].bool()
 			blob := e.build_face(file, size, bold, scale, extras, japanese)!
+			raw_atlas := base64.decode(value(blob, 'blob').str())
+			compressed := zlib.compress(raw_atlas)!
 			scaled := '${name}_${scale}x'; names << scaled
 			out << '// ${name}: ${file} at ${size}px (${scale}x raster)'
 			out << 'const face_${scaled} = FaceBlob{'
@@ -155,9 +158,14 @@ fn (mut e Engine) generate(args map[string]json2.Any) !json2.Any {
 			out << '\traster_scale: ${scale}'
 			out << '\tascent:  ${value(blob, 'ascent').str()}'
 			out << '\tdescent: ${value(blob, 'descent').str()}'
-			out << '\tparts:   ['
-			for part in wrap(value(blob, 'blob').str(), 100)! { out << "\t\t'${part}'," }
-			out << ['\t]', '}', '']
+			out << '\tdecoded_size: ${raw_atlas.len}'
+			out << "\tmetrics: '${base64.encode(raw_atlas[..(95 + extras.len) * 5])}'"
+			out << "\tdata: '${base64.encode(compressed)}'"
+			out << ['}', '']
+			unsafe {
+				raw_atlas.free()
+				compressed.free()
+			}
 		}
 	}
 	out << ['// font_blobs is the set the renderer chooses from.', 'const font_blobs = [']

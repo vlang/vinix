@@ -24,7 +24,7 @@ struct Glyph {
 	bearing_x int
 	bearing_y int
 	advance   int
-	offset    int // into FontFace.pixels
+	offset    int // into FontRaster.pixels
 }
 
 struct FontFace {
@@ -38,21 +38,29 @@ mut:
 	descent      int
 	line_height  int
 	glyphs       []Glyph
-	pixels       []u8
+	raster       &FontRaster = unsafe { nil }
+}
+
+// Metrics are enough to choose a face and lay out text. Coverage is loaded on
+// first use; an ordinary session never draws the large first-run title faces.
+// FontFace copies borrow this cache. free_fonts releases it with its face.
+struct FontRaster {
+	encoded      string // borrowed from the executable
+	decoded_size int
+mut:
+	pixels []u8
 }
 
 const glyph_header_size = 5
 
 fn load_face(data FaceBlob) FontFace {
-	encoded := data.parts.join('')
-	raw := base64.decode(encoded)
-	unsafe { encoded.free() }
+	raw := base64.decode(data.metrics)
+	defer { unsafe { raw.free() } }
 	count := font_last_char - font_first_char + 1 + font_extra_runes.len
 	header_bytes := count * glyph_header_size
+	assert raw.len == header_bytes
 
 	mut glyphs := []Glyph{cap: count}
-	// Coverage is read where it was decoded, just past the metrics header,
-	// rather than from a copy that would leave the decoded blob behind.
 	mut offset := header_bytes
 	for i := 0; i < count; i++ {
 		base := i * glyph_header_size
@@ -68,6 +76,7 @@ fn load_face(data FaceBlob) FontFace {
 		}
 		offset += width * height
 	}
+	assert offset == data.decoded_size
 
 	return FontFace{
 		bold:         data.bold
@@ -78,8 +87,31 @@ fn load_face(data FaceBlob) FontFace {
 		descent:      data.descent
 		line_height:  data.ascent + data.descent
 		glyphs:       glyphs
-		pixels:       raw
+		raster:       &FontRaster{
+			encoded: data.data
+			decoded_size: data.decoded_size
+		}
 	}
+}
+
+fn (face &FontFace) coverage() []u8 {
+	mut raster := face.raster
+	if raster.pixels.len > 0 {
+		return raster.pixels
+	}
+	// Keep the atlas compressed in the executable, including the unused display
+	// scale. Inflate directly into the face's final buffer: growing a temporary
+	// output array would retain its old allocations with -gc none -manualfree.
+	compressed := base64.decode(raster.encoded)
+	defer { unsafe { compressed.free() } }
+	mut raw := []u8{len: raster.decoded_size}
+	got := C.stbi_zlib_decode_buffer(&char(raw.data), raw.len, &char(compressed.data),
+		compressed.len)
+	if got != raw.len {
+		panic('invalid embedded font atlas')
+	}
+	raster.pixels = raw
+	return raster.pixels
 }
 
 fn load_fonts() []FontFace {
@@ -109,13 +141,18 @@ fn load_fonts_for_scale(scale int) []FontFace {
 
 fn free_fonts(mut faces []FontFace) {
 	for face in faces {
-		unsafe {
-			face.glyphs.free()
-			face.pixels.free()
-		}
+		free_font_face(face)
 	}
 	unsafe { faces.free() }
 	faces = []FontFace{}
+}
+
+fn free_font_face(face FontFace) {
+	unsafe {
+		face.glyphs.free()
+		face.raster.pixels.free()
+		free(face.raster)
+	}
 }
 
 // next_rune decodes one UTF-8 sequence and reports how many bytes it took. A
@@ -213,13 +250,15 @@ fn (f &FontFace) truncate(text string, limit int) (string, bool) {
 // draw_text places the run's line box at (x, y) and returns the pen position
 // it ended at.
 fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32) int {
+	if text.len == 0 { return x }
+	pixels := face.coverage()
 	mut pen := x * c.scale
 	mut i := 0
 	for i < text.len {
 		code_point, size := next_rune(text, i)
 		glyph := face.glyph_for(code_point)
 		if glyph.width > 0 && glyph.height > 0 {
-			c.blit_glyph(face, glyph, pen + glyph.bearing_x, y * c.scale + glyph.bearing_y, color)
+			c.blit_glyph(pixels, glyph, pen + glyph.bearing_x, y * c.scale + glyph.bearing_y, color)
 		}
 		pen += glyph.advance
 		i += size
@@ -227,7 +266,7 @@ fn (mut c Canvas) draw_text(face &FontFace, x int, y int, text string, color u32
 	return x + face.text_width(text)
 }
 
-fn (mut c Canvas) blit_glyph(face &FontFace, glyph Glyph, x int, y int, color u32) {
+fn (mut c Canvas) blit_glyph(pixels []u8, glyph Glyph, x int, y int, color u32) {
 	for row := 0; row < glyph.height; row++ {
 		py := y + row
 		if py < 0 || py >= c.physical_height {
@@ -239,7 +278,7 @@ fn (mut c Canvas) blit_glyph(face &FontFace, glyph Glyph, x int, y int, color u3
 			if px < 0 || px >= c.physical_width {
 				continue
 			}
-			coverage := u32(face.pixels[src + col])
+			coverage := u32(pixels[src + col])
 			if coverage == 0 {
 				continue
 			}

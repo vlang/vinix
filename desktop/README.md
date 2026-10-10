@@ -898,8 +898,12 @@ recorded in `SOURCES.txt` beside it on the image.
 Vinix has no font files and no rasteriser, so the glyphs travel inside the
 binary. `tools/genfont.py` rasterises several Roboto faces with Noto Sans CJK
 SC and Noto Sans JP fallback into 8-bit coverage atlases and writes them to
-`font_data.v` as base64; `font.v` decodes them at startup and blends the
-coverage, which is the same antialiasing a desktop toolkit would give.
+`font_data.v` as base64 of zlib-compressed atlases. Each face is one string,
+so unused faces require no heap-allocated string tables. `font.v` loads only
+the metrics for the current display scale and inflates a face directly into
+its final coverage buffer when first drawn, using the existing image decoder.
+Unused title sizes need no coverage buffers. It blends that coverage,
+which is the same antialiasing a desktop toolkit would give.
 All three fonts use the SIL Open Font License 1.1; see
 `FONT-LICENSE.txt` and `FONT-SOURCES.md` for licensing and pinned sources.
 

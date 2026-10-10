@@ -1277,8 +1277,9 @@ struct DesktopNodeInfo {
 }
 
 fn desktop_stat(path string) ?DesktopFileInfo {
+	// libc fills this synchronous stack buffer; its address never escapes.
 	mut info := C.stat{}
-	if unsafe { C.stat(&char(path.str), &info) } != 0 {
+	if !desktop_fill_stat(path, unsafe { &info }) {
 		return none
 	}
 	return DesktopFileInfo{
@@ -1286,6 +1287,12 @@ fn desktop_stat(path string) ?DesktopFileInfo {
 		is_dir:   (u32(info.st_mode) & u32(C.S_IFMT)) == u32(C.S_IFDIR)
 		modified: i64(info.st_mtime)
 	}
+}
+
+// Borrow a typed pointer across V's generic voidptr libc declaration without
+// promoting the caller's local stat buffer to a permanent heap allocation.
+fn desktop_fill_stat(path string, info &C.stat) bool {
+	return unsafe { C.stat(&char(path.str), info) } == 0
 }
 
 // lstat, so a symbolic link is reported as the link and not as whatever it

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import unittest
+import zlib
 
 from PIL import Image, ImageDraw
 
@@ -24,7 +25,13 @@ def atlas_faces():
     code_points = list(range(genfont.FIRST_CHAR, genfont.LAST_CHAR + 1)) + extras
     faces = {}
     for name, body in re.findall(r"const face_(\w+) = FaceBlob\{(.*?)\n\}", source, re.S):
-        raw = base64.b64decode("".join(re.findall(r"'([A-Za-z0-9+/=]+)'", body)))
+        compressed = base64.b64decode(re.search(r"data:\s*'([A-Za-z0-9+/=]+)'", body).group(1))
+        raw = zlib.decompress(compressed)
+        if len(raw) != int(re.search(r"decoded_size:\s*(\d+)", body).group(1)):
+            raise AssertionError("decoded atlas length mismatch: " + name)
+        metrics = base64.b64decode(re.search(r"metrics:\s*'([A-Za-z0-9+/=]+)'", body).group(1))
+        if metrics != raw[:len(code_points) * 5]:
+            raise AssertionError("atlas metrics mismatch: " + name)
         face = {key: int(re.search(r"\b" + key + r":\s*(\d+)", body).group(1))
                 for key in ("size", "raster_scale", "ascent", "descent")}
         face["glyphs"] = {}

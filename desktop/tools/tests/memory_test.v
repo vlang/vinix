@@ -80,6 +80,35 @@ fn print_heap_sizes(label string) {
 	eprintln('${label}: ${sizes}')
 }
 
+fn test_loading_and_replacing_display_scale_fonts_releases_all_storage() {
+	C.vinix_heap_begin()
+	for scale in [1, 2, 1, 2]! {
+		mut fonts := load_fonts_for_scale(scale)
+		assert fonts.len == font_blobs.len / 2
+		for face in fonts {
+			assert face.raster_scale == scale
+			assert face.raster.pixels.len == 0
+			assert face.text_width('English Русский 中文 日本語') > 0
+			assert face.raster.pixels.len == 0
+			pixels := face.coverage()
+			assert pixels.data == face.coverage().data
+			// Walk every glyph, including Chinese and Japanese coverage, to
+			// check that the fixed output buffer contains the complete atlas.
+			mut end := face.glyphs.len * glyph_header_size
+			for glyph in face.glyphs {
+				assert glyph.offset == end
+				end += glyph.width * glyph.height
+			}
+			assert end == pixels.len
+		}
+		free_fonts(mut fonts)
+		assert fonts.len == 0
+	}
+	live := C.vinix_heap_end()
+	if live != 0 { print_heap_sizes('font atlas allocations by size') }
+	assert live == 0, 'replacing display fonts retained ${live} bytes'
+}
+
 fn test_an_idle_redraw_releases_all_temporary_allocations() {
 	mut desktop := memory_fixture_desktop()
 	// Allocate the wallpaper and hit-target capacity before measurement; both

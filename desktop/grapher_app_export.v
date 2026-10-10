@@ -34,12 +34,8 @@ fn (app &GrapherApp) write_graph_png(fd int) bool {
 	face := load_face(face_ui_1x)
 	title := load_face(face_large_bold_1x)
 	defer {
-		unsafe {
-			face.glyphs.free()
-			face.pixels.free()
-			title.glyphs.free()
-			title.pixels.free()
-		}
+		free_font_face(face)
+		free_font_face(title)
 	}
 	canvas.clear(grapher_png_background)
 	canvas.draw_text(unsafe { &title }, 28, 20, tr('app.grapher'), grapher_png_text)
@@ -107,7 +103,7 @@ fn (app &GrapherApp) write_graph_png(fd int) bool {
 	// This descriptor borrows the canvas only for the synchronous stream. It
 	// never initializes Preview state and must not call its ownership cleanup.
 	image := PreviewApp{ pixels: pixels, width: grapher_png_width, height: grapher_png_height }
-	return unsafe { (&image).write_png(fd) }
+	return (unsafe { &image }).write_png(fd)
 }
 
 fn (mut app GrapherApp) export_png() {
