@@ -280,8 +280,12 @@ fn main() {
 		// is half done. The session goes on from here when the machine wakes.
 		if desktop.idle.sleep_requested {
 			titlebar_click = TitlebarClick{}
-			// The kernel does not blank the panel for a sleep, so the display
-			// is turned off here first, as it is for the idle timeout.
+			// The kernel darkens the screen for a sleep where the screen is
+			// the boot framebuffer, and not a panel with a driver of its own,
+			// such as Apple's through DCP, whose backlight it also leaves lit.
+			// So the display is turned off here first, as it is for the idle
+			// timeout: on that panel it is all that goes dark, and on a boot
+			// framebuffer the kernel saves and brings back a black picture.
 			desktop.display_turn_off()
 			if desktop.idle.blank_pending {
 				desktop.idle.blank_pending = false

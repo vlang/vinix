@@ -264,8 +264,8 @@ fn test_sleep_keeps_the_session_and_repaints_when_the_machine_wakes() {
 	d.taskbar_clock_sampled = true
 	d.tray.sampled = false
 	power_test_slept_ms = 3 * 60 * 60 * 1000
-	// As the main loop does it: the kernel leaves the panel showing whatever
-	// was on it, so the display is turned off before the machine is.
+	// As the main loop does it: the kernel darkens only a boot framebuffer
+	// for a sleep, so the display is turned off before the machine is.
 	power_test_level = 120
 	d.display_turn_off()
 	assert d.idle.display_off && d.idle.blank_pending && power_test_dims == 1

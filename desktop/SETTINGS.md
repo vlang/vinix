@@ -306,13 +306,18 @@ whole screen, and that input is swallowed: it is not also typed, or clicked on
 whatever was under the pointer, and a press is swallowed through its release.
 
 **Sleep** is the same request as Sleep in the Start menu: `mem` written to
-`/sys/power/state`, which returns when the machine is awake again. The kernel
-does not blank the panel for a sleep, so the compositor turns the display off
-first, as above. The session is not ended. On the way back the display comes
-on, the screen is repainted, the clock and the battery are read again, and
-whatever was typed or clicked to wake the machine is dropped. If the kernel
-refuses, the display comes back, a notice says so for a few seconds, nothing
-else changes, and the timer does not ask again until there has been input.
+`/sys/power/state`, which returns when the machine is awake again. The
+compositor turns the display off first, as above. For a sleep the kernel
+itself paints the screen black and brings its picture back on waking, but
+only where the screen is the boot framebuffer, as on a PC with no display
+driver and in a virtual machine. A panel with a driver of its own, Apple's
+through DCP, it does not reach, and there the compositor's black frame and
+dimmed backlight are all that goes dark. The session is not ended. On the way
+back the display comes on, the screen is repainted, the clock and the battery
+are read again, and whatever was typed or clicked to wake the machine is
+dropped. If the kernel refuses, the display comes back, a notice says so for a
+few seconds, nothing else changes, and the timer does not ask again until
+there has been input.
 **Sleep after** is disabled, with a line saying why, on a kernel whose
 `/sys/power/state` does not offer `mem`.
 

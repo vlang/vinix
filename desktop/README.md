@@ -1188,9 +1188,11 @@ give the console back to that shell, as they always have.
 `/sys/power/state` offers `mem`. Between two frames the compositor presents
 a black frame and writes `mem` there; the write returns when the machine
 wakes, and the compositor repaints the whole screen, reads the battery again
-and drops the input that woke the machine. A refused write raises a notice
-and changes nothing. The idle timer described in `SETTINGS.md` sleeps the
-same way.
+and drops the input that woke the machine. The kernel darkens the screen for
+a sleep too, but only a boot framebuffer; the compositor's own black frame
+and dimmed backlight are for a panel with a driver of its own, which the
+kernel leaves as it was. A refused write raises a notice and changes nothing.
+The idle timer described in `SETTINGS.md` sleeps the same way.
 
 SIGHUP has a distinct meaning: `vinix-desktop-reload` uses it to ask PID 1 for
 an orderly compositor replacement. It never reaches `reboot(2)`. On a GPU

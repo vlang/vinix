@@ -201,8 +201,9 @@ fn (mut d Desktop) request_sleep() {
 // reporting whether it slept. The session is not ended: every window and
 // every application is where it was. On the way back the whole screen is
 // repainted and the battery read again; a refusal changes nothing and raises
-// a notice. The main loop turns the display off before calling this, since
-// the kernel leaves the panel showing whatever was on it.
+// a notice. The main loop turns the display off before calling this: the
+// kernel darkens a boot framebuffer for a sleep, and leaves a panel with a
+// driver of its own showing whatever was on it.
 fn (mut d Desktop) sleep_now() bool {
 	d.idle.sleep_requested = false
 	d.idle.timer.begin_sleep()
