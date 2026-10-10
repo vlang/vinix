@@ -10,6 +10,8 @@
 //	/sys/power/suspend_stats/     success fail last_failed_dev last_failed_step,
 //	                              and Vinix's last_wake, last_*_ms and
 //	                              security_checks, security_changes
+//	/sys/power/profile_policy     [auto] manual: whether the CPU performance
+//	                              profile follows the power source
 //	/sys/power/lid/               state (open, closed, unknown), closes, and
 //	                              action: suspend or ignore
 //	/sys/class/wakeup/wakeupN/    name event_count wakeup_count, and Vinix's
@@ -90,6 +92,8 @@ pub fn publish() {
 	fs.sysfs_attribute('power/lid/action', 0o644, show_lid_action, store_lid_action, unsafe { nil })
 	fs.sysfs_attribute('power/lid/closes', 0o444, show_lid_closes, unsafe { nil }, unsafe { nil })
 	psupply.publish()
+	fs.sysfs_attribute('power/profile_policy', 0o644, show_profile_policy, store_profile_policy,
+		unsafe { nil })
 
 	fs.sysfs_attribute('class/rtc/rtc0/wakealarm', 0o644, show_alarm, store_alarm, unsafe { nil })
 	fs.sysfs_attribute('class/rtc/rtc0/since_epoch', 0o444, show_epoch, unsafe { nil }, unsafe { nil })
@@ -359,4 +363,22 @@ fn store_lid_action(_ voidptr, data &u8, length u64) u64 {
 
 fn show_lid_closes(_ voidptr, mut text lib.Text) {
 	number_line(mut text, lid_closes())
+}
+
+// ── The performance profile ─────────────────────────────────────────────────
+
+fn show_profile_policy(_ voidptr, mut text lib.Text) {
+	text.add(if profile_follows_source() { '[auto] manual\n' } else { 'auto [manual]\n' })
+}
+
+fn store_profile_policy(_ voidptr, data &u8, length u64) u64 {
+	word := fs.sysfs_word(data, length)
+	if word == 'auto' {
+		set_profile_follows_source(true)
+	} else if word == 'manual' {
+		set_profile_follows_source(false)
+	} else {
+		return errno.einval
+	}
+	return 0
 }

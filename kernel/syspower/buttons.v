@@ -86,6 +86,7 @@ pub fn start() {
 	sched.new_kernel_thread(voidptr(button_thread), unsafe { nil }, true)
 	// A battery about to give out asks for what the power button asks for.
 	psupply.on_critical(battery_critical)
+	connect_policies()
 	psupply.start()
 	platform_start()
 }
