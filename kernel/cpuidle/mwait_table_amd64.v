@@ -113,11 +113,15 @@ pub fn mwait_substates(substates u32, hint u32) u32 {
 	return (substates >> (nibble * 4)) & 0xf
 }
 
-// intel_idle.c's table for an Intel family 6 `model`, C1 first, or false when
-// it has none that is copied here. Models whose entry there says use_acpi --
-// the servers, where firmware decides which states are allowed -- are not: a
-// table without that say-so would overrule it.
-fn intel_model_states(model u32, mut t MwaitTable) bool {
+// intel_idle.c's table for an Intel family 6 `model`, C1 first, or an empty
+// one when it has none that is copied here. Models whose entry there says
+// use_acpi -- the servers, where firmware decides which states are allowed --
+// are not: a table without that say-so would overrule it.
+//
+// Returned by value, and filled through its own method: a table handed to a
+// function to fill is moved to the heap by the compiler and left there.
+fn intel_model_states(model u32) MwaitTable {
+	mut t := MwaitTable{}
 	deep := state_mwait | state_masked
 	match model {
 		// nehalem_cstates: NEHALEM, NEHALEM_G, WESTMERE.
@@ -176,21 +180,21 @@ fn intel_model_states(model u32, mut t MwaitTable) bool {
 			t.put('C6', 'MWAIT 0x20', 0x20, 85, 200, deep)
 			t.put('C7s', 'MWAIT 0x33', 0x33, 124, 800, deep)
 		}
-		else {
-			return false
-		}
+		else {}
 	}
-	return true
+	return t
 }
 
 // C1, C1E, C3 and C6 for an Intel family 6 model with no table, each with the
 // slowest figures the tables above have for it.
-fn intel_generic_states(mut t MwaitTable) {
+fn intel_generic_states() MwaitTable {
+	mut t := MwaitTable{}
 	deep := state_mwait | state_masked
 	t.put('C1', 'MWAIT 0x00', 0x00, 3, 6, deep)
 	t.put('C1E', 'MWAIT 0x01', 0x01, 10, 20, deep)
 	t.put('C3', 'MWAIT 0x10', 0x10, 80, 211, deep)
 	t.put('C6', 'MWAIT 0x20', 0x20, 200, 800, deep)
+	return t
 }
 
 // The states to offer on the processor `c` describes, and the driver's name:
@@ -237,10 +241,11 @@ pub fn mwait_table(c MwaitCpu) MwaitTable {
 	mut candidates := MwaitTable{}
 	mut generic := false
 	if c.intel && c.family == 6 {
-		if intel_model_states(c.model, mut candidates) {
+		candidates = intel_model_states(c.model)
+		if candidates.count != 0 {
 			t.reason = 'intel_idle table for this model'
 		} else {
-			intel_generic_states(mut candidates)
+			candidates = intel_generic_states()
 			generic = true
 			t.reason = 'generic Intel states from CPUID.5'
 		}
