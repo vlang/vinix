@@ -1,0 +1,1 @@
+../../../../kernel/c/apple_smc.h
