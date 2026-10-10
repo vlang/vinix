@@ -22,9 +22,9 @@
 @[has_globals]
 module e1000
 
+import devcore
+import dma
 import klock
-import memory
-import pci
 import socket.inet
 
 // Registers, as offsets into BAR 0.
@@ -102,10 +102,12 @@ const tx_descriptors = u32(64)
 const descriptor_bytes = u64(16)
 const frame_buffer_bytes = u64(2048)
 
-// How many times to look at a register before deciding the card is not going
-// to answer. Each read is a trap into the hypervisor, so this is well over a
-// hundred milliseconds everywhere this runs.
-const register_spins = 1000000
+// How long to wait on a register before deciding the card is not going to
+// answer. A reset or an EEPROM read is done in well under a millisecond.
+const register_timeout_ns = 200 * devcore.millisecond
+// How long a full transmit ring may stay full. The card drains 63 frames in
+// microseconds when it is working.
+const tx_full_timeout_ns = 100 * devcore.millisecond
 
 // The cards this drives, all Intel's. The 82574L reports EEPROM reads with the
 // later layout of EERD.
@@ -132,6 +134,15 @@ __global (
 	e1000_tx_next      u32
 	e1000_tx_clean     u32
 	e1000_tx_in_flight u32
+	e1000_tx_lock      klock.Lock
+	// Where the card finds the rings and buffers, kept so that a resume or a
+	// reset can tell it again, and the memory itself, to give back on removal.
+	e1000_rx_ring_dma    dma.Buffer
+	e1000_rx_buffers_dma dma.Buffer
+	e1000_tx_ring_dma    dma.Buffer
+	e1000_tx_buffers_dma dma.Buffer
+	// The card this driver has. It drives one: the IP stack has one interface.
+	e1000_device &devcore.Device
 )
 
 fn model_name(device_id u16) string {
@@ -145,18 +156,19 @@ fn model_name(device_id u16) string {
 	}
 }
 
+fn eeprom_done(context voidptr) bool {
+	done := if e1000_new_eerd { u32(1) << 1 } else { u32(1) << 4 }
+	return reg_read(reg_eerd) & done != 0
+}
+
 // Read one 16-bit word of the EEPROM through EERD.
 fn eeprom_read(word u32) ?u16 {
 	start := if e1000_new_eerd { (word << 2) | 1 } else { (word << 8) | 1 }
-	done := if e1000_new_eerd { u32(1) << 1 } else { u32(1) << 4 }
 	reg_write(reg_eerd, start)
-	for i := 0; i < register_spins; i++ {
-		value := reg_read(reg_eerd)
-		if value & done != 0 {
-			return u16(value >> 16)
-		}
+	if !devcore.spin_until(eeprom_done, unsafe { nil }, register_timeout_ns) {
+		return none
 	}
-	return none
+	return u16(reg_read(reg_eerd) >> 16)
 }
 
 // The station address. QEMU and VirtualBox both load receive address 0 from
@@ -181,28 +193,56 @@ fn read_mac() bool {
 	return true
 }
 
-fn wait_for_reset() bool {
-	for i := 0; i < register_spins; i++ {
-		if reg_read(reg_ctrl) & ctrl_rst == 0 {
+// A card that has left the bus reads as all ones, reset bit included, so this
+// is also how a pulled card is told from one that is merely slow.
+fn reset_done(context voidptr) bool {
+	ctrl := reg_read(reg_ctrl)
+	return ctrl != 0xffffffff && ctrl & ctrl_rst == 0
+}
+
+fn card_matches(dev &devcore.Device) bool {
+	if dev.bus != .pci || dev.vendor != intel_vendor {
+		return false
+	}
+	for id in supported_ids {
+		if dev.device == id {
 			return true
 		}
 	}
 	return false
 }
 
-// Find a supported card and bring it up. Returns false if there is none, or
-// if another driver already owns the IP stack's one interface.
+// Register with the device core, which hands over a supported card if the
+// machine has one. Returns whether the driver ended up with a working card.
 pub fn initialise() bool {
-	e1000_ready = false
-	mut dev := &pci.PCIDevice(unsafe { nil })
-	for id in supported_ids {
-		dev = pci.get_device_by_vendor(intel_vendor, id, 0) or { continue }
-		break
-	}
-	if dev == unsafe { nil } {
+	devcore.register_driver(devcore.Driver{
+		name:     'e1000'
+		bus:      .pci
+		matches:  card_matches
+		probe:    card_probe
+		remove:   card_remove
+		suspend:  card_suspend
+		resume:   card_resume
+		shutdown: card_shutdown
+		reset:    card_reset
+	}) or { return e1000_ready }
+	return e1000_ready
+}
+
+// Whether a card is up and attached to the IP stack.
+pub fn ready() bool {
+	return e1000_ready
+}
+
+// Take a card and bring it up. False if another driver already owns the IP
+// stack's one interface, or the card cannot be made to work.
+fn card_probe(mut dev devcore.Device) bool {
+	if e1000_device != unsafe { nil } {
+		// One interface: a second card stays unbound rather than half driven.
 		return false
 	}
-	name := model_name(dev.device_id)
+	mut card := dev.pci
+	name := model_name(card.device_id)
 
 	mut other_mac := [6]u8{}
 	mut other_mtu := u32(0)
@@ -215,10 +255,10 @@ pub fn initialise() bool {
 	// Size the BAR with decoding off, so that the all-ones probe never lands
 	// on top of something else, then turn on memory decoding and bus
 	// mastering. The legacy interrupt stays off: this driver polls.
-	command := dev.read[u16](0x4)
-	dev.write[u16](0x4, command & ~u16(0x7))
-	bar := dev.get_bar(0)
-	dev.write[u16](0x4, (command & ~u16(1)) | 0x6 | (u16(1) << 10))
+	command := card.read[u16](0x4)
+	card.write[u16](0x4, command & ~u16(0x7))
+	bar := card.get_bar(0)
+	card.write[u16](0x4, (command & ~u16(1)) | 0x6 | (u16(1) << 10))
 	if !bar.is_mmio || bar.base == 0 {
 		C.kprintf(c'e1000: %.*s has no memory BAR\n', i32(name.len), name.str)
 		return false
@@ -229,8 +269,47 @@ pub fn initialise() bool {
 		C.kprintf(c'e1000: could not map registers at 0x%llx\n', u64(bar.base))
 		return false
 	}
-	e1000_new_eerd = dev.device_id == id_82574l
+	e1000_new_eerd = card.device_id == id_82574l
 
+	if !allocate_rings(mut dev) {
+		print('e1000: out of memory for descriptor rings\n')
+		free_rings(mut dev)
+		return false
+	}
+	if !hardware_start(true) {
+		C.kprintf(c'e1000: %.*s did not come out of reset\n', i32(name.len), name.str)
+		free_rings(mut dev)
+		return false
+	}
+
+	link := if reg_read(reg_status) & status_lu != 0 { 'up' } else { 'down' }
+	C.kprintf(c'e1000: %.*s at %llx:%llx.%llx, MAC %02llx:%02llx:%02llx:%02llx:%02llx:%02llx, link %.*s\n',
+		i32(name.len), name.str, u64(card.bus), u64(card.slot), u64(card.function),
+		u64(e1000_mac[0]), u64(e1000_mac[1]), u64(e1000_mac[2]), u64(e1000_mac[3]),
+		u64(e1000_mac[4]), u64(e1000_mac[5]), i32(link.len), link.str)
+
+	// Transmit has to work before attaching: DHCP sends its discover from
+	// inside attach().
+	e1000_device = unsafe { dev }
+	e1000_ready = true
+	if !inet.attach(&e1000_mac, inet.driver_e1000) {
+		hardware_stop()
+		free_rings(mut dev)
+		e1000_device = unsafe { nil }
+		print('e1000: IP stack attach failed\n')
+		return false
+	}
+	// A frame arriving is what ends a sleep for a machine waiting on the
+	// network; whether it may is the administrator's choice, off by default.
+	dev.wakeup_capable = true
+	print('e1000: ready, DHCP requested\n')
+	return true
+}
+
+// Reset the card and program it from what the driver keeps: the station
+// address, and the rings where they already are. `first` reads the address
+// out of the card instead. Used to start it, to resume it and to reset it.
+fn hardware_start(first bool) bool {
 	// Quiet the card and reset it. Firmware may have left it running: a
 	// network boot ROM, for one, does. The mask is written again after the
 	// reset, as Linux does, and reading ICR drops anything already latched.
@@ -238,8 +317,7 @@ pub fn initialise() bool {
 	reg_write(reg_rctl, 0)
 	reg_write(reg_tctl, 0)
 	reg_write(reg_ctrl, reg_read(reg_ctrl) | ctrl_rst)
-	if !wait_for_reset() {
-		C.kprintf(c'e1000: %.*s did not come out of reset\n', i32(name.len), name.str)
+	if !devcore.spin_until(reset_done, unsafe { nil }, register_timeout_ns) {
 		return false
 	}
 	reg_write(reg_imc, 0xffffffff)
@@ -250,7 +328,7 @@ pub fn initialise() bool {
 	ctrl &= ~(ctrl_lrst | ctrl_ilos | ctrl_phy_rst | ctrl_vme)
 	reg_write(reg_ctrl, ctrl)
 
-	if !read_mac() {
+	if first && !read_mac() {
 		// Locally administered, so it cannot clash with a real card.
 		e1000_mac = [u8(0x52), 0x54, 0x00, 0x12, 0x34, 0x57]!
 		print('e1000: no station address in the card or its EEPROM; using a made-up one\n')
@@ -260,94 +338,160 @@ pub fn initialise() bool {
 	for i := u64(0); i < 128; i++ {
 		reg_write(reg_mta + i * 4, 0)
 	}
-
-	if !setup_rx() || !setup_tx() {
-		print('e1000: out of memory for descriptor rings\n')
-		return false
-	}
-
-	link := if reg_read(reg_status) & status_lu != 0 { 'up' } else { 'down' }
-	C.kprintf(c'e1000: %.*s at %llx:%llx.%llx, MAC %02llx:%02llx:%02llx:%02llx:%02llx:%02llx, link %.*s\n',
-		i32(name.len), name.str, u64(dev.bus), u64(dev.slot), u64(dev.function),
-		u64(e1000_mac[0]), u64(e1000_mac[1]), u64(e1000_mac[2]), u64(e1000_mac[3]),
-		u64(e1000_mac[4]), u64(e1000_mac[5]), i32(link.len), link.str)
-
-	// Transmit has to work before attaching: DHCP sends its discover from
-	// inside attach().
-	e1000_ready = true
-	if !inet.attach(&e1000_mac, inet.driver_e1000) {
-		e1000_ready = false
-		reg_write(reg_rctl, 0)
-		reg_write(reg_tctl, 0)
-		print('e1000: IP stack attach failed\n')
-		return false
-	}
-	print('e1000: ready, DHCP requested\n')
+	start_rx()
+	start_tx()
 	return true
 }
 
-// Physically contiguous, zeroed memory for the card to read or write, and
-// where the kernel sees it.
-fn dma_alloc(bytes u64) (u64, u64) {
-	pages := (bytes + 4095) / 4096
-	phys := u64(memory.pmm_alloc(pages))
-	if phys == 0 {
-		return 0, 0
-	}
-	return phys, phys + memory.get_hhdm_offset()
+// Stop the card touching memory: nothing received, nothing sent, no
+// interrupt. Callers have already made sure no CPU is inside poll() or
+// send().
+fn hardware_stop() {
+	reg_write(reg_imc, 0xffffffff)
+	reg_write(reg_rctl, 0)
+	reg_write(reg_tctl, 0)
+	_ := reg_read(reg_icr)
 }
 
-fn setup_rx() bool {
-	ring_phys, ring_virt := dma_alloc(u64(rx_descriptors) * descriptor_bytes)
-	buffers_phys, buffers_virt := dma_alloc(u64(rx_descriptors) * frame_buffer_bytes)
-	if ring_phys == 0 || buffers_phys == 0 {
+// Keep poll() and send() out, and wait for a CPU already inside either.
+fn fence() {
+	e1000_ready = false
+	e1000_rx_lock.acquire()
+	e1000_rx_lock.release()
+	e1000_tx_lock.acquire()
+	e1000_tx_lock.release()
+}
+
+fn allocate_rings(mut dev devcore.Device) bool {
+	e1000_rx_ring_dma = dma.alloc_buffer(mut dev, u64(rx_descriptors) * descriptor_bytes) or { return false }
+	e1000_rx_buffers_dma = dma.alloc_buffer(mut dev, u64(rx_descriptors) * frame_buffer_bytes) or {
 		return false
 	}
+	e1000_tx_ring_dma = dma.alloc_buffer(mut dev, u64(tx_descriptors) * descriptor_bytes) or { return false }
+	e1000_tx_buffers_dma = dma.alloc_buffer(mut dev, u64(tx_descriptors) * frame_buffer_bytes) or {
+		return false
+	}
+	e1000_rx_ring = e1000_rx_ring_dma.virt
+	e1000_rx_buffers = e1000_rx_buffers_dma.virt
+	e1000_tx_ring = e1000_tx_ring_dma.virt
+	e1000_tx_buffers = e1000_tx_buffers_dma.virt
+	return true
+}
+
+fn free_rings(mut dev devcore.Device) {
+	dma.free_buffer(mut dev, e1000_rx_ring_dma)
+	dma.free_buffer(mut dev, e1000_rx_buffers_dma)
+	dma.free_buffer(mut dev, e1000_tx_ring_dma)
+	dma.free_buffer(mut dev, e1000_tx_buffers_dma)
+	e1000_rx_ring_dma = dma.Buffer{}
+	e1000_rx_buffers_dma = dma.Buffer{}
+	e1000_tx_ring_dma = dma.Buffer{}
+	e1000_tx_buffers_dma = dma.Buffer{}
+	e1000_rx_ring = 0
+	e1000_rx_buffers = 0
+	e1000_tx_ring = 0
+	e1000_tx_buffers = 0
+}
+
+// Point every receive descriptor at its buffer, hand all but one to the card
+// and turn reception on. Anything a previous run left in the ring is dropped.
+fn start_rx() {
+	ring := e1000_rx_ring_dma
+	buffers := e1000_rx_buffers_dma
 	for i := u64(0); i < u64(rx_descriptors); i++ {
 		unsafe {
-			*&u64(ring_virt + i * descriptor_bytes) = buffers_phys + i * frame_buffer_bytes
+			*&u64(ring.virt + i * descriptor_bytes) = buffers.bus + i * frame_buffer_bytes
+			*&u64(ring.virt + i * descriptor_bytes + 8) = 0
 		}
 	}
-	e1000_rx_ring = ring_virt
-	e1000_rx_buffers = buffers_virt
 	e1000_rx_next = 0
 	e1000_rx_discard = false
 	dma_barrier()
-	reg_write(reg_rdbal, u32(ring_phys))
-	reg_write(reg_rdbah, u32(ring_phys >> 32))
+	reg_write(reg_rdbal, u32(ring.bus))
+	reg_write(reg_rdbah, u32(ring.bus >> 32))
 	reg_write(reg_rdlen, rx_descriptors * u32(descriptor_bytes))
 	reg_write(reg_rdh, 0)
 	// Every descriptor but one belongs to the card. The one at the tail is
 	// ours; head reaching it means the ring is full, not empty.
 	reg_write(reg_rdt, rx_descriptors - 1)
 	reg_write(reg_rctl, rctl_en | rctl_mpe | rctl_bam | rctl_secrc)
-	return true
 }
 
-fn setup_tx() bool {
-	ring_phys, ring_virt := dma_alloc(u64(tx_descriptors) * descriptor_bytes)
-	buffers_phys, buffers_virt := dma_alloc(u64(tx_descriptors) * frame_buffer_bytes)
-	if ring_phys == 0 || buffers_phys == 0 {
-		return false
-	}
+fn start_tx() {
+	ring := e1000_tx_ring_dma
+	buffers := e1000_tx_buffers_dma
 	for i := u64(0); i < u64(tx_descriptors); i++ {
 		unsafe {
-			*&u64(ring_virt + i * descriptor_bytes) = buffers_phys + i * frame_buffer_bytes
+			*&u64(ring.virt + i * descriptor_bytes) = buffers.bus + i * frame_buffer_bytes
+			*&u64(ring.virt + i * descriptor_bytes + 8) = 0
 		}
 	}
-	e1000_tx_ring = ring_virt
-	e1000_tx_buffers = buffers_virt
 	e1000_tx_next = 0
 	e1000_tx_clean = 0
 	e1000_tx_in_flight = 0
 	dma_barrier()
-	reg_write(reg_tdbal, u32(ring_phys))
-	reg_write(reg_tdbah, u32(ring_phys >> 32))
+	reg_write(reg_tdbal, u32(ring.bus))
+	reg_write(reg_tdbah, u32(ring.bus >> 32))
 	reg_write(reg_tdlen, tx_descriptors * u32(descriptor_bytes))
 	reg_write(reg_tdh, 0)
 	reg_write(reg_tdt, 0)
 	reg_write(reg_tipg, tipg_copper)
 	reg_write(reg_tctl, tctl_en | tctl_psp | tctl_ct | tctl_cold | tctl_rtlc)
+}
+
+// ── What the device core asks for ───────────────────────────────────────────
+
+// Give the card back: the IP stack loses its interface, the card is stopped
+// and may no longer master the bus, and its memory is returned.
+fn card_remove(mut dev devcore.Device) {
+	fence()
+	inet.detach()
+	hardware_stop()
+	dev.pci.update_command(1 << 2, 0)
+	free_rings(mut dev)
+	e1000_device = unsafe { nil }
+	dev.wakeup_capable = false
+	print('e1000: removed\n')
+}
+
+// Before power off or reset: stop DMA, and leave the card as quiet as
+// firmware expects to find it.
+fn card_shutdown(mut dev devcore.Device) {
+	fence()
+	hardware_stop()
+	dev.pci.update_command(1 << 2, 0)
+}
+
+// For system sleep the card is stopped and everything else is kept: the
+// stack stays attached, and frames sent meanwhile are refused as a full ring
+// would refuse them.
+fn card_suspend(mut dev devcore.Device) bool {
+	fence()
+	hardware_stop()
+	return true
+}
+
+// Firmware may have reset the card while the machine slept, or cut its
+// power: nothing in it is assumed to have survived.
+fn card_resume(mut dev devcore.Device) bool {
+	command := dev.pci.read[u16](0x4)
+	dev.pci.write[u16](0x4, (command & ~u16(1)) | 0x6 | (u16(1) << 10))
+	if !hardware_start(false) {
+		return false
+	}
+	e1000_ready = true
+	return true
+}
+
+// A card that stopped answering is reset in place. The stack keeps its
+// interface and its address; what was in the rings is lost, which TCP
+// recovers from.
+fn card_reset(mut dev devcore.Device) bool {
+	fence()
+	if !hardware_start(false) {
+		return false
+	}
+	e1000_ready = true
 	return true
 }
 
@@ -375,12 +519,28 @@ pub fn send(frame voidptr, length u64) int {
 	// would tell the card the ring is empty. QEMU sends a frame before the
 	// tail write returns, so the ring only fills where the send is
 	// asynchronous; give such a card a moment to catch up.
+	e1000_tx_lock.acquire()
+	defer {
+		e1000_tx_lock.release()
+	}
+	if !e1000_ready {
+		return -1
+	}
 	reclaim_tx()
-	for spin := 0; e1000_tx_in_flight >= tx_descriptors - 1; spin++ {
-		if spin == register_spins {
-			return -1
+	if e1000_tx_in_flight >= tx_descriptors - 1 {
+		full := devcore.deadline(tx_full_timeout_ns)
+		for e1000_tx_in_flight >= tx_descriptors - 1 {
+			if full.expired() {
+				// The card has stopped taking frames: that is a failure to
+				// report, not just a frame to drop.
+				mut dev := e1000_device
+				if dev != unsafe { nil } {
+					devcore.report_timeout(mut dev, 'transmit ring full')
+				}
+				return -1
+			}
+			reclaim_tx()
 		}
-		reclaim_tx()
 	}
 	index := e1000_tx_next
 	buffer := e1000_tx_buffers + u64(index) * frame_buffer_bytes
@@ -409,11 +569,19 @@ pub fn poll() {
 	if !e1000_ready {
 		return
 	}
-	// The usual answer, and it costs one read of ordinary memory.
-	if rx_status(e1000_rx_next) & desc_dd == 0 {
+	// The usual answer, and it costs one read of ordinary memory. It is only
+	// a hint: the card may be on its way out on another CPU, so the ring is
+	// read through a copy of its address, and nothing is believed until the
+	// lock is held and the card is still there.
+	ring := e1000_rx_ring
+	if ring == 0 || u32(unsafe { *&u8(ring + u64(e1000_rx_next) * descriptor_bytes + 12) }) & desc_dd == 0 {
 		return
 	}
 	if !e1000_rx_lock.test_and_acquire() {
+		return
+	}
+	if !e1000_ready {
+		e1000_rx_lock.release()
 		return
 	}
 	mut last := u32(0)
