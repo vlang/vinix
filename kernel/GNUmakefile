@@ -405,9 +405,9 @@ $(LINUXKPI_COBJ): $(V_CONFIG_STAMP)
 
 ifeq ($(ACPI_SYNC_TEST),1)
 ACPI_SYNC_V_ARCH := $(if $(filter aarch64,$(ARCH)),arm64,amd64)
-obj/acpi-sync/native.c: ../tests/acpi-sync/nativefixture/core.v ../tests/acpi-sync/native-abi.h ../tests/acpi-sync/compile-v-native.py ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
+obj/acpi-sync/native.c: ../tests/acpi-sync/nativefixture/core.v ../tests/acpi-sync/native-abi.h ../tests/acpi-sync/compile-v-native ../tests/acpi-sync/compile-v-native.v ../tests/apple-protocols/fixturecompiler/controller.v ../tests/linuxkpi/hosttest/module.v $(V_CONFIG_STAMP)
 	mkdir -p "$(@D)"
-	python3 ../tests/acpi-sync/compile-v-native.py $@ --arch $(ACPI_SYNC_V_ARCH)
+	../tests/acpi-sync/compile-v-native $@ --arch $(ACPI_SYNC_V_ARCH)
 
 obj/acpi-sync/native.o: obj/acpi-sync/native.c GNUmakefile $(V_CONFIG_STAMP)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -I ../tests/acpi-sync -Wno-unused-function -std=gnu11 -c $< -o $@
