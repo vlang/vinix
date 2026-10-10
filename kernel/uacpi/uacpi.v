@@ -228,10 +228,17 @@ pub fn uacpi_kernel_handle_firmware_request(req voidptr) UACPIStatus {
 
 @[export: 'uacpi_kernel_map']
 pub fn uacpi_kernel_map(phys u64, len u64) voidptr {
-	aligned_len := lib.align_up(len, memory.kernel_page_size)
+	// uACPI asks for a table by its first byte, wherever in a page that is.
+	// The pages it lies in are what is mapped: an address that is not a
+	// page's own, put into a page-table entry as it stands, leaves its low
+	// bits where the entry's flags are. The RSDP at ...014 marked its page of
+	// the direct map user-accessible and uncached that way, so userspace
+	// could reach it and, with SMAP on, the kernel no longer could.
+	base := lib.align_down(phys, memory.kernel_page_size)
+	aligned_len := lib.align_up(phys + len - base, memory.kernel_page_size)
 
 	for i := u64(0); i < aligned_len; i += memory.kernel_page_size {
-		kernel_pagemap.map_page(higher_half + phys + i, phys + i, memory.pte_present | memory.pte_noexec | memory.pte_writable) or {
+		kernel_pagemap.map_page(higher_half + base + i, base + i, memory.pte_present | memory.pte_noexec | memory.pte_writable) or {
 			panic('uacpi_kernel_map() failure')
 		}
 	}
