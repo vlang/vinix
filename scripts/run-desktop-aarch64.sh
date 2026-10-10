@@ -82,14 +82,14 @@ while [ "$#" -gt 0 ]; do
         gpuvm|--virgl) VIRGL_DESKTOP=1; PASSTHROUGH+=(--virgl) ;;
         --venus) VIRGL_DESKTOP=1; PASSTHROUGH+=(--venus) ;;
         --ephemeral)  EPHEMERAL_DESKTOP=1; PASSTHROUGH+=("$arg") ;;
-        --v=*)        VINIX_V_COMPILER="${arg#*=}" ;;
+        --v=*)        export VINIX_V_COMPILER="${arg#*=}" ;;
         --v)
             shift
             if [ "$#" -eq 0 ]; then
                 echo "ERROR: --v requires a compiler executable or checkout path" >&2
                 exit 1
             fi
-            VINIX_V_COMPILER="$1"
+            export VINIX_V_COMPILER="$1"
             ;;
         --help|-h)    awk 'NR>1 && /^#/ { sub(/^# ?/, ""); print; next } NR>1 { exit }' "$0"; exit 0 ;;
         *)            PASSTHROUGH+=("$arg") ;;
@@ -131,7 +131,7 @@ if [ "$DISK_ROOT_DESKTOP" -eq 1 ] && [ "$PERSIST_DESKTOP" -eq 0 ]; then
     exit 1
 fi
 
-python3 "$SCRIPT_DIR/tools/prune-build-artifacts.py" --root "$SCRIPT_DIR" --automatic
+"$SCRIPT_DIR/tools/prune-build-artifacts" --root "$SCRIPT_DIR" --automatic
 
 # Keep the chosen compiler in the environment so scripts/build-desktop-aarch64.sh
 # resolves the same compiler after this runner invokes it.

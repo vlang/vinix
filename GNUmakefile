@@ -93,14 +93,14 @@ test-macos-installer:
 
 .PHONY: prune-build prune-build-dry-run
 prune-build:
-	python3 tools/prune-build-artifacts.py
+	./tools/prune-build-artifacts
 
 prune-build-dry-run:
-	python3 tools/prune-build-artifacts.py --dry-run
+	./tools/prune-build-artifacts --dry-run
 
 .PHONY: clean
 clean:
-	python3 tools/prune-build-artifacts.py
+	./tools/prune-build-artifacts
 	rm -rf build-amd64-iso build-amd64-kernel build-amd64-desktop build-aarch64-iso build-aarch64-kernel vinix.iso vinix-aarch64.iso vinix-desktop-amd64.iso build-support/init-aarch64/initramfs.tar build-support/init-aarch64/initramfs-desktop.tar
 
 .PHONY: distclean

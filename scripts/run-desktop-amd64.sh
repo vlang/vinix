@@ -34,7 +34,7 @@ for arg in "$@"; do
     esac
 done
 
-python3 "$SCRIPT_DIR/tools/prune-build-artifacts.py" --root "$SCRIPT_DIR" --automatic
+"$SCRIPT_DIR/tools/prune-build-artifacts" --root "$SCRIPT_DIR" --automatic
 
 if [ "$BUILD" -eq 1 ]; then
     "$SCRIPT_DIR/scripts/build-desktop-amd64.sh"

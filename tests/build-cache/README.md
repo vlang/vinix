@@ -14,8 +14,10 @@ The command and import frontends still accept the existing Python interfaces.
 Their shlex, subprocess version probe, and Python/Pillow version bindings remain
 in Python; input selection, path resolution and hashing execute in V.
 
-`test_prune_build_artifacts.py` remains an independent Python test for the
-unrelated build artifact pruning tool.
+`test_prune_build_artifacts.v` exercises the native pruning command, including
+open files, process environments, keep markers, concurrent replacement and
+failure during inspection. No process environment is logged. The command,
+make targets and build/desktop callers invoke V directly.
 
 The staging and VOffice policies also run in V. Their v2 keys fingerprint the
 native helpers, follow symlink targets, detect directory cycles and omit

@@ -112,9 +112,8 @@ fn main_runtime(work string, runtime string, assets ah.Value, builds [][]string,
 	stem := path(initramfs, 'stem', []ah.Value{}, map[string]ah.Value{})!.text()
 	root := constant('ROOT')!.text()
 	module_iso := join(root, 'build/desktop-perf/' + stem + '-' + tag + '.iso')!
-	python := callback('sys_executable', map[string]ah.Value{})!.text()
-	invoke('', 'run_guest_command', [value_arg(strings([python,
-		join(root, 'tools/prune-build-artifacts.py')!, '--root', root, '--automatic', '--keep',
+	invoke('', 'run_guest_command', [value_arg(strings([
+		join(root, 'tools/prune-build-artifacts')!, '--root', root, '--automatic', '--keep',
 		initramfs, '--keep', module_iso]))], {
 		'check': ah.Value(true)
 	})!
