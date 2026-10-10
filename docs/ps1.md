@@ -84,7 +84,7 @@ the HLE BIOS. Other commercial games and analog controllers have not been tested
 
 ```sh
 python3 tests/ps1/run.py --no-build --game build/ps1/homebrew/TETRADE_PSX.cue
-python3 tests/ps1/frame.py build/ps1/qemu.log build/ps1/gameplay.png
+tests/ps1/frame build/ps1/qemu.log build/ps1/gameplay.png
 python3 tests/ps1/desktop.py
 ```
 

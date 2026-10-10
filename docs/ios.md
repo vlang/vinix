@@ -1087,7 +1087,7 @@ Reproduce the native menu/Settings test and capture its actual pixels:
 ```sh
 python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
   --with-ppsspp --ppsspp-muted --timeout 300 > build/ios/ppsspp-guest.log 2>&1
-python3 tests/ios/frame.py build/ios/ppsspp-guest.log build/ios/ppsspp-settings.png
+tests/ios/frame build/ios/ppsspp-guest.log build/ios/ppsspp-settings.png
 ```
 
 The test uses the installed launcher with fresh preferences, runs beyond the
@@ -1107,7 +1107,7 @@ Neither the PSP binary nor the iOS executable is rewritten.
 python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
   --with-ppsspp --ppsspp-muted --ppsspp-cube --timeout 300 \
   > build/ios/ppsspp-cube-guest.log 2>&1
-python3 tests/ios/frame.py build/ios/ppsspp-cube-guest.log build/ios/ppsspp-cube.png
+tests/ios/frame build/ios/ppsspp-cube-guest.log build/ios/ppsspp-cube.png
 ```
 
 The test passes `/opt/ios/cube.pbp` to the installed launcher. UIKit supplies a
@@ -1153,8 +1153,8 @@ patched or rebuilt.
 python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
   --with-ppsspp --ppsspp-muted --ppsspp-nzp --timeout 300 \
   > build/ios/ppsspp-nzp-guest.log 2>&1
-python3 tests/ios/frame.py build/ios/ppsspp-nzp-guest.log build/ios/ppsspp-nzp-before.png --frame 0
-python3 tests/ios/frame.py build/ios/ppsspp-nzp-guest.log build/ios/ppsspp-nzp.png
+tests/ios/frame build/ios/ppsspp-nzp-guest.log build/ios/ppsspp-nzp-before.png --frame 0
+tests/ios/frame build/ios/ppsspp-nzp-guest.log build/ios/ppsspp-nzp.png
 ```
 
 The game is installed under the emulated memstick's `PSP/GAME/nzportable`,
@@ -1204,7 +1204,7 @@ patched. The binaries remain in the ignored build directory.
 python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
   --with-ppsspp --ppsspp-muted --ppsspp-gow --timeout 1200 \
   > build/ios/ppsspp-gow-guest.log 2>&1
-python3 tests/ios/frame.py build/ios/ppsspp-gow-guest.log build/ios/ppsspp-gow.png
+tests/ios/frame build/ios/ppsspp-gow-guest.log build/ios/ppsspp-gow.png
 ```
 
 The probe sets the normal `[Graphics] InternalResolution=1` preference instead

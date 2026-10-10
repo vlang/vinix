@@ -8,7 +8,7 @@ through SIO2, and reads and writes an actual PS2 memory card.
 ```sh
 python3 tests/ps2/run.py
 python3 tests/ps2/run.py --no-build
-python3 tests/ps2/frame.py build/ps2/qemu.log build/ps2/gameplay.png
+tests/ps2/frame build/ps2/qemu.log build/ps2/gameplay.png
 python3 tests/ps2/desktop.py
 ```
 

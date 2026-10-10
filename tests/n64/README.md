@@ -9,7 +9,7 @@ controller through SI/PIF and reads and writes cartridge SRAM through PI DMA.
 ```sh
 python3 tests/n64/run.py
 python3 tests/n64/run.py --no-build
-python3 tests/n64/frame.py build/n64/qemu.log build/n64/gameplay.png
+tests/n64/frame build/n64/qemu.log build/n64/gameplay.png
 python3 tests/n64/desktop.py
 ```
 

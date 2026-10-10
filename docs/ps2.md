@@ -81,7 +81,7 @@ archive hashes, and license details are in
 
 ```sh
 python3 tests/ps2/run.py --no-build
-python3 tests/ps2/frame.py build/ps2/qemu.log build/ps2/paddle.png
+tests/ps2/frame build/ps2/qemu.log build/ps2/paddle.png
 python3 tests/ps2/desktop.py
 ```
 

@@ -11,7 +11,7 @@ removed. The test uses the normal muted audio option.
 ```sh
 python3 tests/ps1/run.py
 python3 tests/ps1/run.py --no-build
-python3 tests/ps1/frame.py build/ps1/qemu.log build/ps1/gameplay.png
+tests/ps1/frame build/ps1/qemu.log build/ps1/gameplay.png
 python3 tests/ps1/desktop.py
 ```
 
@@ -35,7 +35,7 @@ game check requires a nonempty detailed game frame and clean shutdown. The
 Tetrade gameplay, controller, pause/resume and reset checks still run first.
 No commercial game or Sony BIOS is downloaded by this regression.
 
-`frame.py --frame 0` selects the first captured frame; the default is the last.
+`frame --frame 0` selects the first captured frame; the default is the last.
 PNG pixels come directly from the VSF1 surface produced by the emulator.
 
 `desktop.py` uses the built compositor, actual QEMU mouse input and screenshots
