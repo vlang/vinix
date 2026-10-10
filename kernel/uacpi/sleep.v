@@ -41,6 +41,8 @@ fn C.uacpi_read_register_field(field int, value &u64) UACPIStatus
 fn C.uacpi_write_register_field(field int, value u64) UACPIStatus
 @[c_extern]
 fn C.uacpi_namespace_root() voidptr
+@[c_extern]
+fn C.uacpi_enable_fixed_event(event int) UACPIStatus
 
 // Whether firmware describes sleeping state `state` (the \_Sx package) and a
 // place to leave the address to resume at (the FACS). A machine built to the
@@ -101,9 +103,15 @@ pub fn leave_sleep_early(state int) {
 }
 
 // And with interrupts on: the _WAK method, and the events of a running
-// machine enabled again.
+// machine enabled again. uACPI does that for the general purpose events; the
+// enable bits of the fixed ones went with the power as well, and a power
+// button that is not enabled again is one that no longer does anything. One
+// with no handler is refused, which is the right answer for it.
 pub fn leave_sleep(state int) UACPIStatus {
-	return C.uacpi_wake_from_sleep_state(state)
+	status := C.uacpi_wake_from_sleep_state(state)
+	C.uacpi_enable_fixed_event(fixed_event_power_button)
+	C.uacpi_enable_fixed_event(fixed_event_sleep_button)
+	return status
 }
 
 // Which fixed events the PM1 status register showed when the machine woke.

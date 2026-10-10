@@ -123,14 +123,28 @@ pub fn report(source Source) {
 // suspend to RAM, where no code of the kernel's was running to see the event
 // arrive. It is recorded as the wakeup whatever is allowed: the machine did
 // wake, and saying what woke it is not the place to enforce what should.
-// Replaces anything reported while the machine was coming back.
+// It replaces anything reported while the machine was coming back -- the
+// kernel's own alarm, say, which finds its time has passed the moment the
+// clock is set right -- and one sleep stays one wakeup, of one source.
 pub fn woke(source Source) {
 	katomic.inc(mut &wakesrc_events[int(source)])
 	if katomic.load(&wakesrc_armed) == 0 {
 		return
 	}
-	katomic.store(mut &wakesrc_last, u32(source) + 1)
-	katomic.inc(mut &wakesrc_wakeups[int(source)])
+	mine := u32(source) + 1
+	for {
+		previous := katomic.load(&wakesrc_last)
+		if previous == mine {
+			break
+		}
+		if katomic.cas(mut &wakesrc_last, previous, mine) {
+			if previous != 0 {
+				katomic.dec(mut &wakesrc_wakeups[int(previous - 1)])
+			}
+			katomic.inc(mut &wakesrc_wakeups[int(source)])
+			break
+		}
+	}
 	event.trigger(mut wakesrc_event, false)
 }
 

@@ -9,6 +9,7 @@ import aarch64.kio
 import aarch64.wdt
 import apple.ans
 import devcore
+import lib
 import memory
 import sched
 
@@ -92,4 +93,7 @@ fn platform_deep_failure() string {
 
 fn platform_deep_blocker() &devcore.Device {
 	return unsafe { nil }
+}
+
+fn platform_deep_report(mut _ lib.Text) {
 }

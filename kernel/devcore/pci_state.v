@@ -74,6 +74,8 @@ __global (
 	devcore_pci_count    int
 	devcore_pci_restores u64
 	devcore_pci_missing  u64
+	// Registers the last restore found changed.
+	devcore_pci_rewritten u64
 )
 
 fn pci_device_count() int {
@@ -160,7 +162,10 @@ fn (saved &PciSaved) word_at(offset u32) u16 {
 fn pci_put_word(p &pci.PCIDevice, saved &PciSaved, word int, attempts int, always bool) {
 	offset := u32(word * 4)
 	value := saved.words[word]
-	if !always && p.read[u32](offset) == value {
+	found := p.read[u32](offset)
+	if found != value {
+		devcore_pci_rewritten++
+	} else if !always {
 		return
 	}
 	for attempt := 0; attempt < attempts; attempt++ {
@@ -267,6 +272,9 @@ fn pci_restore_function(p &pci.PCIDevice, saved &PciSaved) bool {
 	pci_restore_msi(p, saved)
 	// Last: decoding and bus mastering as they were, now that there is
 	// something to decode. Sixteen bits, leaving the status register alone.
+	if p.read[u16](pci_command) != saved.word_at(pci_command) {
+		devcore_pci_rewritten++
+	}
 	p.write[u16](pci_command, saved.word_at(pci_command))
 	return true
 }
@@ -276,6 +284,7 @@ fn pci_restore_function(p &pci.PCIDevice, saved &PciSaved) bool {
 // many functions were not restored: gone, changed, or added since.
 pub fn pci_restore_all() int {
 	mut missing := 0
+	devcore_pci_rewritten = 0
 	for i := 0; i < devcore_device_count; i++ {
 		dev := devcore_devices[i]
 		if dev.bus != .pci || dev.pci == unsafe { nil } {
@@ -290,4 +299,13 @@ pub fn pci_restore_all() int {
 	devcore_pci_restores++
 	devcore_pci_missing += u64(missing)
 	return missing
+}
+
+// What the last pci_restore_all() did: how many functions it had a record
+// for, how many of their registers it found changed and wrote back, and how
+// many functions have gone unrestored over the life of the machine. A
+// restore that found nothing changed was a restore after a sleep in which
+// nothing lost power.
+pub fn pci_restore_report() (int, u64, u64) {
+	return devcore_pci_count, devcore_pci_rewritten, devcore_pci_missing
 }

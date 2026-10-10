@@ -33,9 +33,11 @@
 module syspower
 
 import devcore
+import dev.serial
 import dma
 import event
 import katomic
+import lib
 import proc
 import sched
 import time
@@ -55,6 +57,7 @@ const quiet_timeout_ns = devcore.second
 
 // The keyboard controller's status port, and what its bits say.
 const i8042_status = u16(0x64)
+const i8042_data = u16(0x60)
 const i8042_output_full = u8(0x01)
 const i8042_from_pointer = u8(0x20)
 
@@ -151,7 +154,7 @@ fn platform_deep_sleep() bool {
 	sched.wake_cpu(0)
 	mut slept := false
 	if devcore.sleep_until(on_boot_cpu, voidptr(me), move_timeout_ns, 1) {
-		slept = deep_sleep_here()
+		slept = deep_sleep_here(syspower_rehearsal == .platform)
 	} else {
 		deep_failed('could not move to the boot processor')
 	}
@@ -159,19 +162,29 @@ fn platform_deep_sleep() bool {
 	return slept
 }
 
-// What the keyboard controller is holding, read before anything empties it:
-// the key or the movement that woke the machine, if one did.
+// What the keyboard controller is holding: the key or the movement that woke
+// the machine, if one did. It is taken out of the controller here, where no
+// interrupt can deliver it: the byte is in whatever form the controller
+// falls back to without its settings, and the keyboard thread would read it
+// as some other key.
 fn i8042_waiting() int {
-	status := kio.port_in[u8](i8042_status)
-	// All ones is a machine with no such controller.
-	if status == 0xff || status & i8042_output_full == 0 {
-		return no_source
+	mut source := no_source
+	for _ in 0 .. 32 {
+		status := kio.port_in[u8](i8042_status)
+		// All ones is a machine with no such controller.
+		if status == 0xff || status & i8042_output_full == 0 {
+			break
+		}
+		if source == no_source {
+			source = if status & i8042_from_pointer != 0 {
+				int(wakesrc.Source.pointer)
+			} else {
+				int(wakesrc.Source.keyboard)
+			}
+		}
+		kio.port_in[u8](i8042_data)
 	}
-	return if status & i8042_from_pointer != 0 {
-		int(wakesrc.Source.pointer)
-	} else {
-		int(wakesrc.Source.keyboard)
-	}
+	return source
 }
 
 // What ended the sleep, as well as can be told on the way back: the clock's
@@ -180,10 +193,10 @@ fn i8042_waiting() int {
 // machine is not taken for a press once the event interrupt is back.
 fn wake_cause() int {
 	fixed := uacpi.take_wake_status()
+	held := i8042_waiting()
 	if fixed.rtc {
 		return int(wakesrc.Source.alarm)
 	}
-	held := i8042_waiting()
 	if held != no_source {
 		return held
 	}
@@ -196,28 +209,46 @@ fn wake_cause() int {
 	return no_source
 }
 
-// On the boot processor, pinned there.
-fn deep_sleep_here() bool {
-	status := uacpi.prepare_sleep(uacpi.sleep_state_s3)
-	if status != .ok {
-		C.kprintf(c'syspower: firmware would not prepare for S3: %s\n', C.uacpi_status_to_string(status))
-		return deep_failed('firmware would not prepare')
+// In a rehearsal firmware is not asked: the processor is saved, and carries
+// straight on.
+fn enter_nothing() {
+}
+
+// On the boot processor, pinned there. With `rehearse` everything is done
+// but the asking: firmware is told nothing, the machine stays down for the
+// rehearsal's delay with its processors parked, and comes back the way it
+// does when firmware refuses -- which is then not a failure.
+fn deep_sleep_here(rehearse bool) bool {
+	mut alarm := false
+	if !rehearse {
+		status := uacpi.prepare_sleep(uacpi.sleep_state_s3)
+		if status != .ok {
+			C.kprintf(c'syspower: firmware would not prepare for S3: %s\n', C.uacpi_status_to_string(status))
+			return deep_failed('firmware would not prepare')
+		}
+		// From here firmware has been told the machine is going down, and is
+		// told it is back whatever happens.
+		uacpi.set_waking_vector(wake.entry_address())
+		alarm = arm_clock_alarm()
 	}
-	// From here firmware has been told the machine is going down, and is
-	// told it is back whatever happens.
-	uacpi.set_waking_vector(wake.entry_address())
-	alarm := arm_clock_alarm()
 
 	mut slept := false
 	mut why := ''
 	mut cause := no_source
 	mut away_seconds := u64(0)
+	wake.trace('parking', 0)
 	if !wake.park_secondaries() {
 		why = 'a processor would not park'
 	} else if !devcore.sleep_until(events_quiet, unsafe { nil }, quiet_timeout_ns, 1) {
 		why = 'firmware events would not fall quiet'
 	} else {
 		deep_save_devices()
+		if rehearse {
+			// Down, as far as a rehearsal goes: one processor, the others
+			// parked. A wake source that reports now ends it as it would
+			// end the real thing.
+			devcore.sleep_ms(test_delay_ms())
+		}
 		ints := cpu.interrupt_toggle(false)
 		if !uacpi.events_idle() {
 			why = 'firmware events would not fall quiet'
@@ -228,8 +259,12 @@ fn deep_sleep_here() bool {
 		} else {
 			before_ns := hpet_clock.nanoseconds()
 			before_clock := rtc.now() or { u64(0) }
-			slept = wake.sleep_processor(enter_s3)
-			uacpi.leave_sleep_early(uacpi.sleep_state_s3)
+			wake.trace('asking for S3', before_clock)
+			slept = wake.sleep_processor(if rehearse { enter_nothing } else { enter_s3 })
+			wake.trace('processor back, slept', if slept { u64(1) } else { u64(0) })
+			if !rehearse {
+				uacpi.leave_sleep_early(uacpi.sleep_state_s3)
+			}
 			if slept {
 				apic.io_apic_restore()
 				time.pit_resume()
@@ -239,13 +274,15 @@ fn deep_sleep_here() bool {
 				}
 				hpet_clock.resume(before_ns + away_seconds * devcore.second)
 				cause = wake_cause()
-			} else {
+				wake.trace('woken by', u64(cause))
+			} else if !rehearse {
 				why = 'firmware did not put the machine to sleep'
 			}
 		}
 		// Every wait from here on is against a clock that runs again. The
 		// other processors need no interrupts to be started.
 		wake.start_secondaries()
+		wake.trace('processors started, lost', wake.lost_processors())
 		cpu.interrupt_toggle(ints)
 	}
 	// Those that parked while another would not, and the end of parking
@@ -254,13 +291,18 @@ fn deep_sleep_here() bool {
 	// The boot processor's timer was stopped with the rest of its APIC; its
 	// next pass through the scheduler arms it.
 	sched.wake_cpu(0)
-	uacpi.leave_sleep(uacpi.sleep_state_s3)
+	if !rehearse {
+		uacpi.leave_sleep(uacpi.sleep_state_s3)
+	}
 	if alarm {
 		disarm_clock_alarm(cause == int(wakesrc.Source.alarm))
 	}
 	if slept {
 		syspower_deep_cycles++
+		// For the drivers that resume next: their devices are blank.
+		devcore.set_power_lost(true)
 		deep_restore_devices()
+		wake.trace('devices restored', 0)
 		if cause != no_source {
 			wakesrc.woke(unsafe { wakesrc.Source(cause) })
 		}
@@ -274,7 +316,7 @@ fn deep_sleep_here() bool {
 	if why.len != 0 {
 		return deep_failed(why)
 	}
-	return slept
+	return slept || rehearse
 }
 
 // What must be read out of the devices while they still have power.
@@ -333,4 +375,59 @@ fn disarm_clock_alarm(went_off bool) {
 		katomic.store(mut &syspower_alarm_ns, u64(0))
 		event.trigger(mut syspower_alarm_changed, false)
 	}
+}
+
+// ── The serial ports ────────────────────────────────────────────────────────
+
+fn serial_suspend(mut _ devcore.Device) bool {
+	return true
+}
+
+// A UART is untouched by a suspend to idle, and is left alone after one.
+fn serial_resume(mut _ devcore.Device) bool {
+	if devcore.power_lost() {
+		serial.resume()
+	}
+	return true
+}
+
+// Put the PC's serial ports in the device core's list, so that they are
+// programmed again with the other devices after a suspend to RAM. Their
+// driver cannot do it itself: see dev/serial/resume.v.
+fn register_serial_ports() {
+	devcore.register_driver(devcore.Driver{
+		name:    'serial8250'
+		bus:     .platform
+		suspend: serial_suspend
+		resume:  serial_resume
+	}) or { return }
+	devcore.claim_platform('serial8250', 'pnp0501', 'serial8250')
+}
+
+// ── What it came to ─────────────────────────────────────────────────────────
+
+fn report_line(mut text lib.Text, name string, value u64) {
+	text.add(name)
+	text.add(': ')
+	text.add_unsigned(value)
+	text.add_byte(`\n`)
+}
+
+// The lines of /sys/power/deep_sleep after the first: how many suspends to
+// RAM the machine has been through, and what the way back from the last one
+// found to put right. A machine that slept and lost nothing did not sleep.
+fn platform_deep_report(mut text lib.Text) {
+	functions, rewritten, missing := devcore.pci_restore_report()
+	routes, route_count := apic.io_apic_restore_report()
+	report_line(mut text, 'cycles', syspower_deep_cycles)
+	report_line(mut text, 'processors lost', wake.lost_processors())
+	report_line(mut text, 'pci functions saved', u64(functions))
+	report_line(mut text, 'pci registers rewritten', rewritten)
+	report_line(mut text, 'pci functions not restored', missing)
+	report_line(mut text, 'interrupt routes rewritten', routes)
+	report_line(mut text, 'interrupt routes', route_count)
+	report_line(mut text, 'display restored', syspower_display.restores)
+	report_line(mut text, 'display found off', syspower_display.found_off)
+	report_line(mut text, 'display failures', syspower_display.failures)
+	report_line(mut text, 'iommu units', u64(dma.units_on()))
 }

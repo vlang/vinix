@@ -80,9 +80,12 @@ mut:
 	// A copy of the framebuffer, while the machine sleeps.
 	pixels      u64
 	pixel_pages u64
-	// What the last attempt to bring the picture back came to.
-	restores u64
-	failures u64
+	// How often the picture has been brought back, how often the adapter
+	// was found to have lost its mode, and how often it would not take it
+	// back.
+	restores  u64
+	found_off u64
+	failures  u64
 }
 
 __global (
@@ -233,6 +236,10 @@ fn display_restore() {
 	}
 	display.saved = false
 	saved := display.registers
+	// How the adapter came back: with the mode gone, when it lost power.
+	if dispi_read(dispi_enable) & dispi_enabled == 0 {
+		display.found_off++
+	}
 	// The size may only change while the interface is off, and switching it
 	// on sets the virtual size and the offsets to defaults, so those go in
 	// again afterwards.
@@ -254,15 +261,7 @@ fn display_restore() {
 		&& dispi_read(dispi_bpp) == saved[dispi_bpp]
 		&& dispi_read(dispi_virt_width) == saved[dispi_virt_width]
 		&& dispi_read(dispi_enable) & dispi_enabled != 0
-	wake.trace('display took', if took { u64(1) } else { u64(0) })
-	wake.trace('display mmio', display.mmio)
-	wake.trace('display xres saved', u64(saved[dispi_xres]))
-	wake.trace('display xres now', u64(dispi_read(dispi_xres)))
-	wake.trace('display vw saved', u64(saved[dispi_virt_width]))
-	wake.trace('display vw now', u64(dispi_read(dispi_virt_width)))
-	wake.trace('display enable saved', u64(saved[dispi_enable]))
-	wake.trace('display enable now', u64(dispi_read(dispi_enable)))
-	wake.trace('display pixels', display.pixels)
+	wake.trace('display mode taken', if took { u64(1) } else { u64(0) })
 	display.restores++
 	if !took {
 		display.failures++

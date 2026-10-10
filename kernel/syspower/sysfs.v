@@ -6,7 +6,8 @@
 //	/sys/power/state              freeze mem; write one to sleep
 //	/sys/power/mem_sleep          what mem means: [s2idle] deep
 //	/sys/power/deep_sleep         whether deep is offered, and why not (Vinix's)
-//	/sys/power/pm_test            [none] devices: rehearse instead of sleeping
+//	/sys/power/pm_test            [none] devices platform: rehearse instead of
+//	                              sleeping
 //	/sys/power/pm_test_delay_ms   how long a rehearsal stays down (Vinix's)
 //	/sys/power/suspend_stats/     success fail last_failed_dev last_failed_step,
 //	                              and Vinix's last_failed_reason, last_wake,
@@ -173,7 +174,11 @@ fn store_mem_sleep(_ voidptr, data &u8, length u64) u64 {
 }
 
 fn show_pm_test(_ voidptr, mut text lib.Text) {
-	text.add(if rehearsal() == .devices { 'none [devices]\n' } else { '[none] devices\n' })
+	text.add(match rehearsal() {
+		.none { '[none] devices platform\n' }
+		.devices { 'none [devices] platform\n' }
+		.platform { 'none devices [platform]\n' }
+	})
 }
 
 fn store_pm_test(_ voidptr, data &u8, length u64) u64 {
@@ -182,6 +187,8 @@ fn store_pm_test(_ voidptr, data &u8, length u64) u64 {
 		set_rehearsal(.none)
 	} else if word == 'devices' {
 		set_rehearsal(.devices)
+	} else if word == 'platform' {
+		set_rehearsal(.platform)
 	} else {
 		return errno.einval
 	}
@@ -267,11 +274,12 @@ fn show_deep_count(_ voidptr, mut text lib.Text) {
 fn show_deep_sleep(_ voidptr, mut text lib.Text) {
 	if deep_available() {
 		text.add('available\n')
-		return
+	} else {
+		text.add('unavailable: ')
+		text.add(platform_deep_reason())
+		text.add_byte(`\n`)
 	}
-	text.add('unavailable: ')
-	text.add(platform_deep_reason())
-	text.add_byte(`\n`)
+	platform_deep_report(mut text)
 }
 
 // ── /sys/class/wakeup ───────────────────────────────────────────────────────

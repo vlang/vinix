@@ -74,7 +74,15 @@ __global (
 	apic_routes_saved      bool
 	apic_saved_pic_master  u8
 	apic_saved_pic_slave   u8
+	// Redirection entries the last restore found changed.
+	apic_routes_rewritten u64
 )
+
+// How many redirection entries the last io_apic_restore() found changed and
+// wrote back, of how many.
+pub fn io_apic_restore_report() (u64, u64) {
+	return apic_routes_rewritten, apic_saved_route_count
+}
 
 // Read out this processor's local APIC. Interrupts off.
 pub fn lapic_save() LocalState {
@@ -257,6 +265,7 @@ pub fn io_apic_restore() {
 	}
 	kio.port_out[u8](pic_master_data, apic_saved_pic_master)
 	kio.port_out[u8](pic_slave_data, apic_saved_pic_slave)
+	apic_routes_rewritten = 0
 	io_apic_lock.acquire()
 	mut slot := u64(0)
 	for i := 0; i < madt_io_apics.len; i++ {
@@ -264,6 +273,11 @@ pub fn io_apic_restore() {
 		for pin := u32(0); pin < pins && slot < apic_saved_route_count; pin++ {
 			entry := unsafe { apic_saved_routes[slot] }
 			slot++
+			found := u64(io_apic_read(i, 16 + pin * 2)) | (u64(io_apic_read(i, 17 + pin * 2)) << 32)
+			// Delivery status and remote IRR are the controller's own.
+			if (found ^ entry) & ~u64(0x5000) != 0 {
+				apic_routes_rewritten++
+			}
 			// Masked until both halves are the entry's own, and the
 			// destination before the half that unmasks.
 			io_apic_write(i, 16 + pin * 2, u32(entry) | lvt_masked)

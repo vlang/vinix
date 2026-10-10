@@ -67,6 +67,7 @@ fn fixed_button(event int) {
 fn platform_start() {
 	uacpi.on_fixed_button(fixed_button)
 	uacpi.start_events()
+	register_serial_ports()
 }
 
 // Suspend to RAM is ACPI's S3: deep_amd64.v.

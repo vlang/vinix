@@ -55,6 +55,9 @@ pub enum Rehearsal {
 	none
 	// Stop after the devices are suspended.
 	devices
+	// Go all the way down for a suspend to RAM -- the processors parked, the
+	// machine's state read out -- and come back without asking firmware.
+	platform
 }
 
 // How long userspace is given to leave the CPUs. A thread in userspace leaves
@@ -159,8 +162,13 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		fail_sleep('sync', '', '')
 		return false
 	}
-	rehearsing := syspower_rehearsal == .devices
-	going_deep := !rehearsing && kind == .deep && mem_is_deep()
+	// A rehearsal of the platform's part is one of a suspend to RAM: where
+	// `mem` means suspend to idle the platform has no part, and the devices
+	// are what is rehearsed.
+	deep_wanted := kind == .deep && mem_is_deep()
+	rehearsing_platform := syspower_rehearsal == .platform && deep_wanted
+	rehearsing := syspower_rehearsal != .none && !rehearsing_platform
+	going_deep := deep_wanted && !rehearsing
 	sched.freeze_userspace()
 	devcore.sleep_ms(freeze_settle_ms)
 	// What userspace wrote before it stopped.
@@ -219,10 +227,11 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		print('syspower: CPU protections changed across a sleep; restored\n')
 	}
 	devcore.resume_all()
+	devcore.set_power_lost(false)
 	devcore.thaw_bindings()
-	mut woken_by := if rehearsing { 'rehearsal' } else { 'unknown' }
+	mut woken_by := if rehearsing || rehearsing_platform { 'rehearsal' } else { 'unknown' }
 	if source := wakesrc.disarm() {
-		if !rehearsing {
+		if !rehearsing && !rehearsing_platform {
 			woken_by = wakesrc.name(source)
 		}
 	}
@@ -239,10 +248,10 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		return false
 	}
 	syspower_stats.success++
-	if going_deep {
+	if going_deep && !rehearsing_platform {
 		syspower_stats.deep++
 	}
-	syspower_stats.last_depth = if rehearsing {
+	syspower_stats.last_depth = if rehearsing || rehearsing_platform {
 		'rehearsal'
 	} else if going_deep {
 		'deep'
