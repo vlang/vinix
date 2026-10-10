@@ -393,6 +393,12 @@ pub fn run_scenario(host Host, scenario Scenario, run Run) Outcome {
 	machine.stop()
 	if !run.keep {
 		remove_images(scenario, run.state)
+	} else if reason == '' {
+		for disk in scenario.disks {
+			if disk.bulky {
+				os.rm(os.join_path(run.state, disk.name)) or {}
+			}
+		}
 	}
 	return Outcome{
 		scenario:    scenario.name

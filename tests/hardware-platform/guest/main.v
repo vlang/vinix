@@ -39,6 +39,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'nvme-sleep' { scenario_nvme_sleep(mut t) }
 		'firmware' { scenario_firmware(mut t) }
 		'hibernate' { scenario_hibernate(mut t) }
+		'hibernate-cycles' { scenario_hibernate_cycles(mut t) }
 		'hibernate-damaged-header' { scenario_hibernate_damaged_header(mut t) }
 		'hibernate-damaged-pages' { scenario_hibernate_damaged_pages(mut t) }
 		'hibernate-iommu' { scenario_hibernate_iommu(mut t) }

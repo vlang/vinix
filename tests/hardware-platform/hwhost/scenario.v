@@ -49,6 +49,10 @@ pub:
 	// The machine must leave every byte of it as the controller made it.
 	// Checked once the machine has ended, however many times it booted.
 	untouched bool
+	// Its file is removed once the scenario has passed even where the state
+	// directory is being kept: what it holds is hundreds of megabytes of a
+	// machine's memory, of use only for looking into a failure.
+	bulky bool
 }
 
 // Bytes the controller overwrites in a disk's file between two boots, the
@@ -1147,6 +1151,20 @@ pub const scenarios = [
 		timeout:    300
 	},
 	Scenario{
+		name:       'hibernate-cycles'
+		about:      'five suspends to disk one after another, and what the last four leave allocated in the kernel'
+		arches:     ['x86_64']
+		cmdline:    'vinix.hibernate=sd1'
+		qemu:       hibernate_machine
+		disks:      [hibernate_data_disk, hibernate_image_disk]
+		files:      [tftp_probe]
+		required:   ['HWTEST START hibernate-cycles', 'HWTEST PASS hibernate-cycles']
+		reboots:    [Reboot{}, Reboot{}, Reboot{}, Reboot{}, Reboot{}]
+		ending:     .poweroff
+		disk_bytes: hibernate_no_image
+		timeout:    300
+	},
+	Scenario{
 		name:       'hibernate-damaged-header'
 		about:      'an image whose header was damaged while the machine was off is not gone back into'
 		arches:     ['x86_64']
@@ -1262,6 +1280,7 @@ const hibernate_data_disk = Disk{
 const hibernate_image_disk = Disk{
 	name:     'image.raw'
 	size_mib: 640
+	bulky:    true
 }
 
 const hibernate_actions = [

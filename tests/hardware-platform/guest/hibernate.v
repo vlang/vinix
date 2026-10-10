@@ -361,12 +361,10 @@ fn hibernate_twice(mut t Test, unit string) {
 	if !run.cycle(mut t, 1) {
 		return
 	}
-	before := heap_usage() or { HeapUsage{} }
 	// And again: a kernel that has been put back can be put away.
 	if !run.cycle(mut t, 2) {
 		return
 	}
-	after := heap_usage() or { HeapUsage{} }
 	run.check_waiting(mut t, 'after two cycles')
 	if unit != '' {
 		t.check(deep_report('iommu units') == 1 && deep_report('iommu units translating') == 1, 'after two cycles ${deep_report('iommu units')} units are on and ${deep_report('iommu units translating')} translating')
@@ -374,10 +372,6 @@ fn hibernate_twice(mut t Test, unit string) {
 		dma := read_text(card + '/dma') or { '' }
 		t.check(card != '' && dma.contains('isolated'), 'the card is not confined after two cycles: "${dma.replace('\n', ' ')}"')
 	}
-	// One whole cycle lies between the two measurements.
-	t.check(before.objects > 0 && after.objects - before.objects <= heap_noise_objects, 'a suspend to disk and back left ${after.objects - before.objects} more live kernel heap objects (${before.objects} -> ${after.objects})')
-	t.check(after.large_pages <= before.large_pages, 'a suspend to disk and back left ${after.large_pages - before.large_pages} more large pages')
-	t.info('one more cycle: live heap objects ${before.objects} -> ${after.objects}, large pages ${before.large_pages} -> ${after.large_pages}')
 	hib_leave_note('') or { t.check(false, 'clearing the note: ${err.msg()}') }
 	t.step('screen after the cycles')
 	sleep_ms(500)
@@ -389,6 +383,71 @@ fn scenario_hibernate(mut t Test) {
 
 fn scenario_hibernate_iommu(mut t Test) {
 	hibernate_twice(mut t, 'dmar0')
+}
+
+// How many suspends to disk hibernate-cycles measures, after one it does not.
+const hib_measured_cycles = 4
+
+// One suspend to disk with nothing else: no file read, nothing allocated in
+// this program, whose own heap growing costs the kernel objects too.
+fn hib_bare_cycle() bool {
+	fd := C.open(c'/sys/power/state', C.O_WRONLY)
+	if fd < 0 {
+		return false
+	}
+	written := C.write(fd, c'disk', 4)
+	C.close(fd)
+	return written == 4
+}
+
+// hibernate-cycles: what a suspend to disk leaves allocated in the kernel
+// that took it. Every cycle makes tables of the pages it saves and takes a
+// page for each; the kernel inside the image gives them all back when it
+// wakes. One cycle is run first and not measured -- what is made once is
+// made in it -- then four are, with nothing between them.
+fn scenario_hibernate_cycles(mut t Test) {
+	note := hib_note()
+	if !t.check(note == '', 'the machine started afresh after "${note}" instead of going back into its image: ${hib_line('boot')}') {
+		return
+	}
+	if !hib_offered(mut t) {
+		return
+	}
+	hib_leave_note('hibernate-cycles') or { t.check(false, 'leaving a note: ${err.msg()}') }
+	if !t.check(hib_bare_cycle(), 'the first suspend to disk failed: ${deep_stat('last_failed_reason')}') {
+		return
+	}
+	sleep_ms(grace_ms)
+	free_before := meminfo_kb('MemFree') or { 0 }
+	before := heap_usage() or {
+		t.check(false, err.msg())
+		return
+	}
+	mut refused := 0
+	for _ in 0 .. hib_measured_cycles {
+		if !hib_bare_cycle() {
+			refused++
+		}
+	}
+	sleep_ms(grace_ms)
+	after := heap_usage() or {
+		t.check(false, err.msg())
+		return
+	}
+	free_after := meminfo_kb('MemFree') or { 0 }
+	cycles := hib_measured_cycles + 1
+	t.check(refused == 0, '${refused} of ${hib_measured_cycles} suspends to disk failed: ${deep_stat('last_failed_reason')}')
+	t.check(hib_number('resumes') == cycles && deep_stat('disk') == cycles.str() && deep_stat('fail') == '0', '${hib_number('resumes')} resumes and ${deep_stat('disk')} suspends to disk are counted after ${cycles}, with ${deep_stat('fail')} failures')
+	t.check(deep_stat('security_changes') == '0', 'CPU protections changed across a sleep')
+	t.check(deep_report('processors lost') == 0 && deep_report('pci functions not restored') == 0, '${deep_report('processors lost')} processors lost and ${deep_report('pci functions not restored')} PCI functions not restored')
+	t.check(after.objects - before.objects <= heap_noise_objects && after.large_pages <= before.large_pages, '${hib_measured_cycles} suspends to disk left ${after.objects - before.objects} more live kernel heap objects and ${after.large_pages - before.large_pages} more large pages')
+	// The pages a snapshot is copied into are a quarter of this machine's
+	// memory; one cycle's not given back would show here four times over.
+	t.check(free_before - free_after < 16384, '${hib_measured_cycles} suspends to disk left ${free_before - free_after} kB less memory free')
+	hib_check_no_image(mut t, 'after ${cycles} cycles')
+	t.check(network_works(20), 'the network does not work after ${cycles} cycles')
+	t.info('${hib_measured_cycles} more cycles: live heap objects ${before.objects} -> ${after.objects}, large pages ${before.large_pages} -> ${after.large_pages}, MemFree ${free_before} -> ${free_after} kB; last image ${hib_number('image pages')} pages')
+	hib_leave_note('') or { t.check(false, 'clearing the note: ${err.msg()}') }
 }
 
 // An image that must not be gone back into. In the first boot the machine
