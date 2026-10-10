@@ -19,6 +19,7 @@
 @[has_globals]
 module thermal
 
+import devcore
 import errno
 import fs
 import katomic
@@ -123,6 +124,10 @@ fn selftest_start() {
 	katomic.store(mut &thermal_selftest_failing, u32(0))
 	fs.sysfs_attribute('class/thermal/selftest_zone', 0o644, show_selftest_zone, store_selftest_zone,
 		unsafe { nil })
+	if selftest_fake_kind() != fake_none {
+		fs.sysfs_attribute('class/thermal/x86_fake_temp', 0o200, unsafe { nil }, store_fake_temp,
+			unsafe { nil })
+	}
 	if !selftest_register() {
 		C.kprintf(c'thermal: the self-test zone could not be registered\n')
 	}
@@ -164,4 +169,164 @@ fn store_selftest_zone(_ voidptr, data &u8, length u64) u64 {
 		return if selftest_register() { u64(0) } else { u64(errno.enomem) }
 	}
 	return errno.einval
+}
+
+// ── A processor's sensors, made up ──────────────────────────────────────────
+//
+// QEMU's processors have no temperature sensor and no energy counter, so the
+// x86-64 drivers would never run under it. vinix.thermal_fake=intel or =amd
+// on the command line gives them registers to read: the drivers ask here
+// before they ask the processor, and find a Sky Lake with a package sensor,
+// a sensor in each core and RAPL counters, or a Ryzen 7 2700X with Tctl, two
+// die sensors and its package counter. Everything above the instruction that
+// reads a register is then the code a real machine runs, including the
+// interrupt that takes a read to the core it is of.
+//
+//	/sys/class/thermal/x86_fake_temp
+//	    The made-up package's temperature. Write millidegrees Celsius, or
+//	    `critical` and `normal` for the processor's own critical status bit.
+//
+// The package starts at 45 C; each core is three degrees below it and a
+// degree below the core before. The package counter starts just short of
+// wrapping and counts 15 W; the core counter counts 10 W.
+//
+// Kept in plain numbers, with no x86 type in sight: this file is also built
+// for arm64, where nothing calls it.
+
+__global (
+	thermal_fake_parsed      u32
+	thermal_fake_kind        u32
+	thermal_fake_temperature i64
+	thermal_fake_critical    u32
+	thermal_fake_start       u64
+)
+
+const fake_none = u32(0)
+const fake_intel = u32(1)
+const fake_amd = u32(2)
+
+// What selftest_fake_msr() says of a register.
+const fake_not_mine = u32(0)
+const fake_read = u32(1)
+const fake_absent = u32(2)
+
+const fake_tjmax = i64(100000)
+
+// Which processor is made up, if any.
+fn selftest_fake_kind() u32 {
+	if katomic.load(&thermal_fake_parsed) == 0 {
+		mut kind := fake_none
+		if word := devcore.boot_option('vinix.thermal_fake=') {
+			if word == 'intel' {
+				kind = fake_intel
+			} else if word == 'amd' {
+				kind = fake_amd
+			}
+		}
+		thermal_fake_kind = kind
+		thermal_fake_temperature = 45000
+		thermal_fake_start = devcore.now_ns()
+		katomic.store(mut &thermal_fake_parsed, u32(1))
+	}
+	return thermal_fake_kind
+}
+
+// A counter that started at `first` and has counted `rate` a second since.
+fn selftest_fake_counter(first u64, rate u64) u64 {
+	microseconds := (devcore.now_ns() - thermal_fake_start) / 1000
+	return (first + microseconds * rate / 1000000) & 0xffffffff
+}
+
+// An Intel status register for `temperature`.
+fn selftest_fake_status(temperature i64, critical bool) u64 {
+	mut below := (fake_tjmax - temperature) / 1000
+	if below < 0 {
+		below = 0
+	}
+	if below > 127 {
+		below = 127
+	}
+	mut status := (u64(1) << 31) | (u64(below) << 16)
+	if critical {
+		status |= 0x30
+	}
+	return status
+}
+
+// Model-specific register `index` of the made-up processor, as its CPU
+// `cpu_number` reads it.
+fn selftest_fake_msr(cpu_number u64, index u32, value &u64) u32 {
+	kind := selftest_fake_kind()
+	temperature := thermal_fake_temperature
+	critical := katomic.load(&thermal_fake_critical) != 0
+	mut found := u64(0)
+	if kind == fake_intel {
+		match index {
+			// IA32_THERM_STATUS, IA32_PACKAGE_THERM_STATUS.
+			0x19c { found = selftest_fake_status(temperature - 3000 - i64(cpu_number) * 1000, false) }
+			0x1b1 { found = selftest_fake_status(temperature, critical) }
+			// IA32_TEMPERATURE_TARGET: TjMax 100 C, the fans' target 15 below.
+			0x1a2 { found = (u64(100) << 16) | (u64(15) << 8) }
+			// The unit register: 2^-14 J a count.
+			0x606 { found = 0x000a0e03 }
+			// Package: 15 W. Cores: 10 W. Graphics: there, and never used.
+			0x611 { found = selftest_fake_counter(0xfffe0000, 245760) }
+			0x639 { found = selftest_fake_counter(0x1000, 163840) }
+			0x641 { found = 0 }
+			// No memory counter, and none of what TjMax is guessed from.
+			0x619, 0x17, 0xee { return fake_absent }
+			else { return fake_not_mine }
+		}
+	} else if kind == fake_amd {
+		match index {
+			// 2^-16 J a count, and 15 W of them.
+			0xc0010299 { found = 0x000a1003 }
+			0xc001029b { found = selftest_fake_counter(0xfffe0000, 983040) }
+			else { return fake_not_mine }
+		}
+	} else {
+		return fake_not_mine
+	}
+	unsafe {
+		*value = found
+	}
+	return fake_read
+}
+
+// A register behind the made-up AMD host bridge's SMN index. False for one
+// that is not there.
+fn selftest_fake_smn(address u32, value &u32) bool {
+	temperature := thermal_fake_temperature
+	mut found := u32(0)
+	if address == 0x59800 {
+		// Tctl, in eighths of a degree from bit 21.
+		found = u32(temperature / 125) << 21
+	} else if address == 0x59954 || address == 0x59958 {
+		// Two dies, four and five degrees below it: valid, and eighths of a
+		// degree above -49 C.
+		die := i64((address - 0x59954) / 4)
+		found = (u32(1) << 11) | u32((temperature - 4000 - die * 1000 + 49000) / 125)
+	}
+	unsafe {
+		*value = found
+	}
+	return true
+}
+
+fn store_fake_temp(_ voidptr, data &u8, length u64) u64 {
+	word := fs.sysfs_word(data, length)
+	if word == 'critical' {
+		katomic.store(mut &thermal_fake_critical, u32(1))
+		return 0
+	}
+	if word == 'normal' {
+		katomic.store(mut &thermal_fake_critical, u32(0))
+		return 0
+	}
+	value := parse_signed(word) or { return errno.einval }
+	if value < 0 || value > 200000 {
+		return errno.einval
+	}
+	thermal_fake_temperature = value
+	return 0
 }

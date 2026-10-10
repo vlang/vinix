@@ -30,7 +30,6 @@ import x86.apic
 import x86.cpu
 import x86.cpu.local as cpulocal
 import x86.idt
-import x86.msr
 
 const cross_idle = u64(0)
 const cross_posted = u64(1)
@@ -100,7 +99,7 @@ fn cross_cpu_answer() {
 	}
 	mut value := u64(0)
 	mut found := false
-	if read := msr.read_safe(index) {
+	if read := x86_msr_here(index) {
 		value = read
 		found = true
 	}
@@ -111,6 +110,15 @@ fn cross_cpu_answer() {
 		katomic.store(mut &thermal_cross_state, cross_idle)
 		katomic.store(mut &thermal_cross_busy, u32(0))
 	}
+}
+
+// The number of the CPU this runs on, which is only sure to stay the same
+// while interrupts are off.
+fn x86_cpu_here() u64 {
+	ints := cpu.interrupt_toggle(false)
+	here := cpulocal.current().cpu_number
+	cpu.interrupt_toggle(ints)
+	return here
 }
 
 // How a read on another CPU ended.
@@ -133,7 +141,7 @@ fn cross_read(cpu_number u64, index u32, value &u64) CrossRead {
 	ints := cpu.interrupt_toggle(false)
 	if cpulocal.current().cpu_number == cpu_number {
 		mut found := false
-		if read := msr.read_safe(index) {
+		if read := x86_msr_here(index) {
 			unsafe {
 				*value = read
 			}

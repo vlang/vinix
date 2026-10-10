@@ -322,6 +322,10 @@ pub fn unregister_zone(handle u64) bool {
 // What is called when a zone reaches its critical trip: once for each time it
 // does, however long it stays there. Nil for the default, which can only say
 // so; power management installs the one that switches the machine off.
+//
+// The handler runs on the polling thread, with the zone still being read: it
+// must not unregister the zone, and no zone is read again until it returns,
+// so one that has much to do hands the work to a thread of its own.
 pub fn set_critical_handler(handler CriticalHandler) {
 	thermal_critical_handler = voidptr(handler)
 }

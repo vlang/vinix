@@ -36,6 +36,8 @@
 #define STATE CLASS "/cooling_device0/cur_state"
 #define POLLS CLASS "/poll_count"
 #define CRITICAL CLASS "/critical_count"
+#define FAKE CLASS "/x86_fake_temp"
+#define RAPL "/sys/class/powercap/intel-rapl:0"
 #define NONE LONG_MIN
 
 static int out = 1;
@@ -406,6 +408,146 @@ static void selftest(void) {
     check(number(LIMIT) == 100, "limit 100 at the end");
 }
 
+// The x86-64 drivers against the made-up processor of a self-test kernel
+// booted with vinix.thermal_fake=intel or =amd: what they publish, the policy
+// steered through their own readings, and the energy counters across a wrap.
+static unsigned long long big(const char *p) {
+    char b[64];
+    int n = readfile(p, b, sizeof b);
+    return n <= 0 ? 0 : strtoull(b, 0, 10);
+}
+
+static long long now_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1000LL + t.tv_nsec / 1000000;
+}
+
+static void fake(const char *text) {
+    int n = writefile(FAKE, text);
+    if (n < 0) check(0, "write %s to x86_fake_temp: errno %d", text, -n);
+    passes(2, 5000);
+}
+
+static void processor(void) {
+    long seq[32];
+    char name[64], line[256] = "";
+    int at = 0, good = 1;
+
+    check(find_zone("x86_pkg_temp"), "the processor's zone x86_pkg_temp is there");
+    snprintf(name, sizeof name, "%s", word(hwmon, "name"));
+    int intel = strcmp(name, "coretemp") == 0, amd = strcmp(name, "k10temp") == 0;
+    sayf("THERMAL made-up processor: zone %s, hwmon name %s\n", zone, name);
+    check(intel || amd, "its hwmon device is coretemp or k10temp");
+    fake("45000\n");
+    check(in_dir(zone, "temp") == 45000 && in_dir(hwmon, "temp1_input") == 45000, "the package reads 45000");
+    check(strcmp(word(zone, "trip_point_0_type"), "passive") == 0 && in_dir(zone, "trip_point_0_temp") == 85000,
+          "passive trip at 85000");
+    if (intel) {
+        // TjMax 100 C from the register, the fans' target 15 below it.
+        check(strcmp(word(hwmon, "temp1_label"), "Package id 0") == 0, "temp1_label is Package id 0");
+        check(strcmp(word(zone, "trip_point_1_type"), "critical") == 0 && in_dir(zone, "trip_point_1_temp") == 105000,
+              "critical trip at TjMax + 5: 105000");
+        check(in_dir(hwmon, "temp1_max") == 85000 && in_dir(hwmon, "temp1_crit") == 105000, "temp1_max and temp1_crit");
+        // A core's register is read on that core: each one's is a degree lower.
+        int cores = 0;
+        for (int i = 0; i < 64; i++) {
+            char f[32], want[32];
+            snprintf(f, sizeof f, "temp%d_input", i + 2);
+            long t = in_dir(hwmon, f);
+            if (t == NONE) break;
+            cores++;
+            snprintf(f, sizeof f, "temp%d_label", i + 2);
+            snprintf(want, sizeof want, "Core %d", i);
+            at += snprintf(line + at, sizeof line - at, " %s=%ld", word(hwmon, f), t);
+            if (t != 42000 - 1000 * i || strcmp(word(hwmon, f), want) != 0) good = 0;
+        }
+        sayf("THERMAL cores:%s\n", line);
+        check(cores >= 1 && good, "%d cores, each read on its own CPU", cores);
+        check(in_dir(hwmon, "temp2_crit") == 100000 && in_dir(hwmon, "temp2_max") == 85000, "temp2_crit and temp2_max");
+        check(in_dir(hwmon, "temp1_crit_alarm") == 0 && in_dir(hwmon, "temp2_crit_alarm") == 0, "no critical alarm");
+    } else if (amd) {
+        // A Ryzen 7 2700X: Tctl is ten degrees above the die.
+        check(strcmp(word(hwmon, "temp1_label"), "Tctl") == 0, "temp1_label is Tctl");
+        check(strcmp(word(hwmon, "temp2_label"), "Tdie") == 0 && in_dir(hwmon, "temp2_input") == 35000,
+              "Tdie is 35000");
+        check(strcmp(word(hwmon, "temp3_label"), "Tccd1") == 0 && in_dir(hwmon, "temp3_input") == 41000,
+              "Tccd1 is 41000");
+        check(strcmp(word(hwmon, "temp4_label"), "Tccd2") == 0 && in_dir(hwmon, "temp4_input") == 40000,
+              "Tccd2 is 40000");
+        check(in_dir(hwmon, "temp5_input") == NONE, "and there is no third die");
+        check(strcmp(word(zone, "trip_point_1_type"), "critical") == 0 && in_dir(zone, "trip_point_1_temp") == 100000,
+              "critical trip at 100000");
+    }
+
+    // The policy, steered by what the driver reads.
+    fake("86000\n");
+    long first = number(LIMIT);
+    fake("88000\n");
+    long second = number(LIMIT);
+    sayf("THERMAL made-up processor heated: 86 C limit %ld, 88 C limit %ld\n", first, second);
+    check(first == 90 && second == 80, "the processor's zone steps the limit down");
+    writefile(FAKE, "60000\n");
+    follow(100, 20, seq, 32);
+    check(number(LIMIT) == 100, "and gives it back");
+
+    // Its critical trip: on Intel the sensor stops at TjMax, and the status
+    // bit is what reaches it.
+    long before = number(CRITICAL);
+    if (intel) fake("critical\n"); else fake("101000\n");
+    sayf("THERMAL made-up processor critical: temp %ld, critical_count %ld -> %ld\n", in_dir(zone, "temp"), before,
+         number(CRITICAL));
+    check(number(CRITICAL) == before + 1 && number(LIMIT) == 10, "critical calls the handler once");
+    if (intel) check(in_dir(zone, "temp") == 105000 && in_dir(hwmon, "temp1_crit_alarm") == 1,
+                     "the critical status bit reads as the critical trip, and as the alarm");
+    writefile(FAKE, "normal\n");
+    writefile(FAKE, "45000\n");
+    follow(100, 20, seq, 32);
+    check(number(LIMIT) == 100, "limit 100 again");
+
+    // The energy counters. The package register started 131 072 counts short
+    // of wrapping and counts 15 W.
+    check(strcmp(word(RAPL, "name"), "package-0") == 0, "intel-rapl:0 is package-0");
+    check(strcmp(word(RAPL, "max_energy_range_uj"), "9223372036854775807") == 0, "max_energy_range_uj is 2^63 - 1");
+    unsigned long long range = intel ? 262143328850ULL : 65532611009ULL;
+    unsigned long long e0 = big(RAPL "/energy_uj"), last = e0;
+    long long t0 = now_ms();
+    int rising = 1;
+    for (int i = 0; i < 20; i++) {
+        nap(100);
+        unsigned long long e = big(RAPL "/energy_uj");
+        if (e <= last) rising = 0;
+        last = e;
+    }
+    long long ms = now_ms() - t0;
+    long mw = (long)((last - e0) / (unsigned long long)ms);
+    sayf("THERMAL energy_uj %llu -> %llu in %lld ms: %ld mW; the 32-bit register holds %llu\n", e0, last, ms, mw, range);
+    check(rising, "energy_uj only grows");
+    check(e0 > range, "and is past what the register can hold: the wrap was added up");
+    check(mw > 13500 && mw < 16500, "15 W, give or take a tenth");
+    char probe[4096];
+    long said = -1;
+    if (readfile(CLASS "/x86_probe", probe, sizeof probe) > 0) {
+        char *p = strstr(probe, "rapl: package power ");
+        if (p) said = strtol(p + 20, 0, 10);
+    }
+    sayf("THERMAL package_power_mw() says %ld mW\n", said);
+    check(said > 13500 && said < 16500, "package_power_mw() agrees");
+    if (intel) {
+        check(strcmp(word(RAPL "/intel-rapl:0:0", "name"), "core") == 0, "subzone 0 is core");
+        check(strcmp(word("/sys/class/powercap/intel-rapl:0:0", "name"), "core") == 0, "and the class link reaches it");
+        unsigned long long c0 = big(RAPL "/intel-rapl:0:0/energy_uj");
+        long long s0 = now_ms();
+        nap(1500);
+        long cw = (long)((big(RAPL "/intel-rapl:0:0/energy_uj") - c0) / (unsigned long long)(now_ms() - s0));
+        sayf("THERMAL core domain: %ld mW\n", cw);
+        check(cw > 9000 && cw < 11000, "the cores count 10 W");
+        check(!exists(RAPL "/intel-rapl:0:1"), "a counter that reads zero, and one that faults, are no domains");
+    } else {
+        check(!exists(RAPL "/intel-rapl:0:0"), "AMD has the package counter alone");
+    }
+}
+
 int main(void) {
     int fd = open(CONSOLE, O_WRONLY);
     if (fd >= 0) out = fd;
@@ -421,6 +563,7 @@ int main(void) {
     check(exists(CLASS "/cooling_device0/cur_state") && number(LIMIT) == 100, "cooling device there, limit 100");
     if (have) {
         selftest();
+        if (exists(FAKE)) processor();
     } else {
         long before = number(POLLS);
         nap(2500);

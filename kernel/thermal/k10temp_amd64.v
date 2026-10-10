@@ -50,6 +50,16 @@ fn k10_is_amd(device &pci.PCIDevice) bool {
 // A register behind an index and data pair of the host bridge. All ones is a
 // register, or a bridge, that is not there.
 fn k10_indexed_read(index_register u32, address u32) ?u32 {
+	$if thermal_selftest ? {
+		// The made-up processor of selftest_d_thermal_selftest.v has no bridge.
+		if selftest_fake_kind() == fake_amd {
+			mut made_up := u32(0)
+			if index_register == 0x60 && selftest_fake_smn(address, unsafe { &made_up }) {
+				return made_up
+			}
+			return none
+		}
+	}
 	mut value := u32(0)
 	thermal_k10_lock.acquire()
 	wrote := thermal_k10_root.config_write(u64(index_register), 4, address)
@@ -108,6 +118,32 @@ fn k10_htc_register() ?u32 {
 	return none
 }
 
+// The northbridge function the register is in, or is found by, and the host
+// bridge it is reached through from Zen on: Linux binds to the first by its
+// PCI identity. False, with the reason left for x86_probe, when either is
+// missing or is not AMD's.
+fn k10_find_bridges() bool {
+	thermal_k10_misc = pci.get_device_by_coordinates(0, 0x18, 3, 0) or {
+		thermal_k10temp_status = 'no northbridge function at 00:18.3'
+		return false
+	}
+	if !k10_is_amd(thermal_k10_misc) {
+		thermal_k10temp_status = '00:18.3 is not an AMD northbridge'
+		return false
+	}
+	if thermal_k10_model.access != .northbridge {
+		thermal_k10_root = pci.get_device_by_coordinates(0, 0, 0, 0) or {
+			thermal_k10temp_status = 'no host bridge at 00:00.0'
+			return false
+		}
+		if !k10_is_amd(thermal_k10_root) {
+			thermal_k10temp_status = 'the host bridge is not AMD: no SMN registers'
+			return false
+		}
+	}
+	return true
+}
+
 fn k10temp_start() {
 	identity := thermal_x86
 	if identity.vendor != .amd && identity.vendor != .hygon {
@@ -119,23 +155,12 @@ fn k10temp_start() {
 		thermal_k10temp_status = 'no temperature register known for this family'
 		return
 	}
-	thermal_k10_misc = pci.get_device_by_coordinates(0, 0x18, 3, 0) or {
-		thermal_k10temp_status = 'no northbridge function at 00:18.3'
-		return
+	mut made_up := false
+	$if thermal_selftest ? {
+		made_up = selftest_fake_kind() == fake_amd
 	}
-	if !k10_is_amd(thermal_k10_misc) {
-		thermal_k10temp_status = '00:18.3 is not an AMD northbridge'
+	if !made_up && !k10_find_bridges() {
 		return
-	}
-	if thermal_k10_model.access != .northbridge {
-		thermal_k10_root = pci.get_device_by_coordinates(0, 0, 0, 0) or {
-			thermal_k10temp_status = 'no host bridge at 00:00.0'
-			return
-		}
-		if !k10_is_amd(thermal_k10_root) {
-			thermal_k10temp_status = 'the host bridge is not AMD: no SMN registers'
-			return
-		}
 	}
 	if identity.family == 0x10 {
 		_, _, package_type, _, _ := cpu.cpuid(0x80000001, 0)

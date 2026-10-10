@@ -115,6 +115,27 @@ fn x86_identify() {
 		end++
 	}
 	thermal_x86_brand_length = end
+	$if thermal_selftest ? {
+		// The made-up processor has a name and a model too.
+		kind := selftest_fake_kind()
+		if kind == fake_intel {
+			thermal_x86 = X86Identity{
+				vendor:   .intel
+				family:   6
+				model:    0x5e
+				stepping: 3
+			}
+			x86_set_brand('Intel(R) Core(TM) i7-6700 CPU @ 3.40GHz, made up')
+		} else if kind == fake_amd {
+			thermal_x86 = X86Identity{
+				vendor:   .amd
+				family:   0x17
+				model:    0x08
+				stepping: 2
+			}
+			x86_set_brand('AMD Ryzen 7 2700X Eight-Core Processor, made up')
+		}
+	}
 
 	thermal_x86_topology = x86_topology_read()
 	mut one := true
@@ -127,11 +148,51 @@ fn x86_identify() {
 	thermal_x86_one_package = one
 }
 
+// Register `index` of the CPU this runs on, or none if it has no such
+// register. Every sensor and counter is read through here, and only here does
+// a kernel built for the self-test ask its made-up processor first: see
+// selftest_d_thermal_selftest.v.
+fn x86_msr_here(index u32) ?u64 {
+	$if thermal_selftest ? {
+		mut made_up := u64(0)
+		kind := selftest_fake_msr(x86_cpu_here(), index, unsafe { &made_up })
+		if kind == fake_read {
+			return made_up
+		}
+		if kind == fake_absent {
+			return none
+		}
+	}
+	value := msr.read_safe(index) or { return none }
+	return value
+}
+
+// CPUID leaf 6's EAX: which thermal sensors the processor says it has.
+fn x86_thermal_features() u32 {
+	$if thermal_selftest ? {
+		if selftest_fake_kind() == fake_intel {
+			return cpuid6_dtherm | cpuid6_pts
+		}
+	}
+	ok, features, _, _, _ := cpu.cpuid(6, 0)
+	return if ok { features } else { u32(0) }
+}
+
+fn x86_set_brand(name string) {
+	mut length := 0
+	for length < name.len && length < 48 {
+		thermal_x86_brand[length] = name[length]
+		length++
+	}
+	thermal_x86_brand[length] = 0
+	thermal_x86_brand_length = length
+}
+
 // A register of the boot CPU's package: the package's temperature, its
 // energy counters. Read where the caller is when that is the same package.
 fn read_package_msr(index u32) ?u64 {
 	if thermal_x86_one_package {
-		value := msr.read_safe(index) or { return none }
+		value := x86_msr_here(index) or { return none }
 		return value
 	}
 	value := read_msr_on(0, index) or { return none }
@@ -244,9 +305,8 @@ fn show_x86_probe(_ voidptr, mut text lib.Text) {
 	text.add(', "')
 	text.add(x86_brand())
 	text.add('"\n')
-	_, thermal_leaf, _, _, _ := cpu.cpuid(6, 0)
 	text.add('cpuid 6 eax: ')
-	add_hex(mut text, u64(thermal_leaf), 8)
+	add_hex(mut text, u64(x86_thermal_features()), 8)
 	text.add_byte(`\n`)
 	show_status(mut text, 'coretemp', thermal_coretemp_status)
 	show_status(mut text, 'k10temp', thermal_k10temp_status)

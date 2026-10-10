@@ -24,7 +24,6 @@ module thermal
 import devcore
 import memory
 import pci
-import x86.cpu
 
 struct CoretempCore {
 mut:
@@ -60,8 +59,8 @@ fn coretemp_start() {
 		thermal_coretemp_status = 'not an Intel processor'
 		return
 	}
-	ok, features, _, _, _ := cpu.cpuid(6, 0)
-	if !ok || features & cpuid6_dtherm == 0 {
+	features := x86_thermal_features()
+	if features & cpuid6_dtherm == 0 {
 		thermal_coretemp_status = 'CPUID.6:EAX names no digital thermal sensor'
 		return
 	}
