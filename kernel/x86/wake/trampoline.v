@@ -41,6 +41,7 @@ const header_magic = u32(0x454b4157)
 
 const msr_efer = u32(0xc0000080)
 const efer_lma = u64(1) << 10
+const msr_ia32_misc_enable = u32(0x1a0)
 const cr4_pae = u64(1) << 5
 const cr4_la57 = u64(1) << 12
 
@@ -53,7 +54,7 @@ mut:
 	cr3                u32
 	cr4                u32
 	cr0                u32
-	reserved           u32
+	has_misc_enable    u32
 	efer               u64
 	entry              u64
 	stack              u64
@@ -67,6 +68,7 @@ mut:
 	gdt_limit          u16
 	gdt_base           u32
 	pad2               u16
+	misc_enable        u64
 }
 
 __global (
@@ -174,6 +176,12 @@ fn arm(entry u64, stack u64, argument u64) {
 	// the same CR0, and EFER.LMA is the processor's to set.
 	h.cr0 = u32(cpu.read_cr0())
 	h.efer = msr.rdmsr(msr_efer) & ~efer_lma
+	// Before EFER: see the trampoline. An AMD processor has no such register.
+	h.has_misc_enable = 0
+	if value := msr.read_safe(msr_ia32_misc_enable) {
+		h.misc_enable = value
+		h.has_misc_enable = 1
+	}
 	h.stack = stack
 	h.argument = argument
 	$if wake_trace ? {

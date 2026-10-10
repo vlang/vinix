@@ -18,8 +18,9 @@
 //
 //   real mode       load the page's own GDT, set CR0.PE
 //   protected mode  set CR4.PAE (and LA57), load a page table that maps this
-//                   page onto itself and the kernel where it always is, set
-//                   EFER (long mode, no-execute, SYSCALL), set CR0.PG
+//                   page onto itself and the kernel where it always is, put
+//                   IA32_MISC_ENABLE back where there is one, set EFER (long
+//                   mode, no-execute, SYSCALL), set CR0.PG
 //   long mode       load the stack and the argument the kernel left in the
 //                   header and jump to the kernel's entry
 //
@@ -44,8 +45,10 @@ x86_wake_trampoline:
 .code16
     cli
     cld
-    // Over the header; two bytes whatever the assembler would choose.
-    .byte 0xeb, wake_real - 1f
+    // Over the header: a near jump, three bytes whatever the assembler
+    // would choose, so that the header is at offset 8 however long it grows.
+    .byte 0xe9
+    .word wake_real - 1f
 1:
     .balign 8
 
@@ -60,6 +63,8 @@ wake_cr4:
     .long 0
 wake_cr0:
     .long 0
+// Nonzero when wake_misc_enable is to be written.
+wake_has_misc_enable:
     .long 0
 wake_efer:
     .quad 0
@@ -82,6 +87,9 @@ wake_gdt_pointer:
     .word wake_gdt_end - wake_gdt - 1
     .long 0
     .word 0
+// IA32_MISC_ENABLE as the kernel runs with it.
+wake_misc_enable:
+    .quad 0
 // No interrupt can be taken on the way: a table of no entries makes one a
 // shutdown instead of a jump through whatever real mode left behind.
 wake_idt_pointer:
@@ -158,6 +166,17 @@ wake_protected:
     movl %eax, %cr4
     movl AT(wake_cr3)(%ebx), %eax
     movl %eax, %cr3
+    // Firmware may hand an Intel processor back with no-execute switched off
+    // in IA32_MISC_ENABLE (XD disable), and EFER.NXE cannot then be set: the
+    // write below would fault, with no table to take the fault through. The
+    // register goes back to what the kernel ran with first.
+    cmpl $0, AT(wake_has_misc_enable)(%ebx)
+    je 1f
+    movl $0x1a0, %ecx
+    movl AT(wake_misc_enable)(%ebx), %eax
+    movl AT(wake_misc_enable) + 4(%ebx), %edx
+    wrmsr
+1:
     movl $0xc0000080, %ecx
     movl AT(wake_efer)(%ebx), %eax
     movl AT(wake_efer) + 4(%ebx), %edx
@@ -169,6 +188,9 @@ wake_protected:
 
 .code64
 wake_long:
+    // The page's address was put in EBX; what the upper half of RBX holds on
+    // entering 64-bit mode is not defined.
+    movl %ebx, %ebx
     WAKE_TRACE 'L', %rbx
     movq AT(wake_stack)(%rbx), %rsp
     movq AT(wake_argument)(%rbx), %rdi
