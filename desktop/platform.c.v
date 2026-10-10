@@ -1388,3 +1388,46 @@ fn (mut io PosixDeviceIO) is_character(fd int) (bool, DeviceError) {
 	}
 	return (u32(info.st_mode) & u32(C.S_IFMT)) == u32(C.S_IFCHR), DeviceError.none
 }
+
+fn (mut io PosixDeviceIO) is_writable(fd int) (bool, DeviceError) {
+	mut info := C.stat{}
+	if C.fstat(fd, &info) < 0 {
+		return false, device_errno(C.errno)
+	}
+	return u32(info.st_mode) & u32(0o222) != 0, DeviceError.none
+}
+
+// How many entries a listing looks at before it gives up on a directory.
+const device_list_entries = 64
+
+// Only the names: what each entry is, its own files say. Entries a
+// DeviceNames does not keep are skipped, and the listing stops when it is
+// full.
+fn (mut io PosixDeviceIO) list(path string, mut names DeviceNames) DeviceError {
+	names.count = 0
+	dir := C.opendir(&char(path.str))
+	if dir == unsafe { nil } {
+		return device_errno(C.errno)
+	}
+	mut name := [device_name_capacity]u8{}
+	for _ in 0 .. device_list_entries {
+		if names.count >= device_names_capacity {
+			break
+		}
+		entry := C.readdir(dir)
+		if entry == unsafe { nil } {
+			break
+		}
+		mut length := 0
+		for length < device_name_capacity && entry.d_name[length] != 0 {
+			name[length] = u8(entry.d_name[length])
+			length++
+		}
+		// A name that fills the buffer was cut short, so it is not kept.
+		if length < device_name_capacity {
+			names.add(unsafe { (&name[0]).vbytes(length) })
+		}
+	}
+	C.closedir(dir)
+	return .none
+}
