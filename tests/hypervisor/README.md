@@ -1,7 +1,7 @@
 # Hypervisor checks
 
 `sh tests/hypervisor/run.sh` checks the public ioctl layout. Run
-`python3 tests/hypervisor/check-vmx.py` for the production V control helpers
+`tests/hypervisor/check-vmx` for the production V control helpers
 and ARM no-op ABI under ASan/UBSan. The host fixture checks 7,680 cases,
 including every byte-valued failure status, 64-bit operands and VMREAD output
 preservation. Only privileged instructions are adapted in the host control
