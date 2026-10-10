@@ -68,18 +68,31 @@ static int write_file(const char *path, const char *text) {
     return n < 0 ? -e : n;
 }
 
-// Print a file on one line, its newlines turned into bars.
+// Print a file: a short one on one line, its newlines turned into bars, a
+// long one a line at a time.
 static void show(const char *label, const char *path) {
-    char buf[1024];
+    static char buf[8192];
     int n = read_file(path, buf, sizeof buf);
     if (n < 0) {
         sayf("IOMMU-TEST %s: errno %d\n", label, -n);
         return;
     }
     while (n > 0 && buf[n - 1] == '\n') buf[--n] = 0;
+    int lines = 1;
     for (char *c = buf; *c; c++)
-        if (*c == '\n') *c = '|';
-    sayf("IOMMU-TEST %s: %s\n", label, buf);
+        if (*c == '\n') lines++;
+    if (lines <= 8) {
+        for (char *c = buf; *c; c++)
+            if (*c == '\n') *c = '|';
+        sayf("IOMMU-TEST %s: %s\n", label, buf);
+        return;
+    }
+    for (char *line = buf; line;) {
+        char *end = strchr(line, '\n');
+        if (end) *end = 0;
+        sayf("IOMMU-TEST %s: %s\n", label, line);
+        line = end ? end + 1 : NULL;
+    }
 }
 
 // The number after `key` in a "key: value" file such as /proc/meminfo, or -1.
