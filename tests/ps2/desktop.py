@@ -29,39 +29,29 @@ _library.install(_native_sys._getframe().f_globals)
 
 class QMP:
     def __init__(self, path):
-        self.socket = socket.socket(socket.AF_UNIX)
-        self.socket.settimeout(10)
-        self.socket.connect(str(path))
-        self.file = self.socket.makefile("rb")
-        json.loads(self.file.readline())
-        self.call("qmp_capabilities")
+        state = {'self': self, 'path': path}
+        self = path = None
+        return _qmp('qmp_init', state)
 
     def call(self, command, arguments=None):
-        self.socket.sendall((json.dumps({"execute": command, "arguments": arguments or {}}) + "\n").encode())
-        while True:
-            reply = json.loads(self.file.readline())
-            if "error" in reply:
-                raise RuntimeError(reply)
-            if "return" in reply:
-                return reply["return"]
+        state = {'self': self, 'command': command, 'arguments': arguments}
+        self = command = arguments = None
+        return _qmp('qmp_call', state)
 
     def click(self, x, y):
-        self.hold(x, y, .15)
-        time.sleep(.5)
+        state = {'self': self, 'x': x, 'y': y}
+        self = x = y = None
+        return _qmp('qmp_click', state)
 
     def hold(self, x, y, seconds):
-        self.call("input-send-event", {"events": [
-            {"type": "abs", "data": {"axis": "x", "value": round(x * 32767 / WIDTH)}},
-            {"type": "abs", "data": {"axis": "y", "value": round(y * 32767 / HEIGHT)}},
-            {"type": "btn", "data": {"button": "left", "down": True}}]})
-        time.sleep(seconds)
-        self.call("input-send-event", {"events": [
-            {"type": "btn", "data": {"button": "left", "down": False}}]})
+        state = {'self': self, 'x': x, 'y': y, 'seconds': seconds}
+        self = x = y = seconds = None
+        return _qmp('qmp_hold', state)
 
     def close(self):
-        self.file.close()
-        self.socket.close()
-
+        state = {'self': self}
+        self = None
+        return _qmp('qmp_close', state)
 
 def game_pixels(path):
     data = path.read_bytes()

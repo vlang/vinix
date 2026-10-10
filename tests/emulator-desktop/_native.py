@@ -29,7 +29,7 @@ def call(operation, namespace, builtins, state):
 
 _frame = sys._getframe
 _zip = zip
-_SLOT_KEYS = {name: sys.intern(name) for name in ('join', 'desktop', 'mkdir', 'copy2', 'copytree', 'environ', 'get', 'run', 'pop')}
+_SLOT_KEYS = {name: sys.intern(name) for name in ('join', 'desktop', 'mkdir', 'copy2', 'copytree', 'environ', 'get', 'run', 'pop', 'socket', 'AF_UNIX', 'settimeout', 'connect', 'makefile', 'file', 'readline', 'loads', 'dumps', 'sendall', 'encode', 'call', 'sleep', 'hold', 'move', 'close')}
 _ATTRIBUTE = getattr
 
 
@@ -70,7 +70,10 @@ def prepare(operation, directory, args, build, qmp_path):
 def install(namespace):
     namespace.update(_LITERAL_CACHE={}, _SLOT_KEYS=_SLOT_KEYS, _ATTRIBUTE=_ATTRIBUTE,
                      _tuple=_tuple, _list=_list, _FORMAT=_FORMAT,
-                     _environment=_environment, _fill_environment=_fill_environment, _prepare=prepare)
+                     _environment=_environment, _fill_environment=_fill_environment, _prepare=prepare,
+                     _qmp=qmp, _QMP_DICT=_qmp_dict, _QMP_TRUTH=_qmp_truth,
+                     _QMP_STORE_SOCKET=_qmp_store_socket, _QMP_STORE_FILE=_qmp_store_file,
+                     _QMP_RAISE=_binding._raise)
 
 
 def _fill_environment(mapping, keys, *values):
@@ -79,3 +82,41 @@ def _fill_environment(mapping, keys, *values):
         return mapping
     finally:
         mapping = keys = values = None
+
+
+def qmp(operation, state):
+    caller = _frame(1)
+    namespace, builtins = caller.f_globals, caller.f_builtins
+    caller = None
+    try:
+        return call(operation, namespace, builtins, state)
+    finally:
+        namespace = builtins = state = None
+
+
+def _qmp_dict(keys, *values):
+    try:
+        return {key: value for key, value in _zip(keys, values)}
+    finally:
+        values = keys = None
+
+
+def _qmp_truth(value):
+    try:
+        return not not value
+    finally:
+        value = None
+
+
+def _qmp_store_socket(owner, value):
+    try:
+        owner.socket = value
+    finally:
+        value = owner = None
+
+
+def _qmp_store_file(owner, value):
+    try:
+        owner.file = value
+    finally:
+        value = owner = None

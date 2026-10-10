@@ -122,6 +122,7 @@ fn forget_inputs(pins string) ! {
  for name in ['directory','args','build','qmp_path'] { release([call('operator.delitem',o(pins),v(ah.Value(name))!)!])! }
 }
 pub fn dispatch(row map[string]ah.Value) !ah.Value {
+ if ah.field(row,'operation').text().starts_with('qmp_') { return qmp_dispatch(row)! }
  ids := ah.field(row,'arguments').items().map(it.text())
  current_builtins = ids[1]
  mut f := Frame{start:checkpoint()!,pins:ids[0],order:['work','rootfs','name','sysroot','environment']}

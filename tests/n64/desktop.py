@@ -29,59 +29,39 @@ _library.install(_native_sys._getframe().f_globals)
 
 class QMP:
     def __init__(self, path):
-        self.socket = socket.socket(socket.AF_UNIX)
-        self.socket.settimeout(10)
-        self.socket.connect(str(path))
-        self.file = self.socket.makefile("rb")
-        json.loads(self.file.readline())
-        self.call("qmp_capabilities")
+        state = {'self': self, 'path': path}
+        self = path = None
+        return _qmp('qmp_init', state)
 
     def call(self, command, arguments=None):
-        self.socket.sendall((json.dumps({"execute": command, "arguments": arguments or {}}) + "\n").encode())
-        while True:
-            reply = json.loads(self.file.readline())
-            if "error" in reply:
-                raise RuntimeError(reply)
-            if "return" in reply:
-                return reply["return"]
+        state = {'self': self, 'command': command, 'arguments': arguments}
+        self = command = arguments = None
+        return _qmp('qmp_call', state)
 
     def click(self, x, y):
-        self.hold(x, y, .15)
-        time.sleep(.5)
+        state = {'self': self, 'x': x, 'y': y}
+        self = x = y = None
+        return _qmp('qmp_click', state)
 
     def hold(self, x, y, seconds):
-        self.call("input-send-event", {"events": [
-            {"type": "abs", "data": {"axis": "x", "value": round(x * 32767 / WIDTH)}},
-            {"type": "abs", "data": {"axis": "y", "value": round(y * 32767 / HEIGHT)}},
-            {"type": "btn", "data": {"button": "left", "down": True}}]})
-        time.sleep(seconds)
-        self.call("input-send-event", {"events": [
-            {"type": "btn", "data": {"button": "left", "down": False}}]})
+        state = {'self': self, 'x': x, 'y': y, 'seconds': seconds}
+        self = x = y = seconds = None
+        return _qmp('qmp_hold', state)
 
     def move(self, x, y):
-        self.call("input-send-event", {"events": [
-            {"type": "abs", "data": {"axis": "x", "value": round(x * 32767 / WIDTH)}},
-            {"type": "abs", "data": {"axis": "y", "value": round(y * 32767 / HEIGHT)}}]})
+        state = {'self': self, 'x': x, 'y': y}
+        self = x = y = None
+        return _qmp('qmp_move', state)
 
     def drag(self, start_x, start_y, end_x, end_y, seconds):
-        # Let the guest consume the preceding button release before another
-        # press; virtio tablet reports can otherwise coalesce the transition.
-        time.sleep(.25)
-        self.call("input-send-event", {"events": [
-            {"type": "abs", "data": {"axis": "x", "value": round(start_x * 32767 / WIDTH)}},
-            {"type": "abs", "data": {"axis": "y", "value": round(start_y * 32767 / HEIGHT)}},
-            {"type": "btn", "data": {"button": "left", "down": True}}]})
-        time.sleep(.25)
-        self.move(end_x, end_y)
-        time.sleep(seconds)
-        self.call("input-send-event", {"events": [
-            {"type": "btn", "data": {"button": "left", "down": False}}]})
-        time.sleep(.25)
+        state = {'self': self, 'start_x': start_x, 'start_y': start_y, 'end_x': end_x, 'end_y': end_y, 'seconds': seconds}
+        self = start_x = start_y = end_x = end_y = seconds = None
+        return _qmp('qmp_drag', state)
 
     def close(self):
-        self.file.close()
-        self.socket.close()
-
+        state = {'self': self}
+        self = None
+        return _qmp('qmp_close', state)
 
 def game_pixels(path):
     data = path.read_bytes()
