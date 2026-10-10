@@ -87,7 +87,8 @@ fn (mut s Screen) draw_pattern() {
 		for x in 0 .. screen_block {
 			value := (u32(u8(x)) << u32(s.red)) | (u32(u8(y)) << u32(s.green)) | (u32(u8(x + y)) << u32(s.blue))
 			unsafe {
-				*s.pixel(x, y) = value
+				mut target := s.pixel(x, y)
+				*target = value
 			}
 		}
 	}
