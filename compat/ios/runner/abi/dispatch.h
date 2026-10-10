@@ -15,6 +15,11 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <poll.h>
+#ifdef __APPLE__
+/* The installed kernel library exports this iOS API on macOS, although its
+ * SDK declaration is unavailable there. Keep the actual native symbol/ABI. */
+extern size_t ios_native_proc_available_memory(void) __asm__("_os_proc_available_memory");
+#endif
 _Static_assert(sizeof(struct pollfd) == 8 && offsetof(struct pollfd, events) == 4 &&
                offsetof(struct pollfd, revents) == 6, "Darwin poll descriptor layout");
 /* Darwin's fortified overflow path terminates with an ARM64 breakpoint. */

@@ -32,7 +32,7 @@ exports:
                    _fflush, _fread, _fclose, ___stderrp, _sysctlbyname, ___error,
                    _putc, _getc, _feof, _ferror, _dispatch_once_f,
                    _asprintf, ___snprintf_chk, _clock_gettime, _gmtime_r, _strftime,
-                   _posix_spawnp, _dlopen, _dlsym, _dlerror, _dlclose,
+                   _posix_spawnp, _os_proc_available_memory, _dlopen, _dlsym, _dlerror, _dlclose,
                    _open, _write, _close, _unlink, _shm_open, _shm_unlink,
                    _ftruncate, _mmap, _munmap, _stat, _fstat, _strstr, _posix_memalign, _pread, _pwrite, _lseek,
                    _dispatch_async, _dispatch_async_f, _dispatch_sync, _dispatch_sync_f,

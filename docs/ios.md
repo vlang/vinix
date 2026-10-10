@@ -720,28 +720,56 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _os_proc_available_memory
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _pthread_atfork
 ```
 
-The installed Mac SDK defines this query as an application's remaining dirty
+The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
 memory budget, equivalent to `task_vm_info.limit_bytes_remaining`; it does not
 return free system RAM or an address-space limit. The installed native entry
 dispatches Darwin syscall 534 and returns zero for the probed Mac process,
-before and after a touched 64 MiB allocation. Vinix still lacks this Darwin
-application-budget query; a system-memory estimate would not supply its
-documented behavior.
+before and after a touched 64 MiB allocation. A shared Mac/Vinix fixture also
+checks errno preservation and eight concurrent callers.
+
+The V `os_proc_available_memory` adapter now reads the calling process's
+unified cgroup membership and its mounted hierarchy. It returns the smallest
+remaining `memory.max - memory.current` across the group and visible parents,
+saturating at zero. The queries are fresh, use bounded stack buffers and close
+all native descriptors. Unlimited/unmanaged processes return zero, as the Mac
+reference does. Invalid, truncated or unreadable snapshots, legacy/hybrid
+hierarchies, ambiguous membership names, namespace-relative paths and
+subtree-only mounts also return zero rather than an unverified budget.
+Mountinfo octal escapes are decoded, and caller errno is preserved.
+
+This is Vinix's native enforced group budget: its charge includes committed
+anonymous memory and kernel allocations, and a shared group's other processes
+also consume that budget. It is not an exact emulation of Darwin's per-task
+`phys_footprint`; limits above a cgroup namespace's visible root cannot be
+inspected. No finite app budget is invented from free system RAM or `RLIMIT_AS`.
+The native guest fixture creates real nested groups under a mount point with a
+space, verifies headroom loss after touching 8 MiB, recovery after unmapping,
+live child/parent limit changes and unlimited budgets. ASAN covers bounded
+hierarchy parsing and two Mach-O image loads/unloads with eight concurrent
+callers. The full ARM64 C++/GLES/PPSSPP regression passes. This resolves two more
+strong imports across Fortnite and EOSSDK; the actual game still stops before
+entry at `pthread_atfork`.
+
+The installed `libsystem_pthread.dylib` reference accepts null fork handlers
+and preserves errno across eight-thread registration. A real fork verifies
+reverse registration order for prepare callbacks and forward order for parent
+and child callbacks. Vinix's missing adapter must keep those callbacks tied to
+loaded Mach-O images, including their unload lifetime.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,291 | 867 | 81 |
-| EOSSDK | 503 | 159 | 18 |
+| Fortnite executable | 1,292 | 866 | 81 |
+| EOSSDK | 504 | 158 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,847 | 1,149 | 122 |
+| All images | 1,849 | 1,147 | 122 |
 
-The C++/GLES/Text variant reports 1,860 resolved imports, 1,136 unresolved strong
+The C++/GLES/Text variant reports 1,862 resolved imports, 1,134 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

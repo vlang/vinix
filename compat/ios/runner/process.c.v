@@ -89,6 +89,7 @@ fn process_symbol(symbol string) ?u64 {
 		'_setgid' { u64(unsafe { voidptr(darwin_setgid) }) }
 		'_kill' { u64(unsafe { voidptr(darwin_kill) }) }
 		'_malloc_size' { u64(unsafe { voidptr(darwin_malloc_size) }) }
+		'_os_proc_available_memory' { u64(unsafe { voidptr(darwin_os_proc_available_memory) }) }
 		else { return none }
 	}
 }

@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -63,6 +66,34 @@ static void run_program(int native, const char *image, const char *left, const c
 static void run(const char *image, const char *left, const char *op,
                 const char *right, int expected_status, const char *expected_output) {
     run_program(0, image, left, op, right, expected_status, expected_output);
+}
+
+static void memory_group_write(const char *path, const char *value) {
+    int fd=open(path,O_WRONLY);
+    if(fd<0) fail("memory budget control open");
+    ssize_t count=write(fd,value,strlen(value));
+    int cleanup=close(fd);
+    if(count!=(ssize_t)strlen(value) || cleanup) fail("memory budget control write");
+}
+
+static void test_memory_budget(void) {
+    /* A mount point containing a space exercises mountinfo's octal escaping.
+       The Mach-O process inherits the harness's actual kernel membership. */
+    const char *root="/ios memory-cgroup", *parent="/ios memory-cgroup/ios-budget",
+        *child="/ios memory-cgroup/ios-budget/child";
+    if(mkdir(root,0700) || mount("none",root,"cgroup2",0,NULL)) fail("memory budget mount");
+    run("/opt/ios/proc-memory",NULL,NULL,NULL,0,
+        "IOS-PROC-MEMORY: unmanaged budget, touched pages, released mappings, errno and eight threads\n");
+    if(mkdir(parent,0700) || mkdir(child,0700)) fail("memory budget groups");
+    memory_group_write("/ios memory-cgroup/ios-budget/memory.max","536870912");
+    memory_group_write("/ios memory-cgroup/ios-budget/child/memory.max","805306368");
+    char pid[32];snprintf(pid,sizeof(pid),"%d",getpid());
+    memory_group_write("/ios memory-cgroup/ios-budget/child/cgroup.procs",pid);
+    run("/opt/ios/proc-memory","limited",child,parent,0,
+        "IOS-PROC-MEMORY: real nested budgets, touched pages, released mappings, live limit changes and eight threads\n");
+    memory_group_write("/ios memory-cgroup/cgroup.procs",pid);
+    if(rmdir(child) || rmdir(parent) || umount(root) || rmdir(root)) fail("memory budget cleanup");
+    puts("iOS PASS: native hierarchical app memory budgets and live accounting");
 }
 
 extern void test_uikit(void);
@@ -160,6 +191,7 @@ int main(void) {
     run("/opt/ios/process", "bus", NULL, NULL, -SIGBUS,
         "IOS-PROCESS: delivering Darwin SIGBUS\n");
     puts("iOS PASS: Darwin process credentials, signal delivery and allocation sizes");
+    test_memory_budget();
     run("/opt/ios/ioctl", NULL, NULL, NULL, 0,
         "IOS-IOCTL: descriptor flags, shared nonblocking I/O, queued bytes, native interfaces and eight threads\n");
     puts("iOS PASS: Darwin ioctl controls, socket bytes and interface queries");

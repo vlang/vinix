@@ -102,6 +102,9 @@ test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permission
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/process.c" -o "$output/process"
 "$output/process"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/proc-memory.c" -o "$output/proc-memory"
+"$output/proc-memory"
 python3 - "$output/process" <<'PY'
 import subprocess, sys
 for mode, number in [("usr1", 30), ("usr2", 31), ("bus", 10)]:
