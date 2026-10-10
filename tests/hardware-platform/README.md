@@ -105,9 +105,9 @@ under TCG.
 Without `--state-dir` a run works in one directory per architecture,
 `<temporary directory>/vinix-hwtest/<arch>`, which the next run empties and
 uses again. The images of a scenario (boot volume or ISO, initramfs, test
-disks: about 150 MiB for AArch64, 50 MiB for x86-64) are deleted as soon as
-its machine has ended; the logs stay until the next run. A second run for
-the same architecture is refused while the first is alive.
+disks: about 80 MiB on disk for AArch64 and 25 MiB for x86-64) are deleted
+as soon as its machine has ended; the logs stay until the next run. A second
+run for the same architecture is refused while the first is alive.
 
 With `--state-dir DIR` -- which must be empty or not exist -- nothing is
 deleted: `DIR/guest` holds the guest program and each `DIR/<scenario>` has

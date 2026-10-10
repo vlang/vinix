@@ -104,8 +104,9 @@ fn qemu_command(host Host, scenario Scenario, media []string, state string) ![]s
 		command << ['-machine', 'virt,gic-version=3']
 		command << host.accelerator()
 		command << ['-m', '1024', '-smp', '4']
-		// The kernel seeds its random pool from a virtio device and takes
-		// its framebuffer and input from these three, as on a desktop boot.
+		// The devices scripts/run-aarch64.sh gives the machine: an entropy
+		// source, input, and ramfb for the firmware's framebuffer. The
+		// tests boot what that script boots, less the desktop.
 		command << ['-object', 'rng-random,filename=/dev/urandom,id=vinix-rng', '-device',
 			'virtio-rng-device,rng=vinix-rng']
 		command << media

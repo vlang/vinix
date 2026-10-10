@@ -140,7 +140,7 @@ fn test_an_unknown_placeholder_is_an_error() {
 }
 
 fn test_a_state_path_that_would_need_quoting_is_refused() {
-	check_state_path('/private/tmp/vinix-hwtest/x86_64/ahci')!
+	check_state_path('/tmp/vinix-hwtest/x86_64/ahci')!
 	check_state_path('/tmp/with space/and-dash_1.2')!
 	for bad in ['/tmp/a,b', '/tmp/a"b', '/tmp/a\\b', '/tmp/{state}', '/tmp/a\nb'] {
 		check_state_path(bad) or { continue }
