@@ -70,7 +70,15 @@ fn main() {
 		require_child('/opt/ios/swift-fatal-checks')
 		require_child('/opt/ios/swift-interpolation-checks')
 		require_child('/opt/ios/swift-array-storage-checks')
+		require_child('/opt/ios/swift-vararg-checks')
 		require_child('/opt/ios/regression')
+	} else if mode == 'swift' {
+		for name in ['string', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
+			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg'] {
+			require_child('/opt/ios/swift-' + name + '-checks')
+		}
+		println('VINIX iOS SWIFT: PASS')
+		C.fflush(unsafe { nil })
 	} else {
 		args := if mode == 'audit' {
 			['--audit', '/opt/ios/FortniteClient-IOS-Shipping']

@@ -1924,7 +1924,7 @@ cycles leave no owners and prove the empty mapping unmapped. Seven generated
 allocation/ARC bodies have no hidden V allocations on valid paths. Explicit
 storage and registry allocations are owned; rejected-input Result errors box.
 
-The rebuilt Fortnite probe gets past the allocator import and exits with status
+The typed Array Fortnite probe gets past the allocator import and exits with status
 1 before entry at EOSSDK's `CVarArg` protocol descriptor, `_$ss7CVarArgMp`.
 Evidence is retained under `swift-array-storage-checks`, including native
 measurements of that descriptor, Int's conformance/witness and the forty-byte
@@ -1942,17 +1942,43 @@ All three serial/config logs and VM image hashes are retained. The new runner
 binaries remain in the evidence directory; the five published runners retain
 their previous verified hashes pending a passing full regression.
 
+V now supplies the sealed `CVarArg` protocol descriptor, its requirement aliases,
+Int's concrete conformance/witness table and `_cVarArgEncoding` getter. The
+getter preserves every signed Int bit in an owned, one-element typed Array.
+Witness calls borrow indirect Self in x20; generic dispatch forwards the actual
+table requirement, metadata and context. Generic dispatch also works with an
+arbitrary supplied getter witness.
+
+Installed-library and V CVarArg tests pass ASAN/UBSAN in both seed modes,
+alongside the existing Int Hashable/value-witness and typed Array suites.
+Tests cover native descriptor aliases, direct/witness/generic calls, Array
+retained aliases, distinct callback dispatch, preserved contexts, a callback
+waiting for another resolver, eight workers and two drained/unmapped runtime
+cycles. The getter and descriptor emitter have no hidden V allocations.
+Existential metadata, conformance discovery, va_list construction and
+Foundation/String CVarArg support remain unimplemented.
+
+All thirty-one programs rebuild, and the thirteen Swift ABI guest checks pass
+in the focused mode. The actual Fortnite probe gets past `CVarArg` and exits
+with status 1 before entry at EOSSDK's empty-tuple metadata import, `_$sytN`.
+Evidence is retained under `swift-vararg-checks`, including native measurements
+of Void's full-metadata export/address point, zero-sized witnesses and enum
+storage boundaries for the next implementation step. Two host ENOSPC staging
+failures occurred before QEMU and are recorded separately from guest results.
+The broader regression failures above still hold publication; the five
+published runners retain their last passing hashes.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,385 | 773 | 81 |
-| EOSSDK | 595 | 67 | 18 |
+| EOSSDK | 596 | 66 | 18 |
 | MarketplaceKitWrapper | 89 | 87 | 23 |
-| All images | 2,069 | 927 | 122 |
+| All images | 2,070 | 926 | 122 |
 
-The C++/GLES/Text variant reports 2,082 resolved imports, 914 unresolved strong
+The C++/GLES/Text variant reports 2,083 resolved imports, 913 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1981,6 +2007,7 @@ fixtures and extracted IPA under `build/ios/fortnite`:
 ```sh
 v -nocache -cc clang run tests/ios/native-checks.v build
 v -nocache -cc clang run tests/ios/native-checks.v regression
+v -nocache -cc clang run tests/ios/native-checks.v swift
 v -nocache -cc clang run tests/ios/native-checks.v probe
 v -nocache -cc clang run tests/ios/native-checks.v audit
 v -nocache -cc clang run tests/ios/native-checks.v static-audit
@@ -2001,8 +2028,15 @@ there. Regression runs the native V select, semaphore, signal, error, sysctl,
 terminal, thread-policy, file timestamp, UUID, audio-session constant and
 CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
-existing Mach-O suite and requires the guest PASS marker;
-probe/audit completion records the actual child exit status, which remains 1
+existing Mach-O suite and requires the guest PASS marker.
+
+`swift` runs all thirteen Swift ABI checks in a small, independent guest and
+requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
+Probe, audit and Swift modes retire their staging copies after archiving the
+root filesystem, before constructing the boot disk, to limit host disk use.
+Probe/audit streams the preserved Fortnite executable through this Mac's
+libarchive without extracting another large copy. Probe/audit completion records
+the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build
 missing dependency trees or invoke the concurrent Python controller migration.
 `tests/ios/trace-import.v` finds direct ARM64 calls and tail branches to an

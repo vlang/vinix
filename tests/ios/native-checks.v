@@ -64,7 +64,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 
 fn build(root string, out string, only string) {
 	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'signal-checks',
-		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'swift-array-storage-checks', 'native-init'] {
+		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'swift-array-storage-checks', 'swift-vararg-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -129,6 +129,8 @@ fn build(root string, out string, only string) {
 					'swift_interpolation_test.v'
 				} else if item == 'swift-array-storage-checks' {
 					'swift_array_storage_test.v'
+				} else if item == 'swift-vararg-checks' {
+					'swift_vararg_test.v'
 				} else {
 					'thread_policy_test.v'
 				}
@@ -246,6 +248,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/swift-fatal-checks', fs + '/opt/ios/swift-fatal-checks')
 	copy_file(out + '/swift-interpolation-checks', fs + '/opt/ios/swift-interpolation-checks')
 	copy_file(out + '/swift-array-storage-checks', fs + '/opt/ios/swift-array-storage-checks')
+	copy_file(out + '/swift-vararg-checks', fs + '/opt/ios/swift-vararg-checks')
 	sysroot := root + '/build-aarch64-userland/sysroot'
 	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
 		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
@@ -299,7 +302,7 @@ fn verify_monitor(out string) {
 }
 
 fn vm(root string, out string, mode string) {
-	if mode !in ['regression', 'probe', 'audit', 'static-audit'] {
+	if mode !in ['regression', 'swift', 'probe', 'audit', 'static-audit'] {
 		panic('invalid check mode: ' + mode)
 	}
 	state := out + '/' + mode + '-' + time.sys_mono_now().str()
@@ -309,8 +312,16 @@ fn vm(root string, out string, mode string) {
 	fs := state + '/rootfs'
 	if mode == 'regression' {
 		regression_root(root, out, fs)
+	} else if mode == 'swift' {
+		for directory in ['sbin', 'proc', 'sys', 'dev', 'tmp', 'opt/ios'] {
+			os.mkdir_all(fs + '/' + directory) or { panic(err) }
+		}
+		for name in ['string', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
+			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg'] {
+			copy_file(out + '/swift-' + name + '-checks', fs + '/opt/ios/swift-' + name + '-checks')
+		}
 	} else {
-		checked(['tar', '-xzf', root + '/build/ios/fortnite/probe-initramfs.tar.gz', '-C', fs])
+		os.mkdir_all(fs + '/opt/ios') or { panic(err) }
 		tree(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks', fs + '/opt/ios/Frameworks')
 		copy_file(out + '/' + if mode == 'static-audit' { 'run-ios' } else { 'run-ios-gles' }, fs + '/opt/ios/run-ios')
 		tree(root + '/build/ios/fortnite/staging/usr/lib/vinix/ios-gles', fs + '/usr/lib/vinix/ios-gles')
@@ -318,7 +329,19 @@ fn vm(root string, out string, mode string) {
 	copy_file(out + '/native-init', fs + '/sbin/init')
 	os.write_file(fs + '/opt/ios/check-mode', if mode.contains('audit') { 'audit' } else { mode }) or { panic(err) }
 	archive := state + '/initramfs.tar.gz'
-	checked(['tar', '--format=ustar', '-czf', archive, '-C', fs, '.'])
+	if mode in ['probe', 'audit', 'static-audit'] {
+		// This Mac's libarchive copies the preserved IPA executable directly
+		// between archives. Omit its old runner; the overlay path starts ./
+		// and supplies exactly one current replacement. No large extraction.
+		checked(['tar', '--format=ustar', '-czf', archive, '-s', ',^opt/ios/run-ios$,,',
+			'@' + root + '/build/ios/fortnite/probe-initramfs.tar.gz', '-C', fs, '.'])
+	} else {
+		checked(['tar', '--format=ustar', '-czf', archive, '-C', fs, '.'])
+	}
+	// These modes boot entirely from the archive. Release the extracted IPA
+	// and staging copies before constructing the disk to limit host disk use.
+	// Regression keeps its corrected stdio fixture for evidence collection.
+	if mode != 'regression' { os.rmdir_all(fs) or { panic(err) } }
 	disk := state + '/boot.img'
 	checked(['mkfile', '-n', '640m', disk])
 	checked(['mformat', '-F', '-i', disk, '::'])
@@ -345,7 +368,7 @@ fn vm(root string, out string, mode string) {
 		'virtio-keyboard-device', '-device', 'virtio-tablet-device'])
 	p.set_redirect_stdio()
 	p.run()
-	marker := if mode == 'regression' { 'VINIX iOS GUEST: PASS' } else { 'FORTNITE PROBE COMPLETE' }
+	marker := if mode == 'regression' { 'VINIX iOS GUEST: PASS' } else if mode == 'swift' { 'VINIX iOS SWIFT: PASS' } else { 'FORTNITE PROBE COMPLETE' }
 	mut failure := ''
 	await_checks(mut p, log, marker) or { failure = err.msg() }
 	// V panics do not unwind defers. Close our VM before reporting failure.
@@ -355,7 +378,7 @@ fn vm(root string, out string, mode string) {
 	}
 	p.close()
 	if failure != '' { panic(failure) }
-	println('${mode}: ${if mode == 'regression' {
+	println('${mode}: ${if mode in ['regression', 'swift'] {
 		'PASS'
 	} else {
 		'COMPLETE (see guest process status)'
@@ -364,7 +387,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|verify-monitor|regression|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|verify-monitor|regression|swift|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -435,6 +458,8 @@ fn main() {
 		build(root, out, 'swift-interpolation-checks')
 	} else if mode == 'build-swift-array-storage' {
 		build(root, out, 'swift-array-storage-checks')
+	} else if mode == 'build-swift-vararg' {
+		build(root, out, 'swift-vararg-checks')
 	} else if mode == 'verify-monitor' {
 		verify_monitor(out)
 	} else if mode == 'hash' {

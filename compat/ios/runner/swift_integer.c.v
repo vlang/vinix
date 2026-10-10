@@ -126,7 +126,8 @@ fn swift_integer_metadata() u64 {
 	write32(base + 128, 0xf9400470) // Equatable dispatch: ldr x16,[x3,#8]; br.
 	write32(base + 132, 0xd61f0200)
 	swift_hasher_default_emit(base + 160)
-	C.__builtin___clear_cache(arena, unsafe { voidptr(base + 272) })
+	swift_vararg_emit(base, data)
+	C.__builtin___clear_cache(arena, unsafe { voidptr(base + 328) })
 	if C.mprotect(arena, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(arena, usize(page * 2))
@@ -150,6 +151,7 @@ fn swift_integer_symbol(symbol string) ?u64 {
 		'_$sSi9hashValueSivg' { u64(unsafe { voidptr(swift_integer_hash_value) }) }
 		'_$sSi4hash4intoys6HasherVz_tF' { u64(unsafe { voidptr(swift_integer_hash_into) }) }
 		'_$sSi13_rawHashValue4seedS2i_tF' { u64(unsafe { voidptr(swift_hasher_hash_word) }) }
+		'_$sSi16_cVarArgEncodingSaySiGvg' { u64(unsafe { voidptr(swift_integer_vararg) }) }
 		else { u64(0) }
 	}
 	if function != 0 {
@@ -171,11 +173,17 @@ fn swift_integer_symbol(symbol string) ?u64 {
 		'_$sSQMp' { 432 }
 		'_$sSQTL' { 448 }
 		'_$sSQ2eeoiySbx_xtFZTq' { 456 }
-		'_$sSiMa', '_$sSQ2eeoiySbx_xtFZTj' { 0 }
+		'_$sSis7CVarArgsWP' { 528 }
+		'_$sSis7CVarArgsMc' { 544 }
+		'_$ss7CVarArgMp' { 560 }
+		'_$ss7CVarArgTL' { 576 }
+		'_$ss7CVarArgP05_cVarB8EncodingSaySiGvgTq' { 584 }
+		'_$sSiMa', '_$sSQ2eeoiySbx_xtFZTj', '_$ss7CVarArgP05_cVarB8EncodingSaySiGvgTj' { 0 }
 		else { return none }
 	}
 	metadata := swift_integer_metadata()
 	if symbol == '_$sSiMa' { return ios_runtime.swift_integer_arena }
 	if symbol == '_$sSQ2eeoiySbx_xtFZTj' { return ios_runtime.swift_integer_arena + 128 }
+	if symbol == '_$ss7CVarArgP05_cVarB8EncodingSaySiGvgTj' { return ios_runtime.swift_integer_arena + 320 }
 	return metadata - 16 + u64(offset)
 }
