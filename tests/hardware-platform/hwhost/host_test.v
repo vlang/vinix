@@ -145,3 +145,25 @@ fn test_a_worktree_borrows_from_its_main_checkout() {
 	assert shared_path(tree, 'build/sysroot') == os.join_path(tree, 'build/sysroot')
 	assert shared_path(tree, 'missing') == os.join_path(tree, 'missing')
 }
+
+fn test_a_writing_must_hold_its_text_to_the_byte() {
+	state := os.join_path(os.temp_dir(), 'hwhost-writing-${os.getpid()}')
+	os.mkdir_all(state)!
+	defer {
+		os.rmdir_all(state) or {}
+	}
+	writing := Writing{
+		file: 'said.txt'
+		text: 'LS33ls'
+	}
+	check_writing(writing, state) or { assert err.msg().contains('was not written') }
+	os.write_file(os.join_path(state, 'said.txt'), 'LS33ls')!
+	check_writing(writing, state)!
+	os.write_file(os.join_path(state, 'said.txt'), 'LS33ls!')!
+	mut refused := ''
+	check_writing(writing, state) or { refused = err.msg() }
+	assert refused.contains('holds "LS33ls!", not "LS33ls"')
+	// Nothing written is a file that is there and empty.
+	os.write_file(os.join_path(state, 'said.txt'), '')!
+	check_writing(Writing{ file: 'said.txt', text: '' }, state)!
+}

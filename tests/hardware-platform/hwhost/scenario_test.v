@@ -286,3 +286,45 @@ fn test_the_d3_scenarios_look_at_the_card_in_the_middle_of_each_sleep() {
 	assert off.cmdline.contains('vinix.pci_d3=off')
 	assert off.actions.len == 1 && off.actions[0].answer_has == d3_card_memory
 }
+
+fn test_the_wake_scenarios_read_the_enable_register_while_the_machine_is_suspended() {
+	wake := find_scenario(scenarios, 'suspend-deep-wake') or { panic('no suspend-deep-wake scenario') }
+	looks := wake.actions.filter(it.event == 'SUSPEND')
+	assert looks.len == 2
+	assert looks[0].event_count == 1 && looks[0].answer_has == wake_both
+	assert looks[1].event_count == 2 && looks[1].answer_has == wake_button_only
+	// Lid and button on, both off, the button alone on and off.
+	assert wake.writings.len == 1 && wake.writings[0].text == 'LS33lsS33s'
+	off := find_scenario(scenarios, 'suspend-deep-wake-off') or {
+		panic('no suspend-deep-wake-off scenario')
+	}
+	assert off.cmdline.contains('vinix.acpi_wake=off')
+	assert off.actions.len == 1 && off.actions[0].answer_has == wake_none
+	assert off.writings.len == 1 && off.writings[0].text == ''
+}
+
+fn test_a_writing_that_nothing_writes_is_refused() {
+	assert rejected([
+		Scenario{
+			name:     'one'
+			arches:   ['x86_64']
+			required: ['HWTEST START one']
+			writings: [Writing{
+				file: 'said.txt'
+				text: 'a'
+			}]
+		},
+	]).contains('nothing writes said.txt')
+	assert rejected([
+		Scenario{
+			name:     'one'
+			arches:   ['x86_64']
+			qemu:     ['-chardev', 'file,id=c,path={state}/said.txt']
+			required: ['HWTEST START one']
+			writings: [Writing{
+				file: 'said.txt'
+				text: 'a'
+			}]
+		},
+	]) == ''
+}

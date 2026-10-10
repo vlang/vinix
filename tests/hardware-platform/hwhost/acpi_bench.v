@@ -391,6 +391,68 @@ fn ec_absent() []u8 {
 	])
 }
 
+// suspend-deep-wake: three devices that say they can wake the machine, and a
+// way for the host to hear what firmware was told.
+//
+//   LID0   a lid, by event 0x10, from S3 at the deepest; told through _PSW
+//          It is shut when the machine starts, and open from the moment it
+//          is told it need not wake the machine any more -- opened during
+//          the sleep, with no notification, as firmware sometimes does it
+//   BTNP   a power button, by event 0x12, from S1 at the deepest: it cannot
+//          end a suspend to RAM, and must not be armed for one
+//   BTNS   a sleep button, by event 0x11, from S4; told through _DSW
+//
+// _PSW and _DSW write what they were called with to port 0x505, which QEMU's
+// debug console device records in a file: `L` and `l` for the lid being told
+// to wake the machine and told not to, `S` then the sleep state and the
+// device state as digits, and `s`, for the sleep button.
+// Not 0x402, where the firmware QEMU ships writes its own account of itself.
+pub const wake_bench_port = u16(0x505)
+pub const wake_bench_lid_gpe = 0x10
+pub const wake_bench_sleep_gpe = 0x11
+pub const wake_bench_power_gpe = 0x12
+
+fn wake_bench() []u8 {
+	said := aml_name('\\_SB.SAID')
+	return aml_table('SSDT', 'HWTEST', [
+		aml_scope('\\_SB', [
+			aml_region('DBGR', 1, u64(wake_bench_port), 1),
+			aml_field('DBGR', aml_byte_access, [aml_field_unit('SAID', 8)]),
+			aml_device('LID0', [
+				aml_named('_HID', aml_string('PNP0C0D')),
+				aml_named('LIDS', aml_integer(0)),
+				aml_method('_LID', [aml_return(aml_name('LIDS'))]),
+				aml_named('_PRW', aml_package([aml_integer(wake_bench_lid_gpe), aml_integer(3)])),
+				aml_method_taking('_PSW', 1, [
+					aml_if(aml_equal(aml_argument(0), aml_integer(1)), [aml_store(aml_integer(u64(`L`)), said)]),
+					aml_if(aml_equal(aml_argument(0), aml_integer(0)), [
+						aml_store(aml_integer(u64(`l`)), said),
+						// Opened while the machine was down, and nothing said.
+						aml_store(aml_integer(1), aml_name('LIDS')),
+					]),
+				]),
+			]),
+			aml_device('BTNP', [
+				aml_named('_HID', aml_string('PNP0C0C')),
+				aml_named('_PRW', aml_package([aml_integer(wake_bench_power_gpe), aml_integer(1)])),
+				aml_method_taking('_PSW', 1, [aml_store(aml_integer(u64(`!`)), said)]),
+			]),
+			aml_device('BTNS', [
+				aml_named('_HID', aml_string('PNP0C0E')),
+				aml_named('_PRW', aml_package([aml_integer(wake_bench_sleep_gpe), aml_integer(4)])),
+				aml_method_taking('_DSW', 3, [
+					aml_if(aml_equal(aml_argument(0), aml_integer(1)), [
+						aml_store(aml_integer(u64(`S`)), said),
+						aml_store(aml_add(aml_integer(u64(`0`)), aml_argument(1)), said),
+						aml_store(aml_add(aml_integer(u64(`0`)), aml_argument(2)), said),
+					]),
+					aml_if(aml_equal(aml_argument(0), aml_integer(0)), [aml_store(aml_integer(u64(`s`)), said)]),
+				]),
+			]),
+		]),
+	])
+}
+
 // The table called `name`, or an error for a name no scenario should use.
 pub fn acpi_table(name string) ![]u8 {
 	return match name {
@@ -400,6 +462,7 @@ pub fn acpi_table(name string) ![]u8 {
 		'ec-bench-dsdt' { ec_bench(false) }
 		'ec-ecdt' { ecdt_table(bench_ec_command, bench_ec_data, bench_ec_uid, bench_ec_gpe, bench_ec_path) }
 		'ec-absent' { ec_absent() }
+		'wake-bench' { wake_bench() }
 		else { error('no ACPI table called ${name}') }
 	}
 }

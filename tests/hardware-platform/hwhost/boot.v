@@ -220,3 +220,12 @@ pub fn remove_images(scenario Scenario, state string) {
 		os.rm(os.join_path(state, name)) or {}
 	}
 }
+
+// What the machine wrote into `writing.file` must be exactly its text.
+pub fn check_writing(writing Writing, state string) ! {
+	path := os.join_path(state, writing.file)
+	found := os.read_file(path) or { return error('${path} was not written: ${err.msg()}') }
+	if found != writing.text {
+		return error('${path} holds "${found}", not "${writing.text}"')
+	}
+}

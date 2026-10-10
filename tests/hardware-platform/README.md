@@ -50,6 +50,8 @@ here runs any.
 | `suspend-deep-iommu`, `suspend-deep-iommu-amd` | x86_64 | The same behind Intel VT-d and behind AMD-Vi, booted with `vinix.iommu=1`. In addition the unit must say in its own registers that it is translating through the kernel's tables after every sleep, having been found off on the way back each time; the card and the disk controller must still report a domain of their own; and the unit must have recorded no fault. That a device is *stopped* from reaching other memory after a resume is not shown here: the self-tests that make a card try run at boot only. |
 | `suspend-deep-undrawable` | x86_64 | A machine whose screen is on an adapter the kernel cannot set a mode on (QEMU's VirtIO display): `mem_sleep` lists `s2idle` alone, selecting `deep` is refused, `/sys/power/deep_sleep` says the display is why, and `mem` sleeps as suspend to idle. |
 | `suspend-deep-forced`, `suspend-deep-headless` | x86_64 | The same machine with `vinix.deep_sleep=force`, and a machine with no display at all: `deep` is offered, and one suspend to RAM ended by the alarm comes back with QEMU reporting `SUSPEND` and `WAKEUP`. |
+| `suspend-deep-wake` | x86_64 | A table (`wake-bench` in `hwhost/acpi_bench.v`) gives the machine three devices with a `_PRW`: a lid that can end S3 and is told through `_PSW`, a sleep button that can end S4 and is told through `_DSW`, and a power button that can only end S1. QEMU cannot be woken through such an event, so the clock wakes the machine and what is checked is what would let the lid: half a second into each suspend to RAM the controller reads the byte of the event enable register that holds the three events (`i/1xb 0x62a` in the monitor) -- the lid's and the sleep button's bits and no other, then, with the lid's wake source disabled, the button's alone, and with the machine awake neither; the methods write what they were called with to a port QEMU's debug console records, and the file must hold exactly `LS33lsS33s`: lid on, button on with sleep state 3 and device state 3, both off, and the button alone the second time, never the power button's. `/sys/power/acpi_wakeup` must say the same from the kernel's side, a platform rehearsal must arm nothing, and the lid -- shut at boot, opened by the table during the first sleep without a notification -- must be `open` afterwards. |
+| `suspend-deep-wake-off` | x86_64 | The same machine with `vinix.acpi_wake=off`: no `/sys/power/acpi_wakeup`, the byte of the enable register is zero while the machine is suspended, and the record of what firmware was told is empty. |
 | `drivers-sleep` | x86_64 | A machine with an HD Audio controller, whose output QEMU records to a WAV file, and a PCI IDE controller with a disk. A thread of the guest plays a square wave the whole time and the main thread changes its height after each of three sleeps -- a rehearsal, a suspend to idle ended by the alarm, a suspend to RAM ended by the alarm -- each begun with the tone playing; after each the player must go on handing sound to the card, and the disk must hold what was written before the sleep and take a new write. The machine must offer `deep`, which it did not while either driver could not bring its device back. Afterwards the controller looks for the four heights in the recording, a third of a second and a half of each, and for the four patterns in the disk image, and QEMU must have reported `SUSPEND` and `WAKEUP`. QEMU's codec keeps its settings through a controller reset, so this shows the controller, its rings and its stream coming back and not that the codec was programmed again. |
 | `nvme-sleep` | x86_64 | Needs a kernel built with `PROD=false`: a release kernel does not start the NVMe driver. An NVMe disk through the same three sleeps: before each the controller is flushed and told to shut down, after each it is disabled, enabled and its queues created again; what was written before must be there and a new write must reach the disk image. QEMU's controller has a power management capability, so it must also have spent each of the three sleeps in D3hot. |
 
@@ -195,11 +197,13 @@ it once every marker has been seen).
    says it is suspended. An action can also hold QEMU to its answer
    (`answer_has`, `answer_lacks`), which is how the host reads something
    out of the machine instead of doing something to it. A scenario can name
-   the events that must have arrived (`events`), list pictures of the screen
-   its actions took with `screendump` and what each must show (`screens`:
-   dark, or something; the size of another picture; the pattern a guest
-   draws with `guest/framebuffer.v`), and ask for more than the default time
-   (`timeout`). A record that cannot pass yet gets a `pending` reason.
+   files the machine wrote through QEMU and what each must hold (`writings`)
+   and the events that must have arrived (`events`), list pictures of the
+   screen its actions took with `screendump` and what each must show
+   (`screens`: dark, or something; the size of another picture; the pattern
+   a guest draws with `guest/framebuffer.v`), and ask for more than the
+   default time (`timeout`). A record that cannot pass yet gets a `pending`
+   reason.
 
 The table is checked before anything boots (`validate_scenarios`), and
 `hwhost/scenario_test.v` pins which scenarios a default run selects on each

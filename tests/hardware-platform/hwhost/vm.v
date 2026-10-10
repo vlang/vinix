@@ -188,6 +188,9 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	for sound in scenario.sounds {
 		check_sound(sound, state)!
 	}
+	for writing in scenario.writings {
+		check_writing(writing, state)!
+	}
 }
 
 fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout int) ! {

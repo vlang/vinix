@@ -84,6 +84,15 @@ pub:
 	answer_lacks string
 }
 
+// A file QEMU writes in the state directory while the machine runs, and what
+// it must hold, to the byte, once the machine has ended: what firmware wrote
+// to a port that QEMU records, say.
+pub struct Writing {
+pub:
+	file string
+	text string
+}
+
 // What is wrong with QEMU's `answer` to `action`, or nothing.
 pub fn answer_fault(action Action, answer string) string {
 	if action.answer_has != '' && !answer.contains(action.answer_has) {
@@ -142,6 +151,9 @@ pub:
 	// Recordings of what the machine played (`-audiodev wav` into {state}),
 	// and the heights each must hold; see sound.v.
 	sounds       []Sound
+	// Files the machine wrote through QEMU (into {state}), and what each must
+	// hold.
+	writings     []Writing
 }
 
 // What QEMU's TFTP server serves the guest's network probe; see guest/network.v.
@@ -216,6 +228,15 @@ const d3_actions = [
 		answer_has: d3_card_memory
 	},
 ]
+
+// suspend-deep-wake: the byte of the event enable register that holds events
+// 0x10 to 0x17, as QEMU's PC has it (the block is at 0x620, eight bytes of
+// status and then eight of enable), read through the monitor. The lid's
+// event is its first bit and the sleep button's its second.
+const wake_look = '{"execute":"human-monitor-command","arguments":{"command-line":"i/1xb 0x62a"}}'
+const wake_both = '= 0x03'
+const wake_button_only = '= 0x02'
+const wake_none = '= 0x00'
 
 const hotplug_add = '{"execute":"device_add","arguments":{"driver":"e1000","bus":"hwport0","id":"hwcard0","netdev":"hwhot0"}}'
 const hotplug_remove = '{"execute":"device_del","arguments":{"id":"hwcard0"}}'
@@ -834,6 +855,78 @@ pub const scenarios = [
 		events:   deep_once
 	},
 	Scenario{
+		name:     'suspend-deep-wake'
+		about:    'a lid and a sleep button armed to end a suspend to RAM: their events left on, firmware told'
+		arches:   ['x86_64']
+		tables:   ['wake-bench']
+		qemu:     ['-acpitable', 'file={state}/wake-bench.aml', '-chardev', 'file,id=hwsaid,path={state}/firmware-said.txt',
+			'-device', 'isa-debugcon,iobase=0x505,chardev=hwsaid']
+		required: ['HWTEST START suspend-deep-wake', 'HWTEST PASS suspend-deep-wake']
+		actions:  [
+			Action{
+				after:        'HWTEST STEP awake, nothing armed'
+				delay_ms:     100
+				qmp:          wake_look
+				answer_lacks: wake_both
+			},
+			Action{
+				after:          'HWTEST STEP deep sleep, lid and sleep button armed'
+				event:          'SUSPEND'
+				event_count:    1
+				event_delay_ms: 500
+				qmp:            wake_look
+				answer_has:     wake_both
+			},
+			Action{
+				after:          'HWTEST STEP deep sleep, the lid not allowed'
+				event:          'SUSPEND'
+				event_count:    2
+				event_delay_ms: 500
+				qmp:            wake_look
+				answer_has:     wake_button_only
+			},
+		]
+		ending:   .poweroff
+		events:   ['SUSPEND', 'WAKEUP', 'SUSPEND', 'WAKEUP']
+		// The lid told to wake the machine, the sleep button told with the
+		// sleep state and the device state; both told not to; then the same
+		// for the button alone. Never the power button's `!`.
+		writings: [
+			Writing{
+				file: 'firmware-said.txt'
+				text: 'LS33lsS33s'
+			},
+		]
+	},
+	Scenario{
+		name:     'suspend-deep-wake-off'
+		about:    'vinix.acpi_wake=off: the same lid and button are left alone, and no event is left on for the sleep'
+		arches:   ['x86_64']
+		cmdline:  'vinix.acpi_wake=off'
+		tables:   ['wake-bench']
+		qemu:     ['-acpitable', 'file={state}/wake-bench.aml', '-chardev', 'file,id=hwsaid,path={state}/firmware-said.txt',
+			'-device', 'isa-debugcon,iobase=0x505,chardev=hwsaid']
+		required: ['HWTEST START suspend-deep-wake-off', 'HWTEST PASS suspend-deep-wake-off']
+		actions:  [
+			Action{
+				after:          'HWTEST STEP deep sleep, nothing armed'
+				event:          'SUSPEND'
+				event_count:    1
+				event_delay_ms: 500
+				qmp:            wake_look
+				answer_has:     wake_none
+			},
+		]
+		ending:   .poweroff
+		events:   deep_once
+		writings: [
+			Writing{
+				file: 'firmware-said.txt'
+				text: ''
+			},
+		]
+	},
+	Scenario{
 		name:     'drivers-sleep'
 		about:    'HD Audio and an IDE disk through a rehearsal, a suspend to idle and a suspend to RAM'
 		arches:   ['x86_64']
@@ -1298,6 +1391,12 @@ pub fn validate_scenarios(all []Scenario) ! {
 			}
 			if (action.event == '') != (action.event_count == 0) || action.event_count < 0 {
 				return error('scenario ${scenario.name}: an action that waits for an event names it and says how many')
+			}
+		}
+		for writing in scenario.writings {
+			if !scenario.qemu_arguments('x86_64').any(it.contains('{state}/${writing.file}'))
+				&& !scenario.qemu_arguments('aarch64').any(it.contains('{state}/${writing.file}')) {
+				return error('scenario ${scenario.name}: nothing writes ${writing.file}')
 			}
 		}
 		for sound in scenario.sounds {
