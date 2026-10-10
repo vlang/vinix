@@ -216,7 +216,8 @@ looks at. What QEMU's wake-up does to a device is a reset, which is not
 everything a loss of power does to a real one, and OVMF's is one firmware's
 way back among many. A PS/2 key and `system_wakeup` wake this machine
 whatever the kernel has armed; on hardware a device wakes a machine only if
-its wake event was enabled, which the kernel does not do yet.
+its wake event was enabled, which the kernel does for the embedded
+controller's event alone and for no device's `_PRW`.
 
 Two further limits:
 

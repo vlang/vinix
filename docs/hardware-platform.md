@@ -572,8 +572,10 @@ What this is not:
   (q35, OVMF, TCG). On real hardware nothing here is known to work: the
   firmware's resume path, the A20 gate (assumed open), low memory surviving
   firmware, MTRRs and microcode on the other processors, wake-up from
-  devices that need a wake GPE armed (none is), and the AMD IOMMU's own PCI
-  capability are all untested assumptions.
+  devices that need a wake event armed (no device's `_PRW` is read; the one
+  event left on for a sleep is the embedded controller's, which its driver
+  marks), and the AMD IOMMU's own PCI capability are all untested
+  assumptions.
 - **Not hibernation.** There is no memory image and no `disk` state.
 - Only `e1000`, `ahci`, the keyboard controller, the PS/2 mouse and the
   serial ports come back from a loss of power. A machine with another bound
