@@ -94,6 +94,113 @@ mut:
 	// each, and the one typing uses now. The current one is always enabled.
 	keyboard_layouts u32 = keyboard_layout_default_mask
 	keyboard_layout  KeyboardLayout
+	// Minutes without input before the display turns off and before the
+	// machine sleeps; zero is never. See idle_timer.v.
+	display_off_minutes int = idle_display_off_default
+	sleep_minutes       int
+	// What closing the lid does and which performance profile the CPUs keep.
+	// The kernel holds both while it runs, so the desktop puts them back from
+	// here when it starts.
+	lid_action    LidAction
+	power_profile PowerProfile
+}
+
+// ── Power ──────────────────────────────────────────────────────────
+
+// The idle timeouts Settings offers, in minutes. Zero is never.
+const idle_timeout_choices = [0, 1, 2, 5, 10, 15, 30, 60]!
+const idle_display_off_default = 10
+
+// What closing the lid does, in the kernel's words for /sys/power/lid/action.
+enum LidAction {
+	suspend
+	ignore
+}
+
+fn (a LidAction) code() string {
+	return match a {
+		.suspend { 'suspend' }
+		.ignore { 'ignore' }
+	}
+}
+
+fn lid_action_from_code(code string) ?LidAction {
+	if code == 'suspend' {
+		return .suspend
+	}
+	if code == 'ignore' {
+		return .ignore
+	}
+	return none
+}
+
+// The CPUs' performance profile. `automatic` leaves the choice to the kernel,
+// which follows the power source; the others are the kernel's own three.
+enum PowerProfile {
+	automatic
+	performance
+	balanced
+	power_saver
+}
+
+const power_profiles = [PowerProfile.automatic, .performance, .balanced, .power_saver]!
+
+// code names the profile in the preference file. All but `auto` are also what
+// /sys/devices/system/cpu/cpufreq/profile reads and takes.
+fn (p PowerProfile) code() string {
+	return match p {
+		.automatic { 'auto' }
+		.performance { 'performance' }
+		.balanced { 'balanced' }
+		.power_saver { 'power_saver' }
+	}
+}
+
+fn power_profile_from_code(code string) ?PowerProfile {
+	for profile in power_profiles {
+		if profile.code() == code {
+			return profile
+		}
+	}
+	return none
+}
+
+fn idle_timeout_offered(minutes int) bool {
+	for choice in idle_timeout_choices {
+		if choice == minutes {
+			return true
+		}
+	}
+	return false
+}
+
+// The display is not left on by a machine that has gone to sleep: when both
+// timeouts are set, the display's is not the later of the two.
+fn idle_timeouts_valid(display_off int, sleep int) bool {
+	return idle_timeout_offered(display_off) && idle_timeout_offered(sleep)
+		&& (display_off == 0 || sleep == 0 || display_off <= sleep)
+}
+
+// Choosing one timeout moves the other when the pair would no longer hold:
+// the one just chosen is the one the user meant.
+fn (mut s Settings) set_display_off_minutes(minutes int) {
+	if !idle_timeout_offered(minutes) {
+		return
+	}
+	s.display_off_minutes = minutes
+	if minutes != 0 && s.sleep_minutes != 0 && s.sleep_minutes < minutes {
+		s.sleep_minutes = minutes
+	}
+}
+
+fn (mut s Settings) set_sleep_minutes(minutes int) {
+	if !idle_timeout_offered(minutes) {
+		return
+	}
+	s.sleep_minutes = minutes
+	if minutes != 0 && s.display_off_minutes > minutes {
+		s.display_off_minutes = minutes
+	}
 }
 
 // ── Keyboard ───────────────────────────────────────────────────────

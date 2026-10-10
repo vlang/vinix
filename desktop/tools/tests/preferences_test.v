@@ -67,7 +67,7 @@ fn test_preferences_round_trip_every_field_and_both_scale_overrides() {
 	}
 	assert os.ls(home)! == [desktop_preferences_name]
 	record := os.read_file(desktop_preferences_path(home))!
-	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nlanguage=ru\nclock_24_hour=false\nclock_show_seconds=false\nclock_show_date=false\nclock_show_weekday=false\nwallpaper_color=4\nwallpaper_image=2\nkeyboard_layouts=us,ru,de\nkeyboard_layout=de\n'
+	assert record == 'version=1\nscale=2\nbutton_side=left\ntaskbar_mode=combined\ntheme=macos\nlanguage=ru\nclock_24_hour=false\nclock_show_seconds=false\nclock_show_date=false\nclock_show_weekday=false\nwallpaper_color=4\nwallpaper_image=2\nkeyboard_layouts=us,ru,de\nkeyboard_layout=de\ndisplay_off_after=10\nsleep_after=never\nlid_action=suspend\npower_profile=auto\n'
 }
 
 fn test_preferences_each_change_preserves_the_rest_of_the_snapshot() {

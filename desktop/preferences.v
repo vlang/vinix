@@ -42,6 +42,29 @@ fn desktop_preferences_valid(p DesktopPreferences) bool {
 		&& p.settings.wallpaper_color < wallpaper_colors.len
 		&& p.settings.wallpaper_image >= -1
 		&& keyboard_settings_valid(p.settings.keyboard_layouts, p.settings.keyboard_layout)
+		&& idle_timeouts_valid(p.settings.display_off_minutes, p.settings.sleep_minutes)
+		&& int(p.settings.lid_action) >= int(LidAction.suspend)
+		&& int(p.settings.lid_action) <= int(LidAction.ignore)
+		&& int(p.settings.power_profile) >= int(PowerProfile.automatic)
+		&& int(p.settings.power_profile) <= int(PowerProfile.power_saver)
+}
+
+// An idle timeout is saved as its minutes, or `never`.
+fn desktop_encode_idle_timeout(minutes int) string {
+	return if minutes == 0 { 'never' } else { minutes.str() }
+}
+
+// Only the timeouts Settings offers: a number it does not is not rounded to
+// one that it does.
+fn desktop_parse_idle_timeout(text string) ?int {
+	if text == 'never' {
+		return 0
+	}
+	minutes := desktop_preference_index(text)?
+	if minutes <= 0 || !idle_timeout_offered(minutes) {
+		return none
+	}
+	return minutes
 }
 
 // The enabled input sources are saved in Settings' order, e.g. `us,ru`.
@@ -95,7 +118,16 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 	clock_show_weekday := if p.settings.clock_show_weekday { 'true' } else { 'false' }
 	keyboard_sources := desktop_encode_keyboard_layouts(p.settings.keyboard_layouts)
 	keyboard_layout := p.settings.keyboard_layout.code()
-	return 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nlanguage=${language}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\nkeyboard_layouts=${keyboard_sources}\nkeyboard_layout=${keyboard_layout}\n'
+	display_off := desktop_encode_idle_timeout(p.settings.display_off_minutes)
+	sleep := desktop_encode_idle_timeout(p.settings.sleep_minutes)
+	lid_action := p.settings.lid_action.code()
+	power_profile := p.settings.power_profile.code()
+	record := 'version=1\nscale=${scale}\nbutton_side=${side}\ntaskbar_mode=${taskbar}\ntheme=${theme}\nlanguage=${language}\nclock_24_hour=${clock_24_hour}\nclock_show_seconds=${clock_show_seconds}\nclock_show_date=${clock_show_date}\nclock_show_weekday=${clock_show_weekday}\nwallpaper_color=${p.settings.wallpaper_color}\nwallpaper_image=${p.settings.wallpaper_image}\nkeyboard_layouts=${keyboard_sources}\nkeyboard_layout=${keyboard_layout}\ndisplay_off_after=${display_off}\nsleep_after=${sleep}\nlid_action=${lid_action}\npower_profile=${power_profile}\n'
+	unsafe {
+		display_off.free()
+		sleep.free()
+	}
+	return record
 }
 
 // Unlike string.int(), this cannot accept a numeric prefix or wrap on overflow.
@@ -164,6 +196,10 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 			'keyboard_layouts' { u32(2048) }
 			'keyboard_layout' { u32(4096) }
 			'language' { u32(8192) }
+			'display_off_after' { u32(16384) }
+			'sleep_after' { u32(32768) }
+			'lid_action' { u32(65536) }
+			'power_profile' { u32(131072) }
 			else { u32(0) }
 		}
 		if seen & bit != 0 {
@@ -238,6 +274,10 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 			'wallpaper_image' { p.settings.wallpaper_image = desktop_preference_index(value)? }
 			'keyboard_layouts' { p.settings.keyboard_layouts = desktop_parse_keyboard_layouts(value)? }
 			'keyboard_layout' { p.settings.keyboard_layout = keyboard_layout_from_code(value)? }
+			'display_off_after' { p.settings.display_off_minutes = desktop_parse_idle_timeout(value)? }
+			'sleep_after' { p.settings.sleep_minutes = desktop_parse_idle_timeout(value)? }
+			'lid_action' { p.settings.lid_action = lid_action_from_code(value)? }
+			'power_profile' { p.settings.power_profile = power_profile_from_code(value)? }
 			else {}
 		}
 	}
@@ -248,6 +288,13 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 		p.settings.keyboard_layouts |= p.settings.keyboard_layout.bit()
 	} else if seen & u32(4096) == 0 {
 		p.settings.keyboard_layout = keyboard_first_layout(p.settings.keyboard_layouts)
+	}
+	// A record naming only when to sleep has the display's default beside it,
+	// which is brought down to that when it would be the later. When both are
+	// named they must already agree.
+	if seen & u32(16384) == 0 && p.settings.sleep_minutes != 0
+		&& p.settings.display_off_minutes > p.settings.sleep_minutes {
+		p.settings.display_off_minutes = p.settings.sleep_minutes
 	}
 	if seen & u32(1) == 0 || !desktop_preferences_valid(p) {
 		return none
