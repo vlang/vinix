@@ -169,7 +169,11 @@ pub fn sum_bytes(seed u64, bytes &u8, count u64) u64 {
 pub fn header_checksum(header &Header) u64 {
 	mut unsealed := *header
 	unsealed.checksum = 0
-	return sum_words(image_magic, unsafe { &u64(voidptr(&unsealed)) }, sizeof(Header) / 8)
+	// Not in the return itself: a pointer to a local there has the compiler
+	// move the local to the heap, for good.
+	words := unsafe { &u64(voidptr(&unsealed)) }
+	sum := sum_words(image_magic, words, sizeof(Header) / 8)
+	return sum
 }
 
 // How many bytes the frame numbers of `pages` pages take on the device.

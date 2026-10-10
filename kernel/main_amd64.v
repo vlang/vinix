@@ -136,9 +136,16 @@ fn kmain_thread() {
 		// had this one mounted them first, it would wake to disks that had
 		// moved on without it. See hibernate/resume_amd64.v.
 		hibernate.resume_at_boot()
+		// Still here. If an image that could yet be gone back into is on a
+		// disk all the same -- on a device this boot was not told of, or
+		// one that could not be read or written -- the system's disk is not
+		// mounted: this kernel would change the filesystem the image holds
+		// in memory. It runs from memory instead, and says why. A verified
+		// root is only read, and is mounted regardless.
+		image_waiting := hibernate.look_for_images()
 		if verified_root {
 			verity.mount_root()
-		} else if sysdisk.requested() {
+		} else if sysdisk.requested() && !image_waiting {
 			outcome = sysdisk.mount_or_install()
 		}
 	}

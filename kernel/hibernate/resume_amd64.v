@@ -155,6 +155,8 @@ __global (
 	hib_boot_verdict string
 	hib_boot_looked  bool
 	hib_boot_found   bool
+	// The device an image was found still waiting on after that, or ''.
+	hib_waiting string
 )
 
 // What the look for an image at boot came to, for /sys.
@@ -523,6 +525,27 @@ fn refuse(why string) {
 	}
 }
 
+// Whether an image that could still be gone back into is on a disk, after
+// resume_at_boot() has returned: asked before the boot lets anything use the
+// disks, with or without a device named. True means it must not -- see
+// find_waiting_image() -- and the reason has been printed.
+pub fn look_for_images() bool {
+	name := find_waiting_image()
+	if name.len == 0 {
+		return false
+	}
+	hib_waiting = name
+	C.kprintf(c'hibernate: an image of this system is waiting on %.*s, and this boot has not gone back into it.\n',
+		i32(name.len), name.str)
+	print('hibernate: the disks are left alone, so that it stays true: start with vinix.hibernate= naming that device to go back into it, or clear the device to be rid of it\n')
+	return true
+}
+
+// The device an image was found waiting on at boot, or ''.
+pub fn waiting_on() string {
+	return hib_waiting
+}
+
 // Look for an image on the named device and enter it if this machine is the
 // one it was taken on. Returns when there is none to enter; does not return
 // when there is.
@@ -543,7 +566,15 @@ pub fn resume_at_boot() {
 	defer {
 		unsafe { memory.free(loader) }
 	}
-	verdict, damage := read_header(mut loader.header)
+	readable, verdict, damage := read_header(mut loader.header)
+	if !readable {
+		// Not "no image": nobody knows. look_for_images() says what
+		// follows from that.
+		hib_device_problem = 'the device named for the image cannot be read'
+		C.kprintf(c'hibernate: %.*s: %.*s\n', i32(hib_device_name.len), hib_device_name.str,
+			i32(hib_device_problem.len), hib_device_problem.str)
+		return
+	}
 	if verdict == .foreign || verdict == .empty {
 		// No image. Whether one can be kept here is found out now, while
 		// reading the device is all that is happening to it.
@@ -581,6 +612,14 @@ pub fn resume_at_boot() {
 	// not an address to jump to.
 	if loader.header.entry != wake.resume_entry() || loader.header.context != wake.context_address() {
 		refuse('it was taken by another kernel')
+		return
+	}
+	// Every page of the image takes a free frame here, its own or another,
+	// and the allocator is not run dry to find out that there are too few:
+	// the rest of this kernel is still running, and much of it stops the
+	// machine when it is refused memory.
+	if memory.pmm_frames_free() < loader.header.pages + loader.header.pages / 128 + spare_pages {
+		refuse('there is no memory to load it')
 		return
 	}
 	mut problem := loader.read_list()

@@ -90,8 +90,10 @@ __global (
 	hib_taken u32
 	// How long the copying took.
 	hib_copy_ns u64
-	// Why the last attempt failed.
-	hib_failure string
+	// Why the last attempt failed, and whether it left the device in a
+	// state nobody knows.
+	hib_failure      string
+	hib_write_unsure bool
 	// Images this kernel has written, and times it has woken from one.
 	hib_sequence u64
 	hib_resumes  u64
@@ -173,6 +175,18 @@ pub fn prepare() bool {
 	// More than is in use now: preparing takes memory itself, and the
 	// machine runs on until the snapshot.
 	capacity := wanted + wanted / 16 + spare_pages
+	// Is there room for that many copies, and the tables, with pages to
+	// spare? Asked before any is taken: taking them one by one until the
+	// allocator is empty would find out as well, and stop the machine in
+	// passing, since much of the kernel does not take no for an answer.
+	need := capacity + capacity / 128 + most_chunk_pages + 2 * spare_pages
+	if memory.pmm_frames_free() < need {
+		memory.pmm_reclaim(need - memory.pmm_frames_free())
+		if memory.pmm_frames_free() < need {
+			C.kprintf(c'hibernate: %llu pages are in use and %llu are free\n', wanted, memory.pmm_frames_free())
+			return fail('not enough free memory to hold a copy of what is in use')
+		}
+	}
 	hib_origs = words_new(capacity) or { return fail('no memory for the list of pages to save') }
 	hib_copies = words_new(capacity) or {
 		release()
@@ -297,10 +311,30 @@ fn chunk_buffer() (u64, u64) {
 	return 0, 0
 }
 
-// Put the snapshot on the device. True when the device then holds a whole
-// image with a header that reads back as written; false, with the device
-// holding no image at all, otherwise. The machine is up, userspace frozen.
-pub fn write_image() bool {
+pub enum Written {
+	// The device holds a whole image whose header read back as written.
+	image
+	// It holds none: a header that describes no image was written and read
+	// back, and no other header after it.
+	nothing
+	// It may hold either. The last header was written and could not be
+	// confirmed, and could not be replaced. Whoever asked must not let
+	// this kernel go on changing the disks: if the image is there, it is
+	// an image of them as they are now.
+	unknown
+}
+
+// Put the snapshot on the device, and say what the device then holds. The
+// machine is up, userspace frozen.
+pub fn write_image() Written {
+	if write_snapshot() {
+		return .image
+	}
+	return if hib_write_unsure { Written.unknown } else { Written.nothing }
+}
+
+fn write_snapshot() bool {
+	hib_write_unsure = false
 	if hib_taken == 0 || hib_count == 0 {
 		return fail('there is no snapshot to write')
 	}
@@ -374,8 +408,13 @@ pub fn write_image() bool {
 	seal(mut header)
 	// Last, and read back: this block is what makes the rest an image.
 	if !write_header(header) {
-		// It may be there in part. Nothing of it may be believed.
-		write_empty_header(hib_sequence)
+		// It may be there, in part or whole: the write, the flush or the
+		// reading back failed. It is taken back; and if that fails too,
+		// nobody knows what the device holds.
+		if !write_empty_header(hib_sequence) {
+			hib_write_unsure = true
+			return fail('the header of the image could not be confirmed, nor taken back')
+		}
 		return fail('the header of the image did not read back as written')
 	}
 	hib_sequence++

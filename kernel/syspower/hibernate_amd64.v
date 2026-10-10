@@ -230,16 +230,25 @@ fn hibernate_here() HibernateOutcome {
 }
 
 // The kernel that took the snapshot, with its devices resumed and userspace
-// frozen: write the image and switch the machine off. Returns only when that
-// did not happen, with nothing held, no image on the device, and the reason
-// kept.
+// frozen: write the image and switch the machine off. Returns only when the
+// device holds no image, with nothing held and the reason kept.
 fn platform_hibernate_finish() {
 	wake.trace('disk: devices resumed, writing', 0)
-	if !hibernate.write_image() {
+	written := hibernate.write_image()
+	if written == .nothing {
 		why := hibernate.failure()
 		hibernate.release()
 		hibernate_failed(why)
 		return
+	}
+	if written == .unknown {
+		// The header was written and could not be confirmed, and could not
+		// be taken back. If the image is there, it is an image of the disks
+		// as they are at this moment, and stays one only if this kernel
+		// changes nothing more. So the machine goes off all the same: the
+		// next start goes back into the image or finds none and starts
+		// afresh, and either is right.
+		print('syspower: the image could not be confirmed on its device; switching off rather than going on\n')
 	}
 	// Not transition(): its first step is to flush the filesystems, and what
 	// reaches a disk after the snapshot is what the image must never find
@@ -247,10 +256,15 @@ fn platform_hibernate_finish() {
 	// caches are flushed by their shutdown.
 	wake.trace('disk: image written, switching off', 0)
 	carry_out(.power_off)
-	// Still here. The image describes a machine this kernel is about to
-	// carry on changing; it must not be entered later.
+	// carry_out() does not come back once it has stopped the devices: where
+	// firmware will not switch the machine off it halts, and a halted
+	// machine leaves the image as good as one that is off. It comes back
+	// only if the platform would not begin, with nothing stopped. Then the
+	// image describes a machine this kernel would carry on changing, and it
+	// is taken back; if it cannot be, this kernel does not carry on.
 	if !hibernate.withdraw_image() {
-		print('syspower: THE IMAGE COULD NOT BE WITHDRAWN and must not be resumed: clear the device before the next start\n')
+		print('syspower: the machine would not switch off and the image could not be withdrawn; halting\n')
+		platform_halt()
 	}
 	hibernate.release()
 	hibernate_failed('the machine did not switch off')

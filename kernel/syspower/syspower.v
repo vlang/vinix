@@ -51,6 +51,14 @@ pub fn action_name(action Action) string {
 // nothing changed when cached writes could not be flushed, false with the
 // devices already stopped when firmware would not let go of the machine.
 pub fn transition(action Action) bool {
+	// Not in the middle of a sleep. Whoever is carrying one out has the
+	// devices down and the bindings frozen, and for a suspend to disk ends
+	// it by switching the machine off itself: a second thread that set off
+	// now would take the right to do that and then wait, for good, on what
+	// the first is holding. It waits here instead, holding nothing.
+	for sleeping() {
+		devcore.sleep_ms(100)
+	}
 	// Nothing leaves the machine with unwritten data: a failed flush refuses
 	// the transition rather than completing it.
 	if !pagecache.sync_all() {

@@ -21,6 +21,9 @@ pub fn unavailable_reason() string {
 	if hib_device == unsafe { nil } || !hib_device_ours {
 		return hib_device_problem
 	}
+	if hib_waiting.len != 0 {
+		return 'an image is still waiting on a device, and this boot did not go back into it'
+	}
 	return ''
 }
 
@@ -48,6 +51,9 @@ pub fn report(mut text lib.Text) {
 		text.add('image not resumed: ')
 		text.add(hib_boot_verdict)
 	}
+	text.add_byte(`\n`)
+	text.add('waiting: ')
+	text.add(if hib_waiting.len == 0 { 'none' } else { hib_waiting })
 	text.add_byte(`\n`)
 	line(mut text, 'images written', hib_sequence)
 	line(mut text, 'resumes', hib_resumes)

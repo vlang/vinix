@@ -176,12 +176,6 @@ pub fn enter_sleep(kind SleepDepth) bool {
 		fail_sleep('platform', '', platform_hibernate_reason())
 		return false
 	}
-	// Whether the device is still the image's is asked now, while it can
-	// be read: its driver is about to be suspended with the rest.
-	if kind == .disk && syspower_rehearsal == .none && !platform_hibernate_ready() {
-		fail_sleep('platform', '', platform_hibernate_failure())
-		return false
-	}
 	if !pagecache.sync_all() {
 		fail_sleep('sync', '', '')
 		return false
@@ -202,6 +196,14 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	// the last thing any filesystem writes: see platform_hibernate_finish().
 	if !pagecache.sync_all() && going_disk {
 		fail_sleep('sync', '', '')
+		sched.thaw_userspace()
+		return false
+	}
+	// Whether the device is still the image's is asked now: after the last
+	// program that could have written to it has stopped, and while it can
+	// still be read -- its driver is about to be suspended with the rest.
+	if going_disk && !platform_hibernate_ready() {
+		fail_sleep('platform', '', platform_hibernate_failure())
 		sched.thaw_userspace()
 		return false
 	}

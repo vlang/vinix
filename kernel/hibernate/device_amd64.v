@@ -40,7 +40,10 @@ __global (
 	hib_option_read bool
 	// As named, without /dev/; '' when no device was named.
 	hib_device_name string
-	hib_device      &fs.VFSNode
+	// The device itself: what its node in /dev leads to, which is its
+	// driver's and stays for as long as the machine runs. The node is not
+	// kept: a node can be removed, and is freed when it is.
+	hib_device      &resource.Resource
 	// A whole number of blocks.
 	hib_device_bytes u64
 	// Why no image can be kept; '' when one can.
@@ -125,7 +128,7 @@ fn open_device() bool {
 		}
 		unsafe { parent_path.free() }
 	}
-	hib_device = node
+	hib_device = node.resource
 	hib_device_bytes = bytes
 	hib_device_problem = ''
 	return true
@@ -135,7 +138,7 @@ fn device_read(offset u64, buffer voidptr, bytes u64) bool {
 	if hib_device == unsafe { nil } || offset > hib_device_bytes || bytes > hib_device_bytes - offset {
 		return false
 	}
-	mut res := unsafe { hib_device.resource }
+	mut res := unsafe { hib_device }
 	got := res.read(unsafe { nil }, buffer, offset, bytes) or { return false }
 	return u64(got) == bytes
 }
@@ -147,7 +150,7 @@ fn device_write(offset u64, buffer voidptr, bytes u64) bool {
 	if hib_device == unsafe { nil } || offset > hib_device_bytes || bytes > hib_device_bytes - offset {
 		return false
 	}
-	mut res := unsafe { hib_device.resource }
+	mut res := unsafe { hib_device }
 	fence.pass(true)
 	got := res.write(unsafe { nil }, buffer, offset, bytes) or {
 		fence.pass(false)
@@ -162,18 +165,24 @@ fn device_flush() bool {
 	if hib_device == unsafe { nil } {
 		return false
 	}
-	mut res := unsafe { hib_device.resource }
+	mut res := unsafe { hib_device }
 	resource.sync_resource(mut res, unsafe { nil }) or { return false }
 	return true
 }
 
-// A block of the device read into a page of its own. 0 when it cannot be.
-fn read_block(offset u64) u64 {
+// The first block of a block device, read into a page of its own. 0 when it
+// cannot be read. Reads only.
+fn first_block_of(device &resource.Resource) u64 {
 	page := u64(memory.pmm_alloc_fallible(1))
 	if page == 0 {
 		return 0
 	}
-	if !device_read(offset, voidptr(page + higher_half), block_bytes) {
+	mut res := unsafe { device }
+	got := res.read(unsafe { nil }, voidptr(page + higher_half), 0, block_bytes) or {
+		memory.pmm_free(voidptr(page), 1)
+		return 0
+	}
+	if u64(got) != block_bytes {
 		memory.pmm_free(voidptr(page), 1)
 		return 0
 	}
@@ -189,38 +198,50 @@ fn all_zero(words &u64, count u64) bool {
 	return true
 }
 
-// Whether the device reads as zeroes over its first and last megabyte.
+// Whether the device reads as zeroes over its first and last megabyte. In
+// pieces: a megabyte in one run may not be had when memory is in use.
 fn device_blank() bool {
-	buffer := u64(memory.pmm_alloc_fallible(blank_span / page_size))
+	mut pages := u64(16)
+	mut buffer := u64(memory.pmm_alloc_fallible(pages))
+	if buffer == 0 {
+		pages = 1
+		buffer = u64(memory.pmm_alloc_fallible(pages))
+	}
 	if buffer == 0 {
 		return false
 	}
 	defer {
-		memory.pmm_free(voidptr(buffer), blank_span / page_size)
+		memory.pmm_free(voidptr(buffer), pages)
 	}
-	for offset in [u64(0), hib_device_bytes - blank_span]! {
-		if !device_read(offset, voidptr(buffer + higher_half), blank_span) {
-			return false
-		}
-		if !all_zero(page_of(buffer), blank_span / 8) {
-			return false
+	piece := pages * page_size
+	for start in [u64(0), hib_device_bytes - blank_span]! {
+		for offset := u64(0); offset < blank_span; offset += piece {
+			if !device_read(start + offset, voidptr(buffer + higher_half), piece) {
+				return false
+			}
+			if !all_zero(page_of(buffer), piece / 8) {
+				return false
+			}
 		}
 	}
 	return true
 }
 
 // Read the device's first block and say what it is. The header is copied
-// out when there is one.
-fn read_header(mut header Header) (Verdict, string) {
-	page := read_block(0)
+// out when there is one. False when the block could not be read at all:
+// what the device holds is then not known, which is not the same as nothing.
+fn read_header(mut header Header) (bool, Verdict, string) {
+	if hib_device == unsafe { nil } {
+		return false, Verdict.foreign, 'there is no device'
+	}
+	page := first_block_of(hib_device)
 	if page == 0 {
-		// Not known to be this system's: nothing is written to a device
-		// that cannot be read.
-		return Verdict.foreign, 'its first block cannot be read'
+		return false, Verdict.foreign, 'its first block cannot be read'
 	}
 	unsafe { C.memcpy(voidptr(header), voidptr(page + higher_half), sizeof(Header)) }
 	memory.pmm_free(voidptr(page), 1)
-	return judge_header(header, hib_device_bytes)
+	verdict, why := judge_header(header, hib_device_bytes)
+	return true, verdict, why
 }
 
 // Write `header` as the device's first block, have the device keep it, and
@@ -256,7 +277,8 @@ fn write_header(header &Header) bool {
 fn write_empty_header(sequence u64) bool {
 	mut header := new_header(0, sequence)
 	seal(mut header)
-	return write_header(header)
+	written := write_header(header)
+	return written
 }
 
 // Whether the device may be written to at all: it carries a header of this
@@ -269,7 +291,11 @@ fn device_is_ours() bool {
 		return false
 	}
 	mut header := Header{}
-	verdict, _ := read_header(mut header)
+	readable, verdict, _ := read_header(mut header)
+	if !readable {
+		hib_device_problem = 'the device named for the image cannot be read'
+		return false
+	}
 	if verdict == .foreign && !device_blank() {
 		hib_device_problem = 'the device named for the image holds something else; it is left alone (clear its first and last megabyte to give it to hibernation)'
 		return false
@@ -277,4 +303,53 @@ fn device_is_ours() bool {
 	hib_device_problem = ''
 	hib_device_ours = true
 	return true
+}
+
+// Whether a node of /dev has a name one of the disk drivers gives: a disk,
+// or a partition found on one.
+fn driver_named(name string) bool {
+	return name.starts_with('sd') || name.starts_with('ata') || name.starts_with('nvme')
+}
+
+// Look at every disk and partition the drivers have brought up for an image
+// that could still be gone back into: a whole header of this system's that
+// describes pages. Reads their first blocks and nothing else. Returns the
+// name of the first found, or ''; the named device, when it cannot be read
+// at all, counts, since what it holds is not known.
+//
+// This is asked by a boot that has not gone back into an image, before it
+// lets anything use the disks. An image is the state of every filesystem
+// that was mounted when it was taken. A boot that mounts one of them and
+// writes to it leaves an image that a later boot would go back into and
+// then corrupt the disk from; and it is not this boot's to discard -- the
+// image may be on a device nobody named this time, which is not written to.
+// So the answer decides whether this boot uses the disks at all.
+fn find_waiting_image() string {
+	if hib_device_name.len != 0 && hib_device != unsafe { nil } {
+		mut header := Header{}
+		readable, verdict, _ := read_header(mut header)
+		if !readable || verdict == .image {
+			return hib_device_name
+		}
+	}
+	dev := fs.get_node(vfs_root, '/dev', true) or { return '' }
+	for name, node in dev.children {
+		mut found := false
+		if driver_named(name) && node.resource != unsafe { nil } && stat.isblk(node.resource.stat.mode) {
+			page := first_block_of(node.resource)
+			if page != 0 {
+				header := unsafe { &Header(page + higher_half) }
+				verdict, _ := judge_header(header, u64(node.resource.stat.size))
+				memory.pmm_free(voidptr(page), 1)
+				found = verdict == .image
+			}
+		}
+		if found {
+			// The loop's own copy of the name, which the caller keeps.
+			return name
+		}
+		// Each turn of the loop is given a copy of the name.
+		unsafe { name.free() }
+	}
+	return ''
 }
