@@ -145,14 +145,24 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 		create_disk(disk, state)!
 	}
 	command := qemu_command(host, scenario, media, state)!
-	os.write_file(os.join_path(state, 'qemu.log'), command.join(' ') + '\n')!
+	qemu_log := os.join_path(state, 'qemu.log')
+	os.write_file(qemu_log, command.join(' ') + '\n')!
 	m.serial = SerialReader{
 		path: os.join_path(state, 'serial.log')
 	}
-	m.child = start_child(command, map[string]string{}, os.join_path(state, 'qemu.log'))!
+	m.child = start_child(command, map[string]string{}, qemu_log)!
 	m.started = true
 	started := now_ms()
-	m.qmp = qmp_connect(socket, os.join_path(state, 'qmp.log'), mut m.child, started)!
+	m.qmp = qmp_connect(socket, os.join_path(state, 'qmp.log'), mut m.child, started) or {
+		if err is Interrupted {
+			return err
+		}
+		// A QEMU that would not start has said why, and nowhere else: the
+		// first line of its log is the command, the rest is its complaint.
+		said := os.read_lines(qemu_log) or { []string{} }
+		complaint := if said.len > 1 { '\n  ' + said[1..].join('\n  ') } else { '' }
+		return error(err.msg() + complaint)
+	}
 	m.watch(scenario, state, started + i64(run.timeout) * 1000, run.timeout)!
 	// QEMU has exited or the scenario leaves the machine up; either way what
 	// the guest synced is in the disk files only once QEMU has let go of
