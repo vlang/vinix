@@ -77,6 +77,9 @@ pub:
 	qemu_aarch64 []string
 	qemu_x86_64  []string
 	disks        []Disk
+	// ACPI tables to give the machine, by the names acpi_table() knows. Each is
+	// written to {state}/<name>.aml; the scenario's own QEMU arguments load it.
+	tables       []string
 	required     []string // every one must appear on some serial line
 	forbidden    []string // besides always_forbidden
 	actions      []Action
@@ -148,6 +151,15 @@ pub const scenarios = [
 				qmp:   '{"execute":"system_powerdown"}'
 			},
 		]
+		ending:   .poweroff
+	},
+	Scenario{
+		name:     'acpi-power'
+		about:    'ACPI battery, charger and lid: readings, time left, lid sleep, low and critical'
+		arches:   ['x86_64']
+		tables:   ['power-bench']
+		qemu:     ['-acpitable', 'file={state}/power-bench.aml']
+		required: ['HWTEST START acpi-power', 'HWTEST PASS acpi-power']
 		ending:   .poweroff
 	},
 	Scenario{

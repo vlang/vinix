@@ -144,6 +144,9 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 	for disk in scenario.disks {
 		create_disk(disk, state)!
 	}
+	for table in scenario.tables {
+		os.write_file_array(os.join_path(state, table + '.aml'), acpi_table(table)!)!
+	}
 	command := qemu_command(host, scenario, media, state)!
 	qemu_log := os.join_path(state, 'qemu.log')
 	os.write_file(qemu_log, command.join(' ') + '\n')!

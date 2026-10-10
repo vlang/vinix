@@ -22,6 +22,7 @@ module main
 // Runs the named scenario. False when this program has no such scenario.
 fn run_scenario(name string, mut t Test) bool {
 	match name {
+		'acpi-power' { scenario_acpi_power(mut t) }
 		'ahci' { scenario_ahci(mut t) }
 		'devices' { scenario_devices(mut t) }
 		'power-button-init' { scenario_power_button_init(mut t) }
