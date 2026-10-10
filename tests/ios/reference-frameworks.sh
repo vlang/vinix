@@ -74,6 +74,12 @@ test "$exit_status" = 8
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/numeric.c" -o "$output/numeric"
 "$output/numeric"
+"${IOS_CLANG:-clang}" -fno-builtin -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/nan.c" -o "$output/nan"
+"$output/nan"
+"${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
+    "$repo/tests/ios/poll.c" -o "$output/poll"
+"$output/poll" --native-darwin
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/permissions.c" -o "$output/permissions"
 test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permissions-loop"

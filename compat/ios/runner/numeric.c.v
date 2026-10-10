@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import math
+
 #include <fenv.h>
 
 fn C.fegetenv(voidptr) int
@@ -47,4 +49,44 @@ fn darwin_atoll(text &char) i64 {
 	// Darwin uses the checked decimal conversion: saturation and ERANGE on
 	// overflow, EINVAL when there are no digits. musl's atoll omits those checks.
 	return C.strtoll(text, unsafe { nil }, 10)
+}
+
+fn numeric_nan_payload(text &char) u64 {
+	// The installed Darwin library accepts unsigned base-0 integer tags,
+	// wraps overflow, and discards the entire payload on any invalid byte.
+	// Parse in integer registers: neither errno nor the floating environment
+	// may change, including when a tag is much larger than u64.
+	mut position := usize(0)
+	mut base := u64(10)
+	unsafe {
+		if text[0] == 48 {
+			base = 8
+			if text[1] == 120 || text[1] == 88 {
+				base = 16
+				position = 2
+			}
+		}
+		mut payload := u64(0)
+		for text[position] != 0 {
+			byte := u8(text[position])
+			digit := match true {
+				byte >= 48 && byte <= 57 { u64(byte - 48) }
+				byte >= 65 && byte <= 70 { u64(byte - 65 + 10) }
+				byte >= 97 && byte <= 102 { u64(byte - 97 + 10) }
+				else { return 0 }
+			}
+			if digit >= base { return 0 }
+			payload = payload * base + digit
+			position++
+		}
+		return payload
+	}
+}
+
+fn darwin_nan(text &char) f64 {
+	return math.f64_from_bits(u64(0x7ff8000000000000) | (numeric_nan_payload(text) & u64(0x0007ffffffffffff)))
+}
+
+fn darwin_nanf(text &char) f32 {
+	return math.f32_from_bits(u32(0x7fc00000) | (u32(numeric_nan_payload(text)) & u32(0x003fffff)))
 }

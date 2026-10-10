@@ -221,6 +221,8 @@ fn fixed_symbol(symbol string) ?u64 {
         '_strtof' { u64(unsafe { voidptr(C.strtof) }) }
         '_atof' { u64(unsafe { voidptr(darwin_atof) }) }
         '_atoll' { u64(unsafe { voidptr(darwin_atoll) }) }
+        '_nan' { u64(unsafe { voidptr(darwin_nan) }) }
+        '_nanf' { u64(unsafe { voidptr(darwin_nanf) }) }
         '_getpid' { u64(unsafe { voidptr(C.getpid) }) }
         '_getenv' { u64(unsafe { voidptr(C.getenv) }) }
         '_setenv' { u64(unsafe { voidptr(C.setenv) }) }

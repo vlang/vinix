@@ -683,6 +683,30 @@ previous timezone before returning. ASAN checks two loads/unloads. The full
 ARM64 C++/GLES/PPSSPP regression passes. These four entries resolve five
 additional strong imports across Fortnite and EOSSDK.
 
+`nan` and `nanf` construct Darwin quiet NaNs in V from unsigned decimal,
+octal or hexadecimal payload tags. Integer overflow wraps, malformed tags
+discard the entire payload, and the result keeps the representable payload
+bits. Unlike musl's constructors, these preserve the measured Mac payloads.
+They allocate nothing and leave errno, exception flags and rounding mode
+unchanged. Shared Mac/iOS fixtures verify exact single/double bit patterns,
+large tags, four floating-point states/rounding modes and eight concurrent
+callers; ASAN also checks two image loads/unloads.
+
+V adapters for `pipe` and `poll` use real native descriptors and readiness
+waits. They translate Darwin normal/band filters, restrict pipe readiness
+to the correct endpoint, preserve errno, and follow the Mac's EOF and
+zero-filter behavior. Unix stream EOF conversion does not consume `SO_ERROR`.
+Polling uses stack storage for up to 32 entries and frees larger translation
+arrays on success and failure. The native Vinix limit is 4,096 descriptors;
+Darwin vnode change notifications and unknown filters fail explicitly with
+`EOPNOTSUPP`. Shared Mac/iOS fixtures check guarded layouts, real pipe/socket
+data, both ends closing, negative/invalid descriptors, 65-entry arrays,
+finite waits, negative timeouts waking on real I/O and eight concurrent
+clients. ASAN checks two image loads/unloads. The full ARM64 C++/GLES/PPSSPP
+regression passes. Urgent TCP data and connection error combinations remain
+unverified. These four entries resolve five additional strong imports across
+Fortnite and EOSSDK.
+
 The actual executable, using the updated static C++ runner in a 4 GiB Vinix guest,
 still exits with status 1 before its entry point, now at:
 
@@ -696,20 +720,28 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _nan
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _os_proc_available_memory
 ```
+
+The installed Mac SDK defines this query as an application's remaining dirty
+memory budget, equivalent to `task_vm_info.limit_bytes_remaining`; it does not
+return free system RAM or an address-space limit. The installed native entry
+dispatches Darwin syscall 534 and returns zero for the probed Mac process,
+before and after a touched 64 MiB allocation. Vinix still lacks this Darwin
+application-budget query; a system-memory estimate would not supply its
+documented behavior.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,289 | 869 | 81 |
-| EOSSDK | 500 | 162 | 18 |
+| Fortnite executable | 1,291 | 867 | 81 |
+| EOSSDK | 503 | 159 | 18 |
 | MarketplaceKitWrapper | 53 | 123 | 23 |
-| All images | 1,842 | 1,154 | 122 |
+| All images | 1,847 | 1,149 | 122 |
 
-The C++/GLES/Text variant reports 1,855 resolved imports, 1,141 unresolved strong
+The C++/GLES/Text variant reports 1,860 resolved imports, 1,136 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -20,6 +20,8 @@ FEATURES = (
     b"iOS PASS: Darwin socket addresses, options and native network I/O",
     b"iOS PASS: image-scoped exit callbacks and real process termination",
     b"iOS PASS: Darwin floating and integer conversion errors",
+    b"iOS PASS: Darwin NaN payloads and floating state preservation",
+    b"iOS PASS: Darwin pipes, polling filters and native readiness waits",
     b"iOS PASS: Darwin file permissions and descriptor lifetime",
     b"iOS PASS: Darwin dispatch queues, deadlines and callback ownership",
     b"iOS PASS: Darwin descriptor controls and real file synchronization",
@@ -195,7 +197,7 @@ def main() -> int:
             shutil.copy2(build / "fixtures/compression", destination / "compression")
             shutil.copytree(build / "fixtures/TextFixture.app", destination / "TextFixture.app")
             shutil.copy2(build / "ppsspp/unpacked/Payload/PPSSPP.app/assets/Roboto_Condensed-Regular.ttf", destination / "TextFixture.app/font.ttf")
-        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "exit-handlers", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "provider-images", "geometry", "game-constants", "security", "security-trust", "cfnetwork", "keychain", "common-crypto", "atomic-queue", "assertions", "stack-probe", "libsystem-safety", "runes", "sockets", "numeric", "permissions", "dispatch", "fcntl", "netdb", "interfaces", "system-queries", "process", "ioctl", "calendar", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
+        for name in ("calculator", "calculator-legacy", "unsupported", "lifecycle", "exit-handlers", "pointer-tags", "pointer-tags-legacy", "core-foundation", "audio-converter", "audio-graph", "colors", "provider-images", "geometry", "game-constants", "security", "security-trust", "cfnetwork", "keychain", "common-crypto", "atomic-queue", "assertions", "stack-probe", "libsystem-safety", "runes", "sockets", "numeric", "nan", "poll", "permissions", "dispatch", "fcntl", "netdb", "interfaces", "system-queries", "process", "ioctl", "calendar", "framework-constants", "accessibility", "objc-runtime", "arc-registers", "graphics", "lazy", "stdio", "arc-threads", "mach-memory"):
             shutil.copy2(build / "fixtures" / name, destination / name)
         (destination / "permissions-loop").symlink_to("permissions-loop")
         shutil.copytree(build / "fixtures/SceneFixture.app", destination / "SceneFixture.app")

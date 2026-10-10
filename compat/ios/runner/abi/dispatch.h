@@ -14,6 +14,9 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <poll.h>
+_Static_assert(sizeof(struct pollfd) == 8 && offsetof(struct pollfd, events) == 4 &&
+               offsetof(struct pollfd, revents) == 6, "Darwin poll descriptor layout");
 /* Darwin's fortified overflow path terminates with an ARM64 breakpoint. */
 static void ios_fortify_trap(void) { __builtin_trap(); }
 /* A portable non-elidable wipe; keychain storage policy and crypto stay in V. */

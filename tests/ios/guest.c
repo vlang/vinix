@@ -127,6 +127,12 @@ int main(void) {
     run("/opt/ios/numeric", NULL, NULL, NULL, 0,
         "IOS-NUMERIC: decimal/hex floats, signed zero, subnormals, integer limits and eight-thread errno/fenv");
     puts("iOS PASS: Darwin floating and integer conversion errors");
+    run("/opt/ios/nan", NULL, NULL, NULL, 0,
+        "IOS-NAN: decimal/octal/hex payloads, overflow, malformed tags, errno, floating state and eight threads\n");
+    puts("iOS PASS: Darwin NaN payloads and floating state preservation");
+    run("/opt/ios/poll", NULL, NULL, NULL, 0,
+        "IOS-POLL: real pipes/socket I/O, band flags, endpoint readiness, EOF, timeouts, guarded arrays and eight threads\n");
+    puts("iOS PASS: Darwin pipes, polling filters and native readiness waits");
     run("/opt/ios/permissions", "/opt/ios/permissions-loop", NULL, NULL, 0,
         "IOS-PERMISSIONS: real file modes, unlinked descriptors, Darwin errors and eight threads");
     puts("iOS PASS: Darwin file permissions and descriptor lifetime");
