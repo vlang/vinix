@@ -722,7 +722,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _strerror
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _sysctl
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1166,19 +1166,43 @@ permissions/readlink failure, whose log is retained. The three bindings resolve
 four more strong imports. The actual game still exits with status 1 before
 entry, now at `strerror` in EOSSDK. Native Mac measurements for the next
 `strerror`/`strerror_r` adapters are retained under `byte-string-checks`;
-those two imports remain unresolved.
+those two imports were still unresolved in that probe.
+
+The V `strerror` and POSIX `strerror_r` adapters now use the measured C-locale
+Darwin messages for error numbers 0 through 107. Unknown signed 32-bit numbers
+produce `Unknown error: <number>`, including `INT_MIN`, without integer overflow.
+`strerror_r` copies a terminated prefix when space is short, returns `ERANGE`
+(34), and preserves caller errno. Unknown numbers return `EINVAL` (22) even
+when the output is truncated. Zero capacity writes nothing; a null destination
+with nonzero capacity is explicitly rejected with `EINVAL`.
+
+`strerror` reuses one 128-byte native TLS buffer per calling thread, preserving
+errno for known numbers and setting `EINVAL` for unknown numbers. One private
+native key lasts for the process; libc's resident `free` releases each worker's
+buffer at thread exit, without calling app code. Buffers remain usable across
+runtime teardowns. The reentrant formatter uses native stack scratch storage;
+generated C confirms no per-call V heap allocation. Localized error text and
+allocation-failure behavior against native Darwin remain unverified.
+
+Shared native Mac/V tests compare all known messages, unknown numbers, errno,
+seven guarded buffer sizes and truncation results. Adapter checks also exercise
+32 workers per round with repeated calls, private buffer reuse and two runtime
+teardowns. ASAN verifies that terminated workers' buffers were freed; host
+ASAN/UBSAN and the full ARM64 C++/GLES/PPSSPP regression pass. These adapters
+resolve four more strong imports across Fortnite and EOSSDK. The actual game
+still exits with status 1 before entry, now at `sysctl` in EOSSDK.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,319 | 839 | 81 |
-| EOSSDK | 536 | 126 | 18 |
+| Fortnite executable | 1,321 | 837 | 81 |
+| EOSSDK | 538 | 124 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,915 | 1,081 | 122 |
+| All images | 1,919 | 1,077 | 122 |
 
-The C++/GLES/Text variant reports 1,928 resolved imports, 1,068 unresolved strong
+The C++/GLES/Text variant reports 1,932 resolved imports, 1,064 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1213,9 +1237,9 @@ v -nocache -cc clang run tests/ios/native-checks.v static-audit
 ```
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
-`build/ios/fortnite` (default `select-checks`; the signal verification uses
-`signal-checks`). Each mode records its own state path and guest `serial.log`
-there. Regression runs the native V select, semaphore and signal checks before the
+`build/ios/fortnite` (default `select-checks`; the error-message verification uses
+`error-checks`). Each mode records its own state path and guest `serial.log`
+there. Regression runs the native V select, semaphore, signal and error checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build
