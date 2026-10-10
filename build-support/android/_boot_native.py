@@ -314,7 +314,13 @@ _build_transport = _host.Controller(_HERE / 'runtime-query.v', 'VINIX_ANDROID_RU
 
 
 def _build_snapshot(value):
-    return _entry(b"snapshot", value)
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return [_build_snapshot(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _build_snapshot(item) for key, item in value.items()}
+    return value
 
 
 def _build_arguments(items, resources):
@@ -352,9 +358,22 @@ def _build_retire(owners):
 
 
 def _build_primitive(operation, row, context, resources):
-    result = _entry(b"primitive", operation, row, context, resources)
-    if result is not NotImplemented:
-        return result
+    if operation in ('invoke', 'acquire', 'enter'):
+        value = _build_invoke(row, context, resources)
+        if operation == 'enter':
+            entered = value.__enter__()
+            ident = _register(resources, entered)
+            resources['owners'][ident] = value
+            return ident
+        if operation == 'acquire':
+            return _register(resources, value)
+        return value.hex() if row.get('bytes') else _build_snapshot(value)
+    if operation == 'checkpoint':
+        return _entry(b"primitive", 'checkpoint', row, context, resources)
+    if operation == 'release_since':
+        return _entry(b"primitive", 'release_since', row, context, resources)
+    if operation == 'release':
+        return _entry(b"primitive", 'release', row, context, resources)
     if operation == 'release_error':
         error = resources['errors'][row['error']['binding_error']]
         traceback = error.__traceback__
@@ -371,6 +390,12 @@ def _build_primitive(operation, row, context, resources):
                 if error.__traceback__ is replay:
                     error.__traceback__ = traceback
         return None
+    if operation == 'borrow':
+        return _entry(b"primitive", 'borrow', row, context, resources)
+    if operation == 'borrow_global':
+        return _entry(b"primitive", 'borrow_global', row, context, resources)
+    if operation == 'retain':
+        return _entry(b"primitive", 'retain', row, context, resources)
     if operation == 'load_module':
         spec = context['importlib'].util.spec_from_file_location(row['name'],
                      _build_arguments([row['path']], resources)[0])
@@ -378,6 +403,20 @@ def _build_primitive(operation, row, context, resources):
         module = context['importlib'].util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return _register(resources, module)
+    if operation == 'is_none':
+        return _entry(b"primitive", 'is_none', row, context, resources)
+    if operation == 'enter_existing':
+        return _entry(b"primitive", 'enter_existing', row, context, resources)
+    if operation == 'tuple':
+        return _entry(b"primitive", 'tuple', row, context, resources)
+    if operation == 'sequence':
+        return _entry(b"primitive", 'sequence', row, context, resources)
+    if operation == 'unpack_pair':
+        return _entry(b"primitive", 'unpack_pair', row, context, resources)
+    if operation == 'dictionary':
+        return _entry(b"primitive", 'dictionary', row, context, resources)
+    if operation == 'mapping_unpack':
+        return _entry(b"primitive", 'mapping_unpack', row, context, resources)
     if operation == 'sort_attribute':
         return _register(resources, sorted(resources[row['id']], key=lambda item: getattr(item, row['name'])))
     if operation == 'pool_map':
@@ -391,6 +430,13 @@ def _build_primitive(operation, row, context, resources):
             result = list(pool.map(lambda item: context[row['name']](*_build_arguments(row.get('before', []), resources),
                                   item, *_build_arguments(row.get('after', []), resources)), resources[row['id']]))
         return _register(resources, result)
+    if operation == 'getattr':
+        value = getattr(resources[row['id']], row['name'])
+        return _register(resources, value) if row.get('object') else _build_snapshot(value)
+    if operation == 'setattr':
+        return _entry(b"primitive", 'setattr', row, context, resources)
+    if operation == 'iterate':
+        return _entry(b"primitive", 'iterate', row, context, resources)
     if operation == 'exit':
         manager = resources['owners'].pop(row['id'])
         value = row.get('error')
@@ -407,7 +453,17 @@ def _build_primitive(operation, row, context, resources):
     if operation == 'exception_is':
         return isinstance(resources['errors'][row['error']['binding_error']],
                           tuple(getattr(_builtins, name) for name in row['kinds']))
+    if operation == 'function':
+        options = dict(row.get('options', {}))
+        options.update({key: resources[value] for key, value in row.get('keyword_objects', {}).items()})
+        value = context[row['name']](*_build_arguments(row.get('arguments', []), resources), **options)
+        return _register(resources, value) if row.get('object') else _build_snapshot(value)
+    if operation == 'function_is':
+        return _entry(b"primitive", 'function_is', row, context, resources)
+    if operation == 'print':
+        return _entry(b"primitive", 'print', row, context, resources)
     return _primitive(operation, row, context, resources)
+
 
 
 def query_call(transport, request, context, *, values=None):

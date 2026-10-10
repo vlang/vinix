@@ -1,13 +1,18 @@
 # Native Android build-object bindings
 
 `_boot_native.py` borrows the invoking CPython interpreter's actual objects
-through `boot_sdk_library.v`. Object registration, snapshots, argument
+through `boot_sdk_library.v`. Object registration, argument
 conversion, invocation, releases and the bounded collection primitives live in
 `../cpythonhost/boot_d_cpython_boot.c.v`. The caller still owns the resource
 dictionary, integer IDs, error list and entered-manager table. Each native entry
 borrows those objects synchronously and gives its returned value an independent
 reference.
 
+Recursive snapshot traversal retains its original Python body, recursion limits,
+and failure-frame ownership. Snapshot result conversion also stays in the original Python primitive frame
+so an active native bridge does not reduce the accepted recursion depth. The
+original operation comparisons remain in that frame; selected nonrecursive
+bodies execute in V.
 The wire codecs, archive and filesystem bindings, process transport, pool and
 loader policies, and exceptional manager exits remain counted Python during
 this bounded stage. Exact pair unpacking and mapping expansion are narrow
@@ -15,7 +20,11 @@ Python syntax bindings. Named objects and returned aliases remain live through
 their existing owners; pending exceptions preserve the caller's handled state.
 Failed native scopes retain their original local references in the binding
 traceback frame until the actual error's traceback is cleared.
-Private binding traceback frames are not an exact layout contract.
+Private binding traceback frames are not an exact layout contract. Near-limit
+recursion performed inside an arbitrary supplied callback can observe the
+native bridge stack overhead; exact global recursion-budget equivalence inside
+those callbacks is outside this interface. Recursive helpers and their
+maintained result-conversion call sites preserve their original accepted depth.
 Replacing a translated private helper's Python body is outside this adapter's
 contract; its public signature and supplied-object behavior remain supported.
 

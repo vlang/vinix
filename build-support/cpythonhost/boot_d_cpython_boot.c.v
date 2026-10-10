@@ -156,97 +156,8 @@ fn boot_instance(c &BootContext, value voidptr, classes []voidptr) i32 {
 	return truth
 }
 
-fn boot_snapshot(c &BootContext, value voidptr) voidptr {
-	path := c.resolve('Path')
-	if path == unsafe { nil } { return path }
-	path_value := boot_instance(c, value, [path])
-	drop(path)
-	if path_value < 0 { return unsafe { nil } }
-	if path_value != 0 {
-		formatter := c.resolve('str')
-		if formatter == unsafe { nil } { return formatter }
-		result := boot_call(formatter, [value])
-		drop(formatter)
-		return result
-	}
-	list_ := c.resolve('list')
-	tuple_ := c.resolve('tuple')
-	if list_ == unsafe { nil } || tuple_ == unsafe { nil } {
-		drop(list_)
-		drop(tuple_)
-		return unsafe { nil }
-	}
-	sequence := boot_instance(c, value, [list_, tuple_])
-	drop(list_)
-	drop(tuple_)
-	if sequence < 0 { return unsafe { nil } }
-	if sequence != 0 {
-		iterator := C.PyObject_GetIter(value)
-		if iterator == unsafe { nil } { return iterator }
-		result := C.PyList_New(0)
-		mut previous := voidptr(0)
-		for {
-			item := C.PyIter_Next(iterator)
-			if item == unsafe { nil } { break }
-			drop(previous)
-			previous = item
-			converted := boot_snapshot(c, item)
-			if converted == unsafe { nil } { break }
-			status := C.PyList_Append(result, converted)
-			drop(converted)
-			if status != 0 { break }
-		}
-		boot_pin(c, ['.0', 'item'], [iterator, previous])
-		drop(previous)
-		drop(iterator)
-		if pending_error() { drop(result); return unsafe { nil } }
-		return result
-	}
-	dict_ := c.resolve('dict')
-	if dict_ == unsafe { nil } { return dict_ }
-	mapping := boot_instance(c, value, [dict_])
-	drop(dict_)
-	if mapping < 0 { return unsafe { nil } }
-	if mapping != 0 {
-		items := boot_method(value, 'items', [])
-		if items == unsafe { nil } { return items }
-		iterator := C.PyObject_GetIter(items)
-		drop(items)
-		if iterator == unsafe { nil } { return iterator }
-		result := C.PyDict_New()
-		pair_helper := c.resolve('_boot_pair')
-		mut key := voidptr(0)
-		mut entry := voidptr(0)
-		for {
-			row := C.PyIter_Next(iterator)
-			if row == unsafe { nil } { break }
-			pair := boot_call(pair_helper, [row])
-			drop(row)
-			if pair == unsafe { nil } { break }
-			new_key := own(C.PyTuple_GetItem(pair, 0))
-			new_entry := own(C.PyTuple_GetItem(pair, 1))
-			drop(pair)
-			drop(key)
-			key = new_key
-			drop(entry)
-			entry = new_entry
-			converted := boot_snapshot(c, entry)
-			if converted == unsafe { nil } { break }
-			status := C.PyObject_SetItem(result, key, converted)
-			drop(converted)
-			if status != 0 { break }
-		}
-		boot_pin(c, ['.0', 'key', 'item'], [iterator, key, entry])
-		drop(key)
-		drop(entry)
-		drop(iterator)
-		drop(pair_helper)
-		if pending_error() { drop(result); return unsafe { nil } }
-		return result
-	}
-	return own(value)
-}
-
+// Retain recursive traversal in its original Python implementation so the
+// interpreter owns recursion limits, cycles, and failed comprehension frames.
 fn boot_argument(c &BootContext, kind voidptr, value voidptr, resources voidptr) voidptr {
 	mut name := ''
 	for candidate in ['object', 'owned', 'attribute', 'path', 'bytes'] {
@@ -522,41 +433,6 @@ fn boot_primitive(c &BootContext, name string, row voidptr, namespace voidptr, r
 		drop(iterator)
 		return if pending_error() { unsafe { nil } } else { py_none() }
 	}
-	if name in ['invoke', 'acquire', 'enter'] {
-		value := boot_invoke(c, row, namespace, resources)
-		if value == unsafe { nil } { return value }
-		if name == 'enter' {
-			entered := boot_method(value, '__enter__', [])
-			if entered == unsafe { nil } { boot_pin(c, ['value'], [value]); drop(value); return entered }
-			ident := boot_register(c, resources, entered)
-			if ident == unsafe { nil } { boot_pin(c, ['value', 'entered'], [value, entered]); drop(entered); drop(value); return ident }
-			owners := boot_field(resources, 'owners')
-			if owners == unsafe { nil } { boot_pin(c, ['value', 'entered', 'ident'], [value, entered, ident]); drop(entered); drop(value); drop(ident); return owners }
-			status := C.PyObject_SetItem(owners, ident, value)
-			drop(owners)
-			boot_pin(c, ['value', 'entered', 'ident'], [value, entered, ident])
-			drop(entered)
-			drop(value)
-			if status != 0 { drop(ident); return unsafe { nil } }
-			return ident
-		}
-		if name == 'acquire' {
-			ident := boot_register(c, resources, value)
-			drop(value)
-			return ident
-		}
-		false_ := py_none()
-		bytes_ := boot_default(row, 'bytes', false_)
-		drop(false_)
-		if bytes_ == unsafe { nil } { boot_pin(c, ['value'], [value]); drop(value); return bytes_ }
-		truth := C.PyObject_IsTrue(bytes_)
-		drop(bytes_)
-		if truth < 0 { boot_pin(c, ['value'], [value]); drop(value); return unsafe { nil } }
-		result := if truth != 0 { boot_method(value, 'hex', []) } else { boot_snapshot(c, value) }
-		boot_pin(c, ['value'], [value])
-		drop(value)
-		return result
-	}
 	if name == 'checkpoint' {
 		zero := C.PyLong_FromLongLong(0)
 		result := boot_default(resources, 'next_id', zero)
@@ -626,59 +502,35 @@ fn boot_primitive(c &BootContext, name string, row voidptr, namespace voidptr, r
 		drop(value)
 		return ident
 	}
-	if name in ['function', 'print'] {
+	if name == 'print' {
 		options := boot_options(c, row, resources)
 		if options == unsafe { nil } || pending_error() { boot_pin(c, ['options'], [options]); drop(options); return unsafe { nil } }
 		mut target := voidptr(0)
-		if name == 'function' {
-			key := boot_field(row, 'name')
-			if key == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(options); return key }
-			target = C.PyObject_GetItem(namespace, key)
-			drop(key)
-		} else {
-			lookup_name := boot_literal('get')
-			lookup := C.PyObject_GetAttr(namespace, lookup_name)
-			drop(lookup_name)
-			if lookup == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(options); return lookup }
-			fallback := c.resolve('print')
-			if fallback == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(lookup); drop(options); return fallback }
-			key := boot_literal('print')
-			target = boot_call(lookup, [key, fallback])
-			drop(fallback)
-			drop(key)
-			drop(lookup)
-		}
+		lookup_name := boot_literal('get')
+		lookup := C.PyObject_GetAttr(namespace, lookup_name)
+		drop(lookup_name)
+		if lookup == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(options); return lookup }
+		fallback := c.resolve('print')
+		if fallback == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(lookup); drop(options); return fallback }
+		key := boot_literal('print')
+		target = boot_call(lookup, [key, fallback])
+		drop(fallback)
+		drop(key)
+		drop(lookup)
 		if target == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(options); return target }
 		mut args := voidptr(0)
-		if name == 'function' {
-			values := boot_row_arguments(c, row, resources, 'arguments')
-			if values == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(target); drop(options); return values }
-			args = C.PySequence_Tuple(values)
-			drop(values)
-		} else {
-			data := boot_field(row, 'data')
-			if data == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(target); drop(options); return data }
-			args = boot_tuple([data])
-			drop(data)
-		}
+		data := boot_field(row, 'data')
+		if data == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(target); drop(options); return data }
+		args = boot_tuple([data])
+		drop(data)
 		if args == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(target); drop(options); return args }
 		value := C.PyObject_Call(target, args, options)
 		drop(args)
 		drop(target)
 		if value == unsafe { nil } { boot_pin(c, ['options'], [options]); drop(options); return value }
-		if name == 'print' { drop(value); drop(options); return py_none() }
-		default_ := py_none()
-		object := boot_default(row, 'object', default_)
-		drop(default_)
-		if object == unsafe { nil } { boot_pin(c, ['value', 'options'], [value, options]); drop(value); drop(options); return object }
-		truth := C.PyObject_IsTrue(object)
-		drop(object)
-		if truth < 0 { boot_pin(c, ['value', 'options'], [value, options]); drop(value); drop(options); return unsafe { nil } }
-		result := if truth != 0 { boot_register(c, resources, value) } else { boot_snapshot(c, value) }
-		boot_pin(c, ['value', 'options'], [value, options])
 		drop(value)
 		drop(options)
-		return result
+		return py_none()
 	}
 	if name == 'function_is' {
 		name_ := boot_field(row, 'name')
@@ -734,9 +586,9 @@ fn boot_primitive(c &BootContext, name string, row voidptr, namespace voidptr, r
 		drop(value)
 		return result
 	}
-	if name in ['is_none', 'getattr', 'setattr', 'iterate', 'unpack_pair'] {
+	if name in ['is_none', 'setattr', 'iterate', 'unpack_pair'] {
 		mut getter := voidptr(0)
-		if name in ['getattr', 'setattr', 'iterate'] {
+		if name in ['setattr', 'iterate'] {
 			getter = c.resolve(if name == 'iterate' { 'next' } else { name })
 			if getter == unsafe { nil } { return getter }
 		}
@@ -828,24 +680,7 @@ fn boot_primitive(c &BootContext, name string, row voidptr, namespace voidptr, r
 			drop(attribute)
 			return result
 		}
-		attribute_value := boot_call(getter, [value, attribute])
-		drop(attribute)
-		drop(value)
-		value = unsafe { nil }
-		drop(getter)
-		getter = unsafe { nil }
-		if attribute_value == unsafe { nil } { return attribute_value }
-		default_ := py_none()
-		object := boot_default(row, 'object', default_)
-		drop(default_)
-		if object == unsafe { nil } { boot_pin(c, ['value'], [attribute_value]); drop(attribute_value); return object }
-		truth := C.PyObject_IsTrue(object)
-		drop(object)
-		if truth < 0 { boot_pin(c, ['value'], [attribute_value]); drop(attribute_value); return unsafe { nil } }
-		result := if truth != 0 { boot_register(c, resources, attribute_value) } else { boot_snapshot(c, attribute_value) }
-		boot_pin(c, ['value'], [attribute_value])
-		drop(attribute_value)
-		return result
+
 	}
 	// The remaining archive, pool and exceptional-owner boundaries retain
 	// their independent Python implementation during this bounded stage.
@@ -866,7 +701,6 @@ pub fn boot_entry(operation &char, namespace voidptr, arguments voidptr, pins vo
 	name := unsafe { operation.vstring() }
 	if name !in ['register'] && C.PyErr_CheckSignals() != 0 { return unsafe { nil } }
 	result := match name {
-		'snapshot' { boot_snapshot(unsafe { &context }, C.PyTuple_GetItem(arguments, 0)) }
 		'arguments' { boot_arguments(unsafe { &context }, C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1)) }
 		'invoke' { boot_invoke(unsafe { &context }, C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1), C.PyTuple_GetItem(arguments, 2)) }
 		'register' { boot_register(unsafe { &context }, C.PyTuple_GetItem(arguments, 0), C.PyTuple_GetItem(arguments, 1)) }
