@@ -149,6 +149,12 @@ fn power(mut r Report) {
 	r.add('| --- | --- |')
 	r.add('| sleep states | ${word(sys + '/power/state')} |')
 	r.add('| `mem` means | ${word(sys + '/power/mem_sleep')} |')
+	// Why a suspend to RAM is or is not offered, in the kernel's own words;
+	// empty on a kernel or an architecture that has none.
+	deep := (os.read_file(sys + '/power/deep_sleep') or { '' }).split_into_lines()
+	if deep.len > 0 {
+		r.add('| suspend to RAM | ${deep[0]} |')
+	}
 	r.add('| lid | ${word(sys + '/power/lid/state')}, on closing: ${word(sys + '/power/lid/action')} |')
 	mut wake := []string{}
 	for name in listing(sys + '/class/wakeup') {
