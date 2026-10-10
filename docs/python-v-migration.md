@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `52f93ab8e1e0373deb705181788fb3ab54c29754`,
-Linguist 7.27.0 reports **Python 6.72%** (503 files, 2,291,893 bytes) and
-**V 73.38%** (2,192 files, 25,019,606 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `42eac0bc33cb2c4e7dd8a9a928d874fd5a067fcf`,
+Linguist 7.27.0 reports **Python 6.67%** (498 files, 2,280,243 bytes) and
+**V 73.48%** (2,211 files, 25,116,141 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **2,914,392 Python bytes**. All remaining
-2,291,893 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **2,926,042 Python bytes**. All remaining
+2,280,243 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The thirteen stages below remove **29 Python files / 69,455 original bytes** and
+The sixteen stages below remove **34 Python files / 81,105 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -44,6 +44,9 @@ changes remain separate from this per-stage scope and the measured graph.
 | Allocation and user-access log symbolizers | `tests/kernel-symbols/symbolcore`, two `sites.v` entrypoints | 5,395 / 147 | `5a189a86` |
 | Standalone Alpine dependency resolver | `build-support/alpinecore`, `alpine-resolve.v` | 1,830 / 63 | `5b750ff8` |
 | Wine binary patch commands | `build-support/x86-translation/winepatch`, five V entrypoints | 17,908 / 508 | `52f93ab8` |
+| Java trust-store host and guest commands | `build-support/javacacerts`, `java-cacerts.v`, `java-cacerts-stage.v` | 2,285 / 70 | `0c7a52b8` |
+| Resource-accounting, pagecache and procfs generated-C guards | `tests/generated-source-guards/guardcore`, three V entrypoints | 6,326 / 139 | `2886191c` |
+| Kernel archiver selection and archive test | `tests/compiler-selection/test-kernel-ar.v`, `archivercheck` | 3,039 / 68 | `fb58af4e` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -130,16 +133,59 @@ ARM and x86. All five Wine launchers and fourteen caller shell syntax checks
 passed. This fix adds no Python translation credit. Native qualification logs
 remain under `/tmp/vinix-python-zero-20261010/continuation`.
 
-Between `5a189a86` and this snapshot, counted Python declined by exactly 19,738
+Between `5a189a86` and `52f93ab8`, counted Python declined by exactly 19,738
 bytes, matching these two stages. Other sessions also committed V changes;
 their bytes affect the language shares independently.
+
+The next three stages remove five Python files / 11,650 original bytes. The
+Java writer matches every byte of the existing 119-certificate Mozilla trust
+store, whose SHA-256 is
+`a25f4464a74cfba595a04f135b3ee2f6927479161baac152feef2161cc893bad`.
+OpenJDK independently accepts its default and supplementary-Unicode passwords
+and rejects wrong passwords. OpenSSL verifies the JKS checksum independently.
+Native tests cover permissive PEM padding, all byte values, sorted files,
+empty/duplicate blocks, read errors, output preservation and CLI status.
+The host command, image builders, Android controller and package frontend now
+invoke V directly. Both static Linux musl guest executables cross-build with
+the expected ELF architecture and no dynamic interpreter. Staging rejects a
+wrong compiler target and cleans temporary files after failed publication.
+The full package-command suite passes using a native download fixture and the
+real V trust-store writer. Other Minecraft download/login paths still contain
+Python; no Python was run during these qualifications. No new guest Java run
+is established by these host checks and cross-builds.
+
+The three generated-C guards preserve function selection, Unicode word and
+whitespace matching, allocation detection, stack-slot counts, loop ordering,
+procfs template identity, lock/return accounting and ancestry-before-retarget
+checks. Native fixtures cover passing sources and ownership regressions,
+truncated/invalid input, argument errors and partial stdout before a failure.
+Follow-up `42eac0bc` preserves Unicode line separators when selecting the
+root-creation receiver; text on a later line cannot satisfy that ownership check.
+All three pass against the current ARM production blob. The cached x86 blob
+is older: the guards correctly reject its missing caller-stack record, hidden
+read-ahead allocation and unchecked procfs dispatch. These checks do not build
+or boot a kernel and do not establish new retention measurements.
+
+The archiver test isolates the committed kernel makefile and snapshots the
+untracked compiler-runtime makefile into a private fixture. A V `uname`
+stand-in exercises macOS LLVM discovery, configured/explicit precedence,
+Linux defaults, missing-tool errors and cleanup goals. Clang and LLVM build
+and list the real one-object AArch64 ELF runtime archive. Both successful
+runs and forced compiler failures remove their temporary directories.
+ARM, Rosetta x86 and ARM ASan/UBSan checks pass for all three stages. Local
+logs are `/tmp/vinix-java-*`, `/tmp/vinix-guards-*-final-v3.log` and
+`/tmp/vinix-ar-cleanup-*.log`.
+
+Between `52f93ab8` and this snapshot, counted Python declined by exactly
+11,650 bytes, matching these three stages. Concurrent V and C changes affect
+the language shares independently.
 
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these thirteen stages.
+or hidden in these sixteen stages.
 
 ## Earlier completed stages
 

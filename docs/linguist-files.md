@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `52f93ab8e1e0373deb705181788fb3ab54c29754`,
+at source commit `42eac0bc33cb2c4e7dd8a9a928d874fd5a067fcf`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 563 | 2,343,398 | 6.87% |
-| Python | 503 | 2,291,893 | 6.72% |
-| Shell | 345 | 1,339,552 | 3.93% |
+| C | 563 | 2,343,478 | 6.86% |
+| Python | 498 | 2,280,243 | 6.67% |
+| Shell | 350 | 1,339,415 | 3.92% |
 
-All `.v` files are classified as V. The resulting V share is 73.38%, with no
+All `.v` files are classified as V. The resulting V share is 73.48%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,291,893 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,280,243 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 52f93ab8e1e0373deb705181788fb3ab54c29754 --breakdown --json
+github-linguist --rev 42eac0bc33cb2c4e7dd8a9a928d874fd5a067fcf --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -392,7 +392,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/hypervisor/guestfixture/hypervisor-guest-native-abi.h` | 506 |
 | `tests/hypervisor/vmx_test.c` | 4,436 |
 | `tests/init-policy/guestfixture/guest-native-abi.h` | 1,070 |
-| `tests/init-policy/hostfixture/host-native-abi.h` | 1,537 |
+| `tests/init-policy/hostfixture/host-native-abi.h` | 1,617 |
 | `tests/ios/assertions.c` | 544 |
 | `tests/ios/atfork.c` | 6,790 |
 | `tests/ios/atomic-queue.c` | 3,762 |
@@ -661,7 +661,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ios/build-cxx.py` | 6,554 |
 | `build-support/ios/generate-cxx-symbols.py` | 1,647 |
 | `build-support/ios/stage-gles.py` | 2,688 |
-| `build-support/java-cacerts.py` | 2,285 |
 | `build-support/minecraft/_native_fetcher.py` | 6,158 |
 | `build-support/minecraft/fetch-minecraft.py` | 5,843 |
 | `build-support/minecraft/minecraft-login` | 7,459 |
@@ -863,7 +862,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clipboard/test_host.py` | 3,780 |
 | `tests/clock-control/run.py` | 2,357 |
 | `tests/codex/smoke.py` | 4,944 |
-| `tests/compiler-selection/test-kernel-ar.py` | 3,039 |
 | `tests/cpu-mitigations/check-assembly.py` | 569 |
 | `tests/cpu-mitigations/check-linked.py` | 1,476 |
 | `tests/cpu-mitigations/check-policy.py` | 1,598 |
@@ -1001,7 +999,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/opengothic/run.py` | 3,425 |
 | `tests/packages/test-qemu-package-store.py` | 3,072 |
 | `tests/packages/x-window-check.py` | 5,985 |
-| `tests/pagecache/check-generated.py` | 1,308 |
 | `tests/pagecache/run-guest.py` | 6,291 |
 | `tests/paging/run.py` | 5,610 |
 | `tests/pci-config/_native.py` | 512 |
@@ -1018,7 +1015,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/process-smp/run.py` | 5,100 |
 | `tests/procfs-allocs/check-generated.py` | 1,817 |
 | `tests/procfs-allocs/run.py` | 4,043 |
-| `tests/procfs-mount/check-generated.py` | 3,436 |
 | `tests/procfs-mount/run.py` | 5,749 |
 | `tests/ps1/desktop.py` | 7,528 |
 | `tests/ps1/run.py` | 6,744 |
@@ -1047,7 +1043,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tests/reboot-persistence/_native.py` | 959 |
 | `tests/reboot-persistence/run_vm.py` | 5,086 |
-| `tests/resource-accounting/check-generated.py` | 1,582 |
 | `tests/resource-accounting/run.py` | 5,734 |
 | `tests/resource-groups/run.py` | 5,450 |
 | `tests/resource-open/run.py` | 4,792 |
@@ -1158,9 +1153,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/firefox/run-firefox` | 4,380 |
 | `build-support/gimp/run-gimp` | 2,536 |
 | `build-support/hyprland/demo.sh` | 8,747 |
-| `build-support/init-aarch64/alpine-init` | 423 |
-| `build-support/init-amd64/alpine-init` | 364 |
-| `build-support/init-amd64/desktop-init` | 4,239 |
+| `build-support/init-aarch64/alpine-init` | 578 |
+| `build-support/init-amd64/alpine-init` | 519 |
+| `build-support/init-amd64/desktop-init` | 4,405 |
+| `build-support/java-cacerts` | 123 |
 | `build-support/libreoffice/run-libreoffice` | 6,618 |
 | `build-support/link-duplicate-files` | 171 |
 | `build-support/make-docker-image` | 168 |
@@ -1194,7 +1190,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/vinix-files-sync` | 2,361 |
 | `build-support/vinix-host-sync` | 4,410 |
 | `build-support/vinix-persist-packages` | 5,219 |
-| `build-support/vinix-pkg` | 44,457 |
+| `build-support/vinix-pkg` | 44,364 |
 | `build-support/vinix-pkg-wrapper` | 616 |
 | `build-support/vinix-version-check` | 1,591 |
 | `build-support/virglrenderer/build-host.sh` | 3,251 |
@@ -1239,7 +1235,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 92,823 |
+| `scripts/build-desktop-aarch64.sh` | 92,873 |
 | `scripts/build-desktop-amd64.sh` | 14,984 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
@@ -1251,7 +1247,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-go-aarch64.sh` | 3,038 |
 | `scripts/build-hyprland-aarch64.sh` | 10,888 |
 | `scripts/build-ios-aarch64.sh` | 5,136 |
-| `scripts/build-java-aarch64.sh` | 4,693 |
+| `scripts/build-java-aarch64.sh` | 4,674 |
 | `scripts/build-libreoffice-aarch64.sh` | 6,581 |
 | `scripts/build-limine-aarch64.sh` | 4,779 |
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
@@ -1259,7 +1255,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-minecraft-aarch64.sh` | 7,932 |
 | `scripts/build-n64-aarch64.sh` | 2,907 |
 | `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
-| `scripts/build-network-tools-aarch64.sh` | 8,927 |
+| `scripts/build-network-tools-aarch64.sh` | 8,941 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
 | `scripts/build-ps1-aarch64.sh` | 3,170 |
 | `scripts/build-ps2-aarch64.sh` | 2,901 |
@@ -1337,6 +1333,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clipboard/guest-init.sh` | 1,974 |
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
+| `tests/compiler-selection/test-kernel-ar` | 145 |
 | `tests/desktop-perf/perf-init.sh` | 8,147 |
 | `tests/desktop-perf/run-host-tests.sh` | 286 |
 | `tests/desktop/first-run-apps-init.sh` | 4,538 |
@@ -1415,12 +1412,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/qemu-persistence-guest.sh` | 951 |
 | `tests/packages/sublime-smoke.sh` | 2,670 |
 | `tests/packages/test-qemu-persistence.sh` | 4,248 |
-| `tests/packages/test-vinix-pkg.sh` | 25,685 |
+| `tests/packages/test-vinix-pkg.sh` | 24,414 |
+| `tests/pagecache/check-generated` | 146 |
 | `tests/pagecache/run.sh` | 3,296 |
 | `tests/paging/run-host.sh` | 178 |
 | `tests/pci-config/run.sh` | 5,477 |
 | `tests/pci-config/topology` | 169 |
 | `tests/private-pages/run-host.sh` | 16,215 |
+| `tests/procfs-mount/check-generated` | 146 |
 | `tests/ps1/frame` | 180 |
 | `tests/ps2/frame` | 180 |
 | `tests/qemu-core/run.sh` | 4,009 |
@@ -1428,6 +1427,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-nested/run.sh` | 3,182 |
 | `tests/realtime/run.sh` | 1,513 |
 | `tests/reboot-persistence/run.sh` | 2,604 |
+| `tests/resource-accounting/check-generated` | 146 |
 | `tests/resource-groups/run-host.sh` | 801 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
 | `tests/security-audit/collector-run.sh` | 5,601 |
