@@ -189,6 +189,8 @@ fn kmain_thread() {
 	syspower.start()
 	// The batteries, charger, lid and buttons firmware describes.
 	acpipm.initialise()
+	// Its thermal zones and fans.
+	acpipm.initialise_thermal()
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',
 		'/dev/console', '/dev/console') or { panic('Could not start init process') }

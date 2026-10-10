@@ -147,3 +147,69 @@ pub fn has_method(node Node, path string) bool {
 
 @[c_extern]
 fn C.uacpi_namespace_node_find(parent voidptr, path &char, out &voidptr) UACPIStatus
+
+@[c_extern]
+fn C.uacpi_namespace_for_each_child(parent voidptr, descending voidptr, ascending voidptr, kinds u32, depth u32, user voidptr) UACPIStatus
+@[c_extern]
+fn C.uacpi_object_is_aml_namepath(object voidptr) bool
+@[c_extern]
+fn C.uacpi_object_resolve_as_aml_namepath(object voidptr, scope voidptr, out &voidptr) UACPIStatus
+@[c_extern]
+fn C.uacpi_execute_simple(parent voidptr, path &char) UACPIStatus
+
+// uACPI's number for a thermal zone among the kinds of namespace object, as
+// a bit of the mask an iteration is given.
+const kind_thermal_zone = u32(1) << 13
+
+// Call `found` for every thermal zone in the namespace. A zone is a kind of
+// object of its own, not a device with a hardware ID, so for_each_device()
+// does not find it.
+pub fn for_each_thermal_zone(found fn (context voidptr, node Node), context voidptr) {
+	search := DeviceSearch{
+		found:   found
+		context: context
+	}
+	C.uacpi_namespace_for_each_child(C.uacpi_namespace_root(), voidptr(device_found), unsafe { nil },
+		kind_thermal_zone, ~u32(0), voidptr(&search))
+}
+
+// Run the method `path` under `node`, which takes nothing and gives nothing
+// back: _ON, _OFF, _PS0. `path` is a literal.
+pub fn execute(node Node, path string) bool {
+	return C.uacpi_execute_simple(voidptr(node), &char(path.str)) == .ok
+}
+
+// Element `index`, a name written into a package, as the node it names:
+// the fans of an _AL0, the power resources of a _PR0. `scope` is the node
+// the package was read from, which is where a relative name starts. None
+// if the element is not a name or names nothing.
+pub fn (p &Package) node(index int, scope Node) ?Node {
+	if index < 0 || u64(index) >= p.array.count {
+		return none
+	}
+	element := unsafe { p.array.objects[index] }
+	if !C.uacpi_object_is_aml_namepath(element) {
+		return none
+	}
+	mut found := unsafe { nil }
+	if C.uacpi_object_resolve_as_aml_namepath(element, voidptr(scope), unsafe { &found }) != .ok
+		|| found == unsafe { nil } {
+		return none
+	}
+	return Node(found)
+}
+
+// Element `index`, itself a package, to read in the same way. It is part of
+// the package it came from: it needs no release(), and is not to be used
+// after the outer one's.
+pub fn (p &Package) package(index int) ?Package {
+	if index < 0 || u64(index) >= p.array.count {
+		return none
+	}
+	mut inner := Package{}
+	element := unsafe { p.array.objects[index] }
+	if C.uacpi_object_get_package(element, unsafe { &inner.array }) != .ok {
+		return none
+	}
+	return inner
+}
