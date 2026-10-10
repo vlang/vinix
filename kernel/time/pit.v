@@ -49,3 +49,10 @@ fn pit_handler(_num u32, _gpr_state &cpulocal.GPRState) {
 	timer_handler()
 	C.x86__apic__lapic_eoi()
 }
+
+// The timer chip is back from a loss of power counting at the rate firmware
+// left it with; set it to the kernel's again. Its interrupt's route is the
+// I/O APIC's to restore.
+pub fn pit_resume() {
+	pit_set_frequency(timer_frequency)
+}

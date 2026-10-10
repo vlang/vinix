@@ -44,6 +44,9 @@ __global (
 	// hpet_frequency is then the TSC's.
 	hpet_uses_tsc bool
 	hpet_tsc_base u64
+	// What nanoseconds() adds to what the counter says. Zero until the
+	// machine has been through a suspend to RAM; see resume().
+	hpet_offset_ns u64
 )
 
 const pit_frequency = u64(1193182)
@@ -55,11 +58,34 @@ pub fn read_counter() u64 {
 	return kio.mmin(&hpet.main_counter_value)
 }
 
-// Time since initialise(), in nanoseconds.
-pub fn nanoseconds() u64 {
+fn counter_nanoseconds() u64 {
 	ticks := read_counter()
 	return (ticks / hpet_frequency) * 1000000000 +
 		(ticks % hpet_frequency) * 1000000000 / hpet_frequency
+}
+
+// Time since initialise(), in nanoseconds.
+pub fn nanoseconds() u64 {
+	return counter_nanoseconds() + hpet_offset_ns
+}
+
+// The machine is back from a sleep that cut the power: the HPET is switched
+// off and its counter is wherever firmware left it, and a TSC has started
+// again from nothing. Set the counter going and have nanoseconds() carry on
+// from `continue_at_ns` -- what it said when the machine went down, plus
+// however long whoever calls this found the machine to have been away -- so
+// that the clock every wait in the kernel is measured against neither stops
+// nor runs backwards. The counter's rate is taken to be what it was.
+//
+// On the processor that slept, with interrupts off and no other running.
+pub fn resume(continue_at_ns u64) {
+	if hpet_uses_tsc {
+		hpet_tsc_base = cpu.rdtsc()
+	} else {
+		configuration := kio.mmin(&hpet.general_configuration)
+		kio.mmout(&hpet.general_configuration, configuration | 0b01)
+	}
+	hpet_offset_ns = continue_at_ns - counter_nanoseconds()
 }
 
 // Integer nanoseconds per counter tick, separate from the PIT wake interval.

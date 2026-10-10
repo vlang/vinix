@@ -86,6 +86,8 @@ __global (
 	uacpi_work_thread  u64
 	uacpi_button_hook  ButtonHook
 	uacpi_events_up    bool
+	// Set while the SCI thread is inside uACPI's handler.
+	uacpi_sci_busy u32
 )
 
 struct ButtonHook {
@@ -137,6 +139,7 @@ fn sci_interrupt(_num u32, _gpr_state voidptr) {
 fn sci_thread() {
 	for {
 		generation := event.generation(mut uacpi_sci.wake)
+		katomic.store(mut &uacpi_sci_busy, u32(1))
 		if uacpi_sci.handler != unsafe { nil } {
 			uacpi_sci.handler(uacpi_sci.context)
 		}
@@ -146,8 +149,25 @@ fn sci_thread() {
 			apic.io_apic_set_gsi_redirect(uacpi_sci.lapic, uacpi_sci.vector, uacpi_sci.gsi,
 				uacpi_sci.flags, true)
 		}
+		katomic.store(mut &uacpi_sci_busy, u32(0))
 		event.await_one_from_generation(mut uacpi_sci.wake, true, generation) or {}
 	}
+}
+
+// Whether nothing of uACPI's event handling is under way: the SCI thread is
+// not in the handler, and no deferred work is queued or running. Whoever is
+// about to enter a sleeping state with interrupts off asks this first, on the
+// one processor still running: uACPI takes its event lock there, a lock that
+// sleeps, and a thread put down in the middle of handling an event holds it.
+pub fn events_idle() bool {
+	if !uacpi_events_up {
+		return true
+	}
+	uacpi_work_lock.acquire()
+	idle := uacpi_work_count == 0 && katomic.load(&uacpi_work_running) == 0
+		&& katomic.load(&uacpi_sci_busy) == 0
+	uacpi_work_lock.release()
+	return idle
 }
 
 // uACPI's host call: run `handler(context)` later, on a thread. Called from

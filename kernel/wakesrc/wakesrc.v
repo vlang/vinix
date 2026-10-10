@@ -119,6 +119,21 @@ pub fn report(source Source) {
 	event.trigger(mut wakesrc_event, false)
 }
 
+// `source` is what ended a sleep the platform carried out by itself -- a
+// suspend to RAM, where no code of the kernel's was running to see the event
+// arrive. It is recorded as the wakeup whatever is allowed: the machine did
+// wake, and saying what woke it is not the place to enforce what should.
+// Replaces anything reported while the machine was coming back.
+pub fn woke(source Source) {
+	katomic.inc(mut &wakesrc_events[int(source)])
+	if katomic.load(&wakesrc_armed) == 0 {
+		return
+	}
+	katomic.store(mut &wakesrc_last, u32(source) + 1)
+	katomic.inc(mut &wakesrc_wakeups[int(source)])
+	event.trigger(mut wakesrc_event, false)
+}
+
 // Whether a sleeper is waiting: for a driver that has to do something extra
 // to notice its event at all while the machine sleeps.
 pub fn sleeping() bool {
