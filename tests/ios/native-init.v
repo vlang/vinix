@@ -45,6 +45,7 @@ fn main() {
 	if mode == 'regression' {
 		require_child('/opt/ios/select-checks')
 		require_child('/opt/ios/semaphore-checks')
+		require_child('/opt/ios/signal-checks')
 		require_child('/opt/ios/regression')
 	} else {
 		args := if mode == 'audit' {

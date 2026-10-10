@@ -62,7 +62,8 @@ fn compile_c(root string, generated string, output string, gles bool) {
 }
 
 fn build(root string, out string, only string) {
-	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'native-init'] {
+	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'signal-checks',
+		'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -77,8 +78,10 @@ fn build(root string, out string, only string) {
 			args << root + if item.ends_with('-checks') {
 				'/compat/ios/runner/' + if item == 'select-checks' {
 					'select_test.v'
-				} else {
+				} else if item == 'semaphore-checks' {
 					'mach_semaphore_test.v'
+				} else {
+					'signals_test.v'
 				}
 			} else {
 				'/compat/ios/runner'
@@ -147,6 +150,7 @@ fn regression_root(root string, out string, fs string) {
 	os.write_file_array(fs + '/opt/ios/truncated', calculator[..31]) or { panic(err) }
 	copy_file(out + '/select-checks', fs + '/opt/ios/select-checks')
 	copy_file(out + '/semaphore-checks', fs + '/opt/ios/semaphore-checks')
+	copy_file(out + '/signal-checks', fs + '/opt/ios/signal-checks')
 	sysroot := root + '/build-aarch64-userland/sysroot'
 	checked([llvm, '--target=aarch64-linux-musl', '--sysroot=' + sysroot, '-static', '-O2',
 		'-fno-stack-protector', '-Wall', '-Wextra', '-Werror', root + '/tests/ios/guest.c',
@@ -235,7 +239,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|regression|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|regression|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -256,6 +260,8 @@ fn main() {
 		build(root, out, 'select-checks')
 	} else if mode == 'build-semaphore' {
 		build(root, out, 'semaphore-checks')
+	} else if mode == 'build-signal' {
+		build(root, out, 'signal-checks')
 	} else if mode == 'hash' {
 		if os.args.len != 3 { panic('usage: native-checks hash FILE') }
 		println(sha256.sum(os.read_bytes(os.args[2]) or { panic(err) }).hex())

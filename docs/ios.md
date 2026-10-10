@@ -68,6 +68,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Memory | Anonymous relocated image, zero-filled segment tails, segment permissions, sealed `SG_READ_ONLY` data, instruction cache flush |
 | Mach VM subset | Current-task `vm_allocate`, shared `vm_remap` aliases and whole-mapping `vm_deallocate`, backed by native shared storage; fixed mappings preserve occupied addresses |
 | Mach semaphore subset | Current-task, process-private FIFO/LIFO `semaphore_create`, `semaphore_destroy`, `semaphore_signal` and `semaphore_wait`, with native blocking and owned send references |
+| Signal subset | Darwin 16-byte `sigaction` and `signal`, translated native numbers/masks, one-argument handlers, `SA_RESTART`/`SA_NODEFER`, and callback draining before image unload |
 | Entry point | `LC_MAIN`, `argc`/`argv`, empty null-terminated environment and Apple vectors, integer exit status |
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit` termination |
@@ -721,7 +722,7 @@ the actual game gets beyond the legacy libc++ ABI dependency and still exits
 before entry, at:
 
 ```text
-iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _sigaction
+iOS: linking /opt/ios/Frameworks/EOSSDK.framework/EOSSDK: iOS: libSystem symbol is not implemented: _strcspn
 ```
 
 The installed Mac SDK defines `os_proc_available_memory` as an app's remaining dirty
@@ -1120,17 +1121,52 @@ create sites use FIFO with zero initial credits. The four adapters resolve four
 strong EOSSDK imports; the actual game still exits with status 1 before entry,
 now at `sigaction`.
 
+The V signal bridge now translates Darwin's 16-byte action records and signal
+numbers/masks to native libc. One-argument handlers receive the Darwin number;
+default/ignored dispositions, `SA_RESTART` and `SA_NODEFER` use the actual native
+implementation. `signal` uses a zero mask and restart semantics, matching the
+installed Mac library, including EOSSDK's `signal(SIGWINCH, SIG_DFL)` call.
+Queries, aliased input/output records, guarded outputs and caller errno are
+preserved. EOSSDK's traced installation uses one-argument handlers with zero
+mask/flags and saves/restores 16-byte records.
+
+Process-static callback gates use lock-free atomics without allocation or mutexes
+on delivery. Teardown closes the gates, restores original native dispositions
+through libc, and drains running callbacks before unmapping app code. Runtime
+restart is rejected while draining. A fork outside a callback clears the child's
+copies of vanished threads' pins while preserving the parent's running callback.
+Registry queries/changes while any callback is running return Darwin `EDEADLK`
+(11) before taking a mutex; callers can retry after handlers return.
+
+Other flags, including `SA_SIGINFO`, alternate stacks, reset-on-delivery and
+child-specific modes, return `ENOTSUP` (45). Linux cannot represent Darwin
+`SIGEMT`, `SIGINFO`, mask bit 32 or foreign native mask bits; those requests also
+fail explicitly. Native `siginfo`/context layouts are not supplied as Darwin
+objects. Fork/shutdown from inside a callback, concurrent native disposition
+changes outside the bridge, and interrupted app APIs remain unverified.
+
+Shared native Mac/V checks cover real delivery and masks, both verified flags,
+aliasing, guards and errors. Adapter checks deliver signals on 32 worker threads
+per round, fork while a worker's handler blocks, reject callback registry reentry
+and restart during draining, and verify two runtime teardowns. Restored public
+handler/mask/flags match; Linux libc's private restorer flag/padding need not be
+byte-identical. Host ASAN/UBSAN and the full ARM64 C++/GLES/PPSSPP regression pass.
+An earlier regression failed the existing stdio directory check with exit 73;
+that log is retained, and the completed rerun passed. This resolves two strong
+imports across Fortnite and EOSSDK. The actual game still exits with status 1
+before entry, now at `strcspn` in EOSSDK.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,315 | 843 | 81 |
-| EOSSDK | 534 | 128 | 18 |
+| Fortnite executable | 1,316 | 842 | 81 |
+| EOSSDK | 535 | 127 | 18 |
 | MarketplaceKitWrapper | 60 | 116 | 23 |
-| All images | 1,909 | 1,087 | 122 |
+| All images | 1,911 | 1,085 | 122 |
 
-The C++/GLES/Text variant reports 1,922 resolved imports, 1,074 unresolved strong
+The C++/GLES/Text variant reports 1,924 resolved imports, 1,072 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -1165,9 +1201,9 @@ v -nocache -cc clang run tests/ios/native-checks.v static-audit
 ```
 
 `VINIX_IOS_CHECK_NAME` selects a single output directory name under
-`build/ios/fortnite` (default `select-checks`; the semaphore verification uses
-`semaphore-checks`). Each mode records its own state path and guest `serial.log`
-there. Regression runs the native V select and semaphore checks before the
+`build/ios/fortnite` (default `select-checks`; the signal verification uses
+`signal-checks`). Each mode records its own state path and guest `serial.log`
+there. Regression runs the native V select, semaphore and signal checks before the
 existing Mach-O suite and requires the guest PASS marker;
 probe/audit completion records the actual child exit status, which remains 1
 for Fortnite. Completion does not mean the game ran. The driver does not build

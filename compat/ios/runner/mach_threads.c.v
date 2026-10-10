@@ -199,6 +199,7 @@ fn mach_threads_fork_parent() {
 fn mach_threads_fork_child() {
 	mach_threads_clear(true)
 	mach_semaphores_clear(true)
+	signals_fork_child()
 }
 
 fn mach_threads_clear(forked bool) {

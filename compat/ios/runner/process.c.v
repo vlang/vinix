@@ -49,13 +49,12 @@ fn darwin_setgid(gid u32) i32 {
 	return darwin_process_result(C.setgid(gid), previous)
 }
 
-fn darwin_kill(pid i32, signal i32) i32 {
-	if signal < 0 || signal > 31 { darwin_set_errno(22); return -1 }
+fn darwin_native_signal(signal i32) i32 {
 	mut native := signal
 	$if linux {
 		// SIGEMT and SIGINFO have no Linux counterpart. Reject them instead
 		// of accidentally delivering Linux SIGBUS or SIGIO to the process.
-		if signal in [i32(7), 29] { darwin_set_errno(45); return -1 }
+		if signal in [i32(7), 29] { return -1 }
 		native = match signal {
 			10 { i32(C.SIGBUS) }
 			12 { i32(C.SIGSYS) }
@@ -70,6 +69,13 @@ fn darwin_kill(pid i32, signal i32) i32 {
 			else { signal }
 		}
 	}
+	return native
+}
+
+fn darwin_kill(pid i32, signal i32) i32 {
+	if signal < 0 || signal > 31 { darwin_set_errno(22); return -1 }
+	native := darwin_native_signal(signal)
+	if native < 0 { darwin_set_errno(45); return -1 }
 	previous := unsafe { *C.ios_errno_address() }
 	return darwin_process_result(C.kill(pid, native), previous)
 }

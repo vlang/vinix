@@ -137,11 +137,6 @@ fn C.lrint(f64) i64
 fn C.lrintf(f32) i64
 fn C.llrint(f64) i64
 fn C.llrintf(f32) i64
-fn C.ios_signal(i32, voidptr) voidptr
-fn darwin_signal(number i32, handler voidptr) voidptr {
-    if number !in [i32(2), 4, 6, 8, 9, 11, 13, 15] { darwin_set_errno(22); return unsafe { voidptr(-1) } }
-    return C.ios_signal(number, handler)
-}
 fn darwin_mach_absolute_time() u64 { return u64(time.sys_mono_now()) }
 fn darwin_timebase_info(info &u32) i32 {
     if info == unsafe { nil } { return 4 }

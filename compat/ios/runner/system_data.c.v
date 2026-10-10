@@ -90,10 +90,12 @@ fn system_data_start() ! {
 		write32(base + 2108 + u64(i) * 4, u32(if i >= 97 && i <= 122 { i - 32 } else { i }))
 	}
 	dispatch_start()
+	signals_start()!
 }
 
 fn system_data_stop() {
 	if system_data == unsafe { nil } { return }
+	signals_stop()
 	dispatch_free()
 	system_queries_stop()
 	mach_memory_stop()
