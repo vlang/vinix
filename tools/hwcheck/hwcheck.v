@@ -192,9 +192,18 @@ fn power(mut r Report) {
 				continue
 			}
 			to_empty := word(supply + '/time_to_empty_now').int()
+			// Only a battery whose driver can say where charging stops has the file.
+			limit := word(supply + '/charge_control_end_threshold')
+			charged_to := if limit == '' { '' } else { ', charged to ${limit}%' }
 			r.add('| ${name} | Battery | ${word(supply + '/capacity')}% ${word(supply + '/status')}, level ${word(supply +
-				'/capacity_level')}, ${to_empty / 60} min to empty, ${word(supply + '/cycle_count')} cycles, ${word(supply +
+				'/capacity_level')}, ${to_empty / 60} min to empty, ${word(supply + '/cycle_count')} cycles${charged_to}, ${word(supply +
 				'/technology')} ${word(supply + '/manufacturer')} ${word(supply + '/model_name')} |')
+			// A battery that is there with no state and a full charge of nothing
+			// is one its driver cannot read: Apple's SMC stopped answering.
+			full := word(supply + '/charge_full') + word(supply + '/energy_full')
+			if word(supply + '/present') == '1' && word(supply + '/status') == 'Unknown' && full == '0' {
+				r.problem('battery ${name} is there and cannot be read')
+			}
 		}
 	}
 	r.add('')
@@ -215,11 +224,57 @@ fn power(mut r Report) {
 		}
 	}
 	r.add('')
+	// Every temperature and fan speed a zone carries, with the name its
+	// driver gives it: a zone's own temperature is temp1.
+	mut sensors := []string{}
+	for name in listing(sys + '/class/hwmon') {
+		chip := '${sys}/class/hwmon/${name}'
+		for file in listing(chip) {
+			if !file.ends_with('_input') {
+				continue
+			}
+			channel := file.all_before('_input')
+			label := word('${chip}/${channel}_label')
+			called := if label == '' { channel } else { label }
+			reading := word('${chip}/${file}')
+			if reading == '' {
+				sensors << '| ${name} ${word(chip + '/name')} | ${called} | no reading |'
+			} else if channel.starts_with('temp') {
+				millidegrees := reading.int()
+				sensors << '| ${name} ${word(chip + '/name')} | ${called} | ${millidegrees / 1000}.${(millidegrees % 1000) / 100} C |'
+			} else if channel.starts_with('fan') {
+				sensors << '| ${name} ${word(chip + '/name')} | ${called} | ${reading} rpm |'
+			}
+		}
+	}
+	if sensors.len > 0 {
+		r.add('| chip | sensor | reading |')
+		r.add('| --- | --- | --- |')
+		for line in sensors {
+			r.add(line)
+		}
+		r.add('')
+	}
+	// Apple's SMC: what its driver found, and whether it is still answering.
+	smc := sys + '/devices/platform/apple-smc/smc/status'
+	if os.exists(smc) {
+		status := os.read_file(smc) or { '' }
+		r.add('Apple SMC: ${status.trim_space().replace('\n', ', ')}.')
+		for line in status.split_into_lines() {
+			if line.starts_with('transport ') && line != 'transport ok' {
+				r.problem('the Apple SMC stopped answering: ${line.all_after('transport ')}')
+			}
+			if line.starts_with('keys_odd_sized ') && line != 'keys_odd_sized 0' {
+				r.problem('the Apple SMC has keys of a size its driver does not take: ${line}')
+			}
+		}
+		r.add('')
+	}
 	// The fans firmware describes: how each is driven and what it was last
 	// told.
 	fans := (os.read_file(sys + '/class/thermal/acpi_fans') or { '' }).split_into_lines()
 	if fans.len == 0 {
-		r.add('No fan is known to the kernel.')
+		r.add('No fan is driven by the kernel.')
 	} else {
 		r.add('Fans: ${fans.join('; ')}.')
 		for fan in fans {
