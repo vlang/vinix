@@ -182,9 +182,11 @@ fn swift_buffers_stop() {
 	swift_arc_stop()
 	swift_metadata_stop()
 	swift_hash_stop()
+	swift_fatal_stop()
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_fatal_symbol(symbol) { return address }
 	if address := swift_array_symbol(symbol) { return address }
 	if address := swift_integer_symbol(symbol) { return address }
 	if address := swift_hash_symbol(symbol) { return address }

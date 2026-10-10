@@ -1816,28 +1816,58 @@ preservation. Eight workers exercise concurrent publication and hashing;
 unmapped after dependent Array specializations retire. Generated C contains no
 hidden allocations in the thirteen Int runtime bodies or existing Array bodies.
 
-All twenty-four native V checks and the full four-core ARM64 C++/UIKit/GLES/PPSSPP
-regression pass. Twenty-four more strong imports resolve across the three images.
-Fortnite still exits with status 1 before entry at EOSSDK's StaticString overload
+The Int layer passed twenty-four native V checks and the full four-core ARM64
+C++/UIKit/GLES/PPSSPP regression, resolving twenty-four more strong imports across
+the three images. Its probe stopped before entry at EOSSDK's StaticString overload
 of `_assertionFailure`,
 `_$ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF`.
 Evidence is retained under `swift-integer-hash-checks`, including installed LLVM
 disassembly obtained from V, native descriptor/enum measurements, sanitizer and
-guest logs. Other associated-type manglings, Hasher metadata, additional concrete
-standard-library conformances, conformance discovery, generic interpolation and
-application Swift heap support remain incomplete.
+guest logs.
+
+Swift assertion failures now have real V diagnostic bodies and sealed ARM64
+entries. Both `_assertionFailure` overloads with a file argument and the
+StaticString `_fatalErrorMessage` alias capture the registers and spilled file
+flag, line and reporting flags. StaticString supports pointers and Unicode
+scalars; String supports the existing small, native-tail and immortal-literal
+forms. Diagnostics preserve native empty-message and bounded NUL behavior,
+checked CInt lengths and UInt32 lines. Each entry ends in `brk #1`; assertions
+never return successfully. Invalid arguments and unsupported foreign/shared
+String storage report a bridge diagnostic and trap. Host debugger crash
+annotations/backtrace integration remain unsupported.
+
+Installed-runtime and V comparisons pass ASAN/UBSAN in both hash-seed modes:
+thirteen StaticString and eleven String cases cover Unicode, empty/NUL values,
+15/16-byte boundaries, guarded read-only storage, flags 0/1 and UInt32 line
+limits. Child handlers observe actual SIGTRAP; a returning test target exits 99,
+so the adapter cannot manufacture the expected trap. Eight concurrent resolvers
+publish one canonical RX page. Two drained runtime cycles prove its unmapping
+and leave no Swift or ObjC owners. All eleven generated assertion runtime bodies
+have no hidden V allocations; existing Int Hashable sanitizer checks still pass.
+
+All twenty-five native guest checks and the full four-core ARM64
+C++/UIKit/GLES/PPSSPP regression pass. Six more strong imports resolve across
+the three images. An initial run exited 73 in the existing stdio directory
+fixture; the unchanged rerun passed, and both serial logs are retained. Fortnite
+still exits with status 1 before entry at EOSSDK's generic
+string-interpolation append overload,
+`_$ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzs20TextOutputStreamableRzlF`.
+Assertion evidence is retained under `swift-fatal-checks`. Other associated-type
+manglings, Hasher metadata, additional concrete standard-library conformances,
+conformance discovery, generic interpolation and application Swift heap support
+remain incomplete.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,377 | 781 | 81 |
-| EOSSDK | 589 | 73 | 18 |
-| MarketplaceKitWrapper | 86 | 90 | 23 |
-| All images | 2,052 | 944 | 122 |
+| Fortnite executable | 1,379 | 779 | 81 |
+| EOSSDK | 591 | 71 | 18 |
+| MarketplaceKitWrapper | 88 | 88 | 23 |
+| All images | 2,058 | 938 | 122 |
 
-The C++/GLES/Text variant reports 2,065 resolved imports, 931 unresolved strong
+The C++/GLES/Text variant reports 2,071 resolved imports, 925 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
