@@ -9,6 +9,11 @@ ancestry-before-retarget ordering and persistent receiver checks. The timer
 selector accepts multiline arguments and counts raw braces; the other selectors
 use the first unindented closing brace. Socket checks also preserve shared flags,
 interface-box release and the single shallow transfer of each queued FD list.
+For the current kernel, IPv6 receive scratch is checked in `recvfrom_flags`
+after validating `recvfrom`'s single unchanged delegate. Process path ownership
+is checked in `new_process_with_vm` after validating both inheritance delegates
+and rejecting path handling in either wrapper. Earlier generated C with inline
+receive scratch and a direct `new_process` path clone remains supported.
 
 ```sh
 tests/resource-accounting/check-generated kernel/obj/blob.c

@@ -43,6 +43,15 @@ pub fn ipv6_check(generated Generated, name string) !string {
 	if word_calls(function, scratch_allocations, false).len > 0 {
 		return error('heap-promoted scratch in ${name}')
 	}
+	if name == 'inet__InetSocket__recvfrom' && function.contains('inet__InetSocket__recvfrom_flags(') {
+		if function.contains('vinix_stack_alloc(') {
+			return error('receive wrapper must not allocate scratch')
+		}
+		checked_delegate(function, 'inet__InetSocket__recvfrom_flags',
+			'return inet__InetSocket__recvfrom_flags(this, handle, buf, count, _addr, addrlen, 0);')!
+		ipv6_check(generated, 'inet__InetSocket__recvfrom_flags')!
+		return 'PASS ${name}: endpoint/Text scratch stays on caller stack'
+	}
 	if name != 'inet__fill_endpoint' && !function.contains('vinix_stack_alloc(') {
 		return error('missing caller stack scratch: ${name}')
 	}
@@ -159,7 +168,15 @@ pub fn select_check(generated Generated) !string {
 }
 
 pub fn clone_check(generated Generated) !string {
-	inherited := generated.selected('sched__new_process', 'churn')!
+	mut inherited := generated.selected('sched__new_process', 'churn')!
+	if inherited.contains('sched__new_process_in_group(') {
+		checked_path_delegate(inherited, 'sched__new_process_in_group',
+			'return sched__new_process_in_group(old_process, pagemap, account);')!
+		group := generated.selected('sched__new_process_in_group', 'churn')!
+		checked_path_delegate(group, 'sched__new_process_with_vm',
+			'return sched__new_process_with_vm(old_process, pagemap, account, false);')!
+		inherited = generated.selected('sched__new_process_with_vm', 'churn')!
+	}
 	if inherited.count('new_proc->executable_path = string__clone(old_process->executable_path);') != 1 {
 		return error('new_process must establish exactly one inherited path owner')
 	}
@@ -168,4 +185,17 @@ pub fn clone_check(generated Generated) !string {
 		return error('process clone overwrites its inherited path owner')
 	}
 	return 'PASS process clone: one inherited executable-path owner'
+}
+
+fn checked_delegate(body string, name string, expected string) ! {
+	if body.count(name + '(') != 1 || body.count(expected) != 1 {
+		return error('expected one unchanged ownership delegate: ${name}')
+	}
+}
+
+fn checked_path_delegate(body string, name string, expected string) ! {
+	checked_delegate(body, name, expected)!
+	if body.contains('executable_path') {
+		return error('process inheritance wrapper must not create or overwrite a path owner')
+	}
 }
