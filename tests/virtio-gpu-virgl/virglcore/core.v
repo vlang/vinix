@@ -349,6 +349,7 @@ fn success(desktop string) !string {
 pub fn dispatch(row map[string]ah.Value) !ah.Value {
  ids := ah.field(row, 'arguments').items().map(it.text())
  operation := ah.field(row, 'operation').text()
+ current_builtins = ids[1]
  mut f := Frame{ start: checkpoint()!, pins: ids[0], order: ['root','timeout','desktop_startup','qemu','host_error','kernel','source_image','guest_init','pass_line','fail_line','label','path','scratch','environment','command','pid','master','transcript','pass_seen','fail_seen','shutdown_sent','forced_stop','status','deadline','waited','child_status','readable','_','chunk','recent','output','missing','stage','marker','stages','override','devices','sig','_status'] }
  for i in 1 .. ids.len { f.names['argument-' + i.str()] = ids[i] }
  result := execute(operation, ids, mut f) or { f.failed(err)!; return err }
@@ -358,16 +359,16 @@ pub fn dispatch(row map[string]ah.Value) !ah.Value {
 
 fn execute(operation string, ids []string, mut f Frame) !string {
  return match operation {
-  'child_exit_code' { exit_code(ids[1])! }
-  'signal_child' { signal_child(ids[1], ids[2])!; literal(none_())! }
-  'stop_child' { stop_child(ids[1], ids[2], mut f)!; literal(none_())! }
-  'qemu_path' { qemu_path(ids[1], mut f)! }
-  'check_host' { check_host(ids[1], mut f)! }
-  'prepare' { prepare(ids[1], ids[2], mut f)! }
-  'command' { command(ids[1], ids[2], ids[3], ids[4], ids[5], ids[6], mut f)! }
-  'capture' { capture(ids[1], ids[2], ids[3], ids[4], ids[5], mut f)! }
-  'report' { report(ids[1], ids[2], ids[3], mut f)! }
-  'success' { success(ids[1])! }
+  'child_exit_code' { exit_code(ids[2])! }
+  'signal_child' { signal_child(ids[2], ids[3])!; literal(none_())! }
+  'stop_child' { stop_child(ids[2], ids[3], mut f)!; literal(none_())! }
+  'qemu_path' { qemu_path(ids[2], mut f)! }
+  'check_host' { check_host(ids[2], mut f)! }
+  'prepare' { prepare(ids[2], ids[3], mut f)! }
+  'command' { command(ids[2], ids[3], ids[4], ids[5], ids[6], ids[7], mut f)! }
+  'capture' { capture(ids[2], ids[3], ids[4], ids[5], ids[6], mut f)! }
+  'report' { report(ids[2], ids[3], ids[4], mut f)! }
+  'success' { success(ids[2])! }
   else { return error('unknown VirGL controller operation') }
  }
 }

@@ -51,6 +51,7 @@ _LITERAL_CACHE = {}
 _SLOT_KEYS = {name: sys.intern(name) for name in ('EIO', 'SIGKILL', 'SIGTERM', 'WEXITSTATUS', 'WIFEXITED', 'WIFSIGNALED', 'WNOHANG', 'WTERMSIG', 'X_OK', 'access', 'add', 'append', 'buffer', 'contains', 'copy', 'count', 'decode', 'environ', 'eq', 'errno', 'expanduser', 'extend', 'findall', 'flush', 'get', 'ior', 'is_', 'is_file', 'is_not', 'join', 'kill', 'killpg', 'lt', 'machine', 'monotonic', 'ne', 'parent', 'pop', 'read', 'resolve', 'returncode', 'run', 'search', 'select', 'setdefault', 'setitem', 'sleep', 'stderr', 'stdout', 'system', 'truediv', 'waitpid', 'write')}
 _ATTRIBUTE, _TRUTH, _ITER, _REPR = getattr, bool, iter, repr
 _namespace = globals
+_frame = sys._getframe
 
 import importlib.util as _loader
 _spec = _loader.spec_from_file_location("virgl_guest_binding", Path(__file__).with_name("_native.py"))
@@ -60,7 +61,7 @@ _spec.loader.exec_module(_library)
 
 def _native(operation, *arguments):
     try:
-        return _library.call(operation, _namespace(), *arguments)
+        return _library.call(operation, _namespace(), _frame(1).f_builtins, *arguments)
     finally:
         arguments = None
 

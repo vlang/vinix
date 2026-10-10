@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+@[has_globals]
 module virglcore
 
 import androidhost as ah
@@ -61,9 +62,16 @@ fn member(id string, name string) !string {
  release([key, keys])!
  return result
 }
+__global current_builtins string
+
 fn global(name string) !string {
+ // These helpers model Python intrinsic operators, not source LOAD_GLOBAL.
+ if name.starts_with('operator.') { return resolve(name)! }
  parts := name.split('.')
- mut id := resolve(parts[0])!
+ key := literal(ah.Value(parts[0]))!
+ result := callback('load_global', {'key': ah.Value(key), 'builtins': ah.Value(current_builtins)}) or { release([key])!; return err }
+ release([key])!
+ mut id := result.text()
  for part in parts[1..] {
   next := member(id, part) or { release([id])!; return err }
   release([id])!

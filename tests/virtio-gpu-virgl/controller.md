@@ -22,3 +22,8 @@ fixture PASS makes no claim about QEMU rendering or native AGX firmware.
 Private implementation helper replacement and exact private traceback frames
 are outside the migration boundary. Callbacks near CPython's global recursion
 limit can observe the native bridge overhead.
+
+Original global-name lookups use the opt-in `load_global` SDK callback and
+finite interned names. Each public wrapper passes its actual running frame
+builtins table, so callbacks retain the original lookup, fallback and error
+semantics even when the module dictionary or builtins table changes.
