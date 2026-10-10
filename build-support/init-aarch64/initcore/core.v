@@ -96,6 +96,15 @@ fn start_helper(path &char, audit bool) {
   else if child < 0 && audit { init_print(c'init: security audit supervisor could not fork\n') }
  }
 }
+fn restore_boot_volumes() {
+ unsafe {
+  if !executable_available(c'/usr/sbin/vinix-volume') { return }
+  arguments := [&char(c'/usr/sbin/vinix-volume'), &char(c'boot-restore'), &char(nil)]!
+  mut status := i32(0)
+  child := spawn_program(&arguments[0], &&char(nil), false, &status, &vinit_environment[0], false)
+  if child < 0 || status != 0 { init_print(c'init: volume restore failed; continuing to the recovery desktop or shell\n') }
+ }
+}
 fn reap_exited_children() { unsafe { mut status := i32(0); for call(260,u64(i64(-1)),u64(&status),1,0,0) > 0 { continue } } }
 fn wait_for_desktop_group(child i64, attempts i32) bool {
  mut left := attempts
@@ -138,6 +147,8 @@ pub fn desktop_start() {
   shell := [&char(c'/bin/zsh'),&char(c'-l'),&char(nil)]!
   mut status := i32(0)
   prepare_environment(); prepare_desktop_boot(); prepare_hosted_x11_storage(); install_power_signals()
+  restore_boot_volumes()
+  if requested_power != 0 { apply_power_request() }
   start_helper(c'/usr/libexec/vinix-security-audit-supervise',true)
   start_helper(c'/usr/bin/vinix-files-sync',false)
   start_helper(c'/usr/libexec/vinix-version-check',false)

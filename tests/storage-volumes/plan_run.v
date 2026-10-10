@@ -37,7 +37,26 @@ fn host(root string, work string) ! {
 	print(command([binary])!)
 	generate(root, root + '/tools/volumes/volumecli', work + '/volume.c', 'x86_64')!
 	check_generated(work + '/volume.c')!
+	init_policy(root, work)!
 	println('PASS host: plan format, identity, corruption, bounds, atomic publication and sanitizers')
+}
+
+fn init_policy(root string, work string) ! {
+	generate(root, root + '/tests/init-policy/hostfixture', work + '/init-fixture.c', 'aarch64')!
+	for variant in ['normal', 'echo'] {
+		mut args := ['sh', root + '/build-support/run-v-tool.sh', root + '/build-support/init-aarch64/compile_init.v',
+			'desktop', work + '/init-policy-' + variant + '.c', '--host']
+		if variant == 'echo' { args << '--busybox-echo-test' }
+		command(args)!
+		check_generated(work + '/init-policy-' + variant + '.c')!
+		binary := work + '/init-host-' + variant
+		command(['clang', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-unused-function',
+			'-Wno-unused-parameter', '-Wno-unused-label', '-D_GNU_SOURCE', '-DVINIX_INIT_HOST_TEST',
+			'-fsanitize=address,undefined', '-I', root + '/build-support/init-aarch64',
+			'-I', root + '/tests/init-policy/hostfixture', work + '/init-policy-' + variant + '.c',
+			work + '/init-fixture.c', '-o', binary])!
+		print(command(if variant == 'echo' { [binary, 'echo'] } else { [binary] })!)
+	}
 }
 
 fn write_disk(path string, wrong bool) ! {
@@ -48,6 +67,8 @@ fn write_disk(path string, wrong bool) ! {
 	mut sector := [512]u8{}
 	sector[440] = if wrong { 0x79 } else { 0x78 }; sector[441] = 0x56; sector[442] = 0x34; sector[443] = 0x12
 	sector[510] = 0x55; sector[511] = 0xaa
+	// An unformatted partition must not be mistaken for its whole parent.
+	sector[450] = 0x83; sector[455] = 0x40; sector[459] = 8
 	file.seek(0, .start)!
 	file.write(sector[..])!
 }
@@ -58,6 +79,10 @@ fn plan_filesystem(work string) ! {
 	}
 	command([tool, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-m', '0',
 		'-d', work + '/seed', work + '/config.ext2', '2048'])!
+	debugfs := os.join_path(os.dir(tool), 'debugfs')
+	for path in ['/etc', '/etc/vinix'] {
+		command([debugfs, '-w', '-R', 'set_inode_field ' + path + ' uid 0', work + '/config.ext2'])!
+	}
 }
 
 fn compile_guest(root string, work string, arch string) ! {
@@ -75,13 +100,38 @@ fn compile_guest(root string, work string, arch string) ! {
 	os.chmod(work + '/seed/sbin/init', 0o755)!
 	print(command(['sh', root + '/build-support/run-v-tool.sh', root + '/build-support/storage-tools/stage.v',
 		'--arch', if arch == 'aarch64' { 'aarch64' } else { 'x86_64' }, '--staging', work + '/seed'])!)
+	os.mkdir_all(work + '/seed/etc/vinix')!
+	os.write_file(work + '/seed/etc/vinix/volumes.vmap', 'deliberately invalid boot plan\n')!
+	os.mkdir_all(work + '/seed/usr/bin')!
+	os.cp(work + '/init', work + '/seed/usr/bin/vinix-desktop')!
+	os.chmod(work + '/seed/usr/bin/vinix-desktop', 0o755)!
+	if arch == 'aarch64' {
+		command(['sh', root + '/build-support/run-v-tool.sh', root + '/build-support/init-aarch64/compile_init.v',
+			'desktop', work + '/boot-init.c'])!
+		check_generated(work + '/boot-init.c')!
+		command(['clang', '--target=aarch64-linux-none', '-nostdlib', '-ffreestanding', '-O2',
+			'-fno-stack-protector', '-fno-builtin', '-ffunction-sections', '-fdata-sections', '-c',
+			'-I', root + '/build-support/init-aarch64', work + '/boot-init.c', '-o', work + '/boot-init.o'])!
+		command(['clang', '--target=aarch64-linux-none', '-c', root + '/build-support/init-aarch64/syscall_abi.S', '-o', work + '/boot-abi.o'])!
+		command(['ld.lld', '-m', 'aarch64elf', '--nostdlib', '-static', '--gc-sections',
+			work + '/boot-init.o', work + '/boot-abi.o', '-o', work + '/seed/sbin/init'])!
+	} else {
+		cached := os.getenv_opt('VINIX_AMD64_USERLAND_ROOT') or { root + '/build-amd64-userland/staging' }
+		os.mkdir_all(work + '/seed/bin')!; os.mkdir_all(work + '/seed/lib')!
+		for path in ['bin/busybox', 'lib/ld-musl-x86_64.so.1'] { os.cp(cached + '/' + path, work + '/seed/' + path)! }
+		os.symlink('busybox', work + '/seed/bin/sh')!
+		// The V console adapter execs the unchanged packaged init as PID 1.
+		os.mkdir_all(work + '/seed/usr/libexec')!
+		os.cp(root + '/build-support/init-amd64/desktop-init', work + '/seed/usr/libexec/volume-test-init')!
+	}
+	os.chmod(work + '/seed/sbin/init', 0o755)!
 }
 
 fn pack(work string) ! {
 	command(['tar', '--format=ustar', '-cf', work + '/initramfs.tar', '-C', work + '/seed', '.'])!
 }
 
-fn amd64_boot(root string, work string, kernel string) ![]string {
+fn amd64_boot(root string, work string, kernel string, second bool) ![]string {
 	iso := work + '/iso'
 	os.mkdir_all(iso + '/boot')!
 	os.mkdir_all(iso + '/EFI/BOOT')!
@@ -96,15 +146,17 @@ fn amd64_boot(root string, work string, kernel string) ![]string {
 	firmware := os.getenv_opt('VINIX_OVMF_CODE_AMD64') or {
 		os.dir(os.dir(os.real_path(qemu))) + '/share/qemu/edk2-x86_64-code.fd'
 	}
+	first_disk := work + if second { '/wrong.raw' } else { '/volume.raw' }
+	second_disk := work + if second { '/volume.raw' } else { '/wrong.raw' }
 	return [qemu, '-machine', 'q35,smm=off', '-accel', 'tcg', '-cpu', 'max', '-m', '1024', '-smp', '2',
 		'-drive', 'if=pflash,format=raw,unit=0,readonly=on,file=' + firmware,
-		'-cdrom', work + '/test.iso', '-drive', 'if=ide,format=raw,cache=writeback,file=' + work + '/volume.raw',
-		'-drive', 'if=ide,format=raw,cache=writeback,file=' + work + '/wrong.raw',
+		'-cdrom', work + '/test.iso', '-drive', 'if=ide,format=raw,cache=writeback,file=' + first_disk,
+		'-drive', 'if=ide,format=raw,cache=writeback,file=' + second_disk,
 		'-drive', 'if=ide,format=raw,cache=writeback,file=' + work + '/config.ext2',
 		'-display', 'none', '-monitor', 'none', '-serial', 'stdio', '-nic', 'none', '-no-reboot']
 }
 
-fn arm_boot(root string, work string, kernel string) ![]string {
+fn arm_boot(root string, work string, kernel string, second bool) ![]string {
 	boot_image := work + '/boot.img'
 	if !os.exists(boot_image) {
 		mut file := os.create(boot_image)!
@@ -121,18 +173,22 @@ fn arm_boot(root string, work string, kernel string) ![]string {
 	share := os.dir(os.dir(os.real_path(qemu))) + '/share/qemu'
 	os.cp(share + '/edk2-arm-vars.fd', work + '/vars.fd')!
 	firmware := os.getenv_opt('VINIX_OVMF_CODE') or { root + '/boot-image/edk2-aarch64-code-2048x1536.fd' }
+	first_disk := work + if second { '/wrong.raw' } else { '/volume.raw' }
+	second_disk := work + if second { '/volume.raw' } else { '/wrong.raw' }
 	return [qemu, '-machine', 'virt,gic-version=3', '-accel', if os.user_os() == 'macos' { 'hvf' } else { 'tcg' },
 		'-cpu', if os.user_os() == 'macos' { 'host' } else { 'max' }, '-m', '1024', '-smp', '2',
 		'-drive', 'if=pflash,format=raw,readonly=on,file=' + firmware,
 		'-drive', 'if=pflash,format=raw,file=' + work + '/vars.fd', '-drive', 'format=raw,file=' + boot_image,
 		'-drive', 'if=none,format=raw,id=config,file=' + work + '/config.ext2', '-device', 'virtio-blk-device,drive=config',
-		'-drive', 'if=none,format=raw,id=wrong,file=' + work + '/wrong.raw', '-device', 'virtio-blk-device,drive=wrong',
-		'-drive', 'if=none,format=raw,id=plan,file=' + work + '/volume.raw', '-device', 'virtio-blk-device,drive=plan',
+		'-drive', 'if=none,format=raw,id=wrong,file=' + second_disk, '-device', 'virtio-blk-device,drive=wrong',
+		'-drive', 'if=none,format=raw,id=plan,file=' + first_disk, '-device', 'virtio-blk-device,drive=plan',
 		'-device', 'virtio-keyboard-device', '-device', 'ramfb', '-display', 'none', '-monitor', 'none',
 		'-serial', 'stdio', '-nic', 'none', '-no-reboot']
 }
 
 fn boot(args []string, log string) !string {
+	mut capture := os.create(log)!
+	defer { capture.close() }
 	mut process := os.new_process(args[0])
 	process.set_args(args[1..]); process.set_redirect_stdio(); process.run()
 	if process.pid <= 0 { return error('Cannot start QEMU') }
@@ -142,14 +198,16 @@ fn boot(args []string, log string) !string {
 	}
 	mut transcript := ''
 	started := time.sys_mono_now()
-	for process.is_alive() && time.sys_mono_now() - started < u64(360 * time.second) {
-		transcript += process.stdout_read() + process.stderr_read()
+	for process.is_alive() && time.sys_mono_now() - started < u64(600 * time.second) {
+		chunk := process.stdout_read() + process.stderr_read()
+		if chunk != '' { capture.write_string(chunk)!; transcript += chunk }
 		if transcript.contains('PLAN DONE\n') || transcript.contains('PLAN DONE\r') { break }
 		if transcript.contains('PLAN FAIL') || transcript.contains('KERNEL PANIC') || transcript.contains('FATAL EXCEPTION') { break }
 		time.sleep(10 * time.millisecond)
 	}
-	transcript += process.stdout_read() + process.stderr_read()
-	os.write_file(log, transcript)!
+	last := process.stdout_read() + process.stderr_read()
+	capture.write_string(last)!
+	transcript += last
 	if !transcript.contains('PLAN DONE') || transcript.contains('PLAN FAIL') || transcript.contains('KERNEL PANIC') {
 		return error('Guest qualification failed: see ${log}')
 	}
@@ -164,17 +222,19 @@ fn guest(root string, work string, arch string, kernel string) ! {
 	write_disk(work + '/wrong.raw', true)!
 	plan_filesystem(work)!
 	pack(work)!
-	args := if arch == 'aarch64' { arm_boot(root, work, kernel)! } else { amd64_boot(root, work, kernel)! }
+	args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false)! }
 	first := boot(args, work + '/first-boot.log')!
+	if !first.contains('init: volume restore failed; continuing') { return error('Production init did not report its invalid boot plan and continue') }
 	mut encoded := ''
 	for line in first.split_into_lines() { if line.starts_with('PLAN FILE ') { encoded = line.all_after('PLAN FILE ').trim_space() } }
 	if encoded.len < 256 || encoded.len > 4224 { return error('Missing saved plan bytes in first boot') }
 	os.write_file_array(work + '/saved-plan.vmap', hex.decode(encoded)!)!
 	// The phase marker and plan stay on the guest's filesystem. No host copy
 	// supplies either file to the second boot.
-	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel)! } else { amd64_boot(root, work, kernel)! }
-	boot(second_args, work + '/second-boot.log')!
-	println('PASS ${arch}: save/restore, wrong-disk and conflict rejection, idempotence, 200-cycle retention and reboot data')
+	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true)! }
+	second := boot(second_args, work + '/second-boot.log')!
+	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
+	println('PASS ${arch}: discovery, ambiguity and trust rejection, production init restore after device reorder, 200-cycle retention and reboot data')
 }
 
 fn main() {

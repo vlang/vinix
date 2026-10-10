@@ -1,5 +1,24 @@
 # Init policy fixtures
 
+The native V storage controller now also runs the production init host policy
+with ASan/UBSan, including its synchronous volume restore hook:
+
+```sh
+V=/path/to/v build-support/run-v-tool.sh tests/storage-volumes/plan_run.v \
+  --host --work /tmp/vinix-init-and-volume-host
+```
+
+This covers both normal and BusyBox echo variants and checks absent utility,
+successful restore/reaping, nonzero exit, fork failure and failed exec. Native
+ARM init artifacts are produced with
+`build-support/init-aarch64/compile_init.v`; the desktop builder uses that V
+producer. The storage guest tests boot the packaged ARM native init and AMD64
+desktop script with an invalid plan, then reboot with an enrolled plan and
+reordered devices. See [the storage fixture](../storage-volumes/README.md).
+
+The older Python commands below describe historical controls and fixtures;
+the current combined host and storage-boot checks above use V throughout.
+
 `run-vm.py` boots the production ARM shell, full and desktop init policies
 with independent native applications from `guestfixture/core.v`. The shell
 driver checks command input through a pipe and `execv`. The full application

@@ -31,6 +31,8 @@ fn C.vinix_init_power_signal(i32)
 fn C.vinix_init_child_signal(i32)
 fn C.initcore__prepare_desktop_boot()
 fn C.initcore__prepare_hosted_x11_storage()
+fn C.initcore__prepare_environment()
+fn C.initcore__restore_boot_volumes()
 fn C.initcore__install_power_signals()
 fn C.initcore__apply_power_request()
 fn C.initcore__pause_for(C.delay)
@@ -57,6 +59,8 @@ __global mount_failure i32
 __global cloned i64
 __global stop_sleep bool
 __global full_echo bool
+__global volume_missing bool
+__global volume_status i32
 const basic = i32(0)
 const shell = i32(1)
 const full = i32(2)
@@ -65,6 +69,7 @@ const reload = i32(4)
 const sleep = i32(5)
 const spawn_mode = i32(6)
 const group = i32(7)
+const volumes = i32(8)
 const shell_input = [&char(c' \t\r\n'), &char(c'help\n'), &char(c'hello\r\n'), &char(c'uname\n'), &char(c'echo   hello world\n'), &char(c'echo\n'), &char(c'echoes\n'), &char(c'missing\n'), &char(c'exit\n'), &char(nil)]!
 const shell_eof = [&char(nil)]!
 const signals = [u64(1), u64(15), u64(10), u64(12), u64(17)]!
@@ -77,6 +82,7 @@ fn reset(next i32) {
   output[0] = 0; mode = next; exit_status = -1
   symlink_failure = 0; link_failure = 0; mount_failure = 0
   cloned = 77; stop_sleep = false; C.vinit_reload = 0; C.vinit_power = 0
+  volume_missing = false; volume_status = 0
  }
 }
 fn text_copy(out &char, ptr u64) {
@@ -101,6 +107,7 @@ pub fn syscall(nr u64, a0 u64, a1 u64, a2 u64, a3 u64, a4 u64) i64 {
   if nr == 93 { exit_status = i32(a0); C.longjmp(finished, 1) }
   if nr == 56 {
    C.assert(a0 == u64(i64(-100))); text_copy(&r.path[0], a1)
+   if mode == volumes { C.assert(C.strcmp(&r.path[0], c'/usr/sbin/vinix-volume') == 0 && a2 == 0); return if volume_missing { i64(-2) } else { i64(8) } }
    if a2 == 0x41 { C.assert(a3 == 0o600); return 9 }; return 8
   }
   if nr == 57 { C.assert(a0 == 8 || a0 == 9); return 0 }
@@ -149,13 +156,18 @@ pub fn syscall(nr u64, a0 u64, a1 u64, a2 u64, a3 u64, a4 u64) i64 {
     C.assert(C.strcmp(environment[1], c'HOME=/root') == 0 && C.strcmp(environment[2], c'TERM=linux') == 0 && C.strcmp(environment[3], c'PS1=vinix# ') == 0)
     C.assert(C.strcmp(environment[4], c'LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules') == 0)
     C.assert(C.strcmp(environment[5], c'LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri') == 0 && environment[6] == nil)
+   } else if mode == volumes {
+    C.assert(C.strcmp(&r.path[0], c'/usr/sbin/vinix-volume') == 0)
+    C.assert(C.strcmp(arguments[1], c'boot-restore') == 0 && arguments[2] == nil)
+    C.assert(C.strcmp(environment[1], c'HOME=/root') == 0)
    } else { C.assert(mode == spawn_mode && arguments[1] == nil && environment[1] == nil) }; return -2
   }
   if nr == 260 {
    C.assert(a0 == u64(i64(-1)) && a3 == 0); waits++
    if a2 == 1 { return 0 }
-   C.assert(a2 == 0 && (mode == wait || mode == reload || mode == spawn_mode))
+   C.assert(a2 == 0 && (mode == wait || mode == reload || mode == spawn_mode || mode == volumes))
    mut status := &i32(usize(a1))
+   if mode == volumes { *status = volume_status; return 77 }
    if mode == spawn_mode { *status = (i32(4) << 8); return 77 }
    if waits == 1 { *status = 0; return 101 }
    if waits == 2 { if mode == wait { C.vinit_power = 12 }; return -4 }
@@ -252,9 +264,25 @@ fn process_test() {
  }
 }
 
+fn volume_boot_test() {
+ unsafe {
+  reset(volumes); C.initcore__prepare_environment(); volume_missing = true; C.initcore__restore_boot_volumes()
+  C.assert(count(56) == 1 && count(57) == 0 && count(220) == 0 && output_used == 0)
+  reset(volumes); C.initcore__prepare_environment(); C.initcore__restore_boot_volumes()
+  C.assert(count(57) == 1 && count(220) == 1 && count(260) == 1 && count(154) == 0 && output_used == 0)
+  reset(volumes); C.initcore__prepare_environment(); volume_status = 1 << 8; C.initcore__restore_boot_volumes()
+  C.assert(count(260) == 1 && C.strstr(&output[0], c'volume restore failed; continuing') != nil)
+  reset(volumes); C.initcore__prepare_environment(); cloned = -12; C.initcore__restore_boot_volumes()
+  C.assert(count(260) == 0 && C.strstr(&output[0], c'volume restore failed; continuing') != nil)
+  reset(volumes); C.initcore__prepare_environment(); cloned = 0
+  if C.setjmp(finished) == 0 { C.initcore__restore_boot_volumes() }
+  C.assert(exit_status == 127 && count(221) == 1 && count(154) == 0)
+ }
+}
+
 @[export: 'main']
 pub fn entry(argc i32, argv &&char) i32 {
  unsafe { full_echo = argc > 1 && C.strcmp(argv[1], c'echo') == 0 }
- shell_test(); full_test(); boot_test(); signal_test(); process_test()
+ shell_test(); full_test(); boot_test(); signal_test(); process_test(); volume_boot_test()
  C.puts(c'INIT POLICY TEST: PASS'); return 0
 }

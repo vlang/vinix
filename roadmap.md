@@ -152,6 +152,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Boot-local linear block volumes, raw capacity growth and I/O counters](docs/storage-volumes.md).
   - [x] [Protected raw TRIM/discard through volumes and partitions](docs/storage-volumes.md#trimdiscard).
   - [x] [Checksummed saved volume plans with verified disk identity and idempotent restore](docs/storage-volumes.md#saved-volume-plans).
+  - [x] [Identity-based disk discovery and opt-in volume-plan restore before boot applications](docs/storage-volumes.md#discovery-and-boot-restore).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

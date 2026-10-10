@@ -13,4 +13,8 @@ export LD_LIBRARY_PATH=/usr/lib:/usr/lib/xorg/modules
 export LIBGL_DRIVERS_PATH=/usr/lib/xorg/modules/dri:/usr/lib/dri
 export SSL_CA_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
+if [ -x /usr/sbin/vinix-volume ]; then
+    /usr/sbin/vinix-volume boot-restore || echo "init: volume restore failed; continuing to the recovery shell"
+fi
+
 exec /bin/zsh -l

@@ -5,7 +5,7 @@ block devices (including their partitions). A view maps a sector-aligned byte
 range to `/dev/mapper/vinix0` through `/dev/mapper/vinix63`. Creating, growing or
 removing a view changes kernel mappings only; it does not format the device or
 move its contents. Kernel mappings last until reboot. Saved volume plans retain
-their geometry and disk identity for explicit restore after boot.
+their geometry and disk identity for explicit or configured restore after boot.
 
 The native V utility is installed as `/usr/sbin/vinix-volume` by both userland
 and desktop image builders. Commands require a trusted MAC domain,
@@ -81,9 +81,10 @@ protection and resource limits.
 Plans use a bounded little-endian format: a 64-byte `VINIXVM1` version-1 header
 with geometry, identity, record count, CRC32 and zero reserved bytes, followed
 by up to 64 32-byte version-1 create records. CRC32 detects accidental
-corruption; it does not authenticate a plan. MBR signatures and GPT GUIDs also
-cannot distinguish cloned disks with duplicated identity. Choose the physical
-device explicitly and retain backups of both the plan and its data.
+corruption; it does not authenticate a plan. MBR signatures and GPT GUIDs can
+be duplicated by cloning. Explicit restore still relies on the selected
+device; automatic discovery rejects multiple physical matches. Retain backups
+of both the plan and its data.
 
 Publication creates an exclusive mode-0600 temporary file in the destination
 directory, writes and fsyncs it, renames it over the previous plan and fsyncs
@@ -98,9 +99,49 @@ do not lock out other management processes. Kernel creation rechecks each new
 extent, but a later quota, I/O or concurrent-change failure can leave a created
 prefix. Restore reports the error and keeps those mappings; applying the plan
 again resumes from matching entries. It never removes unlisted mappings.
-Automatic disk discovery, boot-service integration and filesystem mounting are
-still separate work. A plan stored inside a managed view must be made available
-before that view can be restored.
+Filesystem mounting remains separate work. A plan stored inside a managed view
+must be made available before that view can be restored.
+
+## Discovery and boot restore
+
+```sh
+vinix-volume discover /root/volumes.vmap
+vinix-volume restore-auto /root/volumes.vmap
+# Opt in to restore before the desktop or interactive shell starts:
+mkdir -p /etc/vinix
+chown root:root /etc/vinix
+chmod 755 /etc/vinix
+vinix-volume save /dev/vda /etc/vinix/volumes.vmap
+vinix-volume boot-restore
+```
+
+`discover` validates a plan and scans the top level of `/dev` for its physical
+disk, printing the matched path without changing mappings. `restore-auto` uses
+the same scan, then applies the ordinary restore checks through the selected
+open device descriptor. The disk can acquire a different device name or runtime
+number on the next boot. The scan considers block nodes only, skips symlinks,
+partitions, logical views and unsupported status backends, and counts at most
+4096 directory entries. Invalid table identities cannot match. An unreadable
+supported candidate with matching geometry fails the scan because uniqueness
+cannot be established. Multiple nodes aliasing one physical disk are accepted;
+matching identities on distinct physical disks fail before creating any view.
+
+The packaged ARM desktop init and both architectures' Alpine init scripts, plus
+the AMD64 desktop init, run `boot-restore` once before starting applications or
+the interactive shell. It loads only `/etc/vinix/volumes.vmap`. A missing plan is
+a successful no-op. The opened `/etc`, `/etc/vinix` and plan must be owned by
+root and not writable by group or others; none of those path components may be
+a symlink. The plan must also satisfy the regular-file and checksum rules.
+Directory-relative operations pin the configuration and device directories;
+the discovered disk descriptor remains open through restore.
+
+A failed boot restore prints its reason and init continues to the desktop or
+recovery shell. It does not format, unlock or mount volumes, retry hotplug, or
+remove existing mappings. One physical disk's plan can be enabled for boot in
+this increment; other plans can be applied explicitly with `restore-auto`.
+Delete the configured plan to disable replay. Normal restore's serialized
+administration and partial-failure rules still apply, and boot replay does not
+provide the root filesystem needed to load its own configuration.
 
 ## Status ABI
 
@@ -192,9 +233,14 @@ The native V saved-plan controller also runs host ASan/UBSan checks and two
 ordinary-kernel boots on each architecture. Plans stay on a disposable ext2
 system disk across an abrupt QEMU stop; the second boot restores mappings and
 checks persisted data and read-only policy without a host-supplied plan. The
-first boot rejects corrupt files, a different disk and conflicting slots,
-checks repeated and partial restore, and measures retained heap across 200
-save/restore cycles after warming the same paths.
+first boot exercises init recovery from an invalid configured plan, rejects
+corrupt files, untrusted configuration, a different disk, duplicated identity
+and conflicting slots, checks physical aliases and repeated/partial restore,
+and measures retained heap across 200 save/automatic-restore cycles after
+warming the same paths. Before the second boot the physical devices are
+reordered. Production init restores the configured plan before the test
+application starts. Host init policy checks cover missing utility, synchronous
+reaping, nonzero utility exits, fork failure and failed exec under ASan/UBSan.
 
 NVMe discard is qualified with the production command/completion code and
 mocked MMIO on the host, including 200 successful operations and failed-reset
@@ -203,8 +249,8 @@ initialization before reaching userspace. Native NVMe boot qualification and
 its production initialization policy remain open; host results do not establish
 real-controller or guest readiness.
 
-The encompassing roadmap item stays open: automatic persistent volume discovery,
-storage pools/RAID, full-disk encryption and recovery, online filesystem resize,
+The encompassing roadmap item stays open: storage pools/RAID, full-disk
+encryption and recovery, online filesystem resize,
 filesystem-aware trimming and controller-specific health data are not
 implemented by this increment. The anonymous pager's encrypted swap remains a
 separate feature.

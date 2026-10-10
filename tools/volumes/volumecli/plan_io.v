@@ -11,6 +11,7 @@ struct C.stat {
 mut:
 	st_mode u32
 	st_size i64
+	st_uid u32
 }
 
 @[c_extern] __global C.errno i32
@@ -62,10 +63,18 @@ fn load_plan(path &char, mut plan Plan) bool {
 	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if fd < 0 { C.perror(c'vinix-volume: open plan'); return false }
 	defer { C.close(fd) }
+	return read_plan(fd, mut plan, false)
+}
+
+@[direct_array_access]
+fn read_plan(fd i32, mut plan Plan, trusted bool) bool {
 	mut info := C.stat{}
 	if C.fstat(fd, &info) != 0 { C.perror(c'vinix-volume: stat plan'); return false }
 	if C.S_ISREG(info.st_mode) == 0 || info.st_size < plan_header_bytes || info.st_size > plan_max_bytes {
 		plan_error(c'plan must be a bounded regular file'); return false
+	}
+	if trusted && (info.st_uid != 0 || info.st_mode & 0o022 != 0) {
+		plan_error(c'boot plan must be owned by root and not writable by group or others'); return false
 	}
 	mut bytes := [2112]u8{}
 	mut done := i64(0)
@@ -194,16 +203,25 @@ fn mapping_matches(status &Status, parent &Status, row &Request) bool {
 }
 
 @[direct_array_access]
+fn plan_writable(plan &Plan) bool {
+	for i := u32(0); i < plan.count; i++ { if plan.rows[i].flags == 0 { return true } }
+	return false
+}
+
+@[direct_array_access]
 fn restore_plan(device &char, path &char) i32 {
 	mut plan := unsafe { &Plan(C.alloca(sizeof(Plan))) }
 	unsafe { *plan = Plan{} }
 	if !load_plan(path, mut plan) { return 1 }
-	mut writable := false
-	for i := u32(0); i < plan.count; i++ { if plan.rows[i].flags == 0 { writable = true } }
-	flags := i32(if writable { C.O_RDWR } else { C.O_RDONLY }) | i32(C.O_CLOEXEC | C.O_NOFOLLOW)
+	flags := i32(if plan_writable(plan) { C.O_RDWR } else { C.O_RDONLY }) | i32(C.O_CLOEXEC | C.O_NOFOLLOW)
 	fd := C.open(device, flags)
 	if fd < 0 { C.perror(c'vinix-volume: open disk'); return 1 }
 	defer { C.close(fd) }
+	return restore_loaded(fd, plan)
+}
+
+@[direct_array_access]
+fn restore_loaded(fd i32, plan &Plan) i32 {
 	mut key := unsafe { &DiskKey(C.alloca(sizeof(DiskKey))) }
 	unsafe { *key = DiskKey{} }
 	mut parent := Status{}

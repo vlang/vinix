@@ -9,6 +9,7 @@ module planguest
 #include <sys/wait.h>
 #include <elf.h>
 #include <sys/auxv.h>
+#include <sys/stat.h>
 
 @[c_extern] __global C.stdout voidptr
 @[c_extern] __global C.errno i32
@@ -34,6 +35,17 @@ fn C.fclose(voidptr) i32
 fn C.fgets(&char, i32, voidptr) &char
 fn C.sscanf(&char, &char, ...voidptr) i32
 fn C.getauxval(u64) u64
+fn C.fstat(i32, &C.stat) i32
+fn C.chmod(&char, u32) i32
+fn C.chown(&char, u32, u32) i32
+fn C.rename(&char, &char) i32
+fn C.mknod(&char, u32, u64) i32
+fn C.symlink(&char, &char) i32
+fn C.unlink(&char) i32
+fn C.getpid() i32
+fn C.getppid() i32
+
+struct C.stat { st_rdev u64 }
 
 @[typedef]
 struct C.Elf64_Phdr {
@@ -144,9 +156,31 @@ fn heap_snapshot(mut snapshot Heap) {
 fn cycles(parent &char, count int) {
 	for _ in 0 .. count {
 		simple(c'save', parent, c'/root/saved.vmap', 0)
-		simple(c'restore', parent, c'/root/saved.vmap', 0)
+		simple(c'restore-auto', c'/root/saved.vmap', unsafe { &char(nil) }, 0)
 	}
 	C.sleep(13)
+}
+
+fn fixture_plan(bytes &u8) {
+	fd := C.open(c'/etc/vinix/volumes.vmap', C.O_WRONLY | C.O_CREAT | C.O_TRUNC, u32(0o600))
+	check(fd >= 0 && C.write(fd, bytes, 128) == 128 && C.fsync(fd) == 0 && C.close(fd) == 0, c'write boot plan fixture')
+}
+
+@[direct_array_access]
+fn signature(device &char, value u32) {
+	fd := C.open(device, C.O_RDWR)
+	mut sector := [512]u8{}
+	check(fd >= 0 && C.pread(fd, &sector[0], 512, 0) == 512, c'read duplicate identity fixture')
+	for i := 0; i < 4; i++ { sector[440 + i] = u8(value >> (8 * i)) }
+	check(C.pwrite(fd, &sector[0], 512, 0) == 512 && C.fsync(fd) == 0 && C.close(fd) == 0, c'change duplicate identity fixture')
+}
+
+fn physical_alias(parent &char) {
+	fd := C.open(parent, C.O_RDONLY)
+	mut info := C.stat{}
+	check(fd >= 0 && C.fstat(fd, &info) == 0 && C.close(fd) == 0, c'physical alias identity')
+	check(C.mknod(c'/dev/volume-plan-alias', C.S_IFBLK | 0o600, info.st_rdev) == 0, c'physical alias creation')
+	check(C.symlink(parent, c'/dev/volume-plan-link') == 0, c'discovery symlink fixture')
 }
 
 // The static fixture itself stays alive across the measurement. Touch every
@@ -191,6 +225,9 @@ fn allocation_trace(path &char, print bool) {
 @[direct_array_access]
 fn first_boot(parent &char) {
 	unsafe {
+		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5')
+		check(C.unlink(c'/etc/vinix/volumes.vmap') == 0, c'remove invalid initial boot plan')
+		simple(c'boot-restore', &char(nil), &char(nil), 0)
 		tool(c'create', parent, c'2', c'1048576', c'4096', 0)
 		arguments := [&char(c'/usr/sbin/vinix-volume'), &char(c'create'), parent, &char(c'5'), &char(c'2097152'), &char(c'8192'), &char(c'ro'), &char(nil)]!
 		child := C.fork(); check(child >= 0, c'fork read-only create')
@@ -214,20 +251,46 @@ fn first_boot(parent &char) {
 		check(bad_fd >= 0 && C.write(bad_fd, &damaged[0], 128) == 128 && C.close(bad_fd) == 0, c'write corruption fixture')
 		simple(c'restore', parent, c'/root/bad.vmap', 1)
 		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5')
+		fixture_plan(&damaged[0])
+		simple(c'boot-restore', &char(nil), &char(nil), 1)
+		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5')
+		damaged[112] ^= 1
+		fixture_plan(&damaged[0])
+		check(C.chmod(c'/etc/vinix/volumes.vmap', 0o622) == 0, c'untrusted plan mode')
+		simple(c'boot-restore', &char(nil), &char(nil), 1)
+		check(C.chmod(c'/etc/vinix/volumes.vmap', 0o600) == 0 && C.chmod(c'/etc/vinix', 0o777) == 0, c'untrusted directory mode')
+		simple(c'boot-restore', &char(nil), &char(nil), 1)
+		check(C.chmod(c'/etc/vinix', 0o755) == 0, c'restore trusted directory')
+		check(C.chown(c'/etc/vinix/volumes.vmap', 65534, 65534) == 0, c'untrusted plan owner')
+		simple(c'boot-restore', &char(nil), &char(nil), 1)
+		check(C.chown(c'/etc/vinix/volumes.vmap', 0, 0) == 0, c'restore trusted plan owner')
+		check(C.rename(c'/etc/vinix/volumes.vmap', c'/etc/vinix/real.vmap') == 0
+			&& C.symlink(c'real.vmap', c'/etc/vinix/volumes.vmap') == 0, c'boot plan symlink fixture')
+		simple(c'boot-restore', &char(nil), &char(nil), 1)
+		check(C.unlink(c'/etc/vinix/volumes.vmap') == 0
+			&& C.rename(c'/etc/vinix/real.vmap', c'/etc/vinix/volumes.vmap') == 0, c'restore regular boot plan')
+		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5')
 		// A different physical disk must fail before creating any mapping.
 		wrong := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 		simple(c'restore', wrong, c'/root/saved.vmap', 1)
 		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5')
+		physical_alias(parent)
+		signature(wrong, 0x12345678)
+		simple(c'restore-auto', c'/root/saved.vmap', &char(nil), 1)
+		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5')
+		signature(wrong, 0x12345679)
+		simple(c'discover', c'/root/saved.vmap', &char(nil), 0)
 		tool(c'create', parent, c'5', c'3145728', c'4096', 0)
-		simple(c'restore', parent, c'/root/saved.vmap', 1)
+		simple(c'restore-auto', c'/root/saved.vmap', &char(nil), 1)
 		missing(c'/dev/mapper/vinix2') // Conflict in a later slot cannot create a prefix.
 		simple(c'remove', c'/dev/mapper/vinix5', &char(nil), 0)
-		simple(c'restore', parent, c'/root/saved.vmap', 0)
+		simple(c'restore-auto', c'/root/saved.vmap', &char(nil), 0)
 		kept := status(c'/dev/mapper/vinix5').generation
 		simple(c'remove', c'/dev/mapper/vinix2', &char(nil), 0)
 		simple(c'restore', parent, c'/root/saved.vmap', 0)
 		check(status(c'/dev/mapper/vinix5').generation == kept, c'resume keeps existing mapping')
 		view_data()
+		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0, c'alias fixture cleanup')
 		allocation_trace(c'/proc/allocstart', false)
 		cycles(parent, 200)
 		mut before := Heap{}; heap_snapshot(mut before)
@@ -242,6 +305,7 @@ fn first_boot(parent &char) {
 			allocation_trace(c'/proc/allocsites', true)
 		}
 		check(!retained, c'heap retention')
+		simple(c'save', parent, c'/etc/vinix/volumes.vmap', 0)
 		plan := C.open(c'/root/saved.vmap', C.O_RDONLY); check(plan >= 0, c'open exported plan')
 		mut bytes := [2112]u8{}
 		size := C.read(plan, &bytes[0], 2112)
@@ -262,6 +326,13 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	$if amd64 {
 		serial := C.open(c'/dev/com1', C.O_WRONLY)
 		check(serial >= 0 && C.dup2(serial, 1) == 1 && C.dup2(serial, 2) == 2 && C.close(serial) == 0, c'serial console')
+		if C.getpid() == 1 {
+			unsafe {
+				arguments := [&char(c'/bin/sh'), &char(c'/usr/libexec/volume-test-init'), &char(nil)]!
+				C.execv(c'/bin/sh', &arguments[0])
+			}
+			check(false, c'exec packaged init')
+		}
 	}
 	parent := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
 	C.printf(c'PLAN START\n')
@@ -270,11 +341,12 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	if phase < 0 { first_boot(parent) }
 	else {
 		C.close(phase)
-		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5')
-		simple(c'restore', parent, c'/root/saved.vmap', 0)
 		view_data()
+		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
+		check(C.getppid() == 1 && status(c'/dev/mapper/vinix2').disk_id == status(actual).disk_id, c'init restored reordered physical disk')
+		C.printf(c'PLAN BOOT RESTORED\n')
 		before := status(c'/dev/mapper/vinix2').generation
-		simple(c'restore', parent, c'/root/saved.vmap', 0)
+		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		check(status(c'/dev/mapper/vinix2').generation == before, c'reboot restore idempotence')
 	}
 	C.printf(c'PLAN DONE\n')

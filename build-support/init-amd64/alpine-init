@@ -9,4 +9,8 @@ echo "Alpine busybox: $(/bin/busybox | /bin/busybox head -n 1)"
 echo "Machine: $(/bin/uname -m)"
 echo "Shell arithmetic: $((20 + 26))"
 
+if [ -x /usr/sbin/vinix-volume ]; then
+    /usr/sbin/vinix-volume boot-restore || echo "init: volume restore failed; continuing to the recovery shell"
+fi
+
 exec /bin/zsh -l

@@ -15,6 +15,7 @@ struct action { void (*handler)(int); uint64_t flags; void (*restorer)(void); ui
 void vinix_init_shell(void), vinix_init_full(void);
 void vinix_init_power_signal(int), vinix_init_child_signal(int);
 void initcore__prepare_desktop_boot(void), initcore__prepare_hosted_x11_storage(void);
+void initcore__prepare_environment(void), initcore__restore_boot_volumes(void);
 void initcore__install_power_signals(void), initcore__apply_power_request(void);
 void initcore__pause_for(struct delay), initcore__wait_for_child(int64_t,int32_t *);
 void initcore__stop_desktop_group(int64_t);

@@ -154,3 +154,23 @@ fn test_plan_publication_preserves_previous_file_on_failure_and_rejects_links() 
 	assert os.is_dir(target_directory) && os.read_bytes(path)! == original
 	assert os.ls(work)!.len == 3
 }
+
+fn test_discovery_ignores_regular_files_and_symlinks_and_rejects_invalid_plans() {
+	work := os.join_path(os.temp_dir(), 'vinix-discovery-test-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := os.join_path(work, 'raw')
+	os.write_file(path, 'not a block device')!
+	os.symlink(path, os.join_path(work, 'disk-link'))!
+	os.mkdir(os.join_path(work, 'subdirectory'))!
+	mut name := [256]char{}
+	plan := sample_plan()
+	assert discover_disk(&plan, work.str, false, &name[0]) == -1
+	link := work + '-link'
+	os.symlink(work, link)!
+	defer { os.rm(link) or {} }
+	assert discover_disk(&plan, link.str, false, &name[0]) == -1
+	mut invalid := plan; invalid.key.sector = 0
+	assert discover_disk(&invalid, work.str, true, &name[0]) == -1
+	assert os.read_file(path)! == 'not a block device'
+}

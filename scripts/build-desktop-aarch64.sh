@@ -795,7 +795,7 @@ INIT_OPTIONS=()
 if [ -n "$WIFI_BUNDLE" ]; then
     INIT_OPTIONS=(--wifi-bundle)
 fi
-python3 "$SCRIPT_DIR/build-support/init-aarch64/compile-v.py" desktop "$BUILD_DIR/desktop-init-v.c" "${INIT_OPTIONS[@]}"
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/init-aarch64/compile_init.v" desktop "$BUILD_DIR/desktop-init-v.c" "${INIT_OPTIONS[@]}"
 "$LLVM_BIN/clang" --target=aarch64-linux-none -nostdlib -ffreestanding -O2 \
     -fno-stack-protector -fno-builtin -ffunction-sections -fdata-sections -c \
     -I"$SCRIPT_DIR/build-support/init-aarch64" \

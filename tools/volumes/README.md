@@ -12,7 +12,15 @@ See the storage documentation for extent protection and interruption behavior.
 managed views. `vinix-volume restore DEVICE PLAN` verifies disk identity and
 geometry, rejects conflicting slots and creates missing mappings. Repeated
 restore keeps matching views. Use a persistent filesystem for the plan; disk
-discovery and automatic boot replay are not provided.
+discovery uses `vinix-volume discover PLAN`, and `restore-auto PLAN` restores
+the unique physical match. Distinct disks with duplicate identity are rejected.
+
+Init runs `vinix-volume boot-restore` before applications. It replays the
+optional root-owned `/etc/vinix/volumes.vmap`; absence is a no-op, and failure
+is reported while boot continues. The configuration directories and plan must
+not be writable by group or others. Only one disk's plan is enabled at boot;
+other plans can be restored explicitly. See the storage documentation for
+discovery bounds, alias behavior and filesystem/mount limits.
 
 The image builders call `build-support/storage-tools/stage.v`, which uses the
 repository's V module producer and a static target musl compiler. To install it
