@@ -178,6 +178,9 @@ fn run_probe(what []string) int {
 		'greeter' {
 			return probe_greeter()
 		}
+		'keyring-flow' {
+			return probe_keyring_flow(what[1])
+		}
 		'flood' {
 			return probe_flood(what[1].int())
 		}

@@ -41,12 +41,90 @@ pub fn mark_active(uid string) {
 	os.rename(temporary, active_file) or {}
 }
 
+// What a login was made with, to be handed to one program of the session
+// and to nothing else: the password that was typed, and the program that
+// gets it on its standard input -- the account's credential store, which it
+// opens. The program is started inside the session, as the account.
+pub struct Unlock {
+pub:
+	secret []u8
+	helper []string
+}
+
+// Hand `unlock.secret` to `unlock.helper`, as the account this process has
+// just become. The helper is its own process, detached from this one, and
+// stays in the login session.
+//
+// The helper is given descriptor 3 and closes it when it is ready to be
+// asked things; this waits for that, a few seconds at most, so that the
+// session's first program does not start before the service it will ask.
+fn run_unlock_helper(unlock Unlock, environment []string) {
+	if unlock.helper.len == 0 || unlock.secret.len == 0 || !os.exists(unlock.helper[0]) {
+		return
+	}
+	mut line := [2]i32{}
+	mut ready := [2]i32{}
+	if C.pipe(&line[0]) != 0 {
+		return
+	}
+	if C.pipe(&ready[0]) != 0 {
+		C.close(line[0])
+		C.close(line[1])
+		return
+	}
+	first := C.fork()
+	if first == 0 {
+		// Forked twice, so that the session's first program is not the
+		// parent of something it did not start.
+		if C.fork() != 0 {
+			C._exit(0)
+		}
+		C.dup2(line[0], 0)
+		// The ready line as descriptor 3, by way of a number that cannot
+		// be 3 already.
+		spare := C.dup2(ready[1], 200)
+		C.dup2(spare, 3)
+		mut c_argv := []&char{cap: unlock.helper.len + 1}
+		for argument in unlock.helper {
+			c_argv << &char(argument.str)
+		}
+		c_argv << &char(unsafe { nil })
+		mut c_env := []&char{cap: environment.len + 1}
+		for variable in environment {
+			c_env << &char(variable.str)
+		}
+		c_env << &char(unsafe { nil })
+		for fd in 4 .. 1024 {
+			C.close(fd)
+		}
+		C.execve(c_argv[0], &c_argv[0], &c_env[0])
+		C._exit(127)
+	}
+	C.close(line[0])
+	C.close(ready[1])
+	C.write(line[1], unlock.secret.data, usize(unlock.secret.len))
+	C.write(line[1], c'\n', 1)
+	C.close(line[1])
+	if first > 0 {
+		mut status := i32(0)
+		C.waitpid(first, &status, 0)
+	}
+	// Ready, gone, or not saying: in no case is the session held up for
+	// longer than this.
+	mut waiting := PollFd{
+		fd:     ready[0]
+		events: 1
+	}
+	C.poll(voidptr(&waiting), 1, 5000)
+	C.close(ready[0])
+}
+
 // Start `argv` as `user` in a login session of its own. With `at_seat` the
 // session is given the display and the input devices. `control`, when not
 // negative, is a descriptor the session's first program gets as number 3
 // (and is told of in VINIX_SESSION_FD): its line to whoever started it.
 // Returns once the child has become a login, before it has become the user.
-pub fn start(db accountcore.Database, user accountcore.User, argv []string, at_seat bool, control int) !Started {
+pub fn start(db accountcore.Database, user accountcore.User, argv []string, at_seat bool, control int, unlock Unlock) !Started {
 	if !accountcore.is_person(user) && user.name != 'greeter' {
 		return error('${user.name} is not an account sessions are for')
 	}
@@ -92,6 +170,9 @@ pub fn start(db accountcore.Database, user accountcore.User, argv []string, at_s
 			eprintln('vinix-session: ${err.msg()}')
 			C._exit(126)
 		}
+		// As the account, and before its first program: the store is open
+		// by the time anything asks it.
+		run_unlock_helper(unlock, environment)
 		exec_as(user, argv, environment, control >= 0)
 		eprintln('vinix-session: cannot run ${argv[0]}')
 		C._exit(127)

@@ -62,6 +62,9 @@ pub:
 	desktop []string // a session's first program and arguments
 	socket  string = authclient.default_socket
 	system  string = '/usr/sbin/vinix-system'
+	// Started in each new session with the password that was typed, to
+	// open the account's credential store. Not started if it is not there.
+	keyring []string = ['/usr/bin/vinix-keyring', 'daemon', '--unlock-stdin']
 }
 
 struct Session {
@@ -194,8 +197,10 @@ fn (m &Manager) check_login(mut request authproto.Frame) (authproto.Frame, ?acco
 	}, user
 }
 
-// Show the login screen until someone has logged in, and return who.
-fn (mut m Manager) greet() accountcore.User {
+// Show the login screen until someone has logged in, and return who, and
+// the password they typed -- for their credential store, and to be wiped
+// by the caller as soon as the session has been started.
+fn (mut m Manager) greet() (accountcore.User, []u8) {
 	for {
 		db := load_accounts() or {
 			eprintln('vinix-session: ${err.msg()}')
@@ -213,7 +218,7 @@ fn (mut m Manager) greet() accountcore.User {
 			continue
 		}
 		mark_active('')
-		started := start(db, greeter, m.config.greeter, true, int(line[1])) or {
+		started := start(db, greeter, m.config.greeter, true, int(line[1]), Unlock{}) or {
 			eprintln('vinix-session: the login screen could not be started: ${err.msg()}')
 			C.close(line[0])
 			C.close(line[1])
@@ -222,11 +227,18 @@ fn (mut m Manager) greet() accountcore.User {
 		}
 		C.close(line[1])
 		mut chosen := ?accountcore.User(none)
+		mut typed := []u8{}
 		for {
 			mut request := authproto.read_frame(int(line[0])) or { break }
 			match request.code {
 				op_login {
+					// A copy first: asking the service wipes what it was sent.
+					mut password := if request.fields.len == 2 { request.fields[1].clone() } else { []u8{} }
 					answer, user := m.check_login(mut request)
+					if _ := user {
+						typed = password.clone()
+					}
+					accountcore.wipe(mut password)
 					request.wipe()
 					authproto.write_frame(int(line[0]), answer) or {}
 					if who := user {
@@ -255,17 +267,17 @@ fn (mut m Manager) greet() accountcore.User {
 		wait(started.pid)
 		release_seat(started.session)
 		if who := chosen {
-			return who
+			return who, typed
 		}
 		// It ended without a login: show it again, but not in a tight loop.
 		C.usleep(500_000)
 	}
-	return accountcore.User{}
+	return accountcore.User{}, []u8{}
 }
 
 // Run `user`'s session until it ends or steps aside: start it, or continue
 // it if it was stopped.
-fn (mut m Manager) attend(user accountcore.User) {
+fn (mut m Manager) attend(user accountcore.User, typed []u8) {
 	mut index := m.find_session(user.uid)
 	if index >= 0 {
 		// Theirs was waiting. The seat first: a continued process may use
@@ -283,7 +295,10 @@ fn (mut m Manager) attend(user accountcore.User) {
 		if C.socketpair(C.AF_UNIX, C.SOCK_STREAM, 0, &line[0]) != 0 {
 			return
 		}
-		started := start(db, user, m.config.desktop, true, int(line[1])) or {
+		started := start(db, user, m.config.desktop, true, int(line[1]), Unlock{
+			secret: typed
+			helper: m.config.keyring
+		}) or {
 			eprintln('vinix-session: ${err.msg()}')
 			C.close(line[0])
 			C.close(line[1])
@@ -348,7 +363,10 @@ pub fn run_manager(config ManagerConfig) {
 		config: config
 	}
 	for {
-		user := manager.greet()
-		manager.attend(user)
+		user, mut typed := manager.greet()
+		manager.attend(user, typed)
+		// The session has it now, or did not need it: either way it does
+		// not stay in a process that is root.
+		accountcore.wipe(mut typed)
 	}
 }

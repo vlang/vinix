@@ -15,7 +15,7 @@ trap 'exit 143' TERM
 # -gc none: a target runs in a process forked from this one, and the
 # collector's threads do not survive a fork.
 "$V" -cc cc -nocache -gc none \
-    -path "@vlib|@vmodules|$repo/tools/accounts|$repo/tools/security-events|$repo/kernel" \
+    -path "@vlib|@vmodules|$repo/tools/accounts|$repo/tools/security-events|$repo/tools/keyring|$repo/kernel" \
     -o "$work/fuzz" "$here" >&2
 set +e
 "$work/fuzz" "$@"

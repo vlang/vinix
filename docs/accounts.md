@@ -231,6 +231,12 @@ A session in the background is therefore stopped, not running: a download
 does not go on while someone else is at the machine. That is the price of
 not being able to take a mapped display away from a running process.
 
+A new session's credential store is opened with the password that was
+typed: the manager hands it to
+[`vinix-keyring`](../tools/keyring/README.md), started inside the session as
+the account, waits until that service is listening, and then wipes its own
+copy. The password goes nowhere else.
+
 The login screen may also ask for the machine to be turned off or
 restarted. The requests are frames of the authentication service's format;
 `sessioncore/manager.v` lists them.
@@ -309,6 +315,8 @@ Five things it found were open and are closed:
   seat's.
 - **No `sudo`, `su`, `login` or PAM.** Programs that expect them find
   nothing; ports that need to elevate have to be taught the service.
+- **The login password and the credential store's are changed separately**
+  ([`tools/keyring`](../tools/keyring/README.md#what-it-does-not-do)).
 - **No per-user limits** beyond what a session inherits, no login records
   (`utmp`/`wtmp`), no password ageing (the fields are kept, not acted on),
   no password recovery other than an administrator or the recovery shell
@@ -331,6 +339,8 @@ the commit that added this page:
 | `unprivileged` | pass | pass |
 | `seat` | pass | pass |
 | `sessions` | pass | pass |
+| `audit` | pass | pass |
+| `keyring` | pass | pass |
 
 and the host tests of `accountcore`, `authproto` and `authcore`. Nothing was
 run on a physical machine, and nothing was run with the desktop.

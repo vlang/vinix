@@ -125,6 +125,12 @@ fn run(argv []string, input string, db ?accountcore.Database, user ?accountcore.
 			C.close(fd)
 		}
 		mut environment := ['PATH=/usr/sbin:/usr/bin:/sbin:/bin']
+		// What a program run from inside a session needs of that session.
+		for variable in ['HOME', 'XDG_RUNTIME_DIR', 'VINIX_KEYRING_TEST_COST'] {
+			if user == none && os.getenv(variable) != '' {
+				environment << '${variable}=${os.getenv(variable)}'
+			}
+		}
 		if account := user {
 			if database := db {
 				sessioncore.become(database, account) or {

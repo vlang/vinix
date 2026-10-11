@@ -66,7 +66,7 @@ fn load() accountcore.Database {
 // the input devices, and is who the authentication service takes for the
 // person at the machine, until it ends.
 fn run_as(db accountcore.Database, user accountcore.User, argv []string, at_seat bool) int {
-	started := sessioncore.start(db, user, argv, at_seat, -1) or {
+	started := sessioncore.start(db, user, argv, at_seat, -1, sessioncore.Unlock{}) or {
 		eprintln('vinix-session: ${err.msg()}')
 		return 126
 	}

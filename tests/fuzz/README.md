@@ -2,8 +2,8 @@
 
 A mutation fuzzer for the parsers that read bytes someone else chose and
 can be built on the host: the account files, the authentication service's
-frames and action files, the security event stream, and two of the kernel's
-own (`posix_acl`, `fdtstrings`). It is V, runs anywhere V and a C compiler
+frames and action files, the security event stream, the credential store,
+and two of the kernel's own (`posix_acl`, `fdtstrings`). It is V, runs anywhere V and a C compiler
 do, and needs nothing installed.
 
     tests/fuzz/run                                   # every target, 20000 inputs each
@@ -34,6 +34,7 @@ second pass over the same snapshot writes nothing".
 | `auth-frame` | a frame on the service's socket | Encodes to the bytes it was decoded from; at most 12 fields. |
 | `event-snapshot` | `/proc/security_events` | Header and records agree; numbers count up; the collector writes each record once and nothing on a second pass. |
 | `event-log` | the end of a collector's log, and its settings | No white space in a boot identity; settings within their bounds. |
+| `keyring` | `tools/keyring/keyringcore`: a credential store file | Formats back to the same bytes; at most 1024 items; opens with no key that is not its own. No password is tried. |
 | `posix-acl` | `kernel/posix_acl`: a list from userspace, or from an ext2 disk | A mode within a mode; access to nothing always allowed; survives conversion to disk and back. |
 | `fdt-strings` | `kernel/fdtstrings`: a device tree string list | No empty string, no NUL inside one, no more characters out than bytes in. |
 
@@ -78,6 +79,7 @@ initramfs reader, the system call layer -- is not reachable from here. See
 | Date | Revision | Run | Result |
 | --- | --- | --- | --- |
 | 11 October 2026 | the commit that added this page | every target, 200 000 inputs, seed 1, macOS on an M1 | One finding on the first run, fixed in the same commit: `parse_group` accepted any second field and wrote it back as `x`, so a group file with a password in it was read as valid and silently changed. Clean afterwards. |
+| 11 October 2026 | the commit that added the `keyring` target | `keyring`, 200 000 inputs, seed 1 | Clean. |
 
 ## What is not fuzzed
 

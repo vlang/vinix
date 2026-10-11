@@ -11,6 +11,7 @@ import authproto
 import eventcore
 import fdtstrings
 import fuzzcore
+import keyringcore
 import posix_acl
 
 const passwd_seed = 'root:x:0:0:root:/root:/bin/sh\nalex:x:1000:1000:Alex Example:/home/alex:/bin/zsh\nnobody:x:65534:65534:nobody:/:/sbin/nologin\n'
@@ -21,6 +22,15 @@ const registration_seed = 'version=1\nname=416c6578204d\nkdf=scrypt\nn=16384\nr=
 const action_seed = '# add someone\ndescription = Add a user account\nauth = admin\nexec = /usr/sbin/vinix-account\narg = add\nparam = name\nparam = text\nparam = choice:admin,standard\ninput = secret\n'
 const snapshot_seed = 'version=1 capacity=256 total=3 retained=2 dropped=0 boot=00112233445566778899aabbccddeeff\n# sequence ns kind denied pid tid uid euid loginuid session arg label\n2 2000 1 1 42 42 1001 1001 1001 3 0 system/hostname/set\n3 3000 7 1 43 43 1001 1001 4294967295 0 80 bind\n'
 const log_seed = 'boundary boot=00112233445566778899aabbccddeeff previous=none collected=1\nloss boot=00112233445566778899aabbccddeeff first=1 last=44 count=44 collected=1\nevent boot=00112233445566778899aabbccddeeff seq=45 ns=5 collected=1 kind=network result=denied pid=42 tid=42 uid=1001 euid=1001 login=1001 session=3 arg=80 label=bind\n'
+
+// A store made once, with a password nobody uses, and written out here: a
+// seed has to be the same bytes on every run.
+const keyring_seed = 'vinix-keyring 1
+slot password ln=10,r=8,p=1 m/7qowgmXuH8mGVddiwaWg== O6SApKaRpM7HzlUrF07/IqGZl5pfvlTV Mr68cGhhp1koTA4RMB50XcT9PI0hKWP/0GhndZutm2aBfVLXxU/UeSNkhkuafCVz
+slot recovery bMhEb4plnkovjnsTATYH9g== GqGbA6fDU8zn+5+INqKvSHIWGtLE0RO6 V+OoiayYBlJmKlLH3oojlszW5mzqGAwPFru8qPWux8i2DUDxAeIkF7RaJ84OQf5+
+check XYGi3yaQ/PuP1P+09qmgtScfvPQI7379 G8FGXak2ghXrCxCZdtWyXVbqyNgeex+hmZ5Rjc1WTKGVQ5s=
+item 95864cda8adddc09 ha8Afy3a+CUwuyOrFawjqUxvhKGu9nTZ fh7TPMBcvpGO+VCyl2Lb2/uwGLYyws9pzQ4qcqcelcBOkR90SDJrq5q1wOg=
+'
 
 fn frame_seed() string {
 	data := authproto.encode(authproto.text_frame(authproto.op_run, 'hostname-set', 'a password',
@@ -197,6 +207,25 @@ fn fuzz_log_tail(data []u8) ! {
 	eventcore.parse_retention(data.bytestr()) or { return }
 }
 
+fn fuzz_keyring(data []u8) ! {
+	text := data.bytestr()
+	store := keyringcore.parse(text) or { return }
+	// One spelling: what is accepted is written back as the same bytes, so
+	// nothing can hide in a file that still reads as a store.
+	if store.format() != text {
+		return error('an accepted store does not format back to itself')
+	}
+	if store.count() > keyringcore.max_items {
+		return error('more items than a store holds')
+	}
+	// No key is tried here: that is scrypt. A key that is not the store's
+	// must open nothing, whatever the file says.
+	wrong := []u8{len: keyringcore.key_bytes, init: u8(index)}
+	if _ := store.list(wrong) {
+		return error('a store opened with a key that is not its own')
+	}
+}
+
 fn fuzz_acl(data []u8) ! {
 	if !posix_acl.valid(data) {
 		// The on-disk form is a parser of its own.
@@ -302,6 +331,12 @@ const targets = [
 		about: 'eventcore: the end of a log a collector resumes from, and its settings'
 		seeds: [log_seed, 'max_bytes = 65536\nkeep_files = 2\nmax_age_days = 0\n']
 		run:   fuzz_log_tail
+	},
+	fuzzcore.Target{
+		name:  'keyring'
+		about: 'keyringcore: a credential store file, without trying a password'
+		seeds: [keyring_seed]
+		run:   fuzz_keyring
 	},
 	fuzzcore.Target{
 		name:  'posix-acl'

@@ -106,6 +106,14 @@ fn probe_desktop() int {
 				os.write_file('/tmp/${user}-ready', '') or {}
 				wait_for_file('/tmp/${user}-go')
 			}
+			'keyring' {
+				// The store, as the session's first program finds it.
+				// No waiting: a login starts this program only once the
+				// service can be asked.
+				status := keyring(['status'], '').output.trim_space()
+				secret := keyring(['get', 'wifi', 'Home Network'], '').output.trim_space()
+				note('desktop ${user}: keyring ${status} | ${secret}')
+			}
 			'logout' {
 				note('desktop ${user}: logout -> ${ask_manager(sessioncore.op_logout)}')
 				idle()
