@@ -111,6 +111,20 @@ fn test_m1_triangle_source_change_invalidates() {
 	assert first != fixture_key(root, v, env)!
 }
 
+fn test_dictionary_native_producer_dependencies_invalidate() {
+	root := desktop_temporary()!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	v, env := desktop_fixture(root)!
+	for name in ['build-support/dictionary/prepare.v',
+		'build-support/dictionary/dictionarycore/core.v', 'tools/sourcecommand/core.v'] {
+		path := root + '/' + name
+		fixture_write(path, 'original dictionary producer\n')!
+		first := fixture_key(root, v, env)!
+		fixture_write(path, 'changed dictionary producer\n')!
+		assert first != fixture_key(root, v, env)!, name
+	}
+}
+
 fn test_nested_x11_rewrite_invalidates_in_place() {
 	root := desktop_temporary()!
 	defer { os.rmdir_all(root) or { panic(err) } }

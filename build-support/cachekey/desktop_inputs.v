@@ -40,6 +40,8 @@ const desktop_source_paths = [
 	'build-support/run-v-tool.sh',
 	'build-support/find-v.sh',
 	'build-support/minecraft',
+	'build-support/dictionary',
+	'tools/sourcecommand',
 	'tools/verified-boot/bundlehost',
 	'tools/verified-boot/bootpolicy',
 	'tools/verified-root/verityimage',

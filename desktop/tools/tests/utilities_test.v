@@ -685,7 +685,7 @@ fn test_terminal_answers_cursor_status_queries() {
 	mut answer := [32]u8{}
 	count := C.read(replies[0], &answer[0], answer.len)
 	assert count == 6
-	assert unsafe { tos(&answer[0], count) } == '\x1b[4;7R'
+	assert unsafe { tos(&answer[0], int(count)) } == '\x1b[4;7R'
 	C.close(replies[0])
 	C.close(replies[1])
 }

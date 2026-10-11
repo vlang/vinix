@@ -1,0 +1,38 @@
+{
+    "embedded_python_blocks_retired": 2,
+    "existing_output_sha256": {
+        "LICENSE.WordNet": "7731175a77952e259390b496fab905e57118b8d19ad3a8383c67eee724ff443f",
+        "dictionary.vnd": "69a8a9e9ce5cbfce4b6942ac2038dca24ff2545de62d06330035c33a931c32ee"
+    },
+    "generated_c_translation_credit": 0,
+    "original_python_bytes": 8204,
+    "original_python_lines": 176,
+    "originals": [
+        {
+            "blob_sha1": "16f60d5c03d8f17ce6103a393c82612fae28858f",
+            "bytes": 5197,
+            "lines": 115,
+            "path": "build-support/dictionary/prepare.py",
+            "sha256": "1003f27969c2410894ea097eac103faf1bde3f1f52d00134fca8ff4d990228b3"
+        },
+        {
+            "blob_sha1": "b2b2caee160c208a9d9b8f1ceeb7e9d9d136e073",
+            "bytes": 3007,
+            "lines": 61,
+            "path": "desktop/tools/tests/test_dictionary_data.py",
+            "sha256": "a5b206eb78b611f0032379bfff4834c9a2283c84c284328228adfa11d0e4d67b"
+        }
+    ],
+    "python_executed": false,
+    "python_files_retired": 2,
+    "qualification": "native-tools.md",
+    "schema": 1,
+    "source_commit": "05e7a248419fe182a97dcb51d52aadca35e5143e",
+    "utility_model_baseline": {
+        "failed": 21,
+        "native_merge_equals_frozen_procedure": true,
+        "passed": 421,
+        "same_failures_reproduced": true,
+        "total": 442
+    }
+}

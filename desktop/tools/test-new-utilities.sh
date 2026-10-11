@@ -4,46 +4,17 @@
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 v=${V:-v}
-python3 -m unittest discover -s "$root/desktop/tools/tests" -p test_dictionary_data.py
+"$root/build-support/run-v-tool.sh" "$root/build-support/dictionary/test-data.v"
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/utilitysource/core_test.v"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 "$root/desktop/tools/stage_ui2" "$work/modules/ui2" "$root/third_party/ui2" "$root/desktop/tools/ui2_headless_bounds.v"
 "$root/desktop/tools/stage_app" "$work/ui" "$root/desktop" "$root/third_party/ui2/examples/calculator" >/dev/null
 "$root/desktop/tools/stage_host_gpu" "$work/ui" --v "$v"
-python3 - "$work/ui" <<'PY'
-from pathlib import Path
-import sys
-for path in Path(sys.argv[1]).iterdir():
-    if path.is_symlink() and path.is_file():
-        contents = path.read_bytes()
-        path.unlink()
-        path.write_bytes(contents)
-PY
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/native-utility-source.v" materialize "$work/ui"
 rm "$work/ui/main.v"
 printf "Module { name: 'native_utility_tests' }\n" > "$work/ui/v.mod"
-python3 - "$root" "$work/ui/native_utility_test.v" <<'PY'
-from pathlib import Path
-import sys
-root, destination = Path(sys.argv[1]), Path(sys.argv[2])
-names = ['preview_app', 'console_app', 'system_information', 'utilities',
-         'archive_app', 'disk_utility', 'backup_app', 'notes_app', 'reminders_app',
-         'grapher_app', 'calculator_features', 'color_meter', 'clock_utility', 'native_close',
-         'start_menu_paging', 'taskbar_pinning', 'quick_launch', 'dictionary', 'editor_workflow', 'editor_selection',
-         'calendar_ics', 'calendar_search', 'disk_usage_features', 'files_trash', 'i18n',
-         'text_copy_client', 'terminal_selection']
-imports, bodies = set(), []
-for name in names:
-    body = []
-    for line in (root / 'desktop/tools/tests' / (name + '_test.v')).read_text().splitlines():
-        if line.startswith('module '):
-            continue
-        if line.startswith('import '):
-            imports.add(line)
-        else:
-            body.append(line)
-    bodies.append('\n'.join(body))
-destination.write_text('module main\n' + '\n'.join(sorted(imports)) + '\n\n' + '\n\n'.join(bodies))
-PY
+"$root/build-support/run-v-tool.sh" "$root/desktop/tools/native-utility-source.v" merge "$root" "$work/ui/native_utility_test.v"
 "$v" -new-compiler -nocache -cc clang -gc none -manualfree -enable-globals -stats -d ui2_headless \
     -path "@vlib|@vmodules|$work/modules|$root|$root/third_party" "$work/ui/native_utility_test.v"
 cp "$root/desktop/tools/tests/heap_tracker.h" "$work/ui/"

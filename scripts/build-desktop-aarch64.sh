@@ -1625,7 +1625,7 @@ for app_name in vinix-files vinix-calculator vinix-terminal vinix-settings \
     ln -sf vinix-desktop "$STAGING/usr/bin/$app_name"
 done
 
-python3 "$SCRIPT_DIR/build-support/dictionary/prepare.py" \
+"$SCRIPT_DIR/build-support/dictionary/prepare" \
     --destination "$STAGING/usr/share/vinix/dictionary"
 
 # The bundle is mutable command-line input, so do not let a previous selection

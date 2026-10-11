@@ -1,6 +1,6 @@
 # Offline Dictionary data
 
-Both desktop image builders run `prepare.py` to install an offline lexicon at
+Both desktop image builders run the native V `prepare` tool to install an offline lexicon at
 `/usr/share/vinix/dictionary/dictionary.vnd`, with `LICENSE.WordNet` beside it.
 The guest never downloads dictionary data. The host caches the pinned WordNet
 3.0 archive under `build/dictionary`, verifies its SHA-256, and derives the same
@@ -18,7 +18,7 @@ pronunciation audio, morphological expansion or encyclopedic articles.
 To stage data separately:
 
 ```sh
-python3 build-support/dictionary/prepare.py --destination build/dictionary/staged
+build-support/dictionary/prepare --destination build/dictionary/staged
 ```
 
 `--archive=PATH` accepts only the same verified upstream archive. The format is
@@ -35,3 +35,12 @@ The app keeps only index/headword bytes and the current definition in memory.
 It uses bytewise sorted lookup with ASCII case folding, word/phrase prefix
 suggestions, bounded history, wrapped definition paging and exclusive text
 exports. Changed or malformed sources preserve the last successful lookup.
+
+The host tool uses a bounded native `curl` child for a missing cached archive.
+`--archive=PATH` stages an already verified local input without downloading it.
+Output files publish atomically with read-only mode. Run the native data fixtures
+with `build-support/run-v-tool.sh build-support/dictionary/test-data.v`.
+Source materialization and utility-test aggregation also use V; the existing
+utility workflow retains its model, memory and IPC assertions. See
+[native qualification](native-tools.md) for exact output checks and the current
+broader utility-suite baseline.
