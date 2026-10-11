@@ -65,7 +65,6 @@ fn test_swift_operating_system_version() {
 		lib := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', C.RTLD_NOW)
 		assert lib != unsafe { nil }
 		entry := u64(C.dlsym(lib, c'_swift_stdlib_operatingSystemVersion')); assert entry != 0
-		assert C.dlsym(lib, c'_swift_stdlib_reportUnimplementedInitializerInFile') != unsafe { nil }
 		mut bytes := [128]u8{}; mut length := usize(128)
 		assert C.sysctlbyname(c'kern.osproductversion', unsafe { &bytes[0] }, &length, unsafe { nil }, 0) == 0
 		parts := unsafe { (&bytes[0]).vstring() }.split('.')
@@ -96,7 +95,6 @@ fn test_swift_operating_system_version() {
 		assert ios_runtime.swift_buffers.len == 0 && ios_runtime.swift_strings.len == 0 && ios_runtime.swift_arrays.len == 0
 		assert ios_runtime.swift_metadata_arena == 0 && ios_runtime.swift_array_arena == 0 && ios_runtime.swift_integer_arena == 0 && ios_runtime.swift_void_arena == 0
 		assert ios_runtime.swift_arc_code == 0 && ios_runtime.swift_hash_code == 0 && ios_runtime.swift_fatal_code == 0
-		assert runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '__swift_stdlib_reportUnimplementedInitializerInFile') == none
 		objc_stop()
 		assert ios_runtime.objects.len == 0 && ios_runtime.live == 0
 		assert version_resolve() == early

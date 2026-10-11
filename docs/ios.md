@@ -2004,23 +2004,51 @@ preserved Swift context/errno, concurrent resolution and eight query workers.
 Calls also work before initialization and after two drained runtime cycles.
 All thirty-three programs rebuild, and all fifteen Swift ABI guest checks pass.
 
-The version probe now exits with status 1 before entry at EOSSDK's
+The version probe exited with status 1 before entry at EOSSDK's
 `__swift_stdlib_reportUnimplementedInitializerInFile` import. Evidence is retained
 under `swift-version-checks`, including native measurements of that reporter's
 ordinary C ABI, bounded diagnostic and successful return. Full regression
 remains unpassed and the five published runners retain their last passing hashes.
+
+V now supplies `__swift_stdlib_reportUnimplementedInitializerInFile` and
+`__swift_stdlib_reportUnimplementedInitializer`. Both use the ordinary C ABI,
+with signed 32-bit byte lengths and unsigned 32-bit line/column/flags. They
+print the measured diagnostic and return; the Swift initializer caller performs
+termination separately. Text is borrowed, bounded by its supplied length and
+stopped at its first NUL. The file variant prints the unsigned line number
+without the column, matching this Mac's library. Flags leave stderr unchanged;
+host debugger crash annotations and backtraces remain unimplemented.
+
+Installed-library and V reporter tests pass ASAN/UBSAN in both seed modes.
+Twenty cases compare both exact diagnostics through direct calls and raw ARM64
+adapters, including empty/NUL/Unicode text, read-only spans ending at protected
+pages, zero-length protected addresses, poisoned upper argument halves and
+UInt32 line/flag boundaries. Both return with broken stderr and preserve Swift's
+context. V rejects negative lengths and null unsafe inputs before reading them.
+Eight reporting/resolution workers, calls before initialization and two drained
+runtime cycles need no Swift owners or arenas. Generated diagnostic bodies have
+no hidden V allocations, locks or traps. All thirty-four programs rebuild, and
+all sixteen Swift ABI guest checks pass.
+
+The initializer probe now exits with status 1 before entry at EOSSDK's
+`_swift_allocObject` import. Evidence is retained under `swift-initializer-checks`,
+including native heap-class metadata, allocation/deallocation/type/ARC
+instructions and eighteen aligned allocations with measured header/refcount
+transitions and real Array storage destruction. Heap-class allocation and ARC
+remain unimplemented in V. Full regression remains unpassed, and the five
+published runners retain their last passing hashes.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,387 | 771 | 81 |
-| EOSSDK | 598 | 64 | 18 |
+| Fortnite executable | 1,388 | 770 | 81 |
+| EOSSDK | 599 | 63 | 18 |
 | MarketplaceKitWrapper | 91 | 85 | 23 |
-| All images | 2,076 | 920 | 122 |
+| All images | 2,078 | 918 | 122 |
 
-The C++/GLES/Text variant reports 2,089 resolved imports, 907 unresolved strong
+The C++/GLES/Text variant reports 2,091 resolved imports, 905 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -2072,7 +2100,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all fifteen Swift ABI checks in a small, independent guest and
+`swift` runs all sixteen Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.

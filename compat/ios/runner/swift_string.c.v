@@ -212,6 +212,8 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'__swift_stdlib_reportUnimplementedInitializerInFile' { u64(unsafe { voidptr(swift_initializer_report_in_file) }) }
+		'__swift_stdlib_reportUnimplementedInitializer' { u64(unsafe { voidptr(swift_initializer_report) }) }
 		'__swift_stdlib_operatingSystemVersion' { u64(unsafe { voidptr(ios_operating_system_version) }) }
 		'_$sytN' { swift_void_full_metadata() }
 		'_$sSSN' { swift_string_metadata() }
