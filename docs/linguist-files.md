@@ -1484,4 +1484,3 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/security-events/build` | 1,659 |
 | `tools/split-desktop-initramfs` | 166 |
 | `tools/split-qemu-initramfs` | 163 |
-
