@@ -46,12 +46,13 @@ live generation and held descriptor's two data pages. Removing desired rows
 then all members restores the exact original version-1 file; re-adding the
 regions restores the exact configured version-2 file.
 
-Each of 200 warmup and 200 measured cycles launches eighteen utility processes:
+Each of 200 warmup and 200 measured cycles launches nineteen utility processes:
 save-set, unchanged plan-grow, unchanged plan-capacity, two pool-add commands,
-pool-expand, pool-space, pool-preview-batch, pool-allocate-batch,
+pool-preview-expand-batch, pool-expand-batch, pool-space,
+pool-preview-batch, pool-allocate-batch,
 pool-preview-grow-batch, pool-grow-batch,
 check-bundle, two plan-remove commands, plan-enroll, plan-forget, restore-bundle
-and boot-restore. This is 7200 processes, 800 member additions, 400 pool queries
+and boot-restore. This is 7600 processes, 800 member additions, 400 pool queries
 and 800 scratch placements/growths. No scratch mapping is created.
 Every slab class and the large-page total must stay flat or decrease.
 
@@ -65,6 +66,8 @@ and exact aggregate capacity, alongside durable old/tail data and modes.
 The tail mapping now uses an additional pool whose region is expanded after
 physical adoption and whose desired mapping grows through `pool-grow`;
 [growth qualification](pool-growth.md) covers those commands and persistence.
+Tail expansion now uses a previewed/retried batch; see
+[expansion batch qualification](pool-expand-batch.md).
 A mixed keep/new tail batch adds a durable read-only neighbor; see
 [batch qualification](pool-batch.md). A growth batch then keeps the writable
 tail and grows its read-only neighbor; see [growth batch qualification](pool-grow-batch.md).

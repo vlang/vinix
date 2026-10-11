@@ -67,11 +67,26 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES\n       vinix-volume pool-grow BUNDLE POOL_ID SLOT LENGTH_BYTES\n')
 	C.printf(c'       vinix-volume pool-allocate-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       vinix-volume pool-preview-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
 	C.printf(c'       vinix-volume pool-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [SLOT LENGTH_BYTES ...]\n       vinix-volume pool-preview-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [SLOT LENGTH_BYTES ...]\n')
+	C.printf(c'       vinix-volume pool-expand-batch BUNDLE POOL_ID DISK_INDEX END_BYTES [DISK_INDEX END_BYTES ...]\n       vinix-volume pool-preview-expand-batch BUNDLE POOL_ID DISK_INDEX END_BYTES [DISK_INDEX END_BYTES ...]\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'pool-expand-batch') == 0 || C.strcmp(argv[1], c'pool-preview-expand-batch') == 0) {
+			if argc < 6 || argc > 132 || (argc - 4) % 2 != 0 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			if pool >= 64 { return usage() }
+			mut batch := &PoolExpansionBatch(C.alloca(sizeof(PoolExpansionBatch)))
+			*batch = PoolExpansionBatch{count: (argc - 4) / 2}
+			for i in 0 .. batch.count {
+				disk := decimal(argv[4 + i * 2]) or { return usage() }
+				end := decimal(argv[5 + i * 2]) or { return usage() }
+				if disk >= 64 || end == 0 { return usage() }
+				batch.disks[i] = u32(disk); batch.ends[i] = end
+			}
+			return expand_batch_pool_plan(argv[2], u32(pool), batch, C.strcmp(argv[1], c'pool-preview-expand-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'pool-grow-batch') == 0 || C.strcmp(argv[1], c'pool-preview-grow-batch') == 0) {
 			if argc < 6 || argc > 132 || (argc - 4) % 2 != 0 { return usage() }
 			pool := decimal(argv[3]) or { return usage() }

@@ -46,14 +46,15 @@ report both saved placements as `keep`, preserve exact bytes, and retain both
 live generations and a readable held descriptor. A mode mismatch fails without
 changing the bundle. Cleanup restores exact baseline bytes.
 
-Each of 200 warmup and 200 measured cycles now executes 18 utility processes:
-save-set, unchanged plan-grow/capacity, two pool-add commands, pool-expand,
+Each of 200 warmup and 200 measured cycles now executes 19 utility processes:
+save-set, unchanged plan-grow/capacity, two pool-add commands,
+pool-preview-expand-batch and pool-expand-batch,
 pool-space, two-request pool-preview-batch and pool-allocate-batch,
 pool-preview-grow-batch and pool-grow-batch,
 check-bundle, two plan-remove commands, plan-enroll/forget, restore-bundle and
-boot-restore. This is **7200 processes**, 400 allocation previews/publications,
+boot-restore. This is **7600 processes**, 400 allocation previews/publications,
 800 scratch placements, 400 growth previews/publications, 800 scratch growths,
-800 member additions and 400 expansions/queries/capacity
+800 member additions, 400 expansion previews/publications and 400 queries/capacity
 checks. Neither scratch mapping becomes live. Every slab class and the large-
 allocation page total must stay flat or decrease. The existing 1800-second
 per-boot limit is unchanged.

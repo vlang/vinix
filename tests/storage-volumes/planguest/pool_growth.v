@@ -15,6 +15,7 @@ fn pool_growth_boot_check() {
 		&& contains(&output[0], c'pool=4 regions=1 gaps=1 bytes=8372224 largest=8372224'),
 		c'expanded tail pool and grown mapping survive boot')
 	C.printf(c'PLAN POOL GROWTH BOOT PRESERVED\n')
+	C.printf(c'PLAN POOL EXPANSION BATCH BOOT PRESERVED\n')
 }
 
 @[direct_array_access]

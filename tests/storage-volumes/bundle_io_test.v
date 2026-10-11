@@ -537,3 +537,87 @@ fn test_pool_growth_batch_preview_and_publication_detect_buffered_output_failure
 		assert decoded.plans[0].rows[0].length == if preview { u64(4096) } else { u64(8192) }
 	}
 }
+
+fn test_pool_expansion_batches_publish_whole_members_and_equal_end_retries_under_every_fault() {
+	work := os.join_path(os.temp_dir(), 'vinix-expand-batch-io-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	mut batch := PoolExpansionBatch{count: 2}
+	batch.disks[0] = 0; batch.ends[0] = 16384; batch.disks[1] = 1; batch.ends[1] = 16384
+	for retry in [false, true] {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}
+			for p in 0 .. 2 {
+				mut plan := Plan{count: 1, key: DiskKey{bytes: 32768, sector: 512, kind: 1}}
+				plan.key.id[0] = u8(p + 1)
+				plan.rows[0] = Request{slot: u32(20 + p), offset: 4096, length: 8192, flags: u64(p)}
+				assert append_plan(mut set, &plan)
+				region := PoolRegion{pool: 3, disk: u32(p), window: SpaceWindow{start: 4096, end: 8192, alignment: 4096}}
+				assert bundle_pool_add(mut set, &region)
+			}
+			bundle_io = BundleIO{}
+			assert publish_bundle(path.str, &set)
+			if retry { assert expand_batch_pool_plan(path.str, 3, &batch, false) == 0 }
+			original := os.read_bytes(path)!
+			bundle_io = BundleIO{mode: mode}
+			assert expand_batch_pool_plan(path.str, 3, &batch, false) == if mode == 1 { 0 } else { 1 }
+			assert bundle_io.closes == 2 && bundle_io.writes > 0 && os.ls(work)!.len == 1
+			current := os.read_bytes(path)!
+			mut decoded := PlanSet{}
+			assert decode_bundle(current.data, current.len, mut decoded) && decoded.plans == set.plans
+			if mode == 1 || mode == 4 {
+				assert (current == original) == retry && bundle_io.renames == 1 && bundle_io.flushes == 2
+				for p in 0 .. 2 { assert decoded.windows[p] == PoolRegion{pool: 3, disk: u32(p), window: SpaceWindow{start: 4096, end: 16384, alignment: 4096}} }
+			} else { assert current == original }
+			bundle_io = BundleIO{}
+			assert expand_batch_pool_plan(path.str, 3, &batch, false) == 0
+			assert bundle_io.writes > 0 && bundle_io.renames == 1 && bundle_io.flushes == 2 && bundle_io.closes == 2
+			completed := os.read_bytes(path)!
+			bundle_io = BundleIO{mode: mode}
+			assert expand_batch_pool_plan(path.str, 3, &batch, true) == 0 && os.read_bytes(path)! == completed
+			assert bundle_io == BundleIO{mode: mode}
+			batch.ends[1] = 36864
+			assert expand_batch_pool_plan(path.str, 3, &batch, false) == 1 && os.read_bytes(path)! == completed
+			assert bundle_io == BundleIO{mode: mode}
+			batch.ends[1] = 16384
+		}
+	}
+}
+
+fn test_pool_expansion_batch_preview_and_publication_detect_buffered_output_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-expand-batch-output-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	for preview in [false, true] {
+		mut set := PlanSet{}
+		mut plan := Plan{count: 1, key: DiskKey{bytes: 32768, sector: 512, kind: 1}}
+		plan.key.id[0] = 1; plan.rows[0] = Request{slot: 20, offset: 4096, length: 4096, flags: 1}
+		assert append_plan(mut set, &plan)
+		region := PoolRegion{pool: 3, disk: 0, window: SpaceWindow{start: 4096, end: 8192, alignment: 4096}}
+		assert bundle_pool_add(mut set, &region)
+		bundle_io = BundleIO{}
+		assert publish_bundle(path.str, &set) && C.fflush(C.stdout) == 0
+		original := os.read_bytes(path)!
+		child := C.fork()
+		assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY)
+			if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }
+			C.close(fd)
+			mut buffer := [4096]char{}
+			if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+			mut batch := PoolExpansionBatch{count: 1}
+			batch.disks[0] = 0; batch.ends[0] = 16384
+			C._exit(if expand_batch_pool_plan(path.str, 3, &batch, preview) == 1 { 0 } else { 4 })
+		}
+		mut code := i32(-1)
+		assert C.waitpid(child, &code, 0) == child && code == 0
+		current := os.read_bytes(path)!
+		assert (current == original) == preview
+		mut decoded := PlanSet{}
+		assert decode_bundle(current.data, current.len, mut decoded) && decoded.plans == set.plans
+		assert decoded.windows[0].window.end == if preview { u64(8192) } else { u64(16384) }
+	}
+}

@@ -651,6 +651,7 @@ file may already be visible. Inspection and retry use that new desired state.
 Each command publishes separately, so a later failed growth retains an earlier
 successful physical-capacity adoption or region expansion. To publish several
 mapping growth requests together, use [growth batches](#atomic-pool-growth-batches).
+To expand several members together, use [expansion batches](#atomic-pool-expansion-batches).
 
 Apply growth separately with `check-bundle BUNDLE grow` and `restore-bundle
 BUNDLE grow`. Ordinary replay still rejects existing smaller live mappings.
@@ -765,6 +766,55 @@ read-only ones. Live administration still requires serialization and retains
 the existing partial-application rules. Boot replay restores the saved grown
 geometry. Filesystem resizing, spanning, RAID and encryption remain separate
 work. See [growth batch qualification](../tests/storage-volumes/pool-grow-batch.md).
+
+## Atomic pool expansion batches
+
+```sh
+# Both disks already belong to pool 3. Adopt any larger physical capacity first.
+vinix-volume pool-preview-expand-batch /root/layout.vset 3 0 25165824 1 33554432
+vinix-volume pool-expand-batch /root/layout.vset 3 0 25165824 1 33554432
+vinix-volume pool-space /root/layout.vset 3
+```
+
+`pool-expand-batch BUNDLE POOL_ID DISK_INDEX END_BYTES [...]` extends 1–64
+existing members of one pool and atomically publishes the complete bundle once.
+Disk indices must be distinct, enrolled and below 64. Each exclusive end must
+be a nonzero unsigned decimal byte offset, at least its previous end, aligned
+to that disk's logical sector size and within its saved capacity. Each resulting
+region must remain disjoint from other pool regions on the same disk; adjacency
+is valid. Expansion works with a full 64-region table.
+
+The planner builds a bounded private candidate in argument order. Any invalid
+or impossible later request preserves the entire original bundle and emits no
+action rows. It retains member starts, alignment, order and allocation priority,
+every disk identity and all desired mappings, including pending growth and rows
+inside newly eligible space. Those rows reduce the pool's available capacity.
+Expansion cannot shrink, move a region, add a member or adopt observed physical
+capacity. Run `plan-capacity` separately before extending beyond saved geometry.
+
+Reports contain request index, disk index, `action=expand` or `action=keep`,
+start, previous end, requested end and alignment. Equal-end requests can accompany
+expansions. An unchanged retry still writes, fsyncs, renames and fsyncs the
+directory, completing durability after a prior directory-flush failure. A
+publisher failure before rename preserves the old file; after rename the
+complete new file may already be visible. Buffered output failure returns an
+error for both commands, including after successful publication. Inspect saved
+state or retry the same requests.
+
+`pool-preview-expand-batch` accepts the same arguments and uses the same planner.
+It prints every action only after the whole batch succeeds, without publishing,
+creating a temporary or acquiring a writer lock. Publication holds the pinned
+directory lock from source read through reporting. Both commands open no
+devices and use the unchanged version-2 format. Preview does not reserve the
+saved state against another editor.
+
+Expanded eligibility describes saved allocation bounds. Plan allocations or
+mapping growth afterward, then use complete-set checking and explicit replay
+to apply desired mappings. Expansion does not reserve live extents or grow
+filesystems. Boot replay preserves the expanded region with its mappings.
+Live administration still requires serialization and retains the existing
+partial-application rules. Spanning, RAID and encryption remain separate work.
+See [expansion batch qualification](../tests/storage-volumes/pool-expand-batch.md).
 
 ## Saved-plan writer locking
 

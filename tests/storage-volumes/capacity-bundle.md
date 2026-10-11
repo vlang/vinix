@@ -50,8 +50,9 @@ absent index, regular-file target and final device symlink without changing the
 bundle. A physical mknod alias is accepted. Adoption creates no live mapping;
 ordinary replay restores the five saved mappings and their previous durable data.
 
-The application then enrolls a tail pool, expands eligibility to the adopted
-capacity and allocates a writable tail view at byte 16777216, applies
+The application then enrolls a tail pool, previews/publishes eligibility to the
+adopted capacity in an expansion batch and retries its equal end. It allocates
+a writable tail view at byte 16777216, applies
 it separately, and writes its first page. It plans growth from 4096 to 8192
 bytes, confirms ordinary replay refuses the size mismatch, and explicitly
 applies growth through a retained descriptor. The descriptor writes and flushes
@@ -67,6 +68,8 @@ tail pages and both neighbor pages, correct physical disk identities and repeate
 adoption/boot replay are verified.
 The original two pool records and the newly expanded tail pool survive adoption
 and reboot; the fourth boot requires their exact eligible capacity reports.
+See [expansion batch qualification](pool-expand-batch.md) for complete rollback
+before capacity adoption and the saved eligibility preview/retry.
 
 Real guest coverage uses MBR disks with 512-byte logical sectors on VirtIO
 (ARM64) and AHCI (x86). GPT, 4096-byte sectors, probe races and publication

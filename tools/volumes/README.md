@@ -107,6 +107,14 @@ the same complete candidate without publication. Equal-size requests report
 separate explicit replay. See
 [atomic growth batch rules](../../docs/storage-volumes.md#atomic-pool-growth-batches).
 
+`pool-expand-batch BUNDLE POOL_ID DISK_INDEX END_BYTES [...]` extends 1–64
+existing members together, preserving starts, alignment and allocation priority.
+A later failure preserves the entire saved state. `pool-preview-expand-batch`
+reports the complete candidate without publication. Equal ends report `keep`;
+retries still complete publication and both flushes. Adopt physical capacity
+separately before expanding beyond its saved bounds. See
+[atomic expansion batch rules](../../docs/storage-volumes.md#atomic-pool-expansion-batches).
+
 Saved-plan writers acquire a nonblocking exclusive lock on the destination
 directory before reading or snapshotting, holding it through atomic publication.
 A busy directory returns failure; retry reads the latest complete state. All
