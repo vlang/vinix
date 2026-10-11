@@ -73,7 +73,10 @@ Evidence is retained under
 The real ARM runtime stack guest passes on the unchanged prepared kernel; its
 second cohort retains zero physical and slab KiB. The real x86 CPU mitigation
 guest also passes every original feature marker, including timer/signal and
-thread/migration/process checks. The prepared x86 kernel's
+thread/migration/process checks. The actual TLS/LDT segments guest also passes
+its unchanged core feature and final CPU marker. The x86 runtime stack guest
+times out after its unchanged first warmup on this prepared kernel; its
+300-second budget and required completion marker remain. The prepared x86 kernel's
 restricted SMT guest fails with `online=4 expected=2`. Extracting the actual
 boot ISO confirms `vinix.disk=auto vinix.smt=0`; the original topology and
 affinity assertion remain. Its controller stops before the enabled run, as
