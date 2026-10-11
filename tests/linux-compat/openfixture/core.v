@@ -54,7 +54,8 @@ fn mount_constraints() bool {
 			|| C.mkdir(c'/tmp/linux-open-bind', u32(0o700)) != 0
 			|| C.mount(c'tmpfs', c'/tmp/linux-open-mount', c'tmpfs', 0, nil) != 0
 			|| C.mount(c'/tmp/linux-open-dir', c'/tmp/linux-open-bind', nil, usize(C.MS_BIND), nil) != 0
-			|| C.symlink(c'/tmp/linux-open-target', c'/tmp/linux-open-dir/outside') != 0 { return false }
+			|| C.symlink(c'/tmp/linux-open-target', c'/tmp/linux-open-dir/outside') != 0
+			|| C.symlink(c'/tmp/linux-open-new-outside', c'/tmp/linux-open-dir/dangling-outside') != 0 { return false }
 		fd := C.open(c'/tmp/linux-open-bind', C.O_PATH | C.O_DIRECTORY)
 		mountfd := C.open(c'/tmp/linux-open-mount', C.O_PATH | C.O_DIRECTORY)
 		if fd < 0 || mountfd < 0 { return false }
@@ -72,6 +73,9 @@ fn mount_constraints() bool {
 			&& open_result(c'/tmp/linux-open-bind', &how, 24, C.EXDEV)
 		how = How{flags: u64(C.O_CREAT | C.O_RDWR), mode: 0o600, resolve: 1}
 		created := open_at_result(mountfd, c'inside', &how, 24, 0)
+			&& open_at_result(fd, c'dangling-outside', &how, 24, C.EXDEV)
+			&& C.access(c'/tmp/linux-open-new-outside', C.F_OK) == -1
+			&& *C.__errno_location() == C.ENOENT
 			&& open_result(c'/tmp/linux-open-mount/escape', &how, 24, C.EXDEV)
 			&& C.access(c'/tmp/linux-open-mount/escape', C.F_OK) == -1
 			&& *C.__errno_location() == C.ENOENT
@@ -217,6 +221,39 @@ fn path_flags() bool {
 	}
 }
 
+fn dangling_creation() bool {
+	unsafe {
+		fd := C.open(c'/tmp/linux-open-dangling', C.O_CREAT | C.O_RDWR, u32(0o600))
+		if fd < 0 { C.puts(c'LINUX OPEN FAIL: dangling O_CREAT'); return false }
+		written := C.write(fd, c'42', 2)
+		C.close(fd)
+		if written != 2 || !link_descriptor(c'/tmp/linux-open-dangling', false, 0) { return false }
+		target := C.open(c'/tmp/linux-open-missing', C.O_RDONLY)
+		if target < 0 { return false }
+		mut data := [2]u8{}
+		mut info := C.stat{}
+		ok := C.read(target, &data[0], data.len) == 2 && data == [u8(`4`), `2`]!
+			&& C.fstat(target, &info) == 0 && info.st_mode & u32(0o777) == u32(0o600)
+		C.close(target)
+		if !ok || C.symlink(c'rel-target', c'/tmp/linux-open-dir/relative') != 0
+			|| C.symlink(c'relative', c'/tmp/linux-open-dir/chain') != 0
+			|| C.symlink(c'/tmp/linux-open-blocked', c'/tmp/linux-open-block-link') != 0
+			|| C.symlink(c'/tmp/linux-open-slash-target/', c'/tmp/linux-open-slash-link') != 0 { return false }
+		mut how := How{flags: u64(C.O_CREAT | C.O_RDWR), mode: 0o600, resolve: 4}
+		if !open_result(c'/tmp/linux-open-block-link', &how, 24, C.ELOOP)
+			|| C.access(c'/tmp/linux-open-blocked', C.F_OK) != -1
+			|| *C.__errno_location() != C.ENOENT { return false }
+		how.resolve = 2
+		if !open_result(c'/tmp/linux-open-dir/chain', &how, 24, 0)
+			|| C.access(c'/tmp/linux-open-dir/rel-target', C.F_OK) != 0
+			|| !open_result(c'/tmp/linux-open-slash-link', &how, 24, C.EISDIR)
+			|| C.access(c'/tmp/linux-open-slash-target', C.F_OK) != -1
+			|| *C.__errno_location() != C.ENOENT { return false }
+		how.flags |= u64(C.O_NOFOLLOW)
+		return open_result(c'/tmp/linux-open-block-link', &how, 24, C.ELOOP)
+	}
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
@@ -238,7 +275,7 @@ pub fn run() i32 {
 		if !link_descriptor(&char(&pipe_path[0]), false, 0)
 			|| !link_descriptor(&char(&pipe_path[0]), true, 0)
 			|| !link_constraints(pipes[0]) || !trailing_slashes()
-			|| !exclusive_creation() || !path_flags() || !mount_constraints() { return 1 }
+			|| !exclusive_creation() || !dangling_creation() || !path_flags() || !mount_constraints() { return 1 }
 		C.close(pipes[0]); C.close(pipes[1])
 		mut how := How{}
 		if !open_result(c'/tmp/linux-open-target', &how, 24, 0)

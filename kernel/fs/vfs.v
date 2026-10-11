@@ -733,25 +733,42 @@ fn internal_create_with_acl_locked(parent &VFSNode, name string, mode u32, acces
 	apply_umask bool) ?&VFSNode {
 	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	if !starting_mount(parent, identity) { return none }
-	return internal_create_resolved_locked(parent, name, mode, access, apply_umask, identity, 0)
+	return internal_create_resolved_locked(parent, name, mode, access, apply_umask, identity, 0, false, 0)
 }
 
 fn internal_create_resolved(parent &VFSNode, name string, mode u32, access u32,
-	identity &lib.MountContext, resolve u64) ?&VFSNode {
+	identity &lib.MountContext, resolve u64, follow_final bool) ?&VFSNode {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
-	return internal_create_resolved_locked(parent, name, mode, access, true, identity, resolve)
+	return internal_create_resolved_locked(parent, name, mode, access, true, identity, resolve, follow_final, 0)
 }
 
 fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, access u32,
-	apply_umask bool, identity &lib.MountContext, resolve u64) ?&VFSNode {
-	mut parent_of_tgt_node, mut target_node, basename := walk_path_resolved(parent, name, 0, true, identity, resolve)
+	apply_umask bool, identity &lib.MountContext, resolve u64, follow_final bool, depth int) ?&VFSNode {
+	if depth > 64 { errno.set(errno.eloop); return none }
+	mut parent_of_tgt_node, mut target_node, basename := walk_path_resolved(parent, name, depth, true, identity, resolve)
+	if parent_of_tgt_node == unsafe { nil } { return none }
+	if follow_final && name.len != 0 && name[name.len - 1] == `/` {
+		// O_CREAT also rejects a trailing slash supplied by a link target.
+		errno.set(errno.eisdir)
+		return none
+	}
 
 	if access != 0 && parent_of_tgt_node != unsafe { nil }
 		&& !policy_check_name(parent_of_tgt_node, basename, access) {
 		return none
 	}
 	if unsafe { target_node != 0 } {
+		if follow_final && target_node.symlink_target.len != 0 {
+			if resolve & resolve_no_symlinks != 0 { errno.set(errno.eloop); return none }
+			if !procfs_may_follow(target_node) { errno.set(errno.eacces); return none }
+			mac_node(target_node, proc.mac_read) or { return none }
+			// The VFS lock keeps this borrowed target and parent alive through
+			// creation. Retain the walk's mount identity and resolution policy.
+			return internal_create_resolved_locked(target_node.parent,
+				target_node.symlink_target, mode, access, apply_umask, identity,
+				resolve, true, depth + 1)
+		}
 		errno.set(errno.eexist)
 		return none
 	}
@@ -1085,7 +1102,7 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 		created = true
 		lib.copy_mount_context(open_mount, parent_mount)
 		new_node := internal_create_resolved(parent, path,
-			stat.ifreg | (mode & 0o7777), policy_open_access(flags), open_mount, resolve) or {
+			stat.ifreg | (mode & 0o7777), policy_open_access(flags), open_mount, resolve, follow_links) or {
 			// Another creator can publish after the initial lookup. A plain
 			// O_CREAT open then uses that file; O_EXCL still reports EEXIST.
 			if errno.get() != errno.eexist || creat_flags & resource.o_excl != 0 {

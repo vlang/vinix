@@ -83,6 +83,16 @@ the same fixture failing on the prior kernel with EBADF for descriptor 123456.
 The anonymous-mapping fault also prevented the unmodified x86-64 glibc loader
 from allocating its shared-object descriptor; that workload identified the fix.
 
+The `dangling-*.json` native receipts qualify O_CREAT through an existing
+dangling final symlink. Absolute targets and relative link chains create the
+target with the requested permissions and preserve the link inode. Reads
+through the target verify the written content. NOFOLLOW/NO_SYMLINKS return
+ELOOP, bind-mount escapes under NO_XDEV return EXDEV, and a target ending in
+a slash returns EISDIR; denied requests leave no target. Both architectures
+pass the complete open fixture. `dangling-before-x86_64.json` retains the
+prior kernel's actual failure to create the target. This follows Linux's
+[final-component open lookup](https://github.com/torvalds/linux/blob/v6.12/fs/namei.c).
+
 An initial i386 attempt failed before linking because V's amd64 inline assembly
 could not target i386. The revised fixture uses SSE2 compiler intrinsics; it
 passes natively on both architectures and as a static i386 executable through
