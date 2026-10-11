@@ -172,12 +172,16 @@ fn trace(op &char, start i32) {
 fn measure(name &char, operation fn () i32) i32 {
 	unsafe {
 		for _ in 0 .. 20 { if !check(operation() == 0, 97) { return 1 } }
-		mut before := Heap{}
-		mut after := Heap{}
 		trace(name, 1)
-		if !check(snapshot(&before) == 0, 100) { return 1 }
+	}
+	before := Heap{}
+	after := Heap{}
+	if !check(snapshot(unsafe { &before }) == 0, 100) { return 1 }
+	unsafe {
 		for _ in 0 .. 200 { if !check(operation() == 0, 101) { return 1 } }
-		if !check(snapshot(&after) == 0 && before.count == after.count, 102) { return 1 }
+	}
+	if !check(snapshot(unsafe { &after }) == 0 && before.count == after.count, 102) { return 1 }
+	unsafe {
 		mut growth := i32(0)
 		for i in 0 .. before.count {
 			if !check(before.sizes[i] == after.sizes[i], 105) { return 1 }

@@ -8,6 +8,10 @@ The [process and inspection guest commands](process-guests.md) also provide
 native SMP, scheduler, TLB, memory-retention, listen-backlog, resource/procfs
 comparisons and genuine dynamic-musl ARM signal-return workflows.
 
+The [regression, protection and loader commands](regression-tools.md) cover
+CPU/job/SysV completion policies, directory/procfs retention, stack canaries,
+genuine ELF interpreters, production greetings and uname staging.
+
 ```sh
 build-support/steam/compile-v-robust OUTPUT [--i386] [--host]
 tests/steam/test-robust-list [--output-dir FRESH-DIR] [--native]

@@ -209,6 +209,7 @@ fn inspection_spec(family string) !InspectionSpec {
 		'resource-open' { InspectionSpec{ revision: '22c5d6ee193d107102888f359bfade8e34b592d2', module_name: 'resourcefixture', expected: ['RESOURCE OPEN semantics PASS', 'RESOURCE OPEN: PASS'], failure: 'FAIL: resource open', timeout: 180 } }
 		'proc-thread-lock' { InspectionSpec{ revision: '8ca75d10e8b804cf26705ba9c04614965da81690', module_name: 'lockfixture', expected: ['VINIX PROC THREAD LOCK: PASS'], failure: 'FAIL: proc thread lock:', timeout: 180 } }
 		'proc-map-lookup' { InspectionSpec{ revision: '47db8e1ce160c2829ad9df9fde6e1f1345d1f80c', module_name: 'mapfixture', expected: ['VINIX PROC MAP LOOKUP: PASS'], failure: 'FAIL: proc map lookup:', timeout: 1800 } }
+		'kernel-retention' { InspectionSpec{ revision: '94143cac914e30d8dc14871eb3163a9e2e31cded', module_name: 'retentionfixture', expected: ['KERNEL RETENTION: PASS'], failure: 'FAIL: retention', timeout: 180 } }
 		else { return error('Unknown inspection fixture') }
 	}
 }
@@ -261,6 +262,13 @@ fn inspection_report(text string, family string, arch string) !map[string]json2.
 		}
 		report['class_rows'] = string_rows(rows)
 		report['large_rows'] = string_rows(large)
+	} else if family == 'kernel-retention' {
+		rows := matched_rows(text, r'PERF-RETENTION op=(\w+) class=(\d+) objects=(-?\d+) bytes=(-?\d+)', 4)!
+		large := matched_rows(text, r'PERF-RETENTION op=(\w+) large-pages=(-?\d+)', 2)!
+		if rows.len != 2 * classes || !rows.all(decimal_zero(it[2]) && decimal_zero(it[3]))
+			|| large.len != 2 || !large.all(decimal_zero(it[1])) { return error('KERNEL RETENTION objects, bytes or large pages differ') }
+		report['class_rows'] = string_rows(rows)
+		report['large_rows'] = string_rows(large)
 	} else if family == 'proc-map-lookup' {
 		rows := matched_rows(text, r'PROC-MAP-RETENTION class=(\d+) live=([+-]?\d+) pages=([+-]?\d+)', 3)!
 		large := matched_rows(text, r'PROC-MAP-RETENTION large=([+-]?\d+) uaf=([+-]?\d+)', 2)!
@@ -304,13 +312,15 @@ fn inspection_command(args []string, family string) !int {
 	write(work + '/original.c', raw)!
 	compiler := inspection_compiler(arch)!
 	mut flags := [...compiler, '-std=gnu11', '-O2', '-g', '-Wall', '-Wextra', '-Werror', '-fno-strict-aliasing']
-	if family != 'resource-open' { flags << '-pthread' }
+	threads := family in ['proc-thread-lock', 'proc-map-lookup']
+	if threads { flags << '-pthread' }
+	if family == 'kernel-retention' { flags.insert(flags.len - 1, '-fno-builtin') }
 	module_path := root() + '/tests/' + family + '/' + spec.module_name
 	fixture := work + '/fixture.o'
-	guesthost.compile_module(module_path, fixture, arch, [...flags, '-D_GNU_SOURCE'])!
+	guesthost.compile_module(module_path, fixture, arch, [...flags, ...if family == 'kernel-retention' { []string{} } else { ['-D_GNU_SOURCE'] }])!
 	guesthost.compile_module(root() + '/tests/kernel-gaps/serialcore', work + '/serial.o', arch, flags)!
 	run([...flags, '-c', work + '/original.c', '-o', work + '/original.o'])!
-	imports := output(['/opt/homebrew/opt/llvm/bin/llvm-nm', '-u', fixture])!
+	imports := output([if family == 'kernel-retention' { os.getenv_opt('NM') or { 'nm' } } else { '/opt/homebrew/opt/llvm/bin/llvm-nm' }, '-u', fixture])!
 	if allocator_imports(imports) { return error('Unexpected fixture allocation import:\n' + imports) }
 	private_kernel := snapshot_kernel(work, parsed.options['--kernel-dir'], arch)!
 	mut receipt := {
@@ -324,7 +334,7 @@ fn inspection_command(args []string, family string) !int {
 		'kernel_sha256': json2.Any(hosttest.sha(private_kernel + '/bin/vinix')!)
 		'harness_timeout_seconds': json2.Any(spec.timeout)
 	}
-	if family != 'resource-open' {
+	if threads {
 		receipt['qemu_cpus'] = if arch == 'aarch64' {
 			json2.Any(strconv.atoi(os.getenv_opt('VINIX_QEMU_SMP') or { '4' })!)
 		} else { json2.Any(2) }
@@ -335,7 +345,7 @@ fn inspection_command(args []string, family string) !int {
 	for variant in ['original', 'v'] {
 		program := work + '/' + variant + '-init'
 		run([...compiler, ...if arch == 'aarch64' { ['-fuse-ld=lld'] } else { []string{} }, '-static',
-			...if family == 'resource-open' { []string{} } else { ['-pthread'] },
+			...if threads { ['-pthread'] } else { []string{} },
 			if variant == 'original' { work + '/original.o' } else { fixture }, work + '/serial.o', '-o', program])!
 		elf_arch(program, arch)!
 		state := resolve(parsed.options['--guest-state-dir'])! + '-' + variant

@@ -3,11 +3,11 @@
 Build the kernel in an isolated worktree with the pinned V compiler, then run:
 
 ```sh
-VINIX_V_COMPILER=/path/to/v python3 tests/kernel-retention/run.py \
+VINIX_V_COMPILER=/path/to/v tests/kernel-retention/run \
   --arch aarch64 --kernel-dir /path/to/kernel --state-dir /tmp/retention-arm-build \
   --guest-state-dir /tmp/retention-arm-guest
 VINIX_V_COMPILER=/path/to/v CC_AMD64=x86_64-linux-musl-gcc \
-  python3 tests/kernel-retention/run.py --arch x86_64 --kernel-dir /path/to/x86/kernel \
+  tests/kernel-retention/run --arch x86_64 --kernel-dir /path/to/x86/kernel \
   --state-dir /tmp/retention-x86-build --guest-state-dir /tmp/retention-x86-guest
 ```
 

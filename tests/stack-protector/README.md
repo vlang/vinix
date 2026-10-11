@@ -1,6 +1,6 @@
 # V stack protector
 
-`python3 run.py` links the actual V guard and failure handler to independent V
+`tests/stack-protector/run` links the actual V guard and failure handler to independent V
 callers built with global `-fstack-protector-strong`. It checks the guard's static
 placeholder, 1,000 successful replacements and protected-frame returns, then
 requires the V panic path when a child's guard is deliberately changed under

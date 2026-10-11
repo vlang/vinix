@@ -5,7 +5,7 @@ and thread execution on four QEMU CPUs. Build the kernel in an isolated worktree
 and supply the checkout containing the prepared AArch64 userland and boot files:
 
 ```sh
-python3 tests/kernel-job-control/run.py --repo /path/to/vinix \
+tests/kernel-job-control/run --repo /path/to/vinix \
   --kernel /path/to/worktree/kernel --smp 4 --log /tmp/job-control.log
 ```
 

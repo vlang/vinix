@@ -33,7 +33,7 @@ Build the isolated kernel with SMP enabled:
 ```sh
 V=/path/to/v make -C /path/to/worktree/kernel ARCH=aarch64 LIMINE_MP=1 \
   CC=clang LD_AARCH64=/path/to/ld.lld AR=/path/to/llvm-ar -j4
-USE_TCG=1 python3 /path/to/worktree/tests/kernel-sysvmsg/run.py \
+USE_TCG=1 /path/to/worktree/tests/kernel-sysvmsg/run \
   --repo /path/to/checkout-with-boot-dependencies \
   --kernel /path/to/worktree/kernel --smp 4 --log /tmp/sysvmsg.log
 ```

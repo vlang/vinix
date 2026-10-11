@@ -7,7 +7,7 @@ malformed/oversized tables, bounds, writable segment overlap, holes and full
 range containment. Resource I/O and the range index/lock are test fixtures;
 the scanner and freeze functions are extracted unchanged from kernel source.
 
-`tests/elf-text/run.py --arch x86_64 --kernel-dir /path/to/kernel` boots the
+`tests/elf-text/run --arch x86_64 --kernel-dir /path/to/kernel` boots the
 actual loader. Its static V guest writes three real ELF files with synthetic
 PT_DYNAMIC records and executes them. Ordinary text rejects mprotect even
 when the requested protection is unchanged; both textrel encodings allow it.
