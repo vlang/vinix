@@ -126,7 +126,10 @@ results, including the initial missing-font failure. Extraction remains
 distinct from installed-system package transactions and desktop integration.
 
 The Go case sets the installed `/usr/lib/go` root when present, a private build
-cache and `CGO_ENABLED=0`, matching the existing pure-Go smoke workflow. Child
+cache and `CGO_ENABLED=0`, matching the existing pure-Go smoke workflow. Native
+AArch64 and x86-64 select the matching architecture assertion while preserving
+the existing application checks. The input generator rejects foreign paths
+and unexpected assertions. Child
 environment overrides and removed variable names are recorded per command and
 cleared between workloads; inherited environment values are not serialized.
 
@@ -134,14 +137,18 @@ The Java case compiles the existing input and runs it from a class directory
 and a newly created JAR, with a bounded heap. HotSpot requires writable
 executable code pages: its children request VINIX_ALLOW_WX=1, which still
 requires Vinix's [privileged launch or wxallowed mount policy](../../docs/mount-execution-policy.md).
-That requirement is recorded in command receipts; ordinary unprivileged
+All Java tools come from one complete JDK. PATH takes precedence; extracted
+Alpine roots can use the actual `/usr/lib/jvm/*/bin` tools when post-install
+alternatives have not been registered. This does not qualify package scripts
+or installation. That launch requirement is recorded in command receipts;
+ordinary unprivileged
 launches without the administrator's policy are not qualified.
 
 `--host` labels host-only evidence and prohibits installation. `--path` chooses
 native AArch64/x86-64 or AArch64's translated x86-64/i386 launcher. Native paths
 must match the driver architecture. `--runtime-probe` chooses the corresponding
-staged fixture. The existing Go and Java inputs assert ARM64 and are explicitly
-unsupported on other paths; translated HTTP service integration is also unqualified.
+staged fixture. Go and Java compilation remain explicitly unsupported on
+translated paths; translated HTTP service integration is also unqualified.
 Portal discovery and games requiring licensed assets remain explicit unsupported
 results until real chooser/save and title-specific GPU/input/audio/save tests
 exist. The JSON report always keeps full lifecycle qualification false: these
@@ -162,6 +169,11 @@ build-support/run-v-tool.sh tools/linux-compat/build/main.v aarch64 /path/to/fre
 build-support/run-v-tool.sh tools/linux-compat/build/main.v aarch64 /path/to/fresh-probe --runtime-probe
 build-support/run-v-tool.sh tests/linux-compat/run-apps.v --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-apps --rootfs /path/to/prepared-root --workloads /path/to/fresh-driver/linux-compat-workloads --runtime-probe /path/to/fresh-probe/linux-compat-workloads --cases sqlite,server,runtime
 ```
+
+The controller's `--workload-timeout` sets each application command's deadline
+(1..3600 seconds, default 120). `--timeout` separately bounds the entire guest.
+The receipt records the command deadline and hashes the exact guest options;
+increasing a deadline does not change or replace a previous failed receipt.
 
 Repeat with `x86_64` and its matching kernel/root. The ARM builder uses
 `VINIX_AARCH64_SYSROOT` and `CC_AARCH64` (default clang); x86 uses `CC_AMD64`

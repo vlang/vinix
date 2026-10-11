@@ -272,9 +272,7 @@ fn (mut suite Suite) run(name string) ! {
 		}
 		'chromium', 'firefox' { suite.browser(name)! }
 		'go' {
-			if suite.path != 'native-aarch64' {
-				return error('unsupported: existing Go application fixture asserts GOARCH=arm64')
-			}
+			source := native_runtime_fixture('go', suite.path, $embed_file('../../../tests/go/smoke.go').to_string())!
 			suite.package('go')!
 			// Alpine trims the compiled-in GOROOT. PID 1 does not source the
 			// login profile used by the existing Go smoke script.
@@ -282,28 +280,27 @@ fn (mut suite Suite) run(name string) ! {
 			suite.environment['GOCACHE'] = suite.work + '/go-cache'
 			suite.environment['CGO_ENABLED'] = '0'
 			suite.execute('go', ['version'])!
-			os.write_file(suite.work + '/smoke.go', $embed_file('../../../tests/go/smoke.go').to_string())!
+			os.write_file(suite.work + '/smoke.go', source)!
 			suite.execute('go', ['build', '-o', suite.work + '/go-smoke', suite.work + '/smoke.go'])!
 			output := suite.execute(suite.work + '/go-smoke', [])!
 			expect(output.contains('GO SMOKE PASS'), 'Go application did not pass')!
 		}
 		'java' {
-			if suite.path != 'native-aarch64' {
-				return error('unsupported: existing Java application fixture asserts os.arch=aarch64')
-			}
+			source := native_runtime_fixture('java', suite.path, $embed_file('../../../tests/java/VinixJavaSmoke.java').to_string())!
 			suite.package('openjdk21-jdk')!
+			jdk := native_java_bin()!
 			// HotSpot needs writable executable code pages. Request the existing
 			// compatibility exception only for these children; exec still
 			// requires a privileged launcher or an administrator's wxallowed mount.
 			suite.environment['VINIX_ALLOW_WX'] = '1'
-			suite.execute('java', ['-version'])!
-			os.write_file(suite.work + '/VinixJavaSmoke.java', $embed_file('../../../tests/java/VinixJavaSmoke.java').to_string())!
-			suite.execute('javac', [suite.work + '/VinixJavaSmoke.java'])!
-			output := suite.execute('java', ['-Xms16m', '-Xmx128m', '-cp', suite.work, 'VinixJavaSmoke'])!
+			suite.execute(jdk + '/java', ['-version'])!
+			os.write_file(suite.work + '/VinixJavaSmoke.java', source)!
+			suite.execute(jdk + '/javac', [suite.work + '/VinixJavaSmoke.java'])!
+			output := suite.execute(jdk + '/java', ['-Xms16m', '-Xmx128m', '-cp', suite.work, 'VinixJavaSmoke'])!
 			expect(output.contains('on Vinix: PASS'), 'Java application did not pass')!
 			archive := suite.work + '/vinix-java-smoke.jar'
-			suite.execute('jar', ['--create', '--file', archive, '-C', suite.work, 'VinixJavaSmoke.class'])!
-			archived := suite.execute('java', ['-Xms16m', '-Xmx128m', '-cp', archive, 'VinixJavaSmoke'])!
+			suite.execute(jdk + '/jar', ['--create', '--file', archive, '-C', suite.work, 'VinixJavaSmoke.class'])!
+			archived := suite.execute(jdk + '/java', ['-Xms16m', '-Xmx128m', '-cp', archive, 'VinixJavaSmoke'])!
 			expect(archived.contains('on Vinix: PASS'), 'Java JAR application did not pass')!
 		}
 		'v' {

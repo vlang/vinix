@@ -12,6 +12,7 @@ struct AppReceipt {
 	execution_path string
 	uid            int
 	memory_mib     int
+	workload_timeout int
 	cases          string
 	inputs         map[string]string
 	exit_code      int
@@ -61,7 +62,8 @@ fn main() {
 		hosttest.Option{ name: '--data-disk', value: true },
 		hosttest.Option{ name: '--cases', value: true },
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: run-apps.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR --rootfs PREPARED-ROOT --workloads NATIVE-ELF --runtime-probe MATCHING-ELF [--path PATH] [--cases runtime,server]') or {
+		hosttest.Option{ name: '--workload-timeout', value: true },
+	], [], 'Usage: run-apps.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR --rootfs PREPARED-ROOT --workloads NATIVE-ELF --runtime-probe MATCHING-ELF [--path PATH] [--cases runtime,server] [--workload-timeout SECONDS]') or {
 		eprintln(err.msg())
 		exit(2)
 	}
@@ -113,6 +115,8 @@ fn main() {
 	uid := options.integer('--uid', 0) or { eprintln(err.msg()); exit(2) }
 	memory := options.integer('--memory', 1024) or { eprintln(err.msg()); exit(2) }
 	if memory < 1024 || memory > 16384 { eprintln('memory must be 1024..16384 MiB'); exit(2) }
+	workload_timeout := options.integer('--workload-timeout', 120) or { eprintln(err.msg()); exit(2) }
+	if workload_timeout < 1 || workload_timeout > 3600 { eprintln('workload timeout must be 1..3600 seconds'); exit(2) }
 	if disk != '' {
 		inputs['data_disk_before'] = sha256.sum(os.read_bytes(disk) or { eprintln(err.msg()); exit(2) }).hex()
 	}
@@ -169,7 +173,9 @@ fn main() {
 	credentials := uid.str() + '\n'
 	os.write_file(state + '/rootfs/etc/linux-compat-uid', credentials) or { eprintln(err.msg()); exit(1) }
 	inputs['guest_credentials'] = sha256.sum(credentials.bytes()).hex()
-	os.write_file(state + '/rootfs/etc/linux-compat-options', '--cases=' + cases + '\x00--path=' + path + '\x00--runtime-libc=' + options.value('--runtime-libc', 'musl') + '\x00' + if disk != '' { '--data-device=' + if arch == 'aarch64' { '/dev/vda' } else { '/dev/sd0' } + '\x00' } else { '' }) or {
+	guest_options := '--cases=' + cases + '\x00--path=' + path + '\x00--runtime-libc=' + options.value('--runtime-libc', 'musl') + '\x00--timeout=' + workload_timeout.str() + '\x00' + if disk != '' { '--data-device=' + if arch == 'aarch64' { '/dev/vda' } else { '/dev/sd0' } + '\x00' } else { '' }
+	inputs['guest_options'] = sha256.sum(guest_options.bytes()).hex()
+	os.write_file(state + '/rootfs/etc/linux-compat-options', guest_options) or {
 		eprintln(err.msg())
 		exit(1)
 	}
@@ -228,7 +234,7 @@ fn main() {
 	}
 	inputs['snapshot_kernel'] = sha256.sum(os.read_bytes(state + '/kernel/bin/vinix') or { []u8{} }).hex()
 	if disk != '' { inputs['data_disk_after'] = sha256.sum(os.read_bytes(disk) or { eprintln(err.msg()); exit(1) }).hex() }
-	os.write_file(state + '/application-inputs.json', json2.encode(AppReceipt{arch, path, uid, memory, cases, inputs, code},
+	os.write_file(state + '/application-inputs.json', json2.encode(AppReceipt{arch, path, uid, memory, workload_timeout, cases, inputs, code},
 		prettify: true
 	)) or {
 		eprintln(err.msg())
