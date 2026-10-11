@@ -228,8 +228,11 @@ fn scenario_sessions(mut t Test) {
 	// A process that has ended and has nobody to collect it shows as Z:
 	// its parent is gone, and this test's init is not one that reaps.
 	ended := ['gone', 'Z']
-	for _ in 0 .. 200 {
-		if process_state(stray_pid) in ended && seat_now() != sam_login.all_after('/') && seat_now() != '0' {
+	// The seat is given to the next login screen a moment before that
+	// screen has written its first line: wait for the line.
+	for _ in 0 .. 300 {
+		shown := read_text(session_log).split_into_lines().filter(it.starts_with('greeter: uid=')).len
+		if process_state(stray_pid) in ended && shown >= 4 {
 			break
 		}
 		C.usleep(50_000)
