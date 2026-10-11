@@ -2139,17 +2139,53 @@ under `swift-error-value-checks`. Full regression remains unpassed after the
 previously preserved kernel/concurrent-filesystem failures, and the five
 published runners retain their last passing hashes.
 
+V now supplies `_swift_getObjectType` for registered Objective-C instances,
+registered constants and supported Swift nominal class allocations. Lookup
+borrows the owner without changing reference counts. Objective-C instances
+initialize their class and honor an overridden `-class` method, called with
+the canonical selector outside the registry lock. The returned class must be
+registered instance metadata. Swift classes return their existing metadata
+address point; Objective-C classes share the sealed `0x305` wrapper cache.
+Unknown, destroyed, tagged and nil owners, class/metaclass objects, blocks,
+heap contexts, private String/Array/UTF8 descriptors and artificial Swift
+subclasses with null nominal descriptors are explicitly unsupported.
+
+The object-type host fixture passes ASAN/UBSAN in both hash modes. Installed
+SwiftCore supplies genuine CFError, string and dictionary owners and a real
+`ContiguousArrayStorage<Int>` class. A Vinix heap allocation against that native
+class returns identical metadata, then deallocates uninitialized storage.
+Raw ARM64 calls preserve x20/x21 and guarded output words. V checks cover eight
+first-publication readers, canonical metadata after `object_setClass`, constant
+storage, a formal-class callback waiting for another metadata worker, canonical
+`_cmd`, caller construction before `+initialize`, the Swift class fast path,
+borrowed lookup during Objective-C and Swift deallocation, protected/freed
+storage rejection and two drained/unmapped runtime cycles. The full class-layout
+fixtures are distinct from the genuine native Swift allocation comparison.
+
+All thirty-eight programs rebuild, and all twenty focused Swift ABI guest
+checks pass. Generated C verifies owner lookup before storage access, unlocked
+formal-class dispatch, shared sealed metadata and no hidden successful V
+allocations. The actual IPA still exits with status 1 before entry, now at
+EOSSDK's `_swift_getTypeByMangledNameInContext` import. Native measurements of
+that next lookup return canonical Int, String, Void and Array<String> metadata
+through guarded direct/raw calls preserving x20/x21. Its declaration and
+context substitution are also recorded from the
+[Swift runtime source](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/MetadataLookup.cpp).
+Generic contexts, symbolic references and invalid names remain unmeasured.
+Evidence is retained under `swift-object-type-checks`; full regression remains
+unpassed, and the five published runners retain their last passing hashes.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,399 | 759 | 81 |
-| EOSSDK | 605 | 57 | 18 |
-| MarketplaceKitWrapper | 97 | 79 | 23 |
-| All images | 2,101 | 895 | 122 |
+| Fortnite executable | 1,400 | 758 | 81 |
+| EOSSDK | 606 | 56 | 18 |
+| MarketplaceKitWrapper | 98 | 78 | 23 |
+| All images | 2,104 | 892 | 122 |
 
-The C++/GLES/Text variant reports 2,114 resolved imports, 882 unresolved strong
+The C++/GLES/Text variant reports 2,117 resolved imports, 879 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

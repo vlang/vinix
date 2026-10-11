@@ -219,6 +219,7 @@ fn swift_buffers_stop() {
 }
 
 fn swift_core_symbol(symbol string) ?u64 {
+	if address := swift_object_type_symbol(symbol) { return address }
 	if address := swift_error_value_symbol(symbol) { return address }
 	if address := swift_interpolation_symbol(symbol) { return address }
 	if address := swift_fatal_symbol(symbol) { return address }
