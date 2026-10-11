@@ -452,21 +452,27 @@ qualification with the corresponding hardware and applications.
 
 ### 10. Files, search and document workflows
 
-- [ ] Extend Files with tabs, multiple selection, batch operations, file-operation
+- [x] Extend Files with tabs, multiple selection, batch operations, file-operation
   undo, drag-and-drop, permission editing and network/removable-volume navigation.
-- [ ] Complete per-volume Trash, recursive removal, restoration of metadata and
+- [x] Complete per-volume Trash, recursive removal, restoration of metadata and
   safe behavior when destinations conflict or devices disappear.
-- [ ] Add cancellable background file operations with progress, retry, conflict
+- [x] Add cancellable background file operations with progress, retry, conflict
   choices, resumable large copies and clear failure results.
-- [ ] Implement indexed file/content/metadata search with permission-aware results,
+- [x] Implement indexed file/content/metadata search with permission-aware results,
   removable/network-volume policy and a system-wide launcher/search interface.
-- [ ] Extend Quick Look and previews to PDFs, office documents, media and common
+- [x] Extend Quick Look and previews to PDFs, office documents, media and common
   archives; integrate thumbnails, tags, recent documents and default apps.
-- [ ] Provide autosave, recovery, document versions and safe atomic saving through
+- [x] Provide autosave, recovery, document versions and safe atomic saving through
   shared document services instead of independent application-specific hacks.
 
 Acceptance: organize, find, preview, edit, copy, undo, delete and restore a real
 mixed document tree across local, removable and network storage.
+
+Implementation, provider requirements and tests:
+[Files and document workflows](desktop/FILE_WORKFLOWS.md). Automated checks
+include real cross-filesystem moves and undo. Physical removable-media removal,
+network disconnects and external preview providers require guest qualification
+with those devices and providers installed.
 
 ### 11. Accessibility, internationalization and text
 
