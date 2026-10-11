@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `f0ec18fb7c61e7c41baeb562449ce91bfc2edd2c`,
+at source commit `eff690f6c8559180fba471f042216a4ea54062fb`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 567 | 2,365,422 | 6.18% |
-| Python | 282 | 1,461,812 | 3.82% |
-| Shell | 555 | 1,358,409 | 3.55% |
+| C | 567 | 2,365,422 | 6.16% |
+| Python | 274 | 1,434,984 | 3.74% |
+| Shell | 560 | 1,359,414 | 3.54% |
 
-All `.v` files are classified as V. The resulting V share is 78.32%, with no
+All `.v` files are classified as V. The resulting V share is 78.45%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,461,812 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,434,984 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev f0ec18fb7c61e7c41baeb562449ce91bfc2edd2c --breakdown --json
+github-linguist --rev eff690f6c8559180fba471f042216a4ea54062fb --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -835,22 +835,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dhewm3/prepare-debian.py` | 1,073 |
 | `tests/dhewm3/run.py` | 3,664 |
 | `tests/dota2/_game_vm_native.py` | 2,621 |
-| `tests/dota2/_guest_vm_native.py` | 2,184 |
-| `tests/dota2/_lavapipe_native.py` | 795 |
 | `tests/dota2/_native.py` | 3,559 |
 | `tests/dota2/_prepare_native.py` | 8,651 |
 | `tests/dota2/_vulkan_fixture_native.py` | 6,287 |
 | `tests/dota2/_vulkan_vm_native.py` | 830 |
-| `tests/dota2/_wake_native.py` | 4,250 |
-| `tests/dota2/env-run.py` | 3,087 |
-| `tests/dota2/lavapipe-run.py` | 3,703 |
-| `tests/dota2/run-mmap32.py` | 7,710 |
 | `tests/dota2/run-test.py` | 5,348 |
 | `tests/dota2/run.py` | 6,163 |
-| `tests/dota2/steam-smoke-run.py` | 2,625 |
 | `tests/dota2/vulkan-run.py` | 2,115 |
 | `tests/dota2/vulkan-stage-test.py` | 4,722 |
-| `tests/dota2/wake-op-run.py` | 2,474 |
 | `tests/ext2-xattr/host.py` | 6,852 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/gl-triangle/run-vm.py` | 5,439 |
@@ -1181,11 +1173,16 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/docker/run.sh` | 2,060 |
 | `tests/docker/run_vm` | 215 |
 | `tests/docker/smoke.sh` | 4,119 |
+| `tests/dota2/env-run` | 197 |
 | `tests/dota2/export-run` | 220 |
 | `tests/dota2/export-test` | 217 |
 | `tests/dota2/game-init.sh` | 2,517 |
+| `tests/dota2/lavapipe-run` | 202 |
+| `tests/dota2/run-mmap32` | 200 |
 | `tests/dota2/steam-smoke-init.sh` | 2,498 |
+| `tests/dota2/steam-smoke-run` | 205 |
 | `tests/dota2/vulkan-init.sh` | 3,187 |
+| `tests/dota2/wake-op-run` | 201 |
 | `tests/dumpability/run` | 182 |
 | `tests/elf-text/run` | 181 |
 | `tests/elf-text/run-host.sh` | 260 |
