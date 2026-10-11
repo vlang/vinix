@@ -7,6 +7,26 @@ import compress.deflate
 import hash.crc32
 import strings
 
+#include <sys/resource.h>
+
+struct C.rlimit {
+mut:
+	rlim_cur u64
+	rlim_max u64
+}
+
+fn C.setrlimit(int, &C.rlimit) int
+
+pub fn preview_worker_limits() ! {
+	mut cpu := C.rlimit{rlim_cur: 20, rlim_max: 20}
+	mut output := C.rlimit{rlim_cur: 8 * 1024 * 1024, rlim_max: 8 * 1024 * 1024}
+	if C.setrlimit(C.RLIMIT_CPU, &cpu) != 0 || C.setrlimit(C.RLIMIT_FSIZE, &output) != 0 { return error('Preview resource limits unavailable') }
+	$if linux {
+		mut memory := C.rlimit{rlim_cur: 512 * 1024 * 1024, rlim_max: 512 * 1024 * 1024}
+		if C.setrlimit(C.RLIMIT_AS, &memory) != 0 { return error('Preview memory limit unavailable') }
+	}
+}
+
 pub struct Preview {
 pub:
 	text string
@@ -98,7 +118,7 @@ fn preview_inflate_chunk(chunk []u8, user voidptr) int {
 
 fn zip_content(bytes []u8, entry PreviewZipEntry) ![]u8 {
 	i := u64(entry.offset)
-	if entry.flags & 1 != 0 || entry.size > 1024 * 1024 || i + 30 > u64(bytes.len) || zip_u32(bytes, int(i)) != 0x04034b50 { return error('Encrypted, oversized or invalid office document entry') }
+	if entry.flags & 1 != 0 || entry.size > 1024 * 1024 || (entry.method == 0 && entry.compressed != entry.size) || i + 30 > u64(bytes.len) || zip_u32(bytes, int(i)) != 0x04034b50 { return error('Encrypted, oversized or invalid office document entry') }
 	start := i + 30 + u64(zip_u16(bytes, int(i) + 26)) + u64(zip_u16(bytes, int(i) + 28))
 	end := start + u64(entry.compressed)
 	if end > u64(bytes.len) { return error('Truncated ZIP content') }
@@ -155,18 +175,23 @@ pub fn preview_document(path string, cache_directory string) !Preview {
 	} else if ext == '.pdf' {
 		text = preview_program('pdftotext', ['-f', '1', '-l', '8', '-layout', path, '-'])!
 		provider = 'Poppler'
+		if cache_directory.len > 0 {
+			prefix := os.join_path(cache_directory, 'page')
+			defer { unsafe { prefix.free() } }
+			if _ := preview_program('pdftoppm', ['-f', '1', '-l', '1', '-singlefile', '-scale-to', '640', '-png', path, prefix]) { image = prefix + '.png' }
+		}
 	} else if ext in ['.mp4', '.mkv', '.webm', '.mov', '.avi', '.mp3', '.wav', '.ogg', '.flac', '.m4a'] {
 		text = preview_program('ffprobe', ['-v', 'error', '-show_format', '-show_streams', path])!
 		provider = 'FFmpeg'
 		if ext in ['.mp4', '.mkv', '.webm', '.mov', '.avi'] {
 			image = os.join_path(cache_directory, 'frame.png')
-			preview_program('ffmpeg', ['-nostdin', '-v', 'error', '-i', path, '-frames:v', '1', '-vf', 'scale=640:-1', '-y', image]) or { unsafe { image.free() }; image = '' }
+			preview_program('ffmpeg', ['-nostdin', '-v', 'error', '-i', path, '-frames:v', '1', '-vf', 'scale=640:640:force_original_aspect_ratio=decrease', '-y', image]) or { unsafe { image.free() }; image = '' }
 		}
-	} else if ext in ['.tar', '.tgz', '.gz', '.bz2', '.xz', '.7z'] {
-		text = preview_program('tar', ['-tf', path])!
+	} else if ext in ['.tar', '.tgz', '.gz', '.bz2', '.xz', '.7z', '.rar'] {
+		text = preview_program(if ext in ['.7z', '.rar'] { 'bsdtar' } else { 'tar' }, ['-tf', path])!
 		provider = 'Archive'
 	} else if ext in ['.doc', '.xls', '.ppt', '.rtf'] {
-		text = preview_program('catdoc', [path])!
+		text = preview_program(if ext == '.xls' { 'xls2csv' } else if ext == '.ppt' { 'catppt' } else { 'catdoc' }, [path])!
 		provider = 'Office'
 	} else { return error('No preview provider for this file type') }
 	if !before.unchanged(identify(path)!) { unsafe { text.free(); image.free() }; return error('File changed during preview') }
