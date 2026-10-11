@@ -1,0 +1,103 @@
+# Linux compatibility qualification
+
+The maintained V controller snapshots a matching, already built ELF64 kernel
+and each V fixture before compiling or booting. Both architectures use the
+existing native guest supervisor and disposable images. Every requested marker
+must pass; bad pointers, errno, compiler failure, panic, timeout and late failure
+remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
+stay in the required fresh artifact directory, including on failure.
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-arm
+tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
+```
+
+`--cases bpf,access,open,runtime` selects the tests; `--timeout` sets each guest's
+deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
+and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
+
+- `bpf` verifies ENOSYS for unavailable program operations and untouched query
+  buffers; loading or attaching a policy cannot return a dummy success.
+- `access` checks empty paths, exact errors, execute permission, O_PATH/deleted
+  files, pipes, real/effective UID differences and nonempty AT_EMPTY_PATH paths.
+- `open` checks open_how size/extensions, flags, invalid pointers, O_PATH,
+  mutually exclusive/unknown constraints, and rejection of all currently
+  unsupported RESOLVE modes. EOPNOTSUPP for known constraints is an explicit
+  Vinix limitation; this test does not claim Linux constrained traversal.
+- `runtime` checks four concurrent pthreads, isolated libc errno/TLS and keys,
+  64-bit atomic increments, SSE2/NEON across scheduling, auxv/sysconf page sizes
+  and an actual RW-to-RX JIT function. It prints pointer width and page size.
+  `--once` makes a staged runtime fixture exit after testing instead of waiting
+  as PID 1. It is a native musl test until run through a foreign runtime.
+
+The [coverage matrix](../../docs/linux-posix-compatibility.md) separates missing
+interfaces from implemented behavior and lists unsupported dependencies. The
+application workload command is V as well:
+
+```sh
+build-support/run-v-tool.sh tools/linux-compat/workloads/main.v --host --work=/path/to/fresh-evidence --cases=sqlite,media
+# Inside Vinix, installation can be included explicitly:
+linux-compat-workloads --work=/tmp/compat-evidence --install
+```
+
+Build the workload command for the target userland and stage it as
+`linux-compat-workloads`. It invokes applications with literal argument vectors,
+bounded output/deadlines and process-group cleanup; it never runs Python.
+SQLite tests a WAL transaction and integrity/reopen; FFmpeg checks actual encoded
+frames; Gnumeric saves and reopens cell data; browsers render real local content;
+existing Go/Java application sources and a V compile/file workload test runtimes;
+BusyBox (or Alpine's BusyBox Extras) runs and retires an HTTP service with a
+unique response, recording its response and termination. Missing
+executables are `unsupported`, nonzero exits/timeouts are `failed`, and either
+causes a failing suite exit. There is no sandbox-disable fallback.
+
+`--host` labels host-only evidence and prohibits installation. `--path` chooses
+native AArch64/x86-64 or AArch64's translated x86-64/i386 launcher. Native paths
+must match the driver architecture. `--runtime-probe` chooses the corresponding
+staged fixture. The existing Go input asserts ARM64 and is explicitly unsupported
+on other paths; translated HTTP service integration is also unqualified.
+Portal discovery and games requiring licensed assets remain explicit unsupported
+results until real chooser/save and title-specific GPU/input/audio/save tests
+exist. The JSON report always keeps full lifecycle qualification false: these
+workloads alone do not certify package updates, desktop integration, systemd,
+Flatpak/Snap or every glibc software dependency.
+
+Cross-build static musl executables with the maintained V builder. It generates
+C through V, invokes the selected target compiler and verifies the ELF machine
+and class. The output directory must be fresh; `build.json` records sources,
+generated C, command arguments and executable hashes. Both modes currently name
+their output `linux-compat-workloads`, so keep the driver and probe in different
+directories:
+
+```sh
+build-support/run-v-tool.sh tools/linux-compat/build/main.v aarch64 /path/to/fresh-driver
+build-support/run-v-tool.sh tools/linux-compat/build/main.v aarch64 /path/to/fresh-probe --runtime-probe
+build-support/run-v-tool.sh tests/linux-compat/run-apps.v --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-apps --rootfs /path/to/prepared-root --workloads /path/to/fresh-driver/linux-compat-workloads --runtime-probe /path/to/fresh-probe/linux-compat-workloads --cases sqlite,server,runtime
+```
+
+Repeat with `x86_64` and its matching kernel/root. The ARM builder uses
+`VINIX_AARCH64_SYSROOT` and `CC_AARCH64` (default clang); x86 uses `CC_AMD64`
+(default x86_64-linux-musl-gcc). `VINIX_V_COMPILER` selects V. The experimental
+`i386 --runtime-probe` path additionally needs an i386-capable V backend and
+`CC_I386`; the current compiler rejected the fixture's inline assembly, so no
+32-bit result is qualified.
+
+The application controller takes a prepared guest root with matching programs
+and libraries, snapshots the kernel/driver/probe and init source, and preserves
+guest symlinks literally. It boots without networking or implicit installation.
+Root file/mode/link hashes, input receipts, serial output and extracted
+`guest-report.json` stay in the state directory, including failed/unsupported
+results. To test translation, select `--path translated-x86_64`, supply a
+native ARM driver and an x86-64 probe, and stage the existing translator/private
+runtime in the prepared root. The static probe uses `run-x86-64 --direct`;
+dynamic applications use the normal private-loader path. A passing static probe
+does not qualify glibc loaders or all translated applications.
+
+Host verification of the report generator and timeout/nonzero-exit handling:
+
+```sh
+v -cc cc test tools/linux-compat
+```
+
+If the local V compiler reports missing cached `_v3_lit_*` literals after edits,
+use a fresh `V3CACHE` directory or `v -nocache -cc cc run` for the host tool.
