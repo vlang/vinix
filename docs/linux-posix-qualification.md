@@ -339,3 +339,26 @@ interfaces, and title-specific game assets, GPU/audio/input and vendor APIs.
 The [behavior matrix](linux-posix-compatibility.md) lists the broader limits.
 Every application report keeps `complete_lifecycle_qualified` false until its
 advertised install/run/save/update/desktop workflow has been exercised.
+
+## Ordinary-user shared memory
+
+Browser qualification exposed incorrect anonymous-file ownership and a mounted
+`/dev/shm` root with mode 0755. Both native architectures now pass the same
+ordinary-user regression: UID 1000/GID 2000 owns a new memfd, receives mode 0777
+independent of umask and zero directory links, changes permissions, and reopens
+the inode read-only through `/proc/self/fd` with exact data. A forbidden write
+reopen returns EACCES. `/dev/shm` retains mode 1777 after mounting, permits user
+file creation, and refuses removal of another owner's file with EPERM.
+
+The initial memfd metadata follows Linux's
+[anonymous shmem file creation](https://github.com/torvalds/linux/blob/v6.12/mm/shmem.c#L4884)
+used by [memfd_create](https://github.com/torvalds/linux/blob/v6.12/mm/memfd.c#L310).
+The change sets metadata before publishing the descriptor and preserves the
+existing reference-count lifetime.
+
+`shared-memory-before-*` records the old kernel returning UID/GID 0, mode 0600
+and one link to the identical fixture. `shared-memory-after-*` contains all
+seven passing ABI cases on each architecture, plus the shared-memory serial
+logs, in the [dated results](../tests/linux-compat/results/2026-10-11/).
+These checks qualify shared-memory permissions, not complete browser or
+sandbox behavior.

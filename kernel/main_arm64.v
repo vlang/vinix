@@ -261,6 +261,10 @@ fn kmain_thread(qemu_platform bool, acpi_platform bool) {
 	// disk-root handoff so both boot modes use the same /dev/shm.
 	fs.create(vfs_root, '/dev/shm', 0o1777 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev/shm', 'tmpfs') or {}
+	// The mounted tmpfs root replaces the covered directory's permissions.
+	if mut shm := fs.get_node(vfs_root, '/dev/shm', true) {
+		shm.resource.stat.mode = stat.ifdir | 0o1777
+	}
 
 	// /sys after the root is settled rather than alongside /dev and /proc: a
 	// disk root replaces the tree those two are carried across into, and this

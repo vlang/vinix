@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "5c6693f437830f49be54d0fe2de3ccf9b42845d74453535338498e6bae65833d",
+    "results": [
+        {
+            "name": "sharedmem",
+            "source_sha256": "99ee2c57a20feb6bcf30b333373985c214e4142769506e76374626e4ccc71f44",
+            "init_sha256": "d58f5693f10e7729ec5d4602879c605e0599b04a94015c3c243a971b6a92117a",
+            "iso_sha256": "e7b837995f516fcddef942ac36998b1ce99b1e7b5a47e116235c3c0903753584",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

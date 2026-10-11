@@ -12,7 +12,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -59,6 +59,12 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
 The [coverage matrix](../../docs/linux-posix-compatibility.md) separates missing
 interfaces from implemented behavior and lists unsupported dependencies.
+
+The `sharedmem` case drops to UID 1000/GID 2000 and checks memfd creator
+ownership, mode 0777 independent of umask, zero links, owner chmod and a
+read-only `/proc/self/fd` reopen with exact data. A write reopen after mode 0400
+must fail with EACCES. It also checks mounted `/dev/shm` mode 1777, ordinary-user
+file creation/ownership, and EPERM when removing a root-owned file there.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,

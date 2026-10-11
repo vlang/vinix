@@ -162,6 +162,10 @@ fn kmain_thread() {
 	// file on devtmpfs grows as one contiguous allocation.
 	fs.create(vfs_root, '/dev/shm', 0o1777 | stat.ifdir) or {}
 	fs.mount(vfs_root, '', '/dev/shm', 'tmpfs') or {}
+	// The mounted tmpfs root replaces the covered directory's permissions.
+	if mut shm := fs.get_node(vfs_root, '/dev/shm', true) {
+		shm.resource.stat.mode = stat.ifdir | 0o1777
+	}
 
 	// The CPU and memory-node topology, at the paths Linux userspace reads it
 	// from. Mounted after the initramfs has been unpacked so the mount point is
