@@ -38,3 +38,24 @@ fn test_real_tables_keep_architecture_numbers_and_private_extension() {
 		assert bpf.len == 1 && bpf[0].status == 'unavailable'
 	}
 }
+
+fn test_semantic_source_changes_invalidate_fingerprints_without_qualifying_dispatch() {
+	root := os.real_path(os.dir(@FILE) + '/../..')
+	original := coverage(root)!
+	work := os.join_path(os.temp_dir(), 'vinix-coverage-inputs-' + os.getpid().str())
+	assert !os.exists(work)
+	os.mkdir_all(work)!
+	defer { os.rmdir_all(work) or { panic(err) } }
+	for path in original.inputs.keys() {
+		os.mkdir_all(os.dir(work + '/' + path))!
+		os.cp(root + '/' + path, work + '/' + path)!
+	}
+	assert coverage(work)!.inputs == original.inputs
+	path := 'kernel/proc/seccomp.v'
+	source := os.read_file(work + '/' + path)!
+	assert source.contains('instructions.len == 0')
+	os.write_file(work + '/' + path, source.replace('instructions.len == 0', 'instructions.len == 1'))!
+	changed := coverage(work)!
+	assert changed.inputs[path] != original.inputs[path]
+	assert changed.syscalls == original.syscalls
+}

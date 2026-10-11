@@ -57,8 +57,17 @@ fn handlers(source string) !map[int]string {
 fn coverage(root string) !Coverage {
 	mut entries := []Entry{}
 	mut inputs := map[string]string{}
-	for path in ['kernel/syscall/table/linux_compat.v', 'kernel/syscall/table/linux_common.v',
-		'kernel/fs/vfs.v', 'kernel/fs/mount_policy.v'] {
+	for path in ['tools/linux-compat/coverage.v',
+		'kernel/syscall/table/linux_compat.v', 'kernel/syscall/table/linux_common.v',
+		'kernel/syscall/table/container.v', 'kernel/syscall/table/trace_amd64.v',
+		'kernel/file/file.v', 'kernel/fs/vfs.v', 'kernel/fs/mount_policy.v',
+		'kernel/fs/mount.v', 'kernel/fs/tmpfs.v', 'kernel/fs/procfs.v',
+		'kernel/proc/proc.v', 'kernel/proc/container.v', 'kernel/proc/seccomp.v',
+		'kernel/futex/futex.v', 'kernel/futex/pi.v', 'kernel/event/event.v',
+		'kernel/userland/clone_arm64.v', 'kernel/userland/clone_amd64.v',
+		'kernel/userland/userland_arm64.v', 'kernel/userland/linux_signal_amd64.v',
+		'kernel/userland/seccomp_signal.v', 'kernel/memory/mmap/linux.v',
+		'kernel/memory/mmap/mmap.v'] {
 		inputs[path] = sha256.sum(os.read_bytes(root + '/' + path)!).hex()
 	}
 	for arch in ['aarch64', 'x86_64'] {
