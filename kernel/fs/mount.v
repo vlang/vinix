@@ -476,7 +476,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	mut block_token := -1
 	mut block_committed := false
 	defer { security.finish_block_mount(block_token, block_committed) }
-	if kind !in filesystems && kind != 'overlay' {
+	if kind !in filesystems && kind !in ['overlay', 'ext2'] {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -491,11 +491,18 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 			errno.set(errno.enoent)
 			return none
 		}
+		source_node = reduce_node(source_node, true)
+		if source_node == unsafe { nil } { return none }
 		if volume_mount_node(source_node) { errno.set(errno.ebusy); return none }
 		if stat.isdir(source_node.resource.stat.mode) {
 			errno.set(errno.enotblk)
 			return none
 		}
+	}
+	if kind == 'ext2' && (source_node == unsafe { nil }
+		|| !stat.isblk(source_node.resource.stat.mode)) {
+		errno.set(errno.enotblk)
+		return none
 	}
 
 	target_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
@@ -558,7 +565,12 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	} else {
 		// Reserve on the actual template before instantiate reads backing
 		// metadata or allocates an instance. EXT2 clones this exact device.
-		mut template := unsafe { filesystems[kind] }
+		mut template := if kind == 'ext2' { block_filesystem(kind, source_node) } else { unsafe { filesystems[kind] } }
+		if template == unsafe { nil } {
+			errno.set(errno.einval)
+			unsafe { basename.free() }
+			return none
+		}
 		block_token = begin_filesystem_block_mount(mut template) or {
 			unsafe { basename.free() }
 			return none

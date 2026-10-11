@@ -1312,6 +1312,10 @@ pub fn ext2_root(mut filesystem EXT2Filesystem) ?&vfs.VFSNode {
 }
 
 pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
+	mut cached := vfs.block_filesystem('ext2', backing_device)
+	if cached != unsafe { nil } {
+		if mut cached is EXT2Filesystem { return cached, true }
+	}
 	sector_size := u64(backing_device.resource.stat.blksize)
 	if sector_size == 0 || sector_size > pagecache.page_bytes
 		|| pagecache.page_bytes % sector_size != 0 || backing_device.resource.stat.size < 2048
@@ -1374,6 +1378,8 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 	}
 	if !register_mapped_writeback()
 		|| !new_filesystem.register_volume_cache() { return 0, false }
+	vfs.register_block_filesystem('ext2', backing_device, new_filesystem.as_filesystem(),
+		new_filesystem.block_identity())
 	ready = true
 	return new_filesystem, true
 }

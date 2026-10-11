@@ -32,6 +32,7 @@ and openat2 exercise the same behavior, following the
 | auxv/sysconf page size, pointer width | 16 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 32 bits |
 | Same runtime predicates with unmodified Debian glibc 2.36 | passed | passed | passed | passed |
 | Remote register/memory reads, stack mutation/restoration, breakpoint and step | unavailable | unavailable | passed | passed |
+| Ordinary ext2 mount, source symlink, readonly alias, errors and remount content | passed | passed | not tested | not tested |
 
 BPF is unavailable: passing its error regression means callers can discover
 that limitation. The later `link-policy-*.json` receipts test kernels that add
@@ -104,6 +105,19 @@ probe bypasses the wrapper's dynamic musl loader and confines its W^X opt-in to
 the translator child. Native ELF32 entry, x32, arbitrary glibc applications, complete
 large-file/time ABI coverage, loader interoperability and native debugger operations
 remain unqualified.
+
+The `mount-after-*.json` receipts and serial logs qualify ordinary ext2 mounting
+on both native architectures. Boot-detected volumes register their actual
+backing resource and physical extent; mount selects that source's template and
+cache, retaining verified/read-only wrappers as distinct backends. A source
+symlink resolves normally. The raw fixture verifies ENOENT for a missing source,
+ENOTBLK for a character device, ENODEV for an unknown filesystem, mounted data
+readback, a read-only alias rejecting creation with EROFS, and content after
+unmount/remount. The matching `mount-before-*.json` controls fail on both prior
+kernels because ext2 was not registered for the ordinary mount syscall.
+The registry is bounded to 256 detected backends and retains the same volume
+lifetimes as the cache registry. Discovery of newly formatted or hot-plugged
+volumes needs separate qualification.
 
 The additional wide-offset/time64 fixture passes on both native architectures
 and both translated x86 paths. It seeks past 8 GiB, verifies current and negative

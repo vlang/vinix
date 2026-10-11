@@ -52,8 +52,23 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
   return EBADF. The test writes anonymous pages and verifies mapped file data.
 
 The [coverage matrix](../../docs/linux-posix-compatibility.md) separates missing
-interfaces from implemented behavior and lists unsupported dependencies. The
-application workload command is V as well:
+interfaces from implemented behavior and lists unsupported dependencies.
+
+The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
+volume and owns QEMU directly. It checks exact missing/non-block/type errors,
+source symlinks, a read-only alias, data readback and unmount/remount. The kernel,
+fixture, init, ISO and before/after volume hashes accompany its serial log.
+`mke2fs` is required; `VINIX_MKE2FS` can select it. Run it with:
+
+```sh
+build-support/run-v-tool.sh tests/linux-compat/run-mount.v --arch aarch64 --kernel-dir /path/to/kernel --state-dir /path/to/fresh-mount-state
+```
+
+Use `x86_64` for the other native architecture. The controller attaches only its
+private volume and enables disk driver startup; the small preformatted volume
+cannot trigger automatic system installation.
+
+Run application workloads with:
 
 ```sh
 build-support/run-v-tool.sh tools/linux-compat/workloads/main.v --host --work=/path/to/fresh-evidence --cases=sqlite,media

@@ -1,0 +1,13 @@
+{
+    "architecture": "x86_64",
+    "context": "native Vinix QEMU guest; private ext2 volume",
+    "inputs": {
+        "disk_after": "d356d83ccc1d71601587aebc8fc21ef8075624a88ab184b31f990810a107d4aa",
+        "disk_before": "aa322467fdbd08fda3cd55df7fd3e06e7544e24baeb6c86299774632f021c89c",
+        "fixture_source": "2e166f2a20371fc4a99ab5cc464c266739f8f0cc5517bd2cc93ee854fc5dc046",
+        "init": "c8c61fb28c0bf4dec5cca1c25053448cc9352dd66edce2bfa7e152fb9d0428d8",
+        "iso": "69040d83c0d6656f87cc39c6e8d74ad339a36741092a3f09d310790fa5974ea9",
+        "kernel": "3b429082703e6c0df7960bbb239670ac35483940eaf90ae0eeb9341fd3176530"
+    },
+    "exit_code": 0
+}
