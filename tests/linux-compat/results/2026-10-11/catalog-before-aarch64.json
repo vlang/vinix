@@ -1,0 +1,215 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-aarch64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "bb6929f642c8683f910996a19960512d8acebe3d0923ad070b4f467b7b4250b0",
+    "runtime_probe_sha256": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+    "runtime_libc": "musl",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "media",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        },
+        {
+            "name": "office",
+            "status": "failed",
+            "detail": "command failed: ['/usr/bin/ssconvert', '/tmp/linux-compat-evidence/sheet.csv', '/tmp/linux-compat-evidence/sheet.gnumeric'] exit=1 timeout=false output_limit=false"
+        },
+        {
+            "name": "sqlite",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        },
+        {
+            "name": "server",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/ffmpeg",
+                "-version"
+            ],
+            "executable_sha256": "067b74f26aa35c1218e5f6da1e2a94efd332bcb420e3b253ac609bbae119b396",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "ffmpeg version 6.1.2 Copyright (c) 2000-2024 the FFmpeg developers\nbuilt with gcc 14.2.0 (Alpine 14.2.0)\nconfiguration: --prefix=/usr --disable-librtmp --disable-lzma --disable-static --disable-stripping --enable-avfilter --enable-gpl --enable-ladspa --enable-libaom --enable-libass --enable-libbluray --enable-libdav1d --enable-libdrm --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharfbuzz --enable-libmp3lame --enable-libopenmpt --enable-libopus --enable-libplacebo --enable-libpulse --enable-librav1e --enable-librist --enable-libsoxr --enable-libsrt --enable-libssh --enable-libtheora --enable-libv4l2 --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxcb --enable-libxml2 --enable-libxvid --enable-libzimg --enable-libzmq --enable-lto=auto --enable-lv2 --enable-openssl --enable-pic --enable-postproc --enable-pthreads --enable-shared --enable-vaapi --enable-vdpau --enable-version3 --enable-vulkan --optflags=-O3 --enable-libjxl --enable-libsvtav1\nlibavutil      58. 29.100 / 58. 29.100\nlibavcodec     60. 31.102 / 60. 31.102\nlibavformat    60. 16.100 / 60. 16.100\nlibavdevice    60.  3.100 / 60.  3.100\nlibavfilter     9. 12.100 /  9. 12.100\nlibswscale      7.  5.100 /  7.  5.100\nlibswresample   4. 12.100 /  4. 12.100\nlibpostproc    57.  3.100 / 57.  3.100\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=64x48:rate=10:duration=1",
+                "-c:v",
+                "mpeg4",
+                "-threads",
+                "2",
+                "-y",
+                "/tmp/linux-compat-evidence/video.avi"
+            ],
+            "executable_sha256": "067b74f26aa35c1218e5f6da1e2a94efd332bcb420e3b253ac609bbae119b396",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_name,width,height,nb_frames",
+                "-of",
+                "csv=p=0",
+                "/tmp/linux-compat-evidence/video.avi"
+            ],
+            "executable_sha256": "aaf181deb5e3ec5a9489f294fc1f61a3ed0292613fb9c2f9262fad4918260bd8",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "mpeg4,64,48,10\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/ssconvert",
+                "--version"
+            ],
+            "executable_sha256": "44871562b44945cc5f43bd4366b72c44d8c46cac9e8ddc678753041cb3a133ee",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "ssconvert version '1.12.57'\ndatadir := '/usr/share/gnumeric/1.12.57'\nlibdir := '/usr/lib/gnumeric/1.12.57'\n",
+            "stderr": "\n(ssconvert:6752): GLib-WARNING **: 11:46:08.262: getpwuid_r(): failed due to unknown user id (0)\n\n(ssconvert:6752): GLib-WARNING **: 11:46:08.262: Could not find home directory: $HOME is not set, and user database could not be read.\n"
+        },
+        {
+            "argv": [
+                "/usr/bin/ssconvert",
+                "/tmp/linux-compat-evidence/sheet.csv",
+                "/tmp/linux-compat-evidence/sheet.gnumeric"
+            ],
+            "executable_sha256": "44871562b44945cc5f43bd4366b72c44d8c46cac9e8ddc678753041cb3a133ee",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 1,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "\n(ssconvert:57272): GLib-WARNING **: 11:46:08.283: getpwuid_r(): failed due to unknown user id (0)\n\n(ssconvert:57272): GLib-WARNING **: 11:46:08.283: Could not find home directory: $HOME is not set, and user database could not be read.\n\n(ssconvert:57272): GLib-WARNING **: 11:46:08.283: Could not find home directory: $HOME is not set, and user database could not be read.\n\n(ssconvert:57272): GdkPixbuf-CRITICAL **: 11:46:08.283: gdk_pixbuf_get_width: assertion 'GDK_IS_PIXBUF (pixbuf)' failed\n\n(ssconvert:57272): Gtk-CRITICAL **: 11:46:08.283: gtk_icon_theme_add_builtin_icon: assertion 'GDK_IS_PIXBUF (pixbuf)' failed\n\n(ssconvert:57272): GLib-GObject-CRITICAL **: 11:46:08.283: g_object_unref: assertion 'G_IS_OBJECT (object)' failed\n\n** (ssconvert:57272): CRITICAL **: 11:46:08.284: go_conf_add_monitor: assertion 'node || key' failed\n\n** (ssconvert:57272): CRITICAL **: 11:46:08.284: go_conf_get_node: assertion 'parent || key' failed\n\n** (ssconvert:57272): CRITICAL **: 11:46:08.284: go_conf_add_monitor: assertion 'node || key' failed\n\n** (ssconvert:57272): CRITICAL **: 11:46:08.284: go_conf_get_node: assertion 'parent || key' failed\n\n** (ssconvert:57272): CRITICAL **: 11:46:08.284: go_conf_add_monitor: assertion 'node || key' failed\n\n** (ssconvert:57272): CRITICAL **: 11:46:08.284: go_conf_get_node: assertion 'parent || key' failed\n\n** (ssconvert:57272): WARNING **: 11:46:08.287: Configured default font 'Sans 10.000000' not available, trying fallback...\n\n** (ssconvert:57272): WARNING **: 11:46:08.287: Fallback font 'Sans 10.000000' not available, trying 'fixed'...\n\n** (ssconvert:57272): WARNING **: 11:46:08.288: Even 'fixed 10' failed ??  We're going to exit now,there is something wrong with your font configuration\n"
+        },
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "--version"
+            ],
+            "executable_sha256": "c648ec2f15033b28c3c0c5e8e6e28c1fa81b5fcc7fe8a050e74f3c04adbf0c34",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "3.48.0 2025-01-14 11:05:00 d2fe6b05f38d9d7cd78c5d252e99ac59f1aea071d669830c1ffe4e8966e84010 (64-bit)\n",
+            "stderr": "-- warning: cannot find home directory; cannot read ~/.sqliterc\n"
+        },
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/tmp/linux-compat-evidence/transaction.db",
+                "PRAGMA journal_mode=WAL; CREATE TABLE t(v INTEGER); BEGIN; INSERT INTO t VALUES(19),(23); COMMIT; SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "c648ec2f15033b28c3c0c5e8e6e28c1fa81b5fcc7fe8a050e74f3c04adbf0c34",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "wal\n42\n",
+            "stderr": "-- warning: cannot find home directory; cannot read ~/.sqliterc\n"
+        },
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/tmp/linux-compat-evidence/transaction.db",
+                "PRAGMA integrity_check; SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "c648ec2f15033b28c3c0c5e8e6e28c1fa81b5fcc7fe8a050e74f3c04adbf0c34",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "ok\n42\n",
+            "stderr": "-- warning: cannot find home directory; cannot read ~/.sqliterc\n"
+        },
+        {
+            "argv": [
+                "/bin/busybox",
+                "--list"
+            ],
+            "executable_sha256": "f35a45f702095d9c2a718deb42c1cf4efa6d2919f212d273c4ea569d0bd03dcb",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "[\n[[\nacpid\nadd-shell\naddgroup\nadduser\nadjtimex\narch\narp\narping\nash\nawk\nbase64\nbasename\nbbconfig\nbc\nbeep\nblkdiscard\nblkid\nblockdev\nbrctl\nbunzip2\nbzcat\nbzip2\ncal\ncat\nchattr\nchgrp\nchmod\nchown\nchpasswd\nchroot\nchvt\ncksum\nclear\ncmp\ncomm\ncp\ncpio\ncrond\ncrontab\ncryptpw\ncut\ndate\ndc\ndd\ndeallocvt\ndelgroup\ndeluser\ndepmod\ndf\ndiff\ndirname\ndmesg\ndnsdomainname\ndos2unix\ndu\ndumpkmap\necho\negrep\neject\nenv\nether-wake\nexpand\nexpr\nfactor\nfallocate\nfalse\nfatattr\nfbset\nfbsplash\nfdflush\nfdisk\nfgrep\nfind\nfindfs\nflock\nfold\nfree\nfsck\nfstrim\nfsync\nfuser\ngetopt\ngetty\ngrep\ngroups\ngunzip\ngzip\nhalt\nhd\nhead\nhexdump\nhostid\nhostname\nhwclock\nid\nifconfig\nifdown\nifenslave\nifup\ninit\ninotifyd\ninsmod\ninstall\nionice\niostat\nip\nipaddr\nipcalc\nipcrm\nipcs\niplink\nipneigh\niproute\niprule\niptunnel\nkbd_mode\nkill\nkillall\nkillall5\nklogd\nlast\nless\nlink\nlinux32\nlinux64\nln\nloadfont\nloadkmap\nlogger\nlogin\nlogread\nlosetup\nls\nlsattr\nlsmod\nlsof\nlsusb\nlzcat\nlzma\nlzop\nlzopcat\nmakemime\nmd5sum\nmdev\nmesg\nmicrocom\nmkdir\nmkdosfs\nmkfifo\nmkfs.vfat\nmknod\nmkpasswd\nmkswap\nmktemp\nmodinfo\nmodprobe\nmore\nmount\nmountpoint\nmpstat\nmv\nnameif\nnanddump\nnandwrite\nnbd-client\nnc\nnetstat\nnice\nnl\nnmeter\nnohup\nnologin\nnproc\nnsenter\nnslookup\nntpd\nod\nopenvt\npartprobe\npasswd\npaste\npgrep\npidof\nping\nping6\npipe_progress\npivot_root\npkill\npmap\npoweroff\nprintenv\nprintf\nps\npscan\npstree\npwd\npwdx\nraidautorun\nrdate\nrdev\nreadahead\nreadlink\nrealpath\nreboot\nreformime\nremove-shell\nrenice\nreset\nresize\nrev\nrfkill\nrm\nrmdir\nrmmod\nroute\nrun-parts\nsed\nsendmail\nseq\nsetconsole\nsetfont\nsetkeycodes\nsetlogcons\nsetpriv\nsetserial\nsetsid\nsh\nsha1sum\nsha256sum\nsha3sum\nsha512sum\nshowkey\nshred\nshuf\nslattach\nsleep\nsort\nsplit\nstat\nstrings\nstty\nsu\nsum\nswapoff\nswapon\nswitch_root\nsync\nsysctl\nsyslogd\ntac\ntail\ntar\ntee\ntest\ntime\ntimeout\ntop\ntouch\ntr\ntraceroute\ntraceroute6\ntree\ntrue\ntruncate\ntty\nttysize\ntunctl\nudhcpc\nudhcpc6\numount\nuname\nunexpand\nuniq\nunix2dos\nunlink\nunlzma\nunlzop\nunshare\nunxz\nunzip\nuptime\nusleep\nuudecode\nuuencode\nvconfig\nvi\nvlock\nvolname\nwatch\nwatchdog\nwc\nwget\nwhich\nwho\nwhoami\nwhois\nxargs\nxxd\nxzcat\nyes\nzcat\nzcip\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/bin/busybox-extras",
+                "--list"
+            ],
+            "executable_sha256": "5b1b01dc3141797d86ddef4539d3965ac8e954b1aa47b86948747393ea603a6f",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "arch\nconspy\ndnsd\ndumpleases\nfakeidentd\nftpd\nftpget\nftpput\nhttpd\ninetd\nreadahead\ntcpsvd\ntelnet\ntelnetd\ntftp\ntftpd\nudhcpd\n",
+            "stderr": ""
+        }
+    ],
+    "services": [
+        {
+            "argv": [
+                "/bin/busybox-extras",
+                "httpd",
+                "-f",
+                "-p",
+                "127.0.0.1:19015",
+                "-h",
+                "/tmp/linux-compat-evidence/www"
+            ],
+            "executable_sha256": "5b1b01dc3141797d86ddef4539d3965ac8e954b1aa47b86948747393ea603a6f",
+            "response": "HTTP/1.1 200 OK\r\nDate: Sun, 11 Oct 2026 11:46:08 GMT\r\nConnection: close\r\nContent-type: text/html\r\nAccept-Ranges: bytes\r\nLast-Modified: Sun, 11 Oct 2026 11:46:08 GMT\r\nETag: \"6acb7700-50\"\r\nContent-Length: 80\r\n\r\nvinix-server-42-1327d4c1db422455199742fcde621558b21ffab53f75c247586692a86bb133bf",
+            "exit_code": 137,
+            "retired": true
+        }
+    ]
+}

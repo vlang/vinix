@@ -151,6 +151,21 @@ and complete suite return failure because unsupported dependencies are not
 success. The HTTP child is killed/reaped after the verified response; its
 recorded nonzero termination is expected cleanup, not a service run failure.
 
+Additional `catalog-aarch64.json` and `catalog-x86_64.json` receipts pass all
+four native media/office/database/server workloads: FFmpeg 6.1.2 encodes ten
+64x48 MPEG-4 frames and FFprobe verifies their format/count; Gnumeric 1.12.57
+converts CSV to its native format, reopens it and verifies the cell data;
+SQLite commits a WAL transaction and checks integrity after reopening; BusyBox
+Extras serves exact HTTP content and is retired. The prepared roots include
+the actual Alpine dependency closures and DejaVu fonts, with archive/index
+hashes in `packages-catalog-*.json`. They use the dangling-creation kernels.
+The initial AArch64 office attempt lacked fonts and a login environment and
+failed; `catalog-before-aarch64.json` retains that result. The guest init now
+provides HOME, user names, UTF-8 locale and a private user runtime directory.
+These are disposable-guest execution/save/reopen checks; package transactions,
+persistent-disk reboot, GTK windows, updates and desktop integration remain
+separate acceptance requirements.
+
 The host SQLite WAL/integrity/reopen and FFmpeg frame encode/probe checks pass.
 Those Darwin results validate workload predicates and report handling only.
 They are not Vinix application results. Host tests also verify that a missing

@@ -72,6 +72,13 @@ unique response, recording its response and termination. Missing
 executables are `unsupported`, nonzero exits/timeouts are `failed`, and either
 causes a failing suite exit. There is no sandbox-disable fallback.
 
+The application guest init supplies the usual login environment (HOME, user
+names, UTF-8 locale and XDG_RUNTIME_DIR). Prepared office roots also need real
+fonts; DejaVu and the Alpine Gnumeric dependency closure qualify the native
+save/reopen workload. Archive and guest-input hashes accompany the dated
+results, including the initial missing-font failure. Extraction remains
+distinct from installed-system package transactions and desktop integration.
+
 The Go case sets the installed `/usr/lib/go` root when present, a private build
 cache and `CGO_ENABLED=0`, matching the existing pure-Go smoke workflow. Child
 environment overrides and removed variable names are recorded per command and

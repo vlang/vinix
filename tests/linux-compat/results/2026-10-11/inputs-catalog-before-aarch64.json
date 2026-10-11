@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "cases": "media,office,sqlite,server",
+    "inputs": {
+        "kernel": "06b936a2ce1781c47d16ea6b605b3b4aba96df517a0544f1816bc99bf1be1261",
+        "workloads": "bb6929f642c8683f910996a19960512d8acebe3d0923ad070b4f467b7b4250b0",
+        "runtime-probe": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+        "rootfs_manifest": "ccd854e5250280fd0b8d865eed6ae6871813c358676f95e9071bc02beefa09b6",
+        "init_source": "7572a6b1763aaf059c2883d96c509c818e28072927ec1f840530717676d875e8",
+        "guest_report": "5bbad5aac3c379b911ddaee3acac3ed43416164bf8fa6d0ce43995b33403c6b2",
+        "snapshot_kernel": "06b936a2ce1781c47d16ea6b605b3b4aba96df517a0544f1816bc99bf1be1261"
+    },
+    "exit_code": 1
+}

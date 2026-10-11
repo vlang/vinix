@@ -5,6 +5,7 @@ module appinitfixture
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 fn C.open(&char, i32, ...) i32
@@ -14,6 +15,7 @@ fn C.puts(&char) i32
 fn C.printf(&char, ...) i32
 fn C.fflush(voidptr) i32
 fn C.setenv(&char, &char, i32) i32
+fn C.mkdir(&char, u32) i32
 fn C.fork() i32
 fn C.execv(&char, &&char) i32
 fn C._exit(i32)
@@ -26,6 +28,16 @@ fn C.pause() i32
 pub fn run() i32 {
 	unsafe {
 		C.setenv(c'PATH', c'/bin:/sbin:/usr/bin:/usr/sbin', 1)
+		// Match a login session's ordinary application environment. A bare
+		// PID 1 inherits neither HOME nor a user runtime directory.
+		C.setenv(c'HOME', c'/root', 1)
+		C.setenv(c'USER', c'root', 1)
+		C.setenv(c'LOGNAME', c'root', 1)
+		C.setenv(c'LANG', c'C.UTF-8', 1)
+		C.mkdir(c'/run', u32(0o755))
+		C.mkdir(c'/run/user', u32(0o755))
+		C.mkdir(c'/run/user/0', u32(0o700))
+		C.setenv(c'XDG_RUNTIME_DIR', c'/run/user/0', 1)
 		mut options := [1024]char{}
 		fd := C.open(c'/etc/linux-compat-options', C.O_RDONLY)
 		if fd < 0 {
