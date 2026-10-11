@@ -7,10 +7,10 @@ through DP/RDP and publishes its framebuffer through VI, polls its
 controller through SI/PIF and reads and writes cartridge SRAM through PI DMA.
 
 ```sh
-python3 tests/n64/run.py
-python3 tests/n64/run.py --no-build
+tests/n64/run
+tests/n64/run --no-build
 tests/n64/frame build/n64/qemu.log build/n64/gameplay.png
-python3 tests/n64/desktop.py
+tests/n64/desktop
 ```
 
 The guest checks detailed changing frames, controller effects at equal
@@ -64,13 +64,13 @@ disposable. The transcript remains in `build/n64/qemu.log`.
 To additionally check your own dumped cartridge:
 
 ```sh
-python3 tests/n64/run.py --no-build --game /path/to/game.z64 --timeout 900
+tests/n64/run --no-build --game /path/to/game.z64 --timeout 900
 ```
 
 The supplied-game check requires a detailed game frame and clean shutdown.
 No commercial game or Nintendo firmware is downloaded by these tests.
 
-`desktop.py` boots the compositor, starts PADDLE using real QEMU mouse input,
+`desktop` boots the compositor, starts PADDLE using real QEMU mouse input,
 holds its on-screen Right button, checks animation and pause/resume, and
 closes the window. Logs and screenshots remain in the N64 build directory.
 It expects a compositor containing Nintendo 64 at `build/vinix-desktop`, or
@@ -79,3 +79,6 @@ compositor at `build/n64/vinix-desktop` to preserve shared build artifacts.
 
 The native command migration and current qualification limits are recorded in
 [serial-tools.md](../native-guest-tools/serial-tools.md).
+
+The host commands use the native V controller in `tests/emulator-desktop/emulatorhost`.
+See [controller qualification](../emulator-desktop/controllers.md).

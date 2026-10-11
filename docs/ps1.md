@@ -83,9 +83,9 @@ the HLE BIOS. Other commercial games and analog controllers have not been tested
 ## Verification
 
 ```sh
-python3 tests/ps1/run.py --no-build --game build/ps1/homebrew/TETRADE_PSX.cue
+tests/ps1/run --no-build --game build/ps1/homebrew/TETRADE_PSX.cue
 tests/ps1/frame build/ps1/qemu.log build/ps1/gameplay.png
-python3 tests/ps1/desktop.py
+tests/ps1/desktop
 ```
 
 The isolated ARM64 Vinix guest executes Tetrade's original PS1 instructions

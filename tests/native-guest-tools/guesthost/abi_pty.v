@@ -63,6 +63,16 @@ pub fn boot_abi(command []string, env map[string]string, state string, arch stri
 
 pub fn boot_abi_from(command []string, env map[string]string, state string, arch string,
 	expected []string, pass string, failures []string, timeout int, inherit bool, directory string) !int {
+	return boot_abi_logged(command, env, state, arch, expected, pass, failures, timeout, inherit, directory, '')!
+}
+
+// Emulator commands retain the byte stream while also displaying it. The
+// caller owns the log path; compiler output never enters the serial capture.
+pub fn boot_abi_logged(command []string, env map[string]string, state string, arch string,
+	expected []string, pass string, failures []string, timeout int, inherit bool, directory string, log_path string) !int {
+	mut log := os.File{}
+	if log_path != '' { log = os.open_append(log_path)! }
+	defer { if log_path != '' { log.close() } }
 	if timeout <= 0 || expected.len == 0 || expected.any(it == '') || pass == '' {
 		return error('ABI timeout and markers must be positive/nonempty')
 	}
@@ -111,6 +121,10 @@ pub fn boot_abi_from(command []string, env map[string]string, state string, arch
 			}
 			if count > 0 {
 				transcript << buffer[..count]
+				if log_path != '' {
+					log.write(buffer[..count]) or { cause = err.msg(); break }
+					log.flush()
+				}
 				if inherit {
 					abi_console(buffer[..count]) or {
 						cause = err.msg()

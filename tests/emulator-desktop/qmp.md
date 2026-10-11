@@ -1,36 +1,24 @@
-# Emulator desktop QMP policy
+# Native emulator desktop QMP
 
-`desktopprep/qmp.v` owns the socket setup, JSON command/reply loop, input-event
-construction, coordinate arithmetic, pointer sequencing and close policy used by
-the N64, PlayStation and PlayStation 2 desktop runners. The Python `QMP` classes
-keep their public methods and pass actual objects through the borrowed Package
-Session ABI. JSON codecs, socket calls and supplied arithmetic/callback objects
-execute in the caller; inputs are not converted to native approximations.
+`emulatorhost/qmp.v` owns one nonblocking Unix socket, the buffered reply
+stream and the desktop pointer sequence. Setup, send and read operations use
+ten-second socket deadlines. Short polling checkpoints allow SIGINT to
+interrupt a pending reply; setup, error and ordinary close paths retire the
+socket, including failed connects. A second close is harmless.
 
-The native expression stack captures callable targets before operands and drops
-consumed handles when the original expression retires. The ordered method state
-owns the original parameters and assigned reply through normal returns and saved
-errors. Finite literals have implementation-lifetime roots; dynamic inputs are
-never memoized. Attribute stores, dictionary displays, truth and raising retain
-small Python syntax bindings with zero algorithm credit. Private helper frames
-do not promise the original traceback layout or arbitrary recursion budgets.
+The client parses the greeting and negotiates capabilities, skips asynchronous
+events, raises on error replies and returns the first `return` value. JSON
+number tokens keep their complete spelling, including integers beyond 64 bits.
+Malformed JSON, EOF and invalid UTF-8 remain errors. Native error text can
+differ from the earlier Python transport's exception formatting.
 
-All code outside the QMP classes keeps its original AST, including guest input
-files, screenshots, pixel checks, startup deadlines and process/finally owners.
-Event declarations receive zero credit. Conservative algorithm credit is 2,250
-bytes across 58 original lines. The previous four Python files total 30,882 bytes;
-the replacements total 29,705 bytes, removing 1,177 net Python bytes.
+Pointer events retain x/y ordering, ties-to-even coordinate rounding, button
+press/release order, 150 ms click holds, 500 ms post-click waits and all three
+250 ms analog-drag pauses. Long waits retain their deadlines and use short
+interrupt checkpoints. Production screenshot crop rectangles, startup and
+close deadlines, animation/movement thresholds and pause checks retain their
+original values.
 
-Qualification compares the original/native callbacks, faults, incoming exception
-contexts, named and temporary retirement, and actual Unix-socket transcripts.
-Actual JSON exchanges cover asynchronous events, errors, malformed input, EOF,
-large integers and pointer commands. ARM, Rosetta x86 and ASan/UBSan artifacts
-are built separately; repeated calls, saved errors, descriptors, interrupts and
-cold private owners are checked. This policy port establishes no new emulator
-boot, game, rendering, GPU, kernel or physical-device result.
-
-The committed shared transport reserves closed standard slots only while its
-private child pipes are created. Its module-instance reentrant lock protects
-spawn windows; callbacks are not serialized. Global POSIX descriptors can still
-change inside or overlapping another allocation window, including a nested
-constructor proxy. Private artifact owners retire at interpreter exit.
+The previous borrowed Package Session query and its Python classes are
+retired. [Controller qualification](controllers.md) records actual socket
+exchanges, measured timing, resource and signal checks and guest limits.

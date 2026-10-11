@@ -6,6 +6,7 @@
 #include <time.h>
 typedef struct stat vinix_module_stat;
 #define vinix_module_stat_path stat
+#define vinix_module_lstat_path lstat
 #ifdef __APPLE__
 #define vinix_module_atime_nsec st_atimespec.tv_nsec
 #define vinix_module_mtime_nsec st_mtimespec.tv_nsec

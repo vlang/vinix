@@ -1,26 +1,25 @@
-# Native emulator desktop preparation
+# Native emulator test preparation
 
-`desktopprep/policy.v` prepares the N64, PS1 and PS2 desktop test root filesystems,
-compiler and archive commands, and QEMU environment. Each harness keeps its
-parser, temporary-directory and log contexts, QMP and screenshot helpers,
-gameplay assertions, deadlines, signals and final cleanup.
+The six `tests/{n64,ps1,ps2}/{run,desktop}` commands compile and invoke V
+directly. `emulatorhost` owns their CLI, rootfs staging, strict guest compiler
+commands, archive creation, native ARM launch and temporary directories.
 
-The controller borrows the actual caller's Path, options, environment and
-subprocess objects through the Package Session ABI. Raw filesystem strings,
-Python widths, operand order and native Python exceptions stay intact. One
-ordered dictionary holds named preparation values on a saved error. Dynamic
-paths and results never enter the finite per-harness literal pool.
+Guest roots retain the original staging tree and its file/directory metadata,
+literal symlink targets, optional game and BIOS locations. PS1 recursively
+copies CUE/M3U dependencies with physical-path cycle/deduplication guards,
+strict UTF-8 and directory containment. N64 retains the full halfword/word
+swaps and original IPL instruction-budget mutation.
 
-All three harnesses share the import and syntax bridge. The first preparation
-call builds a private SDK library and query with the invoking Python's host
-architecture and headers. `VINIX_PACKAGE_STORE_LIBRARY` and
-`VINIX_DESKTOP_PREPARATION_QUERY` may select previously built artifacts. Cold
-build owners use private directories and retire at interpreter exit.
+Desktop roots retain the original compositor, staged `usr` tree and
+`tests/ios/desktop-init.c` recipe. The native ARM launch supplies a separate
+init overlay, private 64 MiB ext2 home, EFI variables and 2048×1536 firmware
+and Limine resolution. It owns QEMU directly; rootfs and package servers are
+unnecessary for these isolated roots. No Python import adapter remains.
 
-Python dictionary expansion, list/tuple construction and formatting bindings
-receive zero migration credit, as do fixed recipe data and unchanged guest
-fixtures. Host comparisons include real copies, permissions and symlinks,
-raw paths, supplied objects, failures and complete controlled harness workflows.
-Controlled processes and screenshots establish no new emulator, kernel or QEMU
-execution result. Extra private bridge frames do not preserve exact traceback
-frame layouts or recursion budgets.
+The earlier borrowed-object preparation policy is historical. Its Python
+object lifetime/exception transport is retired with its callers. These native
+commands accept CLI paths and values; they do not expose arbitrary Python
+objects or callback rebinding. Runtime diagnostics can differ while parser
+errors, unsuccessful runs and interrupts return 2, 1 and 130 respectively.
+
+See [qualification and current limits](controllers.md).

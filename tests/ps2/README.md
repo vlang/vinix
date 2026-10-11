@@ -6,10 +6,10 @@ emulated Emotion Engine and IOP, draws GS primitives, polls its controller
 through SIO2, and reads and writes an actual PS2 memory card.
 
 ```sh
-python3 tests/ps2/run.py
-python3 tests/ps2/run.py --no-build
+tests/ps2/run
+tests/ps2/run --no-build
 tests/ps2/frame build/ps2/qemu.log build/ps2/gameplay.png
-python3 tests/ps2/desktop.py
+tests/ps2/desktop
 ```
 
 The guest requires detailed changing frames, compares controller input at
@@ -36,13 +36,13 @@ native comparison while preserving the same workload and marker gate.
 To additionally test your own ELF or disc image:
 
 ```sh
-python3 tests/ps2/run.py --no-build --game /path/to/game.iso --bios /path/to/ps2.bin --timeout 900
+tests/ps2/run --no-build --game /path/to/game.iso --bios /path/to/ps2.bin --timeout 900
 ```
 
 The supplied-game check requires a detailed game frame and clean shutdown.
 No commercial game or Sony firmware is downloaded by these tests.
 
-`desktop.py` boots the compositor, starts PADDLE using QEMU mouse input,
+`desktop` boots the compositor, starts PADDLE using QEMU mouse input,
 holds the on-screen controller to move its paddle, checks animation and
 pause/resume, and closes the window. Logs and screenshots remain under the
 PS2 build directory. It expects a compositor containing the PlayStation 2
@@ -83,3 +83,6 @@ cache, including `original.json`, `source-audit.json`, `sdk-builds.json`,
 `persistent-card-comparison.json`. These tests
 reuse a recorded kernel and emulator; they do not claim a new kernel build,
 x86 emulator execution, host sanitizers or operation on physical PS2 hardware.
+
+The host commands use the native V controller in `tests/emulator-desktop/emulatorhost`.
+See [controller qualification](../emulator-desktop/controllers.md).

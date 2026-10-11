@@ -80,9 +80,9 @@ archive hashes, and license details are in
 ## Regression
 
 ```sh
-python3 tests/ps2/run.py --no-build
+tests/ps2/run --no-build
 tests/ps2/frame build/ps2/qemu.log build/ps2/paddle.png
-python3 tests/ps2/desktop.py
+tests/ps2/desktop
 ```
 
 The native guest regression runs the PS2 program and verifies changing frames,

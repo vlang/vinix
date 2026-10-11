@@ -9,10 +9,10 @@ across processes, and requires a clean process exit with the shared surface
 removed. The test uses the normal muted audio option.
 
 ```sh
-python3 tests/ps1/run.py
-python3 tests/ps1/run.py --no-build
+tests/ps1/run
+tests/ps1/run --no-build
 tests/ps1/frame build/ps1/qemu.log build/ps1/gameplay.png
-python3 tests/ps1/desktop.py
+tests/ps1/desktop
 ```
 
 The runner uses the existing ARM64 kernel and musl test sysroot. Build those
@@ -25,7 +25,7 @@ at `build/ps1/qemu.log` or the path passed to `--log`.
 To additionally boot a PS1 executable or disc you own:
 
 ```sh
-python3 tests/ps1/run.py --no-build --game /path/to/game.cue --timeout 600
+tests/ps1/run --no-build --game /path/to/game.cue --timeout 600
 ```
 
 Add `--bios /path/to/scph5501.bin` to use your own BIOS for disc compatibility.
@@ -38,7 +38,10 @@ No commercial game or Sony BIOS is downloaded by this regression.
 `frame --frame 0` selects the first captured frame; the default is the last.
 PNG pixels come directly from the VSF1 surface produced by the emulator.
 
-`desktop.py` uses the built compositor, actual QEMU mouse input and screenshots
+`desktop` uses the built compositor, actual QEMU mouse input and screenshots
 to play Tetrade, verify pause/resume and close its window. Its logs and screen
 captures are retained under the PS1 build directory. Both VM harnesses keep
 their disks and game writes isolated from the running desktop.
+
+The host commands use the native V controller in `tests/emulator-desktop/emulatorhost`.
+See [controller qualification](../emulator-desktop/controllers.md).
