@@ -4,6 +4,12 @@ module volumecli
 
 import os
 
+fn C.fork() i32
+fn C.dup2(i32, i32) i32
+fn C.waitpid(i32, &i32, i32) i32
+fn C._exit(i32)
+fn C.setvbuf(voidptr, &char, i32, usize) i32
+
 struct BundleIO {
 mut:
 	mode    int
@@ -259,5 +265,85 @@ fn test_pool_membership_and_allocation_publish_metadata_and_mappings_together_on
 				assert current == original
 			}
 		}
+	}
+}
+
+fn test_pool_expansion_growth_and_equal_size_retries_complete_the_shared_durability_protocol() {
+	work := os.join_path(os.temp_dir(), 'vinix-pool-growth-io-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	for expand in [false, true] {
+		for equal in [false, true] {
+			for mode in 1 .. 7 {
+				mut set := PlanSet{}
+				mut plan := Plan{count: 1, key: DiskKey{bytes: 32768, sector: 512, kind: 1}}
+				plan.key.id[0] = 1
+				plan.rows[0] = Request{slot: 9, offset: 4096, length: if !expand && equal { u64(8192) } else { u64(4096) }, flags: 1}
+				assert append_plan(mut set, &plan)
+				region := PoolRegion{pool: 3, disk: 0, window: SpaceWindow{start: 4096,
+					end: if expand && !equal { u64(8192) } else { u64(16384) }, alignment: 4096}}
+				assert bundle_pool_add(mut set, &region)
+				bundle_io = BundleIO{}
+				assert publish_bundle(path.str, &set)
+				original := os.read_bytes(path)!
+				bundle_io = BundleIO{mode: mode}
+				index := if expand { u32(0) } else { u32(9) }
+				size := if expand { u64(16384) } else { u64(8192) }
+				assert grow_pool_plan(path.str, 3, index, size, expand) == if mode == 1 { 0 } else { 1 }
+				assert bundle_io.closes == 2 && os.ls(work)!.len == 1 && bundle_io.writes > 0
+				current := os.read_bytes(path)!
+				mut decoded := PlanSet{}
+				assert decode_bundle(current.data, current.len, mut decoded) && decoded.regions == 1
+				if mode == 1 || mode == 4 {
+					assert (current == original) == equal && bundle_io.renames == 1 && bundle_io.flushes == 2
+					assert decoded.windows[0].window.end == 16384
+					assert decoded.plans[0].rows[0].length == if expand { u64(4096) } else { u64(8192) }
+					assert decoded.plans[0].rows[0].flags == 1 && decoded.plans[0].rows[0].offset == 4096
+					// A retry after failed directory fsync must publish and flush even
+					// though the complete new desired geometry is already visible.
+					bundle_io = BundleIO{}
+					assert grow_pool_plan(path.str, 3, index, size, expand) == 0 && os.read_bytes(path)! == current
+					assert bundle_io.writes > 0 && bundle_io.renames == 1 && bundle_io.flushes == 2 && bundle_io.closes == 2
+				} else { assert current == original }
+			}
+		}
+	}
+}
+
+fn test_pool_expansion_and_growth_detect_buffered_stdout_failure_after_complete_publication() {
+	work := os.join_path(os.temp_dir(), 'vinix-pool-growth-output-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	for expand in [false, true] {
+		mut set := PlanSet{}
+		mut plan := Plan{count: 1, key: DiskKey{bytes: 32768, sector: 512, kind: 1}}
+		plan.key.id[0] = 1
+		plan.rows[0] = Request{slot: 9, offset: 4096, length: 4096, flags: 1}
+		assert append_plan(mut set, &plan)
+		region := PoolRegion{pool: 3, disk: 0, window: SpaceWindow{start: 4096,
+			end: if expand { u64(8192) } else { u64(16384) }, alignment: 4096}}
+		assert bundle_pool_add(mut set, &region)
+		bundle_io = BundleIO{}
+		assert publish_bundle(path.str, &set) && C.fflush(C.stdout) == 0
+		child := C.fork()
+		assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY)
+			if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }
+			C.close(fd)
+			mut buffer := [4096]char{}
+			if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+			result := grow_pool_plan(path.str, 3, if expand { u32(0) } else { u32(9) },
+				if expand { u64(16384) } else { u64(8192) }, expand)
+			C._exit(if result == 1 { 0 } else { 4 })
+		}
+		mut result := i32(-1)
+		assert C.waitpid(child, &result, 0) == child && result == 0
+		data := os.read_bytes(path)!
+		mut decoded := PlanSet{}
+		assert decode_bundle(data.data, data.len, mut decoded) && decoded.windows[0].window.end == 16384
+		assert decoded.plans[0].rows[0].length == if expand { u64(4096) } else { u64(8192) }
 	}
 }

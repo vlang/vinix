@@ -85,6 +85,13 @@ order and atomically publishes one contiguous mapping with the pool metadata.
 and live mappings. Pool-bearing bundles use version 2; pool-free bundles retain
 version 1. See [pool bounds, persistence and allocation rules](../../docs/storage-volumes.md#persistent-allocation-pools).
 
+`pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES` extends an existing member's
+eligibility without changing its allocation priority. `pool-grow BUNDLE POOL_ID
+SLOT LENGTH_BYTES` grows a desired mapping within that member's contiguous
+bounds, preserving its disk, start and mode. Both publish offline, including
+equal-size durability retries; live growth uses separate explicit replay. See
+[pool expansion and growth rules](../../docs/storage-volumes.md#pool-expansion-and-mapping-growth).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

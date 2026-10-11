@@ -69,6 +69,14 @@ Guests verify later-disk conflict preflight, retained data/descriptors and pool
 metadata across reordered boot and capacity adoption. See
 [pool qualification](pool-bundle.md).
 
+Pool expansion and mapping-growth tests preserve member order and desired rows,
+require adopted capacity and contiguous member bounds, and check every small
+growth fragmentation pattern against an independent sector oracle. Equal-size
+retries still complete every publisher flush; output failure is detected after
+publication. Guests qualify held read-only descriptors, extension conflicts,
+grown writable tail data and expanded eligibility across reboot. See
+[pool growth qualification](pool-growth.md).
+
 Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init
@@ -87,8 +95,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 5200 utility processes across 200 warmup
-and 200 measured thirteen-command cycles, with pool membership/query/allocation,
+its own process. The allowance includes 6000 utility processes across 200 warmup
+and 200 measured fifteen-command cycles, with pool membership/query/allocation/growth,
 physical-capacity verification, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
 checks are unchanged.
@@ -135,8 +143,9 @@ extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
 capacity, verifies/republishes unchanged physical capacity, adds two pool members,
-queries the pool and allocates/checks/removes a scratch mapping, enrolls/forgets
-an empty offline participant, explicitly replays growth and runs boot restoration.
+expands the first region, queries the pool and allocates/grows/checks/removes
+a scratch mapping, enrolls/forgets an empty offline participant, explicitly
+replays growth and runs boot restoration.
 A flushed phase marker
 and the atomically published bundle stay on ext2 across an
 abrupt VM stop. The physical disks are reordered for the second boot. Production ARM
@@ -151,7 +160,9 @@ The third boot must reject the old saved geometry before the application adopts
 the exact new capacity, allocates and grows a tail view, and persists its bundle
 and phase marker. The fourth boot must restore all six mappings through
 production init and retain durable old/tail data and read-only modes. Both pool
-regions must survive the reordered second boot and enlarged fourth boot.
+regions must survive the reordered second boot and enlarged fourth boot. The
+new tail pool's expanded eligibility and grown mapping must survive the fourth
+boot too.
 
 The fixture touches its readable ELF load pages before sampling. This keeps
 cold faults in the long-lived test program's diagnostic code from appearing as

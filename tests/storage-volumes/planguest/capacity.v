@@ -37,6 +37,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 			edited_view_data()
 			capacity_view_data()
 			pool_boot_check()
+			pool_growth_boot_check()
 			check(status(c'/dev/mapper/vinix14').disk_id == status(parent).disk_id
 				&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id,
 				c'capacity boot maps the correct physical disks')
@@ -57,6 +58,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 		size := C.read(fd, &original[0], 6208)
 		check(fd >= 0 && size == 432 && C.close(fd) == 0, c'read pre-adoption pool bundle')
 		planning_allocate(c'/root/saved.vset', c'0', c'14', c'4096', c'16777216', c'25165824', c'4096', false, 1)
+		pool_growth(c'/root/saved.vset', c'pool-expand', c'3', c'0', c'25165824', 1)
 		planning_capacity(c'/root/saved.vset', c'0', other, c'25165824', 1)
 		planning_capacity(c'/root/saved.vset', c'0', parent, c'16777216', 1)
 		planning_capacity(c'/root/saved.vset', c'0', parent, c'8388608', 1)
@@ -80,7 +82,9 @@ fn physical_capacity_phase(parent &char, other &char) {
 		first := status(c'/dev/mapper/vinix2').generation
 		old := C.open(c'/dev/mapper/vinix2', C.O_RDONLY)
 		check(old >= 0, c'hold old descriptor across capacity planning')
-		planning_allocate(c'/root/saved.vset', c'0', c'14', c'4096', c'16777216', c'25165824', c'4096', false, 0)
+		pool_add(c'/root/saved.vset', c'4', c'0', c'16777216', c'16781312', c'4096', 0)
+		pool_growth(c'/root/saved.vset', c'pool-expand', c'4', c'0', c'25165824', 0)
+		pool_allocate(c'/root/saved.vset', c'4', c'14', c'4096', false, 0)
 		missing(c'/dev/mapper/vinix14')
 		planning_capacity(c'/root/saved.vset', c'0', parent, c'25165824', 0)
 		simple(c'restore-bundle', c'/root/saved.vset', &char(nil), 0)
@@ -88,7 +92,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 		held := C.open(c'/dev/mapper/vinix14', C.O_RDWR)
 		mut bytes := [4096]u8{init: 0xc1}
 		check(held >= 0 && C.pwrite(held, &bytes[0], 4096, 0) == 4096, c'write new physical tail')
-		tool(c'plan-grow', c'/root/saved.vset', c'14', c'8192', &char(nil), 0)
+		pool_growth(c'/root/saved.vset', c'pool-grow', c'4', c'14', c'8192', 0)
 		simple(c'restore-bundle', c'/root/saved.vset', &char(nil), 1)
 		tool(c'restore-bundle', c'/root/saved.vset', c'grow', &char(nil), &char(nil), 0)
 		for i in 0 .. 4096 { bytes[i] = 0xc2 }

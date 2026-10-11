@@ -165,8 +165,10 @@ fn cycles(parent &char, count int) {
 		tool(c'plan-grow', c'/etc/vinix/volumes.vset', c'2', c'8192', unsafe { &char(nil) }, 0)
 		planning_capacity(c'/etc/vinix/volumes.vset', c'0', parent, c'16777216', 0)
 		pool_members(c'/etc/vinix/volumes.vset')
+		pool_growth(c'/etc/vinix/volumes.vset', c'pool-expand', c'3', c'0', c'6299648', 0)
 		simple(c'pool-space', c'/etc/vinix/volumes.vset', c'3', 0)
 		pool_allocate(c'/etc/vinix/volumes.vset', c'3', c'14', c'4096', true, 0)
+		pool_growth(c'/etc/vinix/volumes.vset', c'pool-grow', c'3', c'14', c'8192', 0)
 		tool(c'check-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		simple(c'plan-remove', c'/etc/vinix/volumes.vset', c'14', 0)
 		simple(c'plan-enroll', c'/etc/vinix/volumes.vset', c'/root/offline.vmap', 0)
@@ -428,6 +430,7 @@ fn first_boot(parent &char) {
 		planned_disks(wrong)
 		planned_space(parent)
 		planned_pools(parent, wrong)
+		planned_pool_growth(parent)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }

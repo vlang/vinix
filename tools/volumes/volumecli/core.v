@@ -64,11 +64,20 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES ALIGNMENT_BYTES [ro]\n')
 	C.printf(c'       vinix-volume plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES\n')
 	C.printf(c'       vinix-volume pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume pool-remove BUNDLE POOL_ID DISK_INDEX\n       vinix-volume pool-space BUNDLE POOL_ID\n       vinix-volume pool-allocate BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]\n')
+	C.printf(c'       vinix-volume pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES\n       vinix-volume pool-grow BUNDLE POOL_ID SLOT LENGTH_BYTES\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'pool-expand') == 0 || C.strcmp(argv[1], c'pool-grow') == 0) {
+			if argc != 6 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			index := decimal(argv[4]) or { return usage() }
+			size := decimal(argv[5]) or { return usage() }
+			if pool >= 64 || index >= 64 || size == 0 { return usage() }
+			return grow_pool_plan(argv[2], u32(pool), u32(index), size, C.strcmp(argv[1], c'pool-expand') == 0)
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'pool-add') == 0 {
 			if argc != 8 { return usage() }
 			pool := decimal(argv[3]) or { return usage() }

@@ -168,6 +168,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Bounded aligned free-extent inspection and first-fit allocation preserving desired mappings and separate live protection](docs/storage-volumes.md#bounded-extent-allocation).
   - [x] [Explicit adoption of observed physical capacity growth with pinned identity verification, preserved desired mappings and new-tail allocation/replay](docs/storage-volumes.md#adopting-physical-capacity-growth).
   - [x] [Persistent multi-disk allocation pools with atomic membership, full-width free-capacity reporting and ordered contiguous allocation/replay](docs/storage-volumes.md#persistent-allocation-pools).
+  - [x] [Pool eligibility expansion preserving allocation priority and bounded in-place desired mapping growth with durable retries and stable live descriptors](docs/storage-volumes.md#pool-expansion-and-mapping-growth).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

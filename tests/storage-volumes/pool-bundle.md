@@ -46,11 +46,11 @@ live generation and held descriptor's two data pages. Removing desired rows
 then all members restores the exact original version-1 file; re-adding the
 regions restores the exact configured version-2 file.
 
-Each of 200 warmup and 200 measured cycles launches thirteen utility processes:
+Each of 200 warmup and 200 measured cycles launches fifteen utility processes:
 save-set, unchanged plan-grow, unchanged plan-capacity, two pool-add commands,
-pool-space, pool-allocate, check-bundle, plan-remove, plan-enroll, plan-forget,
-restore-bundle and boot-restore. This is 5200 processes, 800 member additions,
-400 pool queries and 400 scratch allocations. No scratch mapping is created.
+pool-expand, pool-space, pool-allocate, pool-grow, check-bundle, plan-remove,
+plan-enroll, plan-forget, restore-bundle and boot-restore. This is 6000 processes,
+800 member additions, 400 pool queries and 400 scratch allocations. No scratch mapping is created.
 Every slab class and the large-page total must stay flat or decrease.
 
 The actual guest-published pool-bearing bundle survives the reordered second
@@ -60,6 +60,9 @@ capacity adoption and tail allocation/growth preserve both pool records. The
 fourth boot must restore all six mappings and report the original pool regions
 and exact aggregate capacity, alongside durable old/tail data and modes.
 `PLAN POOL BOOT PRESERVED` is required on both successful reboot phases.
+The tail mapping now uses an additional pool whose region is expanded after
+physical adoption and whose desired mapping grows through `pool-grow`;
+[growth qualification](pool-growth.md) covers those commands and persistence.
 
 Real guest coverage uses 512-byte MBR disks on VirtIO (ARM64) and AHCI (x86).
 Mixed sectors, ambiguous identities, maximum bounds and publication faults use

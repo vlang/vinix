@@ -574,7 +574,7 @@ in allocation order. Forgetting a disk requires no desired mappings or pool
 membership; following disk indices are adjusted together. Pool membership does
 not tag or restrict ordinary `plan-add`, `plan-grow` or explicit-region edits.
 `plan-capacity` preserves the regions; extending eligibility into an adopted
-tail requires an explicit membership edit. `save-set` captures a fresh live
+tail uses explicit `pool-expand` below. `save-set` captures a fresh live
 mapping snapshot and emits a pool-free bundle, replacing prior desired edits
 and pool configuration. Use bundle edits to retain that configuration.
 
@@ -602,6 +602,61 @@ filesystem free space or a live reservation. Separate complete-set preflight
 detects unlisted live conflicts, and application retains kernel extent
 protection. Spanning, striping, RAID, filesystem resizing and encryption remain
 separate work. See [pool qualification](../tests/storage-volumes/pool-bundle.md).
+
+## Pool expansion and mapping growth
+
+```sh
+# Pool 3 already includes saved disk 0, and slot 20 fits inside that member.
+# Adopt the larger observed disk first when extending past its saved capacity.
+vinix-volume plan-capacity /root/layout.vset 0 /dev/vda 25165824
+vinix-volume pool-expand /root/layout.vset 3 0 25165824
+vinix-volume pool-grow /root/layout.vset 3 20 4194304
+vinix-volume pool-space /root/layout.vset 3
+vinix-volume check-bundle /root/layout.vset grow
+vinix-volume restore-bundle /root/layout.vset grow
+```
+
+`pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES` increases an existing member's
+exclusive end while retaining its start, alignment and allocation priority.
+The new end must be at least the saved end, sector-aligned, within the enrolled
+disk's saved capacity and disjoint from every other pool region on that disk.
+Adjacent regions are valid. Absent members, shrink, overflow, misalignment,
+overlap and an unadopted physical tail fail without publication. Existing desired
+mappings, including rows inside the added eligibility, remain unchanged and
+occupy their usual space. Expansion works even when the region table is full.
+It does not add a member, move data or change live mapping capacity.
+
+`pool-grow BUNDLE POOL_ID SLOT LENGTH_BYTES` increases an existing mapping's
+desired length in place. Its old and requested extents must both fit entirely
+inside this pool's member region on the mapping's current disk. The length must
+be nonzero, at least the saved length and sector-aligned, with no overlap with
+any other desired mapping. Start, disk identity, slot, read-only mode, row order,
+membership order and all other desired state stay fixed. Placement alignment
+governs new allocations; growth keeps the existing start. A manually added
+mapping wholly inside the selected member can also grow. A mapping outside or
+straddling the region fails even for an unchanged-length request. Free capacity
+in other gaps or disks cannot bridge the mapping's contiguous extension, and
+growth does not relocate it or consume a different member.
+
+Both commands validate the complete saved set and atomically publish the
+existing version-2 format without opening devices. Repeating an equal end or
+length still writes, fsyncs, renames and fsyncs the directory, completing the
+durability protocol after a prior directory-flush failure. Publication and
+buffered output errors return failure; after rename, the complete new desired
+file may already be visible. Inspection and retry use that new desired state.
+Each command publishes separately, so a later failed growth retains an earlier
+successful physical-capacity adoption or region expansion.
+
+Apply growth separately with `check-bundle BUNDLE grow` and `restore-bundle
+BUNDLE grow`. Ordinary replay still rejects existing smaller live mappings.
+Complete-set preflight catches unlisted live extension conflicts before any
+action, and explicit replay retains generations and open descriptors, including
+read-only ones. Kernel extent protection and the existing partial-application
+rules continue to apply. Boot replay recreates the saved grown geometry and
+preserves pool metadata. Regions remain an administrative choice accounting for
+partition tables, filesystems, swap and other data; expansion does not reserve
+live extents. Administration must remain serialized. See
+[pool growth qualification](../tests/storage-volumes/pool-growth.md).
 
 ## Status ABI
 

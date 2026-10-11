@@ -22,11 +22,11 @@ fn pool_members(path &char) {
 	pool_add(path, c'3', c'1', c'6291456', c'6303744', c'4096', 0)
 }
 
-fn pool_preview(path &char, expected i32, output &char) {
+fn pool_preview_for(path &char, pool &char, expected i32, output &char) {
 	fd := C.open(c'/root/pool-output', C.O_WRONLY | C.O_CREAT | C.O_TRUNC, u32(0o600))
 	check(fd >= 0, c'open pool output')
 	unsafe {
-		args := [&char(c'/usr/sbin/vinix-volume'), &char(c'pool-space'), path, &char(c'3'), &char(nil)]!
+		args := [&char(c'/usr/sbin/vinix-volume'), &char(c'pool-space'), path, pool, &char(nil)]!
 		child := C.fork()
 		check(child >= 0, c'fork pool preview')
 		if child == 0 {
@@ -41,6 +41,10 @@ fn pool_preview(path &char, expected i32, output &char) {
 	count := C.read(input, output, 4095)
 	check(input >= 0 && count > 0 && count < 4095 && C.close(input) == 0, c'read pool output')
 	unsafe { output[count] = 0 }
+}
+
+fn pool_preview(path &char, expected i32, output &char) {
+	pool_preview_for(path, c'3', expected, output)
 }
 
 fn pool_boot_check() {
