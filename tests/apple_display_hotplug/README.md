@@ -4,7 +4,7 @@ Run the independent V fixture against the actual kernel hotplug policy:
 
 ```sh
 tests/apple_display_hotplug/run.sh
-python3 tests/apple_display_hotplug/run.py --host-arch amd64
+tests/apple_display_hotplug/run.sh --host-arch amd64
 ```
 
 Host builds use ASan/UBSan with immediate failure. The generated production and
@@ -16,7 +16,7 @@ counter wrap, one-shot action selection, non-1 C truth values and zero debounce.
 Build a static native fixture and boot an isolated guest:
 
 ```sh
-python3 tests/apple_display_hotplug/run.py --arch aarch64 \
+tests/apple_display_hotplug/run.sh --arch aarch64 \
   --kernel-dir /path/to/isolated/kernel \
   --state-dir /path/to/new/hotplug-build \
   --guest-state-dir /path/to/new/hotplug-guest
@@ -28,3 +28,7 @@ original with the same provider, compiler flags and guest entry. Normal builds
 read maintained V only. The production provider is copied with a private module
 name; its algorithms and public header remain unchanged. Native model tests do
 not verify physical CD321x/DCP hardware operation.
+
+The command now parses, builds and supervises guests in V. See
+[host-controller.md](host-controller.md) and
+[qualification](../apple-protocols/mailbox-hotplug.md) for current checks.

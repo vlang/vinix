@@ -56,3 +56,25 @@ fn test_interrupt_scope_restores_previous_handler() {
 	assert C.signal(C.SIGINT, voidptr(owner_signal)) == voidptr(owner_signal)
 	assert !os.exists(r.work)
 }
+
+fn test_hotplug_native_guard_and_honoured_temporary_base() {
+	if _ := runtime('hotplug', ['--arch', 'aarch64', '--build-only']) { assert false } else {
+		assert err is FrontendError
+	}
+	work := hosttest.work_dir('', 'vinix-hotplug-owner-test-')!
+	defer { hosttest.remove_work_dir(work) or { panic(err) } }
+	previous := os.getenv_opt('TMPDIR')
+	os.setenv('TMPDIR', work, true)
+	defer {
+		if value := previous { os.setenv('TMPDIR', value, true) } else { os.unsetenv('TMPDIR') }
+	}
+	r := runtime('hotplug', [])!
+	assert r.owned && r.work.starts_with(hosttest.module_resolve(work)! + '/')
+	r.close()!
+	assert os.ls(work)!.len == 0
+	state := work + '/native'
+	retained := runtime('hotplug', ['--arch', 'aarch64', '--state-dir', state, '--build-only'])!
+	assert retained.build_only && retained.kernel == '' && retained.guest == ''
+	retained.close()!
+	assert os.is_dir(state)
+}

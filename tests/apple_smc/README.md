@@ -76,13 +76,21 @@ are possible.
 
 ## The older fixture
 
-`run.sh`, `run.py`, `fixture/` and `compile-fixture` are the original test of
+`run.sh`, `run.v`, `fixture/` and `compile-fixture` are the original test of
 the capacity and telemetry path: a mailbox model compiled to C and compared
-with a frozen C original. Its driver is Python. It asserts that every command
+with a frozen C original. Its driver is V. It asserts that every command
 on the wire is GET_SRAM_ADDR or READ_KEY, which still holds for the three
 calls it exercises (`vinix_smc_refresh`, `vinix_smc_refresh_power`,
 `vinix_smc_poll`); the first test of `protocol_test.v` says the same against
 the simulated SMC.
+
+The native command retains all 27 original golden checks, strict allocator
+guards, the standalone full-core producer and serial/native guest recipe.
+`--host-arch` also selects a real host SDK ABI; `--build-only` stops before
+guest launch. The current compiler emits undeclared `memdup` calls in the
+independent mailbox fixture, so its strict comparison still fails before a
+verdict. No passing current mailbox fixture or guest is claimed. See
+[qualification](../apple-protocols/mailbox-hotplug.md).
 
 ## What this does not show
 

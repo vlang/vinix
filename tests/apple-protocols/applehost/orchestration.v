@@ -5,6 +5,7 @@ module applehost
 import fixturehost
 import guesthost
 import hosttest
+import os
 import policyhost
 import strconv
 
@@ -45,10 +46,26 @@ pub:
 // All former frontends used /tmp explicitly, regardless of TMPDIR. An explicit
 // state directory must be fresh and remains available after success or failure.
 fn private_work(prefix string) !string {
-	mut pattern := ('/tmp/' + prefix + 'XXXXXX\x00').bytes()
+	return private_work_in('/tmp', prefix)!
+}
+
+fn private_work_in(base string, prefix string) !string {
+	mut pattern := (base.trim_right('/') + '/' + prefix + 'XXXXXX\x00').bytes()
 	result := unsafe { C.mkdtemp(&char(pattern.data)) }
 	if result == unsafe { nil } { return error('Cannot create private Apple test directory') }
 	return unsafe { result.vstring().clone() }
+}
+
+fn temporary_work(prefix string) !string {
+	// Hotplug's original tempfile owner honours the caller's temporary base.
+	// Try writable candidates in order instead of os.temp_dir's cached value.
+	mut bases := ['TMPDIR', 'TEMP', 'TMP'].map(os.getenv(it)).filter(it != '')
+	bases << ['/tmp', '/var/tmp', '/usr/tmp', os.getwd()]
+	for base in bases {
+		resolved := hosttest.module_resolve(base) or { continue }
+		if path := private_work_in(resolved, prefix) { return path }
+	}
+	return error('Cannot create private hotplug temporary directory')
 }
 
 pub struct FrontendError {
@@ -67,6 +84,7 @@ pub fn runtime(family string, args []string) !Runtime {
 		hosttest.Option{'--guest-state-dir', true, []}]
 	if family != 'ans' { specs << hosttest.Option{'--host-arch', true, ['arm64', 'amd64']} }
 	if family == 'wifi-control' { specs << hosttest.Option{'--vm', false, []} }
+	if family == 'hotplug' { specs << hosttest.Option{'--original-reference', true, []} }
 	if family == 'ans' { specs << hosttest.Option{'--fixture', true, ['ext2', 'ans']} }
 	if family == 'spi' {
 		specs << hosttest.Option{'--suite', true, ['keyboard', 'touchpad', 'both']}
@@ -84,7 +102,7 @@ pub fn runtime(family string, args []string) !Runtime {
 			'--build-only stops after strict native objects and ELF') or { return FrontendError{err.msg()} }
 	mut values := parsed.options.clone()
 	// Path('') names the current directory; an omitted path owns a temporary.
-	for name in ['--state-dir', '--kernel-dir', '--guest-state-dir', '--provider-source', '--provider-header'] {
+	for name in ['--state-dir', '--kernel-dir', '--guest-state-dir', '--provider-source', '--provider-header', '--original-reference'] {
 		if name in values && values[name] == '' { values[name] = '.' }
 	}
 	arch := values['--arch']
@@ -96,7 +114,11 @@ pub fn runtime(family string, args []string) !Runtime {
 		values['--state-dir'] = hosttest.module_resolve(values['--state-dir'])!
 		values['--guest-state-dir'] = values['--state-dir'] + '/guest'
 	}
-	if arch != '' && ('--kernel-dir' !in values || '--guest-state-dir' !in values) {
+	if family == 'hotplug' && arch != '' && '--state-dir' !in values {
+		return FrontendError{'native run needs --state-dir'}
+	}
+	if arch != '' && !(family == 'hotplug' && '--build-only' in values)
+		&& ('--kernel-dir' !in values || '--guest-state-dir' !in values) {
 		return FrontendError{'--arch requires --kernel-dir and --guest-state-dir'}
 	}
 	if family == 'spi' {
@@ -113,7 +135,8 @@ pub fn runtime(family string, args []string) !Runtime {
 	caller := policyhost.caller_arch()
 	state := values['--state-dir']
 	work := if state == '' {
-		private_work('vinix-' + family + '-')!
+		if family == 'hotplug' { temporary_work('vinix-hotplug-')! }
+		else { private_work('vinix-' + family + '-')! }
 	} else {
 		hosttest.work_dir(state, '')!
 	}
@@ -147,7 +170,11 @@ pub fn (r Runtime) close() ! {
 pub fn environment() map[string]string { return policyhost.environment() }
 
 pub fn capture_result(argv []string, env map[string]string, host_arch string, directory string) !fixturehost.CapturedCommand {
-	return fixturehost.capture_bounded(argv, env, host_arch, directory, -1, apple_suite_cancelled) or {
+	return capture_timeout(argv, env, host_arch, directory, -1)!
+}
+
+pub fn capture_timeout(argv []string, env map[string]string, host_arch string, directory string, timeout int) !fixturehost.CapturedCommand {
+	return fixturehost.capture_bounded(argv, env, host_arch, directory, timeout, apple_suite_cancelled) or {
 		if err.code() == 130 { return err }
 		return error(err.msg())
 	}
