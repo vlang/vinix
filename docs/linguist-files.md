@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `63c3fc160b62ecbb81de0757375e0ca38fdc2136`,
+at source commit `e4ad8a3f9800c956d19e5f24e16e97d037426e28`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -12,15 +12,15 @@ This is a snapshot; regenerate it when source files change.
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
 | C | 567 | 2,365,384 | 6.18% |
-| Python | 323 | 1,677,444 | 4.38% |
-| Shell | 520 | 1,365,700 | 3.57% |
+| Python | 319 | 1,658,007 | 4.33% |
+| Shell | 524 | 1,366,571 | 3.57% |
 
-All `.v` files are classified as V. The resulting V share is 77.72%, with no
+All `.v` files are classified as V. The resulting V share is 77.78%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,677,444 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,658,007 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 63c3fc160b62ecbb81de0757375e0ca38fdc2136 --breakdown --json
+github-linguist --rev e4ad8a3f9800c956d19e5f24e16e97d037426e28 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -669,13 +669,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/minecraft/minecraft-login` | 7,459 |
 | `build-support/minecraft/patch-lwjgl-aarch64.py` | 4,179 |
 | `build-support/musl/stage.py` | 4,754 |
-| `build-support/n64-homebrew/build.py` | 5,005 |
 | `build-support/n64/build.py` | 2,829 |
 | `build-support/native_host.py` | 6,504 |
 | `build-support/opengothic/build.py` | 1,979 |
-| `build-support/ps1/build.py` | 8,162 |
-| `build-support/ps1/download-homebrew.py` | 1,628 |
-| `build-support/ps2-homebrew/build.py` | 4,642 |
 | `build-support/ps2/build.py` | 2,161 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/roblox/_native.py` | 948 |
@@ -993,11 +989,15 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/make-docker-image` | 168 |
 | `build-support/minecraft/minecraft-xinitrc` | 47 |
 | `build-support/minecraft/run-minecraft` | 10,431 |
+| `build-support/n64-homebrew/build` | 231 |
 | `build-support/n64/test-bridge` | 161 |
 | `build-support/obs/run-obs` | 1,305 |
 | `build-support/opengothic/run-opengothic` | 1,674 |
 | `build-support/patch-elf-interpreter` | 176 |
 | `build-support/prepare-desktop-aarch64.sh` | 7,085 |
+| `build-support/ps1/build` | 222 |
+| `build-support/ps1/download-homebrew` | 231 |
+| `build-support/ps2-homebrew/build` | 231 |
 | `build-support/qemu-storage.sh` | 9,938 |
 | `build-support/qemu-system/vinix-qemu` | 1,481 |
 | `build-support/qemu-system/vinix-qemu-desktop` | 851 |
@@ -1091,12 +1091,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
 | `scripts/build-macos-installer.sh` | 3,383 |
 | `scripts/build-minecraft-aarch64.sh` | 7,932 |
-| `scripts/build-n64-aarch64.sh` | 2,907 |
+| `scripts/build-n64-aarch64.sh` | 2,896 |
 | `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
 | `scripts/build-network-tools-aarch64.sh` | 8,941 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
-| `scripts/build-ps1-aarch64.sh` | 3,170 |
-| `scripts/build-ps2-aarch64.sh` | 2,901 |
+| `scripts/build-ps1-aarch64.sh` | 3,148 |
+| `scripts/build-ps2-aarch64.sh` | 2,890 |
 | `scripts/build-python-aarch64.sh` | 3,553 |
 | `scripts/build-python-amd64.sh` | 175 |
 | `scripts/build-qemu-input.sh` | 3,417 |
