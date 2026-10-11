@@ -5,12 +5,14 @@ import os
 
 pub struct PowercutPolicy {
 pub:
-	start string
-	done string
-	phase string
-	failures []string
-	lookback int
+	start           string
+	done            string
+	phase           string
+	failures        []string
+	lookback        int
 	failure_newline bool
+	cut_stage       bool
+	inode           string
 }
 
 // Match the original byte regex PREFIX (\w+) ino=(\d+)\r*\n. The
@@ -30,15 +32,22 @@ pub fn powercut_done(text string, prefix string) ?(string, string) {
 		if position == digits { continue }
 		number_end := position
 		for position < text.len && text[position] == `\r` { position++ }
-		if position < text.len && text[position] == `\n` { return text[start..end], text[digits..number_end] }
+		if position < text.len && text[position] == `\n` {
+			return text[start..end], text[digits..number_end]
+		}
 	}
 	return none
 }
 
 pub fn powercut_verdict(text string, policy PowercutPolicy) int {
-	phase, _ := powercut_done(text, policy.done) or { return 1 }
+	phase, number := powercut_match(text, policy) or { return 1 }
 	return if phase == policy.phase && text.contains(policy.start)
-		&& !policy.failures.any(text.contains(it)) { 0 } else { 1 }
+		&& (policy.inode == '' || number == policy.inode)
+		&& !policy.failures.any(text.contains(it)) {
+		0
+	} else {
+		1
+	}
 }
 
 // QEMU is the directly owned child. SIGKILL retires its writer before any
@@ -56,30 +65,55 @@ pub fn boot_powercut(command []string, env map[string]string, state string,
 	pid, master := spawn_guest(command, env)!
 	mut reaped := false
 	defer {
-		if !reaped { C.killpg(pid, C.SIGKILL); C.kill(pid, C.SIGKILL); wait(pid, false) or {} }
+		if !reaped {
+			C.killpg(pid, C.SIGKILL)
+			C.kill(pid, C.SIGKILL)
+			wait(pid, false) or {}
+		}
 		C.close(master)
 	}
 	mut transcript := []u8{}
 	mut cause := ''
 	deadline := now() + timeout
 	for now() < deadline {
-		done, _ := wait(pid, true) or { cause = err.msg(); break }
-		if done { reaped = true; break }
-		readable := ready(master, false, now() + 0.25) or { cause = err.msg(); break }
+		done, _ := wait(pid, true) or {
+			cause = err.msg()
+			break
+		}
+		if done {
+			reaped = true
+			break
+		}
+		readable := ready(master, false, now() + 0.25) or {
+			cause = err.msg()
+			break
+		}
 		if !readable { continue }
 		mut buffer := [65536]u8{}
 		count := C.read(master, &buffer[0], buffer.len)
 		if count < 0 {
 			if C.errno in [C.EIO, C.EAGAIN, C.EWOULDBLOCK] { break }
-			cause = posix_error().msg(); break
+			cause = posix_error().msg()
+			break
 		}
 		if count == 0 { break }
 		transcript << buffer[..count]
-		if stream && inherit { abi_console(buffer[..count]) or { cause = err.msg(); break } }
+		if stream && inherit {
+			abi_console(buffer[..count]) or {
+				cause = err.msg()
+				break
+			}
+		}
 		text := transcript.bytestr()
-		recent := if policy.lookback > 0 && text.len > policy.lookback { text[text.len - policy.lookback..] } else { text }
-		if _, _ := powercut_done(recent, policy.done) { break }
-		if policy.failures.any(recent.contains(it)) && (!policy.failure_newline || recent.ends_with('\n')) { break }
+		recent := if policy.lookback > 0 && text.len > policy.lookback {
+			text[text.len - policy.lookback..]
+		} else {
+			text
+		}
+		if _, _ := powercut_match(recent, policy) { break }
+		if policy.failures.any(recent.contains(it)) && (!policy.failure_newline || recent.ends_with('\n')) {
+			break
+		}
 	}
 	if !reaped {
 		C.killpg(pid, C.SIGKILL)
@@ -88,9 +122,36 @@ pub fn boot_powercut(command []string, env map[string]string, state string,
 		reaped = done
 	}
 	os.write_file_array(state + '/serial.log', transcript)!
-	if !stream && inherit { abi_console(transcript)!; println('') }
+	if !stream && inherit {
+		abi_console(transcript)!
+		println('')
+	}
 	if cause != '' { return error(cause) }
 	result := powercut_verdict(transcript.bytestr(), policy)
-	if result != 0 && inherit { eprintln('ERROR: ' + policy.phase + ' stopped without its complete power-cut contract (timeout ' + timeout.str() + 's)') }
+	if result != 0 && inherit {
+		eprintln('ERROR: ' + policy.phase + ' stopped without its complete power-cut contract (timeout ' + timeout.str() + 's)')
+	}
 	return result
+}
+
+// Journal qualification freezes at a numbered stage, with no inode field.
+pub fn powercut_stage(text string, prefix string) ?(string, string) {
+	mut offset := 0
+	for offset < text.len {
+		found := text[offset..].index(prefix + ' stage=') or { return none }
+		start := offset + found + prefix.len + ' stage='.len
+		mut end := start
+		for end < text.len && text[end].is_digit() { end++ }
+		offset = start
+		if end == start { continue }
+		mut position := end
+		for position < text.len && text[position] == `\r` { position++ }
+		if position < text.len && text[position] == `\n` { return text[start..end], '' }
+	}
+	return none
+}
+
+fn powercut_match(text string, policy PowercutPolicy) ?(string, string) {
+	if policy.cut_stage { return powercut_stage(text, policy.done) }
+	return powercut_done(text, policy.done)
 }

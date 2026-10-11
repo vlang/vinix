@@ -13,7 +13,7 @@ code and checks cache-owner/private/fork references, clean pages without I/O,
 mixed private/shared references and failed dirty-page retry. Either host runner
 accepts `VINIX_HOST_SANITIZE=1` for AddressSanitizer and UndefinedBehaviorSanitizer.
 
-Run `python3 tests/mapped-writeback/run.py --arch aarch64 --steps=private` or
+Run `tests/mapped-writeback/run --arch aarch64 --steps=private` or
 `--arch amd64 --steps=private` against a built kernel (worktree environment is
 documented in the mapped-writeback README). Eight live mappings touch the same
 8 MiB file. Seven additional aliases must use less than 2 MiB of physical

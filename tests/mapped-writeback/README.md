@@ -10,7 +10,7 @@ a 1024-page locked prefix and explicit pageout beyond that prefix.
 `tests/pagecache/run.sh` separately exercises
 the actual backing cache and global hooks, barriers and failure propagation.
 
-Build the kernel, then run `python3 tests/mapped-writeback/run.py --arch
+Build the kernel, then run `tests/mapped-writeback/run --arch
 aarch64` or `--arch amd64`. The runner kills QEMU immediately after each
 completion marker, with both descriptor and mapping still live. `debugfs`
 then verifies every byte in the actual disk image. Global sync, syncfs and
@@ -26,7 +26,9 @@ For worktrees, set `VINIX_VM_RUNNER_ROOT` to the original repository and
 `VINIX_AMD64_KERNEL` to its built kernel for AMD64. Set
 `VINIX_AARCH64_SYSROOT` to the existing musl sysroot and
 `VINIX_QEMU_RT_NO_BUILD=1` to reuse the ARM build. `--steps=sync,churn` selects
-a subset. Images and firmware state are private temporary files.
+a subset. The native runner always snapshots an already-built kernel;
+`--state-dir` can retain its images, firmware and launch receipts. See
+[controller qualification and retained failures](../native-disk-tools/README.md).
 The `private` step additionally checks clean EXT2 page sharing and copy-on-write;
 see [its ownership and test coverage](../private-pages/README.md).
 

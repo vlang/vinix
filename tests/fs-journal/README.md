@@ -24,15 +24,15 @@ retention check (`ALLOC_TRACK=1`). Production builds have none of these ioctls.
 Run both architectures:
 
 ```sh
-VINIX_KERNEL_DIR=/path/to/arm/kernel python3 tests/fs-journal/run.py --arch=aarch64
+VINIX_KERNEL_DIR=/path/to/arm/kernel tests/fs-journal/run --arch=aarch64
 VINIX_AMD64_KERNEL=/path/to/x86/kernel/bin/vinix \
-  python3 tests/fs-journal/run.py --arch=amd64
+  tests/fs-journal/run --arch=amd64
 VINIX_KERNEL_DIR=/path/to/arm/kernel \
-  python3 tests/fs-journal/run.py --arch=aarch64 --format --cases=full
+  tests/fs-journal/run --arch=aarch64 --format --cases=full
 VINIX_AMD64_KERNEL=/path/to/x86/kernel/bin/vinix \
-  python3 tests/fs-journal/run.py --arch=amd64 --format --cases=full
+  tests/fs-journal/run --arch=amd64 --format --cases=full
 VINIX_AMD64_KERNEL=/path/to/ordinary/kernel/bin/vinix \
-  python3 tests/fs-journal/run.py --arch=amd64 --production --cases=full
+  tests/fs-journal/run --arch=amd64 --production --cases=full
 ```
 
 The native runner kills QEMU without shutdown or a final sync, using actual
@@ -59,6 +59,11 @@ default uses an independently serialized 68 MiB test volume. `--state-dir`
 retains images, payload and boot inputs for inspection. e2fsprogs, QEMU, the
 usual firmware/boot tools and static musl toolchains are required.
 
+The host runner and image serializer are native V. All commands snapshot an
+already-built kernel; qualification ioctls still require `-d journalcut`.
+See [controller qualification](../native-disk-tools/README.md) for current
+host checks, real production/formatter runs and their limits.
+
 The ordinary production-kernel mode runs the full scenario and restart
 verification without qualification ioctls. Architecture builds, the
 legacy EXT2 sparse suite and page-cache suite provide separate regressions.
@@ -80,7 +85,7 @@ with zero added allocation categories. The baseline allow-list is unchanged.
 
 VJFS is a private format. Do not mount it with an EXT2 driver or run EXT2 repair
 tools on its live image. After native recovery clears the commit marker,
-`image.export_clean` makes a separate inspection copy, removes the journal
+`diskhost.export_clean` makes a separate inspection copy, removes the journal
 tail and restores EXT2 signatures in that copy. `e2fsck -fn` then checks every
 allocation, inode sector count, directory and link invariant. The fixture
 serializer is only for new disposable test volumes, not an in-place migration

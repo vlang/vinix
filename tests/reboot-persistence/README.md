@@ -15,7 +15,8 @@ tests/reboot-persistence/run.sh
 ```
 
 The default architecture is ARM. To reuse an existing private kernel, set
-`VINIX_KERNEL_DIR` and `VINIX_REBOOT_PERSISTENCE_NO_BUILD=1`. The x86 runner
+`VINIX_KERNEL_DIR`. The native runner always snapshots an already-built kernel.
+The x86 runner
 uses an existing kernel, the musl cross compiler, QEMU, Limine, and e2fsprogs:
 
 ```sh
@@ -28,6 +29,9 @@ tests/reboot-persistence/run.sh
 `CC_AMD64` selects the x86 musl GCC. Set `VINIX_REBOOT_PERSISTENCE_STATE_DIR`
 to a fresh path to retain the generated source, payload, disk and serial log.
 `VINIX_QEMU_TIMEOUT` overrides the default 240-second deadline.
+
+The host command, guest compilation, archive preparation and PTY ownership are
+now native V. See [controller qualification](../native-disk-tools/README.md).
 
 `persistfixture/core.v` owns the test logic. Its native header supplies libc
 declarations and scalar width checks. The read buffer stays on the stack,

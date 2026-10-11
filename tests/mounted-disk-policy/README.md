@@ -40,11 +40,11 @@ VINIX_VM_RUNNER_ROOT=/path/to/vinix \
 VINIX_KERNEL_DIR="$PWD/kernel" \
 VINIX_AARCH64_SYSROOT=/path/to/vinix/build-aarch64-userland/sysroot \
 VINIX_QEMU_RT_NO_BUILD=1 VINIX_QEMU_AUDIO=off \
-python3 tests/mounted-disk-policy/run.py
+tests/mounted-disk-policy/run
 VINIX_VM_RUNNER_ROOT=/path/to/vinix \
 VINIX_AMD64_KERNEL="$PWD/build-amd64-kernel/bin/vinix" \
 VINIX_QEMU_RT_NO_BUILD=1 \
-python3 tests/mounted-disk-policy/run.py --arch=amd64
+tests/mounted-disk-policy/run --arch=amd64
 ```
 
 The maintained native guest is V in `diskfixture/core.v`. Its declaration-only
@@ -56,8 +56,9 @@ that Git blob's contents with `--source=/absolute/original-guest.c`.
 `--state-dir=/absolute/new-state` retains the actual guest ELF, disk images,
 compiler inputs, EXT2-tool logs and complete payload. The state must be fresh.
 `--kernel-dir=/absolute/worktree/kernel` copies an existing matching kernel
-immutably and disables rebuilding it during the guest run. Without this option,
-the existing environment and build behavior apply.
+immutably. The native controller always uses an already-built kernel, including
+when selected through the existing environment. See the
+[native controller qualification](../native-disk-tools/README.md).
 
 V retains all 72 original source checks: 70 compile on ARM and 64 on AMD.
 Failure messages preserve each native line number and C expression. The native

@@ -54,7 +54,7 @@ replacement, heap sealing, invalid/on-fault flags and two-CPU replacement
 races. Three hundred success and denial loops compare `/proc/meminfo` slab
 usage and print retained allocation sites on an `ALLOC_TRACK=1` kernel.
 
-Run `python3 tests/mapped-writeback/run.py --arch aarch64 --steps=private`
+Run `tests/mapped-writeback/run --arch aarch64 --steps=private`
 and `--arch amd64 --steps=private` with the same kernel overrides (and
 `VINIX_QEMU_RT_NO_BUILD=1` for a prebuilt ARM kernel). That EXT2 guest verifies
 dirty locked private remaps leave cached aliases and disk contents unchanged,
