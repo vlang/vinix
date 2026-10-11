@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `2fed61f84177aea947785d27abdc3b9b0bdc6a68`,
+at source commit `76466b67df4822978faff2a9e23fc769eca53d9c`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 564 | 2,345,798 | 6.31% |
-| Python | 387 | 1,892,762 | 5.09% |
-| Shell | 459 | 1,363,643 | 3.67% |
+| C | 564 | 2,345,795 | 6.26% |
+| Python | 380 | 1,863,005 | 4.97% |
+| Shell | 470 | 1,354,662 | 3.62% |
 
-All `.v` files are classified as V. The resulting V share is 76.53%, with no
+All `.v` files are classified as V. The resulting V share is 76.81%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,892,762 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,863,005 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 2fed61f84177aea947785d27abdc3b9b0bdc6a68 --breakdown --json
+github-linguist --rev 76466b67df4822978faff2a9e23fc769eca53d9c --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -608,7 +608,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/wine-host/test.c` | 9,164 |
 | `tests/wine/calculator.c` | 5,253 |
 | `tests/wine/smoke.c` | 573 |
-| `tests/x11-input/expected.h` | 262 |
+| `tests/x11-input/expected.h` | 259 |
 | `tests/x11-input/fixture.c` | 5,603 |
 | `tests/x11-input/guest.c` | 1,447 |
 | `tests/xnualloc/reference.c` | 11,469 |
@@ -679,12 +679,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/roblox/_native.py` | 948 |
 | `build-support/roblox/build.py` | 5,502 |
 | `build-support/security-tools/compile-v-core.py` | 2,919 |
-| `build-support/security-tools/stage.py` | 3,614 |
 | `build-support/staging-cache.py` | 2,980 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
-| `build-support/storage-tools/stage.py` | 2,679 |
 | `build-support/venus/prepare-qemu.py` | 3,270 |
 | `build-support/venus/tests/run.py` | 6,197 |
 | `build-support/xorg-server/compile-v-host.py` | 1,972 |
@@ -987,8 +985,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/sound/run_vm.py` | 9,126 |
 | `tests/speculation-policy/run.py` | 7,078 |
 | `tests/stack-protector/run.py` | 5,134 |
-| `tests/storage-volumes/host.py` | 7,882 |
-| `tests/storage-volumes/run.py` | 6,625 |
 | `tests/tlb/run.py` | 483 |
 | `tests/uname/run.py` | 2,859 |
 | `tests/userland-demo/run.py` | 3,723 |
@@ -1000,9 +996,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/virtio-gpu-virgl/_native.py` | 957 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 5,650 |
 | `tests/virtio-ro/run.py` | 6,225 |
-| `tests/wine-host/run-vm.py` | 2,988 |
-| `tests/x11-input/run-vm.py` | 2,597 |
-| `tests/x11-input/run.py` | 3,372 |
 | `tools/_package_store_native.py` | 4,314 |
 | `tools/dota2/_ext2_native.py` | 8,261 |
 | `tools/dota2/ext2_export.py` | 6,288 |
@@ -1066,6 +1059,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/roblox/run-roblox-client` | 182 |
 | `build-support/run-v-tool.sh` | 1,617 |
 | `build-support/security-audit/run-collector` | 396 |
+| `build-support/security-tools/compile-v-core` | 167 |
+| `build-support/security-tools/stage` | 165 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
 | `build-support/stage-uname.sh` | 656 |
 | `build-support/steam/bash` | 433 |
@@ -1077,6 +1072,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/steam/steamrt-entry-point` | 415 |
 | `build-support/steam/uname` | 373 |
 | `build-support/steam/zenity` | 653 |
+| `build-support/storage-tools/stage` | 163 |
 | `build-support/uname` | 1,025 |
 | `build-support/v-command` | 1,409 |
 | `build-support/vinix-desktop-build` | 12,928 |
@@ -1101,7 +1097,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/x86-translation/run-wine-x86-64` | 11,702 |
 | `build-support/x86-translation/run-x86-32` | 1,837 |
 | `build-support/x86-translation/run-x86-64` | 2,298 |
-| `build-support/xorg-server/build-wine-host.sh` | 1,752 |
+| `build-support/xorg-server/build-wine-host.sh` | 1,990 |
+| `build-support/xorg-server/compile-v-host` | 162 |
 | `build-support/xorg-server/startx` | 2,994 |
 | `desktop/tools/screenshot.sh` | 2,055 |
 | `desktop/tools/test-activity.sh` | 2,473 |
@@ -1130,8 +1127,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 93,398 |
-| `scripts/build-desktop-amd64.sh` | 14,984 |
+| `scripts/build-desktop-aarch64.sh` | 93,384 |
+| `scripts/build-desktop-amd64.sh` | 14,973 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |
@@ -1163,14 +1160,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
 | `scripts/build-steam-aarch64.sh` | 13,694 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
-| `scripts/build-userland-aarch64.sh` | 24,987 |
-| `scripts/build-userland-amd64.sh` | 6,019 |
+| `scripts/build-userland-aarch64.sh` | 24,976 |
+| `scripts/build-userland-amd64.sh` | 6,008 |
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
 | `scripts/build-venus-aarch64.sh` | 5,339 |
 | `scripts/build-vinix-guest-disk.sh` | 1,837 |
 | `scripts/build-voffice-aarch64.sh` | 6,899 |
-| `scripts/build-x11-aarch64.sh` | 20,713 |
+| `scripts/build-x11-aarch64.sh` | 20,691 |
 | `scripts/build-x11-amd64.sh` | 197 |
 | `scripts/build-x86-translation-aarch64.sh` | 22,821 |
 | `scripts/cross-compile-activity.sh` | 227 |
@@ -1190,6 +1187,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/test-gpu-kekvm.sh` | 274 |
 | `scripts/test-iso.sh` | 18,878 |
 | `tests/abi-scratch/run` | 182 |
+| `tests/accounts/run` | 835 |
 | `tests/acpi-ec/run.sh` | 649 |
 | `tests/acpi-sync/compile-v-native` | 191 |
 | `tests/agx-fake-g17/run.sh` | 942 |
@@ -1227,7 +1225,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple_smc/run-host.sh` | 641 |
 | `tests/apple_smc/run.sh` | 158 |
 | `tests/application-sandbox/run-native.sh` | 1,281 |
-| `tests/application-sandbox/test-host.sh` | 4,343 |
+| `tests/application-sandbox/test-host.sh` | 229 |
 | `tests/application-sandbox/test-ui.sh` | 759 |
 | `tests/archive-tools/run.sh` | 333 |
 | `tests/browsers/chromium-init.sh` | 6,410 |
@@ -1403,8 +1401,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/scheduler-preemption/policy` | 152 |
 | `tests/scheduler-qos/policy` | 152 |
 | `tests/securelevel/run` | 182 |
-| `tests/security-audit/collector-run.sh` | 5,601 |
-| `tests/security-mac/host-run.sh` | 4,937 |
+| `tests/security-audit/collector-run.sh` | 227 |
+| `tests/security-mac/host-run.sh` | 225 |
 | `tests/security-mac/run.sh` | 952 |
 | `tests/security-policy/run.sh` | 2,109 |
 | `tests/shared-streams/run` | 185 |
@@ -1422,6 +1420,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/steam/steam-init.sh` | 11,673 |
 | `tests/steam/steam-smoke` | 4,054 |
 | `tests/steam/test-robust-list` | 184 |
+| `tests/storage-volumes/host` | 184 |
+| `tests/storage-volumes/run` | 185 |
 | `tests/storage/run.sh` | 210 |
 | `tests/storage/test-qemu-storage.sh` | 3,030 |
 | `tests/syscall-policy/run` | 185 |
@@ -1442,13 +1442,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/vlang/test-host-source-sync.sh` | 4,008 |
 | `tests/vlang/test-staging-cache.sh` | 1,155 |
 | `tests/vlang/test-voffice-cache.sh` | 4,845 |
-| `tests/wine-host/run.sh` | 1,504 |
+| `tests/wine-host/run-vm` | 183 |
+| `tests/wine-host/run.sh` | 1,493 |
 | `tests/wine/office2010-launchers-test.sh` | 1,830 |
 | `tests/wine/wine-smoke` | 929 |
 | `tests/wine/wine-smoke32` | 943 |
 | `tests/wine/word2013-launchers-test.sh` | 4,670 |
+| `tests/x11-input/run` | 184 |
+| `tests/x11-input/run-vm` | 185 |
 | `tests/x86-translation/smoke.sh` | 657 |
 | `tests/zsh/smoke.sh` | 561 |
+| `tools/accounts/build` | 2,648 |
 | `tools/agx-re/check_g13_reference_contract` | 180 |
 | `tools/agx-re/compile-v-trace` | 184 |
 | `tools/agx-re/compile_fake_g17_plan` | 167 |

@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `2fed61f84177aea947785d27abdc3b9b0bdc6a68`,
-Linguist 7.27.0 reports **Python 5.09%** (387 files, 1,892,762 bytes) and
-**V 76.53%** (2,693 files, 28,434,945 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `76466b67df4822978faff2a9e23fc769eca53d9c`,
+Linguist 7.27.0 reports **Python 4.97%** (380 files, 1,863,005 bytes) and
+**V 76.81%** (2,758 files, 28,765,296 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,313,523 Python bytes**. All remaining
-1,892,762 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,343,280 Python bytes**. All remaining
+1,863,005 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 37 stages below remove **145 Python files / 468,586 original bytes** and
+The 38 stages below remove **152 Python files / 498,343 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -68,6 +68,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Independent tracker, console, diagnostic and random-hook guests, compiler APIs and hypervisor ABI launcher | `tests/native-guest-tools/guesthost/policy.v`, seven native entrypoints | 23,919 / 482 | `543480fb` |
 | Fifteen ABI guest runners, strict marker controller and native ARM ext2/ISO setup | `tests/native-guest-tools/guesthost/abi*.v`, fifteen native fronts | 66,059 / 1,172 | `da792787` |
 | Steam and Office generators and host/guest proofs, randomness and N64 bridge tooling | `build-support/native-compat-tools/compathost`, eight native fronts | 38,461 / 684 | `2fed61f8` |
+| Security/volume staging, volume host/guest and X11/Wine guest tooling | `build-support/native-compat-tools/compathost`, twelve native fronts and V host fixtures | 29,757 / 529 | `76466b67` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -666,12 +667,41 @@ result is claimed. No Python was run. Between `da792787` and `2fed61f8`, counted
 Python declines by exactly eight files and 38,461 bytes. See the
 [native compatibility qualification](../build-support/native-compat-tools/README.md).
 
+The next batch retires **seven Python files / 29,757 bytes**, plus embedded
+Python in three security host runners. Security and volume staging, volume
+host/guest checks, X11 host/guest checks and the Wine guest now invoke V.
+Compiler precedence, strict static builds, ABI checks, atomic publication,
+original C controls, volume assertions and six frozen X11 traces remain.
+The maintained volume host templates are actual V files, with the current
+production health dependency and independent access/fault tests. X11's termios
+adapter explicitly borrows its stack record, avoiding an implicit allocation.
+
+Fresh ARM, Rosetta x86 and ARM ASan/UBSan hosts pass security original-C/V
+stream comparisons and input hashes, volume host tests, X11 goldens, atomic
+publication/disk checks, twelve CLI checks and failed-stage owner retirements.
+The power-cut supervisor passes malformed/partial verdicts, raw binary and
+large PTY output, deadlines, SIGINT and one hundred FD/PID retirements per
+profile. All twelve cold fronts and three cache-key test files pass. Both
+musl targets build all staging utilities from committed production sources
+at `5e431bdc`; another session's unfinished volume source fails strict C
+warnings and remains outside this port. Real ARM and x86 guests pass Wine
+and X11. The ARM volume guest passes all retention classes and verifies disk
+sentinels after SIGKILL. The prepared x86 kernel rejects the unchanged status
+ioctl with ENOTTY; both guest binaries match the original compiler recipes
+byte for byte. Assertions remain intact. No new kernel, hardware or macOS
+LeakSanitizer result is claimed. See the
+[native compatibility qualification](../build-support/native-compat-tools/README.md).
+No Python was run. The three batches in this continuation retire
+**30 Python files / 134,277 original bytes**. Between `2fed61f8` and `76466b67`,
+counted Python declines by exactly seven files and 29,757 bytes; concurrent
+source changes affect the other language totals separately.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 37 stages.
+or hidden in these 38 stages.
 
 ## Earlier completed stages
 
