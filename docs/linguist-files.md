@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `d22c958f6d5f71b1174b80cc284a814ed2a6cef3`,
+at source commit `cca2fa35eb572d3339e993e8c0f272a633713993`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 566 | 2,364,635 | 6.21% |
-| Python | 354 | 1,747,004 | 4.59% |
-| Shell | 500 | 1,361,754 | 3.58% |
+| C | 567 | 2,365,384 | 6.18% |
+| Python | 349 | 1,733,990 | 4.53% |
+| Shell | 505 | 1,362,694 | 3.56% |
 
-All `.v` files are classified as V. The resulting V share is 77.44%, with no
+All `.v` files are classified as V. The resulting V share is 77.60%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,747,004 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,733,990 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev d22c958f6d5f71b1174b80cc284a814ed2a6cef3 --breakdown --json
+github-linguist --rev cca2fa35eb572d3339e993e8c0f272a633713993 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -510,6 +510,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/memory/runtimefixture/memory-runtime-native-abi.h` | 605 |
 | `tests/mount-policy/test.c` | 27,539 |
 | `tests/mounted-disk-policy/diskfixture/disk-native-abi.h` | 2,953 |
+| `tests/mounted-disk-policy/hosttemplates/host.h` | 749 |
 | `tests/n64/guestfixture/n64-guest-native-abi.h` | 1,072 |
 | `tests/n64/rspbudgetfixture/n64-rsp-native-abi.h` | 626 |
 | `tests/net-random/fixture/net-random-native-abi.h` | 351 |
@@ -885,7 +886,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/fsync-scope/run.py` | 5,958 |
 | `tests/gl-triangle/run-vm.py` | 5,439 |
 | `tests/gl-triangle/run.py` | 2,728 |
-| `tests/hypervisor/host-test.py` | 3,871 |
 | `tests/init-policy/compile-guest.py` | 1,044 |
 | `tests/init-policy/run-vm.py` | 4,345 |
 | `tests/ios/desktop.py` | 7,962 |
@@ -923,7 +923,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/minecraft/test-fetcher.py` | 4,085 |
 | `tests/minecraft/test-patch-lwjgl.py` | 1,985 |
 | `tests/mount-policy/run_vm.py` | 1,615 |
-| `tests/mounted-disk-policy/host.py` | 2,348 |
 | `tests/mounted-disk-policy/run.py` | 10,413 |
 | `tests/n64/desktop.py` | 9,741 |
 | `tests/n64/rsp-budget.py` | 3,714 |
@@ -957,9 +956,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/roblox-windows/run.py` | 7,180 |
 | `tests/roblox/build-test.py` | 8,453 |
 | `tests/roblox/launcher-test.py` | 6,516 |
-| `tests/securelevel-boot/attribute_faults.py` | 3,599 |
-| `tests/securelevel-boot/dispatch.py` | 2,342 |
-| `tests/securelevel-boot/host.py` | 854 |
 | `tests/securelevel-boot/persistent.py` | 4,121 |
 | `tests/securelevel-boot/run.py` | 2,460 |
 | `tests/sound/_native.py` | 957 |
@@ -1254,6 +1250,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/hardware-platform/run` | 178 |
 | `tests/hibernate/run.sh` | 681 |
 | `tests/hypervisor/check-vmx` | 110 |
+| `tests/hypervisor/host-test` | 185 |
 | `tests/hypervisor/run-abi` | 164 |
 | `tests/hypervisor/run-vm` | 171 |
 | `tests/hypervisor/run.sh` | 118 |
@@ -1315,6 +1312,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/minecraft/test-launcher.sh` | 8,276 |
 | `tests/mount-policy/run.sh` | 2,110 |
 | `tests/mounted-disk-policy/check-generated` | 178 |
+| `tests/mounted-disk-policy/host` | 187 |
 | `tests/n64/frame` | 180 |
 | `tests/native-boundaries/run` | 104 |
 | `tests/net-random/run` | 183 |
@@ -1398,6 +1396,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/scheduler-preemption/policy` | 152 |
 | `tests/scheduler-qos/policy` | 152 |
 | `tests/scheduler-qos/run` | 186 |
+| `tests/securelevel-boot/attribute-faults` | 192 |
+| `tests/securelevel-boot/dispatch` | 190 |
+| `tests/securelevel-boot/host` | 186 |
 | `tests/securelevel/run` | 182 |
 | `tests/security-audit/collector-run.sh` | 227 |
 | `tests/security-mac/host-run.sh` | 225 |
