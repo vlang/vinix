@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `543480fb3e395379b4fe2854ad1f8a9c88d62edf`,
-Linguist 7.27.0 reports **Python 5.38%** (410 files, 1,997,282 bytes) and
-**V 76.23%** (2,671 files, 28,296,718 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `da792787a460146757709390d52d6d3983cb249f`,
+Linguist 7.27.0 reports **Python 5.20%** (395 files, 1,931,223 bytes) and
+**V 76.43%** (2,685 files, 28,392,513 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,209,003 Python bytes**. All remaining
-1,997,282 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,275,062 Python bytes**. All remaining
+1,931,223 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 35 stages below remove **122 Python files / 364,066 original bytes** and
+The 36 stages below remove **137 Python files / 430,125 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -66,6 +66,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Production init, tracker, console, fault, CPU and network host commands | `tests/native-policy-tools/nativepolicy`, seven native entrypoints | 21,098 / 378 | `e7e2b615` |
 | Guest controllers, PTY/QMP supervision and independent verdict tests | `tests/native-guest-tools/guesthost`, eight native entrypoints | 20,584 / 434 | `6d2661b6` |
 | Independent tracker, console, diagnostic and random-hook guests, compiler APIs and hypervisor ABI launcher | `tests/native-guest-tools/guesthost/policy.v`, seven native entrypoints | 23,919 / 482 | `543480fb` |
+| Fifteen ABI guest runners, strict marker controller and native ARM ext2/ISO setup | `tests/native-guest-tools/guesthost/abi*.v`, fifteen native fronts | 66,059 / 1,172 | `da792787` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -602,12 +603,45 @@ No Python was run. Between `6d2661b6` and `543480fb`, counted Python declines by
 exactly 23,919 bytes and nine files. The three batches in this continuation
 retire **23 Python files / 65,601 bytes**.
 
+The next batch retires **fifteen Python files / 66,059 bytes**. ABI scratch,
+capability exec, stack and syscall policy, dumpability, shared streams, timers,
+socket I/O, procfs allocations, network options, terminal jobs, securelevel,
+execute-only, procfs mounts and clock control now have native V commands.
+The original compiler/ASM inputs, C controls, rootfs fixtures, baselines,
+readable/reuse options, marker counts and architecture-specific exit rules
+remain. ARM retains its private 64 MiB ext2 home and kernel command line.
+All boots snapshot an existing matching kernel; none rebuilds shared state.
+
+Fresh ARM, Rosetta x86 and ARM ASan/UBSan host profiles pass controller and
+real-PTY qualification, strict CLI and prior-state preservation, raw invalid
+UTF-8/NUL output, interrupts and one hundred FD/PID retirements each. Forty-five
+forced compiler failures retire their private workspaces, and all fifteen
+cold fronts pass. Each host attempts 37 cross-build profiles: 29 succeed, while
+eight preserve undeclared-`memdup` errors in existing shared-streams, socket-I/O
+and terminal-job generated C. Original strict compiler recipes reproduce those
+errors. All twelve original C fixture recipes produce byte-identical ELFs.
+Final source, controller-executable and linked-ELF receipt hashes are verified.
+
+Actual ARM guests pass the permission, timer, network, clock and procfs-reuse
+checks, including execute-only with PAN disabled. Original securelevel and full
+procfs-mount C controls also pass. Securelevel retains its real ext2 write/fsync;
+the image passes read-only e2fsck and contains the expected byte. The unchanged
+ARM stat/poll C fixture exceeds its original retention bound, and procfs
+allocation checks require tracking files missing from this prepared kernel.
+Several suites also fail on the prepared x86 kernel; securelevel and procfs
+mount C controls reproduce the failures on the exact same kernel bytes.
+These verdicts remain failures. No fresh kernel or hardware qualification is
+claimed. See [the native ABI qualification](../tests/native-guest-tools/abi-guests.md).
+No Python was run. Between `543480fb` and `da792787`, counted Python declines
+by exactly 66,059 bytes and fifteen files; concurrent changes affect other
+languages.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 35 stages.
+or hidden in these 36 stages.
 
 ## Earlier completed stages
 
