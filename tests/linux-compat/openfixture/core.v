@@ -163,6 +163,22 @@ fn trailing_slashes() bool {
 	}
 }
 
+fn exclusive_creation() bool {
+	unsafe {
+		for constraint in [u64(0), 2, 4, 6]! {
+			how := How{flags: u64(C.O_CREAT | C.O_EXCL | C.O_RDWR), mode: 0o600, resolve: constraint}
+			if !open_result(c'/tmp/linux-open-target', &how, 24, C.EEXIST)
+				|| !open_result(c'/tmp/linux-open-dangling', &how, 24, C.EEXIST)
+				|| !open_result(c'/tmp/linux-open-dir/link', &how, 24, C.EEXIST) { return false }
+		}
+		fd := C.open(c'/tmp/linux-open-dangling', C.O_CREAT | C.O_EXCL | C.O_RDWR, u32(0o600))
+		if fd >= 0 { C.close(fd); return false }
+		return *C.__errno_location() == C.EEXIST
+			&& C.access(c'/tmp/linux-open-missing', C.F_OK) == -1
+			&& *C.__errno_location() == C.ENOENT
+	}
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
@@ -183,7 +199,8 @@ pub fn run() i32 {
 		C.snprintf(&char(&pipe_path[0]), usize(pipe_path.len), c'/proc/self/fd/%d', pipes[0])
 		if !link_descriptor(&char(&pipe_path[0]), false, 0)
 			|| !link_descriptor(&char(&pipe_path[0]), true, 0)
-			|| !link_constraints(pipes[0]) || !trailing_slashes() || !mount_constraints() { return 1 }
+			|| !link_constraints(pipes[0]) || !trailing_slashes()
+			|| !exclusive_creation() || !mount_constraints() { return 1 }
 		C.close(pipes[0]); C.close(pipes[1])
 		mut how := How{}
 		if !open_result(c'/tmp/linux-open-target', &how, 24, 0)

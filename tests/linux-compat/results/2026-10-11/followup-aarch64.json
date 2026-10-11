@@ -1,0 +1,39 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "16540ed9666c432b828c676a4ffb83a6a6309629d8e00e5a04a317b8cbe0e9fe",
+    "results": [
+        {
+            "name": "bpf",
+            "source_sha256": "c9808ba6ef87fc5e28f98a586d944f86f754a8081faa02259f01993e9eb80e16",
+            "init_sha256": "de2e1606a6d221b59ba43535b921587e0a75977f177c627a917e0c06d7a006d6",
+            "iso_sha256": "b4cab8656597a487829fdfed7def68271c24dd2bb41c9f43550b7305e50fc3bc",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "access",
+            "source_sha256": "0beb5ce37d58a5dff50b24f5ce87bd479bc39718d39b29490e72076183b2c1db",
+            "init_sha256": "a828228da509bfd306fe2b3636e131aa5e5f1bb750042b26d2ffbe558fb1dbf9",
+            "iso_sha256": "00b30d71e5ca5134a371df721319095f06e5f17ffcef9ae05259c697a830520b",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "d2b81a58ef379eeeeaa9af86c152270d3a3bb275e0d6ce113570ed85f3465c71",
+            "init_sha256": "14f6cb5cb684cc806ac7904d0e98a049afb2351425ddbb137c5463ade0ce068f",
+            "iso_sha256": "36bcd9f2cec58180e9ec49f4987dc4e315926c16d50b5b1ccce46bc630529b5d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "959075f12e9d24964931168d73071100e1e944a3685bb70251bbf75af2562d34",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "7d668df047bcefc3da6a21f1bb7ef706311473df3ac37cf556823a93d9bf0782",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

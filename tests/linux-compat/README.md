@@ -27,6 +27,8 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
   intermediate/final/nested/procfs links and creation, and final link handles.
   Trailing slashes require directory resolution even with O_PATH|O_NOFOLLOW;
   failed O_CREAT requests cannot leave regular files behind.
+  Exclusive creation returns EEXIST for existing final symlinks, including
+  dangling targets and supported link constraints, without creating a target.
   NO_XDEV checks tmpfs and same-filesystem bind mounts, alias-relative opens,
   '..', absolute symlink targets, creation and procfs descriptor jumps.
   BENEATH, IN_ROOT, CACHED and combinations requesting them return EOPNOTSUPP;

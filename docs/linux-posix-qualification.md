@@ -59,6 +59,13 @@ O_PATH|O_NOFOLLOW magic link remains a link handle. The test checks same-filesys
 bind boundaries by mount identity and verifies blocked creation leaves no file.
 The effective boot root is established before checking subsequent transitions.
 
+The final `followup-*.json` native receipts run all four ABI/runtime fixtures
+after the additional exclusive-create fix. O_CREAT|O_EXCL returns EEXIST for
+regular files and final symlinks, including dangling links and supported link
+constraints, without creating the missing target. BPF errors, faccessat2,
+all open regressions and the wide-offset/time64/TLS/atomic/SIMD/JIT runtime
+checks pass on both architectures against the exact recorded kernel hashes.
+
 An initial i386 attempt failed before linking because V's amd64 inline assembly
 could not target i386. The revised fixture uses SSE2 compiler intrinsics; it
 passes natively on both architectures and as a static i386 executable through

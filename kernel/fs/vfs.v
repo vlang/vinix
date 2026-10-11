@@ -1062,7 +1062,8 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, flags int, m
 	}
 	// A trailing slash makes the last name a directory component; NOFOLLOW
 	// only controls a final basename, and cannot return that symlink itself.
-	follow_links := flags & resource.o_nofollow == 0 || require_directory
+	exclusive_create := creat_flags & (resource.o_creat | resource.o_excl) == (resource.o_creat | resource.o_excl)
+	follow_links := (flags & resource.o_nofollow == 0 && !exclusive_create) || require_directory
 
 	mut created := false
 	mut node := get_node_resolved(parent, path, follow_links, open_mount, resolve) or {
