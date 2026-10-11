@@ -1,0 +1,165 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-aarch64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "e8f75acd865fd16fa128a38a52e27d696773030267ea631785af806003d53e82",
+    "runtime_probe_sha256": "8c7f44cdbb35924233d177b367377a8644eeffc849a24cf0e5cecd3727b1b395",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "sqlite",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        },
+        {
+            "name": "media",
+            "status": "unsupported",
+            "detail": "unsupported: executable is missing: ffmpeg"
+        },
+        {
+            "name": "office",
+            "status": "unsupported",
+            "detail": "unsupported: executable is missing: ssconvert"
+        },
+        {
+            "name": "chromium",
+            "status": "unsupported",
+            "detail": "unsupported: executable is missing: chromium"
+        },
+        {
+            "name": "firefox",
+            "status": "unsupported",
+            "detail": "unsupported: executable is missing: firefox"
+        },
+        {
+            "name": "go",
+            "status": "unsupported",
+            "detail": "unsupported: executable is missing: go"
+        },
+        {
+            "name": "java",
+            "status": "unsupported",
+            "detail": "unsupported: executable is missing: java"
+        },
+        {
+            "name": "v",
+            "status": "unsupported",
+            "detail": "unsupported: executable is missing: v"
+        },
+        {
+            "name": "server",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        },
+        {
+            "name": "runtime",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        },
+        {
+            "name": "portal",
+            "status": "unsupported",
+            "detail": "unsupported: executable is missing: gdbus"
+        },
+        {
+            "name": "games",
+            "status": "unsupported",
+            "detail": "unsupported: title-specific licensed assets, GPU/input/audio, save and anti-cheat qualification are required; see docs/linux-posix-compatibility.md"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "--version"
+            ],
+            "executable_sha256": "c648ec2f15033b28c3c0c5e8e6e28c1fa81b5fcc7fe8a050e74f3c04adbf0c34",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "3.48.0 2025-01-14 11:05:00 d2fe6b05f38d9d7cd78c5d252e99ac59f1aea071d669830c1ffe4e8966e84010 (64-bit)\n",
+            "stderr": "-- warning: cannot find home directory; cannot read ~/.sqliterc\n"
+        },
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/tmp/linux-compat-evidence/transaction.db",
+                "PRAGMA journal_mode=WAL; CREATE TABLE t(v INTEGER); BEGIN; INSERT INTO t VALUES(19),(23); COMMIT; SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "c648ec2f15033b28c3c0c5e8e6e28c1fa81b5fcc7fe8a050e74f3c04adbf0c34",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "wal\n42\n",
+            "stderr": "-- warning: cannot find home directory; cannot read ~/.sqliterc\n"
+        },
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/tmp/linux-compat-evidence/transaction.db",
+                "PRAGMA integrity_check; SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "c648ec2f15033b28c3c0c5e8e6e28c1fa81b5fcc7fe8a050e74f3c04adbf0c34",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "ok\n42\n",
+            "stderr": "-- warning: cannot find home directory; cannot read ~/.sqliterc\n"
+        },
+        {
+            "argv": [
+                "/bin/busybox",
+                "--list"
+            ],
+            "executable_sha256": "f35a45f702095d9c2a718deb42c1cf4efa6d2919f212d273c4ea569d0bd03dcb",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "[\n[[\nacpid\nadd-shell\naddgroup\nadduser\nadjtimex\narch\narp\narping\nash\nawk\nbase64\nbasename\nbbconfig\nbc\nbeep\nblkdiscard\nblkid\nblockdev\nbrctl\nbunzip2\nbzcat\nbzip2\ncal\ncat\nchattr\nchgrp\nchmod\nchown\nchpasswd\nchroot\nchvt\ncksum\nclear\ncmp\ncomm\ncp\ncpio\ncrond\ncrontab\ncryptpw\ncut\ndate\ndc\ndd\ndeallocvt\ndelgroup\ndeluser\ndepmod\ndf\ndiff\ndirname\ndmesg\ndnsdomainname\ndos2unix\ndu\ndumpkmap\necho\negrep\neject\nenv\nether-wake\nexpand\nexpr\nfactor\nfallocate\nfalse\nfatattr\nfbset\nfbsplash\nfdflush\nfdisk\nfgrep\nfind\nfindfs\nflock\nfold\nfree\nfsck\nfstrim\nfsync\nfuser\ngetopt\ngetty\ngrep\ngroups\ngunzip\ngzip\nhalt\nhd\nhead\nhexdump\nhostid\nhostname\nhwclock\nid\nifconfig\nifdown\nifenslave\nifup\ninit\ninotifyd\ninsmod\ninstall\nionice\niostat\nip\nipaddr\nipcalc\nipcrm\nipcs\niplink\nipneigh\niproute\niprule\niptunnel\nkbd_mode\nkill\nkillall\nkillall5\nklogd\nlast\nless\nlink\nlinux32\nlinux64\nln\nloadfont\nloadkmap\nlogger\nlogin\nlogread\nlosetup\nls\nlsattr\nlsmod\nlsof\nlsusb\nlzcat\nlzma\nlzop\nlzopcat\nmakemime\nmd5sum\nmdev\nmesg\nmicrocom\nmkdir\nmkdosfs\nmkfifo\nmkfs.vfat\nmknod\nmkpasswd\nmkswap\nmktemp\nmodinfo\nmodprobe\nmore\nmount\nmountpoint\nmpstat\nmv\nnameif\nnanddump\nnandwrite\nnbd-client\nnc\nnetstat\nnice\nnl\nnmeter\nnohup\nnologin\nnproc\nnsenter\nnslookup\nntpd\nod\nopenvt\npartprobe\npasswd\npaste\npgrep\npidof\nping\nping6\npipe_progress\npivot_root\npkill\npmap\npoweroff\nprintenv\nprintf\nps\npscan\npstree\npwd\npwdx\nraidautorun\nrdate\nrdev\nreadahead\nreadlink\nrealpath\nreboot\nreformime\nremove-shell\nrenice\nreset\nresize\nrev\nrfkill\nrm\nrmdir\nrmmod\nroute\nrun-parts\nsed\nsendmail\nseq\nsetconsole\nsetfont\nsetkeycodes\nsetlogcons\nsetpriv\nsetserial\nsetsid\nsh\nsha1sum\nsha256sum\nsha3sum\nsha512sum\nshowkey\nshred\nshuf\nslattach\nsleep\nsort\nsplit\nstat\nstrings\nstty\nsu\nsum\nswapoff\nswapon\nswitch_root\nsync\nsysctl\nsyslogd\ntac\ntail\ntar\ntee\ntest\ntime\ntimeout\ntop\ntouch\ntr\ntraceroute\ntraceroute6\ntree\ntrue\ntruncate\ntty\nttysize\ntunctl\nudhcpc\nudhcpc6\numount\nuname\nunexpand\nuniq\nunix2dos\nunlink\nunlzma\nunlzop\nunshare\nunxz\nunzip\nuptime\nusleep\nuudecode\nuuencode\nvconfig\nvi\nvlock\nvolname\nwatch\nwatchdog\nwc\nwget\nwhich\nwho\nwhoami\nwhois\nxargs\nxxd\nxzcat\nyes\nzcat\nzcip\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/bin/busybox-extras",
+                "--list"
+            ],
+            "executable_sha256": "5b1b01dc3141797d86ddef4539d3965ac8e954b1aa47b86948747393ea603a6f",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "arch\nconspy\ndnsd\ndumpleases\nfakeidentd\nftpd\nftpget\nftpput\nhttpd\ninetd\nreadahead\ntcpsvd\ntelnet\ntelnetd\ntftp\ntftpd\nudhcpd\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/share/linux-compat/runtime",
+                "--once"
+            ],
+            "executable_sha256": "8c7f44cdbb35924233d177b367377a8644eeffc849a24cf0e5cecd3727b1b395",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "LINUX RUNTIME page_size=16384 pointer_bits=64\nLINUX RUNTIME PASS: atomics SIMD TLS\nLINUX RUNTIME PASS: JIT page sizes\nLINUX RUNTIME: PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": [
+        {
+            "argv": [
+                "/bin/busybox-extras",
+                "httpd",
+                "-f",
+                "-p",
+                "127.0.0.1:19015",
+                "-h",
+                "/tmp/linux-compat-evidence/www"
+            ],
+            "executable_sha256": "5b1b01dc3141797d86ddef4539d3965ac8e954b1aa47b86948747393ea603a6f",
+            "response": "HTTP/1.1 200 OK\r\nDate: Sun, 11 Oct 2026 03:00:07 GMT\r\nConnection: close\r\nContent-type: text/html\r\nAccept-Ranges: bytes\r\nLast-Modified: Sun, 11 Oct 2026 03:00:07 GMT\r\nETag: \"6acafbb7-50\"\r\nContent-Length: 80\r\n\r\nvinix-server-42-1327d4c1db422455199742fcde621558b21ffab53f75c247586692a86bb133bf",
+            "exit_code": 137,
+            "retired": true
+        }
+    ]
+}

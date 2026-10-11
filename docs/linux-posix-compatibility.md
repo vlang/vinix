@@ -7,6 +7,11 @@ reproducible acceptance workflows, not universal Linux binary compatibility.
 receipt for the exact architecture, kernel, libc and application versions tested.
 Host, QEMU and physical-machine evidence are separate.
 
+See the [2026-10-11 qualification report](linux-posix-qualification.md) for
+native syscall/runtime results, translated x86-64 runtime checks, actual SQLite
+and HTTP workloads, and the unsupported application dependencies. Those receipts
+qualify their stated checks and exact binaries only.
+
 The [generated native syscall inventory](linux-syscall-coverage.md) and
 [machine-readable inventory](linux-syscall-coverage.json) cover every number in
 the pinned musl 1.2.5 namespace on AArch64 and x86-64. Regenerate it with:

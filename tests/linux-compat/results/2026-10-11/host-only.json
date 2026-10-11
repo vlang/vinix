@@ -1,0 +1,119 @@
+{
+    "context": "host",
+    "execution_path": "native-aarch64",
+    "kernel": "Darwin",
+    "suite_sha256": "6be3958dc9d2de7f2db9a481cdae7e68ac5e2b5661391389a0fa320010f1039e",
+    "runtime_probe_sha256": "",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "sqlite",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        },
+        {
+            "name": "media",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "--version"
+            ],
+            "executable_sha256": "96f2e9df7e30cd3ad344c9c1bd06c1e3e0878ac723a181c0b07b7a3941ab3c00",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/Volumes/VIssueFix1011/vinix-linux-posix-host-apps-release/transaction.db",
+                "PRAGMA journal_mode=WAL; CREATE TABLE t(v INTEGER); BEGIN; INSERT INTO t VALUES(19),(23); COMMIT; SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "96f2e9df7e30cd3ad344c9c1bd06c1e3e0878ac723a181c0b07b7a3941ab3c00",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "wal\n42\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/Volumes/VIssueFix1011/vinix-linux-posix-host-apps-release/transaction.db",
+                "PRAGMA integrity_check; SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "96f2e9df7e30cd3ad344c9c1bd06c1e3e0878ac723a181c0b07b7a3941ab3c00",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "ok\n42\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/opt/homebrew/bin/ffmpeg",
+                "-version"
+            ],
+            "executable_sha256": "1ede5c7fd4e97d832ec69c97c78231875de7d69c55423158f5f4a4d923227dd5",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "ffmpeg version 9.0.2 Copyright (c) 2000-2026 the FFmpeg developers\nbuilt with Apple clang version 21.0.0 (clang-2100.3.34.2)\nconfiguration: --prefix=/opt/homebrew/Cellar/ffmpeg/9.0.2 --enable-shared --enable-pthreads --enable-version3 --cc=clang --host-cflags= --host-ldflags= --enable-ffplay --enable-gpl --enable-libsvtav1 --enable-libopus --enable-libx264 --enable-libmp3lame --enable-libdav1d --enable-libvmaf --enable-libvpx --enable-libx265 --enable-openssl --enable-videotoolbox --enable-audiotoolbox --enable-neon\nlibavutil      61.  1.102 / 61.  1.102\nlibavcodec     63.  1.102 / 63.  1.102\nlibavformat    63.  1.102 / 63.  1.102\nlibavdevice    63.  1.102 / 63.  1.102\nlibavfilter    12.  1.102 / 12.  1.102\nlibswscale     10.  1.102 / 10.  1.102\nlibswresample   7.  1.102 /  7.  1.102\n\nExiting with exit code 0\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/opt/homebrew/bin/ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=64x48:rate=10:duration=1",
+                "-c:v",
+                "mpeg4",
+                "-threads",
+                "2",
+                "-y",
+                "/Volumes/VIssueFix1011/vinix-linux-posix-host-apps-release/video.avi"
+            ],
+            "executable_sha256": "1ede5c7fd4e97d832ec69c97c78231875de7d69c55423158f5f4a4d923227dd5",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/opt/homebrew/bin/ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_name,width,height,nb_frames",
+                "-of",
+                "csv=p=0",
+                "/Volumes/VIssueFix1011/vinix-linux-posix-host-apps-release/video.avi"
+            ],
+            "executable_sha256": "258fa480850eec6cf7b6831b2d3edd164cdd2f9ddb7a14965dc9fdaf9d175ff7",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "mpeg4,64,48,10\n",
+            "stderr": ""
+        }
+    ],
+    "services": []
+}

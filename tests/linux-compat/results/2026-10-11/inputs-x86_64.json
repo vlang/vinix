@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "execution_path": "native-x86_64",
+    "cases": "sqlite,media,office,chromium,firefox,go,java,v,server,runtime,portal,games",
+    "inputs": {
+        "kernel": "65bb24c652bb3a015918fced600eeafbac946b9f70d89311ae2d44659553f174",
+        "workloads": "b4207fa20b2f30d0a8c31f2ce8ed9decd46169e0c396726d14964690b6dd18e0",
+        "runtime-probe": "18c0a6a4f7d5faad6001c329e69798ec306af71d1bb5131f3967303a00760749",
+        "rootfs_manifest": "2427905c6c00eaac0307de89dd33fe1fb1f27ca321f002d9042ceaad0d2a964a",
+        "init_source": "27356f2eb32a687a08bdf9611e115b571d689ce8b4f65470709cffa338e7a9b0",
+        "guest_report": "1f86c3dec28cd393308af92b7e71642e49d4c1a8fecd319ac4dd2931afb79098",
+        "snapshot_kernel": "65bb24c652bb3a015918fced600eeafbac946b9f70d89311ae2d44659553f174"
+    },
+    "exit_code": 1
+}

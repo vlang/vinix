@@ -1,0 +1,9 @@
+{
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/busybox-extras-1.37.0-r14.apk": "7cc6ccefbbd60969fbf1908b24c63d6eb8c23ce8f6fd9bb5e868500c2acd2e9c",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/libncursesw-6.5_p20241006-r3.apk": "3919cf673e841d91865213799ccfd5f77a48f5f9f5402723167470295ee32a49",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/ncurses-libs-6.5_p20241006-r3.apk": "5efd05040495f4377f9addf798b42dbab13849a53991f7135fb7b151eaf5cb3c",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/ncurses-terminfo-base-6.5_p20241006-r3.apk": "46402464710d165a8fed4b843b3a20d9950e1e9a20923c3869241014bf6b2f51",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/readline-8.2.13-r0.apk": "fa4ff2347886f5516d021b9064a00259b29fc6e2608eac5588a339de244acf12",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/sqlite-3.48.0-r4.apk": "fe7bbf2257d73e26bf248c5a11752a328caf3d71c1cb3003f5e1fc1406266b27",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/sqlite-libs-3.48.0-r4.apk": "56b55029cce8d43a67f5076e07c96b68b80b26dc412b205b7f0b5c63704ab234"
+}

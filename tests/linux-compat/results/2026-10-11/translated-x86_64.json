@@ -1,0 +1,32 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "translated-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "86e1b6233bb54023fc40b1835aa89ece6344a6808d0659c6cdd3d8be4fa098d7",
+    "runtime_probe_sha256": "18c0a6a4f7d5faad6001c329e69798ec306af71d1bb5131f3967303a00760749",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "runtime",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/run-x86-64",
+                "--direct",
+                "/usr/share/linux-compat/runtime",
+                "--once"
+            ],
+            "executable_sha256": "2a7ead678e964aca7c9059d8da2de15f8ceac9c90b6fce7ec9d9a3521c562ffa",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "LINUX RUNTIME page_size=4096 pointer_bits=64\nLINUX RUNTIME PASS: atomics SIMD TLS\nLINUX RUNTIME PASS: JIT page sizes\nLINUX RUNTIME: PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": []
+}

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "cases": "sqlite,media,office,chromium,firefox,go,java,v,server,runtime,portal,games",
+    "inputs": {
+        "kernel": "f5f79311ed5b7d880a485d593ff98076630dc06d18665bc8ac72c328694aafe1",
+        "workloads": "e8f75acd865fd16fa128a38a52e27d696773030267ea631785af806003d53e82",
+        "runtime-probe": "8c7f44cdbb35924233d177b367377a8644eeffc849a24cf0e5cecd3727b1b395",
+        "rootfs_manifest": "a776f247270fda491045efc01bde3308a091955b9c1a1ea704bcf86d01e1722b",
+        "init_source": "27356f2eb32a687a08bdf9611e115b571d689ce8b4f65470709cffa338e7a9b0",
+        "guest_report": "fd291693066e5ec28bac9364de1da0b26153364130cdb31741a66e07ee6f26b4",
+        "snapshot_kernel": "f5f79311ed5b7d880a485d593ff98076630dc06d18665bc8ac72c328694aafe1"
+    },
+    "exit_code": 1
+}
