@@ -15,6 +15,7 @@ pub mut:
 	destination string
 	partial string
 	backup string
+	replace_expected ?Identity
 	original Identity
 	result ?Identity
 	bytes u64
@@ -68,6 +69,17 @@ pub fn new_transfer(paths []string, directory string, kind TransferKind) !Transf
 	return job
 }
 
+pub fn new_transfer_to(source string, destination string, kind TransferKind) !Transfer {
+	full := canonical(destination)!
+	directory := os.dir(full)
+	defer { unsafe { directory.free() } }
+	mut job := new_transfer([source], directory, kind) or { unsafe { full.free() }; return err }
+	unsafe { job.items[0].destination.free() }
+	job.items[0].destination = full
+	if job.items[0].source == full { job.close(); return error('source and destination are the same') }
+	return job
+}
+
 fn (mut job Transfer) stop(message string) {
 	job.close_fds()
 	unsafe { job.message.free() }
@@ -113,17 +125,69 @@ pub fn (mut job Transfer) tick() bool {
 	return true
 }
 
+fn (mut job Transfer) check_destination() ! {
+	mut item := &job.items[job.index]
+	if exists := identify(item.destination) {
+		if replaced := item.replace_expected {
+			if replaced.unchanged(exists) && job.choice == .ask { return }
+		}
+		if job.choice == .ask { job.state = .conflict; return }
+		if job.choice == .skip {
+			// Only recorded private staging nodes may be discarded.
+			for i := job.nodes.len - 1; i >= 0; i-- {
+				if created := job.nodes[i].created { remove_node(job.nodes[i].target, created)! }
+			}
+			item.skipped = true
+			item.done = true
+			job.index++
+			job.clear_nodes()
+		} else if job.choice == .keep_both {
+			mut found := false
+			for attempt in 1 .. 1000 {
+				candidate := os.join_path(job.parent_path, os.file_name(item.source) + ' (${attempt})')
+				if !item_exists(candidate) { unsafe { item.destination.free() }; item.destination = candidate; found = true; break }
+				unsafe { candidate.free() }
+			}
+			if !found { return error('no unused destination name') }
+			item.replace_expected = none
+		} else {
+			if exists.same_node(item.original) { return error('cannot replace the source') }
+			item.replace_expected = exists
+		}
+	} else { item.replace_expected = none }
+	job.choice = .ask
+}
+
 fn (mut job Transfer) step() ! {
 	if job.index >= job.items.len { job.state = .complete; return }
 	if !job.parent_identity.same_node(identify(job.parent_path)!) { return error('destination volume disappeared') }
 	mut item := &job.items[job.index]
+	// A crash can occur after publication and before its journal is saved.
+	// Recognize only the recorded staging inode, never an unrelated destination.
+	if item.result == none && job.nodes.len > 0 && job.node_index >= job.nodes.len {
+		if staged := job.nodes[0].created {
+			if published := identify(item.destination) {
+				if staged.same_node(published) {
+					if replaced := item.replace_expected {
+						previous := identify(item.partial)!
+						if !previous.same_node(replaced) { return error('replacement backup changed') }
+						item.backup = item.partial.clone()
+					} else if item_exists(item.partial) { return error('staging path changed after publication') }
+					item.result = published
+				}
+			}
+		}
+	}
+	if item.result == none && job.kind == .move && job.nodes.len == 0 && !item_exists(item.source) {
+		if published := identify(item.destination) { if item.original.same_node(published) { item.result = published } }
+	}
 	if result := item.result {
 		if !result.unchanged(identify(item.destination)!) { return error('completed destination changed') }
 		// A cross-volume move can fail while removing its source. Retry only
 		// the remaining recorded nodes; the completed destination stays put.
 		if job.kind == .move {
 			for i := job.nodes.len - 1; i >= 0; i-- {
-				if identify(job.nodes[i].source) != none { remove_node(job.nodes[i].source, job.nodes[i].original)! }
+				if item_exists(job.nodes[i].source) { remove_node(job.nodes[i].source, job.nodes[i].original)! }
 			}
 		}
 		item.done = true
@@ -133,35 +197,21 @@ fn (mut job Transfer) step() ! {
 	}
 	if job.nodes.len == 0 {
 		if !item.original.unchanged(identify(item.source)!) { return error('source changed or disappeared') }
-		if exists := identify(item.destination) {
-			if job.choice == .ask { job.state = .conflict; return }
-			if job.choice == .skip { item.skipped = true; item.done = true; job.index++; job.choice = .ask; return }
-			if job.choice == .keep_both {
-				mut found := false
-				for attempt in 1 .. 1000 {
-					candidate := os.join_path(job.parent_path, os.file_name(item.source) + ' (${attempt})')
-					if identify(candidate) == none { unsafe { item.destination.free() }; item.destination = candidate; found = true; break }
-					unsafe { candidate.free() }
-				}
-				if !found { return error('no unused destination name') }
-			} else {
-				if exists.same_node(item.original) { return error('cannot replace the source') }
-				item.backup = item.partial + '.previous'
-				rename_exclusive(item.destination, item.backup, exists)!
-			}
-		}
-		job.choice = .ask
-		if job.kind == .move && item.original.device == job.parent_identity.device {
+		job.check_destination()!
+		if job.state == .conflict || item.skipped { return }
+		if job.kind == .move && item.original.device == job.parent_identity.device && item.replace_expected == none {
 			rename_exclusive(item.source, item.destination, item.original)!
 			item.result = identify(item.destination)!
 			item.done = true
 			job.index++
 			return
 		}
-		if identify(item.partial) != none { return error('staging item already exists; choose a different destination') }
+		if item_exists(item.partial) { return error('staging item already exists; choose a different destination') }
 		job.nodes << CopyNode{source: item.source.clone(), target: item.partial.clone(), original: item.original}
 	}
 	if job.node_index >= job.nodes.len {
+		job.check_destination()!
+		if job.state == .conflict || item.skipped { return }
 		// Verify every source again before publishing or deleting a moved tree.
 		for n in job.nodes { if !n.original.unchanged(identify(n.source)!) { return error('source changed during copy') } }
 		for n in job.nodes {
@@ -172,7 +222,10 @@ fn (mut job Transfer) step() ! {
 			C.close(fd)
 		}
 		staged := identify(item.partial)!
-		rename_exclusive(item.partial, item.destination, staged)!
+		if replaced := item.replace_expected {
+			exchange(item.partial, item.destination, staged, replaced)!
+			item.backup = item.partial.clone()
+		} else { rename_exclusive(item.partial, item.destination, staged)! }
 		item.result = identify(item.destination)!
 		if job.kind == .move {
 			// Removal walks the exact recorded nodes backwards; newly added files
@@ -201,13 +254,21 @@ fn (mut job Transfer) step() ! {
 		source_dir := n.source.clone()
 		target_dir := n.target.clone()
 		defer { unsafe { source_dir.free(); target_dir.free() } }
+		mut children := []CopyNode{cap: names.len}
+		mut transferred := false
+		defer {
+			if !transferred { for child in children { unsafe { child.source.free(); child.target.free() } } }
+			unsafe { children.free() }
+		}
 		for name in names {
 			src := os.join_path(source_dir, name)
 			target := os.join_path(target_dir, name)
-			original := identify(src)!
-			if original.device != item.original.device { return error('copy crosses a mounted device') }
-			job.nodes << CopyNode{source: src, target: target, original: original}
+			original := identify(src) or { unsafe { src.free(); target.free() }; return err }
+			if original.device != item.original.device { unsafe { src.free(); target.free() }; return error('copy crosses a mounted device') }
+			children << CopyNode{source: src, target: target, original: original}
 		}
+		job.nodes << children
+		transferred = true
 		job.node_index++
 		return
 	}
@@ -232,7 +293,8 @@ fn (mut job Transfer) step() ! {
 		if job.input < 0 || !n.original.unchanged(identify_fd(job.input)!) { return error('cannot open copy source') }
 		dst, dest_leaf := open_parent(n.target)!
 		defer { C.close(dst); unsafe { dest_leaf.free() } }
-		job.output = C.openat(dst, &char(dest_leaf.str), C.O_WRONLY | C.O_NOFOLLOW | C.O_CLOEXEC | (if job.offset == 0 { C.O_CREAT | C.O_EXCL } else { 0 }), 0o600)
+		first_open := n.created == none
+		job.output = C.openat(dst, &char(dest_leaf.str), C.O_WRONLY | C.O_NOFOLLOW | C.O_CLOEXEC | (if first_open { C.O_CREAT | C.O_EXCL } else { 0 }), 0o600)
 		if job.output < 0 { return error('cannot open copy staging file') }
 		opened := identify_fd(job.output)!
 		if created := n.created {
@@ -242,7 +304,7 @@ fn (mut job Transfer) step() ! {
 			if opened.size > job.offset && C.ftruncate(job.output, i64(job.offset)) != 0 { return error('cannot reset uncheckpointed copy tail') }
 		}
 		n.created = opened
-		if job.offset == 0 { job.total_bytes += n.original.size }
+		if first_open { job.total_bytes += n.original.size }
 		if C.lseek(job.input, i64(job.offset), C.SEEK_SET) < 0 || C.lseek(job.output, i64(job.offset), C.SEEK_SET) < 0 { return error('cannot resume copy') }
 	}
 	count := C.read(job.input, job.buffer.data, usize(job.buffer.len))

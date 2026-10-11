@@ -94,3 +94,52 @@ fn test_shared_document_autosave_recovery_versions_and_external_save_conflict() 
 	doc.save('overwrite'.bytes(), false) or { assert os.read_file(path)! == 'external'; return }
 	assert false, 'external edits must be preserved'
 }
+
+fn test_replace_keeps_old_destination_visible_until_publication_and_resumes_after_swap() {
+	root := workflow_test_tree()
+	defer { os.rmdir_all(root) or {} }
+	os.mkdir(root + '/destination')!
+	os.write_file(root + '/destination/source', 'previous')!
+	bytes := []u8{len: 512 * 1024, init: u8(index % 239)}
+	os.write_file_array(root + '/source', bytes)!
+	mut job := workflowcore.new_transfer([root + '/source'], root + '/destination', .copy)!
+	defer { job.close() }
+	job.tick()
+	assert job.state == .conflict
+	job.resolve(.replace)
+	job.tick()
+	assert os.read_file(root + '/destination/source')! == 'previous'
+	job.cancel()
+	assert os.read_file(root + '/destination/source')! == 'previous'
+	job.retry()
+	job.tick()
+	job.tick() // EOF; the complete staged inode is recorded before publication.
+	job.checkpoint(root + '/journal')!
+	job.tick()
+	assert os.read_bytes(root + '/destination/source')! == bytes
+	assert os.read_file(job.items[0].backup)! == 'previous'
+	mut recovered := workflowcore.resume_transfer(root + '/journal')!
+	defer { recovered.close() }
+	for _ in 0 .. 10 { if recovered.state != .running { break }; recovered.tick() }
+	assert recovered.state == .complete, recovered.message
+	assert os.read_file(recovered.items[0].backup)! == 'previous'
+}
+
+fn test_copy_rechecks_destinations_that_appear_during_a_copy() {
+	root := workflow_test_tree()
+	defer { os.rmdir_all(root) or {} }
+	os.mkdir(root + '/destination')!
+	os.write_file_array(root + '/source', []u8{len: 512 * 1024, init: 42})!
+	mut job := workflowcore.new_transfer([root + '/source'], root + '/destination', .copy)!
+	defer { job.close() }
+	job.tick()
+	os.write_file(root + '/destination/source', 'appeared')!
+	for _ in 0 .. 20 { if job.state != .running { break }; job.tick() }
+	assert job.state == .conflict
+	assert os.read_file(root + '/destination/source')! == 'appeared'
+	job.resolve(.keep_both)
+	for _ in 0 .. 20 { if job.state != .running { break }; job.tick() }
+	assert job.state == .complete, job.message
+	assert os.read_file(root + '/destination/source')! == 'appeared'
+	assert os.file_size(root + '/destination/source (1)') == 512 * 1024
+}
