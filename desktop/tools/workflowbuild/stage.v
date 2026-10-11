@@ -39,6 +39,10 @@ fn literal(value string) string {
 pub fn stage(root string, ui string, dest string, cross bool) ! {
 	if os.exists(dest) { os.rmdir_all(dest)! }
 	os.mkdir_all(dest)!
+	if os.is_dir('${root}/desktop/workflowcore') {
+		os.mkdir_all('${dest}/modules/desktop')!
+		os.cp_all('${root}/desktop/workflowcore', '${dest}/modules/desktop/workflowcore', true)!
+	}
 	for name in os.ls('${root}/desktop')! {
 		path := '${root}/desktop/${name}'
 		if !os.is_file(path) || (!name.ends_with('.v') && !name.ends_with('.vml') && !name.ends_with('.h')) { continue }

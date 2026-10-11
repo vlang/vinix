@@ -19,6 +19,7 @@ fn main() {
 			os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}') or { panic(err) }
 		}
 	}
+	if os.is_dir('${root}/desktop/workflowcore') { os.cp_all('${root}/desktop/workflowcore', '${work}/source/desktop/workflowcore', true) or { panic(err) } }
 	ui := os.getenv_opt('VINIX_UI2_SOURCE') or { if os.is_file('${root}/../ui2/v.mod') { '${root}/../ui2' } else { '${root}/third_party/ui2' } }
 	app := '${work}/app'
 	workflowbuild.stage('${work}/source', ui, app, false) or { eprintln(err); exit(1) }

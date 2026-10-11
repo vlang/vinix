@@ -330,6 +330,23 @@ mut:
 	trash_open          bool
 	volumes             []FilesVolume
 	volumes_open        bool
+	selection           []string
+	selection_directory string
+	multi_select        bool
+	worker_pid          int
+	job_path            string
+	job_sequence        u64
+	job_recorded        bool
+	operation_open      bool
+	operation           FilesTransferReport
+	undo_operations     []FilesUndo
+	tabs                []FilesTab
+	active_tab          int
+	drag_path           string
+	drag_start_x        int
+	drag_start_y        int
+	drag_active         bool
+	suppress_row_once   bool
 }
 
 fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
@@ -669,11 +686,15 @@ fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 	}
 	if a.trash_open { return a.trash.build(size) }
 	if a.volumes_open { return a.volumes_panel(size) }
-	browser_height := if size.height > 34 { size.height - 34 } else { 1.0 }
+	browser_height := if size.height > 98 { size.height - 98 - if a.operation_open { 66 } else { 0 } } else { 1.0 }
 	browser_root := a.files.build(ui2.rect(size.x, size.y, size.width, browser_height))!
-	mut browser_children := frame_elements(browser_root.children.len + 3)
-	browser_children << browser_root.children
+	mut browser_children := frame_elements(8)
+	mut content := ui2.view('files.workflow.content', ui2.rect(0, 64, size.width, browser_height), ui2.BoxStyle{transparent: true}, browser_root.children)
+	a.highlight_selection(mut content)
+	browser_children << content
+	browser_children << a.workflow_toolbar(size)
 	browser_children << a.trash_footer(size)
+	if a.operation_open { browser_children << a.operation_panel(size) }
 	root := ui2.Element{ ...browser_root, children: browser_children }
 	if a.tag_picker {
 		mut children := frame_elements(root.children.len + 1)
@@ -693,7 +714,7 @@ fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 	if overlay := a.rename_overlay(size) {
 		mut children := frame_elements(root.children.len + 1)
 		children << root.children
-		children << overlay
+		children << ui2.Element{...overlay, frame: ui2.Rect{...overlay.frame, y: overlay.frame.y + 64}}
 		return ui2.Element{
 			...root
 			children: children
@@ -722,65 +743,18 @@ fn (mut a FilesContextApp) rename_selected() ! {
 }
 
 fn (mut a FilesContextApp) copy_selected(mode FileClipboardMode) ! {
-	if a.context_path.len == 0 || !file_context_clipboard_store(mode, a.context_path) {
+	a.batch_clipboard(mode)!
+	if a.context_path.len > 0 && !file_context_clipboard_store(mode, a.context_path) {
 		return error('cannot put the selected item on the clipboard')
 	}
 }
 
 fn (mut a FilesContextApp) delete_selected() ! {
-	if a.context_path.len == 0 {
-		return error('no file selected')
-	}
-	selected := a.context_path.clone()
-	current := a.files.current_path().clone()
-	mut next_current := current.clone()
-	if file_context_path_inside(current, selected) {
-		unsafe { next_current.free() }
-		next_current = parent_path(selected).clone()
-	}
-	a.trash_for_path(selected)
-	if !a.trash.move(selected) {
-		unsafe {
-			selected.free()
-			current.free()
-			next_current.free()
-		}
-		return
-	}
-	a.files.settings.remove_path(selected)
-	a.files.settings.save(desktop_home)
-	a.clear_context_path()
-	if a.rename_path == selected {
-		a.clear_rename()
-	}
-	a.refresh_to(next_current)
-	unsafe {
-		selected.free()
-		current.free()
-	}
+	a.batch_delete()!
 }
 
 fn (mut a FilesContextApp) paste() ! {
-	directory := a.files.current_path().clone()
-	clipboard := file_context_clipboard_load()
-	pasted := paste_file_clipboard(directory) or {
-		if source := clipboard { unsafe { source.path.free() } }
-		unsafe { directory.free() }
-		return err
-	}
-	if source := clipboard {
-		if source.mode == .cut {
-			a.files.settings.rebase_path(source.path, pasted)
-		} else {
-			a.files.settings.copy_path(source.path, pasted)
-		}
-		a.files.settings.save(desktop_home)
-		unsafe { source.path.free() }
-	}
-	a.refresh_to(directory)
-	a.set_context_path(pasted)
-	a.focus_path(pasted)
-	unsafe { pasted.free() }
+	a.batch_paste()!
 }
 
 fn (mut a FilesContextApp) commit_rename() ! {
@@ -826,6 +800,14 @@ fn (mut a FilesContextApp) rename_key_input(input string) ! {
 
 fn (mut a FilesContextApp) handle(event_id string) ! {
 	a.follow_theme()
+	if a.operation_action(event_id) || a.tab_action(event_id) { return }
+	if a.files.permission_action(event_id) { return }
+	if a.suppress_row_once && a.is_row_action(event_id) { a.suppress_row_once = false; return }
+	if a.multi_select && a.is_row_action(event_id) {
+		a.select_action(event_id)
+		if a.context_path.len > 0 { a.toggle_selection(a.context_path) }
+		return
+	}
 	if !a.settings_only && a.volume_action(event_id) { return }
 	if event_id == files_settings_refresh {
 		a.reload_files_settings(desktop_home)
@@ -956,6 +938,7 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 		a.clear_context_path()
 	}
 	a.handle_browser_action(event_id, desktop_home)!
+	if !a.is_row_action(event_id) && a.files.current_path() != a.selection_directory { a.clear_selection_paths() }
 }
 
 fn (mut a FilesContextApp) handle_browser_action(event_id string, home string) ! {
@@ -1003,12 +986,14 @@ fn (a &FilesContextApp) pointer_moves_matter() bool {
 	if a.settings_only || a.tag_picker || a.preview.open || a.files.info.open || a.trash_open {
 		return false
 	}
-	return a.files.pointer_moves_matter()
+	return a.drag_path.len > 0 || a.files.pointer_moves_matter()
 }
 
 fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
 	scroll int, x int, y int, width int, height int) {
 	a.follow_theme()
+	if !a.settings_only && !a.trash_open && !a.preview.open && !a.volumes_open && !a.files.info.open && !a.tag_picker && a.workflow_drag(phase, button, x, y - 64, width) { return }
+	if a.volumes_open { return }
 	if a.trash_open {
 		if phase == .scroll {
 			a.trash.page -= scroll
@@ -1052,11 +1037,12 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 		}
 		return
 	}
-	a.files.pointer_event(phase, button, scroll, x, y, width, height)
+	a.files.pointer_event(phase, button, scroll, x, y - 64, width, height - 98 - if a.operation_open { 66 } else { 0 })
 }
 
 fn (mut a FilesContextApp) key_input(input string) {
 	a.follow_theme()
+	if !a.settings_only && !a.files.search_focused && !a.trash_open && !a.preview.open && !a.tag_picker && !a.files.info.open && !a.volumes_open && a.rename_path.len == 0 && a.workflow_key(input) { return }
 	if a.trash_open {
 		a.trash.key(input)
 		return
@@ -1087,8 +1073,10 @@ fn (mut a FilesContextApp) key_input(input string) {
 }
 
 fn (mut a FilesContextApp) close_app() {
+	a.close_workflows()
 	a.clear_volumes()
 	unsafe { a.volumes.free() }
+	a.volumes = []FilesVolume{}
 	a.trash.close()
 	a.preview.close()
 	a.files.info.close()

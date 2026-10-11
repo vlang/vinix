@@ -3,6 +3,7 @@
 module main
 
 import ui2
+import desktop.workflowcore
 
 const files_action_info = 'files.info'
 const files_action_info_close = 'files.info.close'
@@ -28,6 +29,9 @@ mut:
 	changed           i64
 	tz_offset_seconds i64
 	language          DesktopLanguage
+	permission_identity workflowcore.Identity
+	pending_mode      u32
+	permission_message string
 }
 
 fn (mut info FilesInfoPanel) close() {
@@ -42,6 +46,7 @@ fn (mut info FilesInfoPanel) close() {
 		info.accessed_text.free()
 		info.changed_text.free()
 		info.link_target.free()
+		info.permission_message.free()
 	}
 	info = FilesInfoPanel{}
 }
@@ -77,6 +82,8 @@ fn (mut info FilesInfoPanel) read(path string, tz_offset_seconds i64) {
 		return
 	}
 	info.mode = u32(stat.st_mode)
+	info.pending_mode = info.mode & 0o777
+	info.permission_identity = workflowcore.identify(path) or { workflowcore.Identity{} }
 	info.size = u64(stat.st_size)
 	info.modified = i64(stat.st_mtime)
 	info.accessed = i64(stat.st_atime)
@@ -192,7 +199,7 @@ fn (mut a FileBrowserApp) build_info_overlay(mut children []ui2.Element, width i
 	if !a.info.open { return }
 	if a.info.error_key.len == 0 && a.info.language != desktop_language { a.info.relabel() }
 	panel_width := if width > 552 { 520 } else { width - 32 }
-	panel_height := if a.info.link_target.len > 0 { 382 } else { 350 }
+	panel_height := if a.info.link_target.len > 0 { 486 } else { 454 }
 	x := (width - panel_width) / 2
 	y := if height > panel_height + 32 { (height - panel_height) / 2 } else { 16 }
 	mut rows := frame_elements(22)
@@ -220,6 +227,13 @@ fn (mut a FileBrowserApp) build_info_overlay(mut children []ui2.Element, width i
 		if a.info.link_target.len > 0 {
 			files_info_row(mut rows, 'files.info.target', a.info.link_target, 322, panel_width)
 		}
+		for i in 0 .. 9 {
+			bit := u32(1) << u32(8 - i)
+			text := ['Owner r', 'w', 'x', 'Group r', 'w', 'x', 'Others r', 'w', 'x'][i]
+			rows << ui2.button('files.permissions.bit.${i}', text, ui2.rect(f64(16 + i * 52), 356, 50, 28), ui2.BoxStyle{bg: if a.info.pending_mode & bit != 0 { files_sidebar_selected } else { body_panel }}, ui2.TextStyle{color: body_text, size: 10})
+		}
+		rows << ui2.button('files.permissions.apply', 'Apply permissions', ui2.rect(16, 390, 160, 28), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 12})
+		rows << ui2.label('', a.info.permission_message, ui2.rect(184, 388, f64(panel_width - 200), 40), ui2.TextStyle{color: body_text, size: 11, lines: 2})
 	}
 	// The full-window blocker receives clicks outside the panel and prevents
 	// directory rows from navigating while their metadata is being read.
@@ -235,4 +249,24 @@ fn (mut a FileBrowserApp) build_info_overlay(mut children []ui2.Element, width i
 			border_left:   1
 			border_right:  1
 		}, rows)
+}
+
+fn (mut a FileBrowserApp) permission_action(event string) bool {
+	if !a.info.open { return false }
+	if event.starts_with('files.permissions.bit.') {
+		i := event['files.permissions.bit.'.len..].int()
+		if i >= 0 && i < 9 { a.info.pending_mode ^= u32(1) << u32(8 - i) }
+		return true
+	}
+	if event != 'files.permissions.apply' { return false }
+	workflowcore.chmod(a.info.path, a.info.permission_identity, a.info.pending_mode) or {
+		unsafe { a.info.permission_message.free() }
+		a.info.permission_message = err.msg().clone()
+		return true
+	}
+	path := a.info.path.clone()
+	a.info.read(path, a.tz_offset_seconds)
+	unsafe { path.free() }
+	a.info.permission_message = 'Permissions updated'.clone()
+	return true
 }
