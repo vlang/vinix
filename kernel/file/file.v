@@ -1574,20 +1574,23 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 
 	mut resource_ := &resource.Resource(unsafe { nil })
 	mut fd := &FD(unsafe { nil })
+	prot := int((prot_and_flags >> 32) & 0xffffffff)
+	flags := int(prot_and_flags & 0xffffffff)
+	file_backed := flags & mmap.map_anonymous == 0
 
-	if fdnum != -1 {
-		fd = fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	// MAP_ANONYMOUS ignores fd entirely, including invalid descriptors and
+	// upper register bits left by Linux libc. File descriptors are C ints.
+	if file_backed {
+		fd = fd_from_fdnum(unsafe { nil }, int(i32(fdnum))) or { return errno.err, errno.get() }
 		resource_ = fd.handle.resource
 	}
 
 	defer {
-		if fdnum != -1 {
+		if file_backed {
 			fd.unref()
 		}
 	}
 
-	prot := int((prot_and_flags >> 32) & 0xffffffff)
-	flags := int(prot_and_flags & 0xffffffff)
 	sharing := flags & (mmap.map_shared | mmap.map_private)
 	if sharing != mmap.map_shared && sharing != mmap.map_private {
 		return errno.err, errno.einval
@@ -1635,7 +1638,7 @@ pub fn syscall_mmap(_ voidptr, addr voidptr, length u64, prot_and_flags u64, fdn
 	}
 
 	mut mapping_handle := voidptr(0)
-	if fdnum != -1 {
+	if file_backed {
 		mapping_handle = voidptr(fd.handle)
 	}
 	ret := mmap.mmap(process.pagemap, addr, length, prot, map_flags, resource_, offset, mapping_handle, retain_mmap_handle, release_mmap_handle) or {

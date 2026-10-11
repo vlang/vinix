@@ -35,7 +35,7 @@ fn main() {
 		hosttest.Option{ name: '--state-dir', value: true },
 		hosttest.Option{ name: '--cases', value: true },
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: tests/linux-compat/run --arch aarch64|x86_64 --kernel-dir DIR --state-dir FRESH-DIR [--cases bpf,access,open,runtime] [--timeout SECONDS]') or {
+	], [], 'Usage: tests/linux-compat/run --arch aarch64|x86_64 --kernel-dir DIR --state-dir FRESH-DIR [--cases bpf,access,open,mmap,runtime] [--timeout SECONDS]') or {
 		eprintln(err.msg())
 		exit(2)
 	}
@@ -50,10 +50,10 @@ fn main() {
 		eprintln(err.msg())
 		exit(2)
 	}
-	cases := options.value('--cases', 'bpf,access,open,runtime').split(',')
+	cases := options.value('--cases', 'bpf,access,open,mmap,runtime').split(',')
 	mut seen := map[string]bool{}
 	for name in cases {
-		if name !in ['bpf', 'access', 'open', 'runtime'] || name in seen {
+		if name !in ['bpf', 'access', 'open', 'mmap', 'runtime'] || name in seen {
 			eprintln('unknown or repeated case: ' + name)
 			exit(2)
 		}

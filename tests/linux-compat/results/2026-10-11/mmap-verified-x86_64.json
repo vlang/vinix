@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "b788687e39bff3d2e73d7e572d45c5b5cbf41d3ca12b77679e153cf276f73324",
+    "results": [
+        {
+            "name": "mmap",
+            "source_sha256": "110291a245baf0ed947d3575dcc54b97006d532d3a6265572697b90d8a3fa624",
+            "init_sha256": "85855eb8b9f83b8c12a7542a0505283bb3a3f5ffe2d3cf82650116f2fb6d69d3",
+            "iso_sha256": "7ceab77bc9ca9c15931230834c208d60a52ad960ec136a0625e84b99f3bec4ec",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

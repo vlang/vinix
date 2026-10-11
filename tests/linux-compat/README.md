@@ -12,7 +12,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,runtime` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -43,6 +43,10 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
   the i386 libc's time64 wrappers.
   `--once` makes a staged runtime fixture exit after testing instead of waiting
   as PID 1. It is a native musl test until run through a foreign runtime.
+- `mmap` checks that MAP_ANONYMOUS ignores every descriptor, including an
+  invalid positive value and a zero-extended -1, and that file-backed mappings
+  consume only the low signed C-int descriptor. Invalid file descriptors still
+  return EBADF. The test writes anonymous pages and verifies mapped file data.
 
 The [coverage matrix](../../docs/linux-posix-compatibility.md) separates missing
 interfaces from implemented behavior and lists unsupported dependencies. The
