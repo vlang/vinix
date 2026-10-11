@@ -3,6 +3,8 @@
 // 64 KiB scratch buffer and do not flatten the original image's alpha channel.
 module main
 
+import desktop.workflowcore
+
 const preview_crc_table = [
 	u32(0x00000000),
 	0x77073096,
@@ -369,8 +371,9 @@ fn (mut a PreviewApp) export_image(original bool) bool {
 		a.set_status('preview.status.export_failed')
 		return false
 	}
-	fd := C.open(&char(path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL, 0o600)
-	if fd < 0 {
+	canonical := workflowcore.canonical(path) or { a.set_status('preview.status.export_failed'); return false }
+	defer { unsafe { canonical.free() } }
+	mut writer := workflowcore.begin_atomic_save(canonical, workflowcore.SaveOptions{create_only: true}) or {
 		a.set_status(if desktop_lstat(path) != none {
 			'preview.status.exists'
 		} else {
@@ -378,20 +381,18 @@ fn (mut a PreviewApp) export_image(original bool) bool {
 		})
 		return false
 	}
+	defer { writer.close() }
+	fd := writer.descriptor()
 	written := if original {
 		desktop_write_all(fd, a.source.data, u64(a.source.len))
 	} else {
 		a.write_png(fd)
 	}
-	synced := written && C.fsync(fd) == 0
-	closed := desktop_close(fd) == 0
-	if !written || !synced || !closed {
-		// O_EXCL guarantees that this path was created by this export. Failed
-		// writes remove only that new incomplete file, never an existing one.
-		desktop_unlink(path)
+	if !written {
 		a.set_status('preview.status.export_failed')
 		return false
 	}
+	writer.publish() or { a.set_status('preview.status.export_failed'); return false }
 	a.set_status(if original { 'preview.status.copied' } else { 'preview.status.exported' })
 	return true
 }

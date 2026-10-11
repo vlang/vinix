@@ -70,7 +70,7 @@ pub fn (a Identity) regular() bool { return a.mode & u32(C.S_IFMT) == u32(C.S_IF
 pub fn (a Identity) link() bool { return a.mode & u32(C.S_IFMT) == u32(C.S_IFLNK) }
 
 fn from_stat(s C.stat) Identity {
-	return Identity{device: u64(s.st_dev), inode: u64(s.st_ino), size: u64(s.st_size), modified: i64(s.st_mtime), accessed: i64(s.st_atime), changed: i64(s.st_ctime), modified_ns: C.vinix_workflow_mtime_ns(&s), changed_ns: C.vinix_workflow_ctime_ns(&s), mode: u32(s.st_mode), uid: u32(s.st_uid), gid: u32(s.st_gid)}
+	return Identity{device: u64(s.st_dev), inode: u64(s.st_ino), size: u64(s.st_size), modified: i64(s.st_mtime), accessed: i64(s.st_atime), changed: i64(s.st_ctime), modified_ns: C.vinix_workflow_mtime_ns(unsafe { &s }), changed_ns: C.vinix_workflow_ctime_ns(unsafe { &s }), mode: u32(s.st_mode), uid: u32(s.st_uid), gid: u32(s.st_gid)}
 }
 
 pub fn valid_path(path string) bool {
@@ -98,7 +98,7 @@ pub fn canonical(path string) !string {
 
 pub fn open_parent(path string) !(int, string) {
 	if !valid_path(path) { return error('invalid path') }
-	parts := path[1..].split('/')
+	parts := unsafe { tos(path.str + 1, path.len - 1) }.split('/')
 	defer { unsafe { parts.free() } }
 	mut fd := C.open(c'/', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC, 0)
 	if fd < 0 { return error('root unavailable') }
@@ -113,13 +113,13 @@ pub fn open_parent(path string) !(int, string) {
 
 fn identify_at(fd int, name string) !Identity {
 	mut s := C.stat{}
-	if unsafe { C.fstatat(fd, &char(name.str), &s, C.AT_SYMLINK_NOFOLLOW) } != 0 { return error('item unavailable') }
+	if C.fstatat(fd, &char(name.str), unsafe { &s }, C.AT_SYMLINK_NOFOLLOW) != 0 { return error('item unavailable') }
 	return from_stat(s)
 }
 
 fn identify_fd(fd int) !Identity {
 	mut s := C.stat{}
-	if unsafe { C.fstat(fd, &s) } != 0 { return error('descriptor unavailable') }
+	if C.fstat(fd, unsafe { &s }) != 0 { return error('descriptor unavailable') }
 	return from_stat(s)
 }
 
@@ -185,8 +185,32 @@ pub:
 // Write on the destination filesystem, sync, then publish a whole new inode.
 // A failed pre-publication step leaves the original bytes untouched.
 pub fn atomic_save(path string, data []u8, options SaveOptions) !Identity {
+	prepared := begin_atomic_save(path, options)!
+	mut output := &AtomicWriter{...prepared}
+	defer { output.close(); unsafe { free(output) } }
+	write_all(output.descriptor(), data)!
+	return output.publish()!
+}
+
+// A streamed save uses the same staging and publication rules as byte saves.
+// Call close on every path; only publish exposes the completed file.
+pub struct AtomicWriter {
+mut:
+	fd int = -1
+	parent int = -1
+	path string
+	leaf string
+	temporary string
+	root Identity
+	staged Identity
+	original ?Identity
+	published bool
+}
+
+pub fn begin_atomic_save(path string, options SaveOptions) !AtomicWriter {
 	parent, leaf := open_parent(path)!
-	defer { C.close(parent); unsafe { leaf.free() } }
+	mut ready := false
+	defer { if !ready { C.close(parent); unsafe { leaf.free() } } }
 	root := identify_fd(parent)!
 	mut original := ?Identity(none)
 	if old := identify_at(parent, leaf) {
@@ -201,32 +225,56 @@ pub fn atomic_save(path string, data []u8, options SaveOptions) !Identity {
 	mut fd := -1
 	mut temporary := ''
 	for attempt in 0 .. 1000 {
-		temporary = '.vinix-save-${os.getpid()}-${attempt}'
+		pid := os.getpid().str()
+		number := attempt.str()
+		temporary = '.vinix-save-' + pid + '-' + number
+		unsafe { pid.free(); number.free() }
 		fd = C.openat(parent, &char(temporary.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC, 0o600)
 		if fd >= 0 { break }
 		unsafe { temporary.free() }
 		if C.errno != C.EEXIST { return error('cannot stage save') }
 	}
 	if fd < 0 { return error('no staging name available') }
-	defer { C.close(fd); C.unlinkat(parent, &char(temporary.str), 0); unsafe { temporary.free() } }
-	write_all(fd, data)!
-	if old := original {
-		if C.fchown(fd, old.uid, old.gid) != 0 { return error('cannot preserve document owner') }
-		if C.fchmod(fd, old.mode & 0o7777) != 0 { return error('cannot preserve document permissions') }
+	staged := identify_fd(fd) or { C.close(fd); C.unlinkat(parent, &char(temporary.str), 0); unsafe { temporary.free() }; return err }
+	ready = true
+	return AtomicWriter{fd: fd, parent: parent, path: path.clone(), leaf: leaf, temporary: temporary, root: root, staged: staged, original: original}
+}
+
+pub fn (writer &AtomicWriter) descriptor() int { return writer.fd }
+
+pub fn (mut writer AtomicWriter) publish() !Identity {
+	if writer.fd < 0 || writer.published { return error('save already closed or published') }
+	if !writer.staged.same_node(identify_at(writer.parent, writer.temporary)!) { return error('staged document changed') }
+	if old := writer.original {
+		if C.fchown(writer.fd, old.uid, old.gid) != 0 { return error('cannot preserve document owner') }
+		if C.fchmod(writer.fd, old.mode & 0o7777) != 0 { return error('cannot preserve document permissions') }
 	}
-	if C.fsync(fd) != 0 { return error('cannot sync saved data') }
+	if C.fsync(writer.fd) != 0 { return error('cannot sync saved data') }
 	// Reopen the named parent to detect device removal/replacement.
-	current, current_leaf := open_parent(path)!
+	current, current_leaf := open_parent(writer.path)!
 	defer { C.close(current); unsafe { current_leaf.free() } }
-	if !root.same_node(identify_fd(current)!) { return error('destination volume disappeared') }
-	if old := original {
-		if !old.unchanged(identify_at(parent, leaf)!) { return error('document changed on disk') }
-		if C.renameat(parent, &char(temporary.str), parent, &char(leaf.str)) != 0 { return error('cannot publish saved document') }
+	if !writer.root.same_node(identify_fd(current)!) { return error('destination volume disappeared') }
+	if old := writer.original {
+		if !old.unchanged(identify_at(writer.parent, writer.leaf)!) { return error('document changed on disk') }
+		if C.renameat(writer.parent, &char(writer.temporary.str), writer.parent, &char(writer.leaf.str)) != 0 { return error('cannot publish saved document') }
 	} else {
-		if C.vinix_workflow_rename(parent, &char(temporary.str), parent, &char(leaf.str)) != 0 { return error('destination appeared while saving') }
+		if C.vinix_workflow_rename(writer.parent, &char(writer.temporary.str), writer.parent, &char(writer.leaf.str)) != 0 { return error('destination appeared while saving') }
 	}
-	if C.fsync(parent) != 0 { return error('document saved; directory sync failed') }
-	return identify_at(parent, leaf)!
+	writer.published = true
+	if C.fsync(writer.parent) != 0 { return error('document saved; directory sync failed') }
+	return identify_at(writer.parent, writer.leaf)!
+}
+
+pub fn (mut writer AtomicWriter) close() {
+	if writer.parent >= 0 && !writer.published && writer.temporary.len > 0 {
+		if current := identify_at(writer.parent, writer.temporary) {
+			if writer.staged.same_node(current) { C.unlinkat(writer.parent, &char(writer.temporary.str), 0) }
+		}
+	}
+	if writer.fd >= 0 { C.close(writer.fd) }
+	if writer.parent >= 0 { C.close(writer.parent) }
+	unsafe { writer.path.free(); writer.leaf.free(); writer.temporary.free() }
+	writer = AtomicWriter{}
 }
 
 pub fn rename_exclusive(source string, destination string, expected Identity) ! {

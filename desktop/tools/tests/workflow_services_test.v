@@ -27,6 +27,29 @@ fn test_shared_atomic_save_keeps_original_on_conflict_and_rejects_links() {
 	assert false, 'stale save must be refused'
 }
 
+fn test_streamed_atomic_saves_remain_private_until_publish_and_preserve_late_arrivals() {
+	root := workflow_test_tree()
+	defer { os.rmdir_all(root) or {} }
+	path := root + '/image.png'
+	mut writer := workflowcore.begin_atomic_save(path, workflowcore.SaveOptions{create_only: true})!
+	assert C.write(writer.descriptor(), c'complete image', 14) == 14
+	assert !os.exists(path)
+	writer.publish()!
+	writer.close()
+	writer.close()
+	assert os.read_file(path)! == 'complete image'
+	mut abandoned := workflowcore.begin_atomic_save(root + '/abandoned', workflowcore.SaveOptions{create_only: true})!
+	assert C.write(abandoned.descriptor(), c'partial', 7) == 7
+	abandoned.close()
+	assert !os.exists(root + '/abandoned')
+	mut conflict := workflowcore.begin_atomic_save(root + '/conflict', workflowcore.SaveOptions{create_only: true})!
+	defer { conflict.close() }
+	assert C.write(conflict.descriptor(), c'ours', 4) == 4
+	os.write_file(root + '/conflict', 'external arrival')!
+	conflict.publish() or { assert os.read_file(root + '/conflict')! == 'external arrival'; return }
+	assert false, 'late arrivals must survive streamed saves'
+}
+
 fn test_background_copy_cancel_checkpoint_resume_and_conflict() {
 	root := workflow_test_tree()
 	defer { os.rmdir_all(root) or {} }

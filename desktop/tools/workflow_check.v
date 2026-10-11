@@ -8,7 +8,8 @@ fn main() {
 	root := os.real_path('.')
 	v := os.getenv_opt('V') or { '/Users/alex/code/v/v' }
 	work := os.join_path(os.temp_dir(), 'vinix-workflows-${os.getpid()}')
-	defer { os.rmdir_all(work) or {} }
+	defer { if os.getenv('VINIX_WORKFLOW_KEEP') != '1' { os.rmdir_all(work) or {} } }
+	if os.getenv('VINIX_WORKFLOW_KEEP') == '1' { println('Workflow test artifacts: ' + work) }
 	// Other sessions share this checkout. Freeze committed desktop sources and
 	// overlay only this workstream when explicitly requested for uncommitted work.
 	os.mkdir_all('${work}/source') or { panic(err) }
@@ -22,11 +23,12 @@ fn main() {
 	if os.getenv('VINIX_WORKFLOW_OVERLAY') == '1' {
 	for name in os.ls('${root}/desktop') or { panic(err) } {
 		if os.getenv('VINIX_WORKFLOW_SKIP_OVERLAY') == name { continue }
-		if name.ends_with('.v') && (name.starts_with('files') || name.starts_with('notes') || name.starts_with('grapher') || name in ['create_context_menu.c.v', 'file_context_ops.c.v', 'quick_launch.v', 'document_open.v', 'editor_documents.v', 'preview_app_ui.v', 'workflow_elements.v', 'render.v']) {
+		if name.ends_with('.v') && (name.starts_with('files') || name.starts_with('notes') || name.starts_with('grapher') || name in ['create_context_menu.c.v', 'file_context_ops.c.v', 'quick_launch.v', 'editor_documents.v', 'preview_app_ui.v', 'preview_app_export.v', 'workflow_elements.v', 'render.v']) {
 			os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}') or { panic(err) }
 		}
 	}
 	if os.is_dir('${root}/desktop/workflowcore') { os.cp_all('${root}/desktop/workflowcore', '${work}/source/desktop/workflowcore', true) or { panic(err) } }
+	os.cp_all('${root}/desktop/translations', '${work}/source/desktop/translations', true) or { panic(err) }
 	}
 	ui := os.getenv_opt('VINIX_UI2_SOURCE') or { if os.is_file('${root}/../ui2/v.mod') { '${root}/../ui2' } else { '${root}/third_party/ui2' } }
 	app := '${work}/app'
