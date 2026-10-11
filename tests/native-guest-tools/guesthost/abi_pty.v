@@ -58,6 +58,11 @@ fn abi_stop(pid i32, master i32, state string, arm bool) !bool {
 // further seconds after a pass/failure. Both require every marker exactly once.
 pub fn boot_abi(command []string, env map[string]string, state string, arch string,
 	expected []string, pass string, failures []string, timeout int, inherit bool) !int {
+	return boot_abi_from(command, env, state, arch, expected, pass, failures, timeout, inherit, '')!
+}
+
+pub fn boot_abi_from(command []string, env map[string]string, state string, arch string,
+	expected []string, pass string, failures []string, timeout int, inherit bool, directory string) !int {
 	if timeout <= 0 || expected.len == 0 || expected.any(it == '') || pass == '' {
 		return error('ABI timeout and markers must be positive/nonempty')
 	}
@@ -66,7 +71,7 @@ pub fn boot_abi(command []string, env map[string]string, state string, arch stri
 	defer { unsafe { C.signal(C.SIGINT, previous) } }
 	previous_pipe := unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
 	defer { unsafe { C.signal(C.SIGPIPE, previous_pipe) } }
-	pid, master := spawn_guest(command, env)!
+	pid, master := spawn_guest_at(command, env, directory)!
 	mut transcript := []u8{}
 	mut reaped := false
 	defer {

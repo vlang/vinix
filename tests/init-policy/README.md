@@ -17,9 +17,9 @@ desktop script with an invalid plan, then reboot with an enrolled plan and
 reordered devices. See [the storage fixture](../storage-volumes/README.md).
 
 The native host command below tests the init policy independently. The guest
-runner still has a Python transport pending its separate port.
+runner, production producer and guest producer now invoke V directly.
 
-`run-vm.py` boots the production ARM shell, full and desktop init policies
+`run-vm` boots the production ARM shell, full and desktop init policies
 with independent native applications from `guestfixture/core.v`. The shell
 driver checks command input through a pipe and `execv`. The full application
 checks PID 1, arguments, environment and console descriptors. The desktop
@@ -29,7 +29,7 @@ and termination and reaping of an orphaned child before the next restart.
 Build an ARM kernel and musl sysroot, then run:
 
 ```sh
-python3 tests/init-policy/run-vm.py \
+tests/init-policy/run-vm \
   --kernel-dir /absolute/path/to/kernel \
   --state-dir "$(mktemp -d /tmp/vinix-init-policy.XXXXXX)"
 ```
@@ -40,7 +40,7 @@ Use a fresh, short state path: QEMU's Unix monitor socket is limited to
 and libraries, and `LD_AARCH64` selects the freestanding policy linker.
 `--reference-guest=/path/to/original-guest.c` builds the independent C
 control with its original three mode defines and every original assertion.
-`compile-guest.py` can emit either ARM or x86 fixture artifacts for SDK checks.
+`compile-guest` can emit either ARM or x86 fixture artifacts for SDK checks.
 The production policies use the raw ARM syscall ABI; x86 evidence is compile
 validation only.
 
@@ -108,3 +108,6 @@ Homebrew Clang produced different object metadata and was retained; the final
 identity check uses the original compiler and source basenames. A supplemental
 x86 IR check first selected an absent sysroot, then passed with the genuine
 GCC sysroot; the genuine GCC SDK object checks passed independently.
+
+The native command migration and current qualification limits are recorded in
+[serial-tools.md](../native-guest-tools/serial-tools.md).

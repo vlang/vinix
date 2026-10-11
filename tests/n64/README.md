@@ -33,8 +33,8 @@ subprocess timeout catches loops that bypass the budget; the old loop-top
 guard fails this test. No cartridge or firmware is needed.
 
 ```sh
-python3 build-support/n64/build.py --host --output build/n64-host
-python3 tests/n64/rsp-budget.py --build build/n64-host
+# Use an existing native host build.
+tests/n64/rsp-budget --build build/n64-host
 ```
 
 The guest is maintained in the freestanding V module `guestfixture`. The
@@ -76,3 +76,6 @@ closes the window. Logs and screenshots remain in the N64 build directory.
 It expects a compositor containing Nintendo 64 at `build/vinix-desktop`, or
 the path passed with `--desktop`. Development validation can use an isolated
 compositor at `build/n64/vinix-desktop` to preserve shared build artifacts.
+
+The native command migration and current qualification limits are recorded in
+[serial-tools.md](../native-guest-tools/serial-tools.md).

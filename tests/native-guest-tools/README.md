@@ -67,3 +67,7 @@ Qualification uses the isolated V 0.5.2 `c6bb06f` compiler described in the
 receipts are under `/tmp/vinix-native-guest-qualification-{arm,x86,san}` and
 `/tmp/vinix-native-guest-final-checks`; maintained commands do not depend on
 those directories. No Python was run.
+
+The init-policy, process-churn, memlock, standalone realtime and N64 instruction-
+budget commands share the native serial/command owners. See
+[serial-tools.md](serial-tools.md) for usage, comparisons and guest limits.

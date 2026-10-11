@@ -7,7 +7,8 @@ import os
 const init_warnings = '#pragma GCC diagnostic ignored "-Wunused-function"\n#pragma GCC diagnostic ignored "-Wunused-label"\n#pragma GCC diagnostic ignored "-Wunused-parameter"\n'
 const init_layout = '\n_Static_assert(sizeof(initcore__SignalAction) == 32 && offsetof(initcore__SignalAction, flags) == 8 && offsetof(initcore__SignalAction, restorer) == 16 && offsetof(initcore__SignalAction, mask) == 24, "raw ARM signal ABI");\n_Static_assert(sizeof(initcore__Delay) == 16 && offsetof(initcore__Delay, nanoseconds) == 8, "raw ARM time ABI");\n'
 
-fn generate_init(tool string, destination string, host bool, echo bool) ! {
+pub fn generate_init(tool string, destination string, host bool, echo bool, wifi bool) ! {
+	if tool !in ['shell', 'full', 'desktop'] { return error('Unknown init policy') }
 	work := private_work('vinix-init-v-')!
 	defer { retire(work) }
 	hosttest.module_copy_tree(root() + '/build-support/init-aarch64/initcore', work + '/initcore')!
@@ -27,6 +28,7 @@ fn generate_init(tool string, destination string, host bool, echo bool) ! {
 	mut defines := []string{}
 	if tool != 'shell' { defines << 'init_' + tool }
 	if host { defines << 'init_host' }
+	if wifi { defines << 'init_wifi_bundle' }
 	if echo { defines << 'init_busybox_echo_test' }
 	generate_project(work, destination, '', false, defines)!
 	text := read(destination)!
@@ -87,7 +89,7 @@ fn validate_init(work string, arguments hosttest.Arguments) ! {
 	run(concat(strict, ['-c', source, '-o', fixture]))!
 	for echo in [false, true] {
 		generated := work + '/init.c'
-		generate_init('desktop', generated, true, echo)!
+		generate_init('desktop', generated, true, echo, false)!
 		defines := concat(['-DVINIX_INIT_HOST_TEST'], if echo { ['-DVINIX_BUSYBOX_ECHO_TEST'] } else { []string{} })
 		executable := work + if echo { '/echo-test' } else { '/test' }
 		run(concat(common, defines, ['-I' + init, generated, fixture, '-o', executable]))!
@@ -110,7 +112,7 @@ fn validate_init(work string, arguments hosttest.Arguments) ! {
 	for tool in ['shell', 'full', 'desktop'] {
 		source_c := work + '/' + tool + '.c'
 		obj, elf, abi := work + '/' + tool + '.o', work + '/' + tool, work + '/' + tool + '-abi.o'
-		generate_init(tool, source_c, false, false)!
+		generate_init(tool, source_c, false, false, false)!
 		run(['clang', '--target=aarch64-linux-none', '-nostdlib', '-ffreestanding', '-O2',
 			'-fno-stack-protector', '-fno-builtin', '-ffunction-sections', '-fdata-sections',
 			'-I' + init, '-c', source_c, '-o', obj])!

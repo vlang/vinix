@@ -20,7 +20,7 @@ aarch64)
 		-o "$work/init"
 	# scripts/run-aarch64.sh overlays the test as /sbin/init itself.
 	COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/initramfs.tar" -C "$work/rootfs" .
-	python3 "$repo/tests/memlock/run_vm.py" --arch aarch64 \
+	"$repo/tests/memlock/run-vm" --arch aarch64 \
 		--init "$work/init" --initramfs "$work/initramfs.tar" \
 		--state-dir "$work/vm" --capture "$work/net.pcap" \
 		--timeout "${VINIX_QEMU_TIMEOUT:-600}"
@@ -37,7 +37,7 @@ amd64)
 		"$repo/build-support/build-amd64-iso.sh" >/dev/null
 	qemu=$(command -v "${VINIX_QEMU_X86_64:-qemu-system-x86_64}")
 	firmware=${VINIX_OVMF_CODE:-"$(cd "$(dirname "$qemu")/.." && pwd)/share/qemu/edk2-x86_64-code.fd"}
-	python3 "$repo/tests/memlock/run_vm.py" --arch amd64 \
+	"$repo/tests/memlock/run-vm" --arch amd64 \
 		--iso "$work/test.iso" --qemu "$qemu" --firmware "$firmware" \
 		--capture "$work/net.pcap" --timeout "${VINIX_QEMU_TIMEOUT:-600}"
 	;;

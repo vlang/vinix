@@ -62,3 +62,6 @@ unlocks allow discard/reload, and 500 private remap/unlink/close/unmap operation
 keep allocations bounded. Its host then checks every byte of the backing file
 after a power cut. The shared anonymous remap behavior inherited from the
 existing kernel remains a separate compatibility limitation.
+
+The native command migration and current qualification limits are recorded in
+[serial-tools.md](../native-guest-tools/serial-tools.md).

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module nativepolicy
 
-import fixturehost
 import hosttest
 import os
 import policyhost
@@ -69,7 +68,7 @@ fn generate_project(work string, destination string, selected string, prod bool,
 	argv << ['-o', destination, work]
 	mut env := policyhost.environment()
 	env['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
-	fixturehost.inherited_command_environment_preferred(argv, env, arch())!
+	policyhost.owned_inherited_environment(argv, env, arch(), '')!
 }
 
 fn generate_module(source string, destination string, selected string) ! {

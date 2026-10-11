@@ -1,0 +1,5 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+set -eu
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+exec sh "$repo/build-support/run-v-tool.sh" "$repo/tests/native-guest-tools/init-fixture-main.v" "$@"

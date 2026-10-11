@@ -22,7 +22,7 @@ for input in \
 		exit 1
 	fi
 done
-for command_name in "$cc" python3 tar; do
+for command_name in "$cc" tar; do
 	command -v "$command_name" >/dev/null 2>&1 || {
 		echo "ERROR: required command not found: $command_name" >&2
 		exit 1
@@ -41,7 +41,7 @@ mkdir -p "$work/rootfs/root" "$work/rootfs/sbin" "$work/rootfs/sys" "$work/rootf
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/initramfs.tar" \
 	-C "$work/rootfs" .
 
-python3 "$repo/tests/realtime/run_vm.py" \
+"$repo/tests/realtime/run-vm" \
 	--init "$work/init" \
 	--initramfs "$work/initramfs.tar" \
 	--state-dir "$work/vm" \

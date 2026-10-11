@@ -21,7 +21,7 @@ const desktop_source_paths = [
 	'build-support/init-aarch64/initcore',
 	'build-support/init-aarch64/syscall_abi.S',
 	'build-support/init-aarch64/syscall_abi.h',
-	'build-support/init-aarch64/compile-v.py',
+	'tests/native-policy-tools/nativepolicy',
 	'build-support/init-aarch64/compile-init',
 	'build-support/init-aarch64/compile_init.v',
 	'tools/m1-wifi/compile-v',

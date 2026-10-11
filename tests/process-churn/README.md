@@ -26,10 +26,10 @@ must identify the exact measured tracked build.
 
 ```sh
 # Tiny standalone regression guest, both architectures.
-python3 tests/process-churn/run.py --mode slabinfo \
+tests/process-churn/run --mode slabinfo \
   --runner-root /path/to/main-checkout --kernel /path/to/arm-kernel \
   > /tmp/slabinfo-arm.log 2>&1
-python3 tests/process-churn/run.py --mode slabinfo --arch amd64 \
+tests/process-churn/run --mode slabinfo --arch amd64 \
   --runner-root /path/to/main-checkout --kernel /path/to/amd64-kernel/bin/vinix \
   > /tmp/slabinfo-amd64.log 2>&1
 tests/process-churn/check-results /tmp/slabinfo-arm.log \
@@ -38,7 +38,7 @@ tests/process-churn/check-results /tmp/slabinfo-amd64.log \
   --mode slabinfo --expect-flat-slabinfo
 
 # ARM exec cohorts need the populated desktop image and its matching module ISO.
-python3 tests/process-churn/run.py --runner-root /path/to/main-checkout \
+tests/process-churn/run --runner-root /path/to/main-checkout \
   --kernel /path/to/arm-kernel --image /path/to/initramfs-desktop.tar \
   --module-iso /path/to/initramfs-desktop.iso > /tmp/exec-cohorts.log 2>&1
 tests/process-churn/check-results /tmp/exec-cohorts.log
@@ -51,7 +51,7 @@ tests/process-churn/check-generated /path/to/blob.c
 # Standalone controls and operations. Also run these with --arch amd64.
 # Allow the complete 900-fork x86 TCG workload to finish under host load.
 for mode in waits pipes sampling; do
-  python3 tests/process-churn/run.py --mode "$mode" \
+  tests/process-churn/run --mode "$mode" \
     --runner-root /path/to/main-checkout --kernel /path/to/arm-kernel \
     --timeout 1800 \
     > "/tmp/churn-$mode.log" 2>&1
@@ -59,13 +59,13 @@ for mode in waits pipes sampling; do
 done
 
 # Directory cohorts require the ARM runner's actual persistent ext2 volume.
-python3 tests/process-churn/run.py --mode directories \
+tests/process-churn/run --mode directories \
   --runner-root /path/to/main-checkout --kernel /path/to/arm-kernel \
   > /tmp/churn-directories.log 2>&1
 tests/process-churn/check-results /tmp/churn-directories.log --mode directories
 
 # Measured select/fork regression fixes. Repeat the guests with --arch amd64.
-python3 tests/process-churn/run.py --mode select \
+tests/process-churn/run --mode select \
   --runner-root /path/to/main-checkout --kernel /path/to/arm-kernel \
   > /tmp/select-fixed.log 2>&1
 tests/process-churn/check-results /tmp/select-fixed.log \
@@ -281,3 +281,6 @@ The validation logs are `/tmp/vinix-process-churn-{arm,amd64}-build.log`,
 `/tmp/vinix-process-churn-alloc-audit.log`, and
 `/tmp/vinix-process-churn-desktop.{log,json}`. The matching fixed ELFs and
 generated C are saved under `/tmp/vinix-process-churn-artifacts/`.
+
+The native command migration and current qualification limits are recorded in
+[serial-tools.md](../native-guest-tools/serial-tools.md).

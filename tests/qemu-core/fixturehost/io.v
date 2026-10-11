@@ -37,6 +37,8 @@ fn C.posix_spawnattr_init(voidptr) i32
 fn C.posix_spawnattr_destroy(voidptr) i32
 fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
+fn C.posix_spawnattr_setpgroup(voidptr, i32) i32
+fn C.killpg(i32, i32) i32
 fn C.poll(&C.pollfd, usize, i32) i32
 
 struct C.pollfd {
@@ -177,7 +179,7 @@ pub fn write(path string, text string) ! {
 
 // Capture one merged pipe with inherited stdin and no deadline. POSIX spawn
 // reports exec errors directly, before any compile log is materialized.
-fn spawn_command_preferred(argv []string, env map[string]string, actions voidptr, excluded []i32, host_arch string) !i32 {
+fn spawn_command_preferred(argv []string, env map[string]string, actions voidptr, excluded []i32, host_arch string, own_group bool) !i32 {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('embedded null byte') }
 	mut c_arguments := []&char{cap: argv.len + 1}
 	for item in argv { c_arguments << &char(item.str) }
@@ -232,7 +234,11 @@ fn spawn_command_preferred(argv []string, env map[string]string, actions voidptr
 		default_status := C.posix_spawnattr_setsigdefault(&attributes, &defaults)
 		if default_status != 0 { return file_error('', default_status) }
 	}
-	configured := C.posix_spawnattr_setflags(&attributes, i16(C.POSIX_SPAWN_SETSIGDEF))
+	if own_group {
+		group_status := C.posix_spawnattr_setpgroup(&attributes, 0)
+		if group_status != 0 { return file_error('', group_status) }
+	}
+	configured := C.posix_spawnattr_setflags(&attributes, i16(C.POSIX_SPAWN_SETSIGDEF | if own_group { C.POSIX_SPAWN_SETPGROUP } else { 0 }))
 	if configured != 0 { return file_error('', configured) }
 	apply_arch_preference(&attributes, host_arch)!
 	mut pid := i32(0)
@@ -270,7 +276,7 @@ pub fn inherited_command_environment(argv []string, env map[string]string) ! {
 // Preserve the original caller's universal-binary preference without changing
 // command arguments, environment, signal restoration or descriptor ownership.
 pub fn inherited_command_environment_preferred(argv []string, env map[string]string, host_arch string) ! {
-	pid := spawn_command_preferred(argv, env, unsafe { nil }, []i32{}, host_arch)!
+	pid := spawn_command_preferred(argv, env, unsafe { nil }, []i32{}, host_arch, false)!
 	status := wait(pid)!
 	if status != 0 {
 		return CommandError{ argv: argv.clone(), status: status, output: '', inherited: true }
@@ -335,7 +341,7 @@ pub fn capture_in_preferred(argv []string, log string, env map[string]string, me
 		C.posix_spawn_file_actions_addclose(&actions, pipes[1])] {
 		if close_status != 0 { return file_error('', close_status) }
 	}
-	pid := spawn_command_preferred(argv, env, &actions, [pipes[0], pipes[1]], host_arch)!
+	pid := spawn_command_preferred(argv, env, &actions, [pipes[0], pipes[1]], host_arch, false)!
 	mut reaped := false
 	defer {
 		if !reaped {
@@ -391,6 +397,26 @@ pub fn capture_both_preferred(argv []string, env map[string]string, host_arch st
 // including a child that closes its output streams before it exits.
 pub fn capture_bounded(argv []string, env map[string]string, host_arch string, directory string,
 	timeout int, should_cancel fn () bool) !CapturedCommand {
+	return capture_streams_bounded(argv, env, host_arch, directory, f64(timeout), timeout.str(), should_cancel, false, false)
+}
+
+// Fractional deadlines and one merged pipe match subprocess's independent
+// instruction-budget fixture. Existing two-stream/integer APIs keep their ABI.
+pub fn capture_merged_bounded(argv []string, env map[string]string, host_arch string, directory string,
+	timeout f64, should_cancel fn () bool) !CapturedCommand {
+	return capture_streams_bounded(argv, env, host_arch, directory, timeout, timeout.str(), should_cancel, true, false)
+}
+
+// Native frontends can launch a compiler through a shell/V command. Retire
+// the private process group on cancellation so that wrapper descendants do
+// not outlive the command owner. The legacy direct-child APIs remain unchanged.
+pub fn capture_owned_bounded(argv []string, env map[string]string, host_arch string, directory string,
+	timeout f64, should_cancel fn () bool, merge bool) !CapturedCommand {
+	return capture_streams_bounded(argv, env, host_arch, directory, timeout, timeout.str(), should_cancel, merge, true)
+}
+
+fn capture_streams_bounded(argv []string, env map[string]string, host_arch string, directory string,
+	timeout f64, timeout_text string, should_cancel fn () bool, merge bool, own_group bool) !CapturedCommand {
 	mut output_pipe := [2]i32{}
 	mut error_pipe := [2]i32{}
 	if C.pipe(&output_pipe[0]) != 0 {
@@ -439,7 +465,7 @@ pub fn capture_bounded(argv []string, env map[string]string, host_arch string, d
 		if changed != 0 { return file_error(directory, changed) }
 	}
 	for configured in [C.posix_spawn_file_actions_adddup2(&actions, output_pipe[1], 1),
-		C.posix_spawn_file_actions_adddup2(&actions, error_pipe[1], 2),
+		C.posix_spawn_file_actions_adddup2(&actions, if merge { output_pipe[1] } else { error_pipe[1] }, 2),
 		C.posix_spawn_file_actions_addclose(&actions, output_pipe[0]),
 		C.posix_spawn_file_actions_addclose(&actions, output_pipe[1]),
 		C.posix_spawn_file_actions_addclose(&actions, error_pipe[0]),
@@ -447,12 +473,13 @@ pub fn capture_bounded(argv []string, env map[string]string, host_arch string, d
 		if configured != 0 { return file_error('', configured) }
 	}
 	pid := spawn_command_preferred(argv, env, &actions,
-		[output_pipe[0], output_pipe[1], error_pipe[0], error_pipe[1]], host_arch)!
+		[output_pipe[0], output_pipe[1], error_pipe[0], error_pipe[1]], host_arch, own_group)!
 	started := time.sys_mono_now()
 	bounded := timeout >= 0 || should_cancel != unsafe { nil }
 	mut reaped := false
 	defer {
 		if !reaped {
+			if own_group { C.killpg(pid, C.SIGKILL) }
 			C.kill(pid, C.SIGKILL)
 			wait(pid) or {}
 		}
@@ -467,7 +494,7 @@ pub fn capture_bounded(argv []string, env map[string]string, host_arch string, d
 	mut errors := strings.new_builder(8192)
 	mut buffer := [8192]u8{}
 	for output_read_open || error_read_open {
-		capture_checkpoint(started, timeout, should_cancel)!
+		capture_checkpoint(started, timeout, timeout_text, should_cancel)!
 		if C.poll(&descriptors[0], 2, if bounded { 100 } else { -1 }) < 0 {
 			number := C.errno
 			if number == C.EINTR { continue }
@@ -494,7 +521,7 @@ pub fn capture_bounded(argv []string, env map[string]string, host_arch string, d
 	if bounded {
 		mut raw := i32(0)
 		for {
-			capture_checkpoint(started, timeout, should_cancel)!
+			capture_checkpoint(started, timeout, timeout_text, should_cancel)!
 			result := C.waitpid(pid, &raw, C.WNOHANG)
 			if result == pid {
 				status = if C.WIFEXITED(raw) != 0 { int(C.WEXITSTATUS(raw)) } else { -int(C.WTERMSIG(raw)) }
@@ -508,9 +535,9 @@ pub fn capture_bounded(argv []string, env map[string]string, host_arch string, d
 	return CapturedCommand{status, output.str(), errors.str()}
 }
 
-fn capture_checkpoint(started u64, timeout int, should_cancel fn () bool) ! {
+fn capture_checkpoint(started u64, timeout f64, timeout_text string, should_cancel fn () bool) ! {
 	if should_cancel != unsafe { nil } && should_cancel() { return error_with_code('Host test interrupted', 130) }
-	if timeout >= 0 && time.sys_mono_now() - started >= u64(timeout) * u64(time.second) {
-		return error('Command timed out after ' + timeout.str() + ' seconds')
+	if timeout >= 0 && f64(time.sys_mono_now() - started) >= timeout * f64(time.second) {
+		return error('Command timed out after ' + timeout_text + ' seconds')
 	}
 }

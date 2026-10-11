@@ -32,10 +32,12 @@ pub fn environment() map[string]string {
 pub fn root() string { return hosttest.root() }
 
 pub fn capture(argv []string) !string {
+	if commands_owned() { return owned_capture(argv)! }
 	return fixturehost.capture_in_preferred(argv, '', environment(), false, '', false, caller_arch())!
 }
 
 pub fn inherited(argv []string) ! {
+	if commands_owned() { owned_inherited_environment(argv, environment(), caller_arch(), '')!; return }
 	fixturehost.inherited_command_environment_preferred(argv, environment(), caller_arch())!
 }
 

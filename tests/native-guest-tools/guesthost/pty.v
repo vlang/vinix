@@ -68,9 +68,14 @@ fn posix_error() IError { return error_with_code(os.get_error_msg(int(C.errno)),
 fn now() f64 { return f64(time.sys_mono_now()) / 1e9 }
 
 // All allocation, PATH lookup and environment construction happens before fork.
-// The child invokes only execve/write/_exit and cannot enter the V runtime.
+// The child invokes only chdir/execve/write/_exit and cannot enter the V runtime.
 fn spawn_guest(command []string, env map[string]string) !(i32, i32) {
+	return spawn_guest_at(command, env, '')!
+}
+
+fn spawn_guest_at(command []string, env map[string]string, directory string) !(i32, i32) {
 	if command.len == 0 { return error('Missing guest command') }
+	if directory.contains('\x00') { return error('embedded null byte') }
 	program := if command[0].contains('/') {
 		command[0]
 	} else {
@@ -88,6 +93,7 @@ fn spawn_guest(command []string, env map[string]string) !(i32, i32) {
 	pid := C.forkpty(&master, unsafe { nil }, unsafe { nil }, unsafe { nil })
 	if pid < 0 { return posix_error() }
 	if pid == 0 {
+		if directory.len > 0 && C.chdir(directory.str) != 0 { C._exit(127) }
 		unsafe { C.execve(program.str, argv.data, envp.data) }
 		C.write(2, c'Cannot execute guest runner\n', 28)
 		C._exit(127)
@@ -273,13 +279,17 @@ pub fn verdict_policy(expected []string, failures []string, panic_mode bool) ([]
 }
 
 pub fn boot(command []string, env map[string]string, state string, expected []string, failures []string, timeout int, inherit bool) !int {
+	return boot_from(command, env, state, expected, failures, timeout, inherit, '')!
+}
+
+pub fn boot_from(command []string, env map[string]string, state string, expected []string, failures []string, timeout int, inherit bool, directory string) !int {
 	if timeout <= 0 { return error('Guest timeout must be positive') }
 	unsafe { C.__atomic_store_n(&interrupted, i32(0), C.__ATOMIC_RELAXED) }
 	previous := unsafe { C.signal(C.SIGINT, voidptr(interrupt)) }
 	defer { unsafe { C.signal(C.SIGINT, previous) } }
 	previous_pipe := unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
 	defer { unsafe { C.signal(C.SIGPIPE, previous_pipe) } }
-	pid, master := spawn_guest(command, env)!
+	pid, master := spawn_guest_at(command, env, directory)!
 	mut transcript := []u8{}
 	mut reaped := false
 	mut closed := false
