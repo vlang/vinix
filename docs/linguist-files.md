@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `b1f701cac0dca56ed75d7aa491f1450c3fe370e3`,
+at source commit `6012b9d3fb05691fcc9847a5beb9e9a7243fd316`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 568 | 2,366,313 | 6.11% |
-| Python | 241 | 1,159,396 | 2.99% |
-| Shell | 592 | 1,363,288 | 3.52% |
+| C | 568 | 2,366,387 | 6.10% |
+| Python | 237 | 1,147,947 | 2.96% |
+| Shell | 596 | 1,364,469 | 3.52% |
 
-All `.v` files are classified as V. The resulting V share is 79.33%, with no
+All `.v` files are classified as V. The resulting V share is 79.38%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,159,396 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,147,947 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev b1f701cac0dca56ed75d7aa491f1450c3fe370e3 --breakdown --json
+github-linguist --rev 6012b9d3fb05691fcc9847a5beb9e9a7243fd316 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -116,7 +116,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `games/n64/abi.h` | 657 |
 | `games/ps1/abi.h` | 1,098 |
 | `games/ps2/abi.h` | 657 |
-| `gl-triangle/gl_v.h` | 1,885 |
+| `gl-triangle/gl_v.h` | 1,919 |
 | `kernel/asm/x86_64/speculation.h` | 2,150 |
 | `kernel/c/agx_fake_g17.h` | 7,541 |
 | `kernel/c/agx_fake_g17_encode.h` | 1,583 |
@@ -278,7 +278,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/acpi-sync/native-abi.h` | 995 |
 | `tests/activity-monitor/metrics.c` | 9,958 |
 | `tests/activity-monitor/test.c` | 10,664 |
-| `tests/agx-fake-g17/agxhost/vm_abi.h` | 984 |
+| `tests/agx-fake-g17/agxhost/vm_abi.h` | 1,024 |
 | `tests/agx-fake-g17/encodefixture/encoder-native-abi.h` | 853 |
 | `tests/agx-fake-g17/ioctl_fault.c` | 17,891 |
 | `tests/agx-fake-g17/verifyfixture/verifier-native-abi.h` | 609 |
@@ -692,8 +692,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/test-gpu-present.py` | 8,956 |
 | `desktop/tools/tests/test_dictionary_data.py` | 3,007 |
 | `desktop/tools/tests/test_font_data.py` | 7,106 |
-| `gl-triangle/compile-v.py` | 2,353 |
-| `gl-triangle/stage.py` | 929 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `kernel/linuxkpi/audit.py` | 7,718 |
 | `kernel/linuxkpi/generate-abi.py` | 713 |
@@ -827,8 +825,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/vulkan-stage-test.py` | 4,722 |
 | `tests/ext2-xattr/host.py` | 6,852 |
 | `tests/ext2-xattr/run.py` | 11,512 |
-| `tests/gl-triangle/run-vm.py` | 5,439 |
-| `tests/gl-triangle/run.py` | 2,728 |
 | `tests/ios/desktop.py` | 7,962 |
 | `tests/ios/game2048.py` | 3,080 |
 | `tests/ios/run.py` | 20,826 |
@@ -889,7 +885,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/build-amd64-iso.sh` | 5,502 |
 | `build-support/build-amd64-uefi-disk.sh` | 3,064 |
 | `build-support/build-v-host-library.sh` | 1,559 |
-| `build-support/check-m1-gpu-image.sh` | 6,323 |
+| `build-support/check-m1-gpu-image.sh` | 6,312 |
 | `build-support/check-screenshot` | 171 |
 | `build-support/chromium/run-chromium` | 8,032 |
 | `build-support/compile-v-module` | 168 |
@@ -987,10 +983,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/test-utilities.sh` | 10,641 |
 | `desktop/tools/test-utility-parity.sh` | 2,891 |
 | `desktop/tools/test-window-experience.sh` | 2,122 |
-| `gl-triangle/run-gl-triangle` | 2,400 |
-| `gl-triangle/run-gl-triangle-agx` | 1,255 |
+| `gl-triangle/compile-v` | 564 |
+| `gl-triangle/run-gl-triangle` | 2,351 |
+| `gl-triangle/run-gl-triangle-agx` | 1,206 |
 | `gl-triangle/run-m1-agx-smoke` | 820 |
 | `gl-triangle/run-virgl-smoke` | 676 |
+| `gl-triangle/stage` | 136 |
 | `installer/macos/fetch-vinix-payload.sh` | 1,774 |
 | `installer/macos/install-vinix.sh` | 8,313 |
 | `installer/macos/test.sh` | 2,189 |
@@ -999,12 +997,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-all-aarch64.sh` | 6,834 |
 | `scripts/build-amd64.sh` | 3,259 |
 | `scripts/build-android-aarch64.sh` | 207 |
-| `scripts/build-asahi-aarch64.sh` | 11,755 |
+| `scripts/build-asahi-aarch64.sh` | 11,744 |
 | `scripts/build-blender-native-aarch64.sh` | 7,179 |
 | `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 93,426 |
+| `scripts/build-desktop-aarch64.sh` | 93,783 |
 | `scripts/build-desktop-amd64.sh` | 14,973 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
@@ -1037,7 +1035,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
 | `scripts/build-steam-aarch64.sh` | 13,694 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
-| `scripts/build-userland-aarch64.sh` | 24,976 |
+| `scripts/build-userland-aarch64.sh` | 24,965 |
 | `scripts/build-userland-amd64.sh` | 6,008 |
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
@@ -1055,7 +1053,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/deploy-m1-efi.sh` | 21,910 |
 | `scripts/kek.sh` | 16,153 |
 | `scripts/push-to-m1.sh` | 6,967 |
-| `scripts/run-aarch64.sh` | 63,281 |
+| `scripts/run-aarch64.sh` | 63,270 |
 | `scripts/run-amd64-alpine.sh` | 5,108 |
 | `scripts/run-desktop-aarch64.sh` | 16,575 |
 | `scripts/run-desktop-amd64.sh` | 2,920 |
@@ -1072,7 +1070,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/run.sh` | 942 |
 | `tests/agx-g13-abi/run.sh` | 785 |
 | `tests/agx-g13-layouts/run.sh` | 796 |
-| `tests/agx-m1-image/run.sh` | 3,165 |
+| `tests/agx-m1-image/run.sh` | 3,154 |
 | `tests/agx-t8103-opp/run.sh` | 791 |
 | `tests/agx-trace/run` | 172 |
 | `tests/agx-vm/run.sh` | 159 |
@@ -1182,6 +1180,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/fsync-scope/run` | 220 |
 | `tests/fuzz/run` | 874 |
+| `tests/gl-triangle/run` | 137 |
+| `tests/gl-triangle/run-vm` | 140 |
 | `tests/go/smoke.sh` | 558 |
 | `tests/hardware-platform/run` | 178 |
 | `tests/hibernate/run.sh` | 681 |
