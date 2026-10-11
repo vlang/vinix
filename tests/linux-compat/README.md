@@ -51,6 +51,11 @@ unique response, recording its response and termination. Missing
 executables are `unsupported`, nonzero exits/timeouts are `failed`, and either
 causes a failing suite exit. There is no sandbox-disable fallback.
 
+The Go case sets the installed `/usr/lib/go` root when present, a private build
+cache and `CGO_ENABLED=0`, matching the existing pure-Go smoke workflow. Child
+environment overrides and removed variable names are recorded per command and
+cleared between workloads; inherited environment values are not serialized.
+
 `--host` labels host-only evidence and prohibits installation. `--path` chooses
 native AArch64/x86-64 or AArch64's translated x86-64/i386 launcher. Native paths
 must match the driver architecture. `--runtime-probe` chooses the corresponding

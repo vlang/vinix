@@ -14,6 +14,8 @@ const catalog = ['sqlite', 'media', 'office', 'chromium', 'firefox', 'go', 'java
 struct CommandResult {
 	argv              []string
 	executable_sha256 string
+	environment_overrides map[string]string
+	environment_unset []string
 	exit_code         int
 	timed_out         bool
 	output_limited    bool
@@ -54,6 +56,7 @@ struct Suite {
 	install bool
 	runtime string
 mut:
+	environment map[string]string
 	commands []CommandResult
 	services []ServiceResult
 }
@@ -104,14 +107,18 @@ fn (mut suite Suite) execute(program string, arguments []string) !string {
 	command := suite.command(program, arguments)!
 	mut child := os.new_process(command[0])
 	child.set_args(command[1..])
+	mut overrides := suite.environment.clone()
+	mut unset := []string{}
 	if suite.path == 'translated-i386' && program == suite.runtime {
 		// Match the translator launcher's opt-in without changing the parent
 		// environment or leaking a foreign library path to native descendants.
+		overrides['VINIX_ALLOW_WX'] = '1'
+		unset = ['LD_LIBRARY_PATH', 'QEMU_LD_PREFIX', 'QEMU_SET_ENV']
+	}
+	if overrides.len > 0 || unset.len > 0 {
 		mut environment := os.environ()
-		environment['VINIX_ALLOW_WX'] = '1'
-		environment.delete('LD_LIBRARY_PATH')
-		environment.delete('QEMU_LD_PREFIX')
-		environment.delete('QEMU_SET_ENV')
+		for name, value in overrides { environment[name] = value }
+		for name in unset { environment.delete(name) }
 		child.set_environment(environment)
 	}
 	child.set_work_folder(suite.work)
@@ -162,7 +169,17 @@ fn (mut suite Suite) execute(program string, arguments []string) !string {
 			break
 		}
 	}
-	result := CommandResult{command, sha256.sum(os.read_bytes(command[0])!).hex(), child.code, timed_out, output_limited, out, err}
+	result := CommandResult{
+		argv: command
+		executable_sha256: sha256.sum(os.read_bytes(command[0])!).hex()
+		environment_overrides: overrides
+		environment_unset: unset
+		exit_code: child.code
+		timed_out: timed_out
+		output_limited: output_limited
+		stdout: out
+		stderr: err
+	}
 	suite.commands << result
 	os.write_file('${suite.work}/command-${suite.commands.len}.json', json2.encode(result,
 		prettify: true
@@ -192,6 +209,7 @@ fn (mut suite Suite) package(name string) ! {
 }
 
 fn (mut suite Suite) run(name string) ! {
+	suite.environment.clear()
 	match name {
 		'sqlite' {
 			suite.package('sqlite')!
@@ -245,6 +263,11 @@ fn (mut suite Suite) run(name string) ! {
 				return error('unsupported: existing Go application fixture asserts GOARCH=arm64')
 			}
 			suite.package('go')!
+			// Alpine trims the compiled-in GOROOT. PID 1 does not source the
+			// login profile used by the existing Go smoke script.
+			if os.is_dir('/usr/lib/go') { suite.environment['GOROOT'] = '/usr/lib/go' }
+			suite.environment['GOCACHE'] = suite.work + '/go-cache'
+			suite.environment['CGO_ENABLED'] = '0'
 			suite.execute('go', ['version'])!
 			os.write_file(suite.work + '/smoke.go', $embed_file('../../../tests/go/smoke.go').to_string())!
 			suite.execute('go', ['build', '-o', suite.work + '/go-smoke', suite.work + '/smoke.go'])!
