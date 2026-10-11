@@ -33,7 +33,7 @@ Short Venus waits poll for at most 2 ms before entering the driver's sleeping
 backoff. QEMU/HVF deliberately skips host sleep for intervals below 2 ms,
 which kept idle CPUs busy and contending with GPU work. On macOS the Venus
 launcher prepares a private QEMU copy with a 100 µs cutoff and enables
-Vinix's 1 ms virtual idle timer. `prepare-qemu.py` verifies the Mach-O symbol
+Vinix's 1 ms virtual idle timer. `prepare-qemu` runs V to verify the Mach-O symbol
 and complete instruction sequence before changing and signing that copy;
 an unknown bottle fails with an error. The original KekVM executable stays
 unchanged. Ordinary QEMU boots use a 4 ms virtual idle interval.

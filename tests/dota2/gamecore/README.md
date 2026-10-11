@@ -1,5 +1,10 @@
 # Dota guest controller
 
+This directory records the earlier borrowed-object port. The maintained command
+is now [`../run`](../run), implemented directly by `nativehost` and `guesthost`.
+Its Python entrypoint and library binding have been retired; the ownership and
+comparison notes below describe that historical stage.
+
 `gamecore` maintains the guest-launch, serial verdict, screenshot, stop/reap,
 read-observer and report policies formerly in `tests/dota2/run.py`. The public
 Python entry points retain their signatures, parser, imports and caller hooks;

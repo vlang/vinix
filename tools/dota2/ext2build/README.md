@@ -1,5 +1,11 @@
 # Native ext2 construction
 
+This directory records the earlier borrowed-object port. The maintained
+[`../ext2-export`](../ext2-export) command and guest runners now use
+[`../ext2host`](../ext2host) directly. `ext2_export.py`, `_ext2_native.py` and their
+Python callers have been retired; the comparisons below describe the historical
+stage.
+
 `ext2_query.v` runs the tree traversal, overlay merge, directory layout,
 geometry, block allocation, indirect address trees, inode/bitmap/superblock
 construction and manifest workflow in V. `export.v` owns the 64-descriptor

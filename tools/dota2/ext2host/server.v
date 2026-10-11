@@ -57,6 +57,10 @@ pub fn serve(state string, port int, name string, flags u16, negotiation_timeout
 
 fn (s &Server) stopping() bool { return stdatomic.load_i64(&s.stopped) != 0 }
 
+pub fn (mut s Server) observe_reads() { s.export.observe_reads() }
+
+pub fn (mut s Server) read_report() ReadReport { return s.export.read_report() }
+
 pub fn (mut s Server) close() {
 	if s.closed { return }
 	s.closed = true

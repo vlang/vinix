@@ -147,7 +147,7 @@ stages an x86-64 build ([`build-support/dota2/venus`](../build-support/dota2/ven
 and the translator passes the virtio-gpu ioctls through
 ([`drm-passthrough.patch`](../build-support/dota2/qemu/README.md)). `run-dota2`
 selects it when the native `venus-available` probe finds a Venus GPU. Pass
-`--venus` to `tests/dota2/run.py` or `tests/dota2/vulkan-run.py` to test it.
+`--venus` to `tests/dota2/run` or `tests/dota2/vulkan-run.py` to test it.
 
 On Vinix in KekVM, translated `vulkaninfo` reports
 `Virtio-GPU Venus (Apple M5 Max)`, vkcube renders, and Dota draws its startup
@@ -400,7 +400,7 @@ in-match controls or online support.
 After the file and graphics probes, capture the real game:
 
 ```sh
-python3 tests/dota2/run.py \
+tests/dota2/run \
     --base-root build/dota2-vulkan/test/root \
     --translator-staging build/dota2-runtime/staging \
     --desktop build/vinix-desktop \

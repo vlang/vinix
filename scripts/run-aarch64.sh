@@ -1306,7 +1306,7 @@ if [ "$VIRTIO_GPU" -ge 2 ]; then
     kekvm_prefix="$(dirname "$(dirname "$QEMU_BIN")")"
     if [ "$VIRTIO_GPU" -eq 3 ] && [ "$(uname -s)" = Darwin ]; then
         venus_qemu="$SCRIPT_DIR/build/venus-host/vinix-venus-qemu-system-aarch64"
-        python3 "$SCRIPT_DIR/build-support/venus/prepare-qemu.py" "$QEMU_BIN" "$venus_qemu" || exit 1
+        "$SCRIPT_DIR/build-support/venus/prepare-qemu" "$QEMU_BIN" "$venus_qemu" || exit 1
         QEMU_BIN="$venus_qemu"
     fi
     if [ "$(uname -s)" = Darwin ]; then

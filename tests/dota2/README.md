@@ -75,3 +75,15 @@ retains its modes, repeatable target environment/preloads and loader options.
 Both mapping and Steam accept `--prepare-only` for inspecting a private fixture.
 The compressed evidence archive is retained; the ISO builder receives a separate
 uncompressed boot copy. See [native qualification](native-controller.md).
+
+`run` prepares and captures the real game through native V. `run-test` checks
+its staging, read diagnostics, capture policy and process owners. The runner
+retains `--prepare-only`, repeatable target environment/preloads/arguments,
+optional translator staging, memory and capture timing controls. It reports
+exit 1 for an observed startup failure and exit 2 for a capture awaiting review;
+it leaves `rendering_verified` false. `--venus` needs the prepared host renderer
+and KekVM bottle, patches a private QEMU through native `qemuhost` and owns a
+stock-QEMU network bridge when the GPU bottle lacks slirp.
+
+The native screenshot command preserves PNG/PPM output without Pillow;
+ImageMagick supplies additional formats. See [game capture qualification](native-game.md).

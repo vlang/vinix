@@ -4,6 +4,7 @@ module ext2host
 import json2
 import os
 import sync
+import time
 
 pub struct Export {
 pub:
@@ -16,6 +17,42 @@ mut:
 	order      []int
 	closed     bool
 	mutex      &sync.Mutex = sync.new_mutex()
+	observed   bool
+	started    i64
+	requests   i64
+	read_bytes i64
+	errors     i64
+	failures   []ReadFailure
+}
+
+pub struct ReadFailure {
+pub:
+	elapsed_seconds f64
+	offset          i64
+	length          int
+	error_number    int @[json: 'errno']
+	message         string
+}
+
+pub struct ReadReport {
+pub:
+	requests    i64
+	bytes       i64
+	error_count i64
+	failures    []ReadFailure
+}
+
+pub fn (mut e Export) observe_reads() {
+	e.mutex.lock()
+	defer { e.mutex.unlock() }
+	e.observed = true
+	e.started = time.ticks()
+}
+
+pub fn (mut e Export) read_report() ReadReport {
+	e.mutex.lock()
+	defer { e.mutex.unlock() }
+	return ReadReport{e.requests, e.read_bytes, e.errors, e.failures.clone()}
 }
 
 pub fn open_export(state string) !&Export {
@@ -97,6 +134,24 @@ fn (mut e Export) source_locked(index int, offset i64, count int) ![]u8 {
 pub fn (mut e Export) read(offset i64, count int) ![]u8 {
 	e.mutex.lock()
 	defer { e.mutex.unlock() }
+	if e.observed { e.requests++ }
+	data := e.read_locked(offset, count) or {
+		if e.observed {
+			e.errors++
+			if e.failures.len < 32 {
+				row := ReadFailure{f64(time.ticks() - e.started) / 1000, offset, count, err.code(), err.msg()}
+				e.failures << row
+				println('DOTA2-EXPORT-READ-ERROR: ' + json2.encode(row))
+				flush_stdout()
+			}
+		}
+		return err
+	}
+	if e.observed { e.read_bytes += data.len }
+	return data
+}
+
+fn (mut e Export) read_locked(offset i64, count int) ![]u8 {
 	if e.closed { return error_with_code('Export is closed', int(C.EIO)) }
 	if offset < 0 || count < 0 || count > max_request || offset > e.size || i64(count) > e.size - offset {
 		return error_with_code('Invalid disk read range', int(C.EINVAL))

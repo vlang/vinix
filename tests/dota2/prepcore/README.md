@@ -1,5 +1,10 @@
 # Dota preparation controller
 
+This directory records the earlier borrowed-object port. The maintained game
+preparation now uses [`../nativehost`](../nativehost) directly. `run.py` and
+`_prepare_native.py` have been retired; the library-binding and comparison notes
+below describe the historical stage.
+
 The maintained staging workflow lives in V: streamed input hashing, ELF
 validation, readonly pin replacement, optional helpers and preloads, runtime
 refresh and trimming, native and Steam SDK dependency closure, translator

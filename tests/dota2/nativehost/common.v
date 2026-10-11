@@ -54,7 +54,15 @@ fn here() string { return root() + '/tests/dota2' }
 
 fn resolve(path string) !string { return hosttest.module_resolve(path)! }
 
-fn argument(message string) IError { return error_with_code(message, 2) }
+struct ArgumentError {
+	message string
+}
+
+fn (failure ArgumentError) msg() string { return failure.message }
+
+fn (failure ArgumentError) code() int { return 2 }
+
+fn argument(message string) IError { return ArgumentError{message} }
 
 fn required(options guesthost.Options, names []string) ! {
 	for name in names { if !options.has(name) { return argument('missing required ' + name) } }
@@ -157,7 +165,7 @@ pub fn command(family string, args []string) int {
 		eprintln(err.msg())
 		return if err.msg() in ['Guest run interrupted', 'Host test interrupted'] {
 			130
-		} else if err.code() == 2 {
+		} else if err is ArgumentError {
 			2
 		} else {
 			1
@@ -172,6 +180,7 @@ fn dispatch(family string, args []string) !int {
 		'wake' { wake(args)! }
 		'mmap' { mmap(args)! }
 		'steam' { steam(args)! }
+		'game' { game(args)! }
 		else { return argument('Unknown Dota controller') }
 	}
 }

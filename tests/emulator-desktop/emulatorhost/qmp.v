@@ -43,6 +43,7 @@ pub struct Qmp {
 mut:
 	fd i32 = -1
 	buffer []u8
+	timeout time.Duration = 10 * time.second
 }
 
 fn qmp_ready(fd i32, events i16, deadline u64) ! {
@@ -57,12 +58,17 @@ fn qmp_ready(fd i32, events i16, deadline u64) ! {
 }
 
 pub fn qmp_connect(path string) !Qmp {
+	return qmp_connect_timeout(path, 10)!
+}
+
+pub fn qmp_connect_timeout(path string, seconds int) !Qmp {
+	if seconds <= 0 { return error('QMP timeout must be positive') }
 	if path.contains('\x00') { return error('embedded null byte') }
 	maximum := $if macos { 103 } $else { 107 }
 	if path.len > maximum { return error('QMP socket path too long') }
 	fd := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
 	if fd < 0 { return error(os.get_error_msg(C.errno)) }
-	mut q := Qmp{fd: fd}
+	mut q := Qmp{fd: fd, timeout: i64(seconds) * time.second}
 	q.connect(path) or { q.close(); return err }
 	q.line() or { q.close(); return err }
 	q.call('qmp_capabilities', {}) or { q.close(); return err }
@@ -78,7 +84,7 @@ fn (mut q Qmp) connect(path string) ! {
 	unsafe { vmemcpy(&address.sun_path[0], path.str, path.len) }
 	if C.connect(q.fd, &address, u32(sizeof(C.sockaddr_un))) == 0 { return }
 	if C.errno != C.EINPROGRESS { return error(os.get_error_msg(C.errno)) }
-	qmp_ready(q.fd, i16(C.POLLOUT), time.sys_mono_now() + u64(10 * time.second))!
+	qmp_ready(q.fd, i16(C.POLLOUT), time.sys_mono_now() + u64(q.timeout))!
 	mut number := i32(0)
 	mut length := u32(sizeof(i32))
 	if C.getsockopt(q.fd, C.SOL_SOCKET, C.SO_ERROR, &number, &length) != 0 { return error(os.get_error_msg(C.errno)) }
@@ -95,7 +101,7 @@ fn (mut q Qmp) line() !QmpValue {
 			hosttest.module_decode_utf8(text)!
 			return json2.decode[QmpValue](text, strict: true)!
 		}
-		qmp_ready(q.fd, i16(C.POLLIN), time.sys_mono_now() + u64(10 * time.second))!
+		qmp_ready(q.fd, i16(C.POLLIN), time.sys_mono_now() + u64(q.timeout))!
 		mut bytes := [8192]u8{}
 		count := C.recv(q.fd, &bytes[0], bytes.len, 0)
 		if count == 0 { return error('QMP socket closed without a reply') }
@@ -112,7 +118,7 @@ pub fn (mut q Qmp) call(command string, arguments map[string]json2.Any) !QmpValu
 	if q.fd < 0 { return error('QMP socket is closed') }
 	text := json2.encode({'execute': json2.Any(command), 'arguments': json2.Any(arguments)}) + '\n'
 	mut sent := 0
-	deadline := time.sys_mono_now() + u64(10 * time.second)
+	deadline := time.sys_mono_now() + u64(q.timeout)
 	for sent < text.len {
 		qmp_ready(q.fd, i16(C.POLLOUT), deadline)!
 		count := unsafe { C.send(q.fd, text.str + sent, usize(text.len - sent), 0) }
