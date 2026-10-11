@@ -131,7 +131,40 @@ pub fn seccomp_check(instructions []SockFilter) bool {
 		}
 	}
 	last := instructions[instructions.len - 1].code
-	return last == 0x06 || last == 0x16
+	if last != 0x06 && last != 0x16 { return false }
+	return seccomp_check_scratch(instructions)
+}
+
+// Linux's classic-BPF verifier requires each scratch word to have been
+// written along every incoming branch before a load. Zeroing the runtime
+// scratch array cannot substitute for rejecting an invalid program.
+fn seccomp_check_scratch(instructions []SockFilter) bool {
+	// Forward-only jumps let one pass intersect the initialized-word masks.
+	// Bound this temporary to 8 KiB of the 64 KiB kernel stack; installation
+	// needs no new allocation or lifetime to manage.
+	mut masks := [bpf_max_instructions]u16{}
+	for i in 0 .. instructions.len { masks[i] = u16(0xffff) }
+	mut initialized := u16(0)
+	for pc, insn in instructions {
+		initialized &= masks[pc]
+		match insn.code {
+			0x02, 0x03 { initialized |= u16(1) << insn.k }
+			0x60, 0x61 {
+				if initialized & (u16(1) << insn.k) == 0 { return false }
+			}
+			0x05 {
+				masks[pc + 1 + int(insn.k)] &= initialized
+				initialized = u16(0xffff)
+			}
+			0x15, 0x1d, 0x25, 0x2d, 0x35, 0x3d, 0x45, 0x4d {
+				masks[pc + 1 + int(insn.jt)] &= initialized
+				masks[pc + 1 + int(insn.jf)] &= initialized
+				initialized = u16(0xffff)
+			}
+			else {}
+		}
+	}
+	return true
 }
 
 // Run a checked program over `data`, struct seccomp_data as sixteen words.

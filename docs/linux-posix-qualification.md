@@ -445,3 +445,23 @@ The new metadata is stored inline in its triggering thread and consumed
 before the private signal frame is built; no allocation lifetime changes.
 Per-thread filter ownership, TSYNC, ptrace and full browser/container sandbox
 isolation remain unqualified by this regression.
+
+## Seccomp scratch-memory verification
+
+Both native architectures reject classic-BPF scratch reads unless the selected
+word was written along every incoming branch. Installation returns `EINVAL`
+for uninitialized A/X loads, a store to the wrong word, a conditional branch
+that skips initialization, and an unconditional jump over a store. Forty
+repeated rejections leave seccomp disabled. Valid A/X stores, stores on both
+branches, and a 4096-instruction program install successfully; existing trap
+signal tests still pass. The check follows [Linux's classic-BPF verifier](https://github.com/torvalds/linux/blob/v6.12/net/core/filter.c#L868).
+
+The identical fixture fails against both prior kernels because an uninitialized
+load is accepted. `seccomp-scratch-before-*` and `seccomp-scratch-after-*` in the
+[dated results](../tests/linux-compat/results/2026-10-11/) retain the controller
+receipts and serial logs; the updated kernels pass all eight ABI cases.
+Generated C keeps the verifier's bounded mask array on the kernel stack and
+adds no allocation. The full allocation scan compiles both architectures but
+reports existing allowance mismatches, so it is not a clean leak certification.
+This regression does not qualify per-thread filters, TSYNC or browser sandbox
+isolation.

@@ -89,6 +89,58 @@ fn install() bool {
 	}
 }
 
+fn verifier_program(instructions &SockFilter, length u16, accepted bool, kind i32) bool {
+	unsafe {
+		program := SockFprog{len: length, filter: instructions}
+		errno_address := C.__errno_location()
+		*errno_address = 0
+		result := C.syscall(isize(C.SYS_seccomp), isize(1), isize(0), &program)
+		code := *errno_address
+		if (accepted && result == 0) || (!accepted && result == -1 && code == C.EINVAL) { return true }
+		C.printf(c'LINUX SECCOMP FAIL: verifier kind=%d accepted=%d result=%ld errno=%d\n', kind, i32(accepted), result, code)
+		return false
+	}
+}
+
+// Exercise actual filter installation, not a copy of the verifier. Every
+// accepted program allows all calls so later tests and child cleanup still run.
+fn verifier_test() i32 {
+	unsafe {
+		if C.prctl(C.PR_SET_NO_NEW_PRIVS, isize(1), isize(0), isize(0), isize(0)) != 0 { return 1 }
+		mut load_a := [SockFilter{code: 0x60, k: 0}, SockFilter{code: 0x06, k: 0x7fff0000}]!
+		mut load_x := [SockFilter{code: 0x61, k: 15}, SockFilter{code: 0x06, k: 0x7fff0000}]!
+		mut wrong_cell := [SockFilter{code: 0x02, k: 0}, SockFilter{code: 0x60, k: 1}, SockFilter{code: 0x06, k: 0x7fff0000}]!
+		mut one_branch := [SockFilter{code: 0x20, k: 0}, SockFilter{code: 0x15, jt: 0, jf: 1, k: 0},
+			SockFilter{code: 0x02, k: 0}, SockFilter{code: 0x60, k: 0}, SockFilter{code: 0x06, k: 0x7fff0000}]!
+		mut skip_store := [SockFilter{code: 0x05, k: 1}, SockFilter{code: 0x02, k: 15},
+			SockFilter{code: 0x61, k: 15}, SockFilter{code: 0x06, k: 0x7fff0000}]!
+		for repeat := 0; repeat < 8; repeat++ {
+			if !verifier_program(&load_a[0], u16(load_a.len), false, 0)
+				|| !verifier_program(&load_x[0], u16(load_x.len), false, 1)
+				|| !verifier_program(&wrong_cell[0], u16(wrong_cell.len), false, 2)
+				|| !verifier_program(&one_branch[0], u16(one_branch.len), false, 3)
+				|| !verifier_program(&skip_store[0], u16(skip_store.len), false, 4) { return 1 }
+		}
+		if C.prctl(C.PR_GET_SECCOMP, isize(0), isize(0), isize(0), isize(0)) != 0 { return 1 }
+		mut initialized_a := [SockFilter{code: 0x02, k: 0}, SockFilter{code: 0x60, k: 0}, SockFilter{code: 0x06, k: 0x7fff0000}]!
+		mut initialized_x := [SockFilter{code: 0x03, k: 15}, SockFilter{code: 0x61, k: 15}, SockFilter{code: 0x06, k: 0x7fff0000}]!
+		mut both_branches := [SockFilter{code: 0x20, k: 0}, SockFilter{code: 0x15, jt: 0, jf: 2, k: 0},
+			SockFilter{code: 0x02, k: 15}, SockFilter{code: 0x05, k: 1}, SockFilter{code: 0x03, k: 15},
+			SockFilter{code: 0x61, k: 15}, SockFilter{code: 0x06, k: 0x7fff0000}]!
+		mut maximum := [4096]SockFilter{}
+		for i in 0..maximum.len { maximum[i] = SockFilter{code: 0x07} }
+		maximum[0] = SockFilter{code: 0x02, k: 15}
+		maximum[4094] = SockFilter{code: 0x60, k: 15}
+		maximum[4095] = SockFilter{code: 0x06, k: 0x7fff0000}
+		if !verifier_program(&initialized_a[0], u16(initialized_a.len), true, 5)
+			|| !verifier_program(&initialized_x[0], u16(initialized_x.len), true, 6)
+			|| !verifier_program(&both_branches[0], u16(both_branches.len), true, 7)
+			|| !verifier_program(&maximum[0], u16(maximum.len), true, 8) { return 1 }
+		C.puts(c'LINUX SECCOMP PASS: scratch initialization on every branch and 4096-instruction filter')
+		return 0
+	}
+}
+
 fn child_test(kind i32) i32 {
 	unsafe {
 		mut action := C.sigaction{}
@@ -119,6 +171,11 @@ fn child_test(kind i32) i32 {
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
+		verifier := C.fork()
+		if verifier == 0 { C._exit(verifier_test()) }
+		mut verifier_status := i32(0)
+		if verifier < 0 || C.waitpid(verifier, &verifier_status, 0) != verifier
+			|| !C.WIFEXITED(verifier_status) || C.WEXITSTATUS(verifier_status) != 0 { return 1 }
 		for kind := i32(0); kind < 3; kind++ {
 			child := C.fork()
 			if child == 0 { C._exit(child_test(kind)) }
