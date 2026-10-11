@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+root=$here
+while [ ! -f "$root/tests/desktop-perf/run-saved" ]; do
+    [ "$root" != / ] || { echo "Cannot find native desktop performance tools" >&2; exit 1; }
+    root=$(dirname -- "$root")
+done
+exec "$root/tests/desktop-perf/run-saved-driver" pipeline "$here" "$@"

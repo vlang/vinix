@@ -130,7 +130,11 @@ pub:
 }
 
 pub fn finish(transcript []u8, variants []string, selected []string, rounds int, json_path ?string, timed_out bool, exit_code ?Value) !Output {
-	verdict := inspect(transcript, variants, selected, rounds, timed_out, exit_code)
+	return finish_policy(transcript, variants, selected, rounds, json_path, timed_out, exit_code, false)
+}
+
+pub fn finish_policy(transcript []u8, variants []string, selected []string, rounds int, json_path ?string, timed_out bool, exit_code ?Value, historical bool) !Output {
+	verdict := inspect_policy(transcript, variants, selected, rounds, timed_out, exit_code, historical)
 	if path := json_path {
 		os.write_file(path, encode(Value(verdict.rows.map(Value(it))), true) + '\n')!
 	}

@@ -57,7 +57,7 @@ the existing per-CPU dead-stack slots are allowed bounded retention.
 
 Also run the existing private-page/pager/mapped-writeback host suites with
 ASan/UBSan; the paging, resource-open and mapped-writeback QEMU regressions;
-`tests/desktop-perf/run.py --scenarios=ops,churn,cache`; both architecture builds;
+`tests/desktop-perf/run --scenarios=ops,churn,cache`; both architecture builds;
 `tests/kernel-allocs/run.sh`; and desktop `idle,apps,drag` scenarios. Existing
 allocation allowance failures and unrelated retention must be compared with
 baseline rather than silently accepted into the allowance file.

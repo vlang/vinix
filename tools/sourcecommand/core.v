@@ -58,6 +58,11 @@ pub fn capture(argv []string, env map[string]string, timeout f64, limit int, can
 
 pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
 	observe fn (string, voidptr) !, context voidptr, shutdown_grace f64) !Output {
+	return capture_owned(argv, env, timeout, limit, cancel, observe, unsafe { nil }, context, shutdown_grace)
+}
+
+pub fn capture_owned(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
+	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64) !Output {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid command') }
 	mut pipes := [i32(-1), -1, -1, -1]!
 	defer { for fd in pipes { if fd >= 0 { C.close(fd) } } }
@@ -124,6 +129,7 @@ pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit
 		C.kill(pid, C.SIGKILL)
 		for { if C.waitpid(pid, &raw, 0) >= 0 || C.errno != C.EINTR { break } }
 	}
+	if spawned != unsafe { nil } { spawned(int(pid), context)! }
 	C.close(pipes[1]); pipes[1] = -1
 	C.close(pipes[3]); pipes[3] = -1
 	mut streams := [C.pollfd{fd: pipes[0], events: i16(C.POLLIN)}, C.pollfd{fd: pipes[2], events: i16(C.POLLIN)}]!

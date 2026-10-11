@@ -18,13 +18,19 @@ mut:
 	connection &unix.StreamConn = unsafe { nil }
 	deadline u64
 	cancel fn () bool = unsafe { nil }
+	accept_errors bool
 }
 pub fn connect(path string) !Monitor {
 	return connect_bounded(path, 0, unsafe { nil })
 }
 pub fn connect_bounded(path string, deadline u64, cancel fn () bool) !Monitor {
+	return connect_policy(path, deadline, cancel, false)
+}
+// Saved performance runners treated a QMP error as a completed reply. Other
+// consumers retain the default policy that raises the returned error.
+pub fn connect_policy(path string, deadline u64, cancel fn () bool, accept_errors bool) !Monitor {
 	mut connection := unix.connect_stream(path)!
-	mut monitor := Monitor{connection: connection, deadline: deadline, cancel: cancel}
+	mut monitor := Monitor{connection: connection, deadline: deadline, cancel: cancel, accept_errors: accept_errors}
 	mut open := false
 	defer { if !open { monitor.close() } }
 	if C.fcntl(connection.sock.handle, C.F_SETFD, C.FD_CLOEXEC) != 0 || C.fcntl(connection.sock.handle, C.F_SETFL, C.O_NONBLOCK) != 0 { return os.error_posix() }
@@ -75,5 +81,5 @@ pub fn (mut monitor Monitor) command(name string, arguments map[string]json2.Any
 		if count == 0 { return error('QMP closed') }
 		position += int(count)
 	}
-	for { reply := monitor.line()!; if 'error' in reply { return error(json2.encode(reply['error']!)) }; if 'return' in reply { return } }
+	for { reply := monitor.line()!; if 'error' in reply { if monitor.accept_errors { return }; return error(json2.encode(reply['error']!)) }; if 'return' in reply { return } }
 }

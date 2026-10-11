@@ -30,7 +30,7 @@ the machine's used memory for good. Find leaks by measuring, not by reading.
    other sessions' edits stay out of it. Point the harness at it with
    `VINIX_KERNEL_DIR=<worktree>/kernel`.
 2. Measure what stays allocated.
-   - `tests/desktop-perf/run.py new=<vinix-desktop> --scenarios=ops,churn,cache`
+   - `tests/desktop-perf/run new=<vinix-desktop> --scenarios=ops,churn,cache`
      boots the image in QEMU with no desktop.
    - `ops` does each common kind of system call 200 times (files on tmpfs and
      ext2, renames, sockets, pipes, epoll, /proc reads, mmap, threads, fork...)

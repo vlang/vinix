@@ -117,7 +117,8 @@ fn test_workflows_require_four_native_clients_and_cached_image_aliases() {
 }
 
 fn test_partial_ops_timeout_keeps_json_but_fails() {
-	path := os.join_path(os.temp_dir(), 'vinix-perf-report-' + os.getpid().str())
+	base := if os.getenv('TMPDIR') != '' { os.getenv('TMPDIR') } else { os.temp_dir() }
+	path := os.join_path(base, 'vinix-perf-report-' + os.getpid().str())
 	os.mkdir(path)!
 	defer { os.rmdir_all(path) or { panic(err) } }
 	report_path := os.join_path(path, 'report.json')

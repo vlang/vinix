@@ -246,6 +246,10 @@ fn (identity Identity) repr() string {
 }
 
 pub fn expected(variants []string, selected []string, rounds int) []Identity {
+	return expected_policy(variants, selected, rounds, false)
+}
+
+pub fn expected_policy(variants []string, selected []string, rounds int, historical bool) []Identity {
 	mut plan := map[string]Identity{}
 	for variant in variants {
 		for scenario in selected {
@@ -259,7 +263,7 @@ pub fn expected(variants []string, selected []string, rounds int) []Identity {
 				}
 				'cache' { details << ['PERF-CACHE'] }
 				'ops' {
-					for op in general_ops { details << ['PERF-OPS', op, '/tmp'] }
+					for op in general_ops { if !historical || op != 'fault' { details << ['PERF-OPS', op, '/tmp'] } }
 					for directory in ['/tmp', '/root'] {
 						for op in file_ops { details << ['PERF-OPS', op, directory] }
 					}
@@ -289,9 +293,13 @@ fn identity_for(row Row) Identity {
 }
 
 pub fn inspect(transcript []u8, variants []string, selected []string, rounds int, timed_out bool, exit_code ?Value) Verdict {
+	return inspect_policy(transcript, variants, selected, rounds, timed_out, exit_code, false)
+}
+
+pub fn inspect_policy(transcript []u8, variants []string, selected []string, rounds int, timed_out bool, exit_code ?Value, historical bool) Verdict {
 	mut verdict := Verdict{}
 	mut plan := map[string]Identity{}
-	for identity in expected(variants, selected, rounds) { plan[identity.key()] = identity }
+	for identity in expected_policy(variants, selected, rounds, historical) { plan[identity.key()] = identity }
 	mut seen := map[string]bool{}
 	mut completions := 0
 	for line in byte_lines(transcript) {

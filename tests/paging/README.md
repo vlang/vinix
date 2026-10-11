@@ -52,7 +52,7 @@ explicit pageout, requires the pageout counter to increase and checks all data.
 After warmup, 200 map/pageout/unmap cycles print per-class `PAGING SLAB` deltas;
 compressed storage must return to its pre-churn baseline.
 
-Broader validation uses `tests/desktop-perf/run.py` scenarios `ops,churn,cache`
+Broader validation uses `tests/desktop-perf/run` scenarios `ops,churn,cache`
 and `idle,apps,drag`, together with `tests/kernel-allocs/run.sh`. The allocation
 allowlist must be compared against the repository/compiler baseline rather than
 accepting unrelated allocation warnings.

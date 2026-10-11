@@ -1,0 +1,97 @@
+{
+    "generated_c_translation_credit": 0,
+    "original_python_bytes": 146185,
+    "original_python_lines": 3224,
+    "originals": [
+        {
+            "blob_sha1": "38ab5181304327b3765a9d34d4a982ad346c6bef",
+            "bytes": 14065,
+            "lines": 331,
+            "path": "tests/desktop-perf/run.py",
+            "sha256": "c7ebff775ab667f644892bbc310d4f04824332604842e6840ed5e87dc5772a94"
+        },
+        {
+            "blob_sha1": "33dbc6c7ff389de137162bc6128a02dcee6dfc7d",
+            "bytes": 11681,
+            "lines": 290,
+            "path": "tests/desktop-perf/_runner_native.py",
+            "sha256": "63da1364343c1be0718ef078e519003f04ddc04d490639f212cb5f09d717f346"
+        },
+        {
+            "blob_sha1": "3853c11d446146a66976cc9d690888c14f32ca76",
+            "bytes": 2681,
+            "lines": 74,
+            "path": "tests/desktop-perf/_native_report.py",
+            "sha256": "a154b541d13c1f6c9cc34fd241c718a58aea760eb936a57de44dd7a6318d55dd"
+        },
+        {
+            "blob_sha1": "9c273dad98407a4ed49ae0601ab9659ded5e9fa6",
+            "bytes": 9519,
+            "lines": 233,
+            "path": "tests/desktop-perf/test_runner.py",
+            "sha256": "0b948b039dcb63079ef7d19b5b590a905e5256d156a298e257e0d8097fc2215d"
+        },
+        {
+            "blob_sha1": "92b050272c12c7369974bd78343a3589411767dc",
+            "bytes": 25268,
+            "lines": 555,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run.py",
+            "sha256": "250c8c98c3e1608f1fa41e03e338ef392bb68349c0690c6aa72b7efdcfdfb82b"
+        },
+        {
+            "blob_sha1": "a7b2d95edaeedf825af2346592b501ec8069357f",
+            "bytes": 25256,
+            "lines": 555,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run.py",
+            "sha256": "db17f9c257409ce2501b440d91a85d5b36c68f6aaf20724d6d8872065baeeb42"
+        },
+        {
+            "blob_sha1": "88e26e53e6f12213fb4ad34b7a3fc44da077fb21",
+            "bytes": 25268,
+            "lines": 555,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/run.py",
+            "sha256": "3f760204c424f4c4560f3fc944a4752d42665cf88312e36719570d9654f498b5"
+        },
+        {
+            "blob_sha1": "9940364775c921c6d0ceba3f2eef357db561adf7",
+            "bytes": 25268,
+            "lines": 555,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run.py",
+            "sha256": "f6ecf6bc4dca8c8fcbdf0be3eb34aa395dd103aadcc9fad78bf6c90eea5958a8"
+        },
+        {
+            "blob_sha1": "c880d27810586b1835c92067cebf4d6625bad268",
+            "bytes": 2733,
+            "lines": 34,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/pipeline.py",
+            "sha256": "93b904de36ec6b7a6ee2c2f34aa8f53432fb0b3a91cde2b4ac07ea76ec21b283"
+        },
+        {
+            "blob_sha1": "ca8a8c91dcd7275820b3de18b2a82d24d4fe4a69",
+            "bytes": 2830,
+            "lines": 26,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run-driver.py",
+            "sha256": "45f886f4273c208cfbb36819c302ffe27a49900476f1c0bc7bf6d66b36e8061d"
+        },
+        {
+            "blob_sha1": "8b351e6fd0fa172b2e59d2a133d24ab9f47ca7ad",
+            "bytes": 1616,
+            "lines": 16,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/validate-completed.py",
+            "sha256": "a4ca325e3399fcb9e64c57443b3bf14a09e119153c331c5042352d7f543ce8e9"
+        }
+    ],
+    "python_executed": false,
+    "python_files_retired": 11,
+    "qualification": "native-tools.md",
+    "schema": 1,
+    "source_commit": "5b9e309dba3b594168c7ad30dda42f509f47125d",
+    "unchanged_guest_payload_sha256": {
+        "tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/perf-init.sh": "44a5b432613f7bb45a67e7d8dab489911a51313928c456d67a7c81491f1928c5",
+        "tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/perf-init.sh": "44a5b432613f7bb45a67e7d8dab489911a51313928c456d67a7c81491f1928c5",
+        "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/perf-init.sh": "44a5b432613f7bb45a67e7d8dab489911a51313928c456d67a7c81491f1928c5",
+        "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/perf-init.sh": "44a5b432613f7bb45a67e7d8dab489911a51313928c456d67a7c81491f1928c5",
+        "tests/desktop-perf/measure.c": "2490bc0e69142080f52a469e241cbb37d61d0e0687a191618654a3b617b68771",
+        "tests/desktop-perf/perf-init.sh": "cc38b39d60561f18a2477cfe21252ee6e274a9e3fcd93d69d18ad03ca4e95af3"
+    }
+}
