@@ -1,0 +1,86 @@
+[
+    {
+        "architecture": "arm64",
+        "name": "libc6",
+        "version": "2.36-9+deb12u14",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6_2.36-9+deb12u14_arm64.deb",
+        "sha256": "01f4330719fd4f65580e16ea5a0527f372fca750e8f588d26deaf09f2d3b1cf4"
+    },
+    {
+        "architecture": "arm64",
+        "name": "libc6-dev",
+        "version": "2.36-9+deb12u14",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6-dev_2.36-9+deb12u14_arm64.deb",
+        "sha256": "8bc395bf2ee9939f1a6ae395f974cffdcf541d98f99adfe89ce7e4bef36d159e"
+    },
+    {
+        "architecture": "arm64",
+        "name": "linux-libc-dev",
+        "version": "6.1.176-1",
+        "url": "https://deb.debian.org/debian/pool/main/l/linux/linux-libc-dev_6.1.176-1_arm64.deb",
+        "sha256": "eeca5ec13bed7206f8171fab9a48e84119dcc20cc79557f104628447a524ad10"
+    },
+    {
+        "architecture": "arm64",
+        "name": "libgcc-s1",
+        "version": "12.2.0-14+deb12u1",
+        "url": "https://deb.debian.org/debian/pool/main/g/gcc-12/libgcc-s1_12.2.0-14+deb12u1_arm64.deb",
+        "sha256": "576926b283613db80168ddf76380a3bd877602778cf0d226caa7bfbfa71eacf3"
+    },
+    {
+        "architecture": "amd64",
+        "name": "libc6",
+        "version": "2.36-9+deb12u14",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6_2.36-9+deb12u14_amd64.deb",
+        "sha256": "ba4f88f73dbc3ae9055f3c20f4523bfdbaf1ad13ff95e258924f77d20b4fbedf"
+    },
+    {
+        "architecture": "amd64",
+        "name": "libc6-dev",
+        "version": "2.36-9+deb12u14",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6-dev_2.36-9+deb12u14_amd64.deb",
+        "sha256": "0218fc2befcd784c1b0c6292c0a137ce89fad054efaa579ad083bee0f2c01aae"
+    },
+    {
+        "architecture": "amd64",
+        "name": "linux-libc-dev",
+        "version": "6.1.176-1",
+        "url": "https://deb.debian.org/debian/pool/main/l/linux/linux-libc-dev_6.1.176-1_amd64.deb",
+        "sha256": "8bb258735b9dffbb111da778ebdd024750878e435ffd9dfcadcb6762ede6b4cf"
+    },
+    {
+        "architecture": "amd64",
+        "name": "libgcc-s1",
+        "version": "12.2.0-14+deb12u1",
+        "url": "https://deb.debian.org/debian/pool/main/g/gcc-12/libgcc-s1_12.2.0-14+deb12u1_amd64.deb",
+        "sha256": "3016e62cb4b7cd8038822870601f5ed131befe942774d0f745622cc77d8a88f7"
+    },
+    {
+        "architecture": "i386",
+        "name": "libc6",
+        "version": "2.36-9+deb12u14",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6_2.36-9+deb12u14_i386.deb",
+        "sha256": "76b12e06be66ec3fc2c1791d7d8cf34c2b828ed210e3913feeeb8edc9688f820"
+    },
+    {
+        "architecture": "i386",
+        "name": "libc6-dev",
+        "version": "2.36-9+deb12u14",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6-dev_2.36-9+deb12u14_i386.deb",
+        "sha256": "c02c0adacabf53b8f34364940c7c4fe5aedaf921765e915742cc31ffc7a9d1ad"
+    },
+    {
+        "architecture": "i386",
+        "name": "linux-libc-dev",
+        "version": "6.1.176-1",
+        "url": "https://deb.debian.org/debian/pool/main/l/linux/linux-libc-dev_6.1.176-1_i386.deb",
+        "sha256": "94b68e46c4df2da33b443c0f1f3ec74691e71ff54b053f0a6198d7b62d159c5e"
+    },
+    {
+        "architecture": "i386",
+        "name": "libgcc-s1",
+        "version": "12.2.0-14+deb12u1",
+        "url": "https://deb.debian.org/debian/pool/main/g/gcc-12/libgcc-s1_12.2.0-14+deb12u1_i386.deb",
+        "sha256": "56b95a550b342418f6c4765d5c9b08df2c7167134767e44f1f1bc82ced363ece"
+    }
+]

@@ -7,6 +7,7 @@ import os
 
 struct BuildReceipt {
 	architecture      string
+	libc              string
 	commands          [][]string
 	inputs            map[string]string
 	executable_sha256 string
@@ -22,13 +23,18 @@ fn run(command []string) ! {
 }
 
 fn main() {
-	runtime := os.args.len == 4 && os.args[3] == '--runtime-probe'
-	if os.args.len !in [3, 4] || (os.args.len == 4 && !runtime) || os.args[1] !in [
+	options := if os.args.len >= 3 { os.args[3..] } else { []string{} }
+	runtime := '--runtime-probe' in options
+	glibc := '--libc=glibc' in options
+	if os.args.len < 3 || options.len > 2
+		|| options.any(it !in ['--runtime-probe', '--libc=glibc'])
+		|| options.filter(it == '--runtime-probe').len > 1
+		|| options.filter(it == '--libc=glibc').len > 1 || (glibc && !runtime) || os.args[1] !in [
 		'aarch64',
 		'x86_64',
 		'i386',
 	] || (os.args[1] == 'i386' && !runtime) {
-		eprintln('Usage: build/main.v aarch64|x86_64 FRESH-OUTPUT-DIR [--runtime-probe]; i386 requires --runtime-probe and CC_I386 or VINIX_I386_SYSROOT/VINIX_I386_BUILTINS')
+		eprintln('Usage: build/main.v aarch64|x86_64|i386 FRESH-OUTPUT-DIR [--runtime-probe] [--libc=glibc]; glibc requires a runtime probe and VINIX_GLIBC_SYSROOT')
 		exit(2)
 	}
 	arch := os.args[1]
@@ -52,7 +58,7 @@ fn main() {
 		exit(1)
 	}
 	work := os.real_path(output)
-	generate := if runtime {
+	mut generate := if runtime {
 		[root + '/build-support/compile-v-module', root + '/tests/linux-compat/runtimefixture',
 			work + '/workloads.c', '--arch',
 			if arch == 'aarch64' {
@@ -66,10 +72,49 @@ fn main() {
 		[compiler, '-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
 			'-gc', 'none', '-prod', '-o', work + '/workloads.c', root + '/tools/linux-compat/workloads']
 	}
+	if glibc { generate << ['-d', 'glibc'] }
 	mut compile := []string{}
 	i386_sdk := if arch == 'i386' { os.getenv('VINIX_I386_SYSROOT') } else { '' }
 	mut link_inputs := map[string]string{}
-	if arch == 'aarch64' {
+	if glibc {
+		sdk := os.getenv_opt('VINIX_GLIBC_SYSROOT') or {
+			eprintln('VINIX_GLIBC_SYSROOT must name the matching pinned Debian SDK')
+			exit(2)
+		}
+		triplet := match arch {
+			'aarch64' { 'aarch64-linux-gnu' }
+			'x86_64' { 'x86_64-linux-gnu' }
+			else { 'i386-linux-gnu' }
+		}
+		target := if arch == 'i386' { 'i686-linux-gnu' } else { triplet }
+		lib := sdk + '/lib/' + triplet
+		dev := sdk + '/usr/lib/' + triplet
+		loader := match arch {
+			'aarch64' { 'ld-linux-aarch64.so.1' }
+			'x86_64' { 'ld-linux-x86-64.so.2' }
+			else { 'ld-linux.so.2' }
+		}
+		link_inputs = {
+			'crt1': dev + '/crt1.o'
+			'crti': dev + '/crti.o'
+			'crtn': dev + '/crtn.o'
+			'libc': lib + '/libc.so.6'
+			'libm': lib + '/libm.so.6'
+			'libgcc': lib + '/libgcc_s.so.1'
+			'loader': lib + '/' + loader
+		}
+		compile = [os.getenv_opt('CC_GLIBC') or { 'clang' }, '--target=' + target,
+			'--sysroot=' + sdk, '-isystem', sdk + '/usr/include/' + triplet, '-fuse-ld=lld',
+			'-D_FILE_OFFSET_BITS=64', '-D_TIME_BITS=64', '-fno-pie']
+		if arch == 'aarch64' { compile << '-mno-outline-atomics' }
+		if arch == 'i386' { compile << '-msse2' }
+		interpreter := if arch == 'x86_64' { '/lib64/' + loader } else { '/lib/' + loader }
+		compile << ['-pthread', '-w', '-nostdlib', '-no-pie', link_inputs['crt1'],
+			link_inputs['crti'], work + '/workloads.c', link_inputs['libc'], link_inputs['libm'],
+			link_inputs['libgcc'], link_inputs['crtn'], '-Wl,--dynamic-linker=' + interpreter,
+			'-Wl,-rpath,/usr/libexec/vinix-glibc/' + arch + '/lib', '-o',
+			work + '/linux-compat-workloads']
+	} else if arch == 'aarch64' {
 		sdk := os.getenv_opt('VINIX_AARCH64_SYSROOT') or { root + '/build-aarch64-userland/sysroot' }
 		compile = [os.getenv_opt('CC_AARCH64') or { 'clang' }, '--target=aarch64-linux-musl',
 			'--sysroot=' + sdk, '-fuse-ld=lld', '-L' + sdk + '/lib']
@@ -95,7 +140,9 @@ fn main() {
 	} else {
 		compile = [os.getenv_opt('CC_AMD64') or { 'x86_64-linux-musl-gcc' }]
 	}
-	if link_inputs.len > 0 {
+	if glibc {
+		// The complete dynamic link command above uses only the pinned SDK.
+	} else if link_inputs.len > 0 {
 		// A musl SDK plus compiler-rt is sufficient; no host GCC CRT or libgcc
 		// may accidentally be pulled into this i386 Linux executable.
 		compile << ['-static', '-pthread', '-w', '-nostdlib', link_inputs['crt1'],
@@ -131,7 +178,7 @@ fn main() {
 	}
 	mut inputs := map[string]string{}
 	for name, path in link_inputs {
-		inputs['i386_' + name] = sha256.sum(os.read_bytes(path) or {
+		inputs[if glibc { 'glibc_' + name } else { 'i386_' + name }] = sha256.sum(os.read_bytes(path) or {
 			eprintln(err.msg())
 			exit(1)
 		}).hex()
@@ -150,7 +197,7 @@ fn main() {
 		eprintln(err.msg())
 		exit(1)
 	}).hex()
-	os.write_file(work + '/build.json', json2.encode(BuildReceipt{arch, [generate, compile], inputs, sha256.sum(bytes).hex()},
+	os.write_file(work + '/build.json', json2.encode(BuildReceipt{arch, if glibc { 'glibc' } else { 'musl' }, [generate, compile], inputs, sha256.sum(bytes).hex()},
 		prettify: true
 	) + '\n') or {
 		eprintln(err.msg())

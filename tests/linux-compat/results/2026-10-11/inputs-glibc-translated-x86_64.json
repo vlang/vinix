@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "translated-x86_64",
+    "cases": "runtime",
+    "inputs": {
+        "kernel": "16540ed9666c432b828c676a4ffb83a6a6309629d8e00e5a04a317b8cbe0e9fe",
+        "workloads": "bb6929f642c8683f910996a19960512d8acebe3d0923ad070b4f467b7b4250b0",
+        "runtime-probe": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+        "rootfs_manifest": "de00de14b27070bed6695f4638c8cbc9b7a7242c9d46f44a9f9682fd694f9eff",
+        "init_source": "7572a6b1763aaf059c2883d96c509c818e28072927ec1f840530717676d875e8",
+        "guest_report": "8ab6b4fd1920bc0d62f83c16ed131bef689ed8f9249eef6b00b8b48c82b834c5",
+        "snapshot_kernel": "16540ed9666c432b828c676a4ffb83a6a6309629d8e00e5a04a317b8cbe0e9fe"
+    },
+    "exit_code": 0
+}

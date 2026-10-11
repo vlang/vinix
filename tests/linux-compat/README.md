@@ -138,8 +138,33 @@ static ELF cannot be passed to the wrapper's dynamic musl loader. That environme
 is confined to the child; ordinary i386 applications still use `run-x86-32`.
 The dated [qualification report](../../docs/linux-posix-qualification.md) contains
 passing native ELF64 and translated 32-bit runtime receipts. Native ELF32/x32 entry,
-glibc, the complete large-file/time ABI and debugger operations remain separate
+arbitrary glibc applications, the complete large-file/time ABI and debugger operations remain separate
 checks beyond the qualified lseek/clock/timerfd predicates.
+
+Unmodified GNU libc can be tested independently with the pinned Debian SDK:
+
+```sh
+build-support/run-v-tool.sh tools/linux-compat/sdk/main.v arm64 /path/to/fresh-sdk
+VINIX_GLIBC_SYSROOT=/path/to/fresh-sdk/sysroot build-support/run-v-tool.sh tools/linux-compat/build/main.v aarch64 /path/to/fresh-gnu-probe --runtime-probe --libc=glibc
+```
+
+Use `amd64`/`x86_64` or `i386` for the other SDK/probe pairs. The SDK verifies
+the checked-in archive hashes, then extracts headers, CRT and libraries without
+executing package scripts. GNU builds use their own headers and dynamic loader;
+i386 enables _FILE_OFFSET_BITS=64 and _TIME_BITS=64. Link receipts retain the
+actual libc, loader, libm, libgcc and CRT hashes.
+
+Stage those libraries in the prepared guest's
+`/usr/libexec/vinix-glibc/ARCH/lib`. Native probes need the matching GNU
+interpreter at `/lib/ld-linux-aarch64.so.1` or
+`/lib64/ld-linux-x86-64.so.2`. For translation, each private `ARCH` root needs
+its interpreter at the normal Linux path: `/lib64/ld-linux-x86-64.so.2` or
+`/lib/ld-linux.so.2`. Pass `--runtime-libc glibc` to the application controller
+(or `--runtime-libc=glibc` to the guest driver). Translated probes use QEMU-user
+directly with this private root, scoped W^X opt-in and removed foreign library
+environment variables. The driver requires the probe's GNU libc version marker
+as well as every runtime predicate. Dated receipts cover both native and both
+translated paths; these checks do not qualify every GNU application or debugger.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

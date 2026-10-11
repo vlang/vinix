@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "execution_path": "native-x86_64",
+    "cases": "runtime",
+    "inputs": {
+        "kernel": "b788687e39bff3d2e73d7e572d45c5b5cbf41d3ca12b77679e153cf276f73324",
+        "workloads": "708f634efffabe14fa89503586dc4800a39e288e71c9333fb712331dadedd910",
+        "runtime-probe": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+        "rootfs_manifest": "b4e1c27f828d77a74154b50e63cab6630ba9376a78dba9a87fa6596a5ac433e5",
+        "init_source": "7572a6b1763aaf059c2883d96c509c818e28072927ec1f840530717676d875e8",
+        "guest_report": "75045c448ef147a621af103879f084ea6de8fce220fe4346f8834d6975a127f6",
+        "snapshot_kernel": "b788687e39bff3d2e73d7e572d45c5b5cbf41d3ca12b77679e153cf276f73324"
+    },
+    "exit_code": 0
+}

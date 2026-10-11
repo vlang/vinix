@@ -43,6 +43,7 @@ struct Report {
 	kernel                       string
 	suite_sha256                 string
 	runtime_probe_sha256         string
+	runtime_libc                 string
 	complete_lifecycle_qualified bool
 	results                      []Verdict
 	commands                     []CommandResult
@@ -55,6 +56,7 @@ struct Suite {
 	timeout int
 	install bool
 	runtime string
+	runtime_libc string = 'musl'
 mut:
 	environment map[string]string
 	commands []CommandResult
@@ -69,6 +71,16 @@ fn stop(mut child os.Process) {
 
 fn (suite Suite) command(program string, arguments []string) ![]string {
 	if suite.path in ['translated-x86_64', 'translated-i386'] {
+		if program == suite.runtime && suite.runtime_libc == 'glibc' {
+			arch := if suite.path == 'translated-x86_64' { 'x86_64' } else { 'i386' }
+			emulator := os.getenv_opt(if arch == 'x86_64' { 'VINIX_X86_64_EMULATOR' } else { 'VINIX_I386_EMULATOR' }) or { '/usr/bin/qemu-' + arch }
+			if !os.is_executable(emulator) { return error('unsupported: translator is missing: ' + emulator) }
+			root := '/usr/libexec/vinix-glibc/' + arch
+			mut argv := [emulator]
+			if arch == 'x86_64' { argv << ['-B', os.getenv_opt('VINIX_X86_64_GUEST_BASE') or { '0x100000000' }] }
+			argv << ['-L', root, '-0', program, program, ...arguments]
+			return argv
+		}
 		wrapper := if suite.path == 'translated-x86_64' {
 			'/usr/bin/run-x86-64'
 		} else {
@@ -109,7 +121,8 @@ fn (mut suite Suite) execute(program string, arguments []string) !string {
 	child.set_args(command[1..])
 	mut overrides := suite.environment.clone()
 	mut unset := []string{}
-	if suite.path == 'translated-i386' && program == suite.runtime {
+	if suite.path.starts_with('translated-') && program == suite.runtime
+		&& (suite.path == 'translated-i386' || suite.runtime_libc == 'glibc') {
 		// Match the translator launcher's opt-in without changing the parent
 		// environment or leaking a foreign library path to native descendants.
 		overrides['VINIX_ALLOW_WX'] = '1'
@@ -305,6 +318,9 @@ fn (mut suite Suite) run(name string) ! {
 				return error('unsupported: supply --runtime-probe with the matching ELF fixture')
 			}
 			output := suite.execute(suite.runtime, ['--once'])!
+			if suite.runtime_libc == 'glibc' {
+				expect(output.contains('LINUX RUNTIME libc=glibc version='), 'probe did not identify the GNU libc runtime')!
+			}
 			expect(output.contains('LINUX RUNTIME PASS: atomics SIMD TLS') && output.contains('LINUX RUNTIME PASS: JIT page sizes') && output.contains('LINUX RUNTIME PASS: wide offsets time64') && output.contains('LINUX RUNTIME: PASS'), 'runtime predicates did not all pass')!
 		}
 		'portal' {
@@ -382,7 +398,7 @@ fn main() {
 	mut values := map[string]string{}
 	for arg in os.args[1..] {
 		key := arg.all_before('=')
-		if key !in ['--work', '--cases', '--path', '--timeout', '--runtime-probe', '--host', '--install'] || key in values {
+		if key !in ['--work', '--cases', '--path', '--timeout', '--runtime-probe', '--runtime-libc', '--host', '--install'] || key in values {
 			eprintln('Usage: workloads --work=FRESH-DIR [--cases=sqlite,media,...] [--path=native-aarch64|native-x86_64|translated-x86_64|translated-i386] [--timeout=SECONDS] [--runtime-probe=ELF] [--host] [--install]')
 			exit(2)
 		}
@@ -397,6 +413,8 @@ fn main() {
 		exit(2)
 	}
 	path := values['--path'] or { native_path() }
+	runtime_libc := values['--runtime-libc'] or { 'musl' }
+	if runtime_libc !in ['musl', 'glibc'] { eprintln('invalid runtime libc'); exit(2) }
 	if path !in ['native-aarch64', 'native-x86_64', 'translated-x86_64', 'translated-i386'] {
 		eprintln('invalid execution path')
 		exit(2)
@@ -447,7 +465,7 @@ fn main() {
 		eprintln(err.msg())
 		exit(1)
 	}
-	mut suite := Suite{ work: os.real_path(work), path: path, timeout: timeout, install: '--install' in values, runtime: values['--runtime-probe'] or { '' } }
+	mut suite := Suite{ work: os.real_path(work), path: path, timeout: timeout, install: '--install' in values, runtime: values['--runtime-probe'] or { '' }, runtime_libc: runtime_libc }
 	mut verdicts := []Verdict{}
 	for name in cases {
 		suite.run(name) or {
@@ -464,7 +482,7 @@ fn main() {
 	} else {
 		''
 	}
-	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, false, verdicts, suite.commands, suite.services}
+	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services}
 	os.write_file(suite.work + '/report.json', json2.encode(report, prettify: true) + '\n') or {
 		eprintln(err.msg())
 		exit(1)

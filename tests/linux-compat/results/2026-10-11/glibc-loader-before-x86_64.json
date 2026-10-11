@@ -1,0 +1,33 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "708f634efffabe14fa89503586dc4800a39e288e71c9333fb712331dadedd910",
+    "runtime_probe_sha256": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+    "runtime_libc": "glibc",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "runtime",
+            "status": "failed",
+            "detail": "command failed: ['/usr/share/linux-compat/runtime', '--once'] exit=127 timeout=false output_limit=false"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/share/linux-compat/runtime",
+                "--once"
+            ],
+            "executable_sha256": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 127,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "/usr/share/linux-compat/runtime: error while loading shared libraries: libc.so.6: cannot create shared object descriptor: Error 9\n"
+        }
+    ],
+    "services": []
+}

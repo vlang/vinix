@@ -53,6 +53,7 @@ fn main() {
 		hosttest.Option{ name: '--rootfs', value: true },
 		hosttest.Option{ name: '--workloads', value: true },
 		hosttest.Option{ name: '--runtime-probe', value: true },
+		hosttest.Option{ name: '--runtime-libc', value: true, choices: ['musl', 'glibc'] },
 		hosttest.Option{ name: '--cases', value: true },
 		hosttest.Option{ name: '--timeout', value: true },
 	], [], 'Usage: run-apps.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR --rootfs PREPARED-ROOT --workloads NATIVE-ELF --runtime-probe MATCHING-ELF [--path PATH] [--cases runtime,server]') or {
@@ -148,7 +149,7 @@ fn main() {
 			exit(1)
 		}
 	}
-	os.write_file(state + '/rootfs/etc/linux-compat-options', '--cases=' + cases + '\x00--path=' + path + '\x00') or {
+	os.write_file(state + '/rootfs/etc/linux-compat-options', '--cases=' + cases + '\x00--path=' + path + '\x00--runtime-libc=' + options.value('--runtime-libc', 'musl') + '\x00') or {
 		eprintln(err.msg())
 		exit(1)
 	}

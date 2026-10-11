@@ -1,0 +1,56 @@
+{
+    "architecture": "aarch64",
+    "libc": "glibc",
+    "commands": [
+        [
+            "/Volumes/VIssueFix1011/vinix-linux-posix-roadmap/build-support/compile-v-module",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-roadmap/tests/linux-compat/runtimefixture",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-probe-glibc-arm/workloads.c",
+            "--arch",
+            "arm64",
+            "-d",
+            "nofloat",
+            "-d",
+            "glibc"
+        ],
+        [
+            "clang",
+            "--target=aarch64-linux-gnu",
+            "--sysroot=/Volumes/VIssueFix1011/vinix-linux-posix-glibc-sdk-arm/sysroot",
+            "-isystem",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-glibc-sdk-arm/sysroot/usr/include/aarch64-linux-gnu",
+            "-fuse-ld=lld",
+            "-D_FILE_OFFSET_BITS=64",
+            "-D_TIME_BITS=64",
+            "-fno-pie",
+            "-mno-outline-atomics",
+            "-pthread",
+            "-w",
+            "-nostdlib",
+            "-no-pie",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-glibc-sdk-arm/sysroot/usr/lib/aarch64-linux-gnu/crt1.o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-glibc-sdk-arm/sysroot/usr/lib/aarch64-linux-gnu/crti.o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-probe-glibc-arm/workloads.c",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-glibc-sdk-arm/sysroot/lib/aarch64-linux-gnu/libc.so.6",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-glibc-sdk-arm/sysroot/lib/aarch64-linux-gnu/libm.so.6",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-glibc-sdk-arm/sysroot/lib/aarch64-linux-gnu/libgcc_s.so.1",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-glibc-sdk-arm/sysroot/usr/lib/aarch64-linux-gnu/crtn.o",
+            "-Wl,--dynamic-linker=/lib/ld-linux-aarch64.so.1",
+            "-Wl,-rpath,/usr/libexec/vinix-glibc/aarch64/lib",
+            "-o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-probe-glibc-arm/linux-compat-workloads"
+        ]
+    ],
+    "inputs": {
+        "glibc_crt1": "a8e2c0dd808011c9d9c5910daa44c64b70e4f2eee20e23de0b6ff24abab887cc",
+        "glibc_crti": "93bb05d2d87f3464fd89a70d26d8ed29f0797e4b97a60786a2724a7e3ffbeba5",
+        "glibc_crtn": "1c741c1f9499461b6f1e531e21fc5f86a216cc5d0c49d18bdcf97d7d922342d5",
+        "glibc_libc": "e4ac8ae1d81e4865e3aadedb962879cf9415903b3f2ba81ec75e9962b86ab8b0",
+        "glibc_libm": "3c4cb3be0b974edf05f023f85ab15107fb5afc2687163593d0d4cf8e80c17b39",
+        "glibc_libgcc": "046856f95f4636f1fc7c3a12bf4f3cd5634c2fc5145c3fdf7395d4f349fa69c7",
+        "glibc_loader": "17538b8f9889a470c061f69a8fea8124da89627311cd16546c133a89f09056df",
+        "tests/linux-compat/runtimefixture/core.v": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+        "generated_c": "e74a9f2c4e988386b8b70130301983101978ce05522a625ccd7593d94daf8eff"
+    },
+    "executable_sha256": "a54ee98c77f419b0e34cb6e281fdad0d47c9ba38e6e61419d576de35c82c83ab"
+}

@@ -14,6 +14,11 @@ module runtimefixture
 #include <time.h>
 #include <unistd.h>
 
+$if glibc ? {
+	#include <gnu/libc-version.h>
+	fn C.gnu_get_libc_version() &char
+}
+
 @[typedef]
 struct C.pthread_t {}
 
@@ -212,6 +217,7 @@ fn wide_offsets_and_time() bool {
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		$if glibc ? { C.printf(c'LINUX RUNTIME libc=glibc version=%s\n', C.gnu_get_libc_version()) }
 		page := C.sysconf(C._SC_PAGESIZE)
 		aux_page := C.getauxval(usize(C.AT_PAGESZ))
 		if page < 4096 || page & (page - 1) != 0 || usize(page) != aux_page {

@@ -2,7 +2,7 @@
 
 Section 15 remains partial. These are results for exact hashed binaries in
 disposable QEMU guests, plus explicitly separate host checks. They do not
-qualify every wired syscall, unmodified glibc, persistent package installation,
+qualify every wired syscall or GNU libc API, persistent package installation,
 desktop integration or physical hardware.
 
 The initial kernels were built in isolated worktrees from `ea6c4189` with the three
@@ -30,6 +30,7 @@ and openat2 exercise the same behavior, following the
 | Concurrent pthread TLS/errno/keys, 64-bit atomics, SIMD and RW-to-RX JIT | passed | passed | passed | passed |
 | File offsets past 8 GiB, normalized clock and time64 timerfd deadline roundtrip | passed | passed | passed | passed |
 | auxv/sysconf page size, pointer width | 16 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 32 bits |
+| Same runtime predicates with unmodified Debian glibc 2.36 | passed | passed | passed | passed |
 
 BPF is unavailable: passing its error regression means callers can discover
 that limitation. The later `link-policy-*.json` receipts test kernels that add
@@ -89,7 +90,7 @@ the existing ARM-native QEMU-i386 translator. Separate native runtime receipts
 record the revision. The i386 SDK's musl 1.2.5-r11, compiler-rt 19.1.4-r1, CRT
 and builtins hashes are recorded with the build and package inputs. The static
 probe bypasses the wrapper's dynamic musl loader and confines its W^X opt-in to
-the translator child. Native ELF32 entry, x32, unmodified glibc, complete
+the translator child. Native ELF32 entry, x32, arbitrary glibc applications, complete
 large-file/time ABI coverage, loader interoperability and debugger operations
 remain unqualified.
 
@@ -102,6 +103,22 @@ The `runtime-wide-*.json`, `translated-wide-*.json`, input and i386 build receip
 record these binaries. This checks the musl lseek/clock/timerfd wrappers and
 translation; it does not qualify legacy time32 interfaces, large disk writes,
 every stat/truncate/mmap layout, or wall-clock synchronization.
+
+The additional `glibc-*.json` reports qualify the same runtime predicates with
+unmodified Debian Bookworm glibc 2.36-9+deb12u14 on all four paths. These probes
+use the pinned GNU headers, CRT, loader, libc, libm and libgcc; gcompat is not in
+their dependency chain. The SDK's package URLs and hashes are retained in
+[`glibc-packages.json`](../tools/linux-compat/reference/glibc-packages.json),
+with individual linked-input hashes in `build-glibc-*.json`. i386 uses
+_FILE_OFFSET_BITS=64 and _TIME_BITS=64, including its GNU time64 wrappers.
+Native AArch64 reports 16 KiB pages; native and translated x86 report 4 KiB.
+The native x86-64 result additionally includes the anonymous-mmap fix described
+above. `glibc-loader-before-x86_64.json` records the proper glibc workload
+failing before that fix with shared-object descriptor allocation error 9.
+Translated probes use the real GNU interpreter in a private root and confine
+W^X opt-in and environment cleanup to the translator child. These results
+qualify the exercised GNU runtime APIs; arbitrary glibc applications, native
+ELF32/x32, debugger operations and complete legacy time32 behavior remain open.
 
 The application suite also attempts all categories and preserves missing
 dependencies as unsupported, with a nonzero complete-suite exit. Test roots

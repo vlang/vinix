@@ -1,0 +1,33 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "708f634efffabe14fa89503586dc4800a39e288e71c9333fb712331dadedd910",
+    "runtime_probe_sha256": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+    "runtime_libc": "glibc",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "runtime",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/share/linux-compat/runtime",
+                "--once"
+            ],
+            "executable_sha256": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "LINUX RUNTIME libc=glibc version=2.36\nLINUX RUNTIME page_size=4096 pointer_bits=64\nLINUX RUNTIME PASS: atomics SIMD TLS\nLINUX RUNTIME PASS: JIT page sizes\nLINUX RUNTIME PASS: wide offsets time64\nLINUX RUNTIME: PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": []
+}

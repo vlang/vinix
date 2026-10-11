@@ -42,12 +42,25 @@ pub fn run() i32 {
 		mut arguments := [8]&char{}
 		arguments[0] = c'/usr/bin/linux-compat-workloads'
 		arguments[1] = c'--work=/tmp/linux-compat-evidence'
-		arguments[2] = &options[0]
-		arguments[3] = c'--runtime-probe=/usr/share/linux-compat/runtime'
-		// The execution-path option is a second NUL-terminated string.
+		arguments[2] = c'--runtime-probe=/usr/share/linux-compat/runtime'
+		// Consume every bounded NUL-terminated controller option. In
+		// particular, retain the libc selection alongside the execution path.
 		mut index := usize(0)
-		for index < usize(n) && options[index] != 0 { index++ }
-		if index + 1 < usize(n) { arguments[4] = &options[index + 1] }
+		mut argc := 3
+		for index < usize(n) {
+			if argc >= arguments.len - 1 || options[index] == 0 {
+				C.puts(c'LINUX APPLICATIONS FAIL: invalid options')
+				return 1
+			}
+			arguments[argc] = &options[index]
+			argc++
+			for index < usize(n) && options[index] != 0 { index++ }
+			if index == usize(n) {
+				C.puts(c'LINUX APPLICATIONS FAIL: unterminated options')
+				return 1
+			}
+			index++
+		}
 		child := C.fork()
 		if child == 0 {
 			C.execv(arguments[0], &arguments[0])
