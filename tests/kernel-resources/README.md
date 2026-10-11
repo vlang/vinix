@@ -8,6 +8,10 @@ rollback host tests:
 V=/path/to/v tests/kernel-resources/run-host.sh
 ```
 
+The entry point invokes the maintained V controller; fixture staging, compiler
+selection, temporary-directory cleanup and test execution live in `run-host.v`.
+`TMPDIR` selects the scratch filesystem.
+
 The host suite exercises concurrent reserve/grow/shrink/release, owner limits,
 global limits, fixed account exhaustion, stale generations, surviving creator
 accounts and denied lazy-root allocation followed by retry and disposal.
