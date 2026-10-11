@@ -1,0 +1,5 @@
+{
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86/compiler-rt-19.1.4-r1.apk": "d0011be70352fb05677c051ac41806bfd24b1d745807288003c0a8a2b22cee29",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86/musl-1.2.5-r11.apk": "9875e26e9683fba40d9c380d5d28a9bcd1b04af7de6c3945b534568fe40fc69b",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86/musl-dev-1.2.5-r11.apk": "9f49e377693ab87bc0acfcd0985e55d9f4f6f5cbe7b744a15091330e8bc03edf"
+}

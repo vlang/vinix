@@ -1,0 +1,45 @@
+{
+    "architecture": "i386",
+    "commands": [
+        [
+            "/Volumes/VIssueFix1011/vinix-linux-posix-roadmap/build-support/compile-v-module",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-roadmap/tests/linux-compat/runtimefixture",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-probe-i386-release/workloads.c",
+            "--arch",
+            "i386",
+            "-d",
+            "nofloat"
+        ],
+        [
+            "clang",
+            "--target=i686-linux-musl",
+            "--sysroot=/Volumes/VIssueFix1011/vinix-linux-posix-i386-dependencies/sysroot",
+            "-fuse-ld=lld",
+            "-L/Volumes/VIssueFix1011/vinix-linux-posix-i386-dependencies/sysroot/usr/lib",
+            "-msse2",
+            "-static",
+            "-pthread",
+            "-w",
+            "-nostdlib",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-i386-dependencies/sysroot/usr/lib/crt1.o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-i386-dependencies/sysroot/usr/lib/crti.o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-probe-i386-release/workloads.c",
+            "-lc",
+            "-lm",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-i386-dependencies/sysroot/usr/lib/llvm19/lib/clang/19/lib/i586-alpine-linux-musl/libclang_rt.builtins-i386.a",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-i386-dependencies/sysroot/usr/lib/crtn.o",
+            "-o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-probe-i386-release/linux-compat-workloads"
+        ]
+    ],
+    "inputs": {
+        "i386_crt1": "d4339db0a55a0cd2b2c7ca429d0e6f5670994faabe55eae88dd3ebb9a50e2496",
+        "i386_crti": "afe9d9cc30238c7af90518c8e35938af435c607a753de2491211379febcf5f61",
+        "i386_crtn": "a8c2110a06887b4e7853f9aedb39ed52395cb09e288fa21ad0de3a825810c11a",
+        "i386_libc": "6301c6357e8c7a7c127c6290933f2ee511cce6edbc20f3176456b614e5f7e8fb",
+        "i386_builtins": "8e2d5ff49bc99323329f569d0179a1f4285fead05cd5432d4051cd7bde450546",
+        "tests/linux-compat/runtimefixture/core.v": "118ec05350f25c120d0eb3752329b112b48697812733d852fd7151215b5ce9d1",
+        "generated_c": "ae5b5542064f56cfcff1170cbb72f88dd16c8012a7d0faad4441b72cd2a7cf0f"
+    },
+    "executable_sha256": "24226be914797b7d796a211346710fcf2bbfb400c02c2c103567d9f38334457f"
+}

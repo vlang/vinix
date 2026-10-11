@@ -13,26 +13,31 @@ init and image hashes are in the checked-in receipts under
 Use the [V qualification controllers](../tests/linux-compat/README.md) to
 reproduce tests against another kernel; a new hash needs a new qualification.
 
-| Check | Native AArch64 | Native x86-64 | x86-64 translated on AArch64 |
-| --- | --- | --- | --- |
-| BPF load/attach/detach/query returns ENOSYS without changing user buffers | passed | passed | not tested |
-| faccessat2 permissions, exact errors, empty/deleted/O_PATH paths and credentials | passed | passed | not tested |
-| openat2 ordinary opens and exact validation/rejection of unsupported resolution | passed | passed | not tested |
-| Concurrent pthread TLS/errno/keys, 64-bit atomics, SIMD and RW-to-RX JIT | passed | passed | passed |
-| auxv/sysconf page size, pointer width | 16 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 64 bits |
+| Check | Native AArch64 | Native x86-64 | x86-64 translated on AArch64 | i386 translated on AArch64 |
+| --- | --- | --- | --- | --- |
+| BPF load/attach/detach/query returns ENOSYS without changing user buffers | passed | passed | not tested | not tested |
+| faccessat2 permissions, exact errors, empty/deleted/O_PATH paths and credentials | passed | passed | not tested | not tested |
+| openat2 ordinary opens and exact validation/rejection of unsupported resolution | passed | passed | not tested | not tested |
+| Concurrent pthread TLS/errno/keys, 64-bit atomics, SIMD and RW-to-RX JIT | passed | passed | passed | passed |
+| auxv/sysconf page size, pointer width | 16 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 32 bits |
 
 BPF is unavailable: passing its error regression means callers can discover
 that limitation. Known openat2 RESOLVE constraints return EOPNOTSUPP; atomic
 constrained traversal is still missing. Neither result is a sandbox support
 claim. The runtime fixture covers NEON or SSE2, not the complete AVX/ARM feature
 set, debugger operations, signal delivery through translation or every JIT.
-The translated result uses the existing QEMU-user launcher in `--direct` mode
+The x86-64 translated result uses the existing QEMU-user launcher in `--direct` mode
 with a static musl x86-64 fixture, not a glibc application runtime.
 
-The i386 attempt failed before linking: the selected V backend rejected the
-fixture's inline assembly. No 32-bit runtime, native ELF32 entry or x32 result
-is qualified. A compatible V backend and i386 compiler/sysroot are still
-required, followed by the same tests and 32-bit time/file/loader checks.
+An initial i386 attempt failed before linking because V's amd64 inline assembly
+could not target i386. The revised fixture uses SSE2 compiler intrinsics; it
+passes natively on both architectures and as a static i386 executable through
+the existing ARM-native QEMU-i386 translator. Separate native runtime receipts
+record the revision. The i386 SDK's musl 1.2.5-r11, compiler-rt 19.1.4-r1, CRT
+and builtins hashes are recorded with the build and package inputs. The static
+probe bypasses the wrapper's dynamic musl loader and confines its W^X opt-in to
+the translator child. Native ELF32 entry, x32, unmodified glibc, 32-bit large-file
+and time APIs, loader interoperability and debugger operations remain unqualified.
 
 The application suite also attempts all categories and preserves missing
 dependencies as unsupported, with a nonzero complete-suite exit. Test roots

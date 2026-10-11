@@ -51,6 +51,15 @@ fn C.fflush(voidptr) i32
 fn C.pause() i32
 fn C.strcmp(&char, &char) i32
 
+$if !arm64 {
+	#include <emmintrin.h>
+	@[typedef]
+	struct C.__m128i {}
+	fn C._mm_loadu_si128(&C.__m128i) C.__m128i
+	fn C._mm_add_epi32(C.__m128i, C.__m128i) C.__m128i
+	fn C._mm_storeu_si128(&C.__m128i, C.__m128i)
+}
+
 fn simd(seed u32) bool {
 	input := [seed, seed + 1, seed + 2, seed + 3]!
 	mut output := [4]u32{}
@@ -68,15 +77,11 @@ fn simd(seed u32) bool {
 			  memory
 		}
 	} $else {
-		asm amd64 raw {
-			"movdqu (%[input]), %%xmm0\n\t"
-			"paddd %%xmm0, %%xmm0\n\t"
-			"movdqu %%xmm0, (%[output])"
-			;
-			; [input] "r" (p)
-			  [output] "r" (q)
-			; xmm0
-			  memory
+		// Compiler intrinsics emit SSE2 in both i386 and x86-64 builds.
+		// V's amd64 inline assembly backend cannot target i386.
+		unsafe {
+			vector := C._mm_loadu_si128(&C.__m128i(p))
+			C._mm_storeu_si128(&C.__m128i(q), C._mm_add_epi32(vector, vector))
 		}
 	}
 	unsafe { for i in 0 .. 4 { if output[i] != input[i] * 2 { return false } }

@@ -77,10 +77,16 @@ build-support/run-v-tool.sh tests/linux-compat/run-apps.v --arch aarch64 --kerne
 
 Repeat with `x86_64` and its matching kernel/root. The ARM builder uses
 `VINIX_AARCH64_SYSROOT` and `CC_AARCH64` (default clang); x86 uses `CC_AMD64`
-(default x86_64-linux-musl-gcc). `VINIX_V_COMPILER` selects V. The experimental
-`i386 --runtime-probe` path additionally needs an i386-capable V backend and
-`CC_I386`; the current compiler rejected the fixture's inline assembly, so no
-32-bit result is qualified.
+(default x86_64-linux-musl-gcc). `VINIX_V_COMPILER` selects V. The
+`i386 --runtime-probe` path uses `CC_I386` (default i686-linux-musl-gcc), or a
+clang-compatible compiler when `VINIX_I386_SYSROOT` names an i386 musl SDK and
+`VINIX_I386_BUILTINS` names its compiler-rt builtins archive. In the latter mode
+the receipt also hashes the SDK CRT, libc and builtins; host GCC libraries are
+excluded. SSE2 intrinsics let this fixture build through V's i386 C backend.
+
+```sh
+VINIX_I386_SYSROOT=/path/to/i386-sdk VINIX_I386_BUILTINS=/path/to/libclang_rt.builtins-i386.a build-support/run-v-tool.sh tools/linux-compat/build/main.v i386 /path/to/fresh-i386-probe --runtime-probe
+```
 
 The application controller takes a prepared guest root with matching programs
 and libraries, snapshots the kernel/driver/probe and init source, and preserves
@@ -92,6 +98,15 @@ native ARM driver and an x86-64 probe, and stage the existing translator/private
 runtime in the prepared root. The static probe uses `run-x86-64 --direct`;
 dynamic applications use the normal private-loader path. A passing static probe
 does not qualify glibc loaders or all translated applications.
+
+Select `--path translated-i386` with an ELF32 probe to test 32-bit translation.
+The static probe invokes `VINIX_I386_EMULATOR` (default `/usr/bin/qemu-i386`)
+directly with the private runtime root and the launcher's W^X opt-in, because a
+static ELF cannot be passed to the wrapper's dynamic musl loader. That environment
+is confined to the child; ordinary i386 applications still use `run-x86-32`.
+The dated [qualification report](../../docs/linux-posix-qualification.md) contains
+passing native ELF64 and translated 32-bit runtime receipts. Native ELF32/x32 entry,
+glibc, 32-bit large-file/time APIs and debugger operations remain separate checks.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

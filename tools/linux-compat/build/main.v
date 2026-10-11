@@ -28,7 +28,7 @@ fn main() {
 		'x86_64',
 		'i386',
 	] || (os.args[1] == 'i386' && !runtime) {
-		eprintln('Usage: build/main.v aarch64|x86_64 FRESH-OUTPUT-DIR [--runtime-probe]; i386 requires --runtime-probe and CC_I386')
+		eprintln('Usage: build/main.v aarch64|x86_64 FRESH-OUTPUT-DIR [--runtime-probe]; i386 requires --runtime-probe and CC_I386 or VINIX_I386_SYSROOT/VINIX_I386_BUILTINS')
 		exit(2)
 	}
 	arch := os.args[1]
@@ -67,17 +67,44 @@ fn main() {
 			'-gc', 'none', '-o', work + '/workloads.c', root + '/tools/linux-compat/workloads']
 	}
 	mut compile := []string{}
+	i386_sdk := if arch == 'i386' { os.getenv('VINIX_I386_SYSROOT') } else { '' }
+	mut link_inputs := map[string]string{}
 	if arch == 'aarch64' {
 		sdk := os.getenv_opt('VINIX_AARCH64_SYSROOT') or { root + '/build-aarch64-userland/sysroot' }
 		compile = [os.getenv_opt('CC_AARCH64') or { 'clang' }, '--target=aarch64-linux-musl',
 			'--sysroot=' + sdk, '-fuse-ld=lld', '-L' + sdk + '/lib']
 	} else if arch == 'i386' {
-		compile = [os.getenv_opt('CC_I386') or { 'i686-linux-musl-gcc' }]
+		if i386_sdk != '' {
+			builtins := os.getenv_opt('VINIX_I386_BUILTINS') or {
+				eprintln('VINIX_I386_BUILTINS must name the matching compiler-rt archive')
+				exit(2)
+			}
+			compile = [os.getenv_opt('CC_I386') or { 'clang' }, '--target=i686-linux-musl',
+				'--sysroot=' + i386_sdk, '-fuse-ld=lld', '-L' + i386_sdk + '/usr/lib']
+			link_inputs = {
+				'crt1': i386_sdk + '/usr/lib/crt1.o'
+				'crti': i386_sdk + '/usr/lib/crti.o'
+				'crtn': i386_sdk + '/usr/lib/crtn.o'
+				'libc': i386_sdk + '/usr/lib/libc.a'
+				'builtins': builtins
+			}
+		} else {
+			compile = [os.getenv_opt('CC_I386') or { 'i686-linux-musl-gcc' }]
+		}
+		compile << '-msse2'
 	} else {
 		compile = [os.getenv_opt('CC_AMD64') or { 'x86_64-linux-musl-gcc' }]
 	}
-	compile << ['-static', '-pthread', '-w', work + '/workloads.c', '-lm', '-o',
-		work + '/linux-compat-workloads']
+	if link_inputs.len > 0 {
+		// A musl SDK plus compiler-rt is sufficient; no host GCC CRT or libgcc
+		// may accidentally be pulled into this i386 Linux executable.
+		compile << ['-static', '-pthread', '-w', '-nostdlib', link_inputs['crt1'],
+			link_inputs['crti'], work + '/workloads.c', '-lc', '-lm', link_inputs['builtins'],
+			link_inputs['crtn'], '-o', work + '/linux-compat-workloads']
+	} else {
+		compile << ['-static', '-pthread', '-w', work + '/workloads.c', '-lm', '-o',
+			work + '/linux-compat-workloads']
+	}
 	run(generate) or {
 		eprintln(err.msg())
 		exit(1)
@@ -103,6 +130,12 @@ fn main() {
 		exit(1)
 	}
 	mut inputs := map[string]string{}
+	for name, path in link_inputs {
+		inputs['i386_' + name] = sha256.sum(os.read_bytes(path) or {
+			eprintln(err.msg())
+			exit(1)
+		}).hex()
+	}
 	for source in if runtime {
 		['tests/linux-compat/runtimefixture/core.v']
 	} else {

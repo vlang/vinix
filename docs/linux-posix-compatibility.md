@@ -8,7 +8,7 @@ receipt for the exact architecture, kernel, libc and application versions tested
 Host, QEMU and physical-machine evidence are separate.
 
 See the [2026-10-11 qualification report](linux-posix-qualification.md) for
-native syscall/runtime results, translated x86-64 runtime checks, actual SQLite
+native syscall/runtime results, translated x86-64/i386 runtime checks, actual SQLite
 and HTTP workloads, and the unsupported application dependencies. Those receipts
 qualify their stated checks and exact binaries only.
 
@@ -62,7 +62,7 @@ they are not automatically rerun or upgraded to current qualification here.
 | Native AArch64 ELF64 musl | partial | pthread TLS, atomics, NEON, W^X transitions/cache flush, auxv and 16 KiB pages; application workload and persistent save/update. |
 | Native x86-64 ELF64 on x86-64 | partial | pthread TLS, atomics, SSE/AVX feature discovery, JIT protection transitions, debugging and 4 KiB pages. |
 | x86-64 ELF64 through `run-x86-64` on AArch64 | partial | QEMU-user translator plus private musl/glibc loader; [translation smoke](../tests/x86-translation/smoke.sh) checks static instructions and a dynamic BusyBox call only. Run the same atomics/TLS/SIMD/JIT workload through the translator; check guest page size, low-address mappings and signals. |
-| i386 ELF32 through `run-x86-32` on AArch64 | partial | Separate i386 libraries and syscall layouts; [Steam robust fixtures](../tests/steam/run-robust-vm) cover selected behavior. Qualify 32-bit time/large-file APIs, TLS, lock-free atomics, SSE, JIT and debugger operations. |
+| i386 ELF32 translation on AArch64 | partial | The [static runtime probe](linux-posix-qualification.md) passes TLS, 64-bit atomics, SSE2, JIT and 4 KiB/32-bit checks through QEMU-i386. Ordinary dynamic apps use `run-x86-32` and separate i386 libraries; [Steam robust fixtures](../tests/steam/run-robust-vm) cover selected behavior. 32-bit time/large-file APIs, loader interoperability and debugger operations remain unqualified. |
 | Native i386/x32 on either 64-bit kernel | open | The ELF64 dispatch inventory does not certify a native ELF32 syscall entry or x32 ABI. |
 
 ## Application acceptance catalog and unsupported dependencies

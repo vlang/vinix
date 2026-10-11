@@ -1,0 +1,35 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "translated-i386",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "b66e84aeea2053909dd0270a81c7512fee10abe3cdefddae60e11d702c7999d9",
+    "runtime_probe_sha256": "24226be914797b7d796a211346710fcf2bbfb400c02c2c103567d9f38334457f",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "runtime",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/qemu-i386",
+                "-L",
+                "/usr/libexec/vinix-i386/root",
+                "-0",
+                "/usr/share/linux-compat/runtime",
+                "/usr/share/linux-compat/runtime",
+                "--once"
+            ],
+            "executable_sha256": "4d073123424b764c657526f5ac76544e368cd65a1295b68803a46e9abe21d6c3",
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "LINUX RUNTIME page_size=4096 pointer_bits=32\nLINUX RUNTIME PASS: atomics SIMD TLS\nLINUX RUNTIME PASS: JIT page sizes\nLINUX RUNTIME: PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": []
+}

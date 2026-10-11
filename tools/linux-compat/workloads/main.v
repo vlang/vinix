@@ -77,6 +77,16 @@ fn (suite Suite) command(program string, arguments []string) ![]string {
 		if suite.path == 'translated-x86_64' && program == suite.runtime {
 			return [wrapper, '--direct', program, ...arguments]
 		}
+		if suite.path == 'translated-i386' && program == suite.runtime {
+			// The static probe has no PT_DYNAMIC for the wrapper's musl loader.
+			// Ordinary applications still use the existing private-loader path.
+			emulator := os.getenv_opt('VINIX_I386_EMULATOR') or { '/usr/bin/qemu-i386' }
+			if !os.is_executable(emulator) {
+				return error('unsupported: translator is missing: ' + emulator)
+			}
+			runtime := os.getenv_opt('VINIX_I386_ROOT') or { '/usr/libexec/vinix-i386/root' }
+			return [emulator, '-L', runtime, '-0', program, program, ...arguments]
+		}
 		return [wrapper, program, ...arguments]
 	}
 	resolved := if program.contains('/') {
@@ -94,6 +104,16 @@ fn (mut suite Suite) execute(program string, arguments []string) !string {
 	command := suite.command(program, arguments)!
 	mut child := os.new_process(command[0])
 	child.set_args(command[1..])
+	if suite.path == 'translated-i386' && program == suite.runtime {
+		// Match the translator launcher's opt-in without changing the parent
+		// environment or leaking a foreign library path to native descendants.
+		mut environment := os.environ()
+		environment['VINIX_ALLOW_WX'] = '1'
+		environment.delete('LD_LIBRARY_PATH')
+		environment.delete('QEMU_LD_PREFIX')
+		environment.delete('QEMU_SET_ENV')
+		child.set_environment(environment)
+	}
 	child.set_work_folder(suite.work)
 	child.set_redirect_stdio()
 	child.use_pgroup = true
