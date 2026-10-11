@@ -26,7 +26,10 @@ struct C.fb_var_screeninfo {
 	transp         C.fb_bitfield
 }
 
-type GetPlatformDisplay = fn (u32, voidptr, &i32) voidptr
+@[typedef]
+struct C.vkg_egl_int {}
+
+type GetPlatformDisplay = fn (u32, voidptr, &C.vkg_egl_int) voidptr
 
 fn C.vkg_get_platform_display() voidptr
 fn C.vkg_errno_pointer() &i32

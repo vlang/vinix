@@ -1,0 +1,38 @@
+{
+    "originals": [
+        {
+            "blob": "131e639dd2696128c0f65b8701685f4145cac47f",
+            "bytes": 2353,
+            "lines": 34,
+            "path": "gl-triangle/compile-v.py",
+            "sha256": "21652004354f85a033f16f13f36ecea50ea35f3f1585a2eeb0872c41d0b24ade"
+        },
+        {
+            "blob": "9fb4e2f771d6d0c85557e265cc2724dabd534603",
+            "bytes": 929,
+            "lines": 16,
+            "path": "gl-triangle/stage.py",
+            "sha256": "8101eb2a9914c0f5c4847c04b2b2ea8c827b379bf29c911f3249f4d86c2ed058"
+        },
+        {
+            "blob": "b80231fb64eb55fd9d311a804a620df2878b06e4",
+            "bytes": 2728,
+            "lines": 32,
+            "path": "tests/gl-triangle/run.py",
+            "sha256": "dc83c315cd57106def4261109d039f32a35bca20498d2566330484ee048950ff"
+        },
+        {
+            "blob": "957498878687d0a7e7cd599ddbd67a63054d5179",
+            "bytes": 5439,
+            "lines": 61,
+            "path": "tests/gl-triangle/run-vm.py",
+            "sha256": "8108fcc6fd91285115ac7e75fb53afb292722c788bc7045d0359a51c35864e0c"
+        }
+    ],
+    "qualification": "native-tools.md",
+    "schema": 1,
+    "sdk_declaration_translation_credit": 0,
+    "source_commit": "22eead19a72c059d0a0dc18e437b70e7d3a5ece7",
+    "translated_python_bytes": 11449,
+    "translated_python_files": 4
+}

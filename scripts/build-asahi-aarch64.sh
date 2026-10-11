@@ -287,7 +287,7 @@ TARGET_CC=(clang --target=aarch64-linux-musl --sysroot="$SYSROOT" -fuse-ld=lld -
 "${TARGET_CC[@]}" -O2 -Wall -Wextra -Werror -fPIC -shared \
     "$SCRIPT_DIR/tests/agx-fake-g17/ioctl_fault.c" \
     -o "$STAGING/usr/lib/libvinix-agx-fault.so" -ldl
-python3 "$SCRIPT_DIR/gl-triangle/stage.py" "$STAGING/usr/share/examples/gl-triangle" --arch arm64
+"$SCRIPT_DIR/gl-triangle/stage" "$STAGING/usr/share/examples/gl-triangle" --arch arm64
 "${TARGET_CC[@]}" -O2 -D__vinix__ -fwrapv -fno-strict-aliasing \
     -I"$STAGING/usr/include" \
     "$STAGING/usr/share/examples/gl-triangle/egl_triangle.c" \

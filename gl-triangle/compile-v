@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -f "$here/../build-support/run-v-tool.sh" ]; then
+    exec sh "$here/../build-support/run-v-tool.sh" "$here/compile-v.v" "$@"
+fi
+tool_dir=$(mktemp -d "${TMPDIR:-/tmp}/vinix-gl-generator.XXXXXX")
+trap 'rm -rf "$tool_dir"' 0
+trap 'exit 130' INT
+trap 'exit 143' TERM
+compiler=${V:-v}
+if [ -d "$compiler" ]; then compiler="$compiler/v"; fi
+V=$compiler
+export V
+"$compiler" -cc cc -o "$tool_dir/tool" "$here/compile-v.v" >&2
+set +e
+"$tool_dir/tool" "$@"
+tool_status=$?
+set -e
+exit "$tool_status"

@@ -330,7 +330,7 @@ XINITRC
     chmod +x "$STAGING/root/.xinitrc"
 
     # Package maintained V demos and native C build artifacts for guest GCC.
-    python3 "$SCRIPT_DIR/gl-triangle/stage.py" \
+    "$SCRIPT_DIR/gl-triangle/stage" \
         "$STAGING/usr/share/examples/gl-triangle" --arch arm64
     cp "$STAGING/usr/share/examples/gl-triangle/legacy_triangle.c" \
         "$STAGING/root/gl_triangle.c"

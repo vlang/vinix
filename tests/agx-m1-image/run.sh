@@ -34,7 +34,7 @@ tar --format=ustar -cf "$work/gpu.tar" -C "$root" .
 
 # The maintained V module must identify exactly the generated C shipped in
 # the image; a change to V is stale even when its public C ABI is unchanged.
-python3 "$repo/gl-triangle/compile-v.py" \
+"$repo/gl-triangle/compile-v" \
     "$root/usr/share/examples/gl-triangle/egl_triangle.c" --arch arm64
 tar --format=ustar -cf "$work/v-gpu.tar" -C "$root" .
 "$checker" --triangle-source "$repo/gl-triangle/eglcore/core.v" "$work/v-gpu.tar"

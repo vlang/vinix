@@ -1236,7 +1236,7 @@ if [ "$GPU_DESKTOP_BUILT" -eq 1 ] && [ "$WITH_ASAHI_GPU" -eq 1 ]; then
     mkdir -p "$STAGING/usr/share/examples/gl-triangle"
     install -m755 "$SCRIPT_DIR/gl-triangle/run-m1-agx-smoke" \
         "$STAGING/usr/bin/run-m1-agx-smoke"
-    python3 "$SCRIPT_DIR/gl-triangle/stage.py" \
+    "$SCRIPT_DIR/gl-triangle/stage" \
         "$STAGING/usr/share/examples/gl-triangle" --arch arm64
 fi
 mkdir -p "$STAGING/sbin" "$STAGING/usr/bin" "$STAGING/usr/share/vinix" \
@@ -1796,8 +1796,17 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/gl-triangle/glutcore"
     "$SCRIPT_DIR/gl-triangle/legacycore"
     "$SCRIPT_DIR/gl-triangle/gl_v.h"
-    "$SCRIPT_DIR/gl-triangle/compile-v.py"
-    "$SCRIPT_DIR/gl-triangle/stage.py"
+    "$SCRIPT_DIR/gl-triangle/glhost"
+    "$SCRIPT_DIR/gl-triangle/hosttest"
+    "$SCRIPT_DIR/gl-triangle/fixturehost"
+    "$SCRIPT_DIR/gl-triangle/policyhost"
+    "$SCRIPT_DIR/tests/linuxkpi/hosttest"
+    "$SCRIPT_DIR/tests/qemu-core/fixturehost"
+    "$SCRIPT_DIR/tests/host-policy/policyhost"
+    "$SCRIPT_DIR/gl-triangle/compile-v"
+    "$SCRIPT_DIR/gl-triangle/stage"
+    "$SCRIPT_DIR/gl-triangle/compile-v.v"
+    "$SCRIPT_DIR/gl-triangle/stage.v"
     "$SCRIPT_DIR/tests/browsers/firefox-smoke.html"
     "$SCRIPT_DIR/tests/browsers/chromium-smoke.html"
     "$SCRIPT_DIR/tests/packages/x-window-check.py"

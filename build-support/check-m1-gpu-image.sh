@@ -119,7 +119,7 @@ if [ -n "$TRIANGLE_SOURCE" ]; then
     case "$TRIANGLE_SOURCE" in
         *.v)
             CHECKER_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-            python3 "$CHECKER_ROOT/gl-triangle/compile-v.py" "$EXPECTED_SOURCE" \
+            "$CHECKER_ROOT/gl-triangle/compile-v" "$EXPECTED_SOURCE" \
                 --source "$TRIANGLE_SOURCE" --arch arm64
             TRIANGLE_SOURCE="$EXPECTED_SOURCE"
             ;;

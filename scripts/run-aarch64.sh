@@ -1199,7 +1199,7 @@ if [ "$FAKE_G17" -eq 1 ]; then
         "$PACKAGE_RUNTIME_ROOT/usr/bin/"
     install -m755 "$ASAHI_STAGING/usr/lib/libvinix-agx-fault.so" \
         "$PACKAGE_RUNTIME_ROOT/usr/lib/"
-    python3 "$SCRIPT_DIR/gl-triangle/stage.py" \
+    "$SCRIPT_DIR/gl-triangle/stage" \
         "$PACKAGE_RUNTIME_ROOT/usr/share/examples/gl-triangle" --arch arm64
     install -m755 "$SCRIPT_DIR/gl-triangle/run-gl-triangle-agx" \
         "$PACKAGE_RUNTIME_ROOT/usr/bin/"

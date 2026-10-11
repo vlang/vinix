@@ -44,6 +44,7 @@ void glutSwapBuffers(void); void glutInit(int *, char **); void glutInitDisplayM
 #ifndef VINIX_GLUT_TRIANGLE
 static inline void vkg_shader_source(unsigned int shader, int count, void *strings, void *length) { glShaderSource(shader,count,(const GLchar *const *)strings,(const GLint *)length); }
 static inline EGLDisplay vkg_default_display(void) { return eglGetDisplay(EGL_DEFAULT_DISPLAY); }
+typedef const EGLint vkg_egl_int;
 static inline void *vkg_get_platform_display(void) { return (void *)eglGetProcAddress("eglGetPlatformDisplayEXT"); }
 #endif
 static inline int *vkg_errno_pointer(void) { return &errno; }
