@@ -1,6 +1,6 @@
 # Native compatibility tooling
 
-The eight commands below compile V directly. Their generators, compiler
+The commands below compile V directly. Their generators, compiler
 recipes, independent C controls, archive assembly and guest supervision have
 no Python runtime dependency.
 
@@ -13,6 +13,18 @@ tests/office-compat/run [--state-dir FRESH-DIR]
 tests/office-compat/run-vm --state-dir FRESH-DIR --kernel-dir DIR --fixtures DIR
 tests/net-random/run [--state-dir FRESH-DIR] [--original-reference FILE]
 build-support/n64/test-bridge [--build-dir DIR] [--archive FILE] [--rom FILE]
+build-support/security-tools/compile-v-core {mac|sandbox|audit} OUTPUT [--arch arm64|amd64] [-d DEFINE]
+build-support/security-tools/stage --arch aarch64|x86_64 --staging DIR [--cc COMPILER]
+build-support/storage-tools/stage --arch aarch64|x86_64 --staging DIR [--cc COMPILER]
+build-support/xorg-server/compile-v-host {winehost|xinputcore} OUTPUT [--arch arm64|amd64] [--no-main]
+tests/storage-volumes/host
+tests/storage-volumes/run [--arch aarch64|amd64] [--state-dir FRESH-DIR]
+tests/x11-input/run [--baseline ORIGINAL-C] [--state-dir FRESH-DIR]
+tests/x11-input/run-vm --arch aarch64|x86_64 --kernel-dir DIR --state-dir FRESH-DIR
+tests/wine-host/run-vm --arch aarch64|x86_64 --kernel-dir DIR --state-dir FRESH-DIR
+tests/security-mac/host-run.sh [--source ORIGINAL-C] [--keep-dir FRESH-DIR]
+tests/application-sandbox/test-host.sh [--source ORIGINAL-C] [--keep-dir FRESH-DIR]
+tests/security-audit/collector-run.sh [--source ORIGINAL-C] [--keep-dir FRESH-DIR]
 ```
 
 Steam retains the original diagnostic declarations derived from its V imports,
@@ -67,3 +79,47 @@ are checked outside the checkout; the corresponding-source N64 front is also
 qualified from a copied source tree. Local evidence is under
 `/tmp/vinix-compat-*`. No Python was executed, fixture predicate weakened or
 language classification override added.
+
+Security and volume staging retain compiler precedence, target checks, strict
+static builds and ABI assertions. Both atomically publish executable files in
+the destination directory and retire failed temporary owners. The existing
+`storage-tools/stage.v` entry delegates to this implementation, including its
+health record size/offset checks. Security staging retains the supervised
+collector and mode-700 audit log directory, rejecting a final directory symlink.
+The older Python generator import interfaces remain for callers awaiting ports.
+
+All three security host commands retain the independent V fixtures, optional
+unchanged C controls, original ASan/UBSan flags, MAC variadic assembly, audit
+allocator guard and non-root denial. Commands, inputs and separate output
+streams remain available in retained evidence directories. X11 keeps its six
+frozen SHA-256 traces, separate C/V stream comparisons, FNV guest goldens and
+allocator-import rejection. Its raw keyboard settings now explicitly borrow
+stack storage for `tcsetattr`, avoiding an implicit `memdup` emitted by the
+current V compiler. Wine's guest entry is V; the original protocol fixture
+remains unchanged. Both X11 suites build and pass in actual ARM and x86 guests.
+
+The volume host keeps the original fifteen V templates and unchanged volume
+assertions, adding the production health dependency and independent health
+access/fault checks. Its guest keeps the original C fixture, sparse 16 MiB
+disk, partition layout, physical sentinels and complete-line verdict regex.
+It kills QEMU directly with SIGKILL before disk inspection. The real ARM guest
+passes all retention classes and physical sentinels. The prepared x86 kernel
+rejects the unchanged status ioctl with ENOTTY; its guest executable matches
+the original compiler recipe byte for byte. No assertion is relaxed.
+
+`check-security.v CONTROLLER PROFILE` retrieves immutable original fixtures
+with their relative header trees, compares both sanitizer output streams and
+checks every receipt input hash. `check-stage.v CONTROLLER` verifies twelve
+CLIs, invalid compilers/staging paths, workspace preservation and twelve failed
+stage-owner retirements. Run resource checks separately. `stage_test.v` checks
+atomic replacement/failure cleanup and actual disk bytes. `check-volume.v`
+checks partial/malformed verdicts, raw large/binary PTY output, power cuts,
+SIGINT, deadlines and 100 FD/PID retirements on each host profile.
+
+Fresh ARM, x86 and sanitizer controllers pass those host checks. Security and
+volume staging build both musl targets from committed production sources at
+`5e431bdcdfbfd46564a90841fcd401b473a87cad`. Concurrent volume CLI edits caused
+strict compiler errors during qualification; those edits were left untouched,
+and the successful builds use a copied source tree with a source-hash receipt.
+Evidence is under `/tmp/vinix-stage-clean-*`, `/tmp/vinix-security-*`,
+`/tmp/vinix-volume-*`, `/tmp/vinix-xinput-*` and `/tmp/vinix-wine-*`.

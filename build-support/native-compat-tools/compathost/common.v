@@ -59,6 +59,18 @@ fn command_checked(args []string, family string) !int {
 		'office-guest' { return office_guest(args)! }
 		'net-random' { return random_command(args)! }
 		'n64-bridge' { return n64_bridge(args)! }
+		'security-compile' { return security_compile(args)! }
+		'x11-compile' { return x11_compile(args)! }
+		'security-stage' { return stage_command(args, true)! }
+		'volume-stage' { return stage_command(args, false)! }
+		'volume-host' { return volume_host(args)! }
+		'volume-guest' { return volume_guest(args)! }
+		'xinput-test' { return xinput_test(args)! }
+		'xinput-guest' { return x11_guest(args, false)! }
+		'wine-guest' { return x11_guest(args, true)! }
+		'mac-host' { return security_host(args, 'mac')! }
+		'sandbox-host' { return security_host(args, 'sandbox')! }
+		'audit-host' { return security_host(args, 'audit')! }
 		else { return error_with_code('Unknown compatibility command', 2) }
 	}
 }

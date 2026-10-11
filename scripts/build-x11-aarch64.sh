@@ -519,7 +519,7 @@ install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/s
 # keyboard through the console. Translate both into XTEST events rather than
 # importing Linux's evdev/udev input stack just to run X11 applications.
 echo "  Building Vinix X11 input bridge..."
-python3 "$SCRIPT_DIR/build-support/xorg-server/compile-v-host.py" xinputcore \
+"$SCRIPT_DIR/build-support/xorg-server/compile-v-host" xinputcore \
     "$BUILD_DIR/vinix-xinput-core.c" --arch arm64
 $CC -std=gnu11 -O2 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
     -ffreestanding -fno-builtin -fwrapv -fno-strict-aliasing \
@@ -535,7 +535,7 @@ $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
 # companion owns that private X server and translates the compositor's scoped
 # input records into XTEST events; it never opens the physical input devices.
 echo "  Building Vinix embedded Wine host..."
-python3 "$SCRIPT_DIR/build-support/xorg-server/compile-v-host.py" winehost \
+"$SCRIPT_DIR/build-support/xorg-server/compile-v-host" winehost \
     "$BUILD_DIR/vinix-wine-host-core.c" --arch arm64
 $CC -O2 -Wall -Wextra -Werror -D__vinix__ -I"$SYSROOT/usr/include" \
     -I"$SCRIPT_DIR/build-support/xorg-server" \

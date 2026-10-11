@@ -53,7 +53,7 @@ python3 tests/kernel-gaps/run.py --source tests/security-audit/collectorguestfix
 `--interval-ms` accepts 10 through 60000. `--log` must be an absolute secure path;
 `--source` selects a snapshot source for controlled diagnostics and still
 requires authorization to read the canonical kernel audit endpoint. The helper
-`build-support/security-tools/stage.py --arch aarch64 --staging /path/to/root`
+`build-support/security-tools/stage --arch aarch64 --staging /path/to/root`
 generates the native V cores and packages a static collector and launcher
 using the target musl compiler. V bindings use the target libc stat and signal
 layouts and call its syscall ABI directly. Both userland and desktop image

@@ -47,7 +47,7 @@ const desktop_source_paths = [
 	'build-support/xorg-server/startx',
 	'build-support/xorg-server/winehost',
 	'build-support/xorg-server/wine-host-v-abi.h',
-	'build-support/xorg-server/compile-v-host.py',
+	'build-support/xorg-server/compile-v-host',
 	'build-support/xorg-server/xinputcore',
 	'build-support/xorg-server/xinput_abi.h',
 	'build-support/xorg-server/build-wine-host.sh',

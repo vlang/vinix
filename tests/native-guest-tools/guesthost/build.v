@@ -127,6 +127,10 @@ pub fn launch(init string, archive string, state string, kernel_dir string, arch
 	return launch_at(init, archive, state, kernel_dir, arch, no_network, root())!
 }
 
+pub fn launch_from(init string, archive string, state string, kernel_dir string, arch string, no_network bool, runner_root string) !Launch {
+	return launch_at(init, archive, state, kernel_dir, arch, no_network, resolve(runner_root)!)!
+}
+
 fn launch_at(_init string, archive string, state string, kernel_dir string, arch string, no_network bool, repo string) !Launch {
 	mut env := policyhost.environment()
 	kernel := kernel_dir + '/bin/vinix'

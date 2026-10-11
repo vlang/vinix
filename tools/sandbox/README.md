@@ -11,7 +11,7 @@ The native V implementation calls the target libc syscall ABI directly and
 has only libc runtime dependencies. Stage it with the target Linux ABI compiler:
 
 ```sh
-python3 build-support/security-tools/stage.py --arch x86_64 \
+build-support/security-tools/stage --arch x86_64 \
   --staging /path/to/root --cc x86_64-linux-musl-gcc
 ```
 

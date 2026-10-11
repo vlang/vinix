@@ -122,15 +122,14 @@ The first boot must emit the monitor qualification marker. Host fault, reset,
 warning/recovery and 200-sample coverage is in
 [the native V monitor suite](../storage-monitor/README.md).
 
-The older block-volume and controller qualification commands below remain
-listed as historical tooling; the saved-plan checks above use V throughout.
+The block-volume host and guest commands below also use native V controllers.
 
 Run the unchanged production volume, metrics and security code with mocked
 host allocation/I/O boundaries:
 
 ```sh
-V=/path/to/v python3 tests/storage-volumes/host.py
-VINIX_HOST_SANITIZE=1 V=/path/to/v python3 tests/storage-volumes/host.py
+V=/path/to/v tests/storage-volumes/host
+VINIX_HOST_SANITIZE=1 V=/path/to/v tests/storage-volumes/host
 V=/path/to/v python3 tests/block-storage/run.py
 V=/path/to/v python3 tests/mounted-disk-policy/host.py
 ```
@@ -140,17 +139,25 @@ fixtures. No qualification ioctl or fault-enabled kernel is required:
 
 ```sh
 VINIX_KERNEL_DIR=/path/to/arm-worktree/kernel V=/path/to/v \
-  python3 tests/storage-volumes/run.py --arch aarch64
+  tests/storage-volumes/run --arch aarch64
 VINIX_AMD64_KERNEL=/path/to/x86-worktree/kernel/bin/vinix V=/path/to/v \
-  python3 tests/storage-volumes/run.py --arch amd64
+  tests/storage-volumes/run --arch amd64
 ```
 
-The ARM runner uses the normal boot/package-store SDK environment documented
-by `scripts/run-aarch64.sh`; set `VINIX_AARCH64_SYSROOT` for the static compiler.
+The ARM runner uses the existing musl SDK; set `VINIX_AARCH64_SYSROOT` for the
+static compiler. Both architectures snapshot the requested kernel and directly
+own QEMU with private ISO, firmware variables and serial log.
 AMD64 needs `x86_64-linux-musl-gcc`, QEMU and Limine/OVMF. `--state-dir` requires
-an empty directory and preserves the generated initramfs and 16 MiB disk.
+a fresh directory and preserves the generated initramfs and 16 MiB disk.
 `VINIX_QEMU_TIMEOUT` defaults to 300 seconds. The runner never selects a host
 physical device; it creates and attaches only its disposable disk.
+`--kernel-dir` selects either architecture's kernel directory; `--build-only`
+produces the fixture, utility, archive and disk without booting. The native
+supervisor kills QEMU with SIGKILL before checking sentinels, preserving the
+power-cut contract. The host command retains artifacts in a fresh directory
+selected by `VINIX_VOLUME_HOST_DIR`. Its original volume assertions remain
+unchanged, and the production health dispatcher now receives an independent
+host device and access/output-fault tests.
 
 The guest verifies actual physical translation with guard sectors, geometry,
 read-only opens, rejection of overlap/shrink/overflow, management privilege,

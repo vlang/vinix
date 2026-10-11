@@ -82,20 +82,21 @@ pub fn native_xtest(display voidptr) i32 {
 pub fn native_open_device(path &char) i32 { return C.open(path, C.O_RDONLY | C.O_NONBLOCK) }
 @[export: 'vxi_raw_keyboard']
 pub fn native_raw_keyboard(fd i32) i32 {
-    unsafe {
-        if fd < 0 { return 0 }
-        if C.tcgetattr(fd, &saved_termios) == 0 {
-            mut raw := saved_termios
-            raw.c_iflag = usize(raw.c_iflag) & ~usize(C.BRKINT | C.ICRNL | C.INPCK | C.ISTRIP | C.IXON)
-            raw.c_oflag = usize(raw.c_oflag) & ~usize(C.OPOST)
-            raw.c_cflag = usize(raw.c_cflag) | usize(C.CS8)
-            raw.c_lflag = usize(raw.c_lflag) & ~usize(C.ECHO | C.ICANON | C.IEXTEN | C.ISIG)
+    if fd < 0 { return 0 }
+    if C.tcgetattr(fd, &saved_termios) == 0 {
+        mut raw := saved_termios
+        raw.c_iflag = usize(raw.c_iflag) & ~usize(C.BRKINT | C.ICRNL | C.INPCK | C.ISTRIP | C.IXON)
+        raw.c_oflag = usize(raw.c_oflag) & ~usize(C.OPOST)
+        raw.c_cflag = usize(raw.c_cflag) | usize(C.CS8)
+        raw.c_lflag = usize(raw.c_lflag) & ~usize(C.ECHO | C.ICANON | C.IEXTEN | C.ISIG)
+        unsafe {
             raw.c_cc[C.VMIN] = 0
             raw.c_cc[C.VTIME] = 0
-            if C.tcsetattr(fd, C.TCSANOW, &raw) == 0 { restore_termios = 1 }
         }
-        return restore_termios
+        // tcsetattr consumes this stack value before returning.
+        if C.tcsetattr(fd, C.TCSANOW, unsafe { &raw }) == 0 { restore_termios = 1 }
     }
+    return restore_termios
 }
 @[export: 'vxi_restore_keyboard']
 pub fn native_restore_keyboard(fd i32) { unsafe { if restore_termios != 0 { C.tcsetattr(fd, C.TCSANOW, &saved_termios) } } }

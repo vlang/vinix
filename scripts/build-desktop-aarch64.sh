@@ -1332,7 +1332,7 @@ done
 # package/Firefox launchers and policy files can be installed directly from
 # source.
 # Refresh security utilities even with cached staging or a compact root.
-python3 "$SCRIPT_DIR/build-support/security-tools/stage.py" --arch aarch64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/security-tools/stage" --arch aarch64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/storage-tools/stage.v" --arch aarch64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
@@ -1765,7 +1765,7 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/xorg-server/startx"
     "$SCRIPT_DIR/build-support/xorg-server/winehost"
     "$SCRIPT_DIR/build-support/xorg-server/wine-host-v-abi.h"
-    "$SCRIPT_DIR/build-support/xorg-server/compile-v-host.py"
+    "$SCRIPT_DIR/build-support/xorg-server/compile-v-host"
     "$SCRIPT_DIR/build-support/xorg-server/xinputcore"
     "$SCRIPT_DIR/build-support/xorg-server/xinput_abi.h"
     "$SCRIPT_DIR/build-support/compile-v-module.py"

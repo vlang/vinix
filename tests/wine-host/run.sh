@@ -16,7 +16,7 @@ fi
 [ -n "$headers" ] || { echo 'Wine host: X11/XTest/Xdamage headers required' >&2; exit 1; }
 mkdir "$work/include"
 ln -s "$headers/X11" "$work/include/X11"
-python3 "$root/build-support/xorg-server/compile-v-host.py" winehost "$work/core.c" --no-main
+"$root/build-support/xorg-server/compile-v-host" winehost "$work/core.c" --no-main
 link_flags='-Wl,--gc-sections'
 if [ "$(uname -s)" = Darwin ]; then
     link_flags='-Wl,-undefined,dynamic_lookup'

@@ -10,9 +10,13 @@ userland=${3:-$root/build-$arch-userland/staging}
 binary=$x11/usr/bin/vinix-wine-host
 header=$root/build-support/xorg-server/wine-host-v-abi.h
 core=$root/build-support/xorg-server/winehost/core.v
-generator=$root/build-support/xorg-server/compile-v-host.py
+generator=$root/build-support/xorg-server/compile-v-host
 if [ -x "$binary" ] && [ "$binary" -nt "$header" ] &&
-   [ "$binary" -nt "$core" ] && [ "$binary" -nt "$root/build-support/xorg-server/winehost/native.v" ] && [ "$binary" -nt "$generator" ]; then
+   [ "$binary" -nt "$core" ] && [ "$binary" -nt "$root/build-support/xorg-server/winehost/native.v" ] &&
+   [ "$binary" -nt "$generator" ] &&
+   [ "$binary" -nt "$root/build-support/native-compat-tools/main.v" ] &&
+   [ "$binary" -nt "$root/build-support/native-compat-tools/compathost/common.v" ] &&
+   [ "$binary" -nt "$root/build-support/native-compat-tools/compathost/project.v" ]; then
     exit 0
 fi
 triple=$arch-linux-musl
@@ -24,7 +28,7 @@ generated=$temp.core.c
 trap 'rm -f "$temp" "$generated"' EXIT HUP INT TERM
 v_arch=arm64
 [ "$arch" != x86_64 ] && [ "$arch" != amd64 ] || v_arch=amd64
-python3 "$generator" winehost "$generated" --arch "$v_arch"
+"$generator" winehost "$generated" --arch "$v_arch"
 echo "==> Updating the $arch embedded X11 clipboard bridge..."
 "$clang" --target="$triple" --sysroot="$sysroot" --gcc-install-dir="$gcc" \
     -static-libgcc -O2 -Wall -Wextra -Werror -D__vinix__ -I"$sysroot/usr/include" \
