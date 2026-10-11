@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `dc893c8b27cf9db79a977a897aa41a1459c583fa`,
-Linguist 7.27.0 reports **Python 3.48%** (257 files, 1,339,032 bytes) and
-**V 78.76%** (3,070 files, 30,343,368 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `9b5e25ee1d2ea80c0a5424785981933b03300fa9`,
+Linguist 7.27.0 reports **Python 3.39%** (251 files, 1,309,323 bytes) and
+**V 78.89%** (3,097 files, 30,480,537 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,867,253 Python bytes**. All remaining
-1,339,032 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,896,962 Python bytes**. All remaining
+1,309,323 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 56 stages below remove **272 Python files / 1,022,001 original bytes** and
+The 57 stages below remove **278 Python files / 1,051,710 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -87,6 +87,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Glibc environment, Lavapipe, WAKE_OP, mapping and Steam guest controllers | `tests/dota2/nativehost`, five native commands and independent host checks | 26,828 / 615 | `eff690f6` |
 | Game capture, screenshot, export diagnostics and Venus QEMU preparation | `tests/dota2/nativehost`, native PTY/NBD/QMP owners, screenshot encoder and QEMU patcher | 40,602 / 1,030 | `7a27a254` |
 | Verified-root and verified-boot builders, pinned loader, host tests and guest controllers | `tools/verified-boot/bundlehost`, `tests/verified-boot/verifiedhost`, eight native commands and sparse-image helper | 55,350 / 1,199 | `dc893c8b` |
+| Minecraft fetching, Microsoft sign-in, LWJGL JAR patching and guest staging | `build-support/minecraft/minecraftnative`, `lwjglpatch`, four native commands and four independent host suites | 29,709 / 824 | `9b5e25ee` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -719,9 +720,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 56 stages.
+or hidden in these 57 stages.
 
-The next eighteen stages remove 120 Python files / 523,658 original bytes.
+The next nineteen stages remove 126 Python files / 553,367 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -734,10 +735,12 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **150 Python files / 657,935 original bytes**. Temporary qualification
-caches were cleared during shared-machine disk cleanup; final follow-on
-checks and inputs are retained under
-`/Users/alex/.cache/vinix-python-zero-process-20261011`.
+translates **156 Python files / 687,644 original bytes**. Temporary qualification
+caches were cleared during shared-machine disk cleanup, and later RAM volumes
+detached. Their local receipts are no longer available. Fresh Minecraft checks
+and inputs are retained on disk under
+`/Users/alex/.cache/vinix-minecraft-native-20261011`; each stage's qualification
+document records its results and retention limits.
 
 ## Earlier completed stages
 
@@ -2844,3 +2847,14 @@ temporary firmware trust and rejection of unsigned/modified loaders under
 Secure Boot. Native V edits private EDK II templates. ARM firmware enrollment
 and optional Linux veritysetup compatibility remain outside this qualification.
 No Python was run and no kernel rebuilt. See [qualification and limits](../tests/verified-boot/native-tools.md).
+
+The Minecraft stage retires six Python files, including the extensionless
+sign-in command, and packages static native fetcher/sign-in executables. ARM,
+Rosetta x86 and ASan/UBSan host suites and actual curl workflows pass, including
+six signal/descendant retirement checks. Both static guest builds and the
+existing launcher/package-manager regressions pass. Real LWJGL 3.3.3 and 3.4.1
+JARs pass independent decoded-payload and instruction checks. Actual ARM and
+x86 QEMU guests run native curl and pass full/cache/index-only/checksum
+preservation plus sign-in preflight with frozen production kernels. No Python
+is run or kernel rebuilt; live account sign-in and game rendering are not
+qualified. See [qualification and limits](../build-support/minecraft/native-tools.md).

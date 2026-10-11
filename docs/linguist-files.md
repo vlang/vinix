@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `dc893c8b27cf9db79a977a897aa41a1459c583fa`,
+at source commit `9b5e25ee1d2ea80c0a5424785981933b03300fa9`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 567 | 2,365,422 | 6.14% |
-| Python | 257 | 1,339,032 | 3.48% |
-| Shell | 572 | 1,360,019 | 3.53% |
+| C | 568 | 2,366,313 | 6.12% |
+| Python | 251 | 1,309,323 | 3.39% |
+| Shell | 580 | 1,361,475 | 3.52% |
 
-All `.v` files are classified as V. The resulting V share is 78.76%, with no
+All `.v` files are classified as V. The resulting V share is 78.89%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,339,032 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,309,323 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev dc893c8b27cf9db79a977a897aa41a1459c583fa --breakdown --json
+github-linguist --rev 9b5e25ee1d2ea80c0a5424785981933b03300fa9 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -78,6 +78,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/dota2/qemubuild/stat_abi.h` | 387 |
 | `build-support/init-aarch64/syscall_abi.h` | 613 |
 | `build-support/ios/cxx-abi.h` | 456 |
+| `build-support/minecraft/minecraftnative/spawn_abi.h` | 891 |
 | `build-support/n64-homebrew/paddlecore/freestanding/inttypes.h` | 124 |
 | `build-support/n64-homebrew/paddlecore/freestanding/stdio.h` | 298 |
 | `build-support/n64-homebrew/paddlecore/native-abi.h` | 1,157 |
@@ -664,10 +665,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ios/build-cxx.py` | 6,554 |
 | `build-support/ios/generate-cxx-symbols.py` | 1,647 |
 | `build-support/ios/stage-gles.py` | 2,688 |
-| `build-support/minecraft/_native_fetcher.py` | 6,158 |
-| `build-support/minecraft/fetch-minecraft.py` | 5,843 |
-| `build-support/minecraft/minecraft-login` | 7,459 |
-| `build-support/minecraft/patch-lwjgl-aarch64.py` | 4,179 |
 | `build-support/musl/stage.py` | 4,754 |
 | `build-support/native_host.py` | 6,504 |
 | `build-support/opengothic/build.py` | 1,979 |
@@ -864,8 +861,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/run_vm.py` | 1,671 |
 | `tests/memory/run-runtime.py` | 7,331 |
 | `tests/memory/test-big-io.py` | 6,072 |
-| `tests/minecraft/test-fetcher.py` | 4,085 |
-| `tests/minecraft/test-patch-lwjgl.py` | 1,985 |
 | `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/opengothic/_native.py` | 3,643 |
 | `tests/opengothic/kekvm-control.py` | 4,448 |
@@ -925,8 +920,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/libreoffice/run-libreoffice` | 6,618 |
 | `build-support/link-duplicate-files` | 171 |
 | `build-support/make-docker-image` | 168 |
+| `build-support/minecraft/fetch-minecraft` | 217 |
+| `build-support/minecraft/minecraft-login` | 217 |
 | `build-support/minecraft/minecraft-xinitrc` | 47 |
+| `build-support/minecraft/patch-lwjgl-aarch64` | 221 |
 | `build-support/minecraft/run-minecraft` | 10,431 |
+| `build-support/minecraft/stage` | 207 |
 | `build-support/n64-homebrew/build` | 231 |
 | `build-support/n64/build` | 209 |
 | `build-support/n64/test-bridge` | 161 |
@@ -968,7 +967,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/vinix-files-sync` | 2,361 |
 | `build-support/vinix-host-sync` | 4,410 |
 | `build-support/vinix-persist-packages` | 5,219 |
-| `build-support/vinix-pkg` | 44,364 |
+| `build-support/vinix-pkg` | 44,282 |
 | `build-support/vinix-pkg-wrapper` | 616 |
 | `build-support/vinix-version-check` | 1,591 |
 | `build-support/virglrenderer/build-host.sh` | 3,251 |
@@ -1015,7 +1014,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 93,384 |
+| `scripts/build-desktop-aarch64.sh` | 93,426 |
 | `scripts/build-desktop-amd64.sh` | 14,973 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
@@ -1032,10 +1031,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-limine-aarch64.sh` | 4,779 |
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
 | `scripts/build-macos-installer.sh` | 3,383 |
-| `scripts/build-minecraft-aarch64.sh` | 7,932 |
+| `scripts/build-minecraft-aarch64.sh` | 7,983 |
 | `scripts/build-n64-aarch64.sh` | 2,885 |
 | `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
-| `scripts/build-network-tools-aarch64.sh` | 8,941 |
+| `scripts/build-network-tools-aarch64.sh` | 8,755 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
 | `scripts/build-ps1-aarch64.sh` | 3,148 |
 | `scripts/build-ps2-aarch64.sh` | 2,879 |
@@ -1255,7 +1254,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/memory/run-pagetable` | 170 |
 | `tests/memory/run-runtime.sh` | 177 |
 | `tests/minecraft/smoke.sh` | 939 |
+| `tests/minecraft/test-fetcher` | 206 |
 | `tests/minecraft/test-launcher.sh` | 8,276 |
+| `tests/minecraft/test-login` | 204 |
+| `tests/minecraft/test-native-cli` | 209 |
+| `tests/minecraft/test-patch-lwjgl` | 210 |
 | `tests/mount-policy/run.sh` | 178 |
 | `tests/mount-policy/run_vm` | 214 |
 | `tests/mounted-disk-policy/check-generated` | 178 |
@@ -1297,7 +1300,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/qemu-persistence-guest.sh` | 951 |
 | `tests/packages/sublime-smoke.sh` | 2,670 |
 | `tests/packages/test-qemu-persistence.sh` | 4,248 |
-| `tests/packages/test-vinix-pkg.sh` | 24,414 |
+| `tests/packages/test-vinix-pkg.sh` | 24,354 |
 | `tests/pagecache/check-generated` | 146 |
 | `tests/pagecache/run-guest` | 182 |
 | `tests/pagecache/run.sh` | 3,296 |
