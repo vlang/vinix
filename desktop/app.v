@@ -95,6 +95,8 @@ const available_apps = [
 		width: 700
 		height: 400
 		process_name: 'vinix-files'
+		polling: true
+		poll_interval_ms: 100
 		keyboard: true
 		pointer: true
 		open: open_files_with_context_menu
