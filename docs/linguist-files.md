@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `541134e89028f6e24dc51b53a048567fe77fe074`,
+at source commit `45a0f271b6dd2f47c9b3759c34d7d74d8cb84a9c`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 570 | 2,367,492 | 6.10% |
-| Python | 217 | 969,145 | 2.50% |
-| Shell | 613 | 1,366,249 | 3.52% |
+| C | 570 | 2,367,492 | 6.09% |
+| Python | 215 | 960,941 | 2.47% |
+| Shell | 614 | 1,365,287 | 3.51% |
 
-All `.v` files are classified as V. The resulting V share is 79.85%, with no
+All `.v` files are classified as V. The resulting V share is 79.89%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 969,145 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 960,941 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 541134e89028f6e24dc51b53a048567fe77fe074 --breakdown --json
+github-linguist --rev 45a0f271b6dd2f47c9b3759c34d7d74d8cb84a9c --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -657,7 +657,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/debian-root.py` | 4,231 |
 | `build-support/desktop-build-key.py` | 4,588 |
 | `build-support/dhewm3/build.py` | 1,738 |
-| `build-support/dictionary/prepare.py` | 5,197 |
 | `build-support/dota2/_vulkan_native.py` | 12,992 |
 | `build-support/dota2/compile-v-compat.py` | 393 |
 | `build-support/dota2/mesa-build.py` | 6,294 |
@@ -688,7 +687,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/genfont.py` | 4,935 |
 | `desktop/tools/input.py` | 6,196 |
 | `desktop/tools/test-gpu-present.py` | 8,956 |
-| `desktop/tools/tests/test_dictionary_data.py` | 3,007 |
 | `desktop/tools/tests/test_font_data.py` | 7,106 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `kernel/linuxkpi/audit.py` | 7,718 |
@@ -872,6 +870,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/chromium/run-chromium` | 8,032 |
 | `build-support/compile-v-module` | 168 |
 | `build-support/dhewm3/run-dhewm3` | 571 |
+| `build-support/dictionary/prepare` | 124 |
 | `build-support/docker/vinix-dockerd` | 1,499 |
 | `build-support/doom/run-doom` | 656 |
 | `build-support/dota2/run-dota2` | 9,142 |
@@ -963,7 +962,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/test-battery.sh` | 673 |
 | `desktop/tools/test-clipboard.sh` | 1,356 |
 | `desktop/tools/test-execinfo.sh` | 834 |
-| `desktop/tools/test-new-utilities.sh` | 3,701 |
+| `desktop/tools/test-new-utilities.sh` | 2,637 |
 | `desktop/tools/test-settings.sh` | 5,219 |
 | `desktop/tools/test-utilities.sh` | 10,608 |
 | `desktop/tools/test-utility-parity.sh` | 2,858 |
@@ -987,8 +986,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 93,761 |
-| `scripts/build-desktop-amd64.sh` | 14,951 |
+| `scripts/build-desktop-aarch64.sh` | 93,750 |
+| `scripts/build-desktop-amd64.sh` | 14,940 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |

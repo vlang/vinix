@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `541134e89028f6e24dc51b53a048567fe77fe074`,
-Linguist 7.27.0 reports **Python 2.50%** (217 files, 969,145 bytes) and
-**V 79.85%** (3,193 files, 31,002,096 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `45a0f271b6dd2f47c9b3759c34d7d74d8cb84a9c`,
+Linguist 7.27.0 reports **Python 2.47%** (215 files, 960,941 bytes) and
+**V 79.89%** (3,203 files, 31,030,497 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **4,237,140 Python bytes**. All remaining
-969,145 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **4,245,344 Python bytes**. All remaining
+960,941 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 61 stages below remove **312 Python files / 1,391,888 original bytes** and
+The 62 stages below remove **314 Python files / 1,400,092 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -92,6 +92,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | GL source generation, guest staging, sanitizer and Mesa guest runners | `gl-triangle/glhost`, `tests/gl-triangle/glvm`, four native fronts and the native AGX PTY owner | 11,449 / 143 | `6012b9d3` |
 | Desktop source/presenter staging, loopback package service and clipboard host/VM tooling | `stagehost`, `gpustage`, `packageserver`, `hostclipboard`, `clipboardvm`, native command owners and independent fixtures | 32,617 / 783 | `5b9e309d` |
 | Desktop performance current/saved runners, native fixtures and saved v6 validation drivers | `perfrunner`, `perfconsole`, `runnerfixture`, `savedworkflow` and native saved entry points | 146,185 / 3,224 | `541134e8` |
+| Offline Dictionary preparation, native fixtures and utility source-processing blocks | `dictionarycore`, `dictionaryfixture`, `utilitysource`, native preparer and desktop cache inputs | 8,204 / 176 | `45a0f271` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -724,9 +725,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 61 stages.
+or hidden in these 62 stages.
 
-The next twenty-three stages remove 160 Python files / 893,545 original bytes.
+The next twenty-four stages remove 162 Python files / 901,749 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -739,7 +740,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **190 Python files / 1,027,822 original bytes**. Earlier qualification
+translates **192 Python files / 1,036,026 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -2911,3 +2912,16 @@ materialized native entry-point builds pass. The unchanged production sampler
 cross-builds to static AArch64 ELF. Captured guest workloads/logs stay unchanged;
 no Python, fresh kernel build or fresh QEMU interaction is used. See
 [desktop-performance qualification](../tests/desktop-perf/native-tools.md).
+
+The Dictionary stage retires two Python files and replaces two embedded Python
+source-processing blocks with V. Eighteen cold builds, original data fixtures,
+utility-source and cache invalidation suites pass on ARM, Rosetta x86 and
+ASan/UBSan. Every real archive conversion matches the existing 147,306-headword
+lexicon and license exactly. Native fetch fixtures cover failure/output bounds,
+valid publication, interrupts and descendant retirement; atomic-write descriptors
+stay flat. The public preparer passes. The broader utility workflow reports
+421 passed / 21 failed / 442 total model tests; an independent reconstruction
+of the frozen procedure produces the same source and reproduces the same failures.
+Assertions remain unchanged, and later memory/IPC stages are not claimed.
+Presenter option parsing is fixed in `e8eb94f3`. No Python or fresh kernel/QEMU
+run is used. See [Dictionary qualification](../build-support/dictionary/native-tools.md).
