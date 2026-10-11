@@ -27,7 +27,7 @@ if [ "${VINIX_MINECRAFT_ASSETS:-full}" = none ]; then
     FETCH_ARGS+=(--no-assets)
 fi
 
-for tool in curl python3 tar; do
+for tool in curl tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1
@@ -89,7 +89,7 @@ echo "=== downloading Minecraft: Java Edition ==="
 # wipes on every run. Half a gigabyte of assets is not worth re-downloading to
 # rebuild the layer around them.
 GAME_CACHE="$BUILD_DIR/game-cache"
-python3 "$SCRIPT_DIR/build-support/minecraft/fetch-minecraft.py" \
+"$SCRIPT_DIR/build-support/minecraft/fetch-minecraft" \
     --version "$MINECRAFT_VERSION" \
     --staging "$GAME_CACHE" \
     --game-root "$GAME_ROOT" \
@@ -97,7 +97,7 @@ python3 "$SCRIPT_DIR/build-support/minecraft/fetch-minecraft.py" \
 # LWJGL's bundled libffi contains one fortified glibc call that gcompat cannot
 # bind. Rewrite that call to its equivalent musl-supported form while the
 # native is still inside its downloaded JAR.
-python3 "$SCRIPT_DIR/build-support/minecraft/patch-lwjgl-aarch64.py" \
+"$SCRIPT_DIR/build-support/minecraft/patch-lwjgl-aarch64" \
     "$GAME_CACHE$GAME_ROOT"
 mkdir -p "$STAGING$(dirname "$GAME_ROOT")"
 cp -a "$GAME_CACHE$GAME_ROOT" "$STAGING$(dirname "$GAME_ROOT")/"
@@ -105,7 +105,8 @@ cp -a "$GAME_CACHE$GAME_ROOT" "$STAGING$(dirname "$GAME_ROOT")/"
 mkdir -p "$STAGING/usr/bin" "$STAGING/usr/share/vinix" "$STAGING/root"
 install -m755 "$SCRIPT_DIR/build-support/minecraft/run-minecraft" \
     "$STAGING/usr/bin/minecraft"
-install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-login" \
+"$SCRIPT_DIR/build-support/minecraft/stage" --arch aarch64 --staging "$STAGING"
+install -m755 "$STAGING/usr/libexec/vinix-minecraft/minecraft-login" \
     "$STAGING/usr/bin/minecraft-login"
 install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-xinitrc" \
     "$STAGING/usr/share/vinix/minecraft-xinitrc"

@@ -1,5 +1,10 @@
 # Minecraft fetcher
 
+This describes the historical import bridge. Maintained commands now use
+[`minecraftnative` and direct native entrypoints](../native-tools.md); the
+Python entry and library adapter described below have been retired. This
+directory preserves the earlier policy implementation and qualification history.
+
 V owns retry policy, streamed SHA-1, cache decisions and publication, Mojang
 rules, Java compatibility selection, Maven coordinates, library/native
 selection, asset deduplication, launch descriptions and complete staging.

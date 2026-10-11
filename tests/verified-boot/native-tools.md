@@ -117,7 +117,12 @@ manifests are under `/Volumes/VinixPythonDotaScratch/verified-runtime-arm`,
 `verified-runtime-x86-secure-3`, `verified-root-runtime-arm` and
 `verified-root-runtime-x86-secure`. Their raw serial/QEMU logs are actual
 guest evidence. Directories prefixed `verified-model-` or
-`verified-interrupt-` contain controlled-observer evidence only.
+`verified-interrupt-` contain controlled-observer evidence only. These scratch
+volumes subsequently detached on 2026-10-11, so those local receipts are no
+longer available. The recorded results above describe the completed checks;
+they do not imply the scratch artifacts still exist. Later Minecraft checks
+retain their fresh receipts on disk as described in
+[native-tools.md](../../build-support/minecraft/native-tools.md).
 
 Run the host checks with:
 

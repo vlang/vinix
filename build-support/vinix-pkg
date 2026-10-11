@@ -925,10 +925,9 @@ install_minecraft() {
 	materialize_gcompat_links
 
 	support=$(root_path /usr/libexec/vinix-minecraft)
-	python=${VINIX_PKG_PYTHON:-$(root_path /usr/bin/python3)}
-	fetcher=${VINIX_MINECRAFT_FETCHER:-$support/fetch-minecraft.py}
+	fetcher=${VINIX_MINECRAFT_FETCHER:-$support/fetch-minecraft}
 	for required in \
-		"$python" "$fetcher" "$support/run-minecraft" \
+		"$fetcher" "$support/run-minecraft" \
 		"$support/minecraft-login" "$support/minecraft-xinitrc"; do
 		if [ ! -f "$required" ]; then
 			echo "pkg: this image lacks Minecraft installer support: $required" >&2
@@ -945,7 +944,7 @@ install_minecraft() {
 	if [ "${VINIX_MINECRAFT_ASSETS:-full}" = none ]; then
 		set -- "$@" --no-assets
 	fi
-	"$python" "$@" || {
+	"$@" || {
 		fetch_status=$?
 		if out_of_space; then
 			report_out_of_space

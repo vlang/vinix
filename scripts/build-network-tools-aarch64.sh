@@ -18,7 +18,7 @@ STAGING="$BUILD_DIR/staging"
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine/v3.21}"
 ALPINE_ARCH="$VINIX_ARCH"
 
-for tool in clang curl ld.lld python3 tar; do
+for tool in clang curl ld.lld tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1
@@ -107,12 +107,9 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 # minecraft` downloads the official client and its large asset set only when a
 # user asks for it.
 mkdir -p "$STAGING/usr/libexec/vinix-minecraft"
-install -m755 "$SCRIPT_DIR/build-support/minecraft/fetch-minecraft.py" \
-    "$STAGING/usr/libexec/vinix-minecraft/fetch-minecraft.py"
+"$SCRIPT_DIR/build-support/minecraft/stage" --arch "$VINIX_ARCH" --staging "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/minecraft/run-minecraft" \
     "$STAGING/usr/libexec/vinix-minecraft/run-minecraft"
-install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-login" \
-    "$STAGING/usr/libexec/vinix-minecraft/minecraft-login"
 install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-xinitrc" \
     "$STAGING/usr/libexec/vinix-minecraft/minecraft-xinitrc"
 "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/java-cacerts-stage.v" \

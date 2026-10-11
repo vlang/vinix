@@ -232,7 +232,6 @@ run_pkg() {
 	VINIX_PKG_BSDTAR="${VINIX_PKG_BSDTAR:-$host_tar}" \
 	VINIX_PKG_SHA256SUM="${VINIX_PKG_SHA256SUM:-$work/bin/sha256sum}" \
 	VINIX_PKG_BUSYBOX= \
-	VINIX_PKG_PYTHON="$work/minecraft-tools/fetch-minecraft" \
 	VINIX_MINECRAFT_FETCHER="$work/minecraft-tools/fetch-minecraft" \
 	VINIX_JAVA_CACERTS_HELPER="${VINIX_JAVA_CACERTS_TOOL:-$repo/build-support/java-cacerts}" \
 	VINIX_TEST_MINECRAFT_FETCH_LOG="$work/minecraft-fetch.log" \

@@ -54,13 +54,11 @@ fn main() {
 		}
 		return
 	}
-	// The unported Minecraft caller still supplies its fetcher path to the
-	// interpreter slot. This fixture consumes that path without an interpreter.
 	if os.args.len < 2 {
 		eprintln('missing fixture arguments')
 		exit(2)
 	}
-	fetch(os.args[2..]) or {
+	fetch(os.args[1..]) or {
 		eprintln(err)
 		exit(1)
 	}
