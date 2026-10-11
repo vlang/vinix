@@ -162,7 +162,7 @@ dumps, JIT symbol registration and tracing of arbitrary applications remain
 separate checks. Remote writes respect guest page permissions; the fixture
 mutates writable stack data and restores it before execution.
 
-The application suite also attempts all categories and preserves missing
+The initial application suite also attempts all categories and preserves missing
 dependencies as unsupported, with a nonzero complete-suite exit. Test roots
 contain real Alpine 3.21 SQLite 3.48.0-r4 and BusyBox Extras 1.37.0-r14 payloads;
 their package URLs and SHA-256 hashes are retained. They were extracted for
@@ -198,6 +198,26 @@ These are disposable-guest execution/save/reopen checks; package transactions,
 persistent-disk reboot, GTK windows, updates and desktop integration remain
 separate acceptance requirements.
 
+The `package-install-*.json` and `package-upgrade-*.json` receipts qualify a
+real disk-backed CLI package lifecycle on both native architectures. The V
+stager retains unchanged signed Alpine v3.20/v3.21 repository indexes and APK
+archives. Inside Vinix, the existing `pkg` frontend invokes real APK with its
+default signature validation and installs SQLite 3.45.3 into an ext2 target
+without SQLite. The installed executable uses the unmodified musl package
+installed by APK; the boot root retains its prepared Vinix interpreter. The
+separate, unused GNU runtime probe in these receipts does not establish a
+glibc package result. SQLite commits saved data in WAL mode; a second cold
+QEMU boot checks the installed version, integrity and saved value, then
+`pkg update` and `pkg upgrade` replace it with SQLite 3.48.0 and newer libraries.
+`pkg remove sqlite` removes its executable and APK registration while retaining
+the database and base musl runtime. Both boots sync and unmount successfully.
+Input receipts verify that the install boot's final volume hash equals the
+upgrade boot's initial hash. `packages-lifecycle-*.json` and
+`build-driver-packages-*.json` preserve archive and executable/source hashes.
+These offline signed-repository transactions qualify this CLI workflow;
+network acquisition, interrupted upgrades, desktop package triggers, service
+installation and sandbox/portal runtimes remain separate acceptance checks.
+
 The host SQLite WAL/integrity/reopen and FFmpeg frame encode/probe checks pass.
 Those Darwin results validate workload predicates and report handling only.
 They are not Vinix application results. Host tests also verify that a missing
@@ -228,8 +248,8 @@ the qualification guest uses a privileged launcher. Unprivileged launches
 without administrator policy, other Java architectures, persistent package
 transactions and desktop integration remain unqualified.
 
-Outstanding dependencies include the browser/office/media and V
-packages, Go/Java on unqualified paths, D-Bus and a real portal backend,
+Outstanding dependencies include browser and V packages, desktop integration
+for the qualified office/media workloads, Go/Java on unqualified paths, D-Bus and a real portal backend,
 systemd/service-unit integration, Flatpak/Snap/FUSE and enforced Linux sandbox
 interfaces, and title-specific game assets, GPU/audio/input and vendor APIs.
 The [behavior matrix](linux-posix-compatibility.md) lists the broader limits.

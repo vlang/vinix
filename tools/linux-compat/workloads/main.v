@@ -9,7 +9,7 @@ import strconv
 import time
 
 const catalog = ['sqlite', 'media', 'office', 'chromium', 'firefox', 'go', 'java', 'v', 'server',
-	'runtime', 'debugger', 'portal', 'games']
+	'runtime', 'debugger', 'packages', 'portal', 'games']
 
 struct CommandResult {
 	argv              []string
@@ -49,6 +49,7 @@ struct Report {
 	commands                     []CommandResult
 	services                     []ServiceResult
 	debuggers                    []DebugResult
+	packages                     []PackageResult
 }
 
 struct Suite {
@@ -58,11 +59,13 @@ struct Suite {
 	install bool
 	runtime string
 	runtime_libc string = 'musl'
+	data_device string
 mut:
 	environment map[string]string
 	commands []CommandResult
 	services []ServiceResult
 	debuggers []DebugResult
+	packages []PackageResult
 }
 
 fn stop(mut child os.Process) {
@@ -326,6 +329,7 @@ fn (mut suite Suite) run(name string) ! {
 			expect(output.contains('LINUX RUNTIME PASS: atomics SIMD TLS') && output.contains('LINUX RUNTIME PASS: JIT page sizes') && output.contains('LINUX RUNTIME PASS: wide offsets time64') && output.contains('LINUX RUNTIME: PASS'), 'runtime predicates did not all pass')!
 		}
 		'debugger' { suite.debug_runtime()! }
+		'packages' { suite.package_lifecycle()! }
 		'portal' {
 			suite.execute('gdbus', ['call', '--session', '--dest', 'org.freedesktop.portal.Desktop',
 				'--object-path', '/org/freedesktop/portal/desktop', '--method',
@@ -401,7 +405,7 @@ fn main() {
 	mut values := map[string]string{}
 	for arg in os.args[1..] {
 		key := arg.all_before('=')
-		if key !in ['--work', '--cases', '--path', '--timeout', '--runtime-probe', '--runtime-libc', '--host', '--install'] || key in values {
+		if key !in ['--work', '--cases', '--path', '--timeout', '--runtime-probe', '--runtime-libc', '--data-device', '--host', '--install'] || key in values {
 			eprintln('Usage: workloads --work=FRESH-DIR [--cases=sqlite,media,...] [--path=native-aarch64|native-x86_64|translated-x86_64|translated-i386] [--timeout=SECONDS] [--runtime-probe=ELF] [--host] [--install]')
 			exit(2)
 		}
@@ -451,8 +455,8 @@ fn main() {
 		exit(2)
 	}
 	host := '--host' in values
-	if host && '--install' in values {
-		eprintln('--install is permitted only inside Vinix')
+	if host && ('--install' in values || 'packages' in cases) {
+		eprintln('installation is permitted only inside Vinix')
 		exit(2)
 	}
 	version := os.read_file('/proc/version') or { os.uname().sysname }
@@ -468,7 +472,7 @@ fn main() {
 		eprintln(err.msg())
 		exit(1)
 	}
-	mut suite := Suite{ work: os.real_path(work), path: path, timeout: timeout, install: '--install' in values, runtime: values['--runtime-probe'] or { '' }, runtime_libc: runtime_libc }
+	mut suite := Suite{ work: os.real_path(work), path: path, timeout: timeout, install: '--install' in values, runtime: values['--runtime-probe'] or { '' }, runtime_libc: runtime_libc, data_device: values['--data-device'] or { '' } }
 	mut verdicts := []Verdict{}
 	for name in cases {
 		suite.run(name) or {
@@ -485,7 +489,7 @@ fn main() {
 	} else {
 		''
 	}
-	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services, suite.debuggers}
+	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages}
 	os.write_file(suite.work + '/report.json', json2.encode(report, prettify: true) + '\n') or {
 		eprintln(err.msg())
 		exit(1)

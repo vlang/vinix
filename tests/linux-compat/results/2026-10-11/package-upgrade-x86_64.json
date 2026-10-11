@@ -1,0 +1,221 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "b78bd32ca7b20a852f02fac71974e3a71786aeaf1bfaae8a56e54d08796e99cf",
+    "runtime_probe_sha256": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+    "runtime_libc": "glibc",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "packages",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/bin/busybox",
+                "--install",
+                "-s",
+                "/bin"
+            ],
+            "executable_sha256": "aa1e1f4214ec2489ed373f3c5b92b7a7c665821a1decaa9685e5363886a93c7c",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/bin/busybox",
+                "chroot",
+                "/mnt/linux-compat-packages/root",
+                "/usr/bin/sqlite3",
+                "--version"
+            ],
+            "executable_sha256": "aa1e1f4214ec2489ed373f3c5b92b7a7c665821a1decaa9685e5363886a93c7c",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "3.45.3 2024-04-15 13:34:05 8653b758870e6ef0c98d46b3ace27849054af85da891eb121e9aaa537f1e8355 (64-bit)\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/bin/busybox",
+                "chroot",
+                "/mnt/linux-compat-packages/root",
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/data/saved.db",
+                "PRAGMA integrity_check; SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "aa1e1f4214ec2489ed373f3c5b92b7a7c665821a1decaa9685e5363886a93c7c",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "ok\n42\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/pkg",
+                "update"
+            ],
+            "executable_sha256": "b1050438fc5141516f049dbd5c37fa33d5b0c50be577e58606eb56377afbf571",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "v3.21.8-29-gcd665478780 [/usr/share/linux-compat-repos/v3.21]\nOK: 5547 distinct packages available\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/pkg",
+                "upgrade"
+            ],
+            "executable_sha256": "b1050438fc5141516f049dbd5c37fa33d5b0c50be577e58606eb56377afbf571",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "v3.21.8-29-gcd665478780 [/usr/share/linux-compat-repos/v3.21]\nOK: 5547 distinct packages available\n(1/5) Upgrading musl (1.2.5-r3 -> 1.2.5-r11)\n(2/5) Upgrading ncurses-terminfo-base (6.4_p20240420-r2 -> 6.5_p20241006-r3)\n(3/5) Upgrading libncursesw (6.4_p20240420-r2 -> 6.5_p20241006-r3)\n(4/5) Upgrading readline (8.2.10-r0 -> 8.2.13-r0)\n(5/5) Upgrading sqlite (3.45.3-r3 -> 3.48.0-r4)\nOK: 3 MiB in 5 packages\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/bin/busybox",
+                "chroot",
+                "/mnt/linux-compat-packages/root",
+                "/usr/bin/sqlite3",
+                "--version"
+            ],
+            "executable_sha256": "aa1e1f4214ec2489ed373f3c5b92b7a7c665821a1decaa9685e5363886a93c7c",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "3.48.0 2025-01-14 11:05:00 d2fe6b05f38d9d7cd78c5d252e99ac59f1aea071d669830c1ffe4e8966e84010 (64-bit)\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/bin/busybox",
+                "chroot",
+                "/mnt/linux-compat-packages/root",
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/data/saved.db",
+                "PRAGMA integrity_check; SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "aa1e1f4214ec2489ed373f3c5b92b7a7c665821a1decaa9685e5363886a93c7c",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "ok\n42\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/pkg",
+                "remove",
+                "sqlite"
+            ],
+            "executable_sha256": "b1050438fc5141516f049dbd5c37fa33d5b0c50be577e58606eb56377afbf571",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "pkg: refreshing Alpine repository indexes\nv3.21.8-29-gcd665478780 [/usr/share/linux-compat-repos/v3.21]\nOK: 5542 distinct packages available\n(1/4) Purging sqlite (3.48.0-r4)\n(2/4) Purging readline (8.2.13-r0)\n(3/4) Purging libncursesw (6.5_p20241006-r3)\n(4/4) Purging ncurses-terminfo-base (6.5_p20241006-r3)\nOK: 0 MiB in 1 packages\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/sbin/apk",
+                "--root",
+                "/mnt/linux-compat-packages/root",
+                "info"
+            ],
+            "executable_sha256": "311602dceb45e207993890f7c45ea934d3bd07794103f3b572f7f06ae67942b0",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "musl\n",
+            "stderr": ""
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [
+        {
+            "phase": "upgrade-remove",
+            "device": "/dev/sd0",
+            "root": "/mnt/linux-compat-packages/root",
+            "previous_version": "3.45.3",
+            "current_version": "3.48.0",
+            "installed": true,
+            "reopened": true,
+            "upgraded": true,
+            "removed": true,
+            "unmounted": true
+        }
+    ]
+}

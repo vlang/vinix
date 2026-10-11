@@ -186,7 +186,7 @@ fn main() {
 	for source in if runtime {
 		['tests/linux-compat/runtimefixture/core.v']
 	} else {
-		['tools/linux-compat/workloads/main.v', 'tools/linux-compat/workloads/debugger.v', 'tests/go/smoke.go', 'tests/java/VinixJavaSmoke.java']
+		['tools/linux-compat/workloads/main.v', 'tools/linux-compat/workloads/debugger.v', 'tools/linux-compat/workloads/packages.v', 'tests/go/smoke.go', 'tests/java/VinixJavaSmoke.java']
 	} {
 		inputs[source] = sha256.sum(os.read_bytes(root + '/' + source) or {
 			eprintln(err.msg())

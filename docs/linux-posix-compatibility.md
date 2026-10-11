@@ -80,6 +80,7 @@ they do not certify all architectures or current releases.
 | Language runtimes | [Go](../tests/go/README.md), [Java](../tests/java/README.md), V/GCC developer fixtures | Native TLS/futex/mmap/signals, JIT permissions and certificates. Tests written in application languages remain application inputs; maintained build/test orchestration is V. |
 | Databases | SQLite transactional create/query/reopen workload | sqlite CLI runtime; WAL locking, concurrent writers, recovery and disk durability require additional tests. PostgreSQL/MySQL service and multiuser qualification remain open. |
 | Servers | HTTP loopback response and service lifecycle workload | Networking, DNS/TLS, credentials and supervision. Linux systemd unit installation is not a supported service integration claim. |
+| CLI packaging | Real signed APK installation, reboot with saved data, version upgrade and removal | Both native architectures pass the SQLite disk-backed lifecycle through the existing `pkg` frontend; see [receipts and limits](linux-posix-qualification.md). Desktop triggers, service units, network downloads, interrupted updates and sandbox/portal runtimes remain unqualified. |
 | Games | [Doom](../tests/dhewm3/README.md), [OpenGothic](../tests/opengothic/README.md), [Steam](../tests/steam/run-robust-vm), emulator suites | Runtime/assets/licenses, sound/input/GPU; proprietary DRM, kernel anti-cheat, account services and vendor APIs may block use. List failures per title and runtime. |
 
 Do not silently disable isolation, install a no-op service or substitute a fake

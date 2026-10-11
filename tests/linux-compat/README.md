@@ -141,6 +141,28 @@ clang-compatible compiler when `VINIX_I386_SYSROOT` names an i386 musl SDK and
 the receipt also hashes the SDK CRT, libc and builtins; host GCC libraries are
 excluded. SSE2 intrinsics let this fixture build through V's i386 C backend.
 
+To qualify real CLI installation/update/removal, stage unchanged signed Alpine
+v3.20/v3.21 SQLite dependency closures and APK tooling with the V stager:
+
+```sh
+build-support/run-v-tool.sh tools/linux-compat/packages/main.v aarch64 /path/to/prepared-base /path/to/fresh-package-inputs
+```
+
+Run `run-apps.v` with that output's `root`, the matching driver/probe, `--cases
+packages` and `--data-disk /path/to/private-preformatted-ext2`. The controller
+never formats an existing data disk. Use a dedicated test volume: the workload
+creates its own root, repositories and database there. The first boot installs
+SQLite through real APK and the existing `pkg` frontend, commits WAL data, syncs
+and unmounts. Repeat in a fresh state directory with the same disk for the
+reboot/upgrade/removal phase. It reopens saved data, performs an actual version
+upgrade, removes the package, verifies base-runtime/data retention and unmounts.
+Run the two phases sequentially. Both state receipts retain before/after disk
+hashes, making the volume handoff verifiable. No untrusted-package opt-in or
+placeholder installer is used. The stager only acquires inputs; guest APK
+performs dependency resolution and validates repository/package signatures.
+`packages` is restricted to native Vinix execution and an explicit disk;
+`--host` rejects it. This workflow does not qualify desktop or service packaging.
+
 ```sh
 VINIX_I386_SYSROOT=/path/to/i386-sdk VINIX_I386_BUILTINS=/path/to/libclang_rt.builtins-i386.a build-support/run-v-tool.sh tools/linux-compat/build/main.v i386 /path/to/fresh-i386-probe --runtime-probe
 ```

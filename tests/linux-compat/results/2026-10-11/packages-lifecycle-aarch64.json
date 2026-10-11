@@ -1,0 +1,20 @@
+{
+    "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/APKINDEX.tar.gz": "c10c0b874b29c641b6e629af2be3eb9797c554d8b959043ee559bf6209a76cbf",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/libncursesw-6.4_p20240420-r2.apk": "0def98cbfab5e85e4ddfacd85840d79039f60a7e9a7717294ffa68a9c63370d8",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/musl-1.2.5-r3.apk": "e455c49c6c3de1dfcd4b9867c35097f588de2fb01a939c77ddb149f8e6086a24",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/ncurses-terminfo-base-6.4_p20240420-r2.apk": "82141d0035a58317791e139a0b68c0837c98c0836bc0bafb10bb16adf0bcc7bd",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/readline-8.2.10-r0.apk": "9e69da5ea8ff8c0bdde1ffa272ec4287684eebda8fdfe0f4a45d842d0ff787e6",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/sqlite-3.45.3-r3.apk": "0b4a5b1050776e3e4abaa735b7a145a1169f54d532974d01b08e9b0214004916",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/APKINDEX.tar.gz": "40ea72213f277f19967d4163160edf67d96c19cd03ed85838b588b6c5a6cd7c1",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/alpine-keys-2.5-r0.apk": "a70d3c55ee676d7d670714aa729285d5ab6fcf18146eb03e05319098bcb715c0",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/apk-tools-2.14.6-r3.apk": "59fddaf7693a7beb922cd54ff351517138500b055f74bd28247159ce42c74042",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/ca-certificates-bundle-20260909-r0.apk": "46aa3bd5988d0bed141242d957a52e4c871066ae4ae1c97195accc0b73e5b94a",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/libcrypto3-3.3.7-r2.apk": "2303cca13dc8bba5798744a68abd07530abb35ab339d9cc4640fc53276049af0",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/libncursesw-6.5_p20241006-r3.apk": "c1a5a3a552ad4d44c94454555f38de71b151dc2d608ea2246d92b3bd845b7f3a",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/libssl3-3.3.7-r2.apk": "d494a0a211dd78a8055c24885fc06375eabb79c82ae797f7f694cefbf3653b79",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/musl-1.2.5-r11.apk": "721010e6bff908878d9c527428598661be59dde0d9f013f8431d01fd4dd16652",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/ncurses-terminfo-base-6.5_p20241006-r3.apk": "a86fb76ba2ac494ed3a550a5c42d032c486d942966bceae38f6ce95eaa384550",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/readline-8.2.13-r0.apk": "7dad49f83ecbcfa00c5c7df044a5566b928ac1995651cfff219e1df1c2b93871",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/sqlite-3.48.0-r4.apk": "8f818aedd63234cef8cd564947115f24b51fd313540a5b6c670b727608251a70",
+    "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/aarch64/zlib-1.3.2-r1.apk": "47bdb66edfddca8b64438369affabd9debc05159aa1bff5c26027270cb28b3f7"
+}

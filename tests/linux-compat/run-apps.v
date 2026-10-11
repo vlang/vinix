@@ -54,6 +54,7 @@ fn main() {
 		hosttest.Option{ name: '--workloads', value: true },
 		hosttest.Option{ name: '--runtime-probe', value: true },
 		hosttest.Option{ name: '--runtime-libc', value: true, choices: ['musl', 'glibc'] },
+		hosttest.Option{ name: '--data-disk', value: true },
 		hosttest.Option{ name: '--cases', value: true },
 		hosttest.Option{ name: '--timeout', value: true },
 	], [], 'Usage: run-apps.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR --rootfs PREPARED-ROOT --workloads NATIVE-ELF --runtime-probe MATCHING-ELF [--path PATH] [--cases runtime,server]') or {
@@ -79,12 +80,18 @@ fn main() {
 	cases := options.value('--cases', 'runtime,server')
 	for name in cases.split(',') {
 		if name !in ['sqlite', 'media', 'office', 'chromium', 'firefox', 'go', 'java', 'v', 'server',
-			'runtime', 'debugger', 'portal', 'games'] {
+			'runtime', 'debugger', 'packages', 'portal', 'games'] {
 			eprintln('unknown case')
 			exit(2)
 		}
 	}
 	state := options.value('--state-dir', '')
+	disk := if options.has('--data-disk') { os.real_path(options.value('--data-disk', '')) } else { '' }
+	if (disk != '' && (!os.is_file(disk) || disk.contains(',')))
+		|| ('packages' in cases.split(',') && (disk == '' || path.starts_with('translated-'))) {
+		eprintln('package transactions require a private ext2 data disk and native execution')
+		exit(2)
+	}
 	timeout := options.integer('--timeout', 300) or {
 		eprintln(err.msg())
 		exit(2)
@@ -99,6 +106,9 @@ fn main() {
 		exit(2)
 	}
 	mut inputs := map[string]string{}
+	if disk != '' {
+		inputs['data_disk_before'] = sha256.sum(os.read_bytes(disk) or { eprintln(err.msg()); exit(2) }).hex()
+	}
 	mut snapshots := map[string][]u8{}
 	for kind in ['kernel', 'workloads', 'runtime-probe'] {
 		file := if kind == 'kernel' {
@@ -149,7 +159,7 @@ fn main() {
 			exit(1)
 		}
 	}
-	os.write_file(state + '/rootfs/etc/linux-compat-options', '--cases=' + cases + '\x00--path=' + path + '\x00--runtime-libc=' + options.value('--runtime-libc', 'musl') + '\x00') or {
+	os.write_file(state + '/rootfs/etc/linux-compat-options', '--cases=' + cases + '\x00--path=' + path + '\x00--runtime-libc=' + options.value('--runtime-libc', 'musl') + '\x00' + if disk != '' { '--data-device=' + if arch == 'aarch64' { '/dev/vda' } else { '/dev/sd0' } + '\x00' } else { '' }) or {
 		eprintln(err.msg())
 		exit(1)
 	}
@@ -185,9 +195,10 @@ fn main() {
 		exit(1)
 	}
 	inputs['init_source'] = sha256.sum(source.bytes()).hex()
-	mut code := guesthost.guest(os.real_path(state + '/sources/appinitfixture/core.v'), '', os.real_path(state), os.real_path(state + '/kernel'), arch, ['LINUX APPLICATIONS: PASS'], ['LINUX APPLICATIONS FAIL'], false, true, timeout) or {
-		eprintln(err.msg())
-		1
+	mut code := if disk == '' {
+		guesthost.guest(os.real_path(state + '/sources/appinitfixture/core.v'), '', os.real_path(state), os.real_path(state + '/kernel'), arch, ['LINUX APPLICATIONS: PASS'], ['LINUX APPLICATIONS FAIL'], false, true, timeout) or { eprintln(err.msg()); 1 }
+	} else {
+		boot_with_disk(state, arch, disk, timeout) or { eprintln(err.msg()); 1 }
 	}
 	serial := (os.read_file(state + '/serial.log') or { '' }).replace('\r', '')
 	if serial.contains('LINUX APPLICATION REPORT BEGIN\n') && serial.contains('LINUX APPLICATION REPORT END') {
@@ -206,6 +217,7 @@ fn main() {
 		code = 1
 	}
 	inputs['snapshot_kernel'] = sha256.sum(os.read_bytes(state + '/kernel/bin/vinix') or { []u8{} }).hex()
+	if disk != '' { inputs['data_disk_after'] = sha256.sum(os.read_bytes(disk) or { eprintln(err.msg()); exit(1) }).hex() }
 	os.write_file(state + '/application-inputs.json', json2.encode(AppReceipt{arch, path, cases, inputs, code},
 		prettify: true
 	)) or {
@@ -213,4 +225,24 @@ fn main() {
 		exit(1)
 	}
 	exit(code)
+}
+
+fn boot_with_disk(state string, arch string, disk string, timeout int) !int {
+	work := os.real_path(state)
+	init := guesthost.compile_init(work + '/sources/appinitfixture/core.v', work, arch, false)!
+	archive := guesthost.image(init, work)!
+	if arch == 'x86_64' {
+		// The release kernel starts SATA drivers when disk boot is requested.
+		// A small preformatted fixture volume cannot trigger auto-installation.
+		os.setenv('VINIX_CMDLINE', os.getenv('VINIX_CMDLINE') + ' vinix.disk=auto', true)
+	}
+	configured := guesthost.launch(init, archive, work, work + '/kernel', arch, true)!
+	mut command := configured.command.clone()
+	if arch == 'aarch64' {
+		command << ['-drive', 'if=none,format=raw,file=' + disk + ',id=compat-data', '-device', 'virtio-blk-device,drive=compat-data']
+	} else {
+		command << ['-drive', 'if=ide,format=raw,file=' + disk]
+	}
+	positive, negative := guesthost.verdict_policy(['LINUX APPLICATIONS: PASS'], ['LINUX APPLICATIONS FAIL'], false)
+	return guesthost.boot(command, configured.env, work, positive, negative, timeout, true)!
 }

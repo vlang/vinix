@@ -1,0 +1,139 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-aarch64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "babb7f67f6cdfcec3bad5142e8eb2f02061bb945f6816f82972cd87eebfd9755",
+    "runtime_probe_sha256": "a54ee98c77f419b0e34cb6e281fdad0d47c9ba38e6e61419d576de35c82c83ab",
+    "runtime_libc": "glibc",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "packages",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/bin/busybox",
+                "--install",
+                "-s",
+                "/bin"
+            ],
+            "executable_sha256": "f35a45f702095d9c2a718deb42c1cf4efa6d2919f212d273c4ea569d0bd03dcb",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/sbin/apk",
+                "--root",
+                "/mnt/linux-compat-packages/root",
+                "--initdb",
+                "--no-network",
+                "add"
+            ],
+            "executable_sha256": "56a21ec2ce8e95506b005aaa5cb04144e0522fde6f03f7516ccd8e9bc9d0a2b1",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "OK: 0 MiB in 0 packages\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/pkg",
+                "install",
+                "sqlite"
+            ],
+            "executable_sha256": "b1050438fc5141516f049dbd5c37fa33d5b0c50be577e58606eb56377afbf571",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "pkg: refreshing Alpine repository indexes\nv3.20.10-114-ga410d2306e5 [/usr/share/linux-compat-repos/v3.20]\nOK: 5543 distinct packages available\npkg: registering the Vinix base packages\n(1/1) Installing musl (1.2.5-r3)\nOK: 0 MiB in 1 packages\n(1/4) Installing ncurses-terminfo-base (6.4_p20240420-r2)\n(2/4) Installing libncursesw (6.4_p20240420-r2)\n(3/4) Installing readline (8.2.10-r0)\n(4/4) Installing sqlite (3.45.3-r3)\nOK: 3 MiB in 5 packages\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/bin/busybox",
+                "chroot",
+                "/mnt/linux-compat-packages/root",
+                "/usr/bin/sqlite3",
+                "--version"
+            ],
+            "executable_sha256": "f35a45f702095d9c2a718deb42c1cf4efa6d2919f212d273c4ea569d0bd03dcb",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "3.45.3 2024-04-15 13:34:05 8653b758870e6ef0c98d46b3ace27849054af85da891eb121e9aaa537f1e8355 (64-bit)\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/bin/busybox",
+                "chroot",
+                "/mnt/linux-compat-packages/root",
+                "/usr/bin/sqlite3",
+                "-batch",
+                "/data/saved.db",
+                "PRAGMA journal_mode=WAL; CREATE TABLE t(v INTEGER); INSERT INTO t VALUES(42); SELECT sum(v) FROM t;"
+            ],
+            "executable_sha256": "f35a45f702095d9c2a718deb42c1cf4efa6d2919f212d273c4ea569d0bd03dcb",
+            "environment_overrides": {
+                "VINIX_PKG_ROOT": "/mnt/linux-compat-packages/root",
+                "VINIX_PKG_NETWORK_RETRIES": "1",
+                "VINIX_PKG_NETWORK_WAIT_SECONDS": "0",
+                "VINIX_PKG_NETWORK_RETRY_DELAY": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "wal\n42\n",
+            "stderr": ""
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [
+        {
+            "phase": "install",
+            "device": "/dev/vda",
+            "root": "/mnt/linux-compat-packages/root",
+            "previous_version": "",
+            "current_version": "3.45.3",
+            "installed": true,
+            "reopened": false,
+            "upgraded": false,
+            "removed": false,
+            "unmounted": true
+        }
+    ]
+}

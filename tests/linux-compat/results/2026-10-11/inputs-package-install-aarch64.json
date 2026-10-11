@@ -1,0 +1,17 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "cases": "packages",
+    "inputs": {
+        "data_disk_after": "968960c1cc534a5efd990e8375edb526f1b99fcd12099e61250392025a898083",
+        "data_disk_before": "33e2024dbc9fed40770fc9e0d18e9b84938d645a0dcd2d885bce5db3cae7ff94",
+        "guest_report": "941e66527397e2102812288c19f06354c9634981ebf90fe2db104d494341e975",
+        "init_source": "796750bf61b36e28f015f34fa6f4591278dd8b895d7cc4a6007212ceb98888c6",
+        "kernel": "e994382b1c592bce221ad6cc367980db5def422ad5c9c0b9a5713012b5db748d",
+        "rootfs_manifest": "8f2d6336a976313c5b0c2e8cbf7e608d019dc3f75aac814fe146641421a4265c",
+        "runtime-probe": "a54ee98c77f419b0e34cb6e281fdad0d47c9ba38e6e61419d576de35c82c83ab",
+        "snapshot_kernel": "e994382b1c592bce221ad6cc367980db5def422ad5c9c0b9a5713012b5db748d",
+        "workloads": "babb7f67f6cdfcec3bad5142e8eb2f02061bb945f6816f82972cd87eebfd9755"
+    },
+    "exit_code": 0
+}

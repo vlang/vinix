@@ -1,0 +1,17 @@
+{
+    "architecture": "x86_64",
+    "execution_path": "native-x86_64",
+    "cases": "packages",
+    "inputs": {
+        "data_disk_after": "4dd714b361572161d7baf5f0a379fd8dafb02cceab6826eaf05d4bd79cee0038",
+        "data_disk_before": "14d24d6b59a49f5dc5ec655515504f766fdc3e0bd0907ca83167c4cd6a3a9a4b",
+        "guest_report": "b19d5c9ecefe6125833619376cc604df9667d125875ff846b25311ffe53e1df2",
+        "init_source": "796750bf61b36e28f015f34fa6f4591278dd8b895d7cc4a6007212ceb98888c6",
+        "kernel": "3b429082703e6c0df7960bbb239670ac35483940eaf90ae0eeb9341fd3176530",
+        "rootfs_manifest": "9c46b26b59ec99962313e19ba36b80170518c00fd8a2f5475ab6af5516aa1369",
+        "runtime-probe": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+        "snapshot_kernel": "3b429082703e6c0df7960bbb239670ac35483940eaf90ae0eeb9341fd3176530",
+        "workloads": "b78bd32ca7b20a852f02fac71974e3a71786aeaf1bfaae8a56e54d08796e99cf"
+    },
+    "exit_code": 0
+}
