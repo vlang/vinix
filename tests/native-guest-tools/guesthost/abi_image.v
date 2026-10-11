@@ -17,6 +17,18 @@ pub fn arm_home_launch(command []string, state string, runner_root string) ![]st
 	return argv
 }
 
+// Reuse a caller-owned physical home across hard-stop/restart epochs.
+pub fn arm_persist_launch(command []string, disk string, state string, runner_root string) ![]string {
+	mut argv := command.clone()
+	if os.getenv('VINIX_QEMU_EXTRA') != '' {
+		argv.insert(1, hosttest.shell_split(os.getenv('VINIX_QEMU_EXTRA'))!)
+	}
+	abi_arm_config(state, runner_root)!
+	argv.insert(argv.index('-device'), ['-drive', 'if=none,format=raw,file=' + disk + ',id=powercut-home,cache=writeback',
+		'-device', 'virtio-blk-device,drive=powercut-home'])
+	return argv
+}
+
 fn abi_home_volume(state string) ! {
 	disk := state + '/root.ext2'
 	os.write_file(disk, '')!

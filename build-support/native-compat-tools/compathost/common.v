@@ -86,6 +86,7 @@ fn command_checked(args []string, family string) !int {
 		'acpi-sync' { return acpi_command(args)! }
 		'resource-groups' { return groups_command(args)! }
 		'speculation-policy' { return speculation_command(args)! }
+		'resource-accounting', 'pagecache', 'ext2-sparse' { return filesystem_command(args, family)! }
 		else { return error_with_code('Unknown compatibility command', 2) }
 	}
 }

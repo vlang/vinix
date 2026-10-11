@@ -39,14 +39,20 @@ slab objects and runtime; traversal depends on allocated tables, not hole length
 VINIX_VM_RUNNER_ROOT=/path/to/main/vinix VINIX_QEMU_RT_NO_BUILD=1 \
 VINIX_KERNEL_DIR=/path/to/saved-arm-build \
 VINIX_AARCH64_SYSROOT=/path/to/aarch64/sysroot \
-  python3 tests/ext2-sparse/run.py --arch=aarch64
+  tests/ext2-sparse/run --arch=aarch64
 VINIX_VM_RUNNER_ROOT=/path/to/main/vinix \
 VINIX_AMD64_KERNEL=/path/to/saved-amd-build/bin/vinix \
-  python3 tests/ext2-sparse/run.py --arch=amd64
+  tests/ext2-sparse/run --arch=amd64
 ```
 
 Both saved binaries must match the tested source. The build directory for ARM
 needs `bin/vinix`; AMD boots the supplied kernel using the disk-root path.
+
+The runner uses native V power-cut supervision and snapshots the supplied
+already-built kernel. `--kernel DIR|ELF` overrides the environment input;
+`--build-only` retains genuine payloads and formatted physical disks without
+booting. Current qualification is recorded in
+[filesystem-tools.md](../../build-support/native-compat-tools/filesystem-tools.md).
 Use `--blocks=4096` or `--blocks=1024` to select one format.
 
 The native guest is maintained in `sparsefixture/core.v`. Its declaration-only

@@ -130,12 +130,14 @@ The pagecache workflow runs these tests; the existing kernel workflow provides
 separate build coverage. Kernel boot, remount persistence, allocation/truncation,
 concurrent descriptor access and power-loss behavior still need integration tests.
 
-`tests/pagecache/run-guest.py --arch=aarch64` (or `amd64`) boots a disposable
-physical EXT2 root using the existing isolated VM drivers. Set
+`tests/pagecache/run-guest --arch=aarch64` (or `amd64`) boots a disposable
+physical EXT2 root using native V power-cut supervision. Set
 `VINIX_VM_RUNNER_ROOT` to the checkout with the boot dependencies,
 `VINIX_KERNEL_DIR` to the ARM kernel directory, and `VINIX_AMD64_KERNEL` to
-the x86 kernel binary. `VINIX_QEMU_RT_NO_BUILD=1` uses the already built ARM
-kernel. The payload verifies random suppression, 128/256 KiB automatic windows,
+the x86 kernel binary. Both kernels must already be built; the runner snapshots
+them and never rebuilds the checkout. `--kernel DIR|ELF` overrides the input and
+`--build-only` retains native payloads and physically formatted disks without
+booting. The payload verifies random suppression, 128/256 KiB automatic windows,
 explicit hints, shared descriptions, offset reset, positional-read offsets and
 byte-exact EOF tails, then repeats 400 cold fetch/discard cycles. After stopping
 the guest, the harness runs `e2fsck -f -n` on the real disk image.

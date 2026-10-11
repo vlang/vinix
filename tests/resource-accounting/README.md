@@ -45,17 +45,23 @@ VINIX_VM_RUNNER_ROOT=/path/to/main \
 VINIX_KERNEL_DIR=/path/to/worktree/kernel \
 VINIX_AARCH64_SYSROOT=/path/to/main/build-aarch64-userland/sysroot \
 VINIX_QEMU_RT_NO_BUILD=1 VINIX_QEMU_AUDIO=off \
-  python3 tests/resource-accounting/run.py --arch=aarch64
+  tests/resource-accounting/run --arch=aarch64
 
 VINIX_VM_RUNNER_ROOT=/path/to/main \
 VINIX_AMD64_KERNEL=/path/to/worktree/build-amd64-kernel/bin/vinix \
-  python3 tests/resource-accounting/run.py --arch=amd64
+  tests/resource-accounting/run --arch=amd64
 ```
 
 The runner cross-compiles the test with warnings treated as errors and
 threads enabled. It boots a temporary EXT2 image, requires the final pass
 marker and checks the stopped image with `e2fsck -f -n`. The x86 guest
 redirects its output to `/dev/com1` using `O_NOCTTY`.
+
+The native V runner snapshots an already-built kernel and directly owns QEMU.
+It accepts `--kernel DIR|ELF`, `--state-dir FRESH-DIR`, `--prebuilt-init ELF`
+and `--build-only` to retain payloads and physical disks. Default temporary
+workspaces retire on success and failure. See the current host and guest
+qualification in [filesystem-tools.md](../../build-support/native-compat-tools/filesystem-tools.md).
 
 `--retention-only` compiles the same warmed query loop while skipping new
 field semantics, pointer-policy checks and file creation. It can compare
