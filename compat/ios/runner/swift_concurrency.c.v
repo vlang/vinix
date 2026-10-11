@@ -36,6 +36,9 @@ fn swift_concurrency_entry(offset u64) !u64 {
 }
 
 fn swift_concurrency_symbol(symbol string) !u64 {
+	if symbol in ['_swift_task_alloc', '_swift_task_dealloc'] {
+		return swift_task_alloc_symbol(symbol)
+	}
 	if symbol in ['_$sScPMa', '_$sScPMn', '_$sScPN'] {
 		base := swift_task_priority_arena()!
 		if symbol == '_$sScPMa' { return base }
@@ -51,6 +54,7 @@ fn swift_concurrency_symbol(symbol string) !u64 {
 
 fn swift_concurrency_stop() {
 	// Called under the runtime lock after workers and callbacks have drained.
+	swift_task_allocator_drain_checked() or { panic(err) }
 	swift_task_priority_stop()
 	if ios_runtime.swift_concurrency_code != 0 {
 		if C.munmap(unsafe { voidptr(ios_runtime.swift_concurrency_code) }, usize(C.getpagesize())) != 0 {

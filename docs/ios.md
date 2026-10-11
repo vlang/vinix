@@ -2437,17 +2437,64 @@ logs, configuration and hashes remain accessible from the evidence directory.
 Full regression remains unpassed and the five published runners keep their
 last passing bytes. Fortnite still has not entered gameplay.
 
+V also resolves `_swift_task_alloc` and `_swift_task_dealloc` for Swift's
+no-active-task fallback. The installed Mac runtime uses one shared allocator
+across threads; its API requires 16-byte alignment and strict LIFO lifetimes.
+The implementation uses an explicit aligned allocation with a private
+16-byte linked header and a rounded, uninitialized payload. Zero-byte requests
+return distinct aligned pointers. Bounds checks precede allocation; frees
+compare with the registered stack top before reading a header, unlink before
+freeing, and reject null, foreign, interior, non-top and repeated pointers.
+Shutdown refuses a live allocation stack. Task creation, current-task switching,
+task-private allocators and scheduling remain unsupported.
+
+Standalone native measurements pass before the runtime comparison. Native and
+V fixtures cover 28 nested sizes from zero through 1,048,577 bytes, writable
+nonoverlapping payloads, reverse frees, eight serialized worker sequences and
+cross-thread LIFO transfer. Raw ARM64 probes preserve borrowed `x20`/`x21`/`x22`
+even when they point into protected storage. The allocator, priority and actor
+suites pass six actual ASAN/UBSAN processes across both hash modes. V checks
+also cover rounded tails, overflow rejection, invalid frees without mutation,
+refused live drain, 512 zero/small allocation pairs per lifetime, concurrent
+canonical resolution and two drained runtime lifetimes. Resolution needs no
+executable adapter page or Swift owner. Generated C audits check explicit
+allocation/free and reject hidden successful allocations or ARC operations.
+
+Evidence is under `build/ios/fortnite/swift-task-alloc-checks`, including the
+52 pinned framework allocation calls, installed native export disassembly,
+probe encoding and hashed official Swift
+[task allocation](https://github.com/swiftlang/swift/blob/main/stdlib/public/Concurrency/TaskAlloc.cpp)
+and [stack allocator](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/StackAllocator.h)
+sources. The preceding proof's serial logs and configuration were recovered
+byte-for-byte from archived evidence after the external test volume unmounted;
+that proof verifies again. New temporary VM payloads use local storage and are
+retired after joined checks. These measurements keep the native current task
+nil and do not create tasks or invoke a scheduler.
+
+All forty-five programs build, and all twenty-seven focused Swift checks pass
+in the Vinix guest. The first IPA probe preparation and binary-compression
+attempts encountered host ENOSPC; their joined failures, overlay and incomplete
+archive hash are preserved. Completed binaries and generated C are retained as
+verified lossless gzip with original byte hashes before retrying the probe.
+The successful retry passes both allocation imports and exits with status 1
+before entry at EOS's `_swift_task_create`. Its native export and six actual
+call sites (two EOS, four Marketplace) are retained for further measurement;
+the task-creation ABI has not been invoked. Both import audits resolve six
+additional strong imports across the three images. Full regression remains
+unpassed, candidates remain in the evidence directory, and the five published
+runners retain their last passing bytes. Gameplay remains unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,407 | 752 | 80 |
-| EOSSDK | 614 | 48 | 18 |
-| MarketplaceKitWrapper | 105 | 71 | 23 |
-| All images | 2,126 | 871 | 121 |
+| Fortnite executable | 1,409 | 750 | 80 |
+| EOSSDK | 616 | 46 | 18 |
+| MarketplaceKitWrapper | 107 | 69 | 23 |
+| All images | 2,132 | 865 | 121 |
 
-The C++/GLES/Text variant reports 2,139 resolved imports, 858 unresolved strong
+The C++/GLES/Text variant reports 2,145 resolved imports, 852 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -2499,7 +2546,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all twenty-six Swift ABI checks in a small, independent guest and
+`swift` runs all twenty-seven Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.
