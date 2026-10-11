@@ -64,6 +64,12 @@ participant while retaining at least one disk. Both edit saved membership;
 live views survive omission. See
 [disk membership and index rules](../../docs/storage-volumes.md#offline-disk-membership).
 
+`plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES` reports
+aligned gaps between saved mappings in an explicitly chosen region.
+`plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES
+ALIGNMENT_BYTES [ro]` atomically adds the lowest-address fitting mapping.
+See [allocation scope and rules](../../docs/storage-volumes.md#bounded-extent-allocation).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

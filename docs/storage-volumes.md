@@ -423,6 +423,52 @@ serialized and live application remains a separate operation. Pools, spanning
 volumes and RAID are still separate work. See
 [disk membership qualification](../tests/storage-volumes/disk-bundle.md).
 
+## Bounded extent allocation
+
+```sh
+# Choose a region reserved for managed raw volumes on saved disk index 0.
+vinix-volume plan-space /root/layout.vset 0 8388608 16777216 1048576
+vinix-volume plan-allocate /root/layout.vset 0 20 2097152 8388608 16777216 1048576
+vinix-volume check-bundle /root/layout.vset
+vinix-volume restore-bundle /root/layout.vset
+```
+
+`plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES` reports
+the gaps between saved desired mappings within an explicit allocation region.
+The end is exclusive. Both boundaries must fit the saved disk and align to its
+logical sector; alignment must be a power of two at least as large as that
+sector. Gap starts round upward to the requested alignment. Lengths cover the
+remaining sector-aligned portion, so alignment constrains placement rather than
+size. Gaps appear in physical offset order even when saved rows are unsorted;
+the saved row order and bundle bytes stay unchanged. Read-only desired mappings
+occupy space too. The summary reports the count, sum and largest eligible gap;
+alignment prefixes are excluded, and a region with no eligible gap succeeds
+with zero totals. Rounding remains bounded near the unsigned 64-bit limit.
+
+`plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES
+ALIGNMENT_BYTES [ro]` appends one mapping in the lowest-address gap that fits its
+nonzero sector-aligned length. It never combines fragmented gaps or spans disks.
+The slot must be globally free, and the complete desired set must remain valid.
+All existing identities, row order, lengths and modes survive. Invalid ranges,
+slots, modes and sizes, full mapping tables or insufficient contiguous space
+fail without publishing. The selected offset, length and mode are printed after
+the shared atomic publisher completes. Publication has the same permissions,
+flush ordering and error rules as `plan-add`, including a visible new bundle
+with a failure result if directory fsync fails after rename.
+
+Both commands operate offline on the existing bounded checksummed bundle;
+they open no devices and reject a final symlink or nonregular input. The
+allocation region is an explicit administrative choice: these gaps describe
+saved desired mappings, not filesystem free space. Reserve partition-table,
+filesystem, swap and other data extents when choosing the region. Unlisted live
+mappings and protected extents may occupy an offline gap. `check-bundle` detects
+live mapping conflicts, and live application retains kernel extent protection
+and the ordinary partial-failure rules. Planning does not format, discard,
+reserve live storage or alter live descriptors. Administration must remain
+serialized; subsequent planning sees the newly saved row. Pools, spanning
+volumes and RAID remain separate work. See
+[extent allocation qualification](../tests/storage-volumes/space-bundle.md).
+
 ## Status ABI
 
 `tools/volumes/volumecli/volume.h` defines the native little-endian ABI shared by

@@ -185,3 +185,34 @@ fn test_enroll_and_forget_commands_preserve_inputs_and_use_atomic_publication_on
 		}
 	}
 }
+
+fn test_allocation_uses_shared_atomic_publisher_for_every_io_fault() {
+	work := os.join_path(os.temp_dir(), 'vinix-space-io-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	for mode in 1 .. 7 {
+		mut set := PlanSet{}
+		mut plan := Plan{count: 1, key: DiskKey{bytes: 4096, sector: 512, kind: 1}}
+		plan.key.id[0] = 1
+		plan.rows[0] = Request{slot: 2, length: 512}
+		assert append_plan(mut set, &plan)
+		bundle_io = BundleIO{}
+		assert publish_bundle(path.str, &set)
+		original := os.read_bytes(path)!
+		bundle_io = BundleIO{mode: mode}
+		window := SpaceWindow{start: 512, end: 4096, alignment: 1024}
+		row := Request{slot: 9, length: 512, flags: 1}
+		assert space_bundle_plan(path.str, 0, window, &row, true) == if mode == 1 { 0 } else { 1 }
+		assert bundle_io.closes == 2 && os.ls(work)!.len == 1
+		current := os.read_bytes(path)!
+		mut decoded := PlanSet{}
+		assert decode_bundle(current.data, current.len, mut decoded)
+		assert decoded.plans[0].rows[0] == plan.rows[0]
+		if mode == 1 || mode == 4 {
+			assert current != original && decoded.plans[0].count == 2
+			assert decoded.plans[0].rows[1] == Request{slot: 9, offset: 1024, length: 512, flags: 1}
+			assert bundle_io.renames == 1 && bundle_io.flushes == 2
+		} else { assert current == original }
+	}
+}

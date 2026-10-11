@@ -45,6 +45,12 @@ first/middle/last participants with stable order and preserved slot ownership.
 They require one remaining disk and cover the full 64-disk/slot format bound,
 unchanged source files, symlink/nonregular refusal and both commands' publisher
 faults. See [membership qualification](disk-bundle.md).
+Extent allocation tests compare aligned gap enumeration against a cell oracle
+for every small fragmentation pattern and first-fit placement against brute
+force. They cover clipping, unsorted/read-only rows, global slots, all 65 gaps,
+sector sizes, near-u64 rounding, atomic rejection, unchanged query bytes and
+publisher faults. Guests verify raw data, live conflict rejection and held
+descriptors. See [extent allocation qualification](space-bundle.md).
 Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init
@@ -108,7 +114,7 @@ their generations. An already open raw descriptor writes and flushes the new
 extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
-capacity, adds/checks/removes a scratch mapping, enrolls/forgets an empty offline
+capacity, allocates/checks/removes a scratch mapping, enrolls/forgets an empty offline
 participant, explicitly replays growth and runs boot restoration. A flushed phase marker
 and the atomically published bundle stay on ext2 across an
 abrupt VM stop. The physical disks are reordered for the second boot. Production ARM

@@ -61,11 +61,36 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume show-bundle BUNDLE\n       vinix-volume check-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume plan-add BUNDLE DISK_INDEX SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume plan-remove BUNDLE SLOT\n')
 	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
+	C.printf(c'       vinix-volume plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES ALIGNMENT_BYTES [ro]\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'plan-space') == 0
+			|| C.strcmp(argv[1], c'plan-allocate') == 0) {
+			allocate := C.strcmp(argv[1], c'plan-allocate') == 0
+			if (!allocate && argc != 7) || (allocate && argc != 9 && argc != 10) { return usage() }
+			disk := decimal(argv[3]) or { return usage() }
+			if disk >= 64 { return usage() }
+			mut row := Request{}
+			if allocate {
+				slot := decimal(argv[4]) or { return usage() }
+				row.length = decimal(argv[5]) or { return usage() }
+				if slot >= 64 || row.length == 0 { return usage() }
+				row.slot = u32(slot)
+				if argc == 10 {
+					if C.strcmp(argv[9], c'ro') != 0 { return usage() }
+					row.flags = 1
+				}
+			}
+			at := if allocate { 6 } else { 4 }
+			window := SpaceWindow{start: decimal(argv[at]) or { return usage() },
+				end: decimal(argv[at + 1]) or { return usage() },
+				alignment: decimal(argv[at + 2]) or { return usage() }}
+			if !space_window_valid(window) { return usage() }
+			return space_bundle_plan(argv[2], int(disk), window, &row, allocate)
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'plan-enroll') == 0 {
 			if argc != 4 { return usage() }
 			return enroll_bundle_disk(argv[2], argv[3])
