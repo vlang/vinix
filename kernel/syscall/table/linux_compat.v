@@ -212,22 +212,10 @@ fn syscall_linux_openat2(gpr_state voidptr, dirfd int, path charptr, how_ptr u64
 	if how.flags & ~u64(linux_open_flags) != 0 || how.mode & ~u64(0o7777) != 0 {
 		return errno.err, errno.einval
 	}
-	// The RESOLVE_* path-resolution constraints. A container runtime opens the
-	// cgroup and /proc files it manages through openat2 with these set, so
-	// rejecting them outright stops it before it can start a container.
-	// Vinix honours the one that changes what a correct open returns --
-	// RESOLVE_NO_SYMLINKS becomes O_NOFOLLOW on the final component -- and
-	// accepts the containment constraints (BENEATH, IN_ROOT, NO_XDEV,
-	// NO_MAGICLINKS, CACHED) as satisfied: the paths a runtime opens this way
-	// resolve to the same file with or without them.
-	resolve_no_symlinks := u64(0x04)
 	resolve_known := u64(0x3f) // NO_XDEV|NO_MAGICLINKS|NO_SYMLINKS|BENEATH|IN_ROOT|CACHED
-	if how.resolve & ~resolve_known != 0 {
-		return errno.err, errno.eopnotsupp
-	}
-	mut open_flags := how.flags
-	if how.resolve & resolve_no_symlinks != 0 {
-		open_flags |= u64(resource.o_nofollow)
+	if how.resolve & ~resolve_known != 0 || how.resolve & 0x18 == 0x18 {
+		// Unknown bits and mutually exclusive BENEATH|IN_ROOT are invalid.
+		return errno.err, errno.einval
 	}
 	if how.flags & u64(resource.o_path) != 0 {
 		path_flags := resource.o_path | resource.o_directory | resource.o_nofollow |
@@ -242,8 +230,14 @@ fn syscall_linux_openat2(gpr_state voidptr, dirfd int, path charptr, how_ptr u64
 	if how.mode != 0 && how.flags & u64(resource.o_creat) == 0 {
 		return errno.err, errno.einval
 	}
+	// No atomic constrained VFS walk exists yet. O_NOFOLLOW only controls
+	// the final component, so substituting it for NO_SYMLINKS lets an
+	// intermediate symlink escape. Likewise normal openat does not enforce
+	// BENEATH, IN_ROOT, mount boundaries, magic links or cache-only lookup.
+	// Refuse the operation rather than silently weaken a caller's sandbox.
+	if how.resolve != 0 { return errno.err, errno.eopnotsupp }
 
-	return fs.syscall_openat(gpr_state, dirfd, path, int(open_flags), u32(how.mode))
+	return fs.syscall_openat(gpr_state, dirfd, path, int(how.flags), u32(how.mode))
 }
 
 fn syscall_linux_getrlimit(gpr_state voidptr, which_resource int, old_limit u64) (u64, u64) {
