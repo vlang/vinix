@@ -146,7 +146,7 @@ fn (mut app GrapherApp) build(size ui2.Rect) !ui2.Element {
 		children << grapher_tick(app.range[0], 52, 176 + chart_height, chart_width / 2, .left)
 		children << grapher_tick(app.range[1], 52 + chart_width / 2, 176 + chart_height, chart_width / 2, .right)
 	}
-	children << ui2.label('', tr('grapher.syntax'), ui2.rect(12, f64(height - 194), f64(width - 24), 18), ui2.TextStyle{ size: 10, color: body_muted })
+	app.graph_document_buttons(mut children, width, height - 200)
 	children << app.field(6, 12, height - 170, width - 234)
 	children << grapher_button('grapher.document_open', 'grapher.document_open', width - 210, height - 170, 88)
 	children << grapher_button('grapher.document_save_as', 'grapher.document_save_as', width - 114, height - 170, 102)

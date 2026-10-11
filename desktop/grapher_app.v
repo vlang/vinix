@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import desktop.workflowcore
+
 #include <stdio.h>
 
 const grapher_field_actions = ['grapher.expression', 'grapher.xmin', 'grapher.xmax', 'grapher.ymin',
@@ -32,6 +34,9 @@ mut:
 	compact_page   GrapherPage
 	compact_layout bool
 	tiny_layout    bool
+	document workflowcore.Document
+	document_changed bool
+	document_autosave_at u64
 }
 
 fn open_grapher_app(mut _ Desktop) !NativeApp {
@@ -63,6 +68,7 @@ fn (mut app GrapherApp) initialize() {
 	app.set_field(8, vector)
 	unsafe { vector.free() }
 	app.plot()
+	app.document_changed = false
 }
 
 fn grapher_default_export_path(home string) string {
@@ -95,7 +101,7 @@ fn (app &GrapherApp) field_text(index int) string {
 fn (mut app GrapherApp) set_field(index int, text string) {
 	app.fields[index].bytes.clear()
 	for ch in text { app.fields[index].bytes << ch }
-	if index < 5 { app.dirty = true }
+	if index < 5 { app.dirty = true; app.document_changed = true }
 	app.export_status = ''
 	app.document_status = ''
 }
@@ -179,6 +185,7 @@ fn (mut app GrapherApp) zoom(factor f64) {
 }
 
 fn (mut app GrapherApp) handle(id string) ! {
+	if app.graph_document_action(id) { return }
 	for index, action in grapher_field_actions {
 		if id == action {
 			app.focus = index
@@ -233,6 +240,7 @@ fn (mut app GrapherApp) input_text(text string) {
 	for ch in text { app.fields[app.focus].bytes << ch }
 	if app.focus < 5 {
 		app.dirty = true
+		app.document_changed = true
 		app.status = 'grapher.changed'
 	}
 	app.export_status = ''
@@ -264,6 +272,7 @@ fn (mut app GrapherApp) input_byte(ch u8) {
 		}
 		if app.focus < 5 {
 			app.dirty = true
+			app.document_changed = true
 			app.status = 'grapher.changed'
 		}
 		app.export_status = ''
@@ -429,6 +438,8 @@ fn (mut app GrapherApp) export_csv() {
 }
 
 fn (mut app GrapherApp) close_app() {
+	if app.initialized { app.poll_graph_document(~u64(0) - 1) }
+	app.document.close()
 	for index in 0 .. app.fields.len {
 		if app.fields[index].bytes.cap > 0 { unsafe { app.fields[index].bytes.free() } }
 		app.fields[index].bytes = []u8{}

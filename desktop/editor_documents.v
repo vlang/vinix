@@ -119,8 +119,8 @@ fn (mut a TextEditorApp) document_service_action(action string) bool {
 }
 
 fn (a &TextEditorApp) build_document_services(mut children []ui2.Element, width int, top int) {
-	for i, pair in [['recovery.restore', 'Recover draft'], ['recovery.discard', 'Discard draft'], ['versions.previous', 'Previous version']] {
-		children << ui2.Element{...ui2.button('editor.' + pair[0], pair[1], ui2.rect(f64(8 + i * 126), f64(top), 120, 26), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 11}), enabled: if i < 2 { a.documents.recovery_available } else { a.documents.versions.len > 0 }}
+	for i, pair in [['editor.recovery.restore', 'Recover draft']!, ['editor.recovery.discard', 'Discard draft']!, ['editor.versions.previous', 'Previous version']!]! {
+		children << ui2.Element{...ui2.button(pair[0], pair[1], ui2.rect(f64(8 + i * 126), f64(top), 120, 26), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 11}), enabled: if i < 2 { a.documents.recovery_available } else { a.documents.versions.len > 0 }}
 	}
 	children << ui2.label('', a.documents.message, ui2.rect(8, f64(top + 28), f64(width - 16), 22), ui2.TextStyle{color: body_muted, size: 11})
 }

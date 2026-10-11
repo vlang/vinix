@@ -125,7 +125,7 @@ fn (mut a NotesApp) import_note() {
 	data := a.encode_added(-1, title, body)
 	defer { unsafe { data.free() } }
 	if data.len > notes_record_limit { a.import_status = 'notes.limit' return }
-	state := notes_publish(a.home_fd, a.record, data)
+	state := notes_publish(a.home_fd, mut a.document, a.record, data)
 	if state < 0 {
 		a.import_status = if state == -2 { 'notes.conflict' } else { 'notes.save_failed' }
 		return

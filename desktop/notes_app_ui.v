@@ -53,6 +53,7 @@ fn (mut a NotesApp) focus_field(field int) {
 }
 
 fn (mut a NotesApp) handle(event_id string) ! {
+	if a.document_action(event_id) { return }
 	a.pending_len = 0
 	if a.importing && !a.close_requested && event_id != 'notes.import_path'
 		&& event_id != 'notes.import_confirm' && event_id != 'notes.import_cancel' { return }
@@ -461,7 +462,7 @@ fn (mut a NotesApp) build(size ui2.Rect) !ui2.Element {
 		}
 		size:  12
 	})
-	children << ui2.label('', tr(if a.history_count > 0 { 'notes.history_scope' } else { 'notes.hint' }), ui2.rect(12, f64(height - 32), f64(width - 24), 24), ui2.TextStyle{ color: body_muted, size: 11 })
+	a.document_buttons(mut children, width, height)
 	return ui2.screen(app_surface, children)
 }
 

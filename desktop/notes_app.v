@@ -3,6 +3,8 @@
 // model, so rejected saves never discard the user's current text.
 module main
 
+import desktop.workflowcore
+
 const notes_limit = 128
 const notes_title_limit = 160
 const notes_body_limit = 16384
@@ -23,6 +25,8 @@ mut:
 	next_id         u64 = 1
 	selected        int = -1
 	home_fd         int = -1
+	document        workflowcore.Document
+	recovery_available bool
 	record          string
 	read_failed     bool
 	dirty           bool
@@ -91,7 +95,11 @@ fn new_notes_app(home string) NotesApp {
 		a.read_failed = true
 		a.status = 'notes.read_failed'
 	} else {
+		path := files_child_path(home, '.vinix-notes')
+		a.document = workflowcore.new_document(home, path) or { workflowcore.Document{} }
+		unsafe { path.free() }
 		a.reload()
+		if recovery := a.document.recovery() { a.recovery_available = true; unsafe { recovery.path.free(); recovery.bytes.free() } }
 	}
 	path := if home.ends_with('/') { '${home}vinix-note.txt' } else { '${home}/vinix-note.txt' }
 	if path.len <= 512 { editor_append(mut a.export_path, path) }
@@ -264,10 +272,17 @@ fn (mut a NotesApp) reload() {
 	defer { desktop_close(lock_fd) }
 	data, state := notes_read(a.home_fd)
 	defer { unsafe { data.free() } }
-	if state < 0 || (state == 1 && !a.decode(data)) {
+	if state < 0 {
 		a.read_failed = true
 		a.status = 'notes.corrupt'
 		return
+	}
+	if state == 1 {
+		bytes := a.document.load(notes_record_limit) or { a.read_failed = true; a.status = 'notes.read_failed'; return }
+		text := editor_bytes_text(bytes)
+		unchanged := text == data
+		unsafe { bytes.free() }
+		if !unchanged || !a.decode(data) { a.read_failed = true; a.status = 'notes.corrupt'; return }
 	}
 	if state == 0 {
 		a.free_items()
@@ -304,7 +319,7 @@ fn (mut a NotesApp) save() bool {
 		a.status = 'notes.limit'
 		return false
 	}
-	state := notes_publish(a.home_fd, a.record, data)
+	state := notes_publish(a.home_fd, mut a.document, a.record, data)
 	if state < 0 {
 		a.status = if state == -2 { 'notes.conflict' } else { 'notes.save_failed' }
 		return false
@@ -320,6 +335,7 @@ fn (mut a NotesApp) save() bool {
 		a.items[a.selected].body = editor_bytes_text(a.body).clone()
 	}
 	a.dirty = false
+	a.recovery_available = false
 	a.close_requested = false
 	a.status = if state == 1 { 'notes.durability_failed' } else { 'notes.saved' }
 	a.refilter()
@@ -378,7 +394,7 @@ fn (mut a NotesApp) delete_note() {
 	}
 	data := a.encode(a.selected)
 	defer { unsafe { data.free() } }
-	state := notes_publish(a.home_fd, a.record, data)
+	state := notes_publish(a.home_fd, mut a.document, a.record, data)
 	if state < 0 {
 		a.status = if state == -2 { 'notes.conflict' } else { 'notes.save_failed' }
 		return
@@ -471,6 +487,7 @@ fn (mut a NotesApp) close_app() {
 	// Forced process termination still bypasses the guard. An ordinary close
 	// reaches destruction only after save or the explicit discard confirmation.
 	if a.dirty && !a.discard_allowed { a.save() }
+	a.document.close()
 	a.clear_history()
 	a.free_items()
 	for index in 0 .. notes_limit {

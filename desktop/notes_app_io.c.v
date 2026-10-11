@@ -2,6 +2,8 @@
 // Saves compare the complete last snapshot under a separate stable lock.
 module main
 
+import desktop.workflowcore
+
 fn C.renameat(old_directory int, old_path &char, new_directory int, new_path &char) int
 
 fn notes_lock(directory int) int {
@@ -58,8 +60,12 @@ fn notes_unlink_own(directory int, name string, device u64, inode u64) {
 
 // -2 means a newer snapshot; -1 means no publication; 1 means publication
 // succeeded but final directory synchronization or close reported an error.
-fn notes_publish(directory int, expected string, data string) int {
+fn notes_publish(directory int, mut document workflowcore.Document, expected string, data string) int {
 	if data.len > notes_record_limit { return -1 }
+	if document.path.len == 0 { return -1 }
+	draft := data.bytes()
+	defer { unsafe { draft.free() } }
+	document.autosave(draft) or { return -1 }
 	lock_fd := notes_lock(directory)
 	if lock_fd < 0 { return -1 }
 	defer { desktop_close(lock_fd) }
@@ -67,44 +73,16 @@ fn notes_publish(directory int, expected string, data string) int {
 	defer { unsafe { current.free() } }
 	if state < 0 { return -1 }
 	if current != expected || (state == 0 && expected.len > 0) { return -2 }
-	pid := C.getpid().str()
-	defer { unsafe { pid.free() } }
-	mut fd := -1
-	mut temporary := ''
-	for attempt in 0 .. 16 {
-		serial := attempt.str()
-		name := '.vinix-notes.tmp-${pid}-${serial}'
-		unsafe { serial.free() }
-		fd = C.openat(directory, &char(name.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL |
-			C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CLOEXEC, u32(0o600))
-		if fd >= 0 {
-			temporary = name
-			break
-		}
-		unsafe { name.free() }
-		if C.errno != C.EEXIST { return -1 }
-	}
-	if fd < 0 { return -1 }
-	defer { unsafe { temporary.free() } }
-	mut own := C.stat{}
-	if unsafe { C.fstat(fd, &own) } != 0 {
-		desktop_close(fd)
-		return -1
-	}
-	if !desktop_write_all(fd, data.str, u64(data.len)) || !desktop_preferences_fsync(fd) {
-		desktop_close(fd)
-		notes_unlink_own(directory, temporary, u64(own.st_dev), u64(own.st_ino))
-		return -1
-	}
-	if C.renameat(directory, &char(temporary.str), directory, c'.vinix-notes') != 0 {
-		desktop_close(fd)
-		notes_unlink_own(directory, temporary, u64(own.st_dev), u64(own.st_ino))
-		return -1
-	}
-	mut synced := desktop_preferences_fsync(directory)
-	if !synced && C.errno == C.EINVAL { synced = desktop_preferences_fsync(fd) }
-	closed := desktop_close(fd) == 0
-	return if synced && closed { 0 } else { 1 }
+	if original := document.expected { if now := workflowcore.identify(document.path) { if !original.unchanged(now) { return -2 } } else { return -2 } }
+	if state == 1 {
+		bytes := document.load(notes_record_limit) or { return -1 }
+		text := bytes.bytestr()
+		unchanged := text == expected
+		unsafe { bytes.free(); text.free() }
+		if !unchanged { return -2 }
+	} else { document.expected = none }
+	document.save(draft, state == 0) or { return -1 }
+	return 0
 }
 
 fn notes_export(path string, title string, body string) string {

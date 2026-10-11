@@ -116,11 +116,16 @@ fn (mut app GrapherApp) open_graph_document() {
 	if !desktop_fill_fstat(fd, unsafe { &after })
 		|| !grapher_document_metadata_same(unsafe { &info }, unsafe { &after }) { return }
 	document := grapher_document_parse(editor_bytes_text(bytes)) or { return }
+	if !app.prepare_graph_service() { app.document_status = 'grapher.document_open_failed'; return }
+	checked := app.document.load(grapher_document_limit) or { app.document_status = 'grapher.document_open_failed'; return }
+	defer { unsafe { checked.free() } }
+	if checked != bytes { app.document_status = 'grapher.document_open_failed'; return }
 	// No model state changes until every record and all math fields validate.
 	for index, text in document.fields { app.set_field(index, text) }
 	app.plot()
 	app.document_status = 'grapher.document_opened'
 	app.pending_length = 0
+	app.document_changed = false
 }
 
 fn (mut app GrapherApp) save_graph_document() {
@@ -144,30 +149,13 @@ fn (mut app GrapherApp) save_graph_document() {
 		desktop_close(parent)
 		unsafe { leaf.free() }
 	}
-	fd := C.openat(parent, &char(leaf.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC | C.O_NONBLOCK, 0o600)
-	if fd < 0 {
-		app.document_status = if C.errno == C.EEXIST {
-			'grapher.document_exists'
-		} else {
-			'grapher.document_save_failed'
-		}
-		return
-	}
-	mut identity := C.stat{}
-	identified := desktop_fill_fstat(fd, unsafe { &identity })
+	mut existing := C.stat{}
+	if unsafe { C.fstatat(parent, &char(leaf.str), &existing, C.AT_SYMLINK_NOFOLLOW) } == 0 { app.document_status = 'grapher.document_exists'; return }
+	if C.errno != C.ENOENT { app.document_status = 'grapher.document_save_failed'; return }
+	if !app.prepare_graph_service() { app.document_status = 'grapher.document_save_failed'; return }
 	bytes := grapher_document_bytes(fields)
-	written := identified && desktop_write_all(fd, bytes.data, u64(bytes.len)) && desktop_preferences_fsync(fd) && archive_sync_parent(parent, fd)
-	unsafe { bytes.free() }
-	closed := desktop_close(fd) == 0
-	if !written || !closed {
-		mut current := C.stat{}
-		// Preserve a concurrently replaced name; remove only our failed creation.
-		if identified && desktop_fill_fstatat(parent, leaf, unsafe { &current }, C.AT_SYMLINK_NOFOLLOW)
-			&& current.st_dev == identity.st_dev && current.st_ino == identity.st_ino {
-			C.unlinkat(parent, &char(leaf.str), 0)
-		}
-		app.document_status = 'grapher.document_save_failed'
-		return
-	}
+	defer { unsafe { bytes.free() } }
+	app.document.save(bytes, true) or { app.document_status = 'grapher.document_save_failed'; return }
+	app.document_changed = false
 	app.document_status = 'grapher.document_saved'
 }

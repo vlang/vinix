@@ -128,8 +128,11 @@ fn (app &GrapherApp) build_compact(width int, height int) ui2.Element {
 			}
 			children << grapher_button(action, action, 12, 152, width - 24)
 		}
-		grapher_compact_help(mut children, help, width, 192, 11)
-		grapher_compact_help(mut children, 'grapher.compact.keyboard', width, 244, 10)
+		if app.compact_page == .document {
+			grapher_compact_help(mut children, help, width, 182, 10)
+			app.graph_document_buttons(mut children, width, 224)
+		} else { grapher_compact_help(mut children, help, width, 192, 11) }
+		grapher_compact_help(mut children, 'grapher.compact.keyboard', width, if app.compact_page == .document { 250 } else { 244 }, 10)
 	}
 	children << app.layout_status(width, height)
 	return ui2.view('grapher.body', ui2.rect(0, 0, f64(width), f64(height)), ui2.BoxStyle{ bg: app_surface }, children)
