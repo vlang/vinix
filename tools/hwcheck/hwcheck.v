@@ -166,6 +166,12 @@ fn power(mut r Report) {
 	r.add('| may wake the machine | ${wake.join(', ')} |')
 	r.add('| screen across a sleep | dark ${word(sys + '/power/suspend_stats/screen_dark')} times, left lit ${word(sys +
 		'/power/suspend_stats/screen_lit')} |')
+	// USB keyboards and pointers, where an xHCI controller was taken into
+	// use: only those on its root ports are seen.
+	usb := (os.read_file(sys + '/bus/usb/xhci') or { '' }).trim_space()
+	if usb != '' {
+		r.add('| USB input (xHCI) | ${usb.replace('\n', '; ')} |')
+	}
 	// Panels whose backlight the kernel can set: without one a dark screen is a
 	// black picture on a lit panel.
 	panels := listing(sys + '/class/backlight')
