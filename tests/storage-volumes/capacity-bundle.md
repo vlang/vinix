@@ -58,10 +58,12 @@ applies growth through a retained descriptor. The descriptor writes and flushes
 the new page; its generation and an old held descriptor/data remain intact.
 Desired growth now uses `pool-grow`, bounded by the expanded tail member.
 After growth, a batch retains the writable tail row and adds a read-only neighbor
-whose raw page is flushed first. The application persists the complete seven-
+whose raw page is flushed first. A growth batch then keeps the writable row and
+grows the neighbor to 8192 bytes. Its held read-only descriptor reads the flushed
+extension page after explicit replay. The application persists the complete seven-
 mapping bundle and its reboot marker. On the fourth boot, production init must
 restore all seven mappings before the application starts; old data/modes, both
-tail pages and the neighbor, correct physical disk identities and repeated
+tail pages and both neighbor pages, correct physical disk identities and repeated
 adoption/boot replay are verified.
 The original two pool records and the newly expanded tail pool survive adoption
 and reboot; the fourth boot requires their exact eligible capacity reports.

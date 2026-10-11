@@ -12,7 +12,7 @@ fn pool_growth_boot_check() {
 	mut output := [4096]char{}
 	pool_preview_for(c'/etc/vinix/volumes.vset', c'4', 0, &output[0])
 	check(contains(&output[0], c'pool=4 disk=0 start=16777216 end=25165824 alignment=4096')
-		&& contains(&output[0], c'pool=4 regions=1 gaps=1 bytes=8376320 largest=8376320'),
+		&& contains(&output[0], c'pool=4 regions=1 gaps=1 bytes=8372224 largest=8372224'),
 		c'expanded tail pool and grown mapping survive boot')
 	C.printf(c'PLAN POOL GROWTH BOOT PRESERVED\n')
 }

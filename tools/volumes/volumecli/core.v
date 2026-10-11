@@ -66,11 +66,27 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume pool-remove BUNDLE POOL_ID DISK_INDEX\n       vinix-volume pool-space BUNDLE POOL_ID\n       vinix-volume pool-allocate BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]\n')
 	C.printf(c'       vinix-volume pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES\n       vinix-volume pool-grow BUNDLE POOL_ID SLOT LENGTH_BYTES\n')
 	C.printf(c'       vinix-volume pool-allocate-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       vinix-volume pool-preview-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
+	C.printf(c'       vinix-volume pool-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [SLOT LENGTH_BYTES ...]\n       vinix-volume pool-preview-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [SLOT LENGTH_BYTES ...]\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'pool-grow-batch') == 0 || C.strcmp(argv[1], c'pool-preview-grow-batch') == 0) {
+			if argc < 6 || argc > 132 || (argc - 4) % 2 != 0 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			if pool >= 64 { return usage() }
+			mut batch := &PoolGrowthBatch(C.alloca(sizeof(PoolGrowthBatch)))
+			*batch = PoolGrowthBatch{count: (argc - 4) / 2}
+			for i in 0 .. batch.count {
+				slot := decimal(argv[4 + i * 2]) or { return usage() }
+				length := decimal(argv[5 + i * 2]) or { return usage() }
+				if slot >= 64 || length == 0 { return usage() }
+				batch.slots[i] = u32(slot)
+				batch.lengths[i] = length
+			}
+			return grow_batch_pool_plan(argv[2], u32(pool), batch, C.strcmp(argv[1], c'pool-preview-grow-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'pool-allocate-batch') == 0 || C.strcmp(argv[1], c'pool-preview-batch') == 0) {
 			if argc < 7 || argc > 196 || (argc - 4) % 3 != 0 { return usage() }
 			pool := decimal(argv[3]) or { return usage() }

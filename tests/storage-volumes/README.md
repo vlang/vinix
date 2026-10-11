@@ -84,6 +84,13 @@ buffered output failure. Guests check later-disk live conflicts, retained
 descriptors and a mixed keep/new batch across reboot. See
 [batch qualification](pool-batch.md).
 
+Atomic pool growth batch tests compare in-place extensions with an independent
+4096-case cell oracle, preserve the whole set and caller output on later failure,
+and qualify mixed growth/equal-size retries through every publisher boundary.
+Read-only previews never publish; both commands detect buffered output failure.
+Guests check cross-disk conflicts, held descriptors and a grown read-only tail
+neighbor across reboot. See [growth batch qualification](pool-grow-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -110,9 +117,9 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 6800 utility processes across 200 warmup
-and 200 measured seventeen-command cycles, with pool membership, query, batch
-preview/allocation and growth,
+its own process. The allowance includes 7200 utility processes across 200 warmup
+and 200 measured eighteen-command cycles, with pool membership, query, batch
+preview/allocation and growth batch preview/publication,
 physical-capacity verification, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
 checks are unchanged.
@@ -160,7 +167,8 @@ The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
 capacity, verifies/republishes unchanged physical capacity, adds two pool members,
 expands the first region, queries the pool and previews/allocates a two-mapping
-batch, grows/checks/removes the scratch mappings, enrolls/forgets an empty offline
+batch, previews/publishes a two-mapping growth batch, checks/removes the scratch
+mappings, enrolls/forgets an empty offline
 participant, explicitly replays growth and runs boot restoration.
 A flushed phase marker
 and the atomically published bundle stay on ext2 across an
@@ -174,9 +182,11 @@ After the ordinary second-boot assertions pass, the controller extends only
 the disposable raw file from 16 to 24 MiB, preserving its MBR and prior bytes.
 The third boot must reject the old saved geometry before the application adopts
 the exact new capacity, allocates and grows a tail view, and publishes a mixed
-keep/new batch with a read-only tail neighbor. It persists the complete bundle
+keep/new batch with a read-only tail neighbor. A growth batch then retains the
+writable tail length and grows that neighbor, preserving its held descriptor.
+It persists the complete bundle
 and phase marker. The fourth boot must restore all seven mappings through
-production init and retain durable old/tail data and read-only modes. Both pool
+production init and retain durable old/tail data, both neighbor pages and read-only modes. Both pool
 regions must survive the reordered second boot and enlarged fourth boot. The
 new tail pool's expanded eligibility, grown mapping and batch neighbor must
 survive the fourth boot too.

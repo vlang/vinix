@@ -649,7 +649,8 @@ durability protocol after a prior directory-flush failure. Publication and
 buffered output errors return failure; after rename, the complete new desired
 file may already be visible. Inspection and retry use that new desired state.
 Each command publishes separately, so a later failed growth retains an earlier
-successful physical-capacity adoption or region expansion.
+successful physical-capacity adoption or region expansion. To publish several
+mapping growth requests together, use [growth batches](#atomic-pool-growth-batches).
 
 Apply growth separately with `check-bundle BUNDLE grow` and `restore-bundle
 BUNDLE grow`. Ordinary replay still rejects existing smaller live mappings.
@@ -715,6 +716,55 @@ rules. Batch metadata uses the unchanged version-2 format and existing boot
 restore. Spanning, RAID, encryption and
 filesystem resizing remain open. See
 [batch qualification](../tests/storage-volumes/pool-batch.md).
+
+## Atomic pool growth batches
+
+```sh
+# Slots 20 and 21 already fit inside pool 3's members on their current disks.
+vinix-volume pool-preview-grow-batch /root/layout.vset 3 20 8388608 21 2097152
+vinix-volume pool-grow-batch /root/layout.vset 3 20 8388608 21 2097152
+vinix-volume check-bundle /root/layout.vset grow
+vinix-volume restore-bundle /root/layout.vset grow
+```
+
+`pool-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [...]` plans 1–64 existing
+mapping lengths in argument order and atomically publishes the complete bundle
+once. Slots must be distinct and below 64; lengths must be nonzero unsigned
+decimal bytes, at least the saved length and aligned to each mapping's disk
+sector size. Both the previous and requested extents must fit inside the selected
+pool's member on that disk and avoid every other desired mapping.
+
+The planner retains each mapping's disk, start, slot, read-only mode and row
+order, alongside all disk identities, other rows and ordered pool metadata.
+It builds a bounded private candidate; an invalid or impossible later request
+preserves the entire previous bundle and emits no action rows. Growth cannot
+shrink, relocate, allocate an absent slot or use capacity on a different member.
+A manually added mapping wholly inside the selected member is eligible.
+
+Equal-size requests can accompany growth requests. Reports include request
+index, disk, slot, `action=grow` or `action=keep`, offset, previous length,
+requested length and mode. Retrying an unchanged batch still writes, fsyncs,
+renames and fsyncs the directory, completing durability after a previous
+directory-flush failure. Before rename a publisher failure preserves the old
+file; after rename the complete new file may already be visible. Buffered output
+failure also returns an error, including after successful publication; inspect
+the saved state or retry the same requests.
+
+`pool-preview-grow-batch` accepts the same arguments and uses the same planner.
+It reports every action only after the whole batch succeeds, without writing,
+creating a temporary or acquiring a writer lock. Publication holds the saved
+directory lock from source read through reporting. Both commands open no
+devices and use the unchanged version-2 format. A preview does not reserve
+the saved state against another editor.
+
+Apply growth separately with complete-set `check-bundle BUNDLE grow` and
+explicit `restore-bundle BUNDLE grow`. Ordinary replay rejects smaller live
+views. Preflight catches an unlisted live conflict on a later disk before any
+action; successful growth retains generations and held descriptors, including
+read-only ones. Live administration still requires serialization and retains
+the existing partial-application rules. Boot replay restores the saved grown
+geometry. Filesystem resizing, spanning, RAID and encryption remain separate
+work. See [growth batch qualification](../tests/storage-volumes/pool-grow-batch.md).
 
 ## Saved-plan writer locking
 

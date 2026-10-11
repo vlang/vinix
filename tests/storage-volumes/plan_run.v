@@ -31,7 +31,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -372,6 +372,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN POOLS PASSED:') { return error('Missing persistent allocation pool qualification') }
 	if !first.contains('PLAN POOL GROWTH PASSED:') { return error('Missing pool expansion and bounded growth qualification') }
 	if !first.contains('PLAN POOL BATCH PASSED:') { return error('Missing atomic pool batch qualification') }
+	if !first.contains('PLAN POOL GROWTH BATCH PASSED:') { return error('Missing atomic pool growth batch qualification') }
 	if !first.contains('PLAN LOCK PASSED:') { return error('Missing saved-plan locking qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
@@ -404,7 +405,8 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !fourth.contains('PLAN POOL BOOT PRESERVED') { return error('Pool configuration did not survive capacity adoption and boot') }
 	if !fourth.contains('PLAN POOL GROWTH BOOT PRESERVED') { return error('Expanded tail pool did not survive boot') }
 	if !fourth.contains('PLAN POOL BATCH BOOT PRESERVED') { return error('Mixed batch tail mapping did not survive boot') }
-	println('PASS ${arch}: saved-plan locks, atomic pool batches/previews/retries, pool expansion and mapping growth, complete preflight, four-boot persistence and 200-cycle retention')
+	if !fourth.contains('PLAN POOL GROWTH BATCH BOOT PRESERVED') { return error('Growth batch tail mapping did not survive boot') }
+	println('PASS ${arch}: atomic pool growth batches/previews/retries, saved-plan locks, complete preflight, four-boot persistence and 200-cycle retention')
 }
 
 fn main() {

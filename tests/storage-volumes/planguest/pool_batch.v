@@ -91,12 +91,15 @@ fn planned_pool_batch(parent &char, other &char) {
 fn pool_batch_boot_check(parent &char) {
 	unsafe {
 		info := status(c'/dev/mapper/vinix18')
-		check(info.disk_id == status(parent).disk_id && info.start == 16785408 && info.bytes == 4096
+		check(info.disk_id == status(parent).disk_id && info.start == 16785408 && info.bytes == 8192
 			&& info.flags & 1 == 1, c'additional batch mapping survives boot with readonly mode')
 		fd := C.open(c'/dev/mapper/vinix18', C.O_RDONLY)
 		mut data := [4096]u8{}
-		check(fd >= 0 && C.pread(fd, &data[0], 4096, 0) == 4096 && C.close(fd) == 0, c'read persisted batch tail data')
+		check(fd >= 0 && C.pread(fd, &data[0], 4096, 0) == 4096, c'read persisted batch tail data')
 		for byte in data { check(byte == 0xcc, c'batch tail data survives reboot') }
+		check(C.pread(fd, &data[0], 4096, 4096) == 4096 && C.close(fd) == 0, c'read persisted growth batch extension')
+		for byte in data { check(byte == 0xcd, c'growth batch tail data survives reboot') }
 		C.printf(c'PLAN POOL BATCH BOOT PRESERVED\n')
+		C.printf(c'PLAN POOL GROWTH BATCH BOOT PRESERVED\n')
 	}
 }

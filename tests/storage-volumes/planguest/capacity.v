@@ -117,6 +117,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 		missing(c'/dev/mapper/vinix18')
 		simple(c'restore-bundle', c'/root/saved.vset', nil, 0)
 		check(status(c'/dev/mapper/vinix14').generation == tail, c'mixed batch retains existing tail generation')
+		capacity_growth_batch(parent)
 		pool_batch_boot_check(parent)
 		copy_plan(c'/root/saved.vset', c'/etc/vinix/volumes.vset')
 		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0,

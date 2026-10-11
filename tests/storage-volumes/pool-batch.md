@@ -46,12 +46,14 @@ report both saved placements as `keep`, preserve exact bytes, and retain both
 live generations and a readable held descriptor. A mode mismatch fails without
 changing the bundle. Cleanup restores exact baseline bytes.
 
-Each of 200 warmup and 200 measured cycles now executes 17 utility processes:
+Each of 200 warmup and 200 measured cycles now executes 18 utility processes:
 save-set, unchanged plan-grow/capacity, two pool-add commands, pool-expand,
-pool-space, two-request pool-preview-batch and pool-allocate-batch, pool-grow,
+pool-space, two-request pool-preview-batch and pool-allocate-batch,
+pool-preview-grow-batch and pool-grow-batch,
 check-bundle, two plan-remove commands, plan-enroll/forget, restore-bundle and
-boot-restore. This is **6800 processes**, 400 previews/publications, 800 scratch
-placements, 800 member additions and 400 expansions/growths/queries/capacity
+boot-restore. This is **7200 processes**, 400 allocation previews/publications,
+800 scratch placements, 400 growth previews/publications, 800 scratch growths,
+800 member additions and 400 expansions/queries/capacity
 checks. Neither scratch mapping becomes live. Every slab class and the large-
 allocation page total must stay flat or decrease. The existing 1800-second
 per-boot limit is unchanged.
@@ -61,8 +63,10 @@ adoption. After growing its writable tail view, it previews and publishes one
 matching writable tail row plus a new read-only neighbor in one batch. Raw data
 is flushed before publication. The fourth boot must restore all seven mappings
 through production init, with exact disk identities, old/tail data, the new
-read-only page and the three ordered pool records. Original pool capacity stays
-unchanged; the expanded tail pool has exactly 8376320 eligible bytes remaining.
+read-only pages and the three ordered pool records. The neighbor grows through
+a subsequent mixed keep/grow batch; see [growth batch qualification](pool-grow-batch.md).
+Original pool capacity stays unchanged; the expanded tail pool has exactly
+8372224 eligible bytes remaining.
 `PLAN POOL BATCH PASSED:` and `PLAN POOL BATCH BOOT PRESERVED` are required.
 
 Both architectures' generated production/guest C must contain no heap or V

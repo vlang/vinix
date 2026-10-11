@@ -99,6 +99,14 @@ preserves the entire saved state. `pool-preview-batch` reports the same complete
 placements without publication. Live checking/application remain separate. See
 [atomic batch rules](../../docs/storage-volumes.md#atomic-pool-allocation-batches).
 
+`pool-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [...]` grows 1–64 existing
+desired mappings together, preserving each disk, start and mode. A later
+failure preserves the complete saved state. `pool-preview-grow-batch` reports
+the same complete candidate without publication. Equal-size requests report
+`keep`; retries still complete publication and both flushes. Live growth uses
+separate explicit replay. See
+[atomic growth batch rules](../../docs/storage-volumes.md#atomic-pool-growth-batches).
+
 Saved-plan writers acquire a nonblocking exclusive lock on the destination
 directory before reading or snapshotting, holding it through atomic publication.
 A busy directory returns failure; retry reads the latest complete state. All
