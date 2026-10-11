@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `7b27042a7cc93da8f4c44c83d2d6deb26a4a3278`,
-Linguist 7.27.0 reports **Python 4.65%** (357 files, 1,766,643 bytes) and
-**V 77.31%** (2,863 files, 29,343,681 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `d22c958f6d5f71b1174b80cc284a814ed2a6cef3`,
+Linguist 7.27.0 reports **Python 4.59%** (354 files, 1,747,004 bytes) and
+**V 77.44%** (2,885 files, 29,487,018 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,439,642 Python bytes**. All remaining
-1,766,643 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,459,281 Python bytes**. All remaining
+1,747,004 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 42 stages below remove **175 Python files / 594,705 original bytes** and
+The 43 stages below remove **178 Python files / 614,344 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -73,6 +73,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | CPU/job/SysV regression supervision, retention, stack canaries, ELF host/guest, greetings and uname | `build-support/native-compat-tools/compathost`, eight native fronts and native PTY completion policy | 37,579 / 659 | `59fc4cc3` |
 | Stack guards, CPU mitigation and segments, paired SMT boot policy, isolated-worktree ACPI | `build-support/native-compat-tools/compathost`, four native fronts and physical ARM home setup | 14,815 / 284 | `091cdf32` |
 | Resource-group swap/guest workflow and independent speculation host/guest oracle | `build-support/native-compat-tools/compathost`, two native fronts | 12,528 / 229 | `7b27042a` |
+| Resource accounting, read-ahead and sparse filesystem power cuts | `build-support/native-compat-tools/compathost`, shared native PTY controller and three fronts | 19,639 / 339 | `d22c958f` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -705,9 +706,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 42 stages.
+or hidden in these 43 stages.
 
-The next four stages remove twenty-three Python files / 96,362 original bytes.
+The next five stages remove twenty-six Python files / 116,001 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -720,7 +721,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **53 Python files / 230,639 original bytes**. Temporary qualification
+translates **56 Python files / 250,278 original bytes**. Temporary qualification
 caches were cleared during shared-machine disk cleanup; final follow-on
 checks and inputs are retained under
 `/Users/alex/.cache/vinix-python-zero-process-20261011`.
@@ -2689,3 +2690,11 @@ other build tooling, desktop generators and benchmark controllers.
 Keep original protocol, build profile, fixture identity, deadlines, allocation
 and lifetime behavior. Commit finished stages using only reviewed owned paths,
 then regenerate the language inventory from an explicit committed source SHA.
+
+The filesystem stage passes all eight target profiles on ARM, Rosetta x86 and
+ASan/UBSan, preserves direct power cuts, and independently checks each completed
+disk with debugfs and e2fsck. ARM read-ahead, accounting retention and all six
+sparse epochs pass on the prepared kernel. Full accounting passes its guest
+assertions but fails the final filesystem check; x86 retains existing retention,
+read-ahead and sparse timeout failures, including frozen C controls. Detailed
+evidence and limits are in [filesystem-tools.md](../build-support/native-compat-tools/filesystem-tools.md).

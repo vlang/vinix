@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `7b27042a7cc93da8f4c44c83d2d6deb26a4a3278`,
+at source commit `d22c958f6d5f71b1174b80cc284a814ed2a6cef3`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 566 | 2,364,635 | 6.23% |
-| Python | 357 | 1,766,643 | 4.65% |
-| Shell | 497 | 1,361,196 | 3.59% |
+| C | 566 | 2,364,635 | 6.21% |
+| Python | 354 | 1,747,004 | 4.59% |
+| Shell | 500 | 1,361,754 | 3.58% |
 
-All `.v` files are classified as V. The resulting V share is 77.31%, with no
+All `.v` files are classified as V. The resulting V share is 77.44%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,766,643 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,747,004 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 7b27042a7cc93da8f4c44c83d2d6deb26a4a3278 --breakdown --json
+github-linguist --rev d22c958f6d5f71b1174b80cc284a814ed2a6cef3 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -878,7 +878,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/vulkan-stage-test.py` | 4,722 |
 | `tests/dota2/wake-op-run.py` | 2,474 |
 | `tests/emulator-desktop/_native.py` | 3,457 |
-| `tests/ext2-sparse/run.py` | 7,614 |
 | `tests/ext2-xattr/host.py` | 6,852 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/fs-journal/image.py` | 3,153 |
@@ -939,7 +938,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/opengothic/run.py` | 3,425 |
 | `tests/packages/test-qemu-package-store.py` | 3,072 |
 | `tests/packages/x-window-check.py` | 5,985 |
-| `tests/pagecache/run-guest.py` | 6,291 |
 | `tests/paging/run.py` | 5,610 |
 | `tests/pci-config/_native.py` | 512 |
 | `tests/pci-config/arm_vm.py` | 5,495 |
@@ -955,7 +953,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tests/reboot-persistence/_native.py` | 959 |
 | `tests/reboot-persistence/run_vm.py` | 5,086 |
-| `tests/resource-accounting/run.py` | 5,734 |
 | `tests/roblox-windows/_native.py` | 5,099 |
 | `tests/roblox-windows/run.py` | 7,180 |
 | `tests/roblox/build-test.py` | 8,453 |
@@ -1249,6 +1246,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/elf-text/run-host.sh` | 260 |
 | `tests/execute-only/check-generated` | 178 |
 | `tests/execute-only/run` | 183 |
+| `tests/ext2-sparse/run` | 184 |
 | `tests/ext2-sparse/run-host.sh` | 2,056 |
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/fuzz/run` | 874 |
@@ -1350,6 +1348,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/test-qemu-persistence.sh` | 4,248 |
 | `tests/packages/test-vinix-pkg.sh` | 24,414 |
 | `tests/pagecache/check-generated` | 146 |
+| `tests/pagecache/run-guest` | 182 |
 | `tests/pagecache/run.sh` | 3,296 |
 | `tests/paging/run-host.sh` | 178 |
 | `tests/pci-config/run.sh` | 5,477 |
@@ -1391,6 +1390,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run.sh` | 1,513 |
 | `tests/reboot-persistence/run.sh` | 2,604 |
 | `tests/resource-accounting/check-generated` | 146 |
+| `tests/resource-accounting/run` | 192 |
 | `tests/resource-groups/run` | 188 |
 | `tests/resource-groups/run-host.sh` | 801 |
 | `tests/resource-open/run` | 186 |
