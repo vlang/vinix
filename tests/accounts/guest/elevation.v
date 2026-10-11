@@ -97,14 +97,17 @@ fn scenario_elevation(mut t Test) {
 		'sam changed alex\'s password')
 	t.check(auth(['verify'], alex_password + '\n', db, alex).status == 0, 'alex\'s password is gone')
 
-	// Guessing gets slower, for the account guessed at and nobody else.
-	for _ in 0 .. 3 {
+	// Guessing gets slower, for the account guessed at and nobody else. Five
+	// wrong passwords make the wait eight seconds: long enough that an
+	// emulated machine under load cannot have sat it out between two
+	// commands.
+	for _ in 0 .. 5 {
 		auth(['verify'], 'a guess, wrong\n', db, kim)
 	}
 	slowed := auth(['verify'], 'kim picked this one\n', db, kim)
-	t.check(slowed.status == 3, 'after three wrong passwords the right one was taken at once: ${slowed.status} ${slowed.output}')
+	t.check(slowed.status == 3, 'after five wrong passwords the right one was taken at once: ${slowed.status} ${slowed.output}')
 	t.check(auth(['verify'], alex_password + '\n', db, alex).status == 0, 'kim\'s failures slowed alex down')
-	C.usleep(2_500_000)
+	C.usleep(8_500_000)
 	t.check(auth(['verify'], 'kim picked this one\n', db, kim).status == 0, 'the wait did not end')
 
 	// What the service keeps is root's.

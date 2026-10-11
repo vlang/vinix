@@ -93,6 +93,7 @@ fn new_world() !World {
 			actions:  os.join_path(dir, 'actions')
 			session:  os.join_path(dir, 'active')
 			log:      os.join_path(dir, 'log', 'auth.log')
+			events:   os.join_path(dir, 'events')
 			cost:     cheap
 			clock:    clock_of_test
 			runner:   fake_runner
@@ -354,4 +355,19 @@ fn test_run_is_throttled_and_logged() ! {
 	assert lines[0] == '1800000000 pid=10 uid=1000 run fails: denied: wrong password'
 	assert lines[3] == '1800000000 pid=10 uid=1000 run fails: wait 2s'
 	assert os.stat(w.env.log)!.mode & 0o777 == 0o600
+}
+
+// What the service reports to the kernel's stream: one write per decision,
+// naming the caller's process, with 1 for anything that was not done.
+fn test_reports_to_the_kernel() ! {
+	w := new_world()!
+	os.write_file(w.env.events, '')!
+	ask(w, w.alex, authproto.op_verify, 'alex', 'wrong')
+	assert os.read_file(w.env.events)! == '10 1 auth:verify alex:denied'
+	os.write_file(w.env.events, '')!
+	ask(w, w.alex, authproto.op_verify, 'alex', 'alex password')
+	assert os.read_file(w.env.events)! == '10 0 auth:verify alex:ok'
+	os.write_file(w.env.events, '')!
+	ask(w, w.alex, authproto.op_run, 'profile', 'alex password', '', 'quiet', '3')
+	assert os.read_file(w.env.events)! == '10 0 auth:run profile as alex:exit 0'
 }

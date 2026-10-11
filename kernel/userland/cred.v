@@ -8,6 +8,7 @@ module userland
 
 import errno
 import proc
+import security
 import usercopy
 
 // The most supplementary groups a process may hold. Linux's default is 65536;
@@ -66,7 +67,7 @@ pub fn syscall_setuid(_ voidptr, uid u32) (u64, u64) {
 	}
 
 	if uid != process.uid && uid != process.suid {
-		return errno.err, errno.eperm
+		return identity_refused()
 	}
 
 	process.euid = uid
@@ -93,7 +94,7 @@ pub fn syscall_setgid(_ voidptr, gid u32) (u64, u64) {
 	}
 
 	if gid != process.gid && gid != process.sgid {
-		return errno.err, errno.eperm
+		return identity_refused()
 	}
 
 	process.egid = gid
@@ -114,13 +115,13 @@ pub fn syscall_setreuid(_ voidptr, ruid u32, euid u32) (u64, u64) {
 
 	if !unchanged(ruid) {
 		if !privileged && ruid != process.uid && ruid != process.euid {
-			return errno.err, errno.eperm
+			return identity_refused()
 		}
 	}
 	if !unchanged(euid) {
 		if !privileged && euid != process.uid && euid != process.euid
 			&& euid != process.suid {
-			return errno.err, errno.eperm
+			return identity_refused()
 		}
 	}
 
@@ -155,13 +156,13 @@ pub fn syscall_setregid(_ voidptr, rgid u32, egid u32) (u64, u64) {
 
 	if !unchanged(rgid) {
 		if !privileged && rgid != process.gid && rgid != process.egid {
-			return errno.err, errno.eperm
+			return identity_refused()
 		}
 	}
 	if !unchanged(egid) {
 		if !privileged && egid != process.gid && egid != process.egid
 			&& egid != process.sgid {
-			return errno.err, errno.eperm
+			return identity_refused()
 		}
 	}
 
@@ -193,7 +194,7 @@ pub fn syscall_setresuid(_ voidptr, ruid u32, euid u32, suid u32) (u64, u64) {
 				continue
 			}
 			if wanted != process.uid && wanted != process.euid && wanted != process.suid {
-				return errno.err, errno.eperm
+				return identity_refused()
 			}
 		}
 	}
@@ -229,7 +230,7 @@ pub fn syscall_setresgid(_ voidptr, rgid u32, egid u32, sgid u32) (u64, u64) {
 				continue
 			}
 			if wanted != process.gid && wanted != process.egid && wanted != process.sgid {
-				return errno.err, errno.eperm
+				return identity_refused()
 			}
 		}
 	}
@@ -314,7 +315,7 @@ pub fn syscall_setgroups(_ voidptr, size int, list u64) (u64, u64) {
 		return errno.err, errno.einval
 	}
 	if !may_set_gids(process) {
-		return errno.err, errno.eperm
+		return identity_refused()
 	}
 
 	// The process' groups from here, freed when they are replaced and when it
@@ -337,7 +338,7 @@ pub fn syscall_setgroups(_ voidptr, size int, list u64) (u64, u64) {
 	if !may_set_gids(process) {
 		proc.unlock_table()
 		unsafe { incoming.free() }
-		return errno.err, errno.eperm
+		return identity_refused()
 	}
 	unsafe { process.groups.free() }
 	process.groups = incoming
@@ -359,4 +360,10 @@ pub fn syscall_setsid(_ voidptr) (u64, u64) {
 // getsid(pid). Zero means the caller.
 pub fn syscall_getsid(_ voidptr, pid int) (u64, u64) {
 	return proc.get_process_session(pid)
+}
+
+// A change of ids the caller may not make: recorded, then refused.
+fn identity_refused() (u64, u64) {
+	security.event(security.event_identity, true, 0, 'setid')
+	return errno.err, errno.eperm
 }

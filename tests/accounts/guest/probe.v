@@ -178,6 +178,15 @@ fn run_probe(what []string) int {
 		'greeter' {
 			return probe_greeter()
 		}
+		'flood' {
+			return probe_flood(what[1].int())
+		}
+		'report' {
+			// An account trying to put a record of its own making into the
+			// kernel's stream.
+			println(if write_once('/proc/security_events', '1 0 forged') { 'accepted' } else { 'refused' })
+			return 0
+		}
 		'desktop' {
 			return probe_desktop()
 		}

@@ -43,9 +43,16 @@ pub fn mac_require(mut res resource.Resource, access u32) ? {
 	domain := proc.mac_current_domain()
 	if domain == 0 { return }
 	// Access to raw block storage would bypass every inode label on it.
-	if stat.isblk(res.stat.mode) { errno.set(errno.eacces); return none }
+	if stat.isblk(res.stat.mode) {
+		event(event_mac, true, (u64(domain) << 32) | u64(access), 'block-device')
+		errno.set(errno.eacces); return none
+	}
 	kind := mac_object_type(mut res)?
-	if !proc.mac_allows(domain, kind, access) { errno.set(errno.eacces); return none }
+	if !proc.mac_allows(domain, kind, access) {
+		// The domain, the object's type and the access that was refused.
+		event(event_mac, true, (u64(domain) << 32) | (u64(kind) << 16) | u64(access), 'object')
+		errno.set(errno.eacces); return none
+	}
 }
 
 pub fn mac_permitted(mut res resource.Resource, access u32) bool {

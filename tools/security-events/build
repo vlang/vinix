@@ -1,0 +1,47 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Build vinix-security-events as a static program for a Vinix machine.
+#
+#   tools/security-events/build aarch64|x86_64 ROOT
+#
+# puts it in ROOT/usr/sbin. The compilers are found as tools/accounts/build
+# finds them.
+set -eu
+
+if [ "$#" -ne 2 ]; then
+    echo "usage: $0 aarch64|x86_64 ROOT" >&2
+    exit 2
+fi
+arch=$1
+root=$2
+repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+. "$repo/build-support/find-v.sh"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-security-events.XXXXXX")
+trap 'rm -rf "$work"' 0
+mkdir -p "$root/usr/sbin"
+output="$root/usr/sbin/vinix-security-events"
+
+case "$arch" in
+    aarch64)
+        sysroot=${VINIX_AARCH64_SYSROOT:-"$repo/build-aarch64-userland/sysroot"}
+        "$V" -os linux -arch arm64 -gc none -d no_backtrace -o "$work/program.c" \
+            "$repo/tools/security-events/events.v"
+        "${CC:-clang}" --target=aarch64-linux-musl --sysroot="$sysroot" -static -O1 -w \
+            -D_GNU_SOURCE -fno-stack-protector -L"$sysroot/lib" -fuse-ld=lld \
+            -o "$output" "$work/program.c" -lm -lpthread
+        ;;
+    x86_64)
+        "$V" -os linux -arch amd64 -gc none -d no_backtrace -o "$work/program.c" \
+            "$repo/tools/security-events/events.v"
+        # -fpermissive: V's library passes an i64 where C wants an int
+        # pointer, which gcc 14 refuses and clang only warns about.
+        "${CC_AMD64:-x86_64-linux-musl-gcc}" -static -O1 -w -fpermissive -D_GNU_SOURCE \
+            -o "$output" "$work/program.c" -lm -lpthread
+        ;;
+    *)
+        echo "unknown architecture: $arch" >&2
+        exit 2
+        ;;
+esac
+chmod 755 "$output"

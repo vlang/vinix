@@ -754,6 +754,7 @@ fn internal_create_with_acl_locked(parent &VFSNode, name string, mode u32, acces
 fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity &lib.MountContext) ?int {
 	current_process := proc.current_thread().process
 	if node.seat && !proc.seat_may_open() {
+		security.event(security.event_seat, true, 0, node.name)
 		errno.set(errno.eacces)
 		return none
 	}

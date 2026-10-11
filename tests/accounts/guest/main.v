@@ -36,6 +36,7 @@ fn main() {
 		'unprivileged' { scenario_unprivileged(mut t) }
 		'seat' { scenario_seat(mut t) }
 		'sessions' { scenario_sessions(mut t) }
+		'audit' { scenario_audit(mut t) }
 		else { t.check(false, 'the guest program has no scenario of this name') }
 	}
 	t.finish()

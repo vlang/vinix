@@ -6,8 +6,19 @@ import katomic
 import proc
 import posixtimer
 import sched
+import security
 
 fn may_signal(caller &proc.Process, target &proc.Process, signal int) bool {
+	allowed := may_signal_now(caller, target, signal)
+	// A refused signal to someone else's process is worth a record; asking
+	// whether a process exists (signal 0) is not.
+	if !allowed && signal != 0 {
+		security.event(security.event_signal, true, u64(target.pid), 'kill')
+	}
+	return allowed
+}
+
+fn may_signal_now(caller &proc.Process, target &proc.Process, signal int) bool {
 	if !proc.mac_peer_allowed(caller, target) { return false }
 	// Capabilities acquired in a user namespace cannot signal its host.
 	same_namespace := voidptr(caller.ns.user) == voidptr(target.ns.user)

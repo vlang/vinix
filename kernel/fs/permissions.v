@@ -4,6 +4,7 @@ import errno
 import proc
 import posix_acl
 import resource
+import security
 import stat
 
 pub const access_exec = u32(1)
@@ -185,10 +186,12 @@ fn may_link(node &VFSNode) ? {
 		return
 	}
 	if !stat.isreg(mode) || mode & 0o4000 != 0 || mode & 0o2010 == 0o2010 {
+		security.event(security.event_file, true, u64(node.resource.stat.uid), 'link')
 		errno.set(errno.eperm)
 		return none
 	}
 	check_access(node, access_read | access_write, true) or {
+		security.event(security.event_file, true, u64(node.resource.stat.uid), 'link')
 		errno.set(errno.eperm)
 		return none
 	}

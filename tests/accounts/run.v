@@ -33,6 +33,10 @@ const programs = [
 		source: 'tools/accounts/auth.v'
 		path:   'usr/bin/vinix-auth'
 	},
+	hwhost.Program{
+		source: 'tools/security-events/events.v'
+		path:   'usr/sbin/vinix-security-events'
+	},
 ]
 
 // Actions only the tests have: something harmless to be allowed or refused.
@@ -103,7 +107,7 @@ scrypt_ln = 10
 	suite := hwhost.Suite{
 		name:        'accounts'
 		guest:       'tests/accounts/guest'
-		module_paths: ['tools/accounts']
+		module_paths: ['tools/accounts', 'tools/security-events']
 		programs:    programs
 		files:       files
 		directories: ['run', 'home', 'var/log', 'usr/share/vinix/actions', 'tmp:1777']
@@ -128,6 +132,7 @@ scrypt_ln = 10
 			},
 			scenario('seat', 'login sessions the kernel knows, and devices that follow who is at the machine'),
 			scenario('sessions', 'the session manager: a login screen, a session, switching to another and back, logging out'),
+			scenario('audit', 'the record of security decisions: attributed to logins, closed to accounts, kept on disk'),
 		]
 	}
 	exit(hwhost.run_suite(suite, os.args[1..], @FILE))

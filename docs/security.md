@@ -9,7 +9,9 @@ Vinix uses a small part of [SBP's selector-based design](https://github.com/okTu
 | `system/hostname/set` | `sethostname` | Effective UID 0 and `CAP_SYS_ADMIN` |
 | `system/domainname/set` | `setdomainname` | Effective UID 0 and `CAP_SYS_ADMIN` |
 | `system/reboot` | `reboot` | Effective UID 0 and `CAP_SYS_BOOT` |
+| `system/clock/set` | `settimeofday`, `clock_settime`, `adjtimex` | Effective UID 0 and `CAP_SYS_TIME` |
 | `system/securelevel/set` | `/proc/sys/kernel/securelevel` writes | Effective UID 0 and `CAP_SYS_ADMIN` in the initial user namespace; cannot lower the boot floor |
+| `system/seat/set` | `/proc/sys/kernel/seat_session` writes | Effective UID 0 and `CAP_SYS_ADMIN` in the initial user namespace |
 
 Host selectors also require trusted mandatory domain 0. The rule applies to
 both architecture ABIs where those operations exist. A denied call returns `EPERM`. The AArch64 syscall smoke test checks full and effective-only privilege drops, invalid userspace pointers, authorized calls with a nonzero real UID, and unchanged host and domain names after denials.
@@ -22,7 +24,16 @@ Both architectures map mount and unmount directly to the shared VFS syscall hand
 
 For an authorized caller, `umount2` detaches the mount at its target, and returns `EINVAL` when nothing is mounted there.
 
-This policy is a starting point for more specific permissions, not an isolation boundary between processes that still run as root. Vinix currently starts processes with UID 0 and every capability; the capability sets are what let a container runtime take some of them away. There are no per-process selector grants. Applications that drop their credentials cannot perform the listed operations. The policy does not install or use the JavaScript SBP runtime in the kernel.
+This policy is a starting point for more specific permissions, not an isolation boundary between processes that still run as root. Init and what it starts run with UID 0 and every capability; the capability sets are what let a container runtime take some of them away, and a [session](accounts.md#sessions) gives all of them up. There are no per-process selector grants. Applications that drop their credentials cannot perform the listed operations. The policy does not install or use the JavaScript SBP runtime in the kernel.
+
+Every decision on a selector, allowed or refused, is [recorded](#security-decisions) with who asked.
+
+## Accounts and sessions
+
+[`docs/accounts.md`](accounts.md) describes users and groups, the
+authentication service through which an account gets something done as
+root, sessions that are not root's, logins the kernel knows, and the seat:
+which login session the display and the input devices belong to.
 
 ## Desktop selector worlds
 
@@ -128,9 +139,27 @@ Logs survive reboot when `/var/log` is backed by
 persistent storage. An initramfs-only root has volatile logs.
 
 The ring can overwrite events before collection; persistence does not make it
-lossless. Privileged software can alter the local log. Login/session attribution,
-Linux's audit ABI, remote tamper-resistant collection and coverage of all
-security decisions remain separate work.
+lossless. Privileged software can alter the local log. Linux's audit ABI and
+remote tamper-resistant collection remain separate work.
+
+## Security decisions
+
+A second ring holds what the kernel itself decided, not what a filter asked
+to have recorded: every privileged operation above, a mandatory domain
+refused an object, a device of the seat refused, a login beginning, the seat
+changing hands, and refused identity changes, signals to other accounts'
+processes, low ports and hard links -- and what trusted services report of
+their own decisions, which the authentication service does for every one.
+Each record names the process, its ids, and the login it belongs to, which
+no later change of ids alters.
+
+[`vinix-security-events`](../tools/security-events/README.md) keeps the
+stream in an append log synced before a record counts as kept, writes a gap
+as a gap with its exact numbers, and sets logs aside and deletes them by
+three settings an administrator can read. The same page lists what is not
+recorded -- ordinary permission failures, pledge and unveil violations,
+what a confined domain was allowed -- and that nothing starts the collector
+at boot yet.
 
 ## x86 speculation controls
 

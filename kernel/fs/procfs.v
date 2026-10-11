@@ -88,6 +88,7 @@ enum ProcFSKind {
 	sysrq_trigger
 	securelevel
 	security_audit
+	security_events
 	net_tcp
 	activity_io
 	activity_gpu
@@ -294,6 +295,10 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	add_procfs_file(mut root, 'version', .version)
 	mut audit_node := add_procfs_file(mut root, 'security_audit', .security_audit)
 	audit_node.resource.stat.mode = stat.ifreg | 0o400
+	// Decisions the kernel made and trusted services report; see
+	// security/events.v.
+	mut events_node := add_procfs_file(mut root, 'security_events', .security_events)
+	events_node.resource.stat.mode = stat.ifreg | 0o600
 	mut sysrq := add_procfs_file(mut root, 'sysrq-trigger', .sysrq_trigger)
 	sysrq.resource.stat.mode = stat.ifreg | 0o200
 
@@ -783,6 +788,9 @@ fn (this &ProcFSResource) contents() string {
 		.security_audit {
 			return security.audit_text()
 		}
+		.security_events {
+			return security.events_text()
+		}
 		else {
 			return ''
 		}
@@ -862,7 +870,8 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eacces)
 		return none
 	}
-	if this.kind == .security_audit && !security.audit_may_read() {
+	if (this.kind == .security_audit || this.kind == .security_events)
+		&& !security.audit_may_read() {
 		errno.set(errno.eacces)
 		return none
 	}
@@ -871,7 +880,7 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		return none
 	}
 	if (this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp
-		|| this.kind == .security_audit || this.kind == .net_tcp6 || this.kind == .net_if_inet6)
+		|| this.kind == .security_audit || this.kind == .security_events || this.kind == .net_tcp6 || this.kind == .net_if_inet6)
 		&& _handle != unsafe { nil } {
 		return this.snapshot_read(_handle, buf, loc, count)
 	}
@@ -934,6 +943,40 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 		.uid_map, .gid_map, .setgroups {
 			return i64(count)
 		}
+		.security_events {
+			// A trusted service reporting a decision of its own:
+			// "<pid> <0 allowed|1 denied> <label>", one line.
+			if !security.event_may_report() {
+				errno.set(errno.eperm)
+				return none
+			}
+			if count < 5 || count > 128 {
+				errno.set(errno.einval)
+				return none
+			}
+			bytes := unsafe { &u8(buf) }
+			mut at := u64(0)
+			mut pid := 0
+			for at < count && unsafe { bytes[at] } >= `0` && unsafe { bytes[at] } <= `9` && pid < 100000000 {
+				pid = pid * 10 + int(unsafe { bytes[at] } - `0`)
+				at++
+			}
+			if at == 0 || at + 3 >= count || unsafe { bytes[at] } != ` `
+				|| (unsafe { bytes[at + 1] } != `0` && unsafe { bytes[at + 1] } != `1`)
+				|| unsafe { bytes[at + 2] } != ` ` {
+				errno.set(errno.einval)
+				return none
+			}
+			denied := unsafe { bytes[at + 1] } == `1`
+			mut length := count - at - 3
+			if length > 0 && unsafe { bytes[count - 1] } == `\n` {
+				length--
+			}
+			// A view of the caller's bytes: event_report copies what it keeps.
+			label := unsafe { tos(bytes + at + 3, int(length)) }
+			security.event_report(pid, denied, label)
+			return i64(count)
+		}
 		.loginuid, .seat_session {
 			// One decimal number. /proc/self/loginuid starts the caller's
 			// login session; /proc/sys/kernel/seat_session says which login
@@ -962,6 +1005,7 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			}
 			if this.kind == .loginuid {
 				proc.start_login_session(this.pid, u32(value))?
+				security.event(security.event_login, false, value, 'login')
 				return i64(count)
 			}
 			if !security.permitted(security.system_seat_set) {
@@ -969,6 +1013,7 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 				return none
 			}
 			proc.set_seat_session(u32(value))
+			security.event(security.event_seat, false, value, 'seat-given')
 			return i64(count)
 		}
 		.sysrq_trigger {
@@ -1016,7 +1061,8 @@ fn (mut this ProcFSResource) grow(_handle voidptr, new_size u64) ? {
 			}
 			return
 		}
-		.oom_score_adj, .uid_map, .gid_map, .setgroups, .loginuid, .seat_session, .sysrq_trigger {
+		.oom_score_adj, .uid_map, .gid_map, .setgroups, .loginuid, .seat_session, .security_events,
+		.sysrq_trigger {
 			return
 		}
 		else {

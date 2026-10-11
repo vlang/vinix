@@ -15,6 +15,7 @@ import lib
 import limine
 import netcore as _
 import proc
+import security
 import resource
 import socket.public as sock_pub
 import stat
@@ -778,6 +779,7 @@ fn (mut this InetSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	port := (endpoint.port >> 8) | ((endpoint.port & 0xff) << 8)
 	if port != 0 && port < 1024
 		&& !proc.current_has_capability(proc.cap_net_bind_service) {
+		security.event(security.event_network, true, u64(port), 'bind')
 		errno.set(errno.eacces)
 		return none
 	}

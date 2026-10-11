@@ -20,6 +20,14 @@ pub const system_seat_set = 'system/seat/set'
 // that guards it, so that a container whose runtime dropped CAP_SYS_ADMIN
 // cannot mount or rename the machine even as root.
 pub fn permitted(selector string) bool {
+	allowed := permitted_now(selector)
+	// Every one of these is rare and matters: who mounted, who set the
+	// clock, who was refused.
+	event(event_policy, !allowed, 0, selector)
+	return allowed
+}
+
+fn permitted_now(selector string) bool {
 	capability := match selector {
 		filesystem_mount, filesystem_unmount, system_hostname_set, system_domainname_set,
 		system_securelevel_set, system_seat_set {

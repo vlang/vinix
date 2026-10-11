@@ -26,6 +26,9 @@ import authproto
 import os
 import time
 
+#include <fcntl.h>
+#include <unistd.h>
+
 pub struct Peer {
 pub:
 	pid int
@@ -49,6 +52,9 @@ pub:
 	actions string = '/usr/share/vinix/actions'
 	session string = '/run/vinix/session/active'
 	log     string = '/var/log/vinix/auth.log'
+	// Where the kernel takes reports of a service's decisions, so that they
+	// are in one stream with its own (kernel/security/events.v); '' for none.
+	events  string = '/proc/security_events'
 	cost    accountcore.Cost = accountcore.default_cost
 	clock   fn () i64 = wall_clock
 	runner  fn (action Action, argv []string, input []u8, peer Peer, user string) RunResult = run_action
@@ -78,6 +84,24 @@ fn (env Env) record(peer Peer, what string, result string) {
 	mut file := os.open_file(env.log, 'a', 0o600) or { return }
 	file.write_string(line) or {}
 	file.close()
+	env.report(peer, clean.bytestr(), result)
+}
+
+// The same decision, to the kernel's stream: about the caller's process,
+// which the kernel attributes to its login. One write is one report.
+fn (env Env) report(peer Peer, what string, result string) {
+	if env.events == '' || peer.pid <= 0 {
+		return
+	}
+	outcome := result.all_before(':')
+	allowed := outcome == 'ok' || outcome == 'changed' || outcome == 'exit 0'
+	text := '${peer.pid} ${if allowed { 0 } else { 1 }} auth:${what}:${outcome}'
+	fd := C.open(&char(env.events.str), C.O_WRONLY)
+	if fd < 0 {
+		return
+	}
+	C.write(fd, text.str, usize(if text.len > 120 { 120 } else { text.len }))
+	C.close(fd)
 }
 
 fn (env Env) load_action(name string) !Action {
