@@ -6,8 +6,8 @@ Build both architectures in isolated worktrees and run:
 V=/path/to/v tests/scheduler-qos/policy
 V=/path/to/v tests/scheduler-preemption/policy
 V=/path/to/v tests/kernel-resources/run-host.sh
-python3 tests/scheduler-qos/run.py --arch aarch64 --kernel-dir /path/to/arm/kernel
-python3 tests/scheduler-qos/run.py --arch x86_64 --kernel-dir /path/to/x86/kernel
+tests/scheduler-qos/run --arch aarch64 --kernel-dir /path/to/arm/kernel
+tests/scheduler-qos/run --arch x86_64 --kernel-dir /path/to/x86/kernel
 ```
 
 The guest requires four CPUs and defaults to 8 GiB RAM. It checks utilization

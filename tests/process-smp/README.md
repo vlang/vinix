@@ -6,8 +6,8 @@ to print surviving allocation chains. AArch64 needs `LIMINE_MP=1`. Build and
 boot both architectures; the runner does not rebuild the kernel.
 
 ```sh
-python3 tests/process-smp/run.py --arch aarch64 --kernel-dir /work/arm/kernel --state-dir /tmp/process-arm
-python3 tests/process-smp/run.py --arch x86_64 --kernel-dir /work/x86/kernel --state-dir /tmp/process-x86
+tests/process-smp/run --arch aarch64 --kernel-dir /work/arm/kernel --state-dir /tmp/process-arm
+tests/process-smp/run --arch x86_64 --kernel-dir /work/x86/kernel --state-dir /tmp/process-x86
 ```
 
 The runner defaults to four CPUs and 4096 MiB of RAM, uses a static musl fixture
@@ -52,12 +52,12 @@ The guest checks:
 
 Run the remaining matrix on both kernels:
 
-| Guest | Command following `python3` | Required result |
+| Guest | Command | Required result |
 | --- | --- | --- |
-| Job control, wait selection/restart, stop/continue and live-thread teardown | `tests/process-smp/run.py --arch ARCH --kernel-dir KERNEL --source tests/kernel-job-control/check.c --expect 'JOB-CHECK DONE failures=0' --state-dir STATE` | `JOB-CHECK DONE failures=0` |
+| Job control, wait selection/restart, stop/continue and live-thread teardown | `tests/process-smp/run --arch ARCH --kernel-dir KERNEL --source tests/kernel-job-control/check.c --expect 'JOB-CHECK DONE failures=0' --state-dir STATE` | `JOB-CHECK DONE failures=0` |
 | Returning detached threads raced against kill/exit_group | Same job command plus `--define JOB_TEARDOWN_ONLY=1 --define JOB_DETACHED_CHURN=1 --define JOB_TEARDOWN_PROCESSES=60 --define JOB_TEARDOWN_BATCHES=6` | `JOB-CHECK DONE failures=0` |
-| Task/kernel-memory quotas, concurrent admission, pressure notifications, swap, OOM/fault/exit races and recovery | `tests/resource-groups/run.py --arch ARCH --kernel-dir KERNEL --smp 4 --state-dir STATE` | `CGROUP PASS` |
-| Anonymous pageout/refault, COW and shared aliases under physical pressure | `tests/paging/run.py --arch ARCH --kernel-dir KERNEL --memory 256 --pressure --state-dir STATE` | `PAGING encrypted-disk-swapoff PASS` and `PAGING PASS` |
+| Task/kernel-memory quotas, concurrent admission, pressure notifications, swap, OOM/fault/exit races and recovery | V runner pending for `tests/resource-groups/run.py` | `CGROUP PASS` |
+| Anonymous pageout/refault, COW and shared aliases under physical pressure | V runner pending for `tests/paging/run.py` | `PAGING encrypted-disk-swapoff PASS` and `PAGING PASS` |
 
 Also run `tests/posix-timer/run` on AArch64 and amd64, and the AArch64 desktop
 performance scenarios `ops,churn,cache` and `idle,apps,drag` with

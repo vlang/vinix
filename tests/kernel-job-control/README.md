@@ -44,10 +44,10 @@ The normal guest must finish with `JOB-CHECK DONE failures=0`. Both architecture
 can use the disposable native runner:
 
 ```sh
-python3 tests/process-smp/run.py --arch aarch64 --kernel-dir /work/arm/kernel \
+tests/process-smp/run --arch aarch64 --kernel-dir /work/arm/kernel \
   --source tests/kernel-job-control/check.c --expect 'JOB-CHECK DONE failures=0' \
   --state-dir /tmp/jobs-arm
-python3 tests/process-smp/run.py --arch x86_64 --kernel-dir /work/x86/kernel \
+tests/process-smp/run --arch x86_64 --kernel-dir /work/x86/kernel \
   --source tests/kernel-job-control/check.c --expect 'JOB-CHECK DONE failures=0' \
   --state-dir /tmp/jobs-x86
 ```

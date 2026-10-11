@@ -71,6 +71,10 @@ fn command_checked(args []string, family string) !int {
 		'mac-host' { return security_host(args, 'mac')! }
 		'sandbox-host' { return security_host(args, 'sandbox')! }
 		'audit-host' { return security_host(args, 'audit')! }
+		'process-smp', 'scheduler-qos', 'tlb', 'memory-retention' { return process_command(args, family)! }
+		'listen-backlog' { return backlog_command(args)! }
+		'resource-open', 'proc-thread-lock', 'proc-map-lookup' { return inspection_command(args, family)! }
+		'aarch64-sigreturn' { return sigreturn_command(args)! }
 		else { return error_with_code('Unknown compatibility command', 2) }
 	}
 }

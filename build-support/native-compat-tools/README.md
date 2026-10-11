@@ -4,6 +4,10 @@ The commands below compile V directly. Their generators, compiler
 recipes, independent C controls, archive assembly and guest supervision have
 no Python runtime dependency.
 
+The [process and inspection guest commands](process-guests.md) also provide
+native SMP, scheduler, TLB, memory-retention, listen-backlog, resource/procfs
+comparisons and genuine dynamic-musl ARM signal-return workflows.
+
 ```sh
 build-support/steam/compile-v-robust OUTPUT [--i386] [--host]
 tests/steam/test-robust-list [--output-dir FRESH-DIR] [--native]

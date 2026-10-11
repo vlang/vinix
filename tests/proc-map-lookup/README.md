@@ -15,7 +15,7 @@ growth itself is outside that window: current procfs pruning retains nodes.
 Run the requested production kernel with the shared isolated-guest harness:
 
 ```sh
-VINIX_QEMU_SMP=4 python3 tests/kernel-gaps/run.py --no-network \
+VINIX_QEMU_SMP=4 tests/kernel-gaps/run-native --no-network \
   --source tests/proc-map-lookup/mapfixture/core.v --arch aarch64 --kernel-dir kernel \
   --timeout 1800 --expect 'VINIX PROC MAP LOOKUP: PASS'
 ```
@@ -34,7 +34,7 @@ a build artifact; the original oracle is recovered from immutable Git revision
 Build and run both versions against the same kernel with the paired runner:
 
 ```sh
-VINIX_QEMU_SMP=4 python3 tests/proc-map-lookup/run.py --arch aarch64 \
+VINIX_QEMU_SMP=4 tests/proc-map-lookup/run --arch aarch64 \
   --kernel-dir /absolute/isolated/kernel \
   --state-dir /absolute/new/evidence --guest-state-dir /tmp/proc-map-arm
 ```

@@ -260,10 +260,14 @@ pub fn entry() i32 {
 		if pm_lookups < 100 || pm_listings < 100 { fail(c'concurrent lookup and snapshot progress') }
 		for i := i32(0); i < 20 && !failed(); i++ { stable_operation() }
 		grace := C.timespec{tv_sec: 7}; C.nanosleep(&grace, nil)
-		before := Heap{}; after := Heap{}
-		if !failed() && snapshot(&before) {
+	}
+	before := Heap{}; after := Heap{}
+	if !failed() && snapshot(unsafe { &before }) {
+		unsafe {
 			for i := i32(0); i < 200 && !failed(); i++ { stable_operation() }
-			if snapshot(&after) {
+		}
+		if snapshot(unsafe { &after }) {
+			unsafe {
 				if before.count != after.count { fail(c'allocation class count remains stable') }
 				for i := i32(0); i < before.count && i < after.count; i++ {
 					C.printf(c'PROC-MAP-RETENTION class=%ld live=%ld pages=%ld\n', native_long(before.size[i]), native_long(after.live[i] - before.live[i]), native_long(after.pages[i] - before.pages[i]))
@@ -273,6 +277,8 @@ pub fn entry() i32 {
 				if before.large != after.large || before.uaf != after.uaf { fail(c'large allocations and UAF remain flat') }
 			}
 		}
+	}
+	unsafe {
 		C.printf(c'proc map lookup: %lu lookups, %lu directory snapshots\n', native_ulong(pm_lookups), native_ulong(pm_listings))
 		if !failed() { C.puts(c'VINIX PROC MAP LOOKUP: PASS') }
 		if pm_owner != 1 { return if failed() { 1 } else { 0 } }

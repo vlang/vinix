@@ -5,8 +5,8 @@ linked from the main checkout as described in AGENTS.md. Enable `ALLOC_TRACK=1`
 and `LIMINE_MP=1` for AArch64. The runner uses an already-built kernel.
 
 ```sh
-python3 tests/memory-retention/run.py --arch aarch64 --kernel-dir /work/arm/kernel --state-dir /tmp/retention-arm
-python3 tests/memory-retention/run.py --arch x86_64 --kernel-dir /work/x86/kernel --state-dir /tmp/retention-x86
+tests/memory-retention/run --arch aarch64 --kernel-dir /work/arm/kernel --state-dir /tmp/retention-arm
+tests/memory-retention/run --arch x86_64 --kernel-dir /work/x86/kernel --state-dir /tmp/retention-x86
 ```
 
 Use fresh state directories. The default is four CPUs, 4096 MiB and a 600-second

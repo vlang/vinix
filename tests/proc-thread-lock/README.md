@@ -16,7 +16,7 @@ first, including TID allocation and PID namespace numbering.
 Build the requested kernel, then boot an isolated guest with:
 
 ```sh
-VINIX_QEMU_SMP=4 python3 tests/kernel-gaps/run.py \
+VINIX_QEMU_SMP=4 tests/kernel-gaps/run-native \
   --source tests/proc-thread-lock/lockfixture/core.v --arch aarch64 \
   --kernel-dir kernel --expect 'VINIX PROC THREAD LOCK: PASS'
 ```
@@ -35,7 +35,7 @@ builds strict native musl SDK C/V executables, and uses the same kernel, serial
 constructor and original 180-second outer budget for both:
 
 ```sh
-VINIX_QEMU_SMP=4 python3 tests/proc-thread-lock/run.py --arch aarch64 \
+VINIX_QEMU_SMP=4 tests/proc-thread-lock/run --arch aarch64 \
   --kernel-dir /absolute/isolated/kernel \
   --state-dir /absolute/new/evidence --guest-state-dir /tmp/proc-lock-arm
 ```

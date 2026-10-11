@@ -16,7 +16,7 @@ is closed and every socket pathname removed after each case.
 Build the static ARM64 fixture from the repository root:
 
 ```sh
-CC=clang python3 tests/listen-backlog/run.py --arch aarch64 --build-only \
+CC=clang tests/listen-backlog/run --arch aarch64 --build-only \
   --state-dir /tmp/vinix-listen-backlog-build
 ```
 
@@ -25,7 +25,7 @@ adds a PID1 driver that waits after the original probe returns. Run it in an
 isolated guest with a separately built kernel:
 
 ```sh
-python3 tests/listen-backlog/run.py --arch aarch64 \
+tests/listen-backlog/run --arch aarch64 \
   --state-dir /tmp/vinix-listen-backlog-build-2 \
   --kernel-dir /path/to/worktree/kernel --guest-state-dir /tmp/vlb-arm
 ```

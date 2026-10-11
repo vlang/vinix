@@ -23,13 +23,13 @@ make -C /work/arm/kernel ARCH=aarch64 LIMINE_MP=1 ALLOC_TRACK=1 \
 make -C /work/x86/kernel ARCH=x86_64 ALLOC_TRACK=1 \
   V=/Users/alex/code/v/v CC=clang LD_X86_64=ld.lld \
   VFLAGS='-d tlb_selftest -d largepage_selftest' -j4
-python3 tests/tlb/run.py --arch aarch64 --kernel-dir /work/arm/kernel \
+tests/tlb/run --arch aarch64 --kernel-dir /work/arm/kernel \
   --state-dir /tmp/tlb-arm --timeout 1200
-python3 tests/tlb/run.py --arch x86_64 --kernel-dir /work/x86/kernel \
+tests/tlb/run --arch x86_64 --kernel-dir /work/x86/kernel \
   --state-dir /tmp/tlb-x86 --timeout 1200
-python3 tests/tlb/run.py --arch x86_64 --kernel-dir /work/x86/kernel \
+tests/tlb/run --arch x86_64 --kernel-dir /work/x86/kernel \
   --cpu max,pcid=off,invpcid=off --state-dir /tmp/tlb-fallback --timeout 1200
-python3 tests/tlb/run.py --arch x86_64 --kernel-dir /work/x86/kernel \
+tests/tlb/run --arch x86_64 --kernel-dir /work/x86/kernel \
   --cpu max,la57=off,pcid=off,invpcid=off --state-dir /tmp/tlb-la48 --timeout 1200
 V=/Users/alex/code/v/v tests/tlb/policy
 ```

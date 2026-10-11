@@ -4,9 +4,9 @@ Build each kernel in an isolated worktree, then boot this guest with networking
 disabled:
 
 ```sh
-python3 tests/kernel-gaps/run.py --no-network --arch aarch64 --kernel-dir /path/to/arm/kernel \
+tests/kernel-gaps/run-native --no-network --arch aarch64 --kernel-dir /path/to/arm/kernel \
   --source tests/resource-open/resourcefixture/core.v --expect 'RESOURCE OPEN: PASS'
-python3 tests/kernel-gaps/run.py --no-network --arch x86_64 --kernel-dir /path/to/x86/kernel \
+tests/kernel-gaps/run-native --no-network --arch x86_64 --kernel-dir /path/to/x86/kernel \
   --source tests/resource-open/resourcefixture/core.v --expect 'RESOURCE OPEN: PASS'
 ```
 
@@ -34,7 +34,7 @@ For a strict SDK build and a paired run against the immutable original C
 fixture, use a fresh build directory and short guest-state path:
 
 ```sh
-python3 tests/resource-open/run.py --arch aarch64 \
+tests/resource-open/run --arch aarch64 \
   --kernel-dir /path/to/arm/kernel --state-dir /path/to/resource-build \
   --guest-state-dir /tmp/resource-arm
 ```
