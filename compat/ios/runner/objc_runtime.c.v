@@ -202,6 +202,7 @@ fn objc_dispose_class(cls u64) {
 	defer { C.ios_objc_initialize_unlock() }
 	info := ios_runtime.classes[cls] or { return }
 	if !info.dynamic || info.meta || C.ios_ref_change(unsafe { &info.instances }, 0) != 0 { panic('iOS: class disposal requires an unused dynamic class') }
+	if cls in ios_runtime.swift_objc_metadata { panic('iOS: class disposal with published Swift metadata is not implemented') }
 	meta := read64(cls)
 	for address, child in ios_runtime.classes {
 		if address != meta && (child.parent == cls || child.parent == meta) { panic('iOS: cannot dispose a class with subclasses') }

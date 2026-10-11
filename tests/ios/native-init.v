@@ -76,10 +76,11 @@ fn main() {
 		require_child('/opt/ios/swift-initializer-checks')
 		require_child('/opt/ios/swift-heap-checks')
 		require_child('/opt/ios/swift-error-checks')
+		require_child('/opt/ios/swift-error-value-checks')
 		require_child('/opt/ios/regression')
 	} else if mode == 'swift' {
 		for name in ['string', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
-			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error'] {
+			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
 		println('VINIX iOS SWIFT: PASS')

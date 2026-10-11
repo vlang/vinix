@@ -2079,8 +2079,8 @@ V now supplies `_swift_errorRetain` and `_swift_errorRelease` through the existi
 Objective-C ownership functions, matching Darwin's ordinary C error ARC ABI.
 Error retain returns the same owner; final release runs the existing dealloc,
 weak-slot and owned-field cleanup. These exports add no Swift arenas, allocation
-registries or ARC adapters. Swift error boxing, stored error values and Error
-protocol witnesses remain unimplemented.
+registries or ARC adapters. Native Swift error boxes remain unsupported;
+the CFError extraction support below adds concrete Error protocol witnesses.
 
 Installed SwiftCore and V error ARC, String and typed Array suites pass
 ASAN/UBSAN in both seed modes. Error checks cover real native CFErrors, reference
@@ -2101,17 +2101,55 @@ unmeasured. A corrected host fixture header conflict is preserved with the
 passing results. Full regression remains unpassed, and the five published
 runners retain their last passing hashes.
 
+V now supplies `_swift_getErrorValue`, `_swift_getObjCClassMetadata`, Error's
+`_$ss5ErrorMp` descriptor and all four requirement-descriptor aliases. Extraction
+borrows a live VinixCFError into caller scratch and returns that address, its
+canonical type metadata and a complete Error witness table. The four witnesses
+return an owned domain String, signed code, owned user-info dictionary and owned
+embedded error. Long domain text is copied into owned Swift storage so it remains
+valid after the error and its NSString are destroyed. Native Swift error boxes,
+arbitrary NSError subclasses and general conformance discovery remain unsupported.
+
+Objective-C class metadata uses sealed wrapper kind `0x305`, the actual registered
+class pointer and a complete eight-byte reference value witness table. Swift
+classes retain their existing metadata address point, and null class lookup
+returns zero. Copy assignment retains before publishing; both assignments publish
+before releasing the old owner, allowing its destructor to reenter. The cache
+publishes under the runtime lock and retires its mappings before classes are
+freed at quiescent teardown. Explicit disposal of a class with published wrapper
+metadata is rejected while those borrowed metadata addresses may remain in use.
+
+Installed SwiftCore and V extraction, error ARC and String metadata suites pass
+ASAN/UBSAN in both hash modes. Extraction checks cover native descriptor aliases,
+guarded output words, borrowed counts, signed codes, UTF-8 and embedded NUL domains,
+user-info contents surviving final error release, all four Swift-context witnesses,
+pointer value ownership and preserved x20/x21. V checks also exercise unlocked
+reentrant assignment, eight concurrent metadata publishers, eight shared-owner
+extraction workers, explicit invalid/unsupported inputs and two drained/unmapped
+runtime cycles. An artificial class flag tests metadata forwarding; it does not
+establish native Swift class allocation support. Generated C checks distinguish
+explicit metadata/storage allocations from failure-only V error boxes.
+
+All thirty-seven programs rebuild, and all nineteen focused Swift ABI guest
+checks pass. The actual IPA now exits with status 1 before entry at EOSSDK's
+`_swift_getObjectType` import. Native measurements of that next entry verify
+canonical metadata for genuine CFError, string and dictionary owners, unchanged
+reference counts, ordinary C calls and preserved x20/x21. Evidence is retained
+under `swift-error-value-checks`. Full regression remains unpassed after the
+previously preserved kernel/concurrent-filesystem failures, and the five
+published runners retain their last passing hashes.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,393 | 765 | 81 |
-| EOSSDK | 603 | 59 | 18 |
-| MarketplaceKitWrapper | 95 | 81 | 23 |
-| All images | 2,091 | 905 | 122 |
+| Fortnite executable | 1,399 | 759 | 81 |
+| EOSSDK | 605 | 57 | 18 |
+| MarketplaceKitWrapper | 97 | 79 | 23 |
+| All images | 2,101 | 895 | 122 |
 
-The C++/GLES/Text variant reports 2,104 resolved imports, 892 unresolved strong
+The C++/GLES/Text variant reports 2,114 resolved imports, 882 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
