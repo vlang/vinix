@@ -2220,17 +2220,64 @@ These measurements do not establish value ownership or concurrency execution.
 Evidence is retained under `swift-mangled-checks`; full regression remains
 unpassed and the five published runners retain their last passing hashes.
 
+V now supplies the ordinary C `_swift_getWitnessTable` entry for unique,
+unconditional static conformances. It returns the borrowed relative pattern,
+including a null pattern, without reading metadata, instantiation arguments,
+protocol/type references or table contents. Signed offsets work in both
+directions. Lookup adds no cache, allocation, arena or reference count changes;
+descriptors and tables remain owned by their images or existing metadata arenas.
+Caller descriptors must stay readable and immutable while used. Unsupported
+flags, null/misaligned/overflowing descriptor addresses and misaligned patterns
+fail explicitly. Generic, conditional, resilient and non-unique foreign tables are
+rejected rather than returning an uninstantiated pattern.
+
+Installed SwiftCore and V pass this fixture under ASAN/UBSAN in both hash modes,
+alongside String protocol dispatch and Int Hashable/Equatable suites. Tests
+compare canonical Int and String tables, preserve x20/x21 through guarded raw
+calls and place descriptors exactly before protected pages. Unused inputs and
+table bodies may be unreadable. Eight readers and two drained cycles pass.
+Generated C checks flags before pattern reads and confirms no successful hidden
+allocation or ownership operation.
+
+The framework inventory identifies EOS's three AppDistributorType conformances
+to Equatable, Hashable and RawRepresentable. All have flags `0x30000`, null
+patterns, zero template words and resilient requirements. These need actual
+instantiation, which remains unsupported. MarketplaceKitWrapper contains the
+same conformances and two non-unique ActivationState conformances. Fifteen
+lookup call sites and their records are retained. A separate native synthetic
+probe measures allocation from a null pattern, placement of an out-of-order
+witness, default and null-default witnesses, and private-cache reuse across 256
+lookups. Base protocols, associated witnesses and instantiation callbacks still
+need measurements. The corresponding
+[Swift runtime instantiation source](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/Metadata.cpp)
+is retained with the ABI declarations.
+
+All forty programs rebuild and all twenty-two focused Swift ABI guest checks
+pass. The supplied IPA still exits with status 1 before entry, now at EOS's
+`_swift_once` import. Native measurements of that next ordinary C entry use
+sixteen static tokens with eight concurrent readers each; all observe both
+callback writes exactly once. Another 2,048 completed-token raw calls preserve
+x20/x21. The observed nonzero token words are consistent with libdispatch's
+epoch handling; an initial fixture incorrectly assumed every completed token
+was `-1` and used a local token. Its failure is retained, and the corrected
+fixture uses static storage as required by the
+[Swift declaration](https://github.com/swiftlang/swift/blob/main/include/swift/Runtime/Once.h).
+This next entry remains unimplemented. Evidence is retained under
+`swift-witness-checks`; full regression remains unpassed, the five published
+runners retain their last passing hashes, and playable Fortnite compatibility
+is still unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,401 | 757 | 81 |
-| EOSSDK | 607 | 55 | 18 |
-| MarketplaceKitWrapper | 99 | 77 | 23 |
-| All images | 2,107 | 889 | 122 |
+| Fortnite executable | 1,402 | 756 | 81 |
+| EOSSDK | 608 | 54 | 18 |
+| MarketplaceKitWrapper | 100 | 76 | 23 |
+| All images | 2,110 | 886 | 122 |
 
-The C++/GLES/Text variant reports 2,120 resolved imports, 876 unresolved strong
+The C++/GLES/Text variant reports 2,123 resolved imports, 873 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
