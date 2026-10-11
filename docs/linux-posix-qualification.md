@@ -789,6 +789,12 @@ cycle are:
 | AArch64, 16 KiB pages | 8,519,680 bytes | 1,883,904 bytes |
 | x86-64, 4 KiB pages | 8,519,680 bytes | 1,859,328 bytes |
 
+All 32 files for this change were re-audited with V assertions enabled using
+`-nocache -cflags -O2`. The current V3 compiler removes assertions in `-prod`
+builds. The [revalidation record](../tests/linux-compat/results/2026-10-12/metadata-revalidation.json)
+includes the assertion failure control, compiler/auditor hashes and matching
+published output hashes; the original guest verdicts are preserved.
+
 The [dated receipts and logs](../tests/linux-compat/results/2026-10-12/)
 include `metadata-storage-before/after-*.json`, the 200-cycle paging regression
 with every reported slab-class delta zero, and all seven memory-lock suites

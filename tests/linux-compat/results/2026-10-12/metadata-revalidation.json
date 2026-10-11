@@ -1,0 +1,87 @@
+{
+    "context": "all 32 mapping-fix files re-audited with assertions; published output byte-identical",
+    "compiler_sha256": "8ff02a50294e6c519cae433a064b8c6c9ad53ada522759be9eaaef267fac6d56",
+    "compiler_options": [
+        "-nocache",
+        "-cflags",
+        "-O2"
+    ],
+    "negative_control_source": "metadata-assertion-negative.v",
+    "negative_control_exit": 1,
+    "negative_control_output": "/Volumes/VinixLinuxCompatNext1011/tmp/assert-check.v:1: FAIL: fn main.main: assert false, 'receipt audit failure must be fatal'\n      message: receipt audit failure must be fatal\nV panic: Assertion failed...\n",
+    "kernel_inventory_sha256": "2bf3118f97dbe4c0ef2fe4e352589d61e18cf87801e63414fcd4432067f99f42",
+    "audits": [
+        {
+            "source": "metadata-abi-audit.v",
+            "source_sha256": "6ffcc4516859cee083e81af50d2a1359c1099473158ea0c635b74c2cd55624a1",
+            "executable_sha256": "2c538f8793e7094d0dff6b68bb11c399d08c4cb2c553f3ec0512e83b07bd5571",
+            "assertions_enabled": true,
+            "outputs": {
+                "metadata-storage-after-aarch64.json": "2b6a8d44e592b9f0c80f0230e3802c19e85663a0e58becf950742f9f0cb1503c",
+                "metadata-storage-after-aarch64.log": "4b09df931c232620742cffa264e4dfa48384f4f7d70672e52efdb81b01f91417",
+                "metadata-storage-after-x86_64.json": "38507bf846bb889aabaa395f3dd4925b8766649f7ceb7281480ccf5179d3f0d6",
+                "metadata-storage-after-x86_64.log": "8fbca56040d482599ef6205d7254355cd1dab6abfaf28c974a2e85e9cac41f48",
+                "metadata-storage-before-aarch64.json": "d57ed1f960f1cee94f34cc30671b7a26994b0c7d9b9a7463da6ef28745812e95",
+                "metadata-storage-before-aarch64.log": "aecb661ea99af8a631d1dc0e5ed66f72f394485db838f5f2cc33231100ad1082",
+                "metadata-storage-before-x86_64.json": "f0b28c25c17c736cbf9d5dc2d4fbe50706131ec6a0427db279e76b4ea181836d",
+                "metadata-storage-before-x86_64.log": "68f4aa474bbe608d99abf911f0d0d79ff2c2226cc5953aa366c03858305f7cd2"
+            }
+        },
+        {
+            "source": "metadata-runtime-audit.v",
+            "source_sha256": "a529bf5e2aea64bdef91ef4c5938845b176accc8826faf21e98f5140a79d7e99",
+            "executable_sha256": "e820ededd2503f3c6abe45a676f4e39cca85014e12f93460fc2e4ca53565a661",
+            "assertions_enabled": true,
+            "outputs": {
+                "inputs-metadata-go-x86_64.json": "7bf45a7d5e662d533a49790015c3658c02e2f42f0528fd9d62dc689ebda45d38",
+                "inputs-metadata-java-x86_64.json": "db554ff8b95639eb7843fab020aa2e3fc32522d0f2ad47b1e7659a0a605bfe73",
+                "metadata-go-x86_64.json": "40868272c0046def63cdde0d98a15d412530ec8c76b6955aee6d9c9469b69f2f",
+                "metadata-go-x86_64.log": "65ac5a3d35419819735ef68576c95b065f62467b9868323325bc29ffa41ab285",
+                "metadata-java-x86_64.json": "0f7e1c7ece35284e6357f5ab1ca6bd008a2be1061614c97493d0e7d4d8051b6b",
+                "metadata-java-x86_64.log": "da710c073c04d9072bf1202f76d6d10e17a8a685f4489ba503d101b933b76356",
+                "metadata-runtime-acquisition-x86_64.v": "bc976692e87e37d5e678105f55966546b159fd53f105276cbc9c68af93a3df7e",
+                "metadata-runtime-packages-x86_64.json": "150a6998b0b663c1272318bf5f9433cf32d26001f9a1f4abb6c11d8aaf9d7e41",
+                "metadata-runtime-rootfs-x86_64.json": "5447a7f2489b494f75f2030391585324f5dea18fa92204d570a37024e11adde3"
+            }
+        },
+        {
+            "source": "metadata-firefox-audit.v",
+            "source_sha256": "2632b0332d2433f6b7767054b408e799c527865b42548b7b45d60cf1e4481f7a",
+            "executable_sha256": "ee30a96d3da25b3203e36574b6f66f8d322ec168bbb77b18505fddfb234d1fc1",
+            "assertions_enabled": true,
+            "outputs": {
+                "inputs-metadata-firefox-2g-x86_64.json": "1a60f03eddd4601d2cdda7a087087b13eaa27b62938ca659676760b5e26871c6",
+                "metadata-firefox-2g-rootfs-x86_64.json": "69e194d817e7ef43b70644952c8dab7dbc3bb4d42e3c9a95e692e4b68cc6b2e1",
+                "metadata-firefox-2g-x86_64.json": "8b3db0790c754a7a85e12fc940bfd21518b8fcf0100f09ed1c1ba7e15f4682ea",
+                "metadata-firefox-2g-x86_64.log": "77571f1b7c3e1ec747db0e69e431bd5f588159a0e076e138227cf8f830c8804b"
+            }
+        },
+        {
+            "source": "metadata-native-audit.v",
+            "source_sha256": "2bcac6bde3e31e7f72a51a779e2aa698eca1e0e52f59a75b9430fb318c296a18",
+            "executable_sha256": "7c6adb1a90453d2adc9b27fc6b3bd6a1ba395d0529135601e169662c28144c65",
+            "assertions_enabled": true,
+            "outputs": {
+                "metadata-native-audit.v": "2bcac6bde3e31e7f72a51a779e2aa698eca1e0e52f59a75b9430fb318c296a18",
+                "metadata-paging-aarch64.json": "2562ac89cd9488c2f047f4120ba4c5d8563745474791a7fa2040676604531bf2",
+                "metadata-paging-aarch64.log": "d5126f7df6aed1b351d53a5d64f87a0a3b16fae724849a8e670ab10d01756d4e",
+                "metadata-paging-x86_64.json": "063e80345cafab5a06f4ed0c234151c14b07c0e719dbaf90acf5e88fcc1193c2",
+                "metadata-paging-x86_64.log": "fcb426211f3e6e21ce2e548fc96275756e9f993410a9a8981f6ba29f8952a7ea"
+            }
+        },
+        {
+            "source": "metadata-memlock-audit.v",
+            "source_sha256": "eace27b8dc680bbe221f68ccf0cf3d6c77da8b11f21dce26d5fee0c289afcee2",
+            "executable_sha256": "7fda3c91fb74983bd62a134cc4dd94e15d84363ff8129bd039c482f4c1aabcbb",
+            "assertions_enabled": true,
+            "outputs": {
+                "metadata-memlock-aarch64.json": "1a339831c61ccff8d069987ddded16f17bd60ada8f9a36cc30eaa93c389b85ad",
+                "metadata-memlock-aarch64.log": "fcf116c7c210390042e7bface092b06c6d3510b4cce2fd3b28cf89df69d75030",
+                "metadata-memlock-audit.v": "eace27b8dc680bbe221f68ccf0cf3d6c77da8b11f21dce26d5fee0c289afcee2",
+                "metadata-memlock-controller.v": "3e00803131fe4fba8a3b00002a7c321624d15e7c0b71ad057abcb7c3abc350ae",
+                "metadata-memlock-x86_64.json": "b4d08a53a0dfa21b685ea091252d0c27e3b15b09777bbd6d69e7291ba39f2be2",
+                "metadata-memlock-x86_64.log": "372a3a3cc2d6e60934a89f77fbfbdf1d78a619584a401c4d07a3ebd7267ca2df"
+            }
+        }
+    ]
+}

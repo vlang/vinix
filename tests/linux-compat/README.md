@@ -7,6 +7,12 @@ must pass; bad pointers, errno, compiler failure, panic, timeout and late failur
 remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
 stay in the required fresh artifact directory, including on failure.
 
+Receipt audit sources use V assertions. Build them without `-prod`, which
+removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
+the checks while optimizing hashing. Confirm a deliberate failing assertion
+exits nonzero before using a compiler for an audit. Application catalog
+validation uses explicit errors and retains its checks in production builds.
+
 ```sh
 tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-arm
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
