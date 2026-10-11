@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `6012b9d3fb05691fcc9847a5beb9e9a7243fd316`,
+at source commit `5b9e309dba3b594168c7ad30dda42f509f47125d`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 568 | 2,366,387 | 6.10% |
-| Python | 237 | 1,147,947 | 2.96% |
-| Shell | 596 | 1,364,469 | 3.52% |
+| C | 569 | 2,367,190 | 6.09% |
+| Python | 228 | 1,115,330 | 2.87% |
+| Shell | 603 | 1,363,354 | 3.51% |
 
-All `.v` files are classified as V. The resulting V share is 79.38%, with no
+All `.v` files are classified as V. The resulting V share is 79.51%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,147,947 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,115,330 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 6012b9d3fb05691fcc9847a5beb9e9a7243fd316 --breakdown --json
+github-linguist --rev 5b9e309dba3b594168c7ad30dda42f509f47125d --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -624,6 +624,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/security-audit/collector_v.h` | 2,306 |
 | `tools/security-mac/mac.h` | 526 |
 | `tools/security-mac/mac_v.h` | 759 |
+| `tools/sourcecommand/abi.h` | 803 |
 | `tools/volumes/volumecli/volume.h` | 1,060 |
 
 ## Python files
@@ -680,15 +681,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/compile-v-host.py` | 1,972 |
 | `desktop/tools/_font_native.py` | 9,708 |
 | `desktop/tools/_input_native.py` | 792 |
-| `desktop/tools/_stage_native.py` | 6,520 |
 | `desktop/tools/build_cache.py` | 848 |
 | `desktop/tools/build_voffice.py` | 5,635 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 4,935 |
 | `desktop/tools/input.py` | 6,196 |
-| `desktop/tools/stage_app.py` | 2,842 |
-| `desktop/tools/stage_host_gpu.py` | 3,424 |
-| `desktop/tools/stage_ui2.py` | 990 |
 | `desktop/tools/test-gpu-present.py` | 8,956 |
 | `desktop/tools/tests/test_dictionary_data.py` | 3,007 |
 | `desktop/tools/tests/test_font_data.py` | 7,106 |
@@ -808,8 +805,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/browsers/_native.py` | 5,357 |
 | `tests/browsers/run_vm.py` | 9,438 |
 | `tests/claude/smoke.py` | 7,250 |
-| `tests/clipboard/run_vm.py` | 5,740 |
-| `tests/clipboard/test_host.py` | 3,780 |
 | `tests/codex/smoke.py` | 4,944 |
 | `tests/desktop-perf/_native_report.py` | 2,681 |
 | `tests/desktop-perf/_runner_native.py` | 11,681 |
@@ -851,7 +846,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/opengothic/_native.py` | 3,643 |
 | `tests/opengothic/kekvm-control.py` | 4,448 |
 | `tests/opengothic/run.py` | 3,425 |
-| `tests/packages/test-qemu-package-store.py` | 3,072 |
 | `tests/packages/x-window-check.py` | 5,985 |
 | `tests/pointer-scroll/run.py` | 5,488 |
 | `tests/python3/smoke.py` | 9,112 |
@@ -865,8 +859,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/virtio-gpu-virgl/_native.py` | 957 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 5,650 |
 | `tools/_package_store_native.py` | 4,314 |
-| `tools/host_clipboard.py` | 1,332 |
-| `tools/qemu-package-store.py` | 4,917 |
 
 ## Shell files
 
@@ -974,15 +966,18 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/compile-v-host` | 162 |
 | `build-support/xorg-server/startx` | 2,994 |
 | `desktop/tools/screenshot.sh` | 258 |
-| `desktop/tools/test-activity.sh` | 2,473 |
+| `desktop/tools/stage_app` | 143 |
+| `desktop/tools/stage_host_gpu` | 148 |
+| `desktop/tools/stage_ui2` | 143 |
+| `desktop/tools/test-activity.sh` | 2,440 |
 | `desktop/tools/test-battery.sh` | 673 |
-| `desktop/tools/test-clipboard.sh` | 1,824 |
+| `desktop/tools/test-clipboard.sh` | 1,356 |
 | `desktop/tools/test-execinfo.sh` | 834 |
-| `desktop/tools/test-new-utilities.sh` | 3,734 |
-| `desktop/tools/test-settings.sh` | 5,252 |
-| `desktop/tools/test-utilities.sh` | 10,641 |
-| `desktop/tools/test-utility-parity.sh` | 2,891 |
-| `desktop/tools/test-window-experience.sh` | 2,122 |
+| `desktop/tools/test-new-utilities.sh` | 3,701 |
+| `desktop/tools/test-settings.sh` | 5,219 |
+| `desktop/tools/test-utilities.sh` | 10,608 |
+| `desktop/tools/test-utility-parity.sh` | 2,858 |
+| `desktop/tools/test-window-experience.sh` | 2,089 |
 | `gl-triangle/compile-v` | 564 |
 | `gl-triangle/run-gl-triangle` | 2,351 |
 | `gl-triangle/run-gl-triangle-agx` | 1,206 |
@@ -1002,8 +997,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 93,783 |
-| `scripts/build-desktop-amd64.sh` | 14,973 |
+| `scripts/build-desktop-aarch64.sh` | 93,761 |
+| `scripts/build-desktop-amd64.sh` | 14,951 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |
@@ -1046,14 +1041,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-x11-amd64.sh` | 197 |
 | `scripts/build-x86-translation-aarch64.sh` | 22,821 |
 | `scripts/cross-compile-activity.sh` | 227 |
-| `scripts/cross-compile-app.sh` | 4,496 |
+| `scripts/cross-compile-app.sh` | 4,493 |
 | `scripts/cross-compile-files.sh` | 212 |
 | `scripts/cross-compile-settings.sh` | 217 |
 | `scripts/deploy-iso.sh` | 18,650 |
 | `scripts/deploy-m1-efi.sh` | 21,910 |
 | `scripts/kek.sh` | 16,153 |
 | `scripts/push-to-m1.sh` | 6,967 |
-| `scripts/run-aarch64.sh` | 63,270 |
+| `scripts/run-aarch64.sh` | 63,398 |
 | `scripts/run-amd64-alpine.sh` | 5,108 |
 | `scripts/run-desktop-aarch64.sh` | 16,575 |
 | `scripts/run-desktop-amd64.sh` | 2,920 |
@@ -1118,7 +1113,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple_smc/run.sh` | 190 |
 | `tests/application-sandbox/run-native.sh` | 1,281 |
 | `tests/application-sandbox/test-host.sh` | 229 |
-| `tests/application-sandbox/test-ui.sh` | 759 |
+| `tests/application-sandbox/test-ui.sh` | 737 |
 | `tests/archive-tools/run.sh` | 333 |
 | `tests/block-storage/run` | 201 |
 | `tests/browsers/chromium-init.sh` | 6,410 |
@@ -1129,6 +1124,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/build-cache/run.sh` | 478 |
 | `tests/capability-exec/run` | 186 |
 | `tests/clipboard/guest-init.sh` | 1,974 |
+| `tests/clipboard/run-vm` | 156 |
+| `tests/clipboard/test-host` | 174 |
 | `tests/clock-control/run` | 184 |
 | `tests/clock-control/run-host.sh` | 731 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
@@ -1221,7 +1218,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-print/run` | 170 |
 | `tests/kernel-print/run-native` | 173 |
 | `tests/kernel-resources/run` | 170 |
-| `tests/kernel-resources/run-host.sh` | 1,620 |
+| `tests/kernel-resources/run-host.sh` | 115 |
 | `tests/kernel-retention/run` | 189 |
 | `tests/kernel-stack-guards/run` | 192 |
 | `tests/kernel-sysvmsg/run` | 187 |
@@ -1301,7 +1298,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/qemu-install-gtk.sh` | 452 |
 | `tests/packages/qemu-persistence-guest.sh` | 951 |
 | `tests/packages/sublime-smoke.sh` | 2,670 |
-| `tests/packages/test-qemu-persistence.sh` | 4,248 |
+| `tests/packages/test-qemu-package-store` | 157 |
+| `tests/packages/test-qemu-persistence.sh` | 4,298 |
 | `tests/packages/test-vinix-pkg.sh` | 24,354 |
 | `tests/pagecache/check-generated` | 146 |
 | `tests/pagecache/run-guest` | 182 |
@@ -1420,7 +1418,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/vlang/host-desktop-build-guest-init.sh` | 5,949 |
 | `tests/vlang/smoke.sh` | 987 |
 | `tests/vlang/test-desktop-build-helper.sh` | 10,292 |
-| `tests/vlang/test-host-source-sync.sh` | 4,008 |
+| `tests/vlang/test-host-source-sync.sh` | 3,885 |
 | `tests/vlang/test-staging-cache.sh` | 1,155 |
 | `tests/vlang/test-voffice-cache.sh` | 4,845 |
 | `tests/wine-host/run-vm` | 183 |
@@ -1462,6 +1460,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/m1-wifi/get-v.sh` | 2,538 |
 | `tools/m1-wifi/package` | 153 |
 | `tools/prune-build-artifacts` | 164 |
+| `tools/qemu-package-store` | 149 |
 | `tools/security-events/build` | 1,659 |
 | `tools/split-desktop-initramfs` | 166 |
 | `tools/split-qemu-initramfs` | 163 |

@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `6012b9d3fb05691fcc9847a5beb9e9a7243fd316`,
-Linguist 7.27.0 reports **Python 2.96%** (237 files, 1,147,947 bytes) and
-**V 79.38%** (3,150 files, 30,783,595 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `5b9e309dba3b594168c7ad30dda42f509f47125d`,
+Linguist 7.27.0 reports **Python 2.87%** (228 files, 1,115,330 bytes) and
+**V 79.51%** (3,175 files, 30,916,766 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **4,058,338 Python bytes**. All remaining
-1,147,947 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **4,090,955 Python bytes**. All remaining
+1,115,330 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 59 stages below remove **292 Python files / 1,213,086 original bytes** and
+The 60 stages below remove **301 Python files / 1,245,703 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -90,6 +90,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Minecraft fetching, Microsoft sign-in, LWJGL JAR patching and guest staging | `build-support/minecraft/minecraftnative`, `lwjglpatch`, four native commands and four independent host suites | 29,709 / 824 | `9b5e25ee` |
 | Saved allocation-campaign comparison, recomputation, integrity fixtures and Git evidence recovery | `tests/alloc-bench/comparecore`, `reportcore`, `reportfixture`, `evidencearchive`, ten native commands and two host suites | 149,927 / 2,760 | `b1f701ca` |
 | GL source generation, guest staging, sanitizer and Mesa guest runners | `gl-triangle/glhost`, `tests/gl-triangle/glvm`, four native fronts and the native AGX PTY owner | 11,449 / 143 | `6012b9d3` |
+| Desktop source/presenter staging, loopback package service and clipboard host/VM tooling | `stagehost`, `gpustage`, `packageserver`, `hostclipboard`, `clipboardvm`, native command owners and independent fixtures | 32,617 / 783 | `5b9e309d` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -722,9 +723,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 59 stages.
+or hidden in these 60 stages.
 
-The next twenty-one stages remove 140 Python files / 714,743 original bytes.
+The next twenty-two stages remove 149 Python files / 747,360 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -737,7 +738,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **170 Python files / 849,020 original bytes**. Earlier qualification
+translates **179 Python files / 881,637 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -2884,3 +2885,15 @@ SIGINT/SIGTERM and exited-leader/descendant retirement checks pass. The native
 ARM Mesa image preparation and image preflight checks pass. No Python or fresh
 QEMU rendering is used; the shared package service is being ported next. See
 [GL qualification](../gl-triangle/native-tools.md).
+
+The source-tooling stage retires nine Python files. Native staging preserves
+generated content and links, including Unicode boundaries and truncation before
+transformation failure. Native package and clipboard suites, portable staging
+closures and committed presenter builds pass on ARM, Rosetta x86 and ASan/UBSan.
+Repeated uploads and command owners keep descriptors flat; real Unix QMP replies,
+blocked interrupts and descendant retirement pass. Existing package-persistence
+and live source-sync scripts pass with the native service. Interrupted uploads
+retain the previous overlay and remove their private files. The ARM X11 clipboard
+client and overlay prepare with the existing cross-toolchain. No Python, fresh
+kernel build or fresh QEMU interaction is used. Shared CPython bridges still used
+by other controllers remain counted. See [source-tool qualification](../tools/source-tools-native.md).
