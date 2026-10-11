@@ -164,7 +164,9 @@ fn cycles(parent &char, count int) {
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, other, unsafe { &char(nil) }, 0)
 		tool(c'plan-grow', c'/etc/vinix/volumes.vset', c'2', c'8192', unsafe { &char(nil) }, 0)
 		planning_capacity(c'/etc/vinix/volumes.vset', c'0', parent, c'16777216', 0)
-		planning_allocate(c'/etc/vinix/volumes.vset', c'0', c'14', c'4096', c'6291456', c'6307840', c'4096', true, 0)
+		pool_members(c'/etc/vinix/volumes.vset')
+		simple(c'pool-space', c'/etc/vinix/volumes.vset', c'3', 0)
+		pool_allocate(c'/etc/vinix/volumes.vset', c'3', c'14', c'4096', true, 0)
 		tool(c'check-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		simple(c'plan-remove', c'/etc/vinix/volumes.vset', c'14', 0)
 		simple(c'plan-enroll', c'/etc/vinix/volumes.vset', c'/root/offline.vmap', 0)
@@ -425,6 +427,7 @@ fn first_boot(parent &char) {
 		planned_mappings(parent, wrong)
 		planned_disks(wrong)
 		planned_space(parent)
+		planned_pools(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -451,6 +454,7 @@ fn first_boot(parent &char) {
 		}
 		check(!retained, c'heap retention')
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, wrong, &char(nil), 0)
+		pool_members(c'/etc/vinix/volumes.vset')
 		plan := C.open(c'/root/saved.vmap', C.O_RDONLY); check(plan >= 0, c'open exported plan')
 		mut bytes := [2112]u8{}
 		size := C.read(plan, &bytes[0], 2112)
@@ -496,6 +500,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		view_data(); second_view_data()
 		grown_view_data()
 		edited_view_data()
+		pool_boot_check()
 		check(C.getppid() == 1 && status(c'/dev/mapper/vinix2').disk_id == status(actual).disk_id
 			&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id, c'init restored reordered physical disks')
 		C.printf(c'PLAN BOOT RESTORED\n')

@@ -19,8 +19,8 @@ truncated prefix and single-bit corruption, checksummed invalid records,
 atomic file publication and discovery's regular-file/symlink rejection with
 ASan/UBSan. Bundle checks include every truncated prefix and single-bit
 corruption, checksummed invalid headers/later records, append rollback,
-duplicate global slots/disk identities, the 6208-byte/64-disk bound and output
-canaries. A publisher fixture replaces only synchronous syscall boundaries;
+duplicate global slots/disk identities, the 6208-byte version-1/64-disk bound
+and output canaries. A publisher fixture replaces only synchronous syscall boundaries;
 it tests EINTR and short writes, write/file-fsync/close/rename failures preserving
 the old file, and directory-fsync failure retaining the new published file with
 unconfirmed durability. A destination matching a temporary candidate must survive
@@ -60,6 +60,15 @@ their existing raw disk between boots, adopt the new geometry, allocate and grow
 a tail mapping, then restore old and new data on a fourth boot. See
 [physical capacity qualification](capacity-bundle.md).
 
+Persistent pool tests compare aggregate capacity and ordered cross-disk first
+fit against an independent 2048-case fragmentation oracle. They cover sector
+eligibility, membership validation/removal, disk-index compaction, 128-bit
+totals, version-1 compatibility, version-2 corruption/import rollback and the
+8768-byte/64-region bound. Pool edits and allocations run all publisher faults.
+Guests verify later-disk conflict preflight, retained data/descriptors and pool
+metadata across reordered boot and capacity adoption. See
+[pool qualification](pool-bundle.md).
+
 Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init
@@ -78,9 +87,10 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 4000 utility processes across 200 warmup
-and 200 measured ten-command cycles, with physical-capacity verification,
-offline mapping/disk edits and live preflight on x86 TCG; the strict retention
+its own process. The allowance includes 5200 utility processes across 200 warmup
+and 200 measured thirteen-command cycles, with pool membership/query/allocation,
+physical-capacity verification, offline mapping/disk edits and live preflight
+on x86 TCG; the strict retention
 checks are unchanged.
 Serial output is streamed to disk, with a fixed marker window for read boundaries;
 pipe buffers are freed after writing, and the completed transcript is read once.
@@ -124,9 +134,10 @@ their generations. An already open raw descriptor writes and flushes the new
 extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
-capacity, verifies/republishes unchanged physical capacity,
-allocates/checks/removes a scratch mapping, enrolls/forgets an empty offline
-participant, explicitly replays growth and runs boot restoration. A flushed phase marker
+capacity, verifies/republishes unchanged physical capacity, adds two pool members,
+queries the pool and allocates/checks/removes a scratch mapping, enrolls/forgets
+an empty offline participant, explicitly replays growth and runs boot restoration.
+A flushed phase marker
 and the atomically published bundle stay on ext2 across an
 abrupt VM stop. The physical disks are reordered for the second boot. Production ARM
 native init or AMD64 desktop init restores both disks from the bundle before the
@@ -139,7 +150,8 @@ the disposable raw file from 16 to 24 MiB, preserving its MBR and prior bytes.
 The third boot must reject the old saved geometry before the application adopts
 the exact new capacity, allocates and grows a tail view, and persists its bundle
 and phase marker. The fourth boot must restore all six mappings through
-production init and retain durable old/tail data and read-only modes.
+production init and retain durable old/tail data and read-only modes. Both pool
+regions must survive the reordered second boot and enlarged fourth boot.
 
 The fixture touches its readable ELF load pages before sampling. This keeps
 cold faults in the long-lived test program's diagnostic code from appearing as

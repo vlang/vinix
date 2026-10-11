@@ -70,11 +70,20 @@ fn bundle_forget_disk(mut set PlanSet, disk int) bool {
 		plan_error(c'only an empty disk can be removed, and one enrolled disk must remain')
 		return false
 	}
+	for i in 0 .. set.regions {
+		if set.windows[i].disk == u32(disk) {
+			plan_error(c'remove allocation pool membership before forgetting this disk')
+			return false
+		}
+	}
 	for next := disk + 1; next < set.count; next++ {
 		set.plans[next - 1] = set.plans[next]
 	}
 	set.count--
 	set.plans[set.count] = Plan{}
+	for i in 0 .. set.regions {
+		if set.windows[i].disk > u32(disk) { set.windows[i].disk-- }
+	}
 	// Empty participants own no slots. All remaining keys, rows and bits survive.
 	return true
 }

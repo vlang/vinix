@@ -1,0 +1,68 @@
+# Persistent allocation-pool qualification
+
+Run the native V controller commands in [README.md](README.md). Host checks
+use ASan/UBSan; both architectures' complete production utility and guest C
+are audited for implicit heap allocation and V runtime dependencies.
+
+The host suite covers:
+
+- Pool/disk ID bounds, absent members, duplicate pairs, overlapping regions
+  across pools, sector/range/alignment errors, ambiguous persistent identifiers,
+  the 64-region bound and unchanged state on failure.
+- Stable membership order, removal retaining desired mappings, refusal to forget
+  a member disk, and compaction of later disk indices when an empty disk is
+  forgotten. Imported version-2 bundle indices rebase after existing plans.
+- Aggregate aligned gap capacity and first fit against an independent sector
+  oracle: all 256 two-disk fragmentation patterns at eight request lengths,
+  including read-only occupied rows, clipped regions and different alignments.
+  A 4096-byte-sector member is skipped for a 512-byte request.
+- Globally owned slots, zero/invalid lengths and modes, missing pools, no single
+  fitting gap, unchanged failure outputs and readonly/writable result modes.
+- Totals beyond u64, including 64 large members totaling
+  `1180591620717411237888` bytes; decimal formatting through the full u128 limit.
+- Exact pool-free version-1 bytes, version-2 roundtrip, every truncated prefix
+  and bit corruption, checksummed malformed headers/records/reserved fields,
+  the exact 8768-byte maximum with output canaries, and return to version 1
+  after the final region is removed.
+- Bounded regular-file inputs, final symlink/nonregular/corrupt/missing input
+  rejection, unchanged query bytes and strict command argument parsing.
+- Add/remove/allocate through the shared syscall-boundary publisher fixture:
+  EINTR and three-byte short writes succeed; write, file-fsync, close and rename
+  failures preserve the old file; directory-fsync failure returns an error with
+  the complete new metadata and mappings visible. Descriptors and temporary
+  files drain on every path.
+
+The first guest boot requires `PLAN POOLS PASSED:`. Two eligible regions have
+4096 and 12288 bytes free. A request of 16384 bytes must fail despite sufficient
+aggregate capacity. An 8192-byte readonly request must skip the first member
+and select the second physical disk; a subsequent 4096-byte request follows
+the saved first member. Neither planning command implicitly creates a view.
+
+An unlisted live conflict on the selected later disk must reject all preview
+actions and replay without disturbing previous generations. Removing it allows
+explicit creation with the selected identity, offset and mode and unchanged
+physical data. Removing pool membership preserves the allocated desired row,
+live generation and held descriptor's two data pages. Removing desired rows
+then all members restores the exact original version-1 file; re-adding the
+regions restores the exact configured version-2 file.
+
+Each of 200 warmup and 200 measured cycles launches thirteen utility processes:
+save-set, unchanged plan-grow, unchanged plan-capacity, two pool-add commands,
+pool-space, pool-allocate, check-bundle, plan-remove, plan-enroll, plan-forget,
+restore-bundle and boot-restore. This is 5200 processes, 800 member additions,
+400 pool queries and 400 scratch allocations. No scratch mapping is created.
+Every slab class and the large-page total must stay flat or decrease.
+
+The actual guest-published pool-bearing bundle survives the reordered second
+boot through production init. After the host enlarges only its disposable raw
+disk, stale geometry must reject replay on the third boot. Explicit physical
+capacity adoption and tail allocation/growth preserve both pool records. The
+fourth boot must restore all six mappings and report the original pool regions
+and exact aggregate capacity, alongside durable old/tail data and modes.
+`PLAN POOL BOOT PRESERVED` is required on both successful reboot phases.
+
+Real guest coverage uses 512-byte MBR disks on VirtIO (ARM64) and AHCI (x86).
+Mixed sectors, ambiguous identities, maximum bounds and publication faults use
+host models. Pools describe saved allocation eligibility; live protection and
+complete preflight remain separate. Spanning volumes, RAID and encryption are
+outside this increment.

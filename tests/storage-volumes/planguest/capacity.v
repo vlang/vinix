@@ -36,6 +36,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 			grown_view_data()
 			edited_view_data()
 			capacity_view_data()
+			pool_boot_check()
 			check(status(c'/dev/mapper/vinix14').disk_id == status(parent).disk_id
 				&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id,
 				c'capacity boot maps the correct physical disks')
@@ -54,7 +55,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 		fd := C.open(c'/root/saved.vset', C.O_RDONLY)
 		mut original := [6208]u8{}
 		size := C.read(fd, &original[0], 6208)
-		check(fd >= 0 && size == 352 && C.close(fd) == 0, c'read pre-adoption bundle')
+		check(fd >= 0 && size == 432 && C.close(fd) == 0, c'read pre-adoption pool bundle')
 		planning_allocate(c'/root/saved.vset', c'0', c'14', c'4096', c'16777216', c'25165824', c'4096', false, 1)
 		planning_capacity(c'/root/saved.vset', c'0', other, c'25165824', 1)
 		planning_capacity(c'/root/saved.vset', c'0', parent, c'16777216', 1)

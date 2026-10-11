@@ -9,6 +9,8 @@ mut:
 	count int
 	slots u64
 	plans [64]Plan
+	regions int
+	windows [64]PoolRegion
 }
 
 struct SetRestore {

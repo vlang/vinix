@@ -63,11 +63,49 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
 	C.printf(c'       vinix-volume plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES ALIGNMENT_BYTES [ro]\n')
 	C.printf(c'       vinix-volume plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES\n')
+	C.printf(c'       vinix-volume pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume pool-remove BUNDLE POOL_ID DISK_INDEX\n       vinix-volume pool-space BUNDLE POOL_ID\n       vinix-volume pool-allocate BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'pool-add') == 0 {
+			if argc != 8 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			disk := decimal(argv[4]) or { return usage() }
+			window := SpaceWindow{start: decimal(argv[5]) or { return usage() },
+				end: decimal(argv[6]) or { return usage() }, alignment: decimal(argv[7]) or { return usage() }}
+			if pool >= 64 || disk >= 64 || !space_window_valid(window) { return usage() }
+			region := PoolRegion{pool: u32(pool), disk: u32(disk), window: window}
+			return edit_pool_plan(argv[2], &region, false)
+		}
+		if argc >= 2 && C.strcmp(argv[1], c'pool-remove') == 0 {
+			if argc != 5 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			disk := decimal(argv[4]) or { return usage() }
+			if pool >= 64 || disk >= 64 { return usage() }
+			region := PoolRegion{pool: u32(pool), disk: u32(disk)}
+			return edit_pool_plan(argv[2], &region, true)
+		}
+		if argc >= 2 && C.strcmp(argv[1], c'pool-space') == 0 {
+			if argc != 4 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			if pool >= 64 { return usage() }
+			return space_pool_plan(argv[2], u32(pool))
+		}
+		if argc >= 2 && C.strcmp(argv[1], c'pool-allocate') == 0 {
+			if argc != 6 && argc != 7 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			slot := decimal(argv[4]) or { return usage() }
+			length := decimal(argv[5]) or { return usage() }
+			if pool >= 64 || slot >= 64 || length == 0 { return usage() }
+			mut row := Request{slot: u32(slot), length: length}
+			if argc == 7 {
+				if C.strcmp(argv[6], c'ro') != 0 { return usage() }
+				row.flags = 1
+			}
+			return allocate_pool_plan(argv[2], u32(pool), &row)
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'plan-capacity') == 0 {
 			if argc != 6 { return usage() }
 			disk := decimal(argv[3]) or { return usage() }

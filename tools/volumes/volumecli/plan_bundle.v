@@ -2,7 +2,7 @@
 module volumecli
 
 const bundle_header_bytes = 64
-const bundle_max_bytes = 6208 // Header + 64 disk headers + 64 global mappings.
+const bundle_max_bytes = 8768 // V1 maximum 6208 plus 64 pool records of 40 bytes.
 
 @[direct_array_access]
 fn bundle_set_valid(set &PlanSet) bool {
@@ -20,7 +20,7 @@ fn bundle_set_valid(set &PlanSet) bool {
 			slots |= bit
 		}
 	}
-	return true
+	return pool_regions_valid(set)
 }
 
 // A bundle contains complete version-1 disk plans, including their checksums.
@@ -39,11 +39,23 @@ fn encode_bundle(set &PlanSet, output &u8) int {
 		size += encode_plan(unsafe { &set.plans[i] }, unsafe { output + size })
 		rows += set.plans[i].count
 	}
-	put_le(output, 0, 8, 0x31535658494e4956) // VINIXVS1
-	put_le(output, 8, 4, 1)
+	for i in 0 .. set.regions {
+		region := set.windows[i]
+		put_le(output, size, 4, region.pool)
+		put_le(output, size + 4, 4, region.disk)
+		put_le(output, size + 8, 8, region.window.start)
+		put_le(output, size + 16, 8, region.window.end)
+		put_le(output, size + 24, 8, region.window.alignment)
+		put_le(output, size + 32, 8, 0)
+		size += 40
+	}
+	// Pool-free sets retain the original V1 byte format exactly.
+	put_le(output, 0, 8, if set.regions == 0 { u64(0x31535658494e4956) } else { u64(0x32535658494e4956) })
+	put_le(output, 8, 4, if set.regions == 0 { u64(1) } else { u64(2) })
 	put_le(output, 12, 4, u64(set.count))
 	put_le(output, 16, 4, u64(size))
 	put_le(output, 20, 4, rows)
+	put_le(output, 28, 4, u64(set.regions))
 	put_le(output, 24, 4, crc32(output, size, 24))
 	return size
 }
@@ -53,27 +65,34 @@ fn encode_bundle(set &PlanSet, output &u8) int {
 @[direct_array_access]
 fn decode_bundle(data &u8, size int, mut set PlanSet) bool {
 	if size < bundle_header_bytes || size > bundle_max_bytes
-		|| get_le(data, 0, 8) != 0x31535658494e4956 || get_le(data, 8, 4) != 1
 		|| get_le(data, 16, 4) != u64(size) || get_le(data, 24, 4) != crc32(data, size, 24) {
 		return false
 	}
+	version := get_le(data, 8, 4)
+	magic := get_le(data, 0, 8)
+	if !((version == 1 && magic == 0x31535658494e4956) || (version == 2 && magic == 0x32535658494e4956)) { return false }
 	count := get_le(data, 12, 4)
 	rows := get_le(data, 20, 4)
-	if count == 0 || count > 64 || rows > 64 || set.count < 0 || set.count > 64 - int(count) {
+	regions := get_le(data, 28, 4)
+	if count == 0 || count > 64 || rows > 64 || set.count < 0 || set.count > 64 - int(count)
+		|| regions > 64 || (version == 1 && regions != 0) || (version == 2 && regions == 0)
+		|| set.regions < 0 || set.regions > 64 - int(regions) {
 		return false
 	}
 	unsafe {
-		for i in 28 .. bundle_header_bytes {
+		for i in 32 .. bundle_header_bytes {
 			if data[i] != 0 { return false }
 		}
 	}
 	original_count := set.count
 	original_slots := set.slots
+	original_regions := set.regions
 	mut accepted := false
 	defer {
 		if !accepted {
 			set.count = original_count
 			set.slots = original_slots
+			set.regions = original_regions
 		}
 	}
 	mut plan := unsafe { &Plan(C.alloca(sizeof(Plan))) }
@@ -94,7 +113,16 @@ fn decode_bundle(data &u8, size int, mut set PlanSet) bool {
 		at += length
 		total_rows += inner_rows
 	}
-	if at != size || total_rows != rows { return false }
+	if total_rows != rows || size - at != int(regions) * 40 { return false }
+	for _ in 0 .. int(regions) {
+		disk := get_le(data, at + 4, 4)
+		if disk >= count || get_le(data, at + 32, 8) != 0 { return false }
+		set.windows[set.regions] = PoolRegion{pool: u32(get_le(data, at, 4)), disk: u32(disk) + u32(original_count),
+			window: SpaceWindow{start: get_le(data, at + 8, 8), end: get_le(data, at + 16, 8), alignment: get_le(data, at + 24, 8)}}
+		set.regions++
+		at += 40
+	}
+	if !bundle_set_valid(unsafe { &set }) { return false }
 	accepted = true
 	return true
 }
@@ -115,7 +143,7 @@ fn read_bundle(fd i32, mut set PlanSet, trusted bool) bool {
 		plan_error(c'boot bundle must be owned by root and not writable by group or others')
 		return false
 	}
-	mut bytes := [6208]u8{}
+	mut bytes := [8768]u8{}
 	mut done := i64(0)
 	for done < info.st_size {
 		read := C.read(fd, unsafe { &bytes[done] }, usize(info.st_size - done))
@@ -157,7 +185,7 @@ fn load_relative_bundle(directory i32, name &char, mut set PlanSet, trusted bool
 }
 
 fn publish_bundle(path &char, set &PlanSet) bool {
-	mut bytes := [6208]u8{}
+	mut bytes := [8768]u8{}
 	size := encode_bundle(set, &bytes[0])
 	if size == 0 {
 		plan_error(c'invalid volume bundle snapshot')

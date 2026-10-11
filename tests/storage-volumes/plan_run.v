@@ -31,7 +31,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -369,6 +369,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN EDIT PASSED:') { return error('Missing offline mapping edit qualification') }
 	if !first.contains('PLAN DISKS PASSED:') { return error('Missing offline disk membership qualification') }
 	if !first.contains('PLAN SPACE PASSED:') { return error('Missing bounded extent allocation qualification') }
+	if !first.contains('PLAN POOLS PASSED:') { return error('Missing persistent allocation pool qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
@@ -382,6 +383,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, nvme)! }
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
+	if !second.contains('PLAN POOL BOOT PRESERVED') { return error('Pool configuration did not survive reordered boot') }
 	// Enlarge the existing disposable backing file without changing its MBR or
 	// prior bytes. The saved bundle and all guest files remain guest-produced.
 	mut disk := os.open_file(work + '/volume.raw', 'r+')!
@@ -396,7 +398,8 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !fourth.contains('PLAN CAPACITY BOOT RESTORED:') || fourth.contains('init: volume restore failed; continuing') {
 		return error('Production init did not restore the adopted physical capacity')
 	}
-	println('PASS ${arch}: physical capacity adoption, tail allocation/growth, atomic bundle save, complete preflight, four-boot persistence and 200-cycle retention')
+	if !fourth.contains('PLAN POOL BOOT PRESERVED') { return error('Pool configuration did not survive capacity adoption and boot') }
+	println('PASS ${arch}: persistent allocation pools, physical capacity adoption, tail allocation/growth, atomic bundle save, complete preflight, four-boot persistence and 200-cycle retention')
 }
 
 fn main() {

@@ -76,6 +76,15 @@ size through one retained read-only descriptor. It preserves desired mappings
 and uses atomic publication; allocation and live replay remain separate. See
 [physical capacity adoption](../../docs/storage-volumes.md#adopting-physical-capacity-growth).
 
+`pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES`
+enrolls an eligible region in a persistent allocation pool. `pool-space BUNDLE
+POOL_ID` reports each member and full-width aggregate capacity. `pool-allocate
+BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]` chooses the first fitting member in saved
+order and atomically publishes one contiguous mapping with the pool metadata.
+`pool-remove BUNDLE POOL_ID DISK_INDEX` removes membership while retaining desired
+and live mappings. Pool-bearing bundles use version 2; pool-free bundles retain
+version 1. See [pool bounds, persistence and allocation rules](../../docs/storage-volumes.md#persistent-allocation-pools).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

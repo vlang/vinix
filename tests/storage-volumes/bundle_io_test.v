@@ -216,3 +216,48 @@ fn test_allocation_uses_shared_atomic_publisher_for_every_io_fault() {
 		} else { assert current == original }
 	}
 }
+
+fn test_pool_membership_and_allocation_publish_metadata_and_mappings_together_on_every_fault() {
+	work := os.join_path(os.temp_dir(), 'vinix-pool-io-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	for operation in 0 .. 3 {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}
+			mut plan := Plan{ key: DiskKey{ bytes: 8192, sector: 512, kind: 1 } }
+			plan.key.id[0] = 1
+			assert append_plan(mut set, &plan)
+			region := PoolRegion{ pool: 3, disk: 0, window: SpaceWindow{ start: 1024, end: 8192, alignment: 4096 } }
+			if operation != 0 {
+				assert bundle_pool_add(mut set, &region)
+			}
+			bundle_io = BundleIO{}
+			assert publish_bundle(path.str, &set)
+			original := os.read_bytes(path)!
+			bundle_io = BundleIO{ mode: mode }
+			row := Request{ slot: 9, length: 4096, flags: 1 }
+			result := if operation == 2 {
+				allocate_pool_plan(path.str, 3, &row)
+			} else {
+				edit_pool_plan(path.str, &region, operation == 1)
+			}
+			assert result == if mode == 1 { 0 } else { 1 }
+			assert bundle_io.closes == 2 && os.ls(work)!.len == 1
+			current := os.read_bytes(path)!
+			mut decoded := PlanSet{}
+			assert decode_bundle(current.data, current.len, mut decoded)
+			if mode == 1 || mode == 4 {
+				assert current != original && bundle_io.renames == 1 && bundle_io.flushes == 2
+				assert decoded.regions == if operation == 1 { 0 } else { 1 }
+				assert decoded.plans[0].count == if operation == 2 { u32(1) } else { u32(0) }
+				if operation == 2 {
+					assert decoded.windows[0] == region
+					assert decoded.plans[0].rows[0] == Request{ slot: 9, offset: 4096, length: 4096, flags: 1 }
+				}
+			} else {
+				assert current == original
+			}
+		}
+	}
+}

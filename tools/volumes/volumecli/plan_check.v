@@ -70,6 +70,11 @@ fn show_plan_set(set &PlanSet) bool {
 		}
 		count += plan.count
 	}
+	for i in 0 .. set.regions {
+		region := set.windows[i]
+		if C.printf(c'pool=%u disk=%u start=%lu end=%lu alignment=%lu\n', region.pool, region.disk,
+			region.window.start, region.window.end, region.window.alignment) < 0 { return false }
+	}
 	return C.printf(c'disks=%u mappings=%u\n', u32(set.count), count) >= 0
 }
 

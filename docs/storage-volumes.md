@@ -184,8 +184,9 @@ current geometry. A failure during creation or concurrent reconfiguration can
 leave previously created mappings in place, including an earlier disk's complete
 plan. Replay resumes from matching mappings and never removes unlisted views.
 Saving several individual files does not publish a set atomically; finish
-enrollment before boot or explicit restore, or use the bundle below. Pools,
-spanning volumes and RAID remain separate work.
+enrollment before boot or explicit restore, or use the bundle below. Allocation
+pools use bundle metadata as described below; spanning volumes and RAID remain
+separate work.
 
 ## Atomic multi-disk bundles
 
@@ -219,8 +220,9 @@ The bounded `VINIXVS1` version-1 format has a 64-byte header containing version,
 disk count, total byte count, total mapping count, CRC32 and zero reserved bytes,
 followed by complete `VINIXVM1` disk plans in command-line order. Both inner and
 outer checksums are validated, together with global identity/slot uniqueness.
-At most 64 mappings are stored across all disks, so the largest bundle is 6208
-bytes. CRC32 detects accidental corruption; it does not authenticate a bundle.
+At most 64 mappings are stored across all disks, so the largest version-1 bundle
+is 6208 bytes. Bundles with allocation pools use version 2 as described below.
+CRC32 detects accidental corruption; it does not authenticate a bundle.
 
 `restore-bundle` reads a bounded regular file without following its final
 symlink, discovers all physical disks, then uses the existing plan-set preflight
@@ -237,7 +239,8 @@ serialized administration: the kernel has no global mapping snapshot or
 configuration generation. Restoring remains a sequence of independently checked
 creates; a quota, I/O or concurrent-reconfiguration failure during application
 can leave an already created prefix. Replaying the same bundle resumes from
-matching entries. Filesystem mounting, pools and RAID remain separate work.
+matching entries. Filesystem mounting, spanning volumes and RAID remain separate
+work.
 
 ## Planned capacity growth
 
@@ -371,7 +374,7 @@ an omitted slot or extent can therefore fail live preflight until the old view
 is explicitly removed. Use `check-bundle` before application: offline validation
 checks saved extents, while live preflight also detects unlisted mappings.
 
-This completes add/remove editing of saved linear mappings; pools, RAID,
+This completes add/remove editing of saved linear mappings; RAID,
 filesystem resize and encryption remain separate work. See
 [offline edit qualification](../tests/storage-volumes/edit-bundle.md).
 
@@ -419,8 +422,10 @@ live mappings, data and open descriptors remain usable, and replay keeps those
 unlisted mappings. Their physical extents still obey the ordinary runtime
 protections. Reenrollment imports the saved desired rows and resumes complete
 preflight; matching live views keep their generations. Administration remains
-serialized and live application remains a separate operation. Pools, spanning
-volumes and RAID are still separate work. See
+serialized and live application remains a separate operation. A disk with pool
+membership must first have that membership removed before it can be forgotten;
+remaining pool disk indices follow the compacted saved order. Spanning volumes
+and RAID are still separate work. See
 [disk membership qualification](../tests/storage-volumes/disk-bundle.md).
 
 ## Bounded extent allocation
@@ -465,8 +470,9 @@ mappings and protected extents may occupy an offline gap. `check-bundle` detects
 live mapping conflicts, and live application retains kernel extent protection
 and the ordinary partial-failure rules. Planning does not format, discard,
 reserve live storage or alter live descriptors. Administration must remain
-serialized; subsequent planning sees the newly saved row. Pools, spanning
-volumes and RAID remain separate work. See
+serialized; subsequent planning sees the newly saved row. Persistent allocation
+pools extend this selection across disk regions below. Spanning volumes and RAID
+remain separate work. See
 [extent allocation qualification](../tests/storage-volumes/space-bundle.md).
 
 ## Adopting physical capacity growth
@@ -514,11 +520,88 @@ bundle/device symlinks are refused. Administration must remain serialized.
 This command does not initiate controller capacity rescanning: the kernel must
 already expose the larger geometry, which may require reattachment or reboot
 on the selected backend. GPT backup-header relocation, partition resizing,
-filesystem growth, pools and RAID remain separate work. Choosing an allocation
+filesystem growth and RAID remain separate work. Choosing an allocation
 region must account for all partition, filesystem, swap and other data or
 metadata extents. Disk identifiers retain the existing uniqueness requirement;
 cloned signatures/GUIDs do not establish physical provenance. See
 [physical capacity qualification](../tests/storage-volumes/capacity-bundle.md).
+
+## Persistent allocation pools
+
+```sh
+# Save each disk's identity first, then enroll explicitly eligible regions.
+vinix-volume save-set /root/layout.vset /dev/vda /dev/vdb
+vinix-volume pool-add /root/layout.vset 3 0 8388608 16777216 4096
+vinix-volume pool-add /root/layout.vset 3 1 8388608 16777216 4096
+vinix-volume pool-space /root/layout.vset 3
+vinix-volume pool-allocate /root/layout.vset 3 20 2097152 ro
+vinix-volume show-bundle /root/layout.vset
+vinix-volume check-bundle /root/layout.vset
+vinix-volume restore-bundle /root/layout.vset
+# Remove disk 1 from pool 3 while retaining its desired and live mappings.
+vinix-volume pool-remove /root/layout.vset 3 1
+```
+
+`pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES`
+adds an eligible region on an enrolled disk. Pool IDs are decimal 0–63, local
+to this saved bundle; disk indices follow `show-bundle` order. There are at most
+64 region records in total and one region per pool/disk pair. Regions on the
+same disk must be disjoint, including regions belonging to different pools;
+adjacent regions are valid. Region-bearing disks cannot share an MBR/GPT
+identifier, even with different saved capacities. Bounds, exclusive ends,
+sector alignment and power-of-two placement alignment follow `plan-space`.
+
+`pool-space BUNDLE POOL_ID` reports each member's eligible gap count, bytes and
+largest gap, followed by their aggregate. Alignment prefixes and saved desired
+mappings, including read-only mappings, are excluded. The total byte count uses
+full 128-bit decimal arithmetic, so large multi-disk totals cannot wrap at
+64 bits. An enrolled pool with no gaps reports zero capacity; an absent pool
+fails. Queries validate the full bundle and preserve its bytes.
+
+`pool-allocate BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]` chooses the first member
+in saved membership order with a fitting sector-aligned contiguous gap, then
+the lowest eligible physical offset in that member. A length incompatible with
+a member's logical sector size skips that member. The slot must be globally
+free. Each result remains one ordinary linear mapping on one physical disk;
+aggregate free capacity cannot satisfy a request larger than every individual
+gap. The selected disk, offset, length and mode are reported after publication.
+All other mappings, identities and pool regions survive unchanged.
+
+`pool-remove BUNDLE POOL_ID DISK_INDEX` removes only the eligible region.
+Previously allocated desired rows and live views remain, including their modes,
+generations and open descriptors. Removing then adding a member places it last
+in allocation order. Forgetting a disk requires no desired mappings or pool
+membership; following disk indices are adjusted together. Pool membership does
+not tag or restrict ordinary `plan-add`, `plan-grow` or explicit-region edits.
+`plan-capacity` preserves the regions; extending eligibility into an adopted
+tail requires an explicit membership edit. `save-set` captures a fresh live
+mapping snapshot and emits a pool-free bundle, replacing prior desired edits
+and pool configuration. Use bundle edits to retain that configuration.
+
+Pool regions and mappings share one checksummed atomic publication. Pool-bearing
+files use a 64-byte `VINIXVS2` version-2 header: the existing counts and CRC remain
+at their version-1 offsets, region count is a little-endian u32 at byte 28, and
+bytes 32–63 are zero. Complete version-1 disk plans are followed by up to 64
+40-byte records: pool u32, saved disk index u32, start u64, exclusive end u64,
+alignment u64 and eight zero reserved bytes. The maximum file is 8768 bytes.
+Version 2 requires at least one region. Pool-free output retains the exact
+version-1 format; removing the last region restores it. Older utilities reject
+the version-2 magic. `show-bundle` displays all region records; ordinary restore
+and boot replay validate them alongside mappings and retain the saved file.
+
+These commands operate offline on bounded regular files, reject final symlinks,
+and open no devices. Membership edits and allocations use the existing
+write/fsync/close/rename/directory-fsync protocol, publishing metadata and desired
+rows together. Failure before rename preserves the previous complete file;
+directory-fsync or output failure can report an error after the complete new
+file is visible. Administration must remain serialized.
+
+Choose regions that account for partition tables, filesystem data, swap and
+other extents. Reported capacity describes saved desired mappings rather than
+filesystem free space or a live reservation. Separate complete-set preflight
+detects unlisted live conflicts, and application retains kernel extent
+protection. Spanning, striping, RAID, filesystem resizing and encryption remain
+separate work. See [pool qualification](../tests/storage-volumes/pool-bundle.md).
 
 ## Status ABI
 
@@ -883,7 +966,7 @@ per namespace after warmup. This measurement exposed heap-promoted read command
 temporaries; read and flush commands now stay on the caller's stack while their
 DMA payloads retain the existing completion/reset ownership rules.
 
-The encompassing roadmap item stays open: storage pools/RAID, full-disk
+The encompassing roadmap item stays open: spanning volumes/RAID, full-disk
 encryption and recovery, online filesystem resize,
 filesystem-aware trimming and predictive health monitoring are not
 implemented by this increment. The anonymous pager's encrypted swap remains a
