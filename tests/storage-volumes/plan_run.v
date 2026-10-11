@@ -31,7 +31,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -42,6 +42,7 @@ fn host(root string, work string) ! {
 	bundle_publication_tests(root, work, v)!
 	growth_io_tests(root, work, v)!
 	capacity_io_tests(root, work, v)!
+	capacity_batch_io_tests(root, work, v)!
 	for arch in ['aarch64', 'x86_64'] {
 		path := work + '/volume-' + arch + '.c'
 		generate(root, root + '/tools/volumes/volumecli', path, arch)!
@@ -49,6 +50,39 @@ fn host(root string, work string) ! {
 	}
 	init_policy(root, work)!
 	println('PASS host: plan format, identity, corruption, bounded plan sets, atomic publication and sanitizers')
+}
+
+fn capacity_batch_io_tests(root string, work string, v string) ! {
+	fixture := work + '/capacitybatchio'
+	os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
+		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file == 'plan_capacity_batch.v' {
+			for name in ['open', 'close'] { source = source.replace('C.' + name + '(', 'capacity_batch_mock_' + name + '(') }
+		}
+		if file == 'plan_io.v' {
+			for name in ['ioctl', 'pread'] {
+				source = source.replace('C.' + name + '(', 'capacity_batch_mock_' + name + '(')
+					.replace('fn capacity_batch_mock_' + name + '(', 'fn C.' + name + '(')
+			}
+			start := source.index('fn publish_bytes(') or { return error('Missing shared publisher') }
+			end := source.index('\nfn volume_path(') or { return error('Missing publisher boundary') }
+			mut publisher := source[start..end]
+			for name in ['write', 'fsync', 'close', 'renameat'] {
+				publisher = publisher.replace('C.' + name + '(', 'capacity_batch_publish_' + name + '(')
+			}
+			source = source[..start] + publisher + source[end..]
+		}
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/capacity_batch_io_test.v', fixture + '/capacity_batch_io_test.v')!
+	binary := work + '/capacity-batch-io-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, fixture + '/capacity_batch_io_test.v'])!
+	print(command([binary])!)
+	println('PASS capacity batches: all-device pinning/rechecks, complete rollback, previews, publication faults and output failure under ASan/UBSan')
 }
 
 // Keep filesystem reads/publication real, replacing only the physical device
@@ -374,6 +408,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN POOL BATCH PASSED:') { return error('Missing atomic pool batch qualification') }
 	if !first.contains('PLAN POOL GROWTH BATCH PASSED:') { return error('Missing atomic pool growth batch qualification') }
 	if !first.contains('PLAN POOL EXPANSION BATCH PASSED:') { return error('Missing atomic pool expansion batch qualification') }
+	if !first.contains('PLAN CAPACITY BATCH PASSED:') { return error('Missing atomic physical capacity batch qualification') }
 	if !first.contains('PLAN LOCK PASSED:') { return error('Missing saved-plan locking qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
@@ -408,7 +443,8 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !fourth.contains('PLAN POOL BATCH BOOT PRESERVED') { return error('Mixed batch tail mapping did not survive boot') }
 	if !fourth.contains('PLAN POOL GROWTH BATCH BOOT PRESERVED') { return error('Growth batch tail mapping did not survive boot') }
 	if !fourth.contains('PLAN POOL EXPANSION BATCH BOOT PRESERVED') { return error('Expansion batch tail region did not survive boot') }
-	println('PASS ${arch}: atomic pool expansion/growth batches, previews/retries, saved-plan locks, complete preflight, four-boot persistence and 200-cycle retention')
+	if !fourth.contains('PLAN CAPACITY BATCH BOOT PRESERVED') { return error('Capacity batch geometry did not survive boot') }
+	println('PASS ${arch}: atomic physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, four-boot persistence and 200-cycle retention')
 }
 
 fn main() {

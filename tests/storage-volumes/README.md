@@ -98,6 +98,14 @@ publisher fault; previews remain usable under a writer lock. Guests check exact
 cross-disk eligibility, first fit, held views and adopted-tail persistence. See
 [expansion batch qualification](pool-expand-batch.md).
 
+Physical capacity batch tests require all device pins before the final identity/
+geometry pass, independently check 4096 adoption combinations, and preserve all
+saved state after a later failure. Preview performs the same read-only probes
+without writer locking or publication. Fault tests cover partial opens, probe
+races, all publisher faults, equal-capacity retries and buffered stdout failure.
+Guests preview/publish a mixed keep/adopt batch after physical growth and verify
+four-boot persistence. See [capacity batch qualification](capacity-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -124,10 +132,10 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 7600 utility processes across 200 warmup
-and 200 measured nineteen-command cycles, with pool membership, query, batch
+its own process. The allowance includes 8000 utility processes across 200 warmup
+and 200 measured twenty-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
-physical-capacity verification, offline mapping/disk edits and live preflight
+physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
 checks are unchanged.
 Serial output is streamed to disk, with a fixed marker window for read boundaries;
@@ -172,7 +180,8 @@ their generations. An already open raw descriptor writes and flushes the new
 extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
-capacity, verifies/republishes unchanged physical capacity, adds two pool members,
+mapping capacity, previews/verifies/republishes both unchanged physical capacities,
+adds two pool members,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
 batch, previews/publishes a two-mapping growth batch, checks/removes the scratch
 mappings, enrolls/forgets an empty offline
@@ -187,8 +196,9 @@ not inject the bundle or phase marker between boots. The controller requires
 the bundle and capacity preflight markers before accepting the first boot.
 After the ordinary second-boot assertions pass, the controller extends only
 the disposable raw file from 16 to 24 MiB, preserving its MBR and prior bytes.
-The third boot must reject the old saved geometry before the application adopts
-the exact new capacity, previews/publishes the tail's expanded eligibility,
+The third boot must reject the old saved geometry before the application previews
+and publishes a mixed keep/adopt capacity batch, retries both capacities,
+previews/publishes the tail's expanded eligibility,
 retries its equal end, allocates and grows a tail view, and publishes a mixed
 keep/new batch with a read-only tail neighbor. A growth batch then retains the
 writable tail length and grows that neighbor, preserving its held descriptor.

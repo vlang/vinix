@@ -46,13 +46,14 @@ live generation and held descriptor's two data pages. Removing desired rows
 then all members restores the exact original version-1 file; re-adding the
 regions restores the exact configured version-2 file.
 
-Each of 200 warmup and 200 measured cycles launches nineteen utility processes:
-save-set, unchanged plan-grow, unchanged plan-capacity, two pool-add commands,
+Each of 200 warmup and 200 measured cycles launches twenty utility processes:
+save-set, unchanged plan-grow, plan-preview-capacity-batch and plan-capacity-batch,
+two pool-add commands,
 pool-preview-expand-batch, pool-expand-batch, pool-space,
 pool-preview-batch, pool-allocate-batch,
 pool-preview-grow-batch, pool-grow-batch,
 check-bundle, two plan-remove commands, plan-enroll, plan-forget, restore-bundle
-and boot-restore. This is 7600 processes, 800 member additions, 400 pool queries
+and boot-restore. This is 8000 processes, 800 member additions, 400 pool queries
 and 800 scratch placements/growths. No scratch mapping is created.
 Every slab class and the large-page total must stay flat or decrease.
 

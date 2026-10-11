@@ -163,7 +163,8 @@ fn cycles(parent &char, count int) {
 	for _ in 0 .. count {
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, other, unsafe { &char(nil) }, 0)
 		tool(c'plan-grow', c'/etc/vinix/volumes.vset', c'2', c'8192', unsafe { &char(nil) }, 0)
-		planning_capacity(c'/etc/vinix/volumes.vset', c'0', parent, c'16777216', 0)
+		capacity_batch(c'/etc/vinix/volumes.vset', c'0', parent, c'16777216', c'1', other, c'16777216', true, 0, unsafe { nil })
+		capacity_batch(c'/etc/vinix/volumes.vset', c'0', parent, c'16777216', c'1', other, c'16777216', false, 0, unsafe { nil })
 		pool_members(c'/etc/vinix/volumes.vset')
 		pool_expand_batch(c'/etc/vinix/volumes.vset', c'3', c'0', c'6299648', c'1', c'6303744', true, 0, unsafe { nil })
 		pool_expand_batch(c'/etc/vinix/volumes.vset', c'3', c'0', c'6299648', c'1', c'6303744', false, 0, unsafe { nil })
@@ -439,6 +440,7 @@ fn first_boot(parent &char) {
 		planned_pool_batch(parent, wrong)
 		planned_pool_grow_batch(parent, wrong)
 		planned_pool_expand_batch(parent, wrong)
+		planned_capacity_batch(parent, wrong)
 		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)

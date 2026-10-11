@@ -42,12 +42,13 @@ and apply separately; preexisting geometry, generations and a held descriptor's
 data stay intact. Cleanup restores exact baseline bytes.
 `PLAN POOL EXPANSION BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured nineteen-command cycles:
-**7600 utility processes**, including 400 expansion batch previews/publications
+Each architecture runs 200 warmup and 200 measured twenty-command cycles:
+**8000 utility processes**, including 400 expansion batch previews/publications
 with one expansion and one retained member each, 400 allocation batch
 previews/publications with 800 scratch placements, and 400 growth batch
 previews/publications with 800 desired growths. There are 800 member additions
-and 400 queries/capacity checks. Scratch mappings stay offline. Every slab class
+and 400 capacity batch previews/publications and pool queries. Scratch mappings
+stay offline. Every slab class
 and the large-allocation page total must stay flat or decrease. The 1800-second
 per-boot limit is unchanged.
 

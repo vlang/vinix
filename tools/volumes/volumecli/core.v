@@ -63,6 +63,7 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
 	C.printf(c'       vinix-volume plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES ALIGNMENT_BYTES [ro]\n')
 	C.printf(c'       vinix-volume plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES\n')
+	C.printf(c'       vinix-volume plan-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [DISK_INDEX DEVICE EXPECTED_BYTES ...]\n       vinix-volume plan-preview-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [DISK_INDEX DEVICE EXPECTED_BYTES ...]\n')
 	C.printf(c'       vinix-volume pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume pool-remove BUNDLE POOL_ID DISK_INDEX\n       vinix-volume pool-space BUNDLE POOL_ID\n       vinix-volume pool-allocate BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]\n')
 	C.printf(c'       vinix-volume pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES\n       vinix-volume pool-grow BUNDLE POOL_ID SLOT LENGTH_BYTES\n')
 	C.printf(c'       vinix-volume pool-allocate-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       vinix-volume pool-preview-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
@@ -73,6 +74,19 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'plan-capacity-batch') == 0 || C.strcmp(argv[1], c'plan-preview-capacity-batch') == 0) {
+			if argc < 6 || argc > 195 || (argc - 3) % 3 != 0 { return usage() }
+			mut batch := &CapacityBatch(C.alloca(sizeof(CapacityBatch)))
+			*batch = CapacityBatch{count: (argc - 3) / 3}
+			for i in 0 .. batch.count {
+				at := 3 + i * 3
+				disk := decimal(argv[at]) or { return usage() }
+				expected := decimal(argv[at + 2]) or { return usage() }
+				if disk >= 64 || expected == 0 || argv[at + 1][0] == 0 { return usage() }
+				batch.disks[i] = u32(disk); batch.devices[i] = argv[at + 1]; batch.expected[i] = expected
+			}
+			return capacity_batch_bundle_plan(argv[2], batch, C.strcmp(argv[1], c'plan-preview-capacity-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'pool-expand-batch') == 0 || C.strcmp(argv[1], c'pool-preview-expand-batch') == 0) {
 			if argc < 6 || argc > 132 || (argc - 4) % 2 != 0 { return usage() }
 			pool := decimal(argv[3]) or { return usage() }

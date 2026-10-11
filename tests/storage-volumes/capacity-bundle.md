@@ -1,5 +1,10 @@
 # Physical capacity adoption qualification
 
+The shared workload now also previews/publishes atomic multi-disk adoption and
+uses a mixed keep/adopt batch after physical growth. See
+[capacity batch qualification](capacity-batch.md) for pinning, final all-disk
+rechecks, complete rollback, retries and four-boot persistence.
+
 Run the native V `plan_run.v` host suite and both architecture guest suites as
 documented in [the storage-volume harness](README.md). This qualifies
 `plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES`; no new ioctl or kernel

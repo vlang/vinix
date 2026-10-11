@@ -76,6 +76,14 @@ size through one retained read-only descriptor. It preserves desired mappings
 and uses atomic publication; allocation and live replay remain separate. See
 [physical capacity adoption](../../docs/storage-volumes.md#adopting-physical-capacity-growth).
 
+`plan-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [...]` adopts
+1–64 observed capacities together. It pins every physical disk read-only and
+rechecks every identity/geometry after the complete candidate is planned.
+A later failure preserves all saved state. `plan-preview-capacity-batch` uses
+the same verification without publication or a writer lock. Equal-capacity
+retries still complete publication and both flushes. See
+[atomic capacity adoption rules](../../docs/storage-volumes.md#atomic-physical-capacity-adoption-batches).
+
 `pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES`
 enrolls an eligible region in a persistent allocation pool. `pool-space BUNDLE
 POOL_ID` reports each member and full-width aggregate capacity. `pool-allocate

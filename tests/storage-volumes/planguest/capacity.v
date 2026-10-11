@@ -44,11 +44,12 @@ fn physical_capacity_phase(parent &char, other &char) {
 				c'capacity boot maps the correct physical disks')
 			first := status(c'/dev/mapper/vinix2').generation
 			tail := status(c'/dev/mapper/vinix14').generation
-			planning_capacity(c'/etc/vinix/volumes.vset', c'0', parent, c'25165824', 0)
+			capacity_batch(c'/etc/vinix/volumes.vset', c'1', other, c'16777216', c'0', parent, c'25165824', false, 0, unsafe { nil })
 			simple(c'boot-restore', &char(nil), &char(nil), 0)
 			check(status(c'/dev/mapper/vinix2').generation == first
 				&& status(c'/dev/mapper/vinix14').generation == tail, c'capacity boot replay is idempotent')
 			C.printf(c'PLAN CAPACITY BOOT RESTORED: exact enlarged identity, old data and new physical tail\n')
+			C.printf(c'PLAN CAPACITY BATCH BOOT PRESERVED\n')
 			return
 		}
 		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5'); missing(c'/dev/mapper/vinix9')
@@ -72,10 +73,23 @@ fn physical_capacity_phase(parent &char, other &char) {
 		physical_alias(parent)
 		planning_capacity(c'/root/saved.vset', c'0', c'/dev/volume-plan-link', c'25165824', 1)
 		bundle_unchanged(c'/root/saved.vset', &original[0], size)
-		planning_capacity(c'/root/saved.vset', c'0', c'/dev/volume-plan-alias', c'25165824', 0)
+		mut output := [4096]char{}
+		// The first requested disk really grew. A later wrong observed size must
+		// still roll back that earlier adoption for publication and preview.
+		for preview in [false, true]! {
+			capacity_batch(c'/root/saved.vset', c'0', parent, c'25165824', c'1', other, c'33554432', preview, 1, &output[0])
+			check(!contains(&output[0], c'action='), c'later capacity failure discards earlier real growth')
+			bundle_unchanged(c'/root/saved.vset', &original[0], size)
+		}
+		capacity_batch(c'/root/saved.vset', c'1', other, c'16777216', c'0', c'/dev/volume-plan-alias', c'25165824', true, 0, &output[0])
+		check(contains(&output[0], c'request=0 disk=1 action=keep previous_bytes=16777216 bytes=16777216 sector=512')
+			&& contains(&output[0], c'request=1 disk=0 action=adopt previous_bytes=16777216 bytes=25165824 sector=512'), c'mixed keep/adopt preview')
+		bundle_unchanged(c'/root/saved.vset', &original[0], size)
+		capacity_batch(c'/root/saved.vset', c'1', other, c'16777216', c'0', c'/dev/volume-plan-alias', c'25165824', false, 0, nil)
+		capacity_batch(c'/root/saved.vset', c'1', other, c'16777216', c'0', parent, c'25165824', false, 0, &output[0])
+		check(contains(&output[0], c'request=0 disk=1 action=keep') && contains(&output[0], c'request=1 disk=0 action=keep'), c'durable complete capacity retry')
 		missing(c'/dev/mapper/vinix2')
 		missing(c'/dev/mapper/vinix14')
-		mut output := [4096]char{}
 		preview(c'show-bundle', false, 0, &output[0])
 		check(contains(&output[0], c'disk=0 bytes=25165824 sector=512 identity=mbr:12345678')
 			&& contains(&output[0], c'disk=1 bytes=16777216 sector=512 identity=mbr:12345679')

@@ -529,6 +529,64 @@ metadata extents. Disk identifiers retain the existing uniqueness requirement;
 cloned signatures/GUIDs do not establish physical provenance. See
 [physical capacity qualification](../tests/storage-volumes/capacity-bundle.md).
 
+## Atomic physical capacity adoption batches
+
+```sh
+# Both physical disks already expose these exact capacities.
+vinix-volume plan-preview-capacity-batch /root/layout.vset 0 /dev/vda 25165824 1 /dev/vdb 33554432
+vinix-volume plan-capacity-batch /root/layout.vset 0 /dev/vda 25165824 1 /dev/vdb 33554432
+vinix-volume show-bundle /root/layout.vset
+```
+
+`plan-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [...]` adopts
+observed capacities for 1–64 distinct enrolled disks and atomically publishes
+the complete saved bundle once. Indices must be below 64. Expected sizes are
+nonzero unsigned decimal bytes, at least the saved capacities and aligned to
+each saved logical sector size. Every observed MBR signature or primary GPT
+GUID and sector size must match its saved disk, and its observed byte count
+must equal the requested size. Ambiguous enrolled identifiers and repeated
+physical disk identities are rejected, including aliases of one disk.
+
+The complete request list is checked before any device opens. All named devices
+are opened read-only with `CLOEXEC`, `NOFOLLOW` and `NONBLOCK`, and held together
+through validation, reporting and publication. After every initial probe, a
+private candidate applies the existing adoption rules in request order. A
+second pass rechecks every pinned descriptor after the complete candidate is
+planned. This catches an early disk changing while later disks are opened or
+probed. Any detected identity, geometry, offline, read or later-request failure
+preserves the entire original bundle and emits no action rows. Every successfully
+opened descriptor is closed on both success and failure.
+
+Only selected saved byte capacities change. Disk identities, sector sizes,
+desired rows and modes, unapplied growth, pool bounds and member priority are
+preserved. Reports contain request index, disk index, `action=adopt` or
+`action=keep`, previous bytes, observed bytes and sector size. Mixed adoption
+and equal-capacity requests are supported. A complete equal-capacity retry
+still probes all devices, writes, fsyncs, renames and fsyncs the directory,
+completing durability after a previous directory-flush failure. Before rename,
+publisher failure preserves the original file; after rename the complete new
+file may already be visible. Buffered output failure also returns an error.
+Inspect saved state or retry the same requests.
+
+`plan-preview-capacity-batch` accepts the same arguments and performs the same
+complete planning and two-pass physical verification. It prints every action
+only after the entire batch succeeds, without publishing, creating a temporary
+or acquiring a writer lock. Publication holds the pinned directory lock from
+source read through reporting. Both commands preserve the existing V1/V2
+formats. A final bundle or device symlink is rejected; a physical mknod alias
+is accepted when it identifies the expected whole disk.
+
+Adoption records geometry already exposed by the backend. It does not rescan
+controllers, write disks, resize partitions/filesystems, expand pool eligibility
+or apply mappings. Expand saved regions and plan allocations/growth afterward,
+then run complete-set live preflight and explicit replay separately. Matching
+live generations and held descriptors survive adoption, and boot replay uses
+the adopted geometry. Administration must serialize hardware and live changes;
+descriptor pinning and sequential rechecks do not lock hardware geometry, and
+a preview does not reserve saved state. Cloned signatures/GUIDs retain the
+existing provenance limitation. See
+[capacity batch qualification](../tests/storage-volumes/capacity-batch.md).
+
 ## Persistent allocation pools
 
 ```sh
