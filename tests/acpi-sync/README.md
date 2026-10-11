@@ -31,10 +31,10 @@ regenerating the kernel. Combined ARM64 and x86 callbacks and userspace boot
 pass after this correction.
 
 ```sh
-python3 tests/acpi-sync/run.py \
+tests/acpi-sync/run \
   --kernel-dir /path/to/arm-worktree/kernel --arch aarch64 \
   --v /path/to/v --state-dir /tmp/acpi-sync-arm
-python3 tests/acpi-sync/run.py \
+tests/acpi-sync/run \
   --kernel-dir /path/to/x86-worktree/kernel --arch x86_64 \
   --v /path/to/v --state-dir /tmp/acpi-sync-x86
 ```

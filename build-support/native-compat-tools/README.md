@@ -12,6 +12,9 @@ The [regression, protection and loader commands](regression-tools.md) cover
 CPU/job/SysV completion policies, directory/procfs retention, stack canaries,
 genuine ELF interpreters, production greetings and uname staging.
 
+The [opt-in kernel commands](optin-tools.md) also provide native guarded-stack,
+CPU mitigation, SMT topology and isolated-worktree ACPI workflows.
+
 ```sh
 build-support/steam/compile-v-robust OUTPUT [--i386] [--host]
 tests/steam/test-robust-list [--output-dir FRESH-DIR] [--native]

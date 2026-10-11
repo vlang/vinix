@@ -14,7 +14,7 @@ Changing the policy requires rebooting. Disabled APs remain parked by Limine.
 
 Run `V=/path/to/v tests/smt-policy/run-host.sh` for production topology/token
 checks. After `./scripts/build-amd64.sh --no-userland --no-iso`, run
-`python3 tests/smt-policy/run.py` to boot QEMU with one socket, two cores and two
+`tests/smt-policy/run` to boot QEMU with one socket, two cores and two
 threads per core, first restricted and then enabled, checking the actual
 scheduler affinity mask. `VINIX_AMD64_KERNEL` and `VINIX_VM_RUNNER_ROOT` allow
 an isolated kernel checkout to use the original checkout's cached boot support.

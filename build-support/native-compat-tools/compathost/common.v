@@ -81,6 +81,9 @@ fn command_checked(args []string, family string) !int {
 		'elf-text' { return elf_guest_command(args)! }
 		'elf-text-host' { return elf_host_command(args)! }
 		'uname' { return uname_command(args)! }
+		'kernel-stack-guards', 'cpu-mitigations' { return optin_guest_command(args, family)! }
+		'smt-policy' { return smt_guest_command(args)! }
+		'acpi-sync' { return acpi_command(args)! }
 		else { return error_with_code('Unknown compatibility command', 2) }
 	}
 }

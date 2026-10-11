@@ -33,7 +33,7 @@ tests/cpu-mitigations/check-assembly
 tests/cpu-mitigations/check-linked build-amd64-kernel/bin/vinix
 VINIX_VM_RUNNER_ROOT=/Users/alex/code/vinix \
 VINIX_AMD64_KERNEL="$PWD/build-amd64-kernel/bin/vinix" \
-python3 tests/cpu-mitigations/run.py --cpu max
+tests/cpu-mitigations/run --cpu max
 ```
 
 The guest checks syscall register preservation, periodic timer/signed signal
@@ -57,7 +57,7 @@ hardware-port adapters test the supported MSR decisions without advertising
 that an emulated CPU implements their effects. Neither test establishes real
 transient attack resistance.
 
-`run.py --cpu max --segments` additionally runs the unchanged core suite’s
+`run --cpu max --segments` additionally runs the unchanged core suite’s
 TLS/LDT/compatibility group, including stale DS on interrupts and scheduler
 resumption, signed signal frames with LDT code, forged segment rejection, and
 the AMD 32-bit CSTAR refusal path.

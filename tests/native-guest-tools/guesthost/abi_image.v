@@ -2,6 +2,20 @@
 module guesthost
 
 import os
+import hosttest
+
+// Other former realtime-driver callers need the same physical ext2 /root.
+pub fn arm_home_launch(command []string, state string, runner_root string) ![]string {
+	mut argv := command.clone()
+	if os.getenv('VINIX_QEMU_EXTRA') != '' {
+		argv.insert(1, hosttest.shell_split(os.getenv('VINIX_QEMU_EXTRA'))!)
+	}
+	abi_home_volume(state)!
+	abi_arm_config(state, runner_root)!
+	argv.insert(argv.index('-device'), ['-drive', 'if=none,format=raw,file=' + state + '/root.ext2,id=abi-home',
+		'-device', 'virtio-blk-device,drive=abi-home'])
+	return argv
+}
 
 fn abi_home_volume(state string) ! {
 	disk := state + '/root.ext2'
