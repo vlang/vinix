@@ -44,8 +44,9 @@ until the physical identity returns; replay then keeps all generations.
 
 Each of 200 warmup and 200 measured cycles adds two successful membership
 commands to the existing workload: enroll an empty unavailable disk, then
-forget it before live restoration. There are nine commands per cycle, or 3600
-utility processes. Strict acceptance requires flat slab classes and large
+forget it before live restoration. Including physical capacity verification,
+there are ten commands per cycle, or 4000 utility processes. Strict acceptance
+requires flat slab classes and large
 allocation pages. The 1800-second allowance accommodates x86 TCG. A reordered
 reboot runs production init against the actual disk-resident two-disk bundle,
 requiring all five mappings, durable data, modes and replay idempotence.

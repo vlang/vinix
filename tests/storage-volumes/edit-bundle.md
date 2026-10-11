@@ -42,13 +42,14 @@ descriptor remains usable after removing its desired entry and replaying the
 remaining set. Reenrolling it preserves generations. `PLAN EDIT PASSED:` is
 required before acceptance.
 
-Each repeated cycle saves, plans unchanged capacity, adds a scratch mapping,
+Each repeated cycle saves, plans and verifies unchanged capacity, adds a scratch mapping,
 checks, removes the scratch entry, enrolls/forgets an empty offline disk,
 explicitly restores and runs boot replay.
 The scratch mapping must never exist. After 200 warmup and 200 measured cycles,
 all slab classes and large allocation pages must stay flat. The 1800-second
-boot allowance covers 3600 utility processes on x86 TCG. A reordered second
-boot uses production init and the actual disk-resident five-mapping bundle,
+boot allowance covers 4000 utility processes on x86 TCG, including physical
+capacity verification. A reordered second boot uses production init and the
+actual disk-resident five-mapping bundle,
 requiring both new mappings, their data and read-only mode alongside previously
 grown extents. Replay remains idempotent.
 

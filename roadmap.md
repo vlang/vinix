@@ -166,6 +166,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Offline mapping additions/removal with complete-set validation, atomic publication and separate live application](docs/storage-volumes.md#offline-mapping-configuration).
   - [x] [Offline disk enrollment and empty-member removal preserving desired mappings, atomic publication and live descriptors](docs/storage-volumes.md#offline-disk-membership).
   - [x] [Bounded aligned free-extent inspection and first-fit allocation preserving desired mappings and separate live protection](docs/storage-volumes.md#bounded-extent-allocation).
+  - [x] [Explicit adoption of observed physical capacity growth with pinned identity verification, preserved desired mappings and new-tail allocation/replay](docs/storage-volumes.md#adopting-physical-capacity-growth).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

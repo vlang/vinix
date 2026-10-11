@@ -469,6 +469,57 @@ serialized; subsequent planning sees the newly saved row. Pools, spanning
 volumes and RAID remain separate work. See
 [extent allocation qualification](../tests/storage-volumes/space-bundle.md).
 
+## Adopting physical capacity growth
+
+```sh
+# Disk index 0 still identifies this whole disk after its backing capacity grows.
+vinix-volume plan-capacity /root/layout.vset 0 /dev/vda 25165824
+vinix-volume plan-space /root/layout.vset 0 16777216 25165824 4096
+vinix-volume plan-allocate /root/layout.vset 0 20 8192 16777216 25165824 4096
+vinix-volume check-bundle /root/layout.vset
+vinix-volume restore-bundle /root/layout.vset
+```
+
+Saved plans normally match the exact physical capacity. If a virtual backing
+disk or physical namespace becomes larger, discovery and ordinary/boot replay
+continue to reject the old geometry. `plan-capacity BUNDLE DISK_INDEX DEVICE
+EXPECTED_BYTES` explicitly adopts a larger **already observed** capacity for
+one enrolled disk. It opens the named whole disk read-only, verifies its valid
+MBR signature or checksummed primary GPT GUID, and requires the saved identifier
+and logical sector size to match. The observed byte count must equal the
+explicit expected value, be sector-aligned, and be at least the saved size.
+Shrinks, changed identifiers/sectors, partition/volume targets, offline devices
+and another enrolled disk with the same identifier fail without publication.
+The disk index follows `show-bundle` order; a reordered device path cannot
+silently update a different identifier.
+
+The same descriptor remains open through a second identity/geometry probe and
+atomic publication. A changed kernel disk identity, persistent identifier or
+capacity between probes aborts. Only that disk's saved capacity changes; all
+desired rows, their order, pending unapplied edits, modes and other participants
+survive. No mapper mutation, disk write, resnapshot, partition-table update or
+filesystem resize occurs. Planning and separate complete-set replay preserve
+matching live generations and open descriptors. The newly adopted tail can be
+allocated with the existing explicit bounded-region commands, and a tail
+mapping can subsequently grow with `plan-grow` and explicit `grow` replay.
+
+The command publishes through the shared write/fsync/rename/directory-fsync
+protocol. Repeating an adopted size still verifies the disk and republishes
+the same desired bytes, completing the durability protocol even after a prior
+directory-flush failure. Its result prints `previous_bytes`, `bytes` and
+`changed=0` or `1`. A directory-flush or output failure can return an error
+after the complete updated bundle is visible; inspect it and retry. Final
+bundle/device symlinks are refused. Administration must remain serialized.
+
+This command does not initiate controller capacity rescanning: the kernel must
+already expose the larger geometry, which may require reattachment or reboot
+on the selected backend. GPT backup-header relocation, partition resizing,
+filesystem growth, pools and RAID remain separate work. Choosing an allocation
+region must account for all partition, filesystem, swap and other data or
+metadata extents. Disk identifiers retain the existing uniqueness requirement;
+cloned signatures/GUIDs do not establish physical provenance. See
+[physical capacity qualification](../tests/storage-volumes/capacity-bundle.md).
+
 ## Status ABI
 
 `tools/volumes/volumecli/volume.h` defines the native little-endian ABI shared by

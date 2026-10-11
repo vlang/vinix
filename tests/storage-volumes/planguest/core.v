@@ -163,6 +163,7 @@ fn cycles(parent &char, count int) {
 	for _ in 0 .. count {
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, other, unsafe { &char(nil) }, 0)
 		tool(c'plan-grow', c'/etc/vinix/volumes.vset', c'2', c'8192', unsafe { &char(nil) }, 0)
+		planning_capacity(c'/etc/vinix/volumes.vset', c'0', parent, c'16777216', 0)
 		planning_allocate(c'/etc/vinix/volumes.vset', c'0', c'14', c'4096', c'6291456', c'6307840', c'4096', true, 0)
 		tool(c'check-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		simple(c'plan-remove', c'/etc/vinix/volumes.vset', c'14', 0)
@@ -485,11 +486,16 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	if phase < 0 { first_boot(parent) }
 	else {
 		C.close(phase)
-		view_data(); second_view_data()
 		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
+		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
+		if status(actual).bytes == 25165824 {
+			physical_capacity_phase(actual, other)
+			C.printf(c'PLAN DONE\n')
+			for { C.pause() }
+		}
+		view_data(); second_view_data()
 		grown_view_data()
 		edited_view_data()
-		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
 		check(C.getppid() == 1 && status(c'/dev/mapper/vinix2').disk_id == status(actual).disk_id
 			&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id, c'init restored reordered physical disks')
 		C.printf(c'PLAN BOOT RESTORED\n')

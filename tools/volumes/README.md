@@ -70,6 +70,12 @@ aligned gaps between saved mappings in an explicitly chosen region.
 ALIGNMENT_BYTES [ro]` atomically adds the lowest-address fitting mapping.
 See [allocation scope and rules](../../docs/storage-volumes.md#bounded-extent-allocation).
 
+`plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES` adopts a larger observed
+whole-disk capacity after verifying the unchanged MBR/GPT identifier and sector
+size through one retained read-only descriptor. It preserves desired mappings
+and uses atomic publication; allocation and live replay remain separate. See
+[physical capacity adoption](../../docs/storage-volumes.md#adopting-physical-capacity-growth).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

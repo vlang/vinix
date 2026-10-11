@@ -31,7 +31,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -41,6 +41,7 @@ fn host(root string, work string) ! {
 	}
 	bundle_publication_tests(root, work, v)!
 	growth_io_tests(root, work, v)!
+	capacity_io_tests(root, work, v)!
 	for arch in ['aarch64', 'x86_64'] {
 		path := work + '/volume-' + arch + '.c'
 		generate(root, root + '/tools/volumes/volumecli', path, arch)!
@@ -48,6 +49,41 @@ fn host(root string, work string) ! {
 	}
 	init_policy(root, work)!
 	println('PASS host: plan format, identity, corruption, bounded plan sets, atomic publication and sanitizers')
+}
+
+// Keep filesystem reads/publication real, replacing only the physical device
+// boundary and the shared publisher's synchronous fault-injection boundary.
+fn capacity_io_tests(root string, work string, v string) ! {
+	fixture := work + '/capacityio'
+	os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
+		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file == 'plan_capacity.v' {
+			for name in ['open', 'close'] { source = source.replace('C.' + name + '(', 'capacity_mock_' + name + '(') }
+		}
+		if file == 'plan_io.v' {
+			for name in ['ioctl', 'pread'] {
+				source = source.replace('C.' + name + '(', 'capacity_mock_' + name + '(')
+					.replace('fn capacity_mock_' + name + '(', 'fn C.' + name + '(')
+			}
+			start := source.index('fn publish_bytes(') or { return error('Missing shared publisher') }
+			end := source.index('\nfn volume_path(') or { return error('Missing publisher boundary') }
+			mut publisher := source[start..end]
+			for name in ['write', 'fsync', 'close', 'renameat'] {
+				publisher = publisher.replace('C.' + name + '(', 'capacity_publish_' + name + '(')
+			}
+			source = source[..start] + publisher + source[end..]
+		}
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/capacity_io_test.v', fixture + '/capacity_io_test.v')!
+	binary := work + '/capacity-io-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, fixture + '/capacity_io_test.v'])!
+	print(command([binary])!)
+	println('PASS physical capacity adoption: pinned read-only probes, identity/geometry changes, atomic publication, durable no-op and output failure under ASan/UBSan')
 }
 
 fn growth_io_tests(root string, work string, v string) ! {
@@ -346,7 +382,21 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, nvme)! }
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
-	println('PASS ${arch}: planned in-place capacity growth, atomic bundle save, multi-disk preflight, production init restore after device reorder, 200-cycle retention and reboot data')
+	// Enlarge the existing disposable backing file without changing its MBR or
+	// prior bytes. The saved bundle and all guest files remain guest-produced.
+	mut disk := os.open_file(work + '/volume.raw', 'r+')!
+	disk.seek(24 * 1024 * 1024 - 1, .start)!
+	disk.write([u8(0)])!
+	disk.close()
+	third := boot(second_args, work + '/capacity-boot.log')!
+	if !third.contains('init: volume restore failed; continuing') || !third.contains('PLAN CAPACITY PASSED:') {
+		return error('Missing rejection of old geometry or explicit physical capacity adoption')
+	}
+	fourth := boot(second_args, work + '/capacity-restored-boot.log')!
+	if !fourth.contains('PLAN CAPACITY BOOT RESTORED:') || fourth.contains('init: volume restore failed; continuing') {
+		return error('Production init did not restore the adopted physical capacity')
+	}
+	println('PASS ${arch}: physical capacity adoption, tail allocation/growth, atomic bundle save, complete preflight, four-boot persistence and 200-cycle retention')
 }
 
 fn main() {

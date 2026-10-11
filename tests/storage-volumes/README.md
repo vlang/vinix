@@ -51,6 +51,15 @@ force. They cover clipping, unsorted/read-only rows, global slots, all 65 gaps,
 sector sizes, near-u64 rounding, atomic rejection, unchanged query bytes and
 publisher faults. Guests verify raw data, live conflict rejection and held
 descriptors. See [extent allocation qualification](space-bundle.md).
+
+Physical capacity adoption covers MBR/GPT identifiers, 512/4096-byte sectors,
+exact expected geometry, unchanged desired rows, identifier ambiguity, full
+bundles, overflow bounds, read-only retained probes and atomic publisher faults.
+An unchanged-size retry must complete the durability protocol. Guests enlarge
+their existing raw disk between boots, adopt the new geometry, allocate and grow
+a tail mapping, then restore old and new data on a fourth boot. See
+[physical capacity qualification](capacity-bundle.md).
+
 Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init
@@ -69,9 +78,10 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 3600 utility processes across 200 warmup
-and 200 measured nine-command cycles, with offline mapping/disk edits and live
-preflight on x86 TCG; the strict retention checks are unchanged.
+its own process. The allowance includes 4000 utility processes across 200 warmup
+and 200 measured ten-command cycles, with physical-capacity verification,
+offline mapping/disk edits and live preflight on x86 TCG; the strict retention
+checks are unchanged.
 Serial output is streamed to disk, with a fixed marker window for read boundaries;
 pipe buffers are freed after writing, and the completed transcript is read once.
 This bounds capture memory during verbose development-kernel NVMe qualification.
@@ -114,7 +124,8 @@ their generations. An already open raw descriptor writes and flushes the new
 extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
-capacity, allocates/checks/removes a scratch mapping, enrolls/forgets an empty offline
+capacity, verifies/republishes unchanged physical capacity,
+allocates/checks/removes a scratch mapping, enrolls/forgets an empty offline
 participant, explicitly replays growth and runs boot restoration. A flushed phase marker
 and the atomically published bundle stay on ext2 across an
 abrupt VM stop. The physical disks are reordered for the second boot. Production ARM
@@ -123,6 +134,12 @@ test application starts, and the application checks persisted data, read-only
 mode, the correct physical disks after reordering and idempotence. The host does
 not inject the bundle or phase marker between boots. The controller requires
 the bundle and capacity preflight markers before accepting the first boot.
+After the ordinary second-boot assertions pass, the controller extends only
+the disposable raw file from 16 to 24 MiB, preserving its MBR and prior bytes.
+The third boot must reject the old saved geometry before the application adopts
+the exact new capacity, allocates and grows a tail view, and persists its bundle
+and phase marker. The fourth boot must restore all six mappings through
+production init and retain durable old/tail data and read-only modes.
 
 The fixture touches its readable ELF load pages before sampling. This keeps
 cold faults in the long-lived test program's diagnostic code from appearing as
