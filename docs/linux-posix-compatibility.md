@@ -12,6 +12,11 @@ native syscall/runtime results, translated x86-64/i386 runtime checks, actual SQ
 and HTTP workloads, and the unsupported application dependencies. Those receipts
 qualify their stated checks and exact binaries only.
 
+The [generated application regression index](linux-application-coverage.md)
+publishes all requested application families, verifies receipt integrity and
+retains failed and unsupported results on each native architecture. Running
+this catalog does not establish full application lifecycle or sandbox support.
+
 The [generated native syscall inventory](linux-syscall-coverage.md) and
 [machine-readable inventory](linux-syscall-coverage.json) cover every number in
 the pinned musl 1.2.5 namespace on AArch64 and x86-64. Regenerate it with:
@@ -74,7 +79,7 @@ they do not certify all architectures or current releases.
 
 | Category | Existing workload | Dependencies / outstanding qualification |
 | --- | --- | --- |
-| Browsers | Firefox/Chromium page rendering, JS and screenshot fixtures in `tests/browsers` | X11/GTK/NSS/fonts/network; full sandbox, D-Bus/portals, WebRTC capture, GPU acceleration and proprietary DRM not qualified. Some launchers currently disable browser sandboxing. |
+| Browsers | Actual Firefox 128.14.0esr and Chromium 136.0.7103.113 ordinary-user default-policy headless regressions on both native architectures; [failed results](linux-application-coverage.md) | Firefox startup times out without JavaScript/PNG proof; Chromium refuses its packaged mode-0755 sandbox helper, and native ptrace is unavailable. Full sandbox, D-Bus/portals, WebRTC capture, GPU acceleration and proprietary DRM remain unqualified. The qualification harness rejects sandbox-disable overrides. |
 | Office | [Gnumeric conversion/window](../tests/packages/gnumeric-smoke.sh), [Office Wine fixtures](../tests/office-compat/run-vm) | Native GTK/X11 or separately staged Wine/x86 runtime. Document reopen, printing, accessibility, clipboard and portals need integration verdicts. Wine fixtures do not establish LibreOffice or Microsoft Office application qualification. |
 | Media | [FFmpeg encode/probe](../tests/packages/ffmpeg-smoke.sh), [Blender](../tests/packages/blender-smoke.sh), [OBS](../tests/packages/obs-init.sh) | Native codecs, audio/video devices, GL/Vulkan; GPU encode, capture and proprietary codecs need separate qualification. |
 | Language runtimes | [Go](../tests/go/README.md), [Java](../tests/java/README.md), V/GCC developer fixtures | Native TLS/futex/mmap/signals, JIT permissions and certificates. Tests written in application languages remain application inputs; maintained build/test orchestration is V. |

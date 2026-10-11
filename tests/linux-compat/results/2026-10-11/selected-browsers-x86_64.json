@@ -1,0 +1,2741 @@
+{
+    "font-dejavu": {
+        "name": "font-dejavu",
+        "version": "2.37-r5",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "fontconfig",
+            "encodings",
+            "mkfontscale"
+        ],
+        "provides": [
+            "ttf-dejavu=2.37-r5"
+        ]
+    },
+    "mkfontscale": {
+        "name": "mkfontscale",
+        "version": "1.2.3-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "/bin/sh",
+            "so:libc.musl-x86_64.so.1",
+            "so:libfontenc.so.1",
+            "so:libfreetype.so.6",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "mkfontdir=1.2.3-r1",
+            "cmd:mkfontdir=1.2.3-r1",
+            "cmd:mkfontscale=1.2.3-r1"
+        ]
+    },
+    "zlib": {
+        "name": "zlib",
+        "version": "1.3.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libz.so.1=1.3.2"
+        ]
+    },
+    "musl": {
+        "name": "musl",
+        "version": "1.2.5-r11",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [],
+        "provides": [
+            "so:libc.musl-x86_64.so.1=1"
+        ]
+    },
+    "freetype": {
+        "name": "freetype",
+        "version": "2.13.3-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libbrotlidec.so.1",
+            "so:libbz2.so.1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libpng16.so.16",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libfreetype.so.6=6.20.2"
+        ]
+    },
+    "libpng": {
+        "name": "libpng",
+        "version": "1.6.59-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libpng16.so.16=16.59.0"
+        ]
+    },
+    "libbz2": {
+        "name": "libbz2",
+        "version": "1.0.8-r6",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libbz2.so.1=1.0.8"
+        ]
+    },
+    "brotli-libs": {
+        "name": "brotli-libs",
+        "version": "1.1.0-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libbrotlicommon.so.1=1.1.0",
+            "so:libbrotlidec.so.1=1.1.0",
+            "so:libbrotlienc.so.1=1.1.0"
+        ]
+    },
+    "libfontenc": {
+        "name": "libfontenc",
+        "version": "1.1.8-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libfontenc.so.1=1.0.0"
+        ]
+    },
+    "yash-binsh": {
+        "name": "yash-binsh",
+        "version": "2.57-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "yash=2.57-r0"
+        ],
+        "provides": [
+            "/bin/sh",
+            "cmd:sh=2.57-r0"
+        ]
+    },
+    "yash": {
+        "name": "yash",
+        "version": "2.57-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "/bin/sh",
+            "so:libc.musl-x86_64.so.1",
+            "so:libncursesw.so.6"
+        ],
+        "provides": [
+            "cmd:yash=2.57-r0"
+        ]
+    },
+    "libncursesw": {
+        "name": "libncursesw",
+        "version": "6.5_p20241006-r3",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "ncurses-terminfo-base=6.5_p20241006-r3",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libncursesw.so.6=6.5"
+        ]
+    },
+    "ncurses-terminfo-base": {
+        "name": "ncurses-terminfo-base",
+        "version": "6.5_p20241006-r3",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [],
+        "provides": []
+    },
+    "encodings": {
+        "name": "encodings",
+        "version": "1.0.7-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [],
+        "provides": []
+    },
+    "fontconfig": {
+        "name": "fontconfig",
+        "version": "2.15.0-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "/bin/sh",
+            "so:libc.musl-x86_64.so.1",
+            "so:libexpat.so.1",
+            "so:libfreetype.so.6"
+        ],
+        "provides": [
+            "so:libfontconfig.so.1=1.12.1",
+            "cmd:fc-cache=2.15.0-r1",
+            "cmd:fc-cat=2.15.0-r1",
+            "cmd:fc-conflist=2.15.0-r1",
+            "cmd:fc-list=2.15.0-r1",
+            "cmd:fc-match=2.15.0-r1",
+            "cmd:fc-pattern=2.15.0-r1",
+            "cmd:fc-query=2.15.0-r1",
+            "cmd:fc-scan=2.15.0-r1",
+            "cmd:fc-validate=2.15.0-r1"
+        ]
+    },
+    "libexpat": {
+        "name": "libexpat",
+        "version": "2.8.4-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libexpat.so.1=1.12.4"
+        ]
+    },
+    "chromium": {
+        "name": "chromium",
+        "version": "136.0.7103.113-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "font-opensans",
+            "gtk+3.0",
+            "icu-data-full",
+            "mesa-dri-gallium",
+            "musl>=1.2.3_git20230322-r0",
+            "so:libudev.so.1",
+            "xdg-utils",
+            "so:libFLAC.so.12",
+            "so:libX11.so.6",
+            "so:libXcomposite.so.1",
+            "so:libXdamage.so.1",
+            "so:libXext.so.6",
+            "so:libXfixes.so.3",
+            "so:libXrandr.so.2",
+            "so:libasound.so.2",
+            "so:libatk-1.0.so.0",
+            "so:libatk-bridge-2.0.so.0",
+            "so:libatspi.so.0",
+            "so:libavcodec.so.60",
+            "so:libavformat.so.60",
+            "so:libavutil.so.58",
+            "so:libbrotlidec.so.1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libcairo.so.2",
+            "so:libcrc32c.so.1",
+            "so:libcups.so.2",
+            "so:libdav1d.so.7",
+            "so:libdbus-1.so.3",
+            "so:libdouble-conversion.so.3",
+            "so:libdrm.so.2",
+            "so:libexpat.so.1",
+            "so:libffi.so.8",
+            "so:libfontconfig.so.1",
+            "so:libfreetype.so.6",
+            "so:libgbm.so.1",
+            "so:libgcc_s.so.1",
+            "so:libgio-2.0.so.0",
+            "so:libglib-2.0.so.0",
+            "so:libgobject-2.0.so.0",
+            "so:libharfbuzz-subset.so.0",
+            "so:libharfbuzz.so.0",
+            "so:libicui18n.so.74",
+            "so:libicuuc.so.74",
+            "so:libjpeg.so.8",
+            "so:libminizip.so.1",
+            "so:libnspr4.so",
+            "so:libnss3.so",
+            "so:libnssutil3.so",
+            "so:libopenh264.so.8",
+            "so:libopus.so.0",
+            "so:libpango-1.0.so.0",
+            "so:libpipewire-0.3.so.0",
+            "so:libpulse.so.0",
+            "so:libsmime3.so",
+            "so:libudev.so.1",
+            "so:libwebp.so.7",
+            "so:libwebpdemux.so.2",
+            "so:libwebpmux.so.3",
+            "so:libxcb.so.1",
+            "so:libxkbcommon.so.0",
+            "so:libxml2.so.2",
+            "so:libxslt.so.1",
+            "so:libz.so.1",
+            "so:libzstd.so.1"
+        ],
+        "provides": [
+            "chromium-angle=136.0.7103.113-r0",
+            "cmd:chromium-browser=136.0.7103.113-r0",
+            "cmd:chromium=136.0.7103.113-r0"
+        ]
+    },
+    "zstd-libs": {
+        "name": "zstd-libs",
+        "version": "1.5.6-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libzstd.so.1=1.5.6"
+        ]
+    },
+    "libxslt": {
+        "name": "libxslt",
+        "version": "1.1.42-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcrypt.so.20",
+            "so:libxml2.so.2"
+        ],
+        "provides": [
+            "so:libexslt.so.0=0.8.23",
+            "so:libxslt.so.1=1.1.42",
+            "cmd:xsltproc=1.1.42-r2"
+        ]
+    },
+    "libxml2": {
+        "name": "libxml2",
+        "version": "2.13.9-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:liblzma.so.5",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libxml2.so.2=2.13.9"
+        ]
+    },
+    "xz-libs": {
+        "name": "xz-libs",
+        "version": "5.8.4-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:liblzma.so.5=5.8.4"
+        ]
+    },
+    "libgcrypt": {
+        "name": "libgcrypt",
+        "version": "1.10.3-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgpg-error.so.0"
+        ],
+        "provides": [
+            "so:libgcrypt.so.20=20.4.3"
+        ]
+    },
+    "libgpg-error": {
+        "name": "libgpg-error",
+        "version": "1.51-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libgpg-error.so.0=0.38.0",
+            "cmd:gpg-error=1.51-r0"
+        ]
+    },
+    "libxkbcommon": {
+        "name": "libxkbcommon",
+        "version": "1.7.0-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "xkeyboard-config",
+            "so:libc.musl-x86_64.so.1",
+            "so:libxml2.so.2"
+        ],
+        "provides": [
+            "so:libxkbcommon.so.0=0.0.0",
+            "so:libxkbregistry.so.0=0.0.0"
+        ]
+    },
+    "xkeyboard-config": {
+        "name": "xkeyboard-config",
+        "version": "2.43-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [],
+        "provides": []
+    },
+    "libxcb": {
+        "name": "libxcb",
+        "version": "1.16.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libXau.so.6",
+            "so:libXdmcp.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libxcb-composite.so.0=0.0.0",
+            "so:libxcb-damage.so.0=0.0.0",
+            "so:libxcb-dbe.so.0=0.0.0",
+            "so:libxcb-dpms.so.0=0.0.0",
+            "so:libxcb-dri2.so.0=0.0.0",
+            "so:libxcb-dri3.so.0=0.1.0",
+            "so:libxcb-glx.so.0=0.0.0",
+            "so:libxcb-present.so.0=0.0.0",
+            "so:libxcb-randr.so.0=0.1.0",
+            "so:libxcb-record.so.0=0.0.0",
+            "so:libxcb-render.so.0=0.0.0",
+            "so:libxcb-res.so.0=0.0.0",
+            "so:libxcb-screensaver.so.0=0.0.0",
+            "so:libxcb-shape.so.0=0.0.0",
+            "so:libxcb-shm.so.0=0.0.0",
+            "so:libxcb-sync.so.1=1.0.0",
+            "so:libxcb-xf86dri.so.0=0.0.0",
+            "so:libxcb-xfixes.so.0=0.0.0",
+            "so:libxcb-xinerama.so.0=0.0.0",
+            "so:libxcb-xinput.so.0=0.1.0",
+            "so:libxcb-xkb.so.1=1.0.0",
+            "so:libxcb-xtest.so.0=0.0.0",
+            "so:libxcb-xv.so.0=0.0.0",
+            "so:libxcb-xvmc.so.0=0.0.0",
+            "so:libxcb.so.1=1.1.0"
+        ]
+    },
+    "libxdmcp": {
+        "name": "libxdmcp",
+        "version": "1.1.5-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libbsd.so.0",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXdmcp.so.6=6.0.0"
+        ]
+    },
+    "libbsd": {
+        "name": "libbsd",
+        "version": "0.12.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "musl",
+            "so:libc.musl-x86_64.so.1",
+            "so:libmd.so.0"
+        ],
+        "provides": [
+            "so:libbsd.so.0=0.12.2"
+        ]
+    },
+    "libmd": {
+        "name": "libmd",
+        "version": "1.1.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libmd.so.0=0.1.0"
+        ]
+    },
+    "libxau": {
+        "name": "libxau",
+        "version": "1.0.11-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXau.so.6=6.0.0"
+        ]
+    },
+    "libwebpmux": {
+        "name": "libwebpmux",
+        "version": "1.4.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libwebp.so.7"
+        ],
+        "provides": [
+            "so:libwebpmux.so.3=3.1.0"
+        ]
+    },
+    "libwebp": {
+        "name": "libwebp",
+        "version": "1.4.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libsharpyuv.so.0"
+        ],
+        "provides": [
+            "so:libwebp.so.7=7.1.9"
+        ]
+    },
+    "libsharpyuv": {
+        "name": "libsharpyuv",
+        "version": "1.4.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libsharpyuv.so.0=0.1.0"
+        ]
+    },
+    "libwebpdemux": {
+        "name": "libwebpdemux",
+        "version": "1.4.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libwebp.so.7"
+        ],
+        "provides": [
+            "so:libwebpdemux.so.2=2.0.15"
+        ]
+    },
+    "libudev-zero": {
+        "name": "libudev-zero",
+        "version": "1.0.3-r3",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "udev",
+            "so:libudev.so.1=1"
+        ]
+    },
+    "nss": {
+        "name": "nss",
+        "version": "3.109-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libnspr4.so",
+            "so:libplc4.so",
+            "so:libplds4.so",
+            "so:libsqlite3.so.0"
+        ],
+        "provides": [
+            "so:libfreebl3.so=109",
+            "so:libfreeblpriv3.so=109",
+            "so:libnss3.so=109",
+            "so:libnssckbi-testlib.so=109",
+            "so:libnssckbi.so=109",
+            "so:libnsssysinit.so=109",
+            "so:libnssutil3.so=109",
+            "so:libsmime3.so=109",
+            "so:libsoftokn3.so=109",
+            "so:libssl3.so=109"
+        ]
+    },
+    "sqlite-libs": {
+        "name": "sqlite-libs",
+        "version": "3.48.0-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libsqlite3.so.0=0.8.6"
+        ]
+    },
+    "nspr": {
+        "name": "nspr",
+        "version": "4.36-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libnspr4.so=0",
+            "so:libplc4.so=0",
+            "so:libplds4.so=0"
+        ]
+    },
+    "libpulse": {
+        "name": "libpulse",
+        "version": "17.0-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libX11-xcb.so.1",
+            "so:libX11.so.6",
+            "so:libasyncns.so.0",
+            "so:libc.musl-x86_64.so.1",
+            "so:libdbus-1.so.3",
+            "so:libintl.so.8",
+            "so:libltdl.so.7",
+            "so:liborc-0.4.so.0",
+            "so:libsndfile.so.1",
+            "so:libsoxr.so.0",
+            "so:libspeexdsp.so.1",
+            "so:libtdb.so.1",
+            "so:libxcb.so.1"
+        ],
+        "provides": [
+            "so:libpulse-simple.so.0=0.1.1",
+            "so:libpulse.so.0=0.24.3",
+            "so:libpulsecommon-17.0.so=0",
+            "so:libpulsecore-17.0.so=0",
+            "so:libpulsedsp.so=0"
+        ]
+    },
+    "tdb-libs": {
+        "name": "tdb-libs",
+        "version": "1.4.12-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libtdb.so.1=1.4.12"
+        ]
+    },
+    "speexdsp": {
+        "name": "speexdsp",
+        "version": "1.2.1-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libspeexdsp.so.1=1.5.2"
+        ]
+    },
+    "soxr": {
+        "name": "soxr",
+        "version": "0.1.3-r7",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgomp.so.1"
+        ],
+        "provides": [
+            "so:libsoxr-lsr.so.0=0.1.9",
+            "so:libsoxr.so.0=0.1.2"
+        ]
+    },
+    "libgomp": {
+        "name": "libgomp",
+        "version": "14.2.0-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libgomp.so.1=1.0.0"
+        ]
+    },
+    "libsndfile": {
+        "name": "libsndfile",
+        "version": "1.2.2-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libFLAC.so.12",
+            "so:libasound.so.2",
+            "so:libc.musl-x86_64.so.1",
+            "so:libmp3lame.so.0",
+            "so:libmpg123.so.0",
+            "so:libogg.so.0",
+            "so:libopus.so.0",
+            "so:libvorbis.so.0",
+            "so:libvorbisenc.so.2"
+        ],
+        "provides": [
+            "so:libsndfile.so.1=1.0.37",
+            "cmd:sndfile-cmp=1.2.2-r2",
+            "cmd:sndfile-concat=1.2.2-r2",
+            "cmd:sndfile-convert=1.2.2-r2",
+            "cmd:sndfile-deinterleave=1.2.2-r2",
+            "cmd:sndfile-info=1.2.2-r2",
+            "cmd:sndfile-interleave=1.2.2-r2",
+            "cmd:sndfile-metadata-get=1.2.2-r2",
+            "cmd:sndfile-metadata-set=1.2.2-r2",
+            "cmd:sndfile-play=1.2.2-r2",
+            "cmd:sndfile-salvage=1.2.2-r2"
+        ]
+    },
+    "libvorbis": {
+        "name": "libvorbis",
+        "version": "1.3.7-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libogg.so.0"
+        ],
+        "provides": [
+            "so:libvorbis.so.0=0.4.9",
+            "so:libvorbisenc.so.2=2.0.12",
+            "so:libvorbisfile.so.3=3.3.8"
+        ]
+    },
+    "libogg": {
+        "name": "libogg",
+        "version": "1.3.5-r5",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libogg.so.0=0.8.5"
+        ]
+    },
+    "opus": {
+        "name": "opus",
+        "version": "1.5.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libopus.so.0=0.10.1"
+        ]
+    },
+    "mpg123-libs": {
+        "name": "mpg123-libs",
+        "version": "1.32.9-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libmpg123.so.0=0.48.3",
+            "so:libout123.so.0=0.5.1",
+            "so:libsyn123.so.0=0.2.3"
+        ]
+    },
+    "lame-libs": {
+        "name": "lame-libs",
+        "version": "3.100-r5",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libmp3lame.so.0=0.0.0"
+        ]
+    },
+    "alsa-lib": {
+        "name": "alsa-lib",
+        "version": "1.2.12-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libasound.so.2=2.0.0",
+            "so:libatopology.so.2=2.0.0",
+            "cmd:aserver=1.2.12-r0"
+        ]
+    },
+    "libflac": {
+        "name": "libflac",
+        "version": "1.4.3-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libogg.so.0"
+        ],
+        "provides": [
+            "so:libFLAC.so.12=12.1.0"
+        ]
+    },
+    "orc": {
+        "name": "orc",
+        "version": "0.4.40-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:liborc-0.4.so.0=0.40.0"
+        ]
+    },
+    "libltdl": {
+        "name": "libltdl",
+        "version": "2.4.7-r3",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libltdl.so.7=7.3.2"
+        ]
+    },
+    "libintl": {
+        "name": "libintl",
+        "version": "0.22.5-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libintl.so.8=8.4.0"
+        ]
+    },
+    "dbus-libs": {
+        "name": "dbus-libs",
+        "version": "1.14.10-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libdbus-1.so.3=3.32.4"
+        ]
+    },
+    "libasyncns": {
+        "name": "libasyncns",
+        "version": "0.8-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libasyncns.so.0=0.3.1"
+        ]
+    },
+    "libx11": {
+        "name": "libx11",
+        "version": "1.8.10-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libxcb.so.1"
+        ],
+        "provides": [
+            "so:libX11-xcb.so.1=1.0.0",
+            "so:libX11.so.6=6.4.0"
+        ]
+    },
+    "pipewire-libs": {
+        "name": "pipewire-libs",
+        "version": "1.2.7-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libasound.so.2",
+            "so:libavahi-client.so.3",
+            "so:libavahi-common.so.3",
+            "so:libc.musl-x86_64.so.1",
+            "so:libcamera-base.so.0.3",
+            "so:libcamera.so.0.3",
+            "so:libdbus-1.so.3",
+            "so:libgcc_s.so.1",
+            "so:libglib-2.0.so.0",
+            "so:libintl.so.8",
+            "so:libopus.so.0",
+            "so:libroc.so.0.4",
+            "so:libsndfile.so.1",
+            "so:libstdc++.so.6",
+            "so:libudev.so.1",
+            "so:libwebrtc-audio-processing-1.so.3"
+        ],
+        "provides": [
+            "so:libpipewire-0.3.so.0=0.1207.0",
+            "so:libpipewire-module-access.so=0",
+            "so:libpipewire-module-adapter.so=0",
+            "so:libpipewire-module-avb.so=0",
+            "so:libpipewire-module-client-device.so=0",
+            "so:libpipewire-module-client-node.so=0",
+            "so:libpipewire-module-combine-stream.so=0",
+            "so:libpipewire-module-fallback-sink.so=0",
+            "so:libpipewire-module-filter-chain.so=0",
+            "so:libpipewire-module-jack-tunnel.so=0",
+            "so:libpipewire-module-jackdbus-detect.so=0",
+            "so:libpipewire-module-link-factory.so=0",
+            "so:libpipewire-module-loopback.so=0",
+            "so:libpipewire-module-metadata.so=0",
+            "so:libpipewire-module-netjack2-driver.so=0",
+            "so:libpipewire-module-netjack2-manager.so=0",
+            "so:libpipewire-module-parametric-equalizer.so=0",
+            "so:libpipewire-module-pipe-tunnel.so=0",
+            "so:libpipewire-module-portal.so=0",
+            "so:libpipewire-module-profiler.so=0",
+            "so:libpipewire-module-protocol-native.so=0",
+            "so:libpipewire-module-protocol-simple.so=0",
+            "so:libpipewire-module-roc-sink.so=0",
+            "so:libpipewire-module-roc-source.so=0",
+            "so:libpipewire-module-rt.so=0",
+            "so:libpipewire-module-rtkit.so=0",
+            "so:libpipewire-module-rtp-sap.so=0",
+            "so:libpipewire-module-rtp-session.so=0",
+            "so:libpipewire-module-rtp-sink.so=0",
+            "so:libpipewire-module-rtp-source.so=0",
+            "so:libpipewire-module-session-manager.so=0",
+            "so:libpipewire-module-snapcast-discover.so=0",
+            "so:libpipewire-module-spa-device-factory.so=0",
+            "so:libpipewire-module-spa-device.so=0",
+            "so:libpipewire-module-spa-node-factory.so=0",
+            "so:libpipewire-module-spa-node.so=0",
+            "so:libpipewire-module-vban-recv.so=0",
+            "so:libpipewire-module-vban-send.so=0"
+        ]
+    },
+    "webrtc-audio-processing-1": {
+        "name": "webrtc-audio-processing-1",
+        "version": "1.3-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libwebrtc-audio-coding-1.so.3=3",
+            "so:libwebrtc-audio-processing-1.so.3=3"
+        ]
+    },
+    "libstdc++": {
+        "name": "libstdc++",
+        "version": "14.2.0-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1"
+        ],
+        "provides": [
+            "so:libstdc++.so.6=6.0.33"
+        ]
+    },
+    "libgcc": {
+        "name": "libgcc",
+        "version": "14.2.0-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libgcc_s.so.1=1"
+        ]
+    },
+    "roc-toolkit-libs": {
+        "name": "roc-toolkit-libs",
+        "version": "0.4.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libspeexdsp.so.1",
+            "so:libstdc++.so.6",
+            "so:libunwind.so.8",
+            "so:libuv.so.1"
+        ],
+        "provides": [
+            "so:libroc.so.0.4=0.4"
+        ]
+    },
+    "libuv": {
+        "name": "libuv",
+        "version": "1.49.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libuv.so.1=1.0.0"
+        ]
+    },
+    "libunwind": {
+        "name": "libunwind",
+        "version": "1.8.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:liblzma.so.5"
+        ],
+        "provides": [
+            "so:libunwind-coredump.so.0=0.0.0",
+            "so:libunwind-ptrace.so.0=0.0.0",
+            "so:libunwind-setjmp.so.0=0.0.0",
+            "so:libunwind-x86_64.so.8=8.1.0",
+            "so:libunwind.so.8=8.1.0"
+        ]
+    },
+    "glib": {
+        "name": "glib",
+        "version": "2.82.5-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "/bin/sh",
+            "so:libc.musl-x86_64.so.1",
+            "so:libffi.so.8",
+            "so:libintl.so.8",
+            "so:libmount.so.1",
+            "so:libpcre2-8.so.0",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libgio-2.0.so.0=0.8200.5",
+            "so:libgirepository-2.0.so.0=0.8200.5",
+            "so:libglib-2.0.so.0=0.8200.5",
+            "so:libgmodule-2.0.so.0=0.8200.5",
+            "so:libgobject-2.0.so.0=0.8200.5",
+            "so:libgthread-2.0.so.0=0.8200.5",
+            "cmd:gapplication=2.82.5-r0",
+            "cmd:gdbus=2.82.5-r0",
+            "cmd:gi-compile-repository=2.82.5-r0",
+            "cmd:gi-decompile-typelib=2.82.5-r0",
+            "cmd:gi-inspect-typelib=2.82.5-r0",
+            "cmd:gio-querymodules=2.82.5-r0",
+            "cmd:gio=2.82.5-r0",
+            "cmd:glib-compile-schemas=2.82.5-r0",
+            "cmd:gsettings=2.82.5-r0"
+        ]
+    },
+    "pcre2": {
+        "name": "pcre2",
+        "version": "10.43-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libpcre2-8.so.0=0.12.0",
+            "so:libpcre2-posix.so.3=3.0.5"
+        ]
+    },
+    "libmount": {
+        "name": "libmount",
+        "version": "2.40.4-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libblkid.so.1",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libmount.so.1=1.1.0"
+        ]
+    },
+    "libblkid": {
+        "name": "libblkid",
+        "version": "2.40.4-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libeconf.so.0"
+        ],
+        "provides": [
+            "so:libblkid.so.1=1.1.0"
+        ]
+    },
+    "libeconf": {
+        "name": "libeconf",
+        "version": "0.6.3-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libeconf.so.0=0.6.2",
+            "cmd:econftool=0.6.3-r0"
+        ]
+    },
+    "libffi": {
+        "name": "libffi",
+        "version": "3.4.7-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libffi.so.8=8.1.4"
+        ]
+    },
+    "libcamera": {
+        "name": "libcamera",
+        "version": "0.3.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "libcamera-ipa=0.3.2-r0",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libgnutls.so.30",
+            "so:libstdc++.so.6",
+            "so:libudev.so.1",
+            "so:libunwind.so.8",
+            "so:libyaml-0.so.2"
+        ],
+        "provides": [
+            "so:libcamera-base.so.0.3=0.3.2",
+            "so:libcamera.so.0.3=0.3.2",
+            "cmd:libcamerify=0.3.2-r0"
+        ]
+    },
+    "yaml": {
+        "name": "yaml",
+        "version": "0.2.5-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libyaml-0.so.2=2.0.9"
+        ]
+    },
+    "gnutls": {
+        "name": "gnutls",
+        "version": "3.8.13-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgmp.so.10",
+            "so:libhogweed.so.6",
+            "so:libidn2.so.0",
+            "so:libnettle.so.8",
+            "so:libp11-kit.so.0",
+            "so:libtasn1.so.6",
+            "so:libunistring.so.5",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libgnutls.so.30=30.42.0"
+        ]
+    },
+    "libunistring": {
+        "name": "libunistring",
+        "version": "1.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libunistring.so.5=5.1.0"
+        ]
+    },
+    "libtasn1": {
+        "name": "libtasn1",
+        "version": "4.21.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libtasn1.so.6=6.6.5"
+        ]
+    },
+    "p11-kit": {
+        "name": "p11-kit",
+        "version": "0.26.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libffi.so.8",
+            "so:libtasn1.so.6"
+        ],
+        "provides": [
+            "so:libp11-kit.so.0=0.4.8",
+            "cmd:p11-kit=0.26.2-r0"
+        ]
+    },
+    "nettle": {
+        "name": "nettle",
+        "version": "3.10.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgmp.so.10"
+        ],
+        "provides": [
+            "so:libhogweed.so.6=6.11",
+            "so:libnettle.so.8=8.11"
+        ]
+    },
+    "gmp": {
+        "name": "gmp",
+        "version": "6.3.0-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libgmp.so.10=10.5.0"
+        ]
+    },
+    "libidn2": {
+        "name": "libidn2",
+        "version": "2.3.7-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libunistring.so.5"
+        ],
+        "provides": [
+            "so:libidn2.so.0=0.4.0"
+        ]
+    },
+    "libcamera-ipa": {
+        "name": "libcamera-ipa",
+        "version": "0.3.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libcamera-base.so.0.3",
+            "so:libcamera.so.0.3",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": []
+    },
+    "avahi-libs": {
+        "name": "avahi-libs",
+        "version": "0.8-r19",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libdbus-1.so.3",
+            "so:libintl.so.8"
+        ],
+        "provides": [
+            "so:libavahi-client.so.3=3.2.9",
+            "so:libavahi-common.so.3=3.5.4"
+        ]
+    },
+    "pango": {
+        "name": "pango",
+        "version": "1.54.0-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "/bin/sh",
+            "so:libX11.so.6",
+            "so:libXft.so.2",
+            "so:libXrender.so.1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libcairo.so.2",
+            "so:libfontconfig.so.1",
+            "so:libfreetype.so.6",
+            "so:libfribidi.so.0",
+            "so:libgio-2.0.so.0",
+            "so:libglib-2.0.so.0",
+            "so:libgobject-2.0.so.0",
+            "so:libharfbuzz.so.0"
+        ],
+        "provides": [
+            "so:libpango-1.0.so.0=0.5400.0",
+            "so:libpangocairo-1.0.so.0=0.5400.0",
+            "so:libpangoft2-1.0.so.0=0.5400.0",
+            "so:libpangoxft-1.0.so.0=0.5400.0"
+        ]
+    },
+    "harfbuzz": {
+        "name": "harfbuzz",
+        "version": "9.0.0-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libfreetype.so.6",
+            "so:libglib-2.0.so.0",
+            "so:libgraphite2.so.3"
+        ],
+        "provides": [
+            "so:libharfbuzz.so.0=0.60900.0"
+        ]
+    },
+    "graphite2": {
+        "name": "graphite2",
+        "version": "1.3.14-r6",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libgraphite2.so.3=3.2.1"
+        ]
+    },
+    "fribidi": {
+        "name": "fribidi",
+        "version": "1.0.16-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libfribidi.so.0=0.4.0",
+            "cmd:fribidi=1.0.16-r0"
+        ]
+    },
+    "cairo": {
+        "name": "cairo",
+        "version": "1.18.4-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libXrender.so.1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libfontconfig.so.1",
+            "so:libfreetype.so.6",
+            "so:libpixman-1.so.0",
+            "so:libpng16.so.16",
+            "so:libxcb-render.so.0",
+            "so:libxcb-shm.so.0",
+            "so:libxcb.so.1",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libcairo-script-interpreter.so.2=2.11804.4",
+            "so:libcairo.so.2=2.11804.4"
+        ]
+    },
+    "pixman": {
+        "name": "pixman",
+        "version": "0.43.4-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libpixman-1.so.0=0.43.4"
+        ]
+    },
+    "libxrender": {
+        "name": "libxrender",
+        "version": "0.9.11-r5",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXrender.so.1=1.3.0"
+        ]
+    },
+    "libxext": {
+        "name": "libxext",
+        "version": "1.3.6-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXext.so.6=6.4.0"
+        ]
+    },
+    "libxft": {
+        "name": "libxft",
+        "version": "2.3.8-r3",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXrender.so.1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libfontconfig.so.1",
+            "so:libfreetype.so.6"
+        ],
+        "provides": [
+            "so:libXft.so.2=2.3.8"
+        ]
+    },
+    "openh264": {
+        "name": "openh264",
+        "version": "2.6.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libopenh264.so.8=2.6.0"
+        ]
+    },
+    "minizip": {
+        "name": "minizip",
+        "version": "1.3.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libminizip.so.1=1.0.0"
+        ]
+    },
+    "libjpeg-turbo": {
+        "name": "libjpeg-turbo",
+        "version": "3.0.4-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libjpeg.so.8=8.3.2"
+        ]
+    },
+    "icu-libs": {
+        "name": "icu-libs",
+        "version": "74.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "icu-data=74.2-r1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libicudata.so.74=74.2",
+            "so:libicui18n.so.74=74.2",
+            "so:libicuio.so.74=74.2",
+            "so:libicuuc.so.74=74.2"
+        ]
+    },
+    "icu-data-full": {
+        "name": "icu-data-full",
+        "version": "74.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [],
+        "provides": [
+            "icu-data=74.2-r1"
+        ]
+    },
+    "harfbuzz-subset": {
+        "name": "harfbuzz-subset",
+        "version": "9.0.0-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libharfbuzz.so.0"
+        ],
+        "provides": [
+            "so:libharfbuzz-subset.so.0=0.60900.0"
+        ]
+    },
+    "mesa-gbm": {
+        "name": "mesa-gbm",
+        "version": "24.2.8-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "mesa=24.2.8-r0",
+            "so:libc.musl-x86_64.so.1",
+            "so:libdrm.so.2",
+            "so:libexpat.so.1",
+            "so:libgallium-24.2.8.so",
+            "so:libwayland-server.so.0",
+            "so:libxcb-randr.so.0"
+        ],
+        "provides": [
+            "so:libgbm.so.1=1.0.0"
+        ]
+    },
+    "wayland-libs-server": {
+        "name": "wayland-libs-server",
+        "version": "1.23.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libffi.so.8"
+        ],
+        "provides": [
+            "so:libwayland-server.so.0=0.23.1"
+        ]
+    },
+    "mesa": {
+        "name": "mesa",
+        "version": "24.2.8-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libLLVM.so.19.1",
+            "so:libX11-xcb.so.1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libdrm.so.2",
+            "so:libdrm_amdgpu.so.1",
+            "so:libdrm_intel.so.1",
+            "so:libdrm_radeon.so.1",
+            "so:libelf.so.1",
+            "so:libexpat.so.1",
+            "so:libgcc_s.so.1",
+            "so:libglapi.so.0",
+            "so:libstdc++.so.6",
+            "so:libxcb-dri2.so.0",
+            "so:libxcb-dri3.so.0",
+            "so:libxcb-present.so.0",
+            "so:libxcb-sync.so.1",
+            "so:libxcb-xfixes.so.0",
+            "so:libxcb.so.1",
+            "so:libxshmfence.so.1",
+            "so:libz.so.1",
+            "so:libzstd.so.1"
+        ],
+        "provides": [
+            "so:libgallium-24.2.8.so=0"
+        ]
+    },
+    "libxshmfence": {
+        "name": "libxshmfence",
+        "version": "1.3.2-r6",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libxshmfence.so.1=1.0.0"
+        ]
+    },
+    "mesa-glapi": {
+        "name": "mesa-glapi",
+        "version": "24.2.8-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libglapi.so.0=0.0.0"
+        ]
+    },
+    "libelf": {
+        "name": "libelf",
+        "version": "0.191-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libz.so.1",
+            "so:libzstd.so.1"
+        ],
+        "provides": [
+            "elfutils-libelf=0.191-r0",
+            "so:libelf.so.1=0"
+        ]
+    },
+    "libdrm": {
+        "name": "libdrm",
+        "version": "2.4.123-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libpciaccess.so.0"
+        ],
+        "provides": [
+            "so:libdrm.so.2=2.123.0",
+            "so:libdrm_amdgpu.so.1=1.123.0",
+            "so:libdrm_etnaviv.so.1=1.123.0",
+            "so:libdrm_exynos.so.1=1.123.0",
+            "so:libdrm_freedreno.so.1=1.123.0",
+            "so:libdrm_intel.so.1=1.123.0",
+            "so:libdrm_nouveau.so.2=2.123.0",
+            "so:libdrm_omap.so.1=1.123.0",
+            "so:libdrm_radeon.so.1=1.123.0",
+            "so:libdrm_tegra.so.0=0.123.0"
+        ]
+    },
+    "libpciaccess": {
+        "name": "libpciaccess",
+        "version": "0.18.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "hwdata-pci",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libpciaccess.so.0=0.11.1"
+        ]
+    },
+    "hwdata-pci": {
+        "name": "hwdata-pci",
+        "version": "0.393-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [],
+        "provides": [
+            "hwids-pci=20220101-r0"
+        ]
+    },
+    "llvm19-libs": {
+        "name": "llvm19-libs",
+        "version": "19.1.4-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libffi.so.8",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6",
+            "so:libxml2.so.2",
+            "so:libz.so.1",
+            "so:libzstd.so.1"
+        ],
+        "provides": [
+            "so:libLLVM.so.19.1=19.1"
+        ]
+    },
+    "double-conversion": {
+        "name": "double-conversion",
+        "version": "3.3.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libdouble-conversion.so.3=3.3.0"
+        ]
+    },
+    "libdav1d": {
+        "name": "libdav1d",
+        "version": "1.5.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libdav1d.so.7=7.0.0"
+        ]
+    },
+    "cups-libs": {
+        "name": "cups-libs",
+        "version": "2.4.18-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libavahi-client.so.3",
+            "so:libavahi-common.so.3",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgnutls.so.30",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libcups.so.2=2",
+            "so:libcupsimage.so.2=2"
+        ]
+    },
+    "crc32c": {
+        "name": "crc32c",
+        "version": "1.1.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libcrc32c.so.1=1.1.0"
+        ]
+    },
+    "ffmpeg-libavutil": {
+        "name": "ffmpeg-libavutil",
+        "version": "6.1.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libc.musl-x86_64.so.1",
+            "so:libcrypto.so.3",
+            "so:libdrm.so.2",
+            "so:libva-drm.so.2",
+            "so:libva-x11.so.2",
+            "so:libva.so.2",
+            "so:libvdpau.so.1",
+            "so:libvpl.so.2"
+        ],
+        "provides": [
+            "so:libavutil.so.58=58.29.100"
+        ]
+    },
+    "onevpl-libs": {
+        "name": "onevpl-libs",
+        "version": "2023.3.1-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libvpl.so.2=2.9"
+        ]
+    },
+    "libvdpau": {
+        "name": "libvdpau",
+        "version": "1.5-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libvdpau.so.1=1.0.0"
+        ]
+    },
+    "libva": {
+        "name": "libva",
+        "version": "2.22.0-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11-xcb.so.1",
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libXfixes.so.3",
+            "so:libc.musl-x86_64.so.1",
+            "so:libdrm.so.2",
+            "so:libwayland-client.so.0",
+            "so:libxcb-dri3.so.0",
+            "so:libxcb.so.1"
+        ],
+        "provides": [
+            "so:libva-drm.so.2=2.2200.0",
+            "so:libva-wayland.so.2=2.2200.0",
+            "so:libva-x11.so.2=2.2200.0",
+            "so:libva.so.2=2.2200.0"
+        ]
+    },
+    "wayland-libs-client": {
+        "name": "wayland-libs-client",
+        "version": "1.23.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libffi.so.8"
+        ],
+        "provides": [
+            "so:libwayland-client.so.0=0.23.1"
+        ]
+    },
+    "libxfixes": {
+        "name": "libxfixes",
+        "version": "6.0.1-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXfixes.so.3=3.1.0"
+        ]
+    },
+    "libcrypto3": {
+        "name": "libcrypto3",
+        "version": "3.3.7-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libcrypto.so.3=3"
+        ]
+    },
+    "ffmpeg-libavformat": {
+        "name": "ffmpeg-libavformat",
+        "version": "6.1.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libavcodec.so.60",
+            "so:libavutil.so.58",
+            "so:libbluray.so.2",
+            "so:libbz2.so.1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libcrypto.so.3",
+            "so:libopenmpt.so.0",
+            "so:librist.so.4",
+            "so:libsrt.so.1.5",
+            "so:libssh.so.4",
+            "so:libssl.so.3",
+            "so:libxml2.so.2",
+            "so:libz.so.1",
+            "so:libzmq.so.5"
+        ],
+        "provides": [
+            "so:libavformat.so.60=60.16.100"
+        ]
+    },
+    "libzmq": {
+        "name": "libzmq",
+        "version": "4.3.5-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libsodium.so.26",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libzmq.so.5=5.2.5"
+        ]
+    },
+    "libsodium": {
+        "name": "libsodium",
+        "version": "1.0.20-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libsodium.so.26=26.2.0"
+        ]
+    },
+    "libssl3": {
+        "name": "libssl3",
+        "version": "3.3.7-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "libcrypto3=3.3.7-r2",
+            "so:libc.musl-x86_64.so.1",
+            "so:libcrypto.so.3"
+        ],
+        "provides": [
+            "so:libssl.so.3=3"
+        ]
+    },
+    "libssh": {
+        "name": "libssh",
+        "version": "0.11.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libcrypto.so.3",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libssh.so.4=4.10.1"
+        ]
+    },
+    "libsrt": {
+        "name": "libsrt",
+        "version": "1.5.3-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libcrypto.so.3",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libsrt.so.1.5=1.5.3"
+        ]
+    },
+    "librist": {
+        "name": "librist",
+        "version": "0.2.10-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libcjson.so.1",
+            "so:libmbedcrypto.so.16"
+        ],
+        "provides": [
+            "so:librist.so.4=4.3.1"
+        ]
+    },
+    "mbedtls": {
+        "name": "mbedtls",
+        "version": "3.6.7-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libmbedcrypto.so.16=3.6.7",
+            "so:libmbedtls.so.21=3.6.7",
+            "so:libmbedx509.so.7=3.6.7"
+        ]
+    },
+    "cjson": {
+        "name": "cjson",
+        "version": "1.7.19-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libcjson.so.1=1.7.19"
+        ]
+    },
+    "libopenmpt": {
+        "name": "libopenmpt",
+        "version": "0.7.12-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libmpg123.so.0",
+            "so:libstdc++.so.6",
+            "so:libvorbis.so.0",
+            "so:libvorbisfile.so.3",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libopenmpt.so.0=0.4.4"
+        ]
+    },
+    "libbluray": {
+        "name": "libbluray",
+        "version": "1.3.4-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libbluray.so.2=2.4.3",
+            "cmd:bd_info=1.3.4-r1",
+            "cmd:bd_list_titles=1.3.4-r1",
+            "cmd:bd_splice=1.3.4-r1"
+        ]
+    },
+    "ffmpeg-libavcodec": {
+        "name": "ffmpeg-libavcodec",
+        "version": "6.1.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libSvtAv1Enc.so.2",
+            "so:libaom.so.3",
+            "so:libavutil.so.58",
+            "so:libc.musl-x86_64.so.1",
+            "so:libdav1d.so.7",
+            "so:libjxl.so.0.10",
+            "so:libjxl_threads.so.0.10",
+            "so:libmp3lame.so.0",
+            "so:libopus.so.0",
+            "so:librav1e.so.0.7",
+            "so:libswresample.so.4",
+            "so:libtheoradec.so.1",
+            "so:libtheoraenc.so.1",
+            "so:libva.so.2",
+            "so:libvorbis.so.0",
+            "so:libvorbisenc.so.2",
+            "so:libvpl.so.2",
+            "so:libvpx.so.9",
+            "so:libwebp.so.7",
+            "so:libwebpmux.so.3",
+            "so:libx264.so.164",
+            "so:libx265.so.209",
+            "so:libxvidcore.so.4",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:libavcodec.so.60=60.31.102"
+        ]
+    },
+    "xvidcore": {
+        "name": "xvidcore",
+        "version": "1.3.7-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libxvidcore.so.4=4.3"
+        ]
+    },
+    "x265-libs": {
+        "name": "x265-libs",
+        "version": "3.6-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libnuma.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libx265.so.209=209"
+        ]
+    },
+    "numactl": {
+        "name": "numactl",
+        "version": "2.0.18-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libnuma.so.1=1.0.0"
+        ]
+    },
+    "x264-libs": {
+        "name": "x264-libs",
+        "version": "0.164.3108-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libx264.so.164=164"
+        ]
+    },
+    "libvpx": {
+        "name": "libvpx",
+        "version": "1.15.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libvpx.so.9=9.1.0"
+        ]
+    },
+    "libtheora": {
+        "name": "libtheora",
+        "version": "1.1.1-r18",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libogg.so.0"
+        ],
+        "provides": [
+            "so:libtheora.so.0=0.3.10",
+            "so:libtheoradec.so.1=1.1.4",
+            "so:libtheoraenc.so.1=1.1.2"
+        ]
+    },
+    "ffmpeg-libswresample": {
+        "name": "ffmpeg-libswresample",
+        "version": "6.1.2-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libavutil.so.58",
+            "so:libc.musl-x86_64.so.1",
+            "so:libsoxr.so.0"
+        ],
+        "provides": [
+            "so:libswresample.so.4=4.12.100"
+        ]
+    },
+    "rav1e-libs": {
+        "name": "rav1e-libs",
+        "version": "0.7.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1"
+        ],
+        "provides": [
+            "so:librav1e.so.0.7=0.7.1"
+        ]
+    },
+    "libjxl": {
+        "name": "libjxl",
+        "version": "0.10.4-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libOpenEXR-3_3.so.32",
+            "so:libbrotlidec.so.1",
+            "so:libbrotlienc.so.1",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libgif.so.7",
+            "so:libhwy.so.1",
+            "so:libjpeg.so.8",
+            "so:liblcms2.so.2",
+            "so:libpng16.so.16",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libjxl.so.0.10=0.10.4",
+            "so:libjxl_cms.so.0.10=0.10.4",
+            "so:libjxl_extras_codec.so.0.10=0.10.4",
+            "so:libjxl_threads.so.0.10=0.10.4"
+        ]
+    },
+    "lcms2": {
+        "name": "lcms2",
+        "version": "2.19-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:liblcms2.so.2=2.0.19"
+        ]
+    },
+    "libhwy": {
+        "name": "libhwy",
+        "version": "1.0.7-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libhwy.so.1=1.0.7"
+        ]
+    },
+    "giflib": {
+        "name": "giflib",
+        "version": "5.2.2-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libgif.so.7=7.2.0"
+        ]
+    },
+    "openexr-libopenexr": {
+        "name": "openexr-libopenexr",
+        "version": "3.3.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libIex-3_3.so.32",
+            "so:libIlmThread-3_3.so.32",
+            "so:libImath-3_1.so.29",
+            "so:libOpenEXRCore-3_3.so.32",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libOpenEXR-3_3.so.32=32.3.3.2"
+        ]
+    },
+    "openexr-libopenexrcore": {
+        "name": "openexr-libopenexrcore",
+        "version": "3.3.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libdeflate.so.0"
+        ],
+        "provides": [
+            "so:libOpenEXRCore-3_3.so.32=32.3.3.2"
+        ]
+    },
+    "libdeflate": {
+        "name": "libdeflate",
+        "version": "1.22-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libdeflate.so.0=0"
+        ]
+    },
+    "imath": {
+        "name": "imath",
+        "version": "3.1.12-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libImath-3_1.so.29=29.11.0"
+        ]
+    },
+    "openexr-libilmthread": {
+        "name": "openexr-libilmthread",
+        "version": "3.3.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libIex-3_3.so.32",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libIlmThread-3_3.so.32=32.3.3.2"
+        ]
+    },
+    "openexr-libiex": {
+        "name": "openexr-libiex",
+        "version": "3.3.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libstdc++.so.6"
+        ],
+        "provides": [
+            "so:libIex-3_3.so.32=32.3.3.2"
+        ]
+    },
+    "aom-libs": {
+        "name": "aom-libs",
+        "version": "3.11.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libaom.so.3=3.11.0"
+        ]
+    },
+    "libSvtAv1Enc": {
+        "name": "libSvtAv1Enc",
+        "version": "2.2.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libSvtAv1Enc.so.2=2.2.0"
+        ]
+    },
+    "at-spi2-core": {
+        "name": "at-spi2-core",
+        "version": "2.54.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXi.so.6",
+            "so:libXtst.so.6",
+            "so:libc.musl-x86_64.so.1",
+            "so:libdbus-1.so.3",
+            "so:libgio-2.0.so.0",
+            "so:libglib-2.0.so.0",
+            "so:libgobject-2.0.so.0",
+            "so:libintl.so.8"
+        ],
+        "provides": [
+            "so:libatspi.so.0=0.0.1"
+        ]
+    },
+    "libxtst": {
+        "name": "libxtst",
+        "version": "1.2.5-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXtst.so.6=6.1.0"
+        ]
+    },
+    "libxi": {
+        "name": "libxi",
+        "version": "1.8.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXi.so.6=6.1.0"
+        ]
+    },
+    "libatk-bridge-2.0": {
+        "name": "libatk-bridge-2.0",
+        "version": "2.54.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libatk-1.0.so.0",
+            "so:libatspi.so.0",
+            "so:libc.musl-x86_64.so.1",
+            "so:libdbus-1.so.3",
+            "so:libglib-2.0.so.0",
+            "so:libgmodule-2.0.so.0",
+            "so:libgobject-2.0.so.0"
+        ],
+        "provides": [
+            "so:libatk-bridge-2.0.so.0=0.0.0"
+        ]
+    },
+    "libatk-1.0": {
+        "name": "libatk-1.0",
+        "version": "2.54.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libglib-2.0.so.0",
+            "so:libgobject-2.0.so.0",
+            "so:libintl.so.8"
+        ],
+        "provides": [
+            "so:libatk-1.0.so.0=0.25410.1"
+        ]
+    },
+    "libxrandr": {
+        "name": "libxrandr",
+        "version": "1.5.4-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libXrender.so.1",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXrandr.so.2=2.2.0"
+        ]
+    },
+    "libxdamage": {
+        "name": "libxdamage",
+        "version": "1.1.6-r5",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXdamage.so.1=1.1.0"
+        ]
+    },
+    "libxcomposite": {
+        "name": "libxcomposite",
+        "version": "0.4.6-r5",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXcomposite.so.1=1.0.0"
+        ]
+    },
+    "xdg-utils": {
+        "name": "xdg-utils",
+        "version": "1.2.1-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "file",
+            "xprop",
+            "xset"
+        ],
+        "provides": [
+            "cmd:xdg-desktop-icon=1.2.1-r1",
+            "cmd:xdg-desktop-menu=1.2.1-r1",
+            "cmd:xdg-email=1.2.1-r1",
+            "cmd:xdg-icon-resource=1.2.1-r1",
+            "cmd:xdg-mime=1.2.1-r1",
+            "cmd:xdg-open=1.2.1-r1",
+            "cmd:xdg-screensaver=1.2.1-r1",
+            "cmd:xdg-settings=1.2.1-r1"
+        ]
+    },
+    "xset": {
+        "name": "xset",
+        "version": "1.2.5-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libXmuu.so.1",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "cmd:xset=1.2.5-r1"
+        ]
+    },
+    "libxmu": {
+        "name": "libxmu",
+        "version": "1.2.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libXt.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXmu.so.6=6.2.0",
+            "so:libXmuu.so.1=1.0.0"
+        ]
+    },
+    "libxt": {
+        "name": "libxt",
+        "version": "1.3.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libICE.so.6",
+            "so:libSM.so.6",
+            "so:libX11.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXt.so.6=6.0.0"
+        ]
+    },
+    "libsm": {
+        "name": "libsm",
+        "version": "1.2.4-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libICE.so.6",
+            "so:libc.musl-x86_64.so.1",
+            "so:libuuid.so.1"
+        ],
+        "provides": [
+            "so:libSM.so.6=6.0.1"
+        ]
+    },
+    "libuuid": {
+        "name": "libuuid",
+        "version": "2.40.4-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libuuid.so.1=1.3.0"
+        ]
+    },
+    "libice": {
+        "name": "libice",
+        "version": "1.1.1-r6",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libICE.so.6=6.3.0"
+        ]
+    },
+    "xprop": {
+        "name": "xprop",
+        "version": "1.2.8-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "cmd:xprop=1.2.8-r0"
+        ]
+    },
+    "file": {
+        "name": "file",
+        "version": "5.46-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libmagic.so.1"
+        ],
+        "provides": [
+            "cmd:file=5.46-r2"
+        ]
+    },
+    "libmagic": {
+        "name": "libmagic",
+        "version": "5.46-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libmagic.so.1=1.0.0"
+        ]
+    },
+    "mesa-dri-gallium": {
+        "name": "mesa-dri-gallium",
+        "version": "24.2.8-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "mesa=24.2.8-r0",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgbm.so.1"
+        ],
+        "provides": []
+    },
+    "gtk+3.0": {
+        "name": "gtk+3.0",
+        "version": "3.24.49-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "shared-mime-info",
+            "gtk-update-icon-cache",
+            "/bin/sh",
+            "so:libX11.so.6",
+            "so:libXcomposite.so.1",
+            "so:libXcursor.so.1",
+            "so:libXdamage.so.1",
+            "so:libXext.so.6",
+            "so:libXfixes.so.3",
+            "so:libXi.so.6",
+            "so:libXinerama.so.1",
+            "so:libXrandr.so.2",
+            "so:libatk-1.0.so.0",
+            "so:libatk-bridge-2.0.so.0",
+            "so:libc.musl-x86_64.so.1",
+            "so:libcairo-gobject.so.2",
+            "so:libcairo.so.2",
+            "so:libcups.so.2",
+            "so:libepoxy.so.0",
+            "so:libfontconfig.so.1",
+            "so:libfribidi.so.0",
+            "so:libgdk_pixbuf-2.0.so.0",
+            "so:libgio-2.0.so.0",
+            "so:libglib-2.0.so.0",
+            "so:libgmodule-2.0.so.0",
+            "so:libgobject-2.0.so.0",
+            "so:libharfbuzz.so.0",
+            "so:libintl.so.8",
+            "so:libpango-1.0.so.0",
+            "so:libpangocairo-1.0.so.0",
+            "so:libpangoft2-1.0.so.0",
+            "so:libwayland-client.so.0",
+            "so:libwayland-cursor.so.0",
+            "so:libwayland-egl.so.1",
+            "so:libxkbcommon.so.0"
+        ],
+        "provides": [
+            "so:libgailutil-3.so.0=0.0.0",
+            "so:libgdk-3.so.0=0.2417.32",
+            "so:libgtk-3.so.0=0.2417.32",
+            "cmd:broadwayd=3.24.49-r0",
+            "cmd:gtk-launch=3.24.49-r0",
+            "cmd:gtk-query-immodules-3.0=3.24.49-r0"
+        ]
+    },
+    "wayland-libs-egl": {
+        "name": "wayland-libs-egl",
+        "version": "1.23.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libwayland-egl.so.1=1.23.1"
+        ]
+    },
+    "wayland-libs-cursor": {
+        "name": "wayland-libs-cursor",
+        "version": "1.23.1-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libwayland-client.so.0"
+        ],
+        "provides": [
+            "so:libwayland-cursor.so.0=0.23.1"
+        ]
+    },
+    "gdk-pixbuf": {
+        "name": "gdk-pixbuf",
+        "version": "2.42.12-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "shared-mime-info",
+            "/bin/sh",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgio-2.0.so.0",
+            "so:libglib-2.0.so.0",
+            "so:libgmodule-2.0.so.0",
+            "so:libgobject-2.0.so.0",
+            "so:libintl.so.8",
+            "so:libjpeg.so.8",
+            "so:libpng16.so.16",
+            "so:libtiff.so.6"
+        ],
+        "provides": [
+            "so:libgdk_pixbuf-2.0.so.0=0.4200.12",
+            "cmd:gdk-pixbuf-csource=2.42.12-r1",
+            "cmd:gdk-pixbuf-pixdata=2.42.12-r1",
+            "cmd:gdk-pixbuf-query-loaders=2.42.12-r1",
+            "cmd:gdk-pixbuf-thumbnailer=2.42.12-r1"
+        ]
+    },
+    "tiff": {
+        "name": "tiff",
+        "version": "4.7.2-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libjpeg.so.8",
+            "so:libwebp.so.7",
+            "so:libz.so.1",
+            "so:libzstd.so.1"
+        ],
+        "provides": [
+            "so:libtiff.so.6=6.3.0"
+        ]
+    },
+    "shared-mime-info": {
+        "name": "shared-mime-info",
+        "version": "2.4-r2",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "/bin/sh",
+            "pkgconfig",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgcc_s.so.1",
+            "so:libglib-2.0.so.0",
+            "so:libstdc++.so.6",
+            "so:libxml2.so.2"
+        ],
+        "provides": [
+            "pc:shared-mime-info=2.4",
+            "cmd:update-mime-database=2.4-r2"
+        ]
+    },
+    "pkgconf": {
+        "name": "pkgconf",
+        "version": "2.3.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "pkgconfig=1",
+            "so:libpkgconf.so.5=5.0.0",
+            "cmd:bomtool=2.3.0-r0",
+            "cmd:pkg-config=2.3.0-r0",
+            "cmd:pkgconf=2.3.0-r0"
+        ]
+    },
+    "libepoxy": {
+        "name": "libepoxy",
+        "version": "1.5.10-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libepoxy.so.0=0.0.0"
+        ]
+    },
+    "cairo-gobject": {
+        "name": "cairo-gobject",
+        "version": "1.18.4-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libcairo.so.2",
+            "so:libglib-2.0.so.0",
+            "so:libgobject-2.0.so.0"
+        ],
+        "provides": [
+            "so:libcairo-gobject.so.2=2.11804.4"
+        ]
+    },
+    "libxinerama": {
+        "name": "libxinerama",
+        "version": "1.1.5-r4",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXext.so.6",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXinerama.so.1=1.0.0"
+        ]
+    },
+    "libxcursor": {
+        "name": "libxcursor",
+        "version": "1.2.3-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libX11.so.6",
+            "so:libXfixes.so.3",
+            "so:libXrender.so.1",
+            "so:libc.musl-x86_64.so.1"
+        ],
+        "provides": [
+            "so:libXcursor.so.1=1.0.2"
+        ]
+    },
+    "gtk-update-icon-cache": {
+        "name": "gtk-update-icon-cache",
+        "version": "3.24.49-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "hicolor-icon-theme",
+            "/bin/sh",
+            "so:libc.musl-x86_64.so.1",
+            "so:libgdk_pixbuf-2.0.so.0",
+            "so:libglib-2.0.so.0",
+            "so:libintl.so.8"
+        ],
+        "provides": [
+            "cmd:gtk-update-icon-cache=3.24.49-r0",
+            "cmd:gtk4-update-icon-cache=3.24.49-r0"
+        ]
+    },
+    "hicolor-icon-theme": {
+        "name": "hicolor-icon-theme",
+        "version": "0.18-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "pkgconfig"
+        ],
+        "provides": [
+            "pc:default-icon-theme=0.18"
+        ]
+    },
+    "font-opensans": {
+        "name": "font-opensans",
+        "version": "0_git20210927-r1",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "fontconfig",
+            "mkfontscale"
+        ],
+        "provides": [
+            "ttf-opensans=0_git20210927-r1"
+        ]
+    },
+    "firefox-esr": {
+        "name": "firefox-esr",
+        "version": "128.14.0-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/",
+        "dependencies": [
+            "ffmpeg-libavcodec",
+            "/bin/sh",
+            "so:libX11-xcb.so.1",
+            "so:libX11.so.6",
+            "so:libXcomposite.so.1",
+            "so:libXdamage.so.1",
+            "so:libXext.so.6",
+            "so:libXfixes.so.3",
+            "so:libXrandr.so.2",
+            "so:libasound.so.2",
+            "so:libatk-1.0.so.0",
+            "so:libc.musl-x86_64.so.1",
+            "so:libcairo-gobject.so.2",
+            "so:libcairo.so.2",
+            "so:libdbus-1.so.3",
+            "so:libevent-2.1.so.7",
+            "so:libffi.so.8",
+            "so:libfontconfig.so.1",
+            "so:libfreetype.so.6",
+            "so:libgcc_s.so.1",
+            "so:libgdk-3.so.0",
+            "so:libgdk_pixbuf-2.0.so.0",
+            "so:libgio-2.0.so.0",
+            "so:libglib-2.0.so.0",
+            "so:libgobject-2.0.so.0",
+            "so:libgtk-3.so.0",
+            "so:libicui18n.so.74",
+            "so:libicuuc.so.74",
+            "so:libjpeg.so.8",
+            "so:libnspr4.so",
+            "so:libnss3.so",
+            "so:libnssutil3.so",
+            "so:libpango-1.0.so.0",
+            "so:libpixman-1.so.0",
+            "so:libplc4.so",
+            "so:libpng16.so.16",
+            "so:libsmime3.so",
+            "so:libssl3.so",
+            "so:libstdc++.so.6",
+            "so:libvpx.so.9",
+            "so:libwebp.so.7",
+            "so:libwebpdemux.so.2",
+            "so:libxcb-shm.so.0",
+            "so:libxcb.so.1",
+            "so:libz.so.1"
+        ],
+        "provides": [
+            "so:firefox-esr:libgkcodecs.so=0",
+            "so:firefox-esr:libipcclientcerts.so=0",
+            "so:firefox-esr:liblgpllibs.so=0",
+            "so:firefox-esr:libmozavcodec.so=0",
+            "so:firefox-esr:libmozavutil.so=0",
+            "so:firefox-esr:libmozgtk.so=0",
+            "so:firefox-esr:libmozsandbox.so=0",
+            "so:firefox-esr:libmozsqlite3.so=0",
+            "so:firefox-esr:libmozwayland.so=0",
+            "so:firefox-esr:libxul.so=0",
+            "cmd:firefox-esr=128.14.0-r0"
+        ]
+    },
+    "libevent": {
+        "name": "libevent",
+        "version": "2.1.13-r0",
+        "repository": "https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/",
+        "dependencies": [
+            "so:libc.musl-x86_64.so.1",
+            "so:libcrypto.so.3",
+            "so:libssl.so.3"
+        ],
+        "provides": [
+            "so:libevent-2.1.so.7=7.0.2",
+            "so:libevent_core-2.1.so.7=7.0.2",
+            "so:libevent_extra-2.1.so.7=7.0.2",
+            "so:libevent_openssl-2.1.so.7=7.0.2",
+            "so:libevent_pthreads-2.1.so.7=7.0.2"
+        ]
+    }
+}

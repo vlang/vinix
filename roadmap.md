@@ -571,8 +571,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   service integration, sandbox/portal requirements and required packaging runtimes.
 - [ ] Qualify native/translated x86-64 and 32-bit application paths on AArch64,
   including atomics, SIMD, TLS, JITs, debugging and memory/page-size assumptions.
-- [ ] Run application-driven regression suites for browsers, office/media tools,
+- [x] Run application-driven regression suites for browsers, office/media tools,
   language runtimes, databases, servers and games; publish unsupported dependencies.
+  See the [generated application results and dependency limits](docs/linux-application-coverage.md).
+  Browser failures and unsupported runtime paths remain visible; running the
+  regression catalog does not close the installation/sandbox acceptance gate.
 
 - [x] Integrate a bounded Linux foreground-service unit subset with the native
   Services chooser and qualify HTTP start/restart/configuration restore/removal

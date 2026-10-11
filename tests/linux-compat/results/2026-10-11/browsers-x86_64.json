@@ -1,0 +1,99 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "2fb5d27a14efb4fab61b8adf5422acf2615fab1b98bb0fc93aba143f69509068",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "uid": 1000,
+    "gid": 1000,
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "firefox",
+            "status": "failed",
+            "detail": "command failed: ['/usr/lib/firefox-esr/firefox-esr', '--headless', '--no-remote', '--profile', '/tmp/linux-compat-evidence/firefox-profile', '--window-size', '800,600', '--screenshot', '/tmp/linux-compat-evidence/firefox.png', 'http://127.0.0.1:53861/'] exit=137 timeout=true output_limit=false"
+        },
+        {
+            "name": "chromium",
+            "status": "failed",
+            "detail": "command failed: ['/usr/lib/chromium/chromium', '--headless', '--user-data-dir=/tmp/linux-compat-evidence/chromium-profile', '--timeout=30000', '--dump-dom', 'http://127.0.0.1:63379/'] exit=191 timeout=false output_limit=false"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--version"
+            ],
+            "executable_sha256": "143aeed9b12686c25130cac64524508ee9342533e5da76d059aef5e26524601f",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Mozilla Firefox 128.14.0esr\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--headless",
+                "--no-remote",
+                "--profile",
+                "/tmp/linux-compat-evidence/firefox-profile",
+                "--window-size",
+                "800,600",
+                "--screenshot",
+                "/tmp/linux-compat-evidence/firefox.png",
+                "http://127.0.0.1:53861/"
+            ],
+            "executable_sha256": "143aeed9b12686c25130cac64524508ee9342533e5da76d059aef5e26524601f",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 137,
+            "timed_out": true,
+            "output_limited": false,
+            "stdout": "[GFX1-]: glxtest: libpci missing\n[GFX1-]: glxtest: libGL.so.1 missing\n[GFX1-]: No GPUs detected via PCI\n\n",
+            "stderr": "*** You are running in headless mode.\n"
+        },
+        {
+            "argv": [
+                "/usr/lib/chromium/chromium",
+                "--version"
+            ],
+            "executable_sha256": "afc7bbe3a89090884b75568e0bb81fb45f18c80578c608322e7123cda5504325",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Chromium 136.0.7103.113 \n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/lib/chromium/chromium",
+                "--headless",
+                "--user-data-dir=/tmp/linux-compat-evidence/chromium-profile",
+                "--timeout=30000",
+                "--dump-dom",
+                "http://127.0.0.1:63379/"
+            ],
+            "executable_sha256": "afc7bbe3a89090884b75568e0bb81fb45f18c80578c608322e7123cda5504325",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 191,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "[62001:62001:1011/141721.563672:FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:163] The SUID sandbox helper binary was found, but is not configured correctly. Rather than run without sandboxing I'm aborting now. You need to make sure that /usr/lib/chromium/chrome-sandbox is owned by root and has mode 4755.\n[1011/141721.577725:ERROR:third_party/crashpad/crashpad/util/linux/scoped_ptrace_attach.cc:27] ptrace: Function not implemented (38)\n[1011/141721.617240:ERROR:third_party/crashpad/crashpad/handler/linux/exception_handler_server.cc:52] EPOLLERR: No error information (0)\n[1011/141721.928811:ERROR:third_party/crashpad/crashpad/handler/linux/exception_handler_server.cc:52] EPOLLERR: No error information (0)\n"
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}

@@ -400,9 +400,29 @@ terminates its process group. Neither run has JavaScript/render proof, and
 both controller receipts exit nonzero. Headless graphics probing also reports
 missing libpci/libGL; its causal role in the timeout has not been established.
 
+`browsers-x86_64.json` also runs the native x86-64 Firefox and Chromium engines
+as UID/GID 1000 with 4 GiB guest RAM and the default sandbox policy. Both version
+commands succeed. Firefox's meaningful headless run times out, and Chromium
+refuses the mode-0755 sandbox helper and reports unavailable ptrace. Neither
+engine produces the required JavaScript/render proof. Its input receipt exits
+1; the exact dependency closure, engine bytes and installed modes are published
+in `packages-browsers-x86_64.json`, `selected-browsers-x86_64.json` and
+`rootfs-browsers-x86_64.json`.
+
 These reports distinguish available browser packages from a qualified browser
-workflow. Native x86-64 browser execution, sandbox isolation, visible windows,
-portal requests and install/update/remove remain outstanding checks.
+workflow. Sandbox isolation, visible windows, portal requests and
+install/update/remove remain outstanding checks.
+
+The [generated application regression index](linux-application-coverage.md)
+collects browser, office, media, language-runtime, database, server and game
+verdicts across both native architectures, including explicit unsupported
+architecture/runtime combinations. Its V auditor checks guest context,
+architecture, controller-requested cases, report/driver/kernel fingerprints,
+unique verdicts and controller exit consistency. It preserves failed and
+unsupported dependencies and rejects edited or host receipts. Regenerate or
+check it with `build-support/run-v-tool.sh tools/linux-compat/applications`
+and `--check`. `--require-complete` still exits 1 because full application
+support and the install/update/desktop acceptance gate remain incomplete.
 
 ## Seccomp trap signal semantics
 
