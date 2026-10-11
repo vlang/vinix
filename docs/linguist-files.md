@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `39bb040f06a3faa9fa88d0f9d13bbd508163b74e`,
+at source commit `486ce8879394ddc7a63267327af10a4f555a9dd5`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 567 | 2,365,384 | 6.18% |
-| Python | 317 | 1,653,017 | 4.32% |
-| Shell | 526 | 1,366,967 | 3.57% |
+| C | 567 | 2,365,422 | 6.18% |
+| Python | 310 | 1,602,768 | 4.19% |
+| Shell | 532 | 1,368,257 | 3.58% |
 
-All `.v` files are classified as V. The resulting V share is 77.77%, with no
+All `.v` files are classified as V. The resulting V share is 77.89%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,653,017 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,602,768 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 39bb040f06a3faa9fa88d0f9d13bbd508163b74e --breakdown --json
+github-linguist --rev 486ce8879394ddc7a63267327af10a4f555a9dd5 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -479,7 +479,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/hostfixtures/wwhost/wwhost_v_contract.h` | 365 |
 | `tests/linuxkpi/hostguest/hostguest_v_contract.h` | 269 |
 | `tests/linuxkpi/hosttest/archive_abi.h` | 1,241 |
-| `tests/linuxkpi/hosttest/module_fs_abi.h` | 481 |
+| `tests/linuxkpi/hosttest/module_fs_abi.h` | 519 |
 | `tests/linuxkpi/kstrtoxhost_v_contract.h` | 413 |
 | `tests/linuxkpi/loghost_v_contract.h` | 1,557 |
 | `tests/linuxkpi/policyhost_v_contract.h` | 1,469 |
@@ -858,7 +858,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/vulkan-run.py` | 2,115 |
 | `tests/dota2/vulkan-stage-test.py` | 4,722 |
 | `tests/dota2/wake-op-run.py` | 2,474 |
-| `tests/emulator-desktop/_native.py` | 3,457 |
 | `tests/ext2-xattr/host.py` | 6,852 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/fs-journal/image.py` | 3,153 |
@@ -894,8 +893,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/minecraft/test-patch-lwjgl.py` | 1,985 |
 | `tests/mount-policy/run_vm.py` | 1,615 |
 | `tests/mounted-disk-policy/run.py` | 10,413 |
-| `tests/n64/desktop.py` | 9,741 |
-| `tests/n64/run.py` | 7,152 |
 | `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/numa/_native.py` | 969 |
 | `tests/numa/run_vm.py` | 5,369 |
@@ -910,10 +907,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pci-config/_native.py` | 512 |
 | `tests/pci-config/arm_vm.py` | 5,495 |
 | `tests/pointer-scroll/run.py` | 5,488 |
-| `tests/ps1/desktop.py` | 7,528 |
-| `tests/ps1/run.py` | 6,744 |
-| `tests/ps2/desktop.py` | 8,979 |
-| `tests/ps2/run.py` | 6,648 |
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/qemu-core/_vm_native.py` | 674 |
 | `tests/qemu-core/run_vm.py` | 6,725 |
@@ -1299,8 +1292,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mount-policy/run.sh` | 2,110 |
 | `tests/mounted-disk-policy/check-generated` | 178 |
 | `tests/mounted-disk-policy/host` | 187 |
+| `tests/n64/desktop` | 217 |
 | `tests/n64/frame` | 180 |
 | `tests/n64/rsp-budget` | 218 |
+| `tests/n64/run` | 213 |
 | `tests/native-boundaries/run` | 104 |
 | `tests/net-random/run` | 183 |
 | `tests/net-random/run.sh` | 283 |
@@ -1353,8 +1348,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/procfs-allocs/run` | 184 |
 | `tests/procfs-mount/check-generated` | 146 |
 | `tests/procfs-mount/run` | 183 |
+| `tests/ps1/desktop` | 217 |
 | `tests/ps1/frame` | 180 |
+| `tests/ps1/run` | 213 |
+| `tests/ps2/desktop` | 217 |
 | `tests/ps2/frame` | 180 |
+| `tests/ps2/run` | 213 |
 | `tests/qemu-core/compile-basefixture` | 165 |
 | `tests/qemu-core/compile-fixtures` | 162 |
 | `tests/qemu-core/run.sh` | 3,987 |

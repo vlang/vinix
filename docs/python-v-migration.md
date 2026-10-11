@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `39bb040f06a3faa9fa88d0f9d13bbd508163b74e`,
-Linguist 7.27.0 reports **Python 4.32%** (317 files, 1,653,017 bytes) and
-**V 77.77%** (2,930 files, 29,760,305 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `486ce8879394ddc7a63267327af10a4f555a9dd5`,
+Linguist 7.27.0 reports **Python 4.19%** (310 files, 1,602,768 bytes) and
+**V 77.89%** (2,940 files, 29,790,079 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,553,268 Python bytes**. All remaining
-1,653,017 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,603,517 Python bytes**. All remaining
+1,602,768 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 49 stages below remove **212 Python files / 708,016 original bytes** and
+The 50 stages below remove **219 Python files / 758,265 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -80,6 +80,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Standalone init and init-policy, process-churn, memlock and RSP budget commands | `tests/native-guest-tools/guesthost`, scoped native process-group and serial owners | 18,962 / 334 | `63c3fc16` |
 | PS1 core/download and N64/PS2 MIPS homebrew builders | `build-support/native-emulator-tools/emulatorbuild`, four native commands and streaming build log owner | 19,437 / 404 | `e4ad8a3f` |
 | N64 and PS2 core builder commands | `build-support/native-emulator-tools/emulatorbuild`, joined native worker pool and core fronts | 4,990 / 142 | `39bb040f` |
+| N64, PS1 and PS2 guest/desktop controllers | `tests/emulator-desktop/emulatorhost`, six native commands, native QMP and logged child owner | 50,249 / 1,097 | `486ce887` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -712,9 +713,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 49 stages.
+or hidden in these 50 stages.
 
-The next eleven stages remove sixty Python files / 209,673 original bytes.
+The next twelve stages remove sixty-seven Python files / 259,922 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -727,7 +728,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **90 Python files / 343,950 original bytes**. Temporary qualification
+translates **97 Python files / 394,199 original bytes**. Temporary qualification
 caches were cleared during shared-machine disk cleanup; final follow-on
 checks and inputs are retained under
 `/Users/alex/.cache/vinix-python-zero-process-20261011`.
@@ -2760,3 +2761,13 @@ ARM/glibc 2.39 worker build and run pass; the local Linux V bootstrap crashes, s
 this does not establish a native Linux compiler build. No Python was run, kernel
 rebuilt or new guest gameplay established. Guest and desktop controllers remain
 pending. See [qualification](../build-support/native-emulator-tools/core-builders.md).
+
+The emulator controller stage retires seven Python files and the unused borrowed
+preparation/QMP query. ARM, Rosetta x86 and ASan/UBSan host checks pass, including
+complete controlled desktop workflows, all 27 standard descriptor layouts and
+SIGINT during an unanswered socket command. All six cold fronts pass from /tmp.
+The three ordinary ARM emulator guest regressions pass with the unchanged guest
+workloads and frozen kernel. Historical C controls fail their status-label check;
+the actual N64 desktop boot fails the retained fixed-coordinate start-game check.
+Those failures remain recorded; actual desktop gameplay qualification is incomplete.
+No Python was run or kernel rebuilt. See [qualification and limits](../tests/emulator-desktop/controllers.md).
