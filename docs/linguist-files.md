@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `59fc4cc3ccf39e62dccbcf03dfc0fec902bcd403`,
+at source commit `7b27042a7cc93da8f4c44c83d2d6deb26a4a3278`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 564 | 2,345,795 | 6.22% |
-| Python | 363 | 1,793,986 | 4.76% |
-| Shell | 490 | 1,359,919 | 3.60% |
+| C | 566 | 2,364,635 | 6.23% |
+| Python | 357 | 1,766,643 | 4.65% |
+| Shell | 497 | 1,361,196 | 3.59% |
 
-All `.v` files are classified as V. The resulting V share is 77.15%, with no
+All `.v` files are classified as V. The resulting V share is 77.31%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,793,986 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,766,643 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 59fc4cc3ccf39e62dccbcf03dfc0fec902bcd403 --breakdown --json
+github-linguist --rev 7b27042a7cc93da8f4c44c83d2d6deb26a4a3278 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -614,6 +614,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/xnualloc/reference.c` | 11,469 |
 | `tools/agx-re/agx_trace.h` | 298 |
 | `tools/agx-re/agx_trace_v.h` | 2,133 |
+| `tools/linux-compat/reference/aarch64-syscall.h` | 8,266 |
+| `tools/linux-compat/reference/x86_64-syscall.h` | 10,574 |
 | `tools/m1-wifi/wifi_v.h` | 1,331 |
 | `tools/prunehost/stat_abi.h` | 623 |
 | `tools/sandbox/sandbox_v.h` | 1,593 |
@@ -708,7 +710,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/generate-bounds.py` | 2,882 |
 | `kernel/linuxkpi/upstream.py` | 1,586 |
 | `scripts/build-opengothic-aarch64.sh` | 169 |
-| `tests/acpi-sync/run.py` | 2,414 |
 | `tests/activity-monitor/run.py` | 5,933 |
 | `tests/agx-fake-g17/_native.py` | 7,413 |
 | `tests/agx-fake-g17/run.py` | 1,075 |
@@ -846,7 +847,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/clipboard/run_vm.py` | 5,740 |
 | `tests/clipboard/test_host.py` | 3,780 |
 | `tests/codex/smoke.py` | 4,944 |
-| `tests/cpu-mitigations/run.py` | 4,795 |
 | `tests/desktop-perf/_native_report.py` | 2,681 |
 | `tests/desktop-perf/_runner_native.py` | 11,681 |
 | `tests/desktop-perf/run.py` | 14,065 |
@@ -897,7 +897,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/compile-v-fixture.py` | 2,092 |
 | `tests/kernel-gaps/run.py` | 3,048 |
-| `tests/kernel-stack-guards/run.py` | 4,358 |
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/linuxkpi/_audit_native.py` | 7,668 |
 | `tests/linuxkpi/_guest_native.py` | 6,611 |
@@ -957,7 +956,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/reboot-persistence/_native.py` | 959 |
 | `tests/reboot-persistence/run_vm.py` | 5,086 |
 | `tests/resource-accounting/run.py` | 5,734 |
-| `tests/resource-groups/run.py` | 5,450 |
 | `tests/roblox-windows/_native.py` | 5,099 |
 | `tests/roblox-windows/run.py` | 7,180 |
 | `tests/roblox/build-test.py` | 8,453 |
@@ -967,10 +965,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/securelevel-boot/host.py` | 854 |
 | `tests/securelevel-boot/persistent.py` | 4,121 |
 | `tests/securelevel-boot/run.py` | 2,460 |
-| `tests/smt-policy/run.py` | 3,248 |
 | `tests/sound/_native.py` | 957 |
 | `tests/sound/run_vm.py` | 9,126 |
-| `tests/speculation-policy/run.py` | 7,078 |
 | `tests/verified-boot/runtime.py` | 10,385 |
 | `tests/verified-boot/test.py` | 7,670 |
 | `tests/verified-root/run-host.py` | 7,267 |
@@ -1174,6 +1170,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/accounts/run` | 835 |
 | `tests/acpi-ec/run.sh` | 649 |
 | `tests/acpi-sync/compile-v-native` | 191 |
+| `tests/acpi-sync/run` | 182 |
 | `tests/agx-fake-g17/run.sh` | 942 |
 | `tests/agx-g13-abi/run.sh` | 785 |
 | `tests/agx-g13-layouts/run.sh` | 796 |
@@ -1227,6 +1224,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/cpu-mitigations/check-assembly` | 179 |
 | `tests/cpu-mitigations/check-linked` | 157 |
 | `tests/cpu-mitigations/check-policy` | 158 |
+| `tests/cpu-mitigations/run` | 188 |
 | `tests/cpu-power/run.sh` | 638 |
 | `tests/desktop-bootstrap/run-runner.sh` | 169 |
 | `tests/desktop-bootstrap/run.sh` | 224 |
@@ -1291,11 +1289,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-resources/run` | 170 |
 | `tests/kernel-resources/run-host.sh` | 1,620 |
 | `tests/kernel-retention/run` | 189 |
+| `tests/kernel-stack-guards/run` | 192 |
 | `tests/kernel-sysvmsg/run` | 187 |
 | `tests/krandom/compile-hooks` | 175 |
 | `tests/krandom/run-hooks` | 172 |
 | `tests/krandom/run.sh` | 1,734 |
 | `tests/limine-aarch64/test-patch` | 111 |
+| `tests/linux-compat/run` | 153 |
 | `tests/linuxkpi/run.sh` | 11,272 |
 | `tests/listen-backlog/run` | 187 |
 | `tests/m1-deploy/run.sh` | 2,686 |
@@ -1391,6 +1391,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run.sh` | 1,513 |
 | `tests/reboot-persistence/run.sh` | 2,604 |
 | `tests/resource-accounting/check-generated` | 146 |
+| `tests/resource-groups/run` | 188 |
 | `tests/resource-groups/run-host.sh` | 801 |
 | `tests/resource-open/run` | 186 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
@@ -1403,10 +1404,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/security-mac/run.sh` | 952 |
 | `tests/security-policy/run.sh` | 2,109 |
 | `tests/shared-streams/run` | 185 |
+| `tests/smt-policy/run` | 183 |
 | `tests/smt-policy/run-host.sh` | 1,181 |
 | `tests/socket-io/check-generated` | 146 |
 | `tests/socket-io/run` | 180 |
 | `tests/sound/run.sh` | 1,419 |
+| `tests/speculation-policy/run` | 191 |
 | `tests/stack-policy/run` | 183 |
 | `tests/stack-protector/diagnostic` | 175 |
 | `tests/stack-protector/run` | 188 |
