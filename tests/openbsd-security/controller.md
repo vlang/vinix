@@ -1,31 +1,27 @@
-The OpenBSD security guest controller uses `securitycore` for pcap frame
-extraction, packet-randomness checks, launch arguments, port selection,
-process polling and shutdown, serial capture and marker reporting. Its V
-query borrows actual Python objects through the shared Package Session ABI.
-The original marker thresholds, command-line options and deadlines remain.
+# Native security guest controllers
 
-Python retains the parser, initial capture state, `pty.fork` child branch,
-`chdir`/`execvpe`, and sequential `finally` calls to `stop` and `os.close`.
-Small generator and list-comprehension syntax helpers remain counted Python;
-V owns their nontrivial predicates and arithmetic. Original recursive
-algorithms are unchanged. Each public wrapper supplies its running frame's
-builtins table for original global lookup. Fixed names have finite caches.
-Named helper values remain with saved exceptions; temporary operands retire
-at their original evaluation boundaries.
+`run_vm` and `run.sh` compile and run V directly through
+[`systemhost`](../native-system-tools/systemhost/security.v). The mount-policy
+and IPv6 controllers share this typed implementation. There is no Python query,
+object bridge or package server on this path.
 
-Other guest controllers import this runner and replace its markers,
-`command_for` and `check_capture`. Those public lookups remain live. The
-packet parser retains its original permissive truncation behavior.
+The maintained CLI, exact feature counts, failure markers, two-second settling
+period and 600-second deadline remain. ARM also requires the pledge-violation
+report. Packet parsing keeps all four pcap byte orders and permissive truncated
+records. Random IP IDs, ephemeral ports and TCP sequence checks keep the original
+thresholds. IPv6 retains its ICMPv6, MLD, IGMP, TCP and UDP requirements and an
+IPv6 TCP/UDP echo service with explicitly joined workers.
 
-`VINIX_SECURITY_GUEST_QUERY` selects an existing query; otherwise the shared
-host controller builds and installs a private executable. The Package SDK
-supports `VINIX_PACKAGE_STORE_LIBRARY` for an existing library. Both default
-build paths use `build-support/find-v.sh` and retain compiler diagnostics.
+Provided ARM init/archive inputs and provided x86 ISOs remain supported.
+`run.sh [aarch64|amd64]` builds the unchanged strict-warning C fixture, copies a
+prebuilt kernel and packages a private ISO. ARM defaults to `VINIX_KERNEL_DIR`
+or `kernel`; x86 defaults to `VINIX_AMD64_KERNEL` or
+`build-amd64-kernel/bin/vinix`. `--kernel-dir` overrides either. Explicit state
+directories retain raw serial, captures and launch hashes; default scratch is
+removed. `--build-only` prepares without booting.
 
-Host, packet and actual PTY-child fixtures validate the controller without
-booting a kernel. Actual OpenBSD-security guest validation requires a matching
-Vinix kernel/image and the original guest workload. Host fixture passes do
-not establish kernel security or QEMU behavior. Private implementation helper
-replacement and exact private traceback frames are outside the migration
-boundary. Callbacks near CPython's global recursion limit can observe native
-bridge stack overhead.
+The PTY owner retains argument/environment storage through child exec, keeps
+the original bounded read and marker window, and retires the whole process
+group on success, failure or interrupt. Cleanup output cannot supply missing
+features. See the [qualification and guest limits](../native-system-tools/README.md).
+The previous Python import/monkey-patching interface is retired with its callers.

@@ -1,25 +1,25 @@
-# NUMA guest controller
+# Native NUMA guest controller
 
-`numacore` owns environment and QEMU argument policy, exit-status conversion,
-timed capture, shutdown escalation, and result reporting. It borrows the live
-Python namespace, the public caller's actual builtins table, and operands through
-the shared Package Session ABI. Fixed source constants use the module's finite
-literal cache; dynamic caller values are never put in that cache.
+`run_vm` and `run.sh` compile and run V directly through
+[`systemhost`](../native-system-tools/systemhost/numa.v). The unchanged C guest
+and its six feature markers remain, as do the five independent kernel topology
+markers, exactly-once feature/pass checks and rejection of nonzero or forced
+exit.
 
-Python retains argument parsing, the eager public marker/topology constants,
-the socket owner, PTY fork/chdir/exec, and the original ordered `finally` cleanup.
-Marker comprehensions and the failure generator remain counted Python syntax.
-After fork, environment, command, PID and PTY descriptor ownership transfers to
-the private state in the original named-local order; duplicate bridge references
-retire before capture, so the transcript retires after those owners.
-The generator closes over the genuine `recent` cell, so a caller that retains
-it observes later transcript assignments. Original named locals survive saved
-callback errors in the entry frame's private pins; the Session consumes its
-private error slots after transport and descriptor cleanup.
+The QEMU machine retains two 1 GiB memory backends, CPUs 0–1 and 2–3, distance
+20, four CPUs by default and 2048 MiB of RAM. The default deadline is 300 seconds.
+At the first verdict the PTY sends Ctrl-A x and waits ten seconds for a clean
+exit. A later failure remains a failure. The owner then retires the entire
+process group and closes the PTY on all paths, including SIGINT.
 
-Controller qualification compares the independent original implementation with
-actual Python operands, errors, stdio, and PTY children. It does not establish a
-fresh kernel build, QEMU boot, or physical NUMA behavior. Private bridge traceback
-frames differ. Arbitrary external callbacks precisely at a Python recursion
-budget are outside the qualified scope; no maintained recursive algorithm is
-moved to a different frame.
+Provided init/archive inputs remain supported. `run.sh` builds the original
+strict-warning C fixture and snapshots a prebuilt kernel without rebuilding it.
+`--kernel-dir DIR`, `--state-dir DIR` and `--build-only` select the kernel,
+retain artifacts or prepare without booting. Explicit state contains the launch
+hashes and raw serial capture; default scratch is removed.
+
+Host checks exercise fragmented serial, first verdicts, late failures, exit
+statuses, descendant retirement and repeated FD closure. They do not establish
+NUMA placement in a kernel. See the
+[guest qualification and limits](../native-system-tools/README.md).
+The previous Python object/query bridge is retired.

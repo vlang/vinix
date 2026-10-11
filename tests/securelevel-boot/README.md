@@ -43,10 +43,10 @@ Run from an isolated worktree with a kernel built for the requested architecture
 V=/Users/alex/code/v/v tests/securelevel-boot/host
 V=/Users/alex/code/v/v tests/securelevel-boot/dispatch
 V=/Users/alex/code/v/v tests/securelevel-boot/attribute-faults
-python3 tests/kernel-gaps/test_runner.py
-python3 tests/securelevel-boot/run.py --arch aarch64 --state-dir /tmp/securelevel-arm
-python3 tests/securelevel-boot/run.py --arch x86_64 --state-dir /tmp/securelevel-x86
-python3 tests/securelevel-boot/persistent.py --state-dir /tmp/securelevel-ext2
+tests/kernel-gaps/test-runner
+tests/securelevel-boot/run --arch aarch64 --state-dir /tmp/securelevel-arm
+tests/securelevel-boot/run --arch x86_64 --state-dir /tmp/securelevel-x86
+tests/securelevel-boot/persistent --state-dir /tmp/securelevel-ext2
 ```
 
 Each architecture suite boots default, explicit -1, 0, 1, and 2 policies, then
@@ -54,6 +54,10 @@ three malformed policies. Negative boot tests opt in to expected-panic mode,
 require both the panic and exact rejection reason, and reject userspace entry.
 The common runner also rejects timeout, nonzero launch exit, and later failure
 output. Production panic messages remain visible on serial.
+
+The guest commands run V directly, snapshot a prebuilt kernel and retain
+explicit state directories. `--kernel-dir` selects the kernel and `--build-only`
+prepares the fixtures without booting. Default scratch directories are removed.
 
 Valid guests test PID 1 lowering, strict writes, namespace-local capability
 rejection, private namespace controls, old-descriptor writes/writev/pwrite/

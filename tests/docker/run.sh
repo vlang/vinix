@@ -50,4 +50,4 @@ fi
 if [ "${VINIX_DOCKER_TEST_NO_BUILD:-0}" = 1 ]; then
 	set -- "$@" --no-build
 fi
-python3 "$repo/tests/docker/run_vm.py" "$@"
+"$repo/tests/docker/run_vm" "$@"

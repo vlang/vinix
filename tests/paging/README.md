@@ -28,9 +28,9 @@ Build the kernels in isolated worktrees with their untracked dependencies linked
 then boot the guest on both architectures:
 
 ```sh
-python3 tests/paging/run.py --arch aarch64 --kernel-dir /work/arm/kernel \
+tests/paging/run --arch aarch64 --kernel-dir /work/arm/kernel \
   --memory 256 --pressure --state-dir /tmp/paging-arm
-python3 tests/paging/run.py --arch x86_64 --kernel-dir /work/x86/kernel \
+tests/paging/run --arch x86_64 --kernel-dir /work/x86/kernel \
   --memory 256 --pressure --state-dir /tmp/paging-x86
 ```
 
@@ -39,9 +39,10 @@ device and requires both encrypted-disk/swapoff and final success verdicts.
 The AArch64 build uses `VINIX_AARCH64_SYSROOT` (default
 `build-aarch64-userland/sysroot`); x86-64 uses `CC_AMD64` (default
 `x86_64-linux-musl-gcc`). QEMU and the existing boot-image tools are required.
-Artifact paths must contain no spaces because the AArch64 launcher splits
-`VINIX_QEMU_EXTRA` into arguments. The state directory and transcripts are kept
-for inspection; only its dedicated `swap.img` is recreated on each run.
+The V runner owns QEMU directly and copies the selected prebuilt kernel into
+its state directory. An explicit state directory keeps the artifacts and raw
+serial transcript; default scratch directories are removed. Only its dedicated
+`swap.img` is recreated on each run. `--build-only` prepares without booting.
 
 Guests check mincore residency, private fork isolation, protection changes,
 discard, locked pages, shared fork aliases across remap, concurrent refault with

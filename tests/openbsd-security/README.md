@@ -24,12 +24,15 @@ tests/openbsd-security/run.sh amd64
 ```
 
 The aarch64 run compiles against the musl sysroot from
-`./scripts/build-userland-aarch64.sh` (or `VINIX_AARCH64_SYSROOT`) and boots through
-`scripts/run-aarch64.sh --guest-init` with its own boot disk, EFI variables and
-persistent volume. The amd64 run compiles with `x86_64-linux-musl-gcc` (or
+`./scripts/build-userland-aarch64.sh` (or `VINIX_AARCH64_SYSROOT`) and directly
+owns QEMU with its own boot ISO, EFI variables and persistent volume.
+The amd64 run compiles with `x86_64-linux-musl-gcc` (or
 `CC_AMD64`), builds a throwaway ISO around `build-amd64-kernel/bin/vinix`, and
-boots it under TCG. Both runs leave nothing behind. `VINIX_QEMU_TIMEOUT`
-changes the default 600-second deadline.
+boots it under TCG. The V controller copies the selected prebuilt kernel before
+packaging. `--kernel-dir DIR` overrides the default, `--state-dir DIR` retains
+artifacts and serial output, and `--build-only` prepares without booting.
+Default scratch directories are removed. `VINIX_QEMU_TIMEOUT` changes the
+default 600-second deadline. See [native controller details](controller.md).
 
 The runner records the guest's network traffic with QEMU's `filter-dump`
 and checks the TCP sequence numbers, source ports and IP IDs of what the test

@@ -1,6 +1,6 @@
 # AArch64 NUMA / multi-socket regression
 
-This test boots a freshly built Vinix kernel on a QEMU machine deliberately
+This test boots a selected prebuilt Vinix kernel on a QEMU machine deliberately
 built with two memory nodes — one gigabyte and two vCPUs each, declared twenty
 apart — and checks that the kernel discovers that machine and acts on it.
 
@@ -41,9 +41,12 @@ Build the AArch64 userland once to provide the musl test sysroot, then run:
 tests/numa/run.sh
 ```
 
-Set `VINIX_QEMU_NUMA_NO_BUILD=1` to reuse `kernel/bin/vinix`, or
-`VINIX_QEMU_TIMEOUT` to change the default 300-second deadline. The boot and
-EXT2 images are isolated in temporary directories and removed after the run.
+Build the kernel first; the V controller snapshots `kernel/bin/vinix` and does
+not rebuild it. `--kernel-dir DIR` selects another kernel,
+`VINIX_QEMU_TIMEOUT` changes the default 300-second deadline, and `--build-only`
+prepares without booting. An explicit `--state-dir DIR` retains boot/EXT2 images,
+launch hashes and raw serial output. Default scratch directories are removed.
+See [native controller details](controller.md).
 
 A single-node machine — every machine this test does not build — is the
 uniform case the kernel falls back to, and `tests/qemu-core` covers it: it

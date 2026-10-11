@@ -72,4 +72,4 @@ if [ -n "${VINIX_QEMU_NESTED_LOG:-}" ]; then
     set -- "$@" --log "$VINIX_QEMU_NESTED_LOG"
 fi
 set -- "$@" --no-build
-python3 "$repo/tests/docker/run_vm.py" "$@"
+"$repo/tests/docker/run_vm" "$@"
