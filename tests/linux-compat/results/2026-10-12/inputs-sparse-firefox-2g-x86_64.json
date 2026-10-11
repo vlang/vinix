@@ -1,0 +1,20 @@
+{
+    "architecture": "x86_64",
+    "execution_path": "native-x86_64",
+    "uid": 1000,
+    "memory_mib": 2048,
+    "workload_timeout": 120,
+    "cases": "firefox",
+    "inputs": {
+        "kernel": "f48f16acb0ecf3a5b752e3488cf66b6dbd2ec6998610664075367aa846960027",
+        "workloads": "623190a0edf821cd0e34ee4e06b5efc6a49f44d52a76c300b9a01769b0754bd2",
+        "runtime-probe": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+        "rootfs_manifest": "69e194d817e7ef43b70644952c8dab7dbc3bb4d42e3c9a95e692e4b68cc6b2e1",
+        "guest_credentials": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "guest_options": "60e527d951d26524702872ea3dcc59227942ee04b69362774d0d6ad128b33e61",
+        "init_source": "bde6c7e44355d2fc72707eba435c3aa39a1c76c362bffba637fc2c8ffe81771b",
+        "guest_report": "1bd52f4f4d67fd23ff17a951288485310ccbec31d35bcb0d0af1e5b690220837",
+        "snapshot_kernel": "f48f16acb0ecf3a5b752e3488cf66b6dbd2ec6998610664075367aa846960027"
+    },
+    "exit_code": 1
+}

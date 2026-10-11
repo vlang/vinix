@@ -1,0 +1,2182 @@
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/bpf/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/bpf/.vinix-aarch64.iso.80lkr2'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 12.3g free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/bpf/iso-build/.iso-staging.Lwu49m/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9817 sectors
+Written to medium : 9817 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/bpf/.vinix-aarch64.iso.80lkr2' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/bpf/test.iso (20105216 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/bpf
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782fa000
+initramfs: Size:    47104
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=40840
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305400
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x210f80
+LINUX BPF: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/access/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/access/.vinix-aarch64.iso.qmg7fj'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 11.1g free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/access/iso-build/.iso-staging.NjHjk9/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9825 sectors
+Written to medium : 9825 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/access/.vinix-aarch64.iso.qmg7fj' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/access/test.iso (20121600 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/access
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f6000
+initramfs: Size:    63488
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=57328
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305400
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211040
+LINUX ACCESS: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/open/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/open/.vinix-aarch64.iso.GR5DIM'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 11.0g free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/open/iso-build/.iso-staging.X26pbH/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9824 sectors
+Written to medium : 9824 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/open/.vinix-aarch64.iso.GR5DIM' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/open/test.iso (20119552 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/open
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f7000
+initramfs: Size:    61440
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=55040
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305c00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2118e0
+vfs: Mounted `tmpfs` to `/tmp/linux-open-mount` with filesystem `tmpfs`
+LINUX OPEN: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/mmap/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/mmap/.vinix-aarch64.iso.HwcPoL'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 10.9g free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/mmap/iso-build/.iso-staging.7BsYOW/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9819 sectors
+Written to medium : 9819 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/mmap/.vinix-aarch64.iso.HwcPoL' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/mmap/test.iso (20109312 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/mmap
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f9000
+initramfs: Size:    50688
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=44296
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305200
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2111b0
+LINUX MMAP: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/runtime/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/runtime/.vinix-aarch64.iso.PLpdPX'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 10.8g free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/runtime/iso-build/.iso-staging.8sTRnA/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9827 sectors
+Written to medium : 9827 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/runtime/.vinix-aarch64.iso.PLpdPX' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/runtime/test.iso (20125696 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/runtime
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f5000
+initramfs: Size:    67584
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=61088
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305400
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211430
+LINUX RUNTIME page_size=16384 pointer_bits=64
+LINUX RUNTIME PASS: atomics SIMD TLS
+LINUX RUNTIME PASS: JIT page sizes
+LINUX RUNTIME PASS: wide offsets time64
+LINUX RUNTIME: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/namespace/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/namespace/.vinix-aarch64.iso.2JK3xa'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 9404m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/namespace/iso-build/.iso-staging.fPWu5x/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9819 sectors
+Written to medium : 9819 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/namespace/.vinix-aarch64.iso.2JK3xa' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/namespace/test.iso (20109312 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/namespace
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f9000
+initramfs: Size:    50176
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=43936
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305000
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211180
+LINUX NAMESPACE: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sharedmem/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sharedmem/.vinix-aarch64.iso.6mzUBT'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 6325m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sharedmem/iso-build/.iso-staging.ILyvdL/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE : Thank you for being patient. Working since 0 seconds.
+ISO image produced: 9826 sectors
+Written to medium : 9826 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sharedmem/.vinix-aarch64.iso.6mzUBT' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sharedmem/test.iso (20123648 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sharedmem
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f6000
+initramfs: Size:    65536
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=59000
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305c00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2110f0
+LINUX SHAREDMEM: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/seccomp/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/seccomp/.vinix-aarch64.iso.N7jEkV'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 6209m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/seccomp/iso-build/.iso-staging.cXwyzX/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9824 sectors
+Written to medium : 9824 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/seccomp/.vinix-aarch64.iso.N7jEkV' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/seccomp/test.iso (20119552 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/seccomp
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f7000
+initramfs: Size:    61440
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=55200
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305c00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2112e0
+LINUX SECCOMP PASS: scratch initialization on every branch and 4096-instruction filter
+LINUX SECCOMP: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futex/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futex/.vinix-aarch64.iso.hMTjc8'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 6093m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futex/iso-build/.iso-staging.DYfml7/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9824 sectors
+Written to medium : 9824 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futex/.vinix-aarch64.iso.hMTjc8' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futex/test.iso (20119552 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futex
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f7000
+initramfs: Size:    60928
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=54648
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305a00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211130
+LINUX FUTEX PASS: exact wake counts, legacy zero/negative counts, WAKE_OP queues, 108 timed waiters
+LINUX FUTEX: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexkeys/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexkeys/.vinix-aarch64.iso.bSF9cv'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 6006m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexkeys/iso-build/.iso-staging.Mnpzif/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9825 sectors
+Written to medium : 9825 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexkeys/.vinix-aarch64.iso.bSF9cv' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexkeys/test.iso (20121600 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexkeys
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f6000
+initramfs: Size:    61952
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=55368
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078304e00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2112e0
+LINUX FUTEXKEYS PASS: shared aliases, private virtual keys, distinct flags on both mapping types, 20 timed waits
+LINUX FUTEXKEYS: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexbits/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexbits/.vinix-aarch64.iso.67M3dR'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 5891m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexbits/iso-build/.iso-staging.B32YsE/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9824 sectors
+Written to medium : 9824 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexbits/.vinix-aarch64.iso.67M3dR' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexbits/test.iso (20119552 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexbits
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f7000
+initramfs: Size:    60416
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=54112
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305800
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211170
+LINUX FUTEXBITS PASS: selective masks, counted wakes, zero-mask EINVAL and u32 narrowing, plain WAIT matches all bits, 36 timed and 12 untimed waits
+LINUX FUTEXBITS: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+/Volumes/VinixLinuxCompatNext1011/tmp/vinix-v-module-1ZXzaR/futexopfixture/core.v:29:11: notice: unused parameter: `argument`
+   27 | __global ( first i32 target i32 ready i32 completed i32 wait_result i32 )
+   28 | 
+   29 | fn waiter(argument voidptr) voidptr {
+      |           ~~~~~~~~
+   30 |     unsafe {
+   31 |         deadline := C.timespec{tv_sec: 5}
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexop/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexop/.vinix-aarch64.iso.CIMCED'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 5801m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexop/iso-build/.iso-staging.xzmA5d/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9824 sectors
+Written to medium : 9824 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexop/.vinix-aarch64.iso.CIMCED' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexop/test.iso (20119552 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexop
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f7000
+initramfs: Size:    60928
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=54504
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305a00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211150
+LINUX FUTEXOP PASS: all six signed comparisons, 24 actual waiters, five atomic operations, masked shifts and ENOSYS side effects
+LINUX FUTEXOP: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexerror/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexerror/.vinix-aarch64.iso.Cjv0On'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 5689m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexerror/iso-build/.iso-staging.pH9Gjf/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9820 sectors
+Written to medium : 9820 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexerror/.vinix-aarch64.iso.Cjv0On' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexerror/test.iso (20111360 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexerror
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f9000
+initramfs: Size:    53248
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=46608
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305c00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211280
+LINUX FUTEXERROR PASS: 38 alignment, flags, mapped/shared keys, timeout precedence and expired-deadline checks
+LINUX FUTEXERROR: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexqueue/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexqueue/.vinix-aarch64.iso.gr7Oyg'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 5573m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexqueue/iso-build/.iso-staging.YhFM7b/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9831 sectors
+Written to medium : 9831 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexqueue/.vinix-aarch64.iso.gr7Oyg' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexqueue/test.iso (20133888 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/futexqueue
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f3000
+initramfs: Size:    74752
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=68272
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305000
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2114a0
+LINUX FUTEXQUEUE PASS: exact comparison/count errors, bounded and shared-alias transfers, masks, same-key/multihop, timeout/signal cleanup, 164 raw waiters and 240 musl condition waits
+LINUX FUTEXQUEUE: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sparsefork/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sparsefork/.vinix-aarch64.iso.l6niSX'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 5436m free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sparsefork/iso-build/.iso-staging.KyyYSJ/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 9824 sectors
+Written to medium : 9824 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sparsefork/.vinix-aarch64.iso.l6niSX' completed successfully.
+
+    /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sparsefork/test.iso (20119552 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatPressure1012/sparse-all-arm/sparsefork
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x78318000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x78318000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0x785e0000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0x7860c000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x78318000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000782f7000
+initramfs: Size:    59904
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=53728
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000078305600
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211310
+LINUX SPARSEFORK: page=16384 ranges=512 before=945668096 after=942227456 fork_bytes=3440640 limit=6291456
+LINUX SPARSEFORK: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+Linux compatibility guest suite: PASS

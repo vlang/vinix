@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "21aa02acb0f56e44c188ea37fd149ebdcd295282a3c9c06b1e22edb4f5647b83",
+    "results": [
+        {
+            "name": "sparsefork",
+            "source_sha256": "c81c3b9566ec76cd4b52cc3e3aa8eaf9ac29cb0d9bc4d96c8f97a6f48f8198a3",
+            "init_sha256": "adb00bb71b464d4b81ab17079ee3e822a0e94dc0ca683347cb61891a92a2130a",
+            "iso_sha256": "658fad39dd3b5239a8e841503a83dc582f266d241ab90daf76e3fd92134eb3bb",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

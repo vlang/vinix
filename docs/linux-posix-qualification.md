@@ -665,3 +665,43 @@ browser startup issue; it does not prove either failure's complete cause.
 Neither run executes the nonce-bearing page or renders its PNG. Reports,
 controller receipts, source/build hashes, prepared-root manifests and logs
 remain alongside the other qualification artifacts.
+
+## Sparse fork page-table reservations
+
+Fork now leaves a private shadow pagemap without a root until its first
+resident page requires one. Read-only lookups of an empty pagemap return
+no entry; allocating lookups reserve and create the root through the existing
+fallible accounting path. This also applies to WIPEONFORK mappings. Existing
+locks and disposal paths retain ownership; no new allocation lifetime is
+introduced. The production-helper host test covers an empty lookup, quota
+denial, retry, root reuse and complete charge release. Generated C on both
+architectures confirms that the mutable lookup alias adds no allocation.
+
+The native fixture reserves 512 private 64 MiB mappings and touches one page
+in every sixteenth mapping. It measures physical allocation while the child
+is stopped on a pipe, then checks resident copy-on-write, independent zero
+pages on first access after fork, WIPEONFORK and unmapping in both processes.
+The memory bounds are an isolated-guest regression contract, rather than a
+general Linux conformance threshold.
+
+| Native architecture | Prior fork allocation | Fixed fork allocation |
+| --- | ---: | ---: |
+| x86-64, 4 KiB pages | 4,247,552 bytes | 1,732,608 bytes |
+| AArch64, 16 KiB pages | 11,288,576 bytes | 3,440,640 bytes |
+
+The [dated results](../tests/linux-compat/results/2026-10-12/) retain matching
+before/after fixture hashes and all fifteen passing native ABI cases on the
+fixed kernels. Both kernels build, the resource-accounting host suite and
+four coverage-generator tests pass, and the generated inventory is current.
+Native x86-64 Go passes compilation and its file/thread/timer/exec/TCP workload
+as UID/GID 1000. OpenJDK passes compilation, threaded file/TCP tests and JAR
+create/reopen under its previously qualified privileged JIT policy. Their
+reports, acquisition/package hashes and prepared-root manifest remain there;
+these extracted inputs do not qualify package installation.
+
+Firefox on the same fixed x86-64 kernel still times out as UID/GID 1000 in a
+2048 MiB guest, reports a failed fork and retains four resource denials. Its
+[failed report](../tests/linux-compat/results/2026-10-12/sparse-firefox-2g-x86_64.json)
+includes bounded proc diagnostics. This fix reduces sparse-fork allocation;
+it does not qualify browser startup or establish the cause of the remaining
+resource denials.

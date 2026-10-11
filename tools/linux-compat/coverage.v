@@ -70,7 +70,8 @@ fn coverage(root string) !Coverage {
 		'kernel/userland/clone_arm64.v', 'kernel/userland/clone_amd64.v',
 		'kernel/userland/userland_arm64.v', 'kernel/userland/linux_signal_amd64.v',
 		'kernel/userland/seccomp_signal.v', 'kernel/memory/mmap/linux.v',
-		'kernel/memory/mmap/mmap.v'] {
+		'kernel/memory/mmap/mmap.v', 'kernel/memory/table_budget.v',
+		'kernel/memory/virtual_arm64.v', 'kernel/memory/virtual_amd64.v'] {
 		inputs[path] = sha256.sum(os.read_bytes(root + '/' + path)!).hex()
 	}
 	for arch in ['aarch64', 'x86_64'] {

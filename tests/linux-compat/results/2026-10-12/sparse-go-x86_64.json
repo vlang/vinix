@@ -1,0 +1,139 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "623190a0edf821cd0e34ee4e06b5efc6a49f44d52a76c300b9a01769b0754bd2",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "uid": 1000,
+    "gid": 1000,
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "go",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/go",
+                "version"
+            ],
+            "executable_sha256": "3451084e5f9fb94d52b31324d2302a233febfdedf520b9759a8f61bc0d3758e4",
+            "environment_overrides": {
+                "GOROOT": "/usr/lib/go",
+                "GOCACHE": "/tmp/linux-compat-evidence/go-cache",
+                "CGO_ENABLED": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "go version go1.23.9 linux/amd64\n",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1273300 kB\nMemFree:        1180268 kB\nMemAvailable:   1180268 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           21624 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 162982400\nOwnerLimit: 81491200\nCharged: 3321198\nAccounts: 3\nDenied: 0\nKind Objects Bytes\nfile 18 69704\ndescriptor 21 51456\nsocket 0 0\nipc 3 12288\nmapping 91 1396224\nprocess 6 82582\nthread 3 1692432\nscratch 1 16512\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "argv": [
+                "/usr/bin/go",
+                "build",
+                "-o",
+                "/tmp/linux-compat-evidence/go-smoke",
+                "/tmp/linux-compat-evidence/smoke.go"
+            ],
+            "executable_sha256": "3451084e5f9fb94d52b31324d2302a233febfdedf520b9759a8f61bc0d3758e4",
+            "environment_overrides": {
+                "GOROOT": "/usr/lib/go",
+                "GOCACHE": "/tmp/linux-compat-evidence/go-cache",
+                "CGO_ENABLED": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1273300 kB\nMemFree:        1167432 kB\nMemAvailable:   1167432 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           21720 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 162982400\nOwnerLimit: 81491200\nCharged: 4162874\nAccounts: 5\nDenied: 0\nKind Objects Bytes\nfile 38 193342\ndescriptor 22 67840\nsocket 0 0\nipc 3 12288\nmapping 131 2070528\nprocess 8 109932\nthread 3 1692432\nscratch 1 16512\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "argv": [
+                "/tmp/linux-compat-evidence/go-smoke"
+            ],
+            "executable_sha256": "7f538d1d6c9b05142bfbccf61c40824d4ef5ce1275a3043c18737bff4acf987a",
+            "environment_overrides": {
+                "GOROOT": "/usr/lib/go",
+                "GOCACHE": "/tmp/linux-compat-evidence/go-cache",
+                "CGO_ENABLED": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "VINIX AMD64 GO SMOKE\nLinux-compatible Go runtime              ok\nx86-64 Go runtime                        ok\n  [info] go1.23.9 linux/amd64\ncreate temporary directory               ok\nwrite a file                             ok\nread the file back                       ok\ntruncate an existing file                ok\nappend to an existing file               ok\nrename the file                          ok\ncreate a symbolic link                   ok\nenumerate directory entries              ok\ngoroutines, channels, and WaitGroup      ok\nruntime timer                            ok\nfork/exec subprocess                     ok\nSHA-256 standard library                 ok\ncrypto/rand                              ok\nTCP listener                             ok\nTCP loopback round trip                  ok\nGO SMOKE PASS\n",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1273300 kB\nMemFree:        1106976 kB\nMemAvailable:   1106976 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           24392 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 162982400\nOwnerLimit: 81491200\nCharged: 14544684\nAccounts: 10\nDenied: 0\nKind Objects Bytes\nfile 1690 10678048\ndescriptor 16 67072\nsocket 0 0\nipc 3 12288\nmapping 90 1404544\nprocess 8 109644\nthread 4 2256576\nscratch 1 16512\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}

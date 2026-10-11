@@ -76,6 +76,17 @@ pub fn ensure_table_root(mut pagemap Pagemap) ? {
 	pagemap.top_level = root
 }
 
+// Empty shadow maps describe sparse reservations without allocating tables.
+// Callers serialize allocating lookups with the same lock as lower levels.
+fn (pagemap &Pagemap) lookup_root(allocate bool) ?&u64 {
+	if pagemap.top_level == unsafe { nil } {
+		if !allocate { return none }
+		mut writable := unsafe { pagemap }
+		ensure_table_root(mut writable)?
+	}
+	return pagemap.top_level
+}
+
 fn dispose_table(table &u64, levels int, root bool) {
 	if table == unsafe { nil } { return }
 	if levels > 1 {

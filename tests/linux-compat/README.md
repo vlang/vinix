@@ -12,7 +12,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -115,6 +115,14 @@ blocked and preserve masks. Shared aliases distinguish neighboring words
 within one page. Same-key counting, multiple transfers and timeout/signal
 cleanup exercise the transferred queue's lifetime. It runs 164 raw waits and
 240 musl condition-variable waits across repeated broadcasts.
+
+The `sparsefork` case reserves 512 private 64 MiB mappings, touching one page
+in every sixteenth mapping. It holds the child after fork and measures physical
+memory use before further faults: untouched reservations must keep empty shadow
+page tables. The page-size-dependent bound allows metadata, resident COW tables
+and stacks. The child checks initial zero pages, COW writes, WIPEONFORK zeros and
+unmapping; the parent then checks its original bytes and independently faults
+the untouched pages. This memory bound applies to the isolated native guest.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,

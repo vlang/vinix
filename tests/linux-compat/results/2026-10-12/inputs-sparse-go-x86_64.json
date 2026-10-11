@@ -1,0 +1,20 @@
+{
+    "architecture": "x86_64",
+    "execution_path": "native-x86_64",
+    "uid": 1000,
+    "memory_mib": 2048,
+    "workload_timeout": 600,
+    "cases": "go",
+    "inputs": {
+        "kernel": "f48f16acb0ecf3a5b752e3488cf66b6dbd2ec6998610664075367aa846960027",
+        "workloads": "623190a0edf821cd0e34ee4e06b5efc6a49f44d52a76c300b9a01769b0754bd2",
+        "runtime-probe": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+        "rootfs_manifest": "5447a7f2489b494f75f2030391585324f5dea18fa92204d570a37024e11adde3",
+        "guest_credentials": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "guest_options": "066f80ba8c1452b8979ed63bd6ae438fd6d0be7518209ce6f90cbe65586a95bc",
+        "init_source": "bde6c7e44355d2fc72707eba435c3aa39a1c76c362bffba637fc2c8ffe81771b",
+        "guest_report": "69fe8ec153c632889ca1422537bdb78083d896097f917d2bc34e4a22f9bc96bc",
+        "snapshot_kernel": "f48f16acb0ecf3a5b752e3488cf66b6dbd2ec6998610664075367aa846960027"
+    },
+    "exit_code": 0
+}

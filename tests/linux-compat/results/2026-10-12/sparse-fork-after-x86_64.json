@@ -1,0 +1,127 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "f48f16acb0ecf3a5b752e3488cf66b6dbd2ec6998610664075367aa846960027",
+    "results": [
+        {
+            "name": "bpf",
+            "source_sha256": "c9808ba6ef87fc5e28f98a586d944f86f754a8081faa02259f01993e9eb80e16",
+            "init_sha256": "e7152bb075c5fc4acbdd72c2cefebaf5edaf289cc5024bff8ed2cba95c10c7b4",
+            "iso_sha256": "5e0740cee742575dedb0c5f4e80435655f65e0bb28354ff4024a6d56cfdb331c",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "access",
+            "source_sha256": "0beb5ce37d58a5dff50b24f5ce87bd479bc39718d39b29490e72076183b2c1db",
+            "init_sha256": "2383380e229b19ee24642f3081e307ae49246ef6c43e5906c07dddd35e7e9cdd",
+            "iso_sha256": "cae3add4f16a458bc2508f2f232e4a50650f4838740b48619070444f9ffb82e6",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "377071b25bf7f8a9b3a048c8eab9ec87c689beb7ca5791e8439a46a4131f222a",
+            "iso_sha256": "fecbbb0fdc92c9cabd19faf1a91dc8d08c7b56360f0fc50fe2609674dad25c33",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "mmap",
+            "source_sha256": "110291a245baf0ed947d3575dcc54b97006d532d3a6265572697b90d8a3fa624",
+            "init_sha256": "85855eb8b9f83b8c12a7542a0505283bb3a3f5ffe2d3cf82650116f2fb6d69d3",
+            "iso_sha256": "0bdeb36fb4f57ae03d559a8b75e70b75f5208e5e43cd4e108322f00767cdad74",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "f5808bee4f4dfe4b67f3ae96b92d8db17e72941dd525be4e6cf90f6c278d39d2",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "namespace",
+            "source_sha256": "50262bc779a7d3114c9db4499152d668acd8085670904d81b9c85d74b92fcef9",
+            "init_sha256": "1cdc4a73259ea68007cefac1d2078c263b6c68ee8cf86a3317c50e03e78ac95b",
+            "iso_sha256": "1fea340b0fa89fb73f192c26e972ea38afd983945fd65e76c20a52b84c3762bd",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sharedmem",
+            "source_sha256": "99ee2c57a20feb6bcf30b333373985c214e4142769506e76374626e4ccc71f44",
+            "init_sha256": "d58f5693f10e7729ec5d4602879c605e0599b04a94015c3c243a971b6a92117a",
+            "iso_sha256": "5a5540e50b5bbf14d70f71994813af387d2548df856593ff3a7af15858509914",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccomp",
+            "source_sha256": "fa786d3dbf56b7a0ad48273a8f2ac09984d6c22a9e9930bda91b8f7711d25dc3",
+            "init_sha256": "594490a182b4abe3c8f52a1e9dd61a2f62fd333aecea2103f02d833e8cf737de",
+            "iso_sha256": "66cfce0ebc6b2a23d6b8e775004548eaadfdfc682fd69e4a289974eb9ae1406a",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futex",
+            "source_sha256": "2319eb993ee19d6abf7cc94e5f5921ae2c98d45640e9061584e2cfcad4872743",
+            "init_sha256": "326cab9c0cc00dd79496f10e04aa2b440e3a12a3fe0dca0f0914d7cfc188a135",
+            "iso_sha256": "2be841bd18ad13a090e24e9c8648d6766c31941c6d0e9ac812c3d335b2fad361",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexkeys",
+            "source_sha256": "37381c372e83aa88069bb9b62b0c2f50216e0307a4ace701a007b6e4fdd17227",
+            "init_sha256": "488fccb13829e5484ab969ae2c3fa109de5295ca82e1aacb78460e5fb756842e",
+            "iso_sha256": "5f38a3de544ae128f768699af995449e6c06896941ed555bd9a4d750356bc6ce",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexbits",
+            "source_sha256": "6e28bf81420fbc4befe541d0dac72d6ddea475bb5571aeb325da2fb625398e35",
+            "init_sha256": "3509ef01eed60e576fcf6816f410c82097821717928b11242996388be0951b62",
+            "iso_sha256": "b9e1fe38cd71af70760772e55b9d3238f6b1b23d4bc8ec983da57dc876bfe173",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexop",
+            "source_sha256": "b106beee9e10b1e75c9417d4294421011e05cb06d4a8172c26844b5b3432c483",
+            "init_sha256": "b5b430d4aed643e63a506b82afc91b43e6a3f2a1ec7d43b638bda54953317e00",
+            "iso_sha256": "52d0a07dde0afcdc71689c6b9a24ac98d7da4667b12bd422fc67a349a195b69e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexerror",
+            "source_sha256": "23ae970412d591bebeb69133d9370591e17bbc9cb56d2f500871b8360dd6a451",
+            "init_sha256": "90ea487bde6e86012c309846931a7569ef571cd5d0cb6dbf16997fce3f33fe8d",
+            "iso_sha256": "e48a67c2e98808ddccf23b42fe50bbb6d4f62a2a337d31e8cdc3903d5dfe6306",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexqueue",
+            "source_sha256": "9c881bb3bad609ab72d2161a39a994486e0b222b6c053709c16754c5d3c1d9cf",
+            "init_sha256": "d78c405f6f78b731850e1d1dce70e365e87d4a16fdc6b5feefc3b1ec3c5a0db4",
+            "iso_sha256": "54cfa95af5a01a0ca4ca81c4c54bce10e10dc1995347dec5e9a0e6a28b623455",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sparsefork",
+            "source_sha256": "c81c3b9566ec76cd4b52cc3e3aa8eaf9ac29cb0d9bc4d96c8f97a6f48f8198a3",
+            "init_sha256": "f55399d7429818d43fbb1310c1c96bb869bd719a43c4973cc394e4e62f56362b",
+            "iso_sha256": "7c14b5514f98fb959c930584e6011c9ea0d59a5b643f87988dddf4b0a2f7c1eb",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

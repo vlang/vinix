@@ -162,7 +162,7 @@ pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 	l2_entry := (virt >> 25) & 0x7ff
 	l3_entry := (virt >> 14) & 0x7ff
 
-	l1 := pagemap.top_level
+	l1 := pagemap.lookup_root(allocate)?
 	l2 := get_next_level(pagemap, l1, l1_entry, allocate) or { return none }
 	l3 := get_next_level(pagemap, l2, l2_entry, allocate) or { return none }
 
@@ -172,7 +172,7 @@ pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
 // TTBR1 keeps Limine's 4 KiB, 48-bit kernel geometry. TTBR0 uses the
 // independent 16 KiB, 47-bit user geometry above.
 fn (pagemap &Pagemap) kernel_virt2pte(virt u64, allocate bool) ?&u64 {
-	l0 := pagemap.top_level
+	l0 := pagemap.lookup_root(allocate)?
 	l1 := get_next_level(pagemap, l0, (virt >> 39) & 0x1ff, allocate) or { return none }
 	l2 := get_next_level(pagemap, l1, (virt >> 30) & 0x1ff, allocate) or { return none }
 	l3 := get_next_level(pagemap, l2, (virt >> 21) & 0x1ff, allocate) or { return none }

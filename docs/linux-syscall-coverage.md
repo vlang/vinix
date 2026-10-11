@@ -707,7 +707,10 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/memory/mmap/linux.v` | `71c091b8310ff8af5d8f39c11897b57ba33e3d52c14bc56edcc8ba9616a3fbb7` |
-| `kernel/memory/mmap/mmap.v` | `a6aadc35e0bc7d6018c192fa3f5616d152a8c7f358c8cc499050e209e541684c` |
+| `kernel/memory/mmap/mmap.v` | `c0287b230ac9d9648634689556bba6d3379f9ddadaf053d8db86b4b8b010346d` |
+| `kernel/memory/table_budget.v` | `541774d55b1883250a8a7240d857e014dffa6f8201266d36cee0fa677de6bb8c` |
+| `kernel/memory/virtual_amd64.v` | `2cec489cf4aad0f6c1c0b7542f2ee1043f8cb64d876ba3b8b5a95fbbdc0b92d8` |
+| `kernel/memory/virtual_arm64.v` | `a6572bc58d8790d0bbaae0f8f3d7019af9f725bc76be3072f6b0240bc6c50303` |
 | `kernel/proc/container.v` | `8a614355ad29ae3595820fc0ef1e07b7958f09741f1f268929e793295f2346e7` |
 | `kernel/proc/proc.v` | `faa486b29869cecc594ce220b7f1547007a51cea80d900f6ce16ca0311f5433a` |
 | `kernel/proc/proc_amd64.v` | `f0e35ad1dae37c66ae7066b3d598c51db60afd768df24b59c80f4fb37c5981bf` |
@@ -727,6 +730,6 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/linux_signal_amd64.v` | `cd84d3265e38cd99189a1c0c27f30b5db6c01f7dd23208daef1bdbcd51f37077` |
 | `kernel/userland/seccomp_signal.v` | `b6fb6b23e10c8663d88b6d3fd6794eae1d906e162797b0c298e9bc674182f1f4` |
 | `kernel/userland/userland_arm64.v` | `bfb40ad41a2b227d2688bf55b0977f37a4916872045e3964e56f91a0a9ded39e` |
-| `tools/linux-compat/coverage.v` | `ee35d3561b7afc312168d11eaf35f49bfa43a9567707f4ba9888acf198f36ca8` |
+| `tools/linux-compat/coverage.v` | `9a368969c9d69a60a561b7d632feaaf8521dedcb2f3a46880eb222f6ac7fdda2` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

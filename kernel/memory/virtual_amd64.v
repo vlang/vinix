@@ -99,15 +99,16 @@ pub fn new_user_pagemap(owner kbudget.Owner) ?&Pagemap {
 }
 
 pub fn (pagemap &Pagemap) virt2pte(virt u64, allocate bool) ?&u64 {
+	root := pagemap.lookup_root(allocate)?
 	pml5_entry := (virt & (u64(0x1ff) << 48)) >> 48
 	pml4_entry := (virt & (u64(0x1ff) << 39)) >> 39
 	pml3_entry := (virt & (u64(0x1ff) << 30)) >> 30
 	pml2_entry := (virt & (u64(0x1ff) << 21)) >> 21
 	pml1_entry := (virt & (u64(0x1ff) << 12)) >> 12
 
-	pml5 := pagemap.top_level
+	pml5 := root
 	pml4 := if !la57 {
-		pagemap.top_level
+		root
 	} else {
 		get_next_level(pagemap, pml5, pml5_entry, allocate) or { return none }
 	}

@@ -717,7 +717,6 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 			new_local_range.global = empty_global
 			empty_global.add_local(new_local_range)
 			insert_range_unlocked(mut new_pagemap, new_local_range)
-			memory.ensure_table_root(mut empty_global.shadow_pagemap)?
 			continue
 		}
 
@@ -802,7 +801,6 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 			new_global_range.add_local(new_local_range)
 			range_locals_lock.release()
 			insert_range_unlocked(mut new_pagemap, new_local_range)
-			memory.ensure_table_root(mut new_global_range.shadow_pagemap)?
 			fork_paged_span(global_range, mut new_global_range, shadow_begin(local_range),
 				shadow_begin(local_range) + local_range.length)
 
