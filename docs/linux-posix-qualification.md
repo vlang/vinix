@@ -465,3 +465,20 @@ adds no allocation. The full allocation scan compiles both architectures but
 reports existing allowance mismatches, so it is not a clean leak certification.
 This regression does not qualify per-thread filters, TSYNC or browser sandbox
 isolation.
+
+## Futex wake counts
+
+Both native architectures pass 108 timed pthread waits with exact wake counts.
+Eight twelve-thread rounds check that requests for one, two and three wake
+only those numbers, with the remaining threads blocked until subsequent calls.
+The original futex ABI's zero/negative requests wake one when waiters exist.
+WAKE_OP checks independent queue limits, true/false comparisons and the
+unchanged atomic OR-zero target. Listener compaction preserves the remaining
+timed waits and reuses the existing overflow storage cleanup; the added code
+allocates nothing. See [Linux's wake implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/waitwake.c#L148).
+
+`futex-count-before-*` receipts retain both prior kernels returning twelve for
+a request of one. `futex-count-after-*` retain the same fixture and all nine
+passing ABI cases on both architectures in the [dated results](../tests/linux-compat/results/2026-10-11/).
+Bitset filtering, explicit private keys on shared mappings and real requeue
+behavior remain unqualified by these checks.

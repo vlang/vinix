@@ -69,7 +69,7 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 			return futex.wait_timeout(uaddr, int(val), duration)
 		}
 		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
-			return futex.wake(uaddr), 0
+			return futex.wake_n(uaddr, int(i32(val))), 0
 		}
 		5 { // FUTEX_WAKE_OP
 			// Decode FUTEX_OP(op, oparg, cmp, cmparg). In particular Qt's
@@ -91,7 +91,7 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 			old := usercopy.futex_atomic_op_u32(uaddr2, operation & 7, u32(operand)) or {
 				return errno.err, errno.efault
 			}
-			woken := futex.wake(uaddr)
+			woken := futex.wake_n(uaddr, int(i32(val)))
 			matched := match comparison {
 				0 { i32(old) == compare_arg }
 				1 { i32(old) != compare_arg }
@@ -101,7 +101,7 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 				else { i32(old) >= compare_arg }
 			}
 			if matched {
-				return woken + futex.wake(uaddr2), 0
+				return woken + futex.wake_n(uaddr2, int(i32(timeout))), 0
 			}
 			return woken, 0
 		}

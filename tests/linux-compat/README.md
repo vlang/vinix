@@ -12,7 +12,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -73,6 +73,15 @@ Ordinary SIGSYS delivery before and after must carry no stale trap metadata.
 Separate children must die from SIGSYS when the synchronous trap is blocked
 or ignored. This qualifies trap delivery; filter thread ownership and complete
 application sandbox isolation remain separate checks.
+It also rejects uninitialized scratch loads, stores to another word and skipped
+stores on conditional/unconditional paths with EINVAL. Valid A/X stores, both
+branch stores and a maximum-length filter must install successfully.
+
+The `futex` case checks actual waiter returns and exact wake counts across eight
+rounds of twelve timed pthread waiters, including overflow event storage.
+It checks Linux's original futex ABI zero/negative-count behavior and both
+queues of WAKE_OP with true and false comparisons. Shared/private key
+selection, bitset selection and real requeue semantics remain separate checks.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,

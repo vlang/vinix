@@ -193,3 +193,13 @@ pub fn wake(virt u64) u64 {
 	return woken
 }
 
+pub fn wake_n(virt u64, maximum int) u64 {
+	mut f := get(virt, false) or { return 0 }
+	// The original Linux futex ABI wakes one for a nonpositive count when
+	// waiters exist. FUTEX2's strict zero-count behavior is a separate ABI.
+	count := if maximum > 0 { u64(maximum) } else { u64(1) }
+	woken := event.trigger_n(mut f.event, count)
+	put(mut f)
+	return woken
+}
+

@@ -392,6 +392,33 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 	return ret
 }
 
+// Futex wake selects a bounded number of blocked threads. Keep unselected
+// listeners attached, including timed waits that also listen to their timer.
+// The generic broadcast trigger above retains its existing behavior.
+pub fn trigger_n(mut e eventstruct.Event, maximum u64) u64 {
+	if maximum == 0 { return 0 }
+	ints := interrupt_state()
+	interrupt_toggle(false)
+	defer { if ints { interrupt_toggle(true) } }
+	e.@lock.acquire()
+	defer { e.@lock.release() }
+	e.generation++
+	mut woken := u64(0)
+	mut i := u64(0)
+	for i < e.listeners_i && woken < maximum {
+		listener := e.slot(i)
+		mut t := unsafe { &proc.Thread(listener.thrd) }
+		if katomic.load(&t.is_in_queue) { i++; continue }
+		t.which_event = listener.which
+		if !sched.enqueue_thread(t, false) { i++; continue }
+		woken++
+		e.listeners_i--
+		unsafe { *listener = *e.slot(e.listeners_i) }
+	}
+	e.shrink()
+	return woken
+}
+
 // Native thread ownership changes require an ordinary task on x86. Check
 // before consuming a join reference or changing run-queue and exit state.
 pub fn require_task_context() {
