@@ -30,13 +30,13 @@ for input in "$SYSROOT/usr/lib/libc.a" "$SYSROOT/usr/lib/crt1.o" "$GCCLIB/libgcc
         exit 1
     fi
 done
-python3 "$SCRIPT_DIR/build-support/ps1/build.py" --output "$OUTPUT" --sysroot "$SYSROOT" --llvm-bin "$LLVM_BIN"
+"$SCRIPT_DIR/build-support/ps1/build" --output "$OUTPUT" --sysroot "$SYSROOT" --llvm-bin "$LLVM_BIN"
 mkdir -p "$OUTPUT/staging/usr/bin" "$OUTPUT/staging/usr/share/games/ps1" \
     "$OUTPUT/staging/usr/share/licenses/vinix-ps1"
 cp "$OUTPUT/source/COPYING" "$OUTPUT/staging/usr/share/licenses/vinix-ps1/PCSX-ReARMed-COPYING"
 cp "$SCRIPT_DIR/build-support/ps1/README.md" "$OUTPUT/staging/usr/share/licenses/vinix-ps1/SOURCES.md"
 if [ "$WITH_HOMEBREW" = 1 ]; then
-    python3 "$SCRIPT_DIR/build-support/ps1/download-homebrew.py" --output "$OUTPUT/homebrew"
+    "$SCRIPT_DIR/build-support/ps1/download-homebrew" --output "$OUTPUT/homebrew"
     for name in tetrade.exe TETRADE_PSX.bin TETRADE_PSX.cue TETRADE-LICENSE; do
         cp "$OUTPUT/homebrew/$name" "$OUTPUT/staging/usr/share/games/ps1/$name"
     done

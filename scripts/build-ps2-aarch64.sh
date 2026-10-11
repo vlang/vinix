@@ -33,7 +33,7 @@ done
 python3 "$SCRIPT_DIR/build-support/ps2/build.py" --output "$OUTPUT" --sysroot "$SYSROOT" --llvm-bin "$LLVM_BIN"
 mkdir -p "$OUTPUT/staging/usr/bin" "$OUTPUT/staging/usr/share/games/ps2"
 if [ "$WITH_HOMEBREW" = 1 ]; then
-    python3 "$SCRIPT_DIR/build-support/ps2-homebrew/build.py" --output "$OUTPUT/homebrew" --llvm-bin "$LLVM_BIN"
+    "$SCRIPT_DIR/build-support/ps2-homebrew/build" --output "$OUTPUT/homebrew" --llvm-bin "$LLVM_BIN"
     cp "$OUTPUT/homebrew/paddle.elf" "$OUTPUT/staging/usr/share/games/ps2/paddle.elf"
     cp "$SCRIPT_DIR/build-support/ps2-homebrew/LICENSE" "$OUTPUT/staging/usr/share/games/ps2/PADDLE-LICENSE"
 else

@@ -541,3 +541,50 @@ fn capture_checkpoint(started u64, timeout f64, timeout_text string, should_canc
 		return error('Command timed out after ' + timeout_text + ' seconds')
 	}
 }
+
+// Stream long build logs directly to disk while retaining private-group
+// cancellation and wait ownership. A failed command leaves its partial log.
+pub fn logged_owned(argv []string, env map[string]string, host_arch string, directory string,
+	log string, should_cancel fn () bool) !int {
+	mut file := os.create(log)!
+	defer { file.close() }
+	mut fd := file.fd
+	mut moved := false
+	if fd < 3 {
+		fd = C.fcntl(fd, C.F_DUPFD_CLOEXEC, 3)
+		if fd < 0 { return file_error(log, C.errno) }
+		moved = true
+	}
+	defer { if moved { C.close(fd) } }
+	if C.fcntl(fd, C.F_SETFD, C.FD_CLOEXEC) != 0 { return file_error(log, C.errno) }
+	mut actions := C.posix_spawn_file_actions_t{}
+	status := C.posix_spawn_file_actions_init(&actions)
+	if status != 0 { return file_error(log, status) }
+	defer { C.posix_spawn_file_actions_destroy(&actions) }
+	if directory != '' {
+		if directory.contains('\x00') { return error('embedded null byte') }
+		changed := C.posix_spawn_file_actions_addchdir_np(&actions, directory.str)
+		if changed != 0 { return file_error(directory, changed) }
+	}
+	for configured in [C.posix_spawn_file_actions_adddup2(&actions, fd, 1),
+		C.posix_spawn_file_actions_adddup2(&actions, fd, 2), C.posix_spawn_file_actions_addclose(&actions, fd)] {
+		if configured != 0 { return file_error(log, configured) }
+	}
+	pid := spawn_command_preferred(argv, env, &actions, [fd], host_arch, true)!
+	mut reaped := false
+	defer {
+		if !reaped { C.killpg(pid, C.SIGKILL); C.kill(pid, C.SIGKILL); wait(pid) or {} }
+	}
+	mut raw := i32(0)
+	for {
+		capture_checkpoint(0, -1, '', should_cancel)!
+		result := C.waitpid(pid, &raw, C.WNOHANG)
+		if result == pid {
+			reaped = true
+			return if C.WIFEXITED(raw) != 0 { int(C.WEXITSTATUS(raw)) } else { -int(C.WTERMSIG(raw)) }
+		}
+		if result < 0 && C.errno != C.EINTR { return file_error(log, C.errno) }
+		time.sleep(10 * time.millisecond)
+	}
+	return 0
+}

@@ -7,7 +7,7 @@ three lives, scoring, a game-over screen, another round after clearing the
 court, and a saved best score.
 
 ```sh
-python3 build-support/ps2-homebrew/build.py --output build/ps2/homebrew
+build-support/ps2-homebrew/build --output build/ps2/homebrew
 ```
 
 The build uses the V compiler selected by `build-support/find-v.sh`, with
@@ -67,3 +67,6 @@ including `source-native-review-ready.json`, `native-comparison.json` and
 `persistent-card-comparison.json`. The kernel source is unchanged; these tests
 reuse the qualified default kernel. They make no fresh kernel build, x86
 emulator, host sanitizer, commercial-game or physical PS2 execution claim.
+
+The native builder migration and current host/artifact qualification are
+recorded in [native-emulator-tools](../native-emulator-tools/README.md).

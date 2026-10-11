@@ -33,7 +33,7 @@ done
 python3 "$SCRIPT_DIR/build-support/n64/build.py" --output "$OUTPUT" --sysroot "$SYSROOT" --llvm-bin "$LLVM_BIN"
 mkdir -p "$OUTPUT/staging/usr/bin" "$OUTPUT/staging/usr/share/games/n64"
 if [ "$WITH_HOMEBREW" = 1 ]; then
-    python3 "$SCRIPT_DIR/build-support/n64-homebrew/build.py" --output "$OUTPUT/homebrew" --llvm-bin "$LLVM_BIN"
+    "$SCRIPT_DIR/build-support/n64-homebrew/build" --output "$OUTPUT/homebrew" --llvm-bin "$LLVM_BIN"
     cp "$OUTPUT/homebrew/paddle.z64" "$OUTPUT/staging/usr/share/games/n64/paddle.z64"
     cp "$SCRIPT_DIR/build-support/n64-homebrew/LICENSE" "$OUTPUT/staging/usr/share/games/n64/PADDLE-LICENSE"
 else

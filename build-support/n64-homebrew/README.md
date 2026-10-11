@@ -6,7 +6,7 @@ moves the paddle, and A launches the next ball. It includes forty bricks,
 three lives, scoring, a game-over screen, new rounds and a saved best score.
 
 ```sh
-python3 build-support/n64-homebrew/build.py --output build/n64/homebrew
+build-support/n64-homebrew/build --output build/n64/homebrew
 ```
 
 LLVM must include its MIPS backend; Apple Clang does not. Pass
@@ -63,6 +63,9 @@ emulators which already initialize RDRAM; it has not been verified on physical
 N64 hardware. The ROM has a conventional big-endian header and CIC-6102
 checksum. The advanced homebrew header's cartridge ID `DE` and version `0x30`
 request a 32 KiB SRAM cartridge.
+
+The native builder migration and current host/artifact qualification are
+recorded in [native-emulator-tools](../native-emulator-tools/README.md).
 
 The R4300 submits fill-cycle background clears through actual DP DMA and
 waits for the RDP's FullSync interrupt. It then draws foreground pixels into

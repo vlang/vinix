@@ -90,6 +90,13 @@ pub fn generate_module(source string, output string, arch string, defines []stri
 }
 
 pub fn generate_module_capture(source string, output string, arch string, defines []string) !Result {
+	return generate_module_with_capture(source, output, arch, defines, capture)
+}
+
+// Command owners may supply cancellation without changing the producer's
+// copy, ABI metadata, compiler flags or generated symbol policy.
+pub fn generate_module_with_capture(source string, output string, arch string, defines []string,
+	runner fn ([]string, string, int, map[string]string) !Result) !Result {
 	selected := command(['sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"', 'find-v',
 		root()], '', -1, os.environ())!.stdout
 	work := work_dir('', 'vinix-v-module-')!
@@ -124,7 +131,7 @@ pub fn generate_module_capture(source string, output string, arch string, define
 	argv << ['-o', output, work]
 	mut env := os.environ()
 	env['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
-	compiled := capture(argv, '', -1, env)!
+	compiled := runner(argv, '', -1, env)!
 	if compiled.code != 0 { return ModuleCommandError{argv, compiled} }
 	mut text := scalar_metadata(source, module_read(output)!)!
 	for symbol in ['_vinit', '_vcleanup', '_vinit_caller', '_vcleanup_caller', '_vno_main_init_caller',

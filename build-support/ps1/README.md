@@ -34,3 +34,14 @@ lists supported BIOS names and explains HLE's compatibility limits.
 
 Build products are kept in ignored `build/ps1/`; `VINIX_PS1_BUILD_DIR`,
 `VINIX_AARCH64_SYSROOT`, `VINIX_AARCH64_LINUX_HEADERS`, and `LLVM_BIN` override their locations.
+
+The builder and pinned homebrew downloader invoke V directly:
+
+```sh
+build-support/ps1/build --output build/ps1
+build-support/ps1/download-homebrew --output build/ps1/homebrew
+```
+
+The script's complete build path uses these native commands. Qualification and
+shared download/archive contracts are recorded in
+[native-emulator-tools](../native-emulator-tools/README.md).
