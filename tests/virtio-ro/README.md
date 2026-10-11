@@ -8,7 +8,7 @@ filesystem aliases, and raw device writes returning `EROFS`.
 Run each kernel in a fresh directory; failed reports are preserved:
 
 ```sh
-VINIX_PRUNE_BUILD=0 python3 tests/virtio-ro/run.py \
+tests/virtio-ro/run \
   --work /absolute/path/to/results --kernel-dir /absolute/path/to/kernel \
   --runner-root /absolute/path/to/main-checkout
 ```

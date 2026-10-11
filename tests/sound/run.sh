@@ -42,4 +42,4 @@ fi
 if [ "${VINIX_SOUND_NO_BUILD:-0}" = 1 ]; then
 	set -- "$@" --no-build
 fi
-python3 "$repo/tests/sound/run_vm.py" "$@"
+"$repo/tests/sound/run_vm" "$@"

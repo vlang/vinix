@@ -14,6 +14,10 @@ SIGKILL and leaves the device free.
 The host then reads the recording and checks the pitch and length of each
 tone and that the sound has no dropouts.
 
+`run_vm` is a native V supervisor, including WAV parsing and tone checks. To
+reuse a separately built kernel and compile only the static guest fixture, run
+`tests/sound/run_vm --build-fixture --kernel-dir /path/to/kernel --state-dir /tmp/new-sound-state`.
+
 Build the AArch64 userland once to provide the musl test sysroot, then run:
 
 ```sh

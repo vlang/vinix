@@ -1,7 +1,7 @@
 # Existing game data as a read-only Vinix disk
 
-`ext2_export.py` presents a host directory as a valid ext2 block device over
-loopback TCP NBD. It writes only filesystem metadata and indirect block
+`ext2-export` runs the native V `ext2host` module to present a host directory as
+a valid ext2 block device over loopback TCP NBD. It writes only filesystem metadata and indirect block
 pointers; regular file payloads are read from their original host paths when
 QEMU requests them. A 72 GiB Dota 2 installation needs about 116 MiB of stored
 metadata. The large apparent `metadata.ext2` size is sparse and must not be
@@ -10,11 +10,11 @@ copied with a tool that materializes holes.
 Build a fresh export, optionally merging a Linux depot over the existing game:
 
 ```sh
-python3 tools/dota2/ext2_export.py build \
+tools/dota2/ext2-export build \
   "$HOME/Library/Application Support/Steam/steamapps/common/dota 2 beta" \
   --overlay build/dota2/steamcmd/steamapps/content/app_570/depot_373306 \
   --state build/dota2/linux-export
-python3 tools/dota2/ext2_export.py serve \
+tools/dota2/ext2-export serve \
   --state build/dota2/linux-export --port 10809
 ```
 
@@ -35,17 +35,17 @@ Attach the server to QEMU:
 
 Vinix's current QEMU persistence path can mount the export at `/root` if it is
 the sole readable ext2 disk and `vinix.qemu_persist=1` is in the kernel command
-line. `scripts/run-aarch64.sh` requires a local persistent filename; the test runner
-supplies an unformatted 16 MiB sparse dummy disk to enable that command line,
-then attaches the NBD device using `VINIX_QEMU_EXTRA`. The kernel skips the
+line. The native test runner supplies an unformatted 16 MiB sparse dummy disk,
+enables persistence in its private boot configuration and attaches NBD directly
+to its owned QEMU process. The kernel skips the
 dummy disk and mounts the exported one. Remount `/root` read-only before
 starting an application and put its writable home/config elsewhere.
 
 Validate the layout and protocol with:
 
 ```sh
-python3 tests/dota2/export-test.py -v
-python3 tests/dota2/export-run.py \
+tests/dota2/export-test
+tests/dota2/export-run \
   --source "$HOME/Library/Application Support/Steam/steamapps/common/dota 2 beta" \
   --export-state build/dota2/linux-export \
   --state-dir build/dota2/export-proof
@@ -58,3 +58,9 @@ both `pread` and `mmap`, crosses direct/single/double-indirect boundaries, and
 checks that the read-only mount rejects writes. It needs an existing AArch64
 kernel and musl sysroot; it creates private boot state and leaves existing VM
 disks untouched.
+
+The native server owns its listener and workers, permits idle transmission
+after negotiation, and closes all workers before retiring the export. Its
+source descriptor cache is bounded at 64 files. The older Python exporter
+adapter remains temporarily for the separate game launcher until that caller
+is ported; these native commands do not use it.

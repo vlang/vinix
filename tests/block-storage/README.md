@@ -1,9 +1,10 @@
 # Native block persistence and NVMe containment tests
 
-Run `python3 tests/block-storage/run.py` with the host V compiler available
+Run `tests/block-storage/run` with the host V compiler available
 (or set `V=/path/to/v`). The runner compiles unchanged declarations and selected
 functions from the native drivers with controlled clock, MMIO and allocator
-substitutes. It checks:
+substitutes. The native V runner also includes the production block fence and
+models the drivers' current power/timeout dependencies. It checks:
 
 - AHCI FLUSH CACHE/EXT FIS construction with zero PRDT entries, propagation of
   port errors, busy-port timeout, and refusal to reuse a failed port.

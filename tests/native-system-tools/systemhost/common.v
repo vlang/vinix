@@ -169,6 +169,10 @@ fn dispatch(family string, args []string) !int {
 		'paging' { paging(args)! }
 		'securelevel' { securelevel(args)! }
 		'securelevel-ext2' { securelevel_ext2(args)! }
+		'fsync-scope', 'virtio-ro', 'export-read' { storage_guest(family, args)! }
+		'sound' { sound(args)! }
+		'pci-arm' { pci_arm(args)! }
+		'ext2-export' { ext2_export(args)! }
 		else { return error('Unknown system controller') }
 	}
 }

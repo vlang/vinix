@@ -1,5 +1,11 @@
 # Dota 2 compatibility tests
 
+The native V `export-test` checks sparse ext2 layout and the loopback NBD
+protocol with e2fsprogs and QEMU. `export-run --source DIR --state-dir DIR`
+compiles the unchanged ARM payload and compares package byte ranges through
+guest `pread` and `mmap`, including direct and indirect boundaries. These
+commands use `tools/dota2/ext2host` directly.
+
 `env-run.py` checks the private glibc runtime's concurrent environment access
 through Vinix's native AArch64 QEMU translator. It adapts GNU libc's
 [`tst-getenv-thread.c`](https://github.com/bminor/glibc/blob/glibc-2.41/stdlib/tst-getenv-thread.c):

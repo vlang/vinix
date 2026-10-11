@@ -10,7 +10,7 @@ O_PATH and pipe descriptors retain their existing error behavior.
 Build an isolated ARM kernel with `LIMINE_MP=1`, then run:
 
 ```sh
-VINIX_PRUNE_BUILD=0 python3 tests/fsync-scope/run.py \
+tests/fsync-scope/run \
   --kernel-dir=/path/to/isolated/kernel \
   --runner-root=/path/to/vinix \
   --work=/path/to/vinix/build/fsync-new
@@ -35,7 +35,7 @@ For an independent original-C control, recover
 `eecdee9228db3dc5edffe0bb8e3a9d4088c2fa17`, compile it with the same SDK,
 and pass the resulting static executable with `--prebuilt-init`. This option
 changes only which executable is installed in the fresh test image. The
-default runner compiles V and retains the original 240-second deadline,
+native V runner compiles V and retains the original 240-second deadline,
 NBD negotiation, error assertions and host-file integrity check.
 
 The kernel before the fix passes the initial tmpfs sync, then returns EIO for

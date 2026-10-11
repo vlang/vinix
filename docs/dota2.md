@@ -188,9 +188,9 @@ downloaded two manifests into the same directory; their complete official-length
 contents matched Valve byte for byte. No loaded headers or code were patched.
 
 ```sh
-python3 tools/dota2/ext2_export.py build '/path/to/dota 2 beta' \
+tools/dota2/ext2-export build '/path/to/dota 2 beta' \
     --overlay '/path/to/depot_373306' --state build/dota2/game-export
-python3 tests/dota2/export-run.py --source '/path/to/dota 2 beta' \
+tests/dota2/export-run --source '/path/to/dota 2 beta' \
     --export-state build/dota2/game-export
 ```
 
@@ -206,7 +206,7 @@ return `EROFS`.
 ```sh
 python3 tests/dota2/vulkan-run.py --staging build/dota2-runtime/staging
 python3 tests/dota2/launcher-test.py
-python3 tests/dota2/export-test.py
+tests/dota2/export-test
 ```
 
 The Vulkan probe boots Vinix, runs translated `vulkaninfo` and `vkcube` on

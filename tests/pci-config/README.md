@@ -44,7 +44,7 @@ runs also passed, but the helper removed their temporary boot images; the final
 pair repeats the unchanged workload with boot-image retention enabled.
 
 The host transport model cannot validate real interrupt masking or ECAM access.
-Build an ARM kernel with `PCI_CONFIG_TEST=1` and run `arm_vm.py --kernel <image>`
+Build an ARM kernel with `PCI_CONFIG_TEST=1` and run `./arm_vm --kernel <image> --state-dir <new-directory>`
 to exercise the actual platform transport and every DAIF mask combination.
 
 `./topology` compiles the actual production V topology, capability
@@ -58,7 +58,7 @@ checks run with `v -cc cc test .`; frozen original compiler fixtures and body
 comparisons remain byte-exact.
 
 Build either architecture with `PCI_TOPOLOGY_TEST=1` for the read-only native
-boot fixture, then pass `--pci-topology-test` to `arm_vm.py` or
+boot fixture, then pass `--pci-topology-test` to `arm_vm` or
 `tests/linuxkpi/run_vm.py`. It reads actual root-zero configuration, compares the
 private snapshot with permanent boot records, rejects every graph allocation
 index and measures physical pages plus all live heap classes after three

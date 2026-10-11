@@ -70,3 +70,6 @@ logs are under `/Users/alex/.cache/vinix-python-zero-process-20261011/system-*`.
 Redundant boot images and the completed writeback disk are retired only after
 hashing, with receipts kept; maintained commands do not depend on those paths.
 The twelve Python entry/binding files and unused query bridges are retired.
+
+The storage, sound, PCI and ext2 export commands also run V directly. See their
+[interfaces, qualification and limits](devices.md).

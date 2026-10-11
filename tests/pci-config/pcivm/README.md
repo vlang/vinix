@@ -1,5 +1,14 @@
 # ARM PCI host observation
 
+The maintained runner is now native V: `../arm_vm` executes
+`tests/native-system-tools/systemhost/pci.v` directly. It validates arguments,
+freezes inputs, builds the unchanged guest fixture, creates private boot state,
+observes serial markers and retires its process group before writing reports.
+It preserves the one-second marker settle and five-second shutdown grace.
+`check-devices-cli.v` qualifies early exits, late and final-drain failures,
+timeouts, interruption, and TERM/KILL cleanup. The sources below describe the
+historical object bridge; no maintained ARM guest command uses it.
+
 `core.v` owns executable lookup, owned-Popen termination and the ARM guest's
 serial marker, timeout and final-drain policy. `preparation.v` checks and freezes
 the boot inputs, constructs fixture compilation and linking commands, creates
