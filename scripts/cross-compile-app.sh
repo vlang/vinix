@@ -10,6 +10,14 @@
 # /usr/bin/vinix-<app> without restarting Vinix; reopening the app runs it.
 set -euo pipefail
 
+# Native V replacement for the source staging and app-only cross-build.
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+. "$ROOT/build-support/find-v.sh"
+cd "$ROOT"
+BOOTSTRAP="${VINIX_V_BOOTSTRAP:-$HOME/.cache/v/v1-fallback/0.5.2/v}"
+if [ ! -x "$BOOTSTRAP" ]; then BOOTSTRAP="$V"; fi
+exec env -u VEXE "$BOOTSTRAP" run desktop/tools/workflow_driver.v publish "$@"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APPS_DIR="$SCRIPT_DIR/build-aarch64-desktop-apps"
 BUILD_CACHE="$APPS_DIR/app-cross-cache"

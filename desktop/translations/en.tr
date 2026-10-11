@@ -3795,13 +3795,13 @@ files.trash.next
 Next
 -----
 files.trash.hint
-Trash accepts items in your Home on the same filesystem. Restore never replaces an existing item.
+Trash belongs to this volume. Restore preserves metadata and never replaces an existing item.
 -----
 files.trash.limited
-Emptying removes files, links and empty folders. Restore nonempty folders to manage their contents.
+Emptying removes folders recursively without following links or crossing into other volumes.
 -----
 files.trash.confirm_hint
-Permanently remove eligible items? This cannot be undone. Nonempty folders and damaged entries prevent emptying.
+Permanently remove these items and all folder contents? This cannot be undone. Damaged entries prevent emptying.
 -----
 files.trash.empty_list
 Trash is empty.

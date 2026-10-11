@@ -328,6 +328,8 @@ mut:
 	preview             FilesQuickLook
 	trash               FilesTrash
 	trash_open          bool
+	volumes             []FilesVolume
+	volumes_open        bool
 }
 
 fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
@@ -666,6 +668,7 @@ fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 		return a.settings_window(size)
 	}
 	if a.trash_open { return a.trash.build(size) }
+	if a.volumes_open { return a.volumes_panel(size) }
 	browser_height := if size.height > 34 { size.height - 34 } else { 1.0 }
 	browser_root := a.files.build(ui2.rect(size.x, size.y, size.width, browser_height))!
 	mut browser_children := frame_elements(browser_root.children.len + 3)
@@ -735,7 +738,7 @@ fn (mut a FilesContextApp) delete_selected() ! {
 		unsafe { next_current.free() }
 		next_current = parent_path(selected).clone()
 	}
-	a.ensure_trash()
+	a.trash_for_path(selected)
 	if !a.trash.move(selected) {
 		unsafe {
 			selected.free()
@@ -823,6 +826,7 @@ fn (mut a FilesContextApp) rename_key_input(input string) ! {
 
 fn (mut a FilesContextApp) handle(event_id string) ! {
 	a.follow_theme()
+	if !a.settings_only && a.volume_action(event_id) { return }
 	if event_id == files_settings_refresh {
 		a.reload_files_settings(desktop_home)
 		return
@@ -1083,6 +1087,8 @@ fn (mut a FilesContextApp) key_input(input string) {
 }
 
 fn (mut a FilesContextApp) close_app() {
+	a.clear_volumes()
+	unsafe { a.volumes.free() }
 	a.trash.close()
 	a.preview.close()
 	a.files.info.close()

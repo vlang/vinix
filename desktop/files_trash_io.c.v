@@ -25,18 +25,27 @@ fn files_trash_private_directory(fd int) bool {
 
 fn (mut trash FilesTrash) ensure_store() string {
 	if trash.home_fd < 0 { return 'files.trash.unavailable' }
+	// A removed/replaced mount must never redirect an old Trash descriptor to
+	// the underlying directory or to a different device at the same path.
+	mut root_info := C.stat{}
+	mut root_now := C.stat{}
+	if unsafe { C.fstat(trash.home_fd, &root_info) } != 0
+		|| unsafe { C.lstat(&char(trash.home.str), &root_now) } != 0
+		|| !files_trash_identity(root_now, u64(root_info.st_dev), u64(root_info.st_ino)) {
+		return 'files.trash.unavailable'
+	}
 	if trash.store_fd < 0 {
-		if C.mkdirat(trash.home_fd, c'.vinix-trash', 0o700) != 0 && C.errno != C.EEXIST {
+		if C.mkdirat(trash.home_fd, &char(trash.store_name.str), 0o700) != 0 && C.errno != C.EEXIST {
 			return 'files.trash.unavailable'
 		}
-		trash.store_fd = C.openat(trash.home_fd, c'.vinix-trash', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW, 0)
+		trash.store_fd = C.openat(trash.home_fd, &char(trash.store_name.str), C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW, 0)
 		if trash.store_fd < 0 { return 'files.trash.unavailable' }
 	}
 	mut info := C.stat{}
 	mut current := C.stat{}
 	if !files_trash_private_directory(trash.store_fd)
 		|| unsafe { C.fstat(trash.store_fd, &info) } != 0
-		|| unsafe { C.fstatat(trash.home_fd, c'.vinix-trash', &current, C.AT_SYMLINK_NOFOLLOW) } != 0
+		|| unsafe { C.fstatat(trash.home_fd, &char(trash.store_name.str), &current, C.AT_SYMLINK_NOFOLLOW) } != 0
 		|| !files_trash_identity(current, u64(info.st_dev), u64(info.st_ino)) {
 		return 'files.trash.unavailable'
 	}
@@ -373,9 +382,6 @@ fn files_trash_empty_check(store int, entry &FilesTrashEntry) string {
 	bucket := files_trash_checked_bucket(store, entry)
 	if bucket < 0 { return 'files.trash.changed' }
 	defer { desktop_close(bucket) }
-	if entry.mode & u32(C.S_IFMT) == u32(C.S_IFDIR) && !files_trash_directory_empty(bucket) {
-		return 'files.trash.nonempty'
-	}
 	return 'files.trash.ready'
 }
 
@@ -413,8 +419,47 @@ fn files_trash_empty_one(store int, entry &FilesTrashEntry) bool {
 	bucket := files_trash_checked_bucket(store, entry)
 	if bucket < 0 { return false }
 	defer { desktop_close(bucket) }
-	flags := if entry.mode & u32(C.S_IFMT) == u32(C.S_IFDIR) { C.AT_REMOVEDIR } else { 0 }
-	// unlinkat never follows a leaf link; rmdir refuses a directory that grew.
-	if C.unlinkat(bucket, c'item', flags) != 0 { return false }
+	mut budget := [100000]!
+	if !files_trash_remove_tree(bucket, 'item', entry.device, 0, mut budget) { return false }
 	return files_trash_cleanup_bucket(store, bucket, entry)
+}
+
+// Walk anchored descriptors, never symbolic links or nested mounted devices.
+// Failure retains the bucket/metadata so a partial removal remains visible.
+fn files_trash_remove_tree(parent int, name string, device u64, depth int, mut budget [1]int) bool {
+	if depth > 64 || budget[0] <= 0 { return false }
+	budget[0]--
+	mut before := C.stat{}
+	if unsafe { C.fstatat(parent, &char(name.str), &before, C.AT_SYMLINK_NOFOLLOW) } != 0
+		|| u64(before.st_dev) != device || !files_trash_kind_allowed(u32(before.st_mode)) { return false }
+	is_dir := u32(before.st_mode) & u32(C.S_IFMT) == u32(C.S_IFDIR)
+	if is_dir {
+		fd := C.openat(parent, &char(name.str), C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC, 0)
+		if fd < 0 { return false }
+		mut opened := C.stat{}
+		if unsafe { C.fstat(fd, &opened) } != 0 || !files_trash_identity(opened, u64(before.st_dev), u64(before.st_ino)) {
+			desktop_close(fd)
+			return false
+		}
+		stream := C.fdopendir(fd)
+		if stream == unsafe { nil } { desktop_close(fd); return false }
+		mut ok := true
+		for {
+			C.errno = 0
+			entry := C.readdir(stream)
+			if entry == unsafe { nil } { ok = C.errno == 0; break }
+			child := unsafe { tos2(&u8(&entry.d_name[0])) }
+			if child == '.' || child == '..' { continue }
+			owned := child.clone()
+			ok = files_trash_remove_tree(fd, owned, device, depth + 1, mut budget)
+			unsafe { owned.free() }
+			if !ok { break }
+		}
+		C.closedir(stream)
+		if !ok { return false }
+	}
+	mut now := C.stat{}
+	if unsafe { C.fstatat(parent, &char(name.str), &now, C.AT_SYMLINK_NOFOLLOW) } != 0
+		|| !files_trash_identity(now, u64(before.st_dev), u64(before.st_ino)) { return false }
+	return C.unlinkat(parent, &char(name.str), if is_dir { C.AT_REMOVEDIR } else { 0 }) == 0
 }

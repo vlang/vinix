@@ -156,7 +156,7 @@ fn test_trash_leaf_links_preserve_targets_and_empty_requires_confirmation() {
 	assert os.read_file('${outside}/target')! == 'keep target'
 }
 
-fn test_trash_nonempty_folders_prevent_all_emptying_and_remain_restorable() {
+fn test_trash_recursive_folders_restore_then_empty_without_following_links() {
 	home := trash_test_home('folders')
 	defer {
 		os.rmdir_all(home) or {}
@@ -164,6 +164,9 @@ fn test_trash_nonempty_folders_prevent_all_emptying_and_remain_restorable() {
 	}
 	os.mkdir('${home}/folder')!
 	os.write_file('${home}/folder/child', 'child')!
+	os.mkdir('${home}/folder/nested')!
+	os.write_file('${home}/folder/nested/file', 'nested')!
+	os.symlink('${home}/file', '${home}/folder/nested/link')!
 	os.write_file('${home}/file', 'ordinary')!
 	os.mkdir('${home}/empty')!
 	mut trash := files_trash_new(home)
@@ -171,16 +174,32 @@ fn test_trash_nonempty_folders_prevent_all_emptying_and_remain_restorable() {
 	assert trash.move('${home}/file')
 	assert trash.move('${home}/folder')
 	assert trash.move('${home}/empty')
-	trash.action('files.trash.empty')
-	trash.action('files.trash.confirm')
-	assert trash.status == 'files.trash.nonempty' && trash.entries.len == 3
 	trash_test_select(mut trash, 'folder')
 	trash.restore()
 	assert trash.status == 'files.trash.restored'
 	assert os.read_file('${home}/folder/child')! == 'child'
+	assert os.read_file('${home}/folder/nested/file')! == 'nested'
+	assert trash.move('${home}/folder')
 	trash.action('files.trash.empty')
 	trash.action('files.trash.confirm')
 	assert trash.status == 'files.trash.emptied' && trash.entries.len == 0
+}
+
+fn test_trash_replaced_volume_root_refuses_stale_descriptor() {
+	home := trash_test_home('disappear')
+	old := home + '-detached'
+	defer { os.rmdir_all(home) or {}; os.rmdir_all(old) or {}; unsafe { home.free(); old.free() } }
+	os.write_file('${home}/file', 'original')!
+	mut trash := files_trash_new(home)
+	defer { trash.close() }
+	assert trash.move('${home}/file')
+	os.rename(home, old)!
+	os.mkdir(home)!
+	os.write_file('${home}/file', 'new volume')!
+	trash.selected = 0
+	trash.restore()
+	assert trash.status == 'files.trash.unavailable'
+	assert os.read_file('${home}/file')! == 'new volume'
 }
 
 fn test_trash_missing_parent_symlink_parent_and_changed_metadata_refuse_restore() {

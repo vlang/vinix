@@ -25,6 +25,7 @@ mut:
 	home_alias   string
 	home_fd      int = -1
 	store_fd     int = -1
+	store_name   string = files_trash_store
 	entries      []FilesTrashEntry
 	selected     int = -1
 	page         int
@@ -65,6 +66,10 @@ fn files_trash_relative_valid(path string) bool {
 
 fn (trash &FilesTrash) relative(path string) string {
 	for home in [trash.home, trash.home_alias]! {
+		if home == '/' && path.starts_with('/') {
+			candidate := unsafe { tos(path.str + 1, path.len - 1) }
+			if files_trash_relative_valid(candidate) { return candidate.clone() }
+		}
 		if home.len > 0 && path.len > home.len + 1 && path.starts_with(home) && path[home.len] == `/` {
 			candidate := unsafe { tos(path.str + home.len + 1, path.len - home.len - 1) }
 			if files_trash_relative_valid(candidate) { return candidate.clone() }
@@ -98,10 +103,12 @@ fn (mut trash FilesTrash) close() {
 		trash.entries.free()
 		trash.home.free()
 		trash.home_alias.free()
+		if trash.store_name != files_trash_store { trash.store_name.free() }
 	}
 	trash.entries = []FilesTrashEntry{}
 	trash.home = ''
 	trash.home_alias = ''
+	trash.store_name = files_trash_store
 	if trash.store_fd >= 0 { desktop_close(trash.store_fd) }
 	if trash.home_fd >= 0 { desktop_close(trash.home_fd) }
 	trash.store_fd = -1

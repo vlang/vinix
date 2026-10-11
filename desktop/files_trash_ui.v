@@ -121,7 +121,7 @@ fn (mut a FilesContextApp) ensure_trash() {
 }
 
 fn (mut a FilesContextApp) open_trash() {
-	a.ensure_trash()
+	a.trash_for_path(a.files.current_path())
 	a.clear_rename()
 	a.preview.close()
 	a.files.info.close()
@@ -137,8 +137,9 @@ fn (a &FilesContextApp) trash_footer(size ui2.Rect) []ui2.Element {
 	top := if size.height > 34 { size.height - 34 } else { 0.0 }
 	children << ui2.view('', ui2.rect(0, top, size.width, 34), ui2.BoxStyle{ bg: body_panel }, [])
 	children << console_button('files.trash.open', 'files.trash.open', 8, int(top) + 3, 96, false)
-	if size.width > 120 && a.trash.status != 'files.trash.ready' {
-		children << ui2.label('', tr(a.trash.status), ui2.rect(112, top + 3, size.width - 120, 28), ui2.TextStyle{ color: body_text, size: 11, lines: 2 })
+	children << ui2.button('files.volumes.open', 'Volumes', ui2.rect(112, top + 3, 90, 28), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 12})
+	if size.width > 216 && a.trash.status != 'files.trash.ready' {
+		children << ui2.label('', tr(a.trash.status), ui2.rect(208, top + 3, size.width - 216, 28), ui2.TextStyle{ color: body_text, size: 11, lines: 2 })
 	}
 	return children
 }
