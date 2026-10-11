@@ -73,6 +73,10 @@ pub mut:
 	// so that passing the resulting descriptor cannot erase the device gate.
 	mac_device bool
 	mac_block_device bool
+	// Opened from a device of the seat, by this login session (0: by the
+	// system). Checked at every use; see proc/login.v.
+	seat_gated bool
+	seat_owner u32
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.
 	// Mount entries are permanent; fs resolves namespace copies by mount id.
@@ -441,6 +445,10 @@ fn stream_mode(mode u32) bool {
 }
 
 pub fn (mut this Handle) mac_check(access u32) ? {
+	if this.seat_gated && !proc.seat_allows(this.seat_owner) {
+		errno.set(errno.eacces)
+		return none
+	}
 	if !proc.mac_trusted() && this.mac_device {
 		if this.mac_block_device || !proc.mac_allows(proc.mac_current_domain(), proc.mac_device_type, access) {
 			errno.set(errno.eacces); return none
@@ -453,7 +461,14 @@ pub fn (mut this Handle) mac_check(access u32) ? {
 pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	this.mac_check(proc.mac_read)?
 	if stream_mode(this.resource.stat.mode) {
-		return this.resource.read(voidptr(this), buf, 0, count)
+		ret := this.resource.read(voidptr(this), buf, 0, count)?
+		// A read of the keyboard may have waited across a change of seat.
+		// What it then got was typed for someone else: it is not delivered.
+		if this.seat_gated && !proc.seat_allows(this.seat_owner) {
+			errno.set(errno.eacces)
+			return none
+		}
+		return ret
 	}
 	this.l.acquire()
 	defer {

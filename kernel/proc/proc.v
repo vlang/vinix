@@ -400,6 +400,9 @@ pub mut:
 	mac_domain     u32
 	mac_next_domain u32
 	no_new_privs    bool
+	// Who logged in, and which login this is; see login.v.
+	login_uid       u32 = 0xffffffff
+	login_session   u32
 	// The seccomp programs a process has installed, newest first, and
 	// whether it is in strict mode instead; see seccomp.v.
 	seccomp_mode    int

@@ -203,7 +203,7 @@ fn init_ata_drive(port_index int, mut pci_device pci.PCIDevice) ?&ATADrive {
 	dev.stat.blksize = 512
 	dev.stat.size = dev.stat.blocks * dev.stat.blksize
 	dev.stat.rdev = resource.create_dev_id()
-	dev.stat.mode = 0o644 | stat.ifblk
+	dev.stat.mode = 0o600 | stat.ifblk
 	dev.prdt_phys = u32(u64(memory.pmm_alloc(1)))
 	dev.prdt = unsafe { &PRDT(dev.prdt_phys + higher_half) }
 	dev.prdt.buffer_phys = u32(u64(memory.pmm_alloc(lib.div_roundup[u64](ata_bytes_per_prdt,

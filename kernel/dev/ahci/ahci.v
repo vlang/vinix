@@ -728,7 +728,7 @@ fn (mut d AHCIDevice) initialise() ?int {
 	d.stat.blksize = sector_size
 	d.stat.size = sector_cnt * sector_size
 	d.stat.rdev = resource.create_dev_id()
-	d.stat.mode = 0o644 | stat.ifblk
+	d.stat.mode = 0o600 | stat.ifblk
 	mut core := d.parent_controller.core
 	dma.free_buffer(mut core, dma.Buffer{
 		virt:  identity_page + higher_half

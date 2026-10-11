@@ -10,7 +10,7 @@ rules; this page is where things are.
 | `authproto/` | The frame format on the service's socket. |
 | `authcore/` | What the service decides (`service.v`), the action files (`action.v`) and how an allowed action is started (`run.v`). |
 | `authclient/` | Connect, send one request, read one reply. |
-| `sessioncore/` | `become`: a root process turned into an account's. |
+| `sessioncore/` | `become.v`: a root process turned into an account's, logins and the seat. `launch.v`: starting a session. `manager.v`: the session manager. |
 | `actions/` | The action files that ship, installed in `/usr/share/vinix/actions`. |
 | `authd.v` | `vinix-authd` |
 | `auth.v` | `vinix-auth` |

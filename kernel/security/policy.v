@@ -13,6 +13,7 @@ pub const system_domainname_set = 'system/domainname/set'
 pub const system_reboot = 'system/reboot'
 pub const system_clock_set = 'system/clock/set'
 pub const system_securelevel_set = 'system/securelevel/set'
+pub const system_seat_set = 'system/seat/set'
 
 // A selector has to be explicitly listed here. Unknown operations fail closed.
 // Each operation requires an effective UID of zero and the Linux capability
@@ -21,7 +22,7 @@ pub const system_securelevel_set = 'system/securelevel/set'
 pub fn permitted(selector string) bool {
 	capability := match selector {
 		filesystem_mount, filesystem_unmount, system_hostname_set, system_domainname_set,
-		system_securelevel_set {
+		system_securelevel_set, system_seat_set {
 			proc.cap_sys_admin
 		}
 		system_clock_set {
@@ -40,7 +41,7 @@ pub fn permitted(selector string) bool {
 	// Private mount and UTS namespaces retain their existing controls.
 	if !proc.is_initial_namespace(process.ns.user) {
 		host_operation := match selector {
-			system_securelevel_set, system_reboot { true }
+			system_securelevel_set, system_reboot, system_seat_set { true }
 			system_hostname_set, system_domainname_set {
 				proc.is_initial_namespace(process.ns.uts)
 			}

@@ -48,7 +48,7 @@ pub fn initialise() {
 	com1_res.stat.blocks = 0
 	com1_res.stat.blksize = 512
 	com1_res.stat.rdev = resource.create_dev_id()
-	com1_res.stat.mode = 0o644 | stat.ifchr
+	com1_res.stat.mode = 0o600 | stat.ifchr
 	com1_res.status |= file.pollout
 	com1_res.port = com1_port
 	com1_res.port_vector = com1_3_vector
@@ -65,7 +65,7 @@ pub fn initialise() {
 			com_res.stat.blocks = 0
 			com_res.stat.blksize = 512
 			com_res.stat.rdev = resource.create_dev_id()
-			com_res.stat.mode = 0o644 | stat.ifchr
+			com_res.stat.mode = 0o600 | stat.ifchr
 			com_res.status |= file.pollout
 			com_res.port = port
 			com_res.port_vector = if i % 2 == 0 { com1_3_vector } else { com2_4_vector }

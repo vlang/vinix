@@ -73,7 +73,7 @@ fn setup_console() {
 	console_res.stat.blocks = 0
 	console_res.stat.blksize = 512
 	console_res.stat.rdev = resource.create_dev_id()
-	console_res.stat.mode = 0o644 | stat.ifchr
+	console_res.stat.mode = 0o600 | stat.ifchr
 
 	// Initialise termios
 	console_res.termios.c_iflag = termios.brkint | termios.icrnl | termios.ixon | termios.imaxbel

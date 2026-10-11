@@ -5,12 +5,19 @@
 // something init started -- it is the only place a process stops being
 // root and becomes a person's.
 //
-//	vinix-session run USER COMMAND [ARGUMENT...]
-//	    become USER and run COMMAND: for services and scripts that must
-//	    not be root
+//	vinix-session run [--seat] USER COMMAND [ARGUMENT...]
+//	    become USER and run COMMAND, in a login session of its own. With
+//	    --seat the session is the one at the machine: it is given the
+//	    display and the input devices, and is who the authentication
+//	    service takes for the person at the machine, until COMMAND exits.
+//	    Without, it is for services and scripts that must not be root.
 //	vinix-session console
 //	    ask for a name and a password on the terminal, run that person's
 //	    shell as them until it exits, and ask again
+//	vinix-session manager [--greeter COMMAND...] [--desktop COMMAND...]
+//	    show the login screen, run the session of whoever logs in, and
+//	    come back to the login screen when it ends or steps aside
+//	    (sessioncore/manager.v); COMMAND runs to the next option
 //
 // The console login checks the password through the authentication service,
 // like everything else: one place counts failures and writes the log.
@@ -27,19 +34,14 @@ import sessioncore
 #include <sys/wait.h>
 
 fn C.geteuid() u32
-fn C.fork() int
-fn C.waitpid(pid int, status &i32, options int) int
 fn C.tcgetattr(fd int, termios voidptr) int
 fn C.tcsetattr(fd int, action int, termios voidptr) int
-fn C._exit(status int)
 fn C.sleep(seconds u32) u32
 
 struct C.termios {
 mut:
 	c_lflag u32
 }
-
-const active_file = '/run/vinix/session/active'
 
 fn fail(message string) {
 	eprintln('vinix-session: ${message}')
@@ -59,44 +61,24 @@ fn load() accountcore.Database {
 	}
 }
 
-// Say who is at the machine, for the service's `session` rule; '' when
-// nobody is.
-fn mark_active(uid string) {
-	os.mkdir_all(os.dir(active_file), mode: 0o755) or {}
-	if uid == '' {
-		os.rm(active_file) or {}
-		return
+// Start `argv` as `user` in a login session of its own and wait for it. With
+// `at_seat` the session is the one at the machine: it holds the display and
+// the input devices, and is who the authentication service takes for the
+// person at the machine, until it ends.
+fn run_as(db accountcore.Database, user accountcore.User, argv []string, at_seat bool) int {
+	started := sessioncore.start(db, user, argv, at_seat, -1) or {
+		eprintln('vinix-session: ${err.msg()}')
+		return 126
 	}
-	temporary := active_file + '.new'
-	os.write_file(temporary, uid + '\n') or { return }
-	os.chmod(temporary, 0o644) or {}
-	os.rename(temporary, active_file) or {}
-}
-
-// Start `argv` as `user` in a session of its own and wait for it.
-fn run_as(db accountcore.Database, user accountcore.User, argv []string) int {
-	sessioncore.make_runtime_directory(user) or { fail(err.msg()) }
-	environment := sessioncore.session_environment(user, os.environ().keys().map('${it}=${os.getenv(it)}'))
-	child := C.fork()
-	if child < 0 {
-		fail('cannot fork')
+	if at_seat {
+		sessioncore.mark_active(user.uid.str())
 	}
-	if child == 0 {
-		sessioncore.become(db, user) or {
-			eprintln('vinix-session: ${err.msg()}')
-			C._exit(126)
-		}
-		sessioncore.exec_as(user, argv, environment)
-		eprintln('vinix-session: cannot run ${argv[0]}')
-		C._exit(127)
+	status := sessioncore.wait(started.pid)
+	if at_seat {
+		sessioncore.mark_active('')
+		sessioncore.release_seat(started.session)
 	}
-	mut status := i32(0)
-	for C.waitpid(child, &status, 0) < 0 {
-		if C.errno != C.EINTR {
-			return 1
-		}
-	}
-	return if status & 0x7f == 0 { (status >> 8) & 0xff } else { 128 + (status & 0x7f) }
+	return status
 }
 
 // A line from the terminal, or none when there is nothing more to read.
@@ -165,9 +147,7 @@ fn console() {
 			continue
 		}
 		shell := if user.shell == '' { '/bin/sh' } else { user.shell }
-		mark_active(user.uid.str())
-		run_as(db, user, [shell, '-l'])
-		mark_active('')
+		run_as(db, user, [shell, '-l'], true)
 	}
 }
 
@@ -180,14 +160,45 @@ fn main() {
 		console()
 		return
 	}
-	if args.len < 3 || args[0] != 'run' {
-		eprintln('usage: vinix-session run USER COMMAND [ARGUMENT...] | console')
+	if args.len >= 1 && args[0] == 'manager' {
+		mut greeter := ['/usr/bin/vinix-desktop', '--greeter']
+		mut desktop := ['/usr/bin/vinix-desktop']
+		mut target := 0
+		for argument in args[1..] {
+			if argument == '--greeter' {
+				greeter = []string{}
+				target = 1
+			} else if argument == '--desktop' {
+				desktop = []string{}
+				target = 2
+			} else if target == 1 {
+				greeter << argument
+			} else if target == 2 {
+				desktop << argument
+			} else {
+				fail('unknown argument ${argument}')
+			}
+		}
+		if greeter.len == 0 || desktop.len == 0 {
+			fail('--greeter and --desktop each need a command')
+		}
+		sessioncore.run_manager(greeter: greeter, desktop: desktop)
+		return
+	}
+	mut rest := args.clone()
+	mut at_seat := false
+	if rest.len >= 2 && rest[0] == 'run' && rest[1] == '--seat' {
+		at_seat = true
+		rest.delete(1)
+	}
+	if rest.len < 3 || rest[0] != 'run' {
+		eprintln('usage: vinix-session run [--seat] USER COMMAND [ARGUMENT...] | console | manager [--greeter COMMAND...] [--desktop COMMAND...]')
 		exit(2)
 	}
 	db := load()
-	user := db.user(args[1]) or {
-		fail('no user ${args[1]}')
+	user := db.user(rest[1]) or {
+		fail('no user ${rest[1]}')
 		return
 	}
-	exit(run_as(db, user, args[2..].clone()))
+	exit(run_as(db, user, rest[2..].clone(), at_seat))
 }

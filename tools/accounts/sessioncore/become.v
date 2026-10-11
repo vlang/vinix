@@ -16,6 +16,7 @@ import accountcore
 import os
 
 #include <unistd.h>
+#include <fcntl.h>
 #include <grp.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
@@ -183,11 +184,13 @@ fn verify(user accountcore.User, groups []u32) ! {
 
 // Replace this process with `argv`, in `user`'s home. Only returns if the
 // program could not be started.
-pub fn exec_as(user accountcore.User, argv []string, environment []string) {
+pub fn exec_as(user accountcore.User, argv []string, environment []string, keep_control bool) {
 	if C.chdir(&char(user.home.str)) != 0 {
 		C.chdir(c'/')
 	}
-	for fd in 3 .. 1024 {
+	// Nothing of root's but the first three descriptors and, where the
+	// session has a line to its starter, the fourth.
+	for fd in (if keep_control { 4 } else { 3 }) .. 1024 {
 		C.close(fd)
 	}
 	mut c_argv := []&char{cap: argv.len + 1}
@@ -201,4 +204,52 @@ pub fn exec_as(user accountcore.User, argv []string, environment []string) {
 	}
 	c_env << &char(unsafe { nil })
 	C.execve(c_argv[0], &c_argv[0], &c_env[0])
+}
+
+// One write() of `text` to a file that exists, with the kernel's answer: the
+// buffered writes of the library report success for a write the kernel
+// refused.
+fn write_whole(path string, text string) ! {
+	fd := C.open(&char(path.str), C.O_WRONLY)
+	if fd < 0 {
+		return error('cannot open ${path} (errno ${C.errno})')
+	}
+	put := C.write(fd, text.str, usize(text.len))
+	code := C.errno
+	C.close(fd)
+	if put != text.len {
+		return error('cannot write ${path} (errno ${code})')
+	}
+}
+
+// Label this process, still root, as the start of a login by `uid`: the
+// kernel then knows everything it goes on to start as that login, whatever
+// those processes later do to their ids. It can be done once. Returns the
+// number the kernel gave the login session.
+pub fn start_login(uid u32) !u32 {
+	write_whole('/proc/self/loginuid', uid.str()) or {
+		return error('the kernel did not accept the login: ${err.msg()}')
+	}
+	text := os.read_file('/proc/self/sessionid') or { return error('cannot read the login session') }
+	session := u32(text.trim_space().u64())
+	if session == 0 {
+		return error('the kernel started no login session')
+	}
+	return session
+}
+
+const seat_file = '/proc/sys/kernel/seat_session'
+
+// Give the seat -- the display, the keyboard, the pointer, sound -- to a
+// login session. Whoever held it loses the use of those devices at once.
+pub fn give_seat(session u32) ! {
+	write_whole(seat_file, session.str()) or { return error('cannot give the seat: ${err.msg()}') }
+}
+
+// Take the seat back from `session` if it still holds it.
+pub fn release_seat(session u32) {
+	text := os.read_file(seat_file) or { return }
+	if u32(text.trim_space().u64()) == session {
+		write_whole(seat_file, '0') or {}
+	}
 }

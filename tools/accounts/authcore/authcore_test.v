@@ -187,10 +187,11 @@ fn test_verify_rules() ! {
 	assert ask(w, w.sam, authproto.op_verify, 'alex', 'alex password').code == authproto.status_denied
 	assert ask(w, w.sam, authproto.op_verify, 'alex', 'guess').code == authproto.status_denied
 	assert w.env.throttle.read('alex', clock_of_test()).count == 1
-	// The login screen and root may check anyone.
-	assert ask(w, w.greet, authproto.op_verify, 'sam', 'sam password').code == authproto.status_ok
+	// Root may check anyone: the session manager, for a login. The login
+	// screen's own account may not.
 	assert ask(w, w.root, authproto.op_verify, 'sam', 'sam password').code == authproto.status_ok
-	assert ask(w, w.greet, authproto.op_verify, 'nobody-here', 'x').code == authproto.status_denied
+	assert ask(w, w.greet, authproto.op_verify, 'sam', 'sam password').code == authproto.status_denied
+	assert ask(w, w.root, authproto.op_verify, 'nobody-here', 'x').code == authproto.status_denied
 	// Accounts without a password match nothing.
 	assert ask(w, w.root, authproto.op_verify, 'root', '').code == authproto.status_denied
 	assert ask(w, w.root, authproto.op_verify, 'greeter', '*').code == authproto.status_denied
@@ -202,19 +203,19 @@ fn test_verify_rules() ! {
 fn test_throttle() ! {
 	w := new_world()!
 	for _ in 0 .. 3 {
-		assert ask(w, w.greet, authproto.op_verify, 'sam', 'guess').code == authproto.status_denied
+		assert ask(w, w.root, authproto.op_verify, 'sam', 'guess').code == authproto.status_denied
 	}
 	// Now even the right password has to wait.
-	blocked := ask(w, w.greet, authproto.op_verify, 'sam', 'sam password')
+	blocked := ask(w, w.root, authproto.op_verify, 'sam', 'sam password')
 	assert blocked.code == authproto.status_wait && blocked.text(0) == '2'
 	// Sam's own unlock waits too; Alex is not affected.
 	assert ask(w, w.sam, authproto.op_verify, 'sam', 'sam password').code == authproto.status_wait
 	assert ask(w, w.alex, authproto.op_verify, 'alex', 'alex password').code == authproto.status_ok
 	set_now(clock_of_test() + 2)
-	assert ask(w, w.greet, authproto.op_verify, 'sam', 'guess').code == authproto.status_denied
-	assert ask(w, w.greet, authproto.op_verify, 'sam', 'sam password').text(0) == '4'
+	assert ask(w, w.root, authproto.op_verify, 'sam', 'guess').code == authproto.status_denied
+	assert ask(w, w.root, authproto.op_verify, 'sam', 'sam password').text(0) == '4'
 	set_now(clock_of_test() + 4)
-	assert ask(w, w.greet, authproto.op_verify, 'sam', 'sam password').code == authproto.status_ok
+	assert ask(w, w.root, authproto.op_verify, 'sam', 'sam password').code == authproto.status_ok
 	assert w.env.throttle.read('sam', clock_of_test()).count == 0
 }
 

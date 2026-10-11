@@ -60,6 +60,10 @@ pub mut:
 	mount_root bool
 	// Set when the directory is removed; see unlink().
 	removed bool
+	// A device of the seat: the display, the keyboard, the pointer, sound.
+	// Opening it, and every use of the descriptor after, follows who holds
+	// the seat; see proc/login.v.
+	seat bool
 	// What an overlay node is made of; see overlay.v.
 	overlay &OverlayEntry = unsafe { nil }
 	// How many open-file descriptions lead to this node, whether no name does
@@ -749,6 +753,10 @@ fn internal_create_with_acl_locked(parent &VFSNode, name string, mode u32, acces
 
 fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity &lib.MountContext) ?int {
 	current_process := proc.current_thread().process
+	if node.seat && !proc.seat_may_open() {
+		errno.set(errno.eacces)
+		return none
+	}
 	katomic.inc(mut &node.handles)
  mut node_transferred := false
  defer { if !node_transferred { release_handle_node(voidptr(node)) } }
@@ -778,6 +786,8 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
 	mut fd := file.fd_create_from_opened(opened_resource, flags) or { return none }
 	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
 	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
+	fd.handle.seat_gated = node.seat
+	fd.handle.seat_owner = current_process.login_session
 	fd.handle.node = voidptr(node)
 	lib.copy_mount_context(&fd.handle.mount, identity)
  node_transferred = true

@@ -199,7 +199,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.identity = partition_identity(parent_identity, partition.device_offset,
 				u64(partition.stat.size))
 			partition.stat.rdev = resource.create_dev_id()
-			partition.stat.mode = 0o644 | stat.ifblk
+			partition.stat.mode = 0o600 | stat.ifblk
 
 			C.kprintf(c'gpt: partition detected [start: %llx sector cnt: %llu]\n',
 				u64(partition.device_offset), u64(partition.sector_cnt))
@@ -240,7 +240,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			partition.identity = partition_identity(parent_identity, partition.device_offset,
 				u64(partition.stat.size))
 			partition.stat.rdev = resource.create_dev_id()
-			partition.stat.mode = 0o644 | stat.ifblk
+			partition.stat.mode = 0o600 | stat.ifblk
 
 			C.kprintf(c'mbr: partition detected [start: %llx sector cnt: %llu]\n',
 				u64(partition.device_offset), u64(partition.sector_cnt))

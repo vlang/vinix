@@ -319,6 +319,8 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	child.mac_domain = parent.mac_domain
 	child.mac_next_domain = parent.mac_next_domain
 	child.no_new_privs = parent.no_new_privs
+	child.login_uid = parent.login_uid
+	child.login_session = parent.login_session
 	child.stack_policy_mode = katomic.load(&parent.stack_policy_mode)
 	syscall_policy_inherit(mut child, parent)
 	child.seccomp_mode = parent.seccomp_mode

@@ -17,7 +17,7 @@ that boot a kernel are in [`tests/accounts`](../tests/accounts/README.md).
 | `vinix-account` | root | The administrator's tool: accounts every system has, add, remove, lock, password, administrator on/off. No authentication of its own. |
 | `vinix-authd` | root | The authentication service: the one reader of `/etc/shadow` and the one way from an account to something done as root. |
 | `vinix-auth` | anyone | Asks the service from a terminal or a script. |
-| `vinix-session` | root | Turns a root process into a person's: `run USER COMMAND`, and a login prompt on the console. |
+| `vinix-session` | root | Turns a root process into a person's: `run USER COMMAND`, a login prompt on the console, and the session manager. |
 | `vinix-system` | root | The privileged halves of what a desktop does for the person at it: power off, restart, sleep, host name. |
 
 There are no set-user-id programs. The kernel does not honour the bit, and
@@ -36,8 +36,9 @@ root by asking `vinix-authd` over a socket, and in no other way.
   authentication service will do for them when they give their own
   password. The last administrator who can still log in cannot be removed,
   locked or demoted.
-- **`greeter`** is the account a login screen runs as. It can ask the
-  service to check anyone's password and can do nothing else.
+- **`greeter`** is the account a login screen runs as. It can draw and read
+  the keyboard while it holds the seat, and nothing else: it cannot check a
+  password itself.
 - **`nobody`** (65534) is what programs that should be no one run as.
 
 `vinix-account init` adds whatever of this a system lacks and is safe to run
@@ -104,7 +105,7 @@ what is over that is refused, not queued.
 | Request | Who may | Answer |
 | --- | --- | --- |
 | `info` | anyone | Their own name, whether they are an administrator, whether they are the person at the machine. |
-| `verify` | Their own account; root and `greeter` for any account | Whether the password is right, or how long to wait. |
+| `verify` | Their own account; root for any account | Whether the password is right, or how long to wait. |
 | `change password` | Their own account, with the old password; root without | Done, or why the new password will not do. |
 | `describe` | anyone | What an action is, and whether this caller could run it and would need a password. |
 | `run` | See below | The action's exit status and the first 32 KiB of what it printed. |
@@ -158,6 +159,90 @@ password is ever written there.
 
 ## Sessions
 
+### Logins the kernel knows
+
+Before a session stops being root it labels itself as a login: it writes
+the account's uid to `/proc/self/loginuid`, as on Linux, and the kernel gives
+the login a number (`/proc/self/sessionid`). Both are inherited by everything
+the session starts and can never be set again -- not by the session, which
+is no longer root, and not by root either: a second write is refused. A
+process of the system has no login (uid 4294967295, session 0). Only a
+process itself, as root with `CAP_AUDIT_CONTROL` outside any confinement,
+can make the label; a container's runtime that writes there is accepted and
+ignored, since a login is something the host has.
+
+### The seat
+
+The display, the keyboard, the pointer and sound belong to whoever is at
+the machine. The kernel calls that the seat, and one login session holds it
+at a time (`/proc/sys/kernel/seat_session`, written by root with
+`CAP_SYS_ADMIN`; 0 is nobody). The devices of the seat are `/dev/fb*`,
+`/dev/dri/*`, `/dev/pointer`, `/dev/mouse`, `/dev/console`, `/dev/tty<N>`,
+`/dev/dsp*`, `/dev/mixer*`, `/dev/input/*`, `/dev/video*`, `/dev/snd/*`, the
+display's hot-plug device and the panel backlight.
+
+- **Opening** one is allowed to the session that holds the seat, and to
+  root outside any login (the system: init, the session manager, a recovery
+  shell). Not to a session in the background, and not to a process that has
+  neither a login nor root -- a service that dropped its privileges.
+- **Using** a descriptor that is already open is checked again every time:
+  read, write, ioctl, a new mapping. A descriptor a session opened works
+  while that session holds the seat, stops when another does, and works
+  again when the seat comes back; the descriptor is not closed and the
+  session is not told. A read that was waiting when the seat moved returns
+  an error instead of what was typed for someone else.
+- **Inheriting** is not a way around it. The console init opened is handed
+  down to everything; for a login session those descriptors work only while
+  it holds the seat.
+
+`vinix-session run --seat USER COMMAND` and the console login give the seat
+to the session they start and take it back when it ends.
+
+What this does not reach: memory of the framebuffer that a session mapped
+while it held the seat stays mapped. That is why the session manager stops
+a session it moves into the background.
+
+### The session manager
+
+`vinix-session manager` is what stands between the machine being on and a
+person using it:
+
+1. It starts the login screen as the `greeter` account, at the seat, with a
+   socket to the manager as descriptor 3.
+2. The login screen sends a name and a password. The manager asks the
+   authentication service -- as root, which may check anyone's -- and answers
+   yes, no, or wait. The login screen is believed about what was typed and
+   about nothing else: it cannot name who is logged in.
+3. On a yes for a person's account the login screen is ended, with
+   everything it started, and that person's session starts: a login the
+   kernel knows, the seat, `/run/vinix/session/active`, and a socket to the
+   manager as descriptor 3 of its first program.
+4. When that program exits, or asks to log out, every process of the login
+   is ended -- asked, then killed -- including what left the session's
+   process group or terminal, because the kernel's login number is what
+   they are found by. Then the login screen again.
+5. When it asks to switch, the session is not ended. The seat is taken from
+   it and every one of its processes is stopped; the login screen shows.
+   When its owner logs in again the seat is given back and the processes are
+   continued where they were. Someone else who logs in meanwhile gets a
+   session of their own.
+
+A session in the background is therefore stopped, not running: a download
+does not go on while someone else is at the machine. That is the price of
+not being able to take a mapped display away from a running process.
+
+The login screen may also ask for the machine to be turned off or
+restarted. The requests are frames of the authentication service's format;
+`sessioncore/manager.v` lists them.
+
+The programs the manager starts are arguments (`--greeter`, `--desktop`), by
+default `vinix-desktop --greeter` and `vinix-desktop`. **Neither exists in
+that form yet**: the desktop has no login screen and has never run as
+anything but root. The manager is tested with stand-ins that speak its
+protocol and write down what they see.
+
+### Becoming the account
+
 `vinix-session run USER COMMAND` and the console login both end in the same
 step (`sessioncore.become`): drop every capability from the bounding set,
 clear the ambient set, set the account's supplementary groups, then all
@@ -191,7 +276,7 @@ turning the machine off, low ports, raw sockets, negative nice and real-time
 scheduling. The same calls are first made as root, where the harmless ones
 must succeed.
 
-Three things it found were open and are closed:
+Five things it found were open and are closed:
 
 - A hard link to a file the caller could neither read nor write
   (`/etc/shadow` under a name in `/tmp`). The kernel now applies Linux's
@@ -200,18 +285,28 @@ Three things it found were open and are closed:
 - Binding a TCP or UDP port below 1024. Now `CAP_NET_BIND_SERVICE`.
 - `SCHED_FIFO`. The check against `RLIMIT_RTPRIO` was there; the limit's
   default was "unlimited". It is now 0, as on Linux, and root is not asked.
+- `/dev` itself was mode 0644: without search permission no account could
+  reach even `/dev/null`. It is 0755.
+- Which uncovered that disks and their partitions were mode 0644 -- any
+  account could have read every file on them, whatever the files' own modes
+  -- and the console and serial lines too. They are 0600. The sweep now runs
+  with a disk attached, which root must be able to open and the account must
+  not, and the disk must come out of the run unchanged.
 
 ## What is not done
 
 - **The desktop is still root's.** Init starts the compositor as root, and
-  the compositor starts every application as root. The tools above are what
-  a session manager and a login screen are built from, and neither exists
-  yet; nor does a lock screen or switching between users. Until then the
+  the compositor starts every application as root. The session manager
+  exists and is tested, but nothing starts it: the desktop has no login
+  screen, no lock screen, and has not been taught to live without root
+  (it turns the machine off by signalling init, writes to `/sys` and
+  `/usr/bin`, and keeps its settings in `/root`). Until that is done the
   accounts protect what runs through `vinix-session`, and nothing else.
-- **Device nodes are mode 0666.** `/dev/fb0`, `/dev/pointer`, `/dev/dsp` and
-  the terminals can be opened by any account. Who may use the display and
-  the input devices has to follow who is at the machine, which the kernel
-  does not know yet.
+- **A session in the background is stopped**, for the reason given above.
+- **The seat is all or nothing.** Every program of the session at the
+  machine can open the display and the pointer. Keeping an application
+  from capturing the screen or the keyboard is confinement's job, not the
+  seat's.
 - **No `sudo`, `su`, `login` or PAM.** Programs that expect them find
   nothing; ports that need to elevate have to be taught the service.
 - **No per-user limits** beyond what a session inherits, no login records
@@ -234,6 +329,8 @@ the commit that added this page:
 | `accounts` | pass | pass |
 | `elevation` | pass | pass |
 | `unprivileged` | pass | pass |
+| `seat` | pass | pass |
+| `sessions` | pass | pass |
 
 and the host tests of `accountcore`, `authproto` and `authcore`. Nothing was
 run on a physical machine, and nothing was run with the desktop.

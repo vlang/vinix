@@ -142,24 +142,6 @@ fn probe_sweep(others []string) int {
 			}
 			line('write ${path}', result)
 		}
-		// Every disk and every other block device there is.
-		for entry in os.ls('/dev') or { []string{} } {
-			path := '/dev/${entry}'
-			info := os.lstat(path) or { continue }
-			if info.get_filetype() != .block_device {
-				continue
-			}
-			fd := C.open(&char(path.str), C.O_RDONLY)
-			line('open-disk ${path}', fd)
-			if fd >= 0 {
-				C.close(fd)
-			}
-			wfd := C.open(&char(path.str), C.O_WRONLY)
-			line('open-disk-write ${path}', wfd)
-			if wfd >= 0 {
-				C.close(wfd)
-			}
-		}
 		for path in ['/dev/mem', '/dev/kmem', '/dev/port'] {
 			fd := C.open(&char(path.str), C.O_RDONLY)
 			if fd < 0 && C.errno == 2 {
@@ -189,6 +171,43 @@ fn probe_sweep(others []string) int {
 			line('syslog-read', C.syscall(116, voidptr(3), voidptr(0), voidptr(0)))
 			line('kexec_load', C.syscall(104, voidptr(0), voidptr(0), voidptr(0), voidptr(0)))
 			line('init_module', C.syscall(105, voidptr(0), voidptr(0), voidptr(0)))
+		}
+	}
+	// Every disk and every other block device there is. Reading one is
+	// reading every file on it, whatever the files' own modes say.
+	for entry in os.ls('/dev') or { []string{} } {
+		path := '/dev/${entry}'
+		info := os.lstat(path) or { continue }
+		if info.get_filetype() != .block_device {
+			continue
+		}
+		fd := C.open(&char(path.str), C.O_RDONLY)
+		line('open-disk ${path}', fd)
+		if fd >= 0 {
+			C.close(fd)
+		}
+		if control {
+			continue
+		}
+		wfd := C.open(&char(path.str), C.O_WRONLY)
+		line('open-disk-write ${path}', wfd)
+		if wfd >= 0 {
+			C.close(wfd)
+		}
+	}
+	if !control {
+		// The display, the pointer, the console and sound, for a process
+		// that is not at the machine.
+		for path in ['/dev/fb0', '/dev/pointer', '/dev/mouse', '/dev/console', '/dev/dsp', '/dev/mixer',
+			'/dev/dri/card0', '/dev/com1'] {
+			fd := C.open(&char(path.str), C.O_RDONLY | C.O_NONBLOCK)
+			if fd < 0 && C.errno == 2 {
+				continue
+			}
+			line('open-device ${path}', fd)
+			if fd >= 0 {
+				C.close(fd)
+			}
 		}
 	}
 	// Sockets a program does not get to have without asking the system.
@@ -282,6 +301,14 @@ fn scenario_unprivileged(mut t Test) {
 		'nice-raise', 'realtime'] {
 		t.check(control[name] == 'allowed', 'as root, ${name}: ${control[name]}')
 	}
+	mut disks := 0
+	for name, result in control {
+		if name.starts_with('open-disk ') {
+			disks++
+			t.check(result == 'allowed', 'as root, ${name}: ${result}')
+		}
+	}
+	t.check(disks > 0, 'the machine has no disk for the sweep to be refused')
 	t.info('as root: raw-socket ${control['raw-socket']}, packet-socket ${control['packet-socket']}, mknod-block ${control['mknod-block']}')
 	C.umount2(c'/mnt', 0)
 	os.rm('/tmp/swept-null') or {}

@@ -110,7 +110,24 @@ scrypt_ln = 10
 		scenarios:   [
 			scenario('accounts', 'the account database, homes nobody else can read, and sessions that are not root'),
 			scenario('elevation', 'the authentication service: passwords, throttling, actions and who may run them'),
-			scenario('unprivileged', 'what an ordinary account is refused by the kernel'),
+			hwhost.Scenario{
+				...scenario('unprivileged', 'what an ordinary account is refused by the kernel')
+				// A disk, for the account to be refused: reading it would
+				// be reading every file on it.
+				qemu_aarch64: ['-drive', 'if=none,id=acct0,format=raw,file={state}/disk.raw', '-device',
+					'virtio-blk-device,drive=acct0']
+				qemu_x86_64:  ['-drive', 'if=ide,format=raw,file={state}/disk.raw']
+				disks:        [
+					hwhost.Disk{
+						name:      'disk.raw'
+						size_mib:  8
+						header:    'vinix account test disk: not blank'
+						untouched: true
+					},
+				]
+			},
+			scenario('seat', 'login sessions the kernel knows, and devices that follow who is at the machine'),
+			scenario('sessions', 'the session manager: a login screen, a session, switching to another and back, logging out'),
 		]
 	}
 	exit(hwhost.run_suite(suite, os.args[1..], @FILE))

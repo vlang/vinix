@@ -9,8 +9,9 @@
 // The rules, in one place:
 //
 //	- A password is only ever checked for the caller's own account, except
-//	  that root and the login screen's account may check anyone's: that is
-//	  what a login is.
+//	  that root may check anyone's: that is what a login is. The login
+//	  screen is not root; it hands what was typed to the session manager,
+//	  which asks.
 //	- Wrong passwords for an account make the next tries for it wait
 //	  (accountcore's throttle), whoever sent them.
 //	- An action is allowed to root; to the person at the machine without a
@@ -169,11 +170,6 @@ fn (env Env) verify(peer Peer, request authproto.Frame) authproto.Frame {
 	}
 	db := env.load() or { return reply(authproto.status_failed, 'the account database is unreadable') }
 	mut may_ask := peer.uid == accountcore.uid_root
-	if greeter := db.user('greeter') {
-		if greeter.uid == peer.uid && greeter.uid != accountcore.uid_root {
-			may_ask = true
-		}
-	}
 	user := db.user(name) or {
 		if may_ask {
 			// The same work as for an account that exists.

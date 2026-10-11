@@ -589,7 +589,7 @@ pub fn (mut namespace NVMENamespace) initialise(mut parent_controller NVMEContro
 	namespace.stat.blksize = 1 << u64(namespace.identity.lbaf_list[format].ds)
 	namespace.stat.size = namespace.stat.blocks * namespace.stat.blksize
 	namespace.stat.rdev = resource.create_dev_id()
-	namespace.stat.mode = 0o644 | stat.ifblk
+	namespace.stat.mode = 0o600 | stat.ifblk
 
 	return 0
 }

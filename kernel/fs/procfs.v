@@ -80,6 +80,8 @@ enum ProcFSKind {
 	uid_map
 	gid_map
 	loginuid
+	sessionid
+	seat_session
 	process_cgroup
 	environ
 	sysctl
@@ -310,6 +312,9 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	// Writable, so root can raise it; see security.set_securelevel.
 	mut securelevel_node := add_procfs_file(mut sys_kernel, 'securelevel', .securelevel)
 	securelevel_node.resource.stat.mode = stat.ifreg | 0o644
+	// Which login session holds the seat; see proc/login.v.
+	mut seat_node := add_procfs_file(mut sys_kernel, 'seat_session', .seat_session)
+	seat_node.resource.stat.mode = stat.ifreg | 0o644
 	mut sys_kernel_keys := add_procfs_directory(mut sys_kernel, 'keys')
 	add_procfs_text(mut sys_kernel_keys, 'root_maxkeys', '1000000\n')
 	add_procfs_text(mut sys_kernel_keys, 'root_maxbytes', '25000000\n')
@@ -750,8 +755,17 @@ fn (this &ProcFSResource) contents() string {
 		.gid_map {
 			return proc.id_map_text(this.pid, true)
 		}
-		.loginuid {
-			return '4294967295\n'
+		.loginuid, .sessionid, .seat_session {
+			mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+			unsafe { *text = lib.new_text(16) }
+			login_uid, login_session := proc.login_identity(this.pid)
+			text.add_decimal(i64(match this.kind {
+				.loginuid { login_uid }
+				.sessionid { login_session }
+				else { proc.seat_session() }
+			}))
+			text.add_byte(`\n`)
+			return text.str()
 		}
 		.process_cgroup {
 			return process_cgroup_text(this.pid)
@@ -917,7 +931,44 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			security.set_securelevel(value) or { return none }
 			return i64(count)
 		}
-		.uid_map, .gid_map, .setgroups, .loginuid {
+		.uid_map, .gid_map, .setgroups {
+			return i64(count)
+		}
+		.loginuid, .seat_session {
+			// One decimal number. /proc/self/loginuid starts the caller's
+			// login session; /proc/sys/kernel/seat_session says which login
+			// session holds the seat. See proc/login.v.
+			if count == 0 || count > 16 {
+				errno.set(errno.einval)
+				return none
+			}
+			mut value := u64(0)
+			mut digits := 0
+			for i := u64(0); i < count; i++ {
+				ch := unsafe { (&u8(buf))[i] }
+				if ch == `\n` && i == count - 1 {
+					break
+				}
+				if ch < `0` || ch > `9` {
+					errno.set(errno.einval)
+					return none
+				}
+				value = value * 10 + u64(ch - `0`)
+				digits++
+			}
+			if digits == 0 || value > u64(0xffffffff) {
+				errno.set(errno.einval)
+				return none
+			}
+			if this.kind == .loginuid {
+				proc.start_login_session(this.pid, u32(value))?
+				return i64(count)
+			}
+			if !security.permitted(security.system_seat_set) {
+				errno.set(errno.eperm)
+				return none
+			}
+			proc.set_seat_session(u32(value))
 			return i64(count)
 		}
 		.sysrq_trigger {
@@ -965,7 +1016,7 @@ fn (mut this ProcFSResource) grow(_handle voidptr, new_size u64) ? {
 			}
 			return
 		}
-		.oom_score_adj, .uid_map, .gid_map, .setgroups, .loginuid, .sysrq_trigger {
+		.oom_score_adj, .uid_map, .gid_map, .setgroups, .loginuid, .seat_session, .sysrq_trigger {
 			return
 		}
 		else {
@@ -1580,7 +1631,7 @@ fn populate_process_directory(mut node VFSNode, pid int) {
 // descriptors, namespaces and mounts are its process', since Vinix threads
 // share all three.
 const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'io', 'cgroup', 'environ',
-	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'auxv', 'limits', 'loginuid',
+	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'auxv', 'limits', 'loginuid', 'sessionid',
 	'oom_score_adj', 'uid_map', 'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
 
 fn add_process_entries(mut node VFSNode, pid int) {
@@ -1616,7 +1667,8 @@ fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bo
 		'smaps' { add_process_file(mut node, 'smaps', .smaps, pid) }
 		'auxv' { add_process_file(mut node, 'auxv', .auxv, pid) }
 		'limits' { add_process_file(mut node, 'limits', .limits, pid) }
-		'loginuid' { add_process_file(mut node, 'loginuid', .loginuid, pid) }
+		'loginuid' { add_process_writable(mut node, 'loginuid', .loginuid, pid) }
+		'sessionid' { add_process_file(mut node, 'sessionid', .sessionid, pid) }
 		'oom_score_adj' { add_process_writable(mut node, 'oom_score_adj', .oom_score_adj, pid) }
 		'uid_map' { add_process_writable(mut node, 'uid_map', .uid_map, pid) }
 		'gid_map' { add_process_writable(mut node, 'gid_map', .gid_map, pid) }

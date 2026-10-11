@@ -42,7 +42,7 @@ fn probe_ids() int {
 	list.sort()
 	mut cwd := []u8{len: 256}
 	C.getcwd(&char(cwd.data), 256)
-	println('uid=${C.getuid()} euid=${C.geteuid()} gid=${C.getgid()} groups=${list.join(',')} caps=${status_field('CapEff')} permitted=${status_field('CapPrm')} bounding=${status_field('CapBnd')} nnp=${status_field('NoNewPrivs')} home=${os.getenv('HOME')} runtime=${os.getenv('XDG_RUNTIME_DIR')} user=${os.getenv('USER')} cwd=${unsafe { cstring_to_vstring(&char(cwd.data)) }} active=${read_text('/run/vinix/session/active').trim_space()}')
+	println('uid=${C.getuid()} euid=${C.geteuid()} gid=${C.getgid()} groups=${list.join(',')} caps=${status_field('CapEff')} permitted=${status_field('CapPrm')} bounding=${status_field('CapBnd')} nnp=${status_field('NoNewPrivs')} home=${os.getenv('HOME')} runtime=${os.getenv('XDG_RUNTIME_DIR')} user=${os.getenv('USER')} cwd=${unsafe { cstring_to_vstring(&char(cwd.data)) }} active=${read_text('/run/vinix/session/active').trim_space()} login=${read_text('/proc/self/loginuid').trim_space()}/${read_text('/proc/self/sessionid').trim_space()}')
 	return 0
 }
 
@@ -168,6 +168,18 @@ fn run_probe(what []string) int {
 		}
 		'sweep' {
 			return probe_sweep(what[1..])
+		}
+		'seat-try' {
+			return probe_seat_try()
+		}
+		'seat-hold' {
+			return probe_seat_hold()
+		}
+		'greeter' {
+			return probe_greeter()
+		}
+		'desktop' {
+			return probe_desktop()
 		}
 		else {
 			return 2

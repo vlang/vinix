@@ -230,7 +230,9 @@ fn (mut this DevTmpFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&V
 	}
 	if unsafe { devtmpfs_root == 0 } {
 		// XXX this will break if devtmpfs is mounted more than once
-		devtmpfs_root = this.create(parent, name, 0o644 | stat.ifdir)
+		// Searchable by everyone, like any /dev: without the x bits nobody
+		// but root could reach even /dev/null.
+		devtmpfs_root = this.create(parent, name, 0o755 | stat.ifdir)
 	}
 	return devtmpfs_root
 }
@@ -275,6 +277,7 @@ fn (mut this DevTmpFS) link(parent &VFSNode, path string, mut old_node VFSNode) 
 
 	new_node.resource = old_node.resource
 	new_node.children = old_node.children
+	new_node.seat = old_node.seat
 
 	return new_node
 }
@@ -345,6 +348,30 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	return new_node
 }
 
+// Whether a device, by the name it is registered under, belongs to the
+// seat: what shows the screen, what reads the keyboard and the pointer,
+// what plays and records sound, and the kernel's console, which is both a
+// keyboard and something a person reads. Terminals of the pseudo kind are
+// not: they belong to whoever opened their master. `tty` is not either: it
+// is whatever terminal the caller already has.
+fn seat_device_name(name string) bool {
+	for whole in ['console', 'pointer', 'mouse', 'dsp', 'mixer', 'audio', 'display-hpd', 'apple-panel-bl']! {
+		if name == whole {
+			return true
+		}
+	}
+	for prefix in ['fb', 'dri/', 'input/', 'tty', 'dsp', 'mixer', 'video', 'snd/']! {
+		if name.len > prefix.len && name.starts_with(prefix) {
+			// ttyS0 and its like are serial lines, not the seat.
+			if prefix == 'tty' && (name[3] < `0` || name[3] > `9`) {
+				continue
+			}
+			return true
+		}
+	}
+	return false
+}
+
 pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	if stat.isblk(device.stat.mode) {
 		mut actual_device := unsafe { device }
@@ -389,6 +416,7 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, leaf, false)
 
 	new_node.resource = unsafe { device }
+	new_node.seat = seat_device_name(name)
 	new_node.resource.stat.dev = devtmpfs_dev_id
 	new_node.resource.stat.ino = devtmpfs_inode_counter++
 	new_node.resource.stat.nlink = 1
