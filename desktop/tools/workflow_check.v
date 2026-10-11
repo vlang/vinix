@@ -15,7 +15,7 @@ fn main() {
 	workflowbuild.run('git', ['archive', 'HEAD', 'desktop', '-o', '${work}/source.tar']) or { panic(err) }
 	workflowbuild.run('tar', ['-xf', '${work}/source.tar', '-C', '${work}/source']) or { panic(err) }
 	for name in os.ls('${root}/desktop') or { panic(err) } {
-		if name.ends_with('.v') && (name.starts_with('files') || name.starts_with('editor') || name.starts_with('quick_launch') || name == 'create_context_menu.c.v' || name == 'file_context_ops.c.v') {
+		if name.ends_with('.v') && (name.starts_with('files') || name == 'create_context_menu.c.v' || name == 'file_context_ops.c.v') {
 			os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}') or { panic(err) }
 		}
 	}

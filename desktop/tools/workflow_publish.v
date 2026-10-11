@@ -40,7 +40,7 @@ fn main() {
 		os.cp(binary, '${dest}/.vinix-${app}.${os.getpid()}') or { panic(err) }
 		os.chmod('${dest}/.vinix-${app}.${os.getpid()}', 0o755) or { panic(err) }
 		os.rename('${dest}/.vinix-${app}.${os.getpid()}', '${dest}/vinix-${app}') or { panic(err) }
-		result := os.exec(['cksum', '${dest}/vinix-${app}']) or { panic(err) }
+		result := os.exec(['cksum', '${dest}/vinix-${app}'])
 		fields := result.output.split(' ')
 		if result.exit_code != 0 || fields.len < 2 { panic('checksum failed') }
 		os.write_file('${dest}/.version.${os.getpid()}', '${fields[0]} ${fields[1]}\n') or { panic(err) }
