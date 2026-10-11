@@ -58,6 +58,12 @@ desired entry. Both atomically publish a validated complete set; live mappings
 are changed only by separate runtime commands. See
 [offline configuration editing](../../docs/storage-volumes.md#offline-mapping-configuration).
 
+`plan-enroll BUNDLE PLAN` appends a saved single-disk plan without resnapshotting
+existing desired mappings. `plan-forget BUNDLE DISK_INDEX` removes an empty
+participant while retaining at least one disk. Both edit saved membership;
+live views survive omission. See
+[disk membership and index rules](../../docs/storage-volumes.md#offline-disk-membership).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

@@ -60,11 +60,22 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume save-set BUNDLE DEVICE [DEVICE ...]\n       vinix-volume plan-grow BUNDLE SLOT LENGTH_BYTES\n       vinix-volume restore-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume show-bundle BUNDLE\n       vinix-volume check-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume plan-add BUNDLE DISK_INDEX SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume plan-remove BUNDLE SLOT\n')
+	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'plan-enroll') == 0 {
+			if argc != 4 { return usage() }
+			return enroll_bundle_disk(argv[2], argv[3])
+		}
+		if argc >= 2 && C.strcmp(argv[1], c'plan-forget') == 0 {
+			if argc != 4 { return usage() }
+			disk := decimal(argv[3]) or { return usage() }
+			if disk >= 64 { return usage() }
+			return forget_bundle_disk(argv[2], int(disk))
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'plan-add') == 0 {
 			if argc != 7 && argc != 8 { return usage() }
 			disk := decimal(argv[3]) or { return usage() }

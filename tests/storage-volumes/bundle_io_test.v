@@ -149,3 +149,39 @@ fn test_add_and_remove_commands_use_atomic_publication_and_cleanup_on_every_io_f
 		}
 	}
 }
+
+fn test_enroll_and_forget_commands_preserve_inputs_and_use_atomic_publication_on_io_failures() {
+	work := os.join_path(os.temp_dir(), 'vinix-membership-io-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	source := work + '/member.vmap'
+	for forget in [false, true] {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}
+			mut first := Plan{count: 1, key: DiskKey{bytes: 4096, sector: 512, kind: 1}}
+			first.key.id[0] = 1
+			first.rows[0] = Request{slot: 2, length: 512}
+			mut second := Plan{key: DiskKey{bytes: 4096, sector: 512, kind: 1}}
+			second.key.id[0] = 2
+			assert append_plan(mut set, &first)
+			if forget { assert append_plan(mut set, &second) }
+			bundle_io = BundleIO{}
+			assert publish_bundle(path.str, &set) && publish_plan(source.str, &second)
+			original := os.read_bytes(path)!
+			input := os.read_bytes(source)!
+			bundle_io = BundleIO{mode: mode}
+			result := if forget { forget_bundle_disk(path.str, 1) } else { enroll_bundle_disk(path.str, source.str) }
+			assert result == if mode == 1 { 0 } else { 1 }
+			assert bundle_io.closes == 2 && os.ls(work)!.len == 2
+			assert os.read_bytes(source)! == input
+			current := os.read_bytes(path)!
+			mut decoded := PlanSet{}
+			assert decode_bundle(current.data, current.len, mut decoded) && decoded.plans[0] == first
+			if mode == 1 || mode == 4 {
+				assert current != original && decoded.count == if forget { 1 } else { 2 }
+				assert bundle_io.renames == 1 && bundle_io.flushes == 2
+			} else { assert current == original }
+		}
+	}
+}

@@ -166,6 +166,8 @@ fn cycles(parent &char, count int) {
 		planning_add(c'/etc/vinix/volumes.vset', c'0', c'14', c'6291456', c'4096', true, 0)
 		tool(c'check-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		simple(c'plan-remove', c'/etc/vinix/volumes.vset', c'14', 0)
+		simple(c'plan-enroll', c'/etc/vinix/volumes.vset', c'/root/offline.vmap', 0)
+		simple(c'plan-forget', c'/etc/vinix/volumes.vset', c'2', 0)
 		tool(c'restore-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 	}
@@ -420,6 +422,7 @@ fn first_boot(parent &char) {
 		bundle_plans(parent, wrong)
 		planned_growth(parent, wrong)
 		planned_mappings(parent, wrong)
+		planned_disks(wrong)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -438,6 +441,11 @@ fn first_boot(parent &char) {
 		}
 		if retained {
 			allocation_trace(c'/proc/allocsites', true)
+			// Observe asynchronous reclamation without changing the failed verdict.
+			C.sleep(2)
+			mut observed := Heap{}
+			heap_snapshot(mut observed)
+			C.printf(c'PLAN OBSERVE large=%ld after_wait=%ld\n', after.large, observed.large)
 		}
 		check(!retained, c'heap retention')
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, wrong, &char(nil), 0)

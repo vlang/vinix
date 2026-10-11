@@ -39,6 +39,12 @@ removal, preserved identities/order/modes, freed slot reuse across disks, full
 on corrupt/symlink inputs. Both command paths run publisher fault injection.
 See [offline edit qualification](edit-bundle.md) and
 [read-only bundle inspection/preflight](check-bundle.md).
+Disk membership tests import empty/populated saved plans, retain existing
+desired state, reject duplicate keys/slots and invalid inputs, and remove empty
+first/middle/last participants with stable order and preserved slot ownership.
+They require one remaining disk and cover the full 64-disk/slot format bound,
+unchanged source files, symlink/nonregular refusal and both commands' publisher
+faults. See [membership qualification](disk-bundle.md).
 Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init
@@ -57,8 +63,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 2800 utility processes across 200 warmup
-and 200 measured seven-command cycles, including offline add/remove and live
+its own process. The allowance includes 3600 utility processes across 200 warmup
+and 200 measured nine-command cycles, with offline mapping/disk edits and live
 preflight on x86 TCG; the strict retention checks are unchanged.
 Serial output is streamed to disk, with a fixed marker window for read boundaries;
 pipe buffers are freed after writing, and the completed transcript is read once.
@@ -102,7 +108,8 @@ their generations. An already open raw descriptor writes and flushes the new
 extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
-capacity, explicitly replays growth and runs boot restoration. A flushed phase marker
+capacity, adds/checks/removes a scratch mapping, enrolls/forgets an empty offline
+participant, explicitly replays growth and runs boot restoration. A flushed phase marker
 and the atomically published bundle stay on ext2 across an
 abrupt VM stop. The physical disks are reordered for the second boot. Production ARM
 native init or AMD64 desktop init restores both disks from the bundle before the

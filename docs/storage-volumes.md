@@ -375,6 +375,54 @@ This completes add/remove editing of saved linear mappings; pools, RAID,
 filesystem resize and encryption remain separate work. See
 [offline edit qualification](../tests/storage-volumes/edit-bundle.md).
 
+## Offline disk membership
+
+```sh
+# Capture another whole disk, then append its saved plan to the existing bundle.
+# This example assumes disk 2 has no managed views and the bundle has two disks.
+vinix-volume save /dev/sd2 /root/disk2.vmap
+vinix-volume plan-enroll /root/layout.vset /root/disk2.vmap
+vinix-volume show-bundle /root/layout.vset
+vinix-volume check-bundle /root/layout.vset
+vinix-volume restore-bundle /root/layout.vset
+# An empty participant can stop taking part in subsequent replay:
+vinix-volume plan-forget /root/layout.vset 2
+```
+
+`plan-enroll BUNDLE PLAN` imports one complete checksummed single-disk `.vmap`
+plan into an existing bundle. It appends the disk's saved identity, geometry
+and all desired rows in their existing order. Empty disk plans are valid.
+Existing desired mappings, including pending capacity changes and mappings not
+yet created, remain intact. This avoids rebuilding the whole bundle from live
+views with `save-set`. No device is opened during enrollment: physical presence
+and identity are checked by the later `check-bundle` or restoration command.
+An unavailable but enrolled empty disk also blocks that later replay.
+
+Both inputs must be bounded regular files with valid versions and checksums;
+final symlinks are rejected. Repeated disk keys, duplicate global slots,
+invalid imported geometry and the 64-disk/64-mapping limits fail before
+publication. The source plan remains unchanged and its readable descriptor
+stays open alongside the bundle descriptor through publication. Enrollment uses
+the existing atomic publisher and the same durability/error rules as mapping
+edits. A bundle cannot import itself as a single-disk plan.
+
+`plan-forget BUNDLE DISK_INDEX` removes an empty enrolled disk. First remove each
+of its desired mappings with `plan-remove` if any remain. A populated disk, a
+missing index or removal of the last enrolled disk fails without changing the
+file. The remaining identities, geometry, modes and global slot ownership
+survive. Disk order is stable, but indices after the removed disk decrease by
+one; inspect `show-bundle` before subsequent indexed edits. Enrollment appends
+and keeps all existing indices unchanged.
+
+Omitting a disk stops requiring its identity during subsequent replay. Its
+live mappings, data and open descriptors remain usable, and replay keeps those
+unlisted mappings. Their physical extents still obey the ordinary runtime
+protections. Reenrollment imports the saved desired rows and resumes complete
+preflight; matching live views keep their generations. Administration remains
+serialized and live application remains a separate operation. Pools, spanning
+volumes and RAID are still separate work. See
+[disk membership qualification](../tests/storage-volumes/disk-bundle.md).
+
 ## Status ABI
 
 `tools/volumes/volumecli/volume.h` defines the native little-endian ABI shared by

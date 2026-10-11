@@ -39,8 +39,9 @@ unchanged. First-boot acceptance requires `PLAN CHECK PASSED:` in addition to
 the bundle/growth markers.
 
 Each repeated cycle saves the bundle, plans unchanged capacity, adds a scratch
-entry, checks explicit growth, removes the scratch entry, explicitly replays the
-remaining set, and runs boot restoration. After 200 warmup cycles,
+entry, checks explicit growth, removes the scratch entry, enrolls/forgets an
+empty offline disk, explicitly replays the remaining set, and runs boot
+restoration. After 200 warmup cycles,
 200 measured cycles must retain no slab objects or additional large allocation
 pages. The flushed ext2 bundle and phase marker stay in the guest filesystem for
 a second boot with reordered physical disks. Production init restores the grown
