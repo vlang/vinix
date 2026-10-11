@@ -207,7 +207,7 @@ fn (mut a PreviewApp) handle(action string) ! {
 		return
 	}
 	match action {
-		preview_action_open { a.open_image() }
+		preview_action_open { a.choose_open_image() }
 		preview_action_open_path { a.focus_field(.open_path) }
 		preview_action_export_path { a.focus_field(.export_path) }
 		preview_action_resize_width { a.focus_field(.resize_width) }

@@ -245,6 +245,7 @@ fn (mut d Desktop) take_switcher_sequence(input string, at int) int {
 	// incomplete packet whole, then pass the completed chord through to its
 	// owner instead of exposing its first half to the application.
 	partial = partial || window_shortcut_prefix(input, at)
+	partial = partial || d.session_shortcut_prefix(input, at)
 	return if partial { seq_partial } else { seq_none }
 }
 

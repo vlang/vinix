@@ -16,6 +16,8 @@ mut:
 	started_ms   u64
 	running      bool
 	done         bool
+	background   bool
+	id int
 	name         [clock_timer_name_limit]u8
 	name_len     int
 }
@@ -23,6 +25,7 @@ mut:
 fn (mut a ClockApp) initialize_timers() {
 	if a.timer_count > 0 { return }
 	a.timers[0] = ClockTimer{}
+	a.next_timer_id++; a.timers[0].id=a.next_timer_id
 	a.timer_count = 1
 	a.selected_timer = 0
 }
@@ -72,6 +75,7 @@ fn (mut a ClockApp) toggle_timer_at(now u64) {
 	a.update_timer(now)
 	a.selected_timer = selected
 	if a.timers[selected].running {
+		if !a.cancel_background_timer(selected) { return }
 		a.timers[selected].remaining_ms = a.timers[selected].remaining(now)
 		a.timers[selected].running = false
 	} else {
@@ -81,15 +85,30 @@ fn (mut a ClockApp) toggle_timer_at(now u64) {
 		a.timers[selected].started_ms = now
 		a.timers[selected].running = true
 		a.timers[selected].done = false
+		key := 'clock.timer.${a.timers[selected].id}'
+		seconds := ((a.timers[selected].remaining_ms + 999) / 1000).str()
+		args := [key, if a.timer_name(selected).len > 0 { a.timer_name(selected) } else { 'Timer finished' }, seconds, '0']
+		a.timers[selected].background = session_call_ok('alarm', args)
+		unsafe { key.free(); seconds.free(); (&array(&args)).free() }
 	}
 }
 
 fn (mut a ClockApp) reset_timer() {
 	a.initialize_timers()
 	index := a.selected_timer
+	if !a.cancel_background_timer(index) { return }
 	a.timers[index].remaining_ms = a.timers[index].duration_ms
 	a.timers[index].running = false
 	a.timers[index].done = false
+}
+
+fn (mut a ClockApp) cancel_background_timer(index int) bool {
+	if !a.timers[index].background { return true }
+	key := 'clock.timer.${a.timers[index].id}'
+	args := [key]
+	if session_call_ok('alarm.cancel', args) { a.timers[index].background = false }
+	unsafe { key.free(); (&array(&args)).free() }
+	return !a.timers[index].background
 }
 
 fn (mut a ClockApp) set_timer_duration(milliseconds u64) {
@@ -114,6 +133,7 @@ fn (mut a ClockApp) add_timer() bool {
 	a.cancel_duration_edit()
 	a.selected_timer = a.timer_count
 	a.timers[a.timer_count] = ClockTimer{}
+	a.next_timer_id++; a.timers[a.timer_count].id=a.next_timer_id
 	a.timer_count++
 	return true
 }
@@ -121,6 +141,7 @@ fn (mut a ClockApp) add_timer() bool {
 fn (mut a ClockApp) remove_timer() bool {
 	a.initialize_timers()
 	if a.timer_count <= 1 || a.timers[a.selected_timer].running { return false }
+	if !a.cancel_background_timer(a.selected_timer) { return false }
 	for index in a.selected_timer + 1 .. a.timer_count {
 		a.timers[index - 1] = a.timers[index]
 	}
@@ -296,6 +317,6 @@ fn (mut a ClockApp) append_timer(mut children []ui2.Element, width int) {
 	} else if a.timers[a.selected_timer].done { 'clock.timer.finished' } else { 'clock.timer.legend' }),
 		ui2.rect(f64(pad), 334, f64(inner), 18),
 		ui2.TextStyle{color: if a.duration_error || a.timers[a.selected_timer].done { clock_stop } else { body_muted }, size: 11, align: .center})
-	children << ui2.label('', tr('clock.timer.scope'), ui2.rect(f64(pad), 354, f64(inner), 16),
+	children << ui2.label('', if a.timers[a.selected_timer].background { 'Alarm saved. It continues after Clock closes.' } else { tr('clock.timer.scope') }, ui2.rect(f64(pad), 354, f64(inner), 16),
 		ui2.TextStyle{color: body_muted, size: 10, align: .center})
 }

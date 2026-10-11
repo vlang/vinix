@@ -8,6 +8,8 @@
 // buffer instead of a write syscall per scanline.
 module main
 
+import desktop.sessioncore
+
 const fbioget_vscreeninfo = u64(0x4600)
 const fbioget_fscreeninfo = u64(0x4602)
 
@@ -91,6 +93,11 @@ mut:
 	b_shift u32
 	gpu              GpuPresenter
 	graphics_claimed bool
+	identity sessioncore.Text
+	origin_x int
+	origin_y int
+	extra [7]&Framebuffer = unsafe { [7]&Framebuffer{} }
+	extra_count int
 }
 
 fn open_framebuffer(path string) !Framebuffer {
@@ -127,6 +134,7 @@ fn open_framebuffer(path string) !Framebuffer {
 	// A driver that reports no pitch is laying the scanlines out end to end.
 	stride := if fix.line_length > 0 { int(fix.line_length) / 4 } else { width }
 	size := u64(stride) * u64(height) * 4
+	if width<120 || height<60 || width>16384 || height>16384 || stride<width || size>256*1024*1024 { desktop_close(fd); return error('invalid framebuffer geometry') }
 
 	gpu_present_startup_stage(c'mapping framebuffer memory')
 	mapping := desktop_mmap_shared(fd, size)
@@ -137,6 +145,7 @@ fn open_framebuffer(path string) !Framebuffer {
 	gpu_present_startup_stage(c'framebuffer memory mapped')
 
 	return Framebuffer{
+		identity: sessioncore.text(path) or { desktop_close(fd); return error('invalid framebuffer path') }
 		fd:      fd
 		base:    unsafe { &u32(mapping) }
 		width:   width
@@ -169,6 +178,8 @@ fn (mut fb Framebuffer) claim_graphics() {
 // keeps logical geometry separately from its backing dimensions, allowing 2x
 // font masks to remain sharp while this final transfer stays scale-agnostic.
 fn (mut fb Framebuffer) present(canvas &Canvas, _ int) {
+	if fb.fd<0 { return }
+	if fb.extra_count>0 { fb.claim_graphics(); fb.present_viewport(canvas); for i in 0 .. fb.extra_count { fb.extra[i].present_viewport(canvas) }; return }
 	// On an M1 build this creates a surfaceless EGL context lazily and lets AGX
 	// composite the CPU canvas into the firmware framebuffer. The static
 	// desktop and any failed GPU initialization continue through this file's
@@ -220,6 +231,8 @@ fn (mut fb Framebuffer) present_damages(canvas &Canvas, first DamageRect, second
 }
 
 fn (mut fb Framebuffer) present_frame_damage(canvas &Canvas, damage FrameDamage) {
+	if fb.fd<0 { return }
+	if fb.extra_count>0 { fb.present(canvas,canvas.scale); return }
 	if !damage.valid() {
 		return
 	}
@@ -267,6 +280,8 @@ fn (mut fb Framebuffer) copy_damage(canvas &Canvas, damage DamageRect) {
 }
 
 fn (mut fb Framebuffer) close() {
+	for i in 0 .. fb.extra_count { fb.extra[i].close(); unsafe { free(fb.extra[i]) } }
+	fb.extra_count=0
 	fb.gpu.close()
 	if fb.base != unsafe { nil } {
 		desktop_munmap(fb.base, fb.size)

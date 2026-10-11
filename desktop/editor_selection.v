@@ -132,9 +132,13 @@ fn (mut a TextEditorApp) expire_key_escape(now u64) bool {
 	return true
 }
 
-fn (mut a TextEditorApp) poll() bool { return a.expire_key_escape(desktop_monotonic_ms()) }
+fn (mut a TextEditorApp) poll() bool {
+	mut changed:=a.expire_key_escape(desktop_monotonic_ms())
+	if a.portal_open { if path:=session_dialog_take('editor.open') { a.portal_open=false; if path.len>0 { a.set_path(path); a.open_document(); changed=true }; unsafe { path.free() } } }
+	return changed
+}
 
-fn (a &TextEditorApp) next_poll_ms() u64 { return if a.key_csi_active { u64(100) } else { u64(2000) } }
+fn (a &TextEditorApp) next_poll_ms() u64 { return if a.key_csi_active { u64(100) } else if a.portal_open { u64(200) } else { u64(2000) } }
 
 fn (mut a TextEditorApp) copy_selection(cut bool) {
 	if !a.has_selection() { return }

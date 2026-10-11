@@ -46,6 +46,7 @@ const create_context_background_entries = [
 ]
 
 const create_context_item_entries = [
+	ui2.MenuEntry{ id:'session.openwith.context',title:'Open With…' },
 	ui2.MenuEntry{
 		id:    file_context_rename
 		title: 'Rename'
@@ -69,6 +70,7 @@ const create_context_item_entries = [
 ]
 
 const create_context_files_item_entries = [
+	ui2.MenuEntry{ id:'session.openwith.context',title:'Open With…' },
 	ui2.MenuEntry{ id: file_context_rename, title: 'Rename' },
 	ui2.MenuEntry{ id: file_context_copy, title: 'Copy' },
 	ui2.MenuEntry{ id: file_context_cut, title: 'Cut' },
@@ -1389,6 +1391,8 @@ fn (mut d Desktop) desktop_context_action(action string, item_path string) ! {
 }
 
 fn (mut d Desktop) create_context_left_down(x int, y int) bool {
+	action_session,world_session:=d.hit_action_world(x,y)
+	if create_context_menu.visible && world_session==.desktop && action_session=='session.openwith.context' { d.handle_session_hub_action(action_session); create_context_menu.swallow_left_release=true; return true }
 	if !create_context_menu.visible {
 		return false
 	}

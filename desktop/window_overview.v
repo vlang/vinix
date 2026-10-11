@@ -14,7 +14,7 @@ const window_overview_dismiss = 'overview.dismiss'
 const window_overview_previous = 'overview.previous'
 const window_overview_next = 'overview.next'
 const window_overview_workspace_ids = ['overview.workspace.0', 'overview.workspace.1',
-	'overview.workspace.2', 'overview.workspace.3']
+	'overview.workspace.2', 'overview.workspace.3','overview.workspace.4','overview.workspace.5','overview.workspace.6','overview.workspace.7','overview.workspace.8','overview.workspace.9','overview.workspace.10','overview.workspace.11','overview.workspace.12','overview.workspace.13','overview.workspace.14','overview.workspace.15']
 const key_window_overview = '\x1b[1;13A'
 const window_overview_sequences = [key_window_overview, '\x1b[A', '\x1b[B', '\x1b[C', '\x1b[D',
 	'\x1bOA', '\x1bOB', '\x1bOC', '\x1bOD', '\x1b[Z']
@@ -279,6 +279,7 @@ fn (mut d Desktop) window_overview_pointer_down(action string, world ActionWorld
 	}
 	for workspace, id in window_overview_workspace_ids {
 		if action == id {
+			if workspace>=d.workspace_total() { return true }
 			if workspace != d.current_workspace {
 				d.switch_workspace(workspace)
 				d.open_window_overview()
@@ -358,7 +359,7 @@ fn (mut d Desktop) take_window_overview_keys(keys string) string {
 					matched = true
 					d.overview.pending_len = 0
 					was_active := d.overview.active
-					if candidate == key_window_overview || was_active {
+					if (candidate == key_window_overview && !d.session_binding_exists('overview')) || was_active {
 						d.window_overview_sequence(candidate)
 						owned_input = true
 					} else if !owned_input {
@@ -472,8 +473,10 @@ fn (mut d Desktop) window_overview_element() ui2.Element {
 		ui2.rect(window_overview_padding, 12, f64(layout.width - 2 * window_overview_padding), 26),
 		ui2.TextStyle{ color: taskbar_preview_text, size: 20, bold: true })
 	for workspace, id in window_overview_workspace_ids {
+		if workspace>=d.workspace_total() { break }
+		space:=if d.workspace_total()<=4 { 42 } else { (layout.width-2*window_overview_padding)/d.workspace_total() }
 		children << ui2.button(id, workspace_labels[workspace],
-			ui2.rect(f64(window_overview_padding + workspace * 42), 40, 34, 24),
+			ui2.rect(f64(window_overview_padding + workspace * space), 40, f64(space-8), 24),
 			ui2.BoxStyle{
 				bg:     if workspace == d.current_workspace {
 					app_accent

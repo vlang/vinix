@@ -132,6 +132,33 @@ fn main() {
 	gpu_present_startup_stage(c'entered main')
 	gpu_present_startup_stage(c'collecting process arguments')
 	all_args := arguments()
+	for i,arg in all_args { if arg=='--session-dialog' && i+2<all_args.len { kind:=all_args[i+1].int(); session_dialog_cli(kind,all_args[i+2],if i+3<all_args.len { all_args[i+3] } else { '' }); return } }
+	if '--time-service' in all_args {
+		mut server := 'pool.ntp.org'
+		for arg in all_args { if arg.starts_with('--time-server=') { server = arg['--time-server='.len..] } }
+		run_time_service(server)
+		return
+	}
+	if '--session-services' in all_args {
+		mut home := desktop_home
+		mut owner:=0
+		for arg in all_args { if arg.starts_with('--session-home=') { home = arg['--session-home='.len..] } }
+		for arg in all_args { if arg.starts_with('--session-owner=') { owner=arg['--session-owner='.len..].int() } }
+		run_session_services(home,owner)
+		return
+	}
+	if '--session-control' in all_args {
+		for i, arg in all_args {
+			if arg == '--session-control' && i + 1 < all_args.len {
+				reply := session_call(all_args[i + 1], all_args[i + 2..]) or { eprintln(err); exit(1) }
+				println(reply)
+				unsafe { reply.free() }
+				return
+			}
+		}
+		eprintln('Usage: vinix-desktop --session-control COMMAND ARGUMENTS...')
+		return
+	}
 	gpu_present_startup_stage(c'process arguments collected')
 	// Both parsers only recognise option prefixes, so argv[0] is harmless.
 	// Passing the captured array directly also avoids V's array-slice path,
@@ -154,7 +181,7 @@ fn main() {
 	gpu_present_startup_stage(c'command line parsed')
 
 	gpu_present_startup_stage(c'opening framebuffer')
-	mut fb := open_framebuffer(options.framebuffer) or {
+	mut fb := open_desktop_outputs(options.framebuffer) or {
 		eprintln('vinix-desktop: ${err}')
 		exit(1)
 	}
@@ -168,10 +195,11 @@ fn main() {
 	set_desktop_language(preferences.settings.language)
 	gpu_present_startup_stage(c'preferences loaded')
 	scale := preferences.configure_scale(fb.width, fb.height)
+	desktop_physical_width=fb.virtual_width(); desktop_physical_height=fb.virtual_height()
 	gpu_present_startup_stage(c'display scale configured')
 	gpu_present_startup_stage(c'allocating canvas')
-	canvas := new_scaled_canvas(desktop_scaled_extent(fb.width, scale),
-		desktop_scaled_extent(fb.height, scale), fb.width, fb.height, scale)
+	canvas := new_scaled_canvas(desktop_scaled_extent(fb.virtual_width(), scale),
+		desktop_scaled_extent(fb.virtual_height(), scale), fb.virtual_width(), fb.virtual_height(), scale)
 	gpu_present_startup_stage(c'canvas allocated')
 	gpu_present_startup_stage(c'loading fonts')
 	fonts := load_fonts_for_scale(scale)
@@ -188,6 +216,7 @@ fn main() {
 		trace_selectors:   options.trace_selectors
 	}
 	gpu_present_startup_stage(c'desktop state allocated')
+	desktop.configure_display_outputs(&fb)
 
 	gpu_present_startup_stage(c'opening pointer device')
 	mut pointer := open_pointer(options.pointer)
@@ -219,6 +248,7 @@ fn main() {
 	// The Desktop and Files show the user's /home/<user>/Desktop, Documents,
 	// Downloads and so on from here on.
 	desktop_use_user_home(desktop_prepare_user_home(desktop_home, desktop_users_directory))
+	_ = session_start(desktop.home)
 	gpu_present_startup_stage(c'user home ready')
 	// A newly created user then chooses which optional apps to install. The
 	// install itself runs in a Terminal once the ordinary desktop is up.
@@ -234,7 +264,10 @@ fn main() {
 	// edge. The calculator remains available from its shortcut and the Start
 	// menu; the Welcome page is available from Help but is not shown at launch.
 	mut launch_default_files := false
-	if options.open.len == 0 {
+	if options.open.len == 0 && desktop.restore_shell_session() {
+		if launch_install_terminal { desktop.launch_titled_at_startup('Terminal') }
+		desktop_publish_session_ready()
+	} else if options.open.len == 0 {
 		gpu_present_startup_stage(c'creating initial System window')
 		desktop.spawn('System', .system, 580, 60, 372, 232)
 		gpu_present_startup_stage(c'initial System window created')
@@ -245,6 +278,7 @@ fn main() {
 		// Startup settings retain Files and the development Terminal as defaults.
 	} else {
 		for title in options.open {
+			if !desktop.session.loaded { desktop.load_shell_session() }
 			desktop.launch_titled_at_startup(title)
 		}
 		if launch_install_terminal {
@@ -253,6 +287,7 @@ fn main() {
 		desktop_publish_session_ready()
 	}
 
+	desktop.session.saving = true
 	// Whether the kernel can sleep, and the lid action and performance profile
 	// that were saved: the kernel keeps those two only while it runs.
 	gpu_present_startup_stage(c'taking up power settings')
@@ -301,6 +336,16 @@ fn main() {
 
 		desktop.update_taskbar_clock()
 		desktop.poll_apps()
+		desktop.poll_shell_services()
+		if frame_started-desktop.session.last_output_check>=2000 {
+			desktop.session.last_output_check=frame_started
+			if fb.output_geometry_changed() {
+				fb.close()
+				fb=open_desktop_outputs(options.framebuffer) or { Framebuffer{} }
+				if fb.fd>=0 { desktop.recover_display_outputs(&fb) }
+			}
+		}
+		desktop.save_shell_session(false)
 		// Keep a drag's pointer-only damage separate from independent changes
 		// (a clock tick, an app frame, keyboard input, etc.). A partial compose
 		// is valid only when the pointer is the sole source of new pixels.
@@ -329,7 +374,7 @@ fn main() {
 			pointer.close()
 			fb.close()
 			result := desktop_run_external(command)
-			fb = open_framebuffer(options.framebuffer) or {
+			fb = open_desktop_outputs(options.framebuffer) or {
 				eprintln('vinix-desktop: cannot reclaim the framebuffer: ${err}')
 				exit(1)
 			}
@@ -337,12 +382,14 @@ fn main() {
 			keyboard = open_keyboard()
 			desktop.pointer_present = pointer.available()
 			desktop.external_finished(result)
+			desktop.recover_display_outputs(&fb)
 			continue
 		}
 		// Settings only requests a new scale. Apply it after all input from this
 		// frame and before layout so drawing and hit targets share one space.
 		previous_scale := desktop_current_scale()
 		desktop.apply_requested_scale()
+		if previous_scale!=desktop_current_scale() { desktop.capture_shell_session(); desktop.configure_display_outputs(&fb); desktop.apply_session_placements() }
 		if !preferences.save_changes(desktop.settings, previous_scale, desktop_home) {
 			eprintln('vinix-desktop: could not save desktop settings; changes may reset on restart')
 		}
@@ -507,9 +554,11 @@ fn main() {
 
 	// Leave the console the way it was found rather than on top of a desktop
 	// that is no longer being redrawn.
+	desktop.save_shell_session(true)
 	desktop.close_apps()
 	desktop.clipboard.close_request()
 	desktop.capture_close()
+	if desktop.power != .reload_desktop { session_shutdown() }
 	if desktop.power == .reload_desktop {
 		// Close every inherited device before exec, but keep this process alive:
 		// graphics-mode ownership is PID based, so the last complete frame stays
@@ -571,6 +620,7 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	// The level goes in before the move is handled, so a drag can see that the
 	// button is no longer held.
 	d.buttons = packet.buttons
+	if d.session_gesture(packet,pointer_x,pointer_y) { d.pointer_x=pointer_x; d.pointer_y=pointer_y; d.dirty=true; return TitlebarClick{} }
 	d.on_pointer_move(pointer_x, pointer_y)
 	if packet.pressed != 0 || packet.released != 0 || packet.scroll != 0 || packet.scroll_x != 0 {
 		// A click or a scroll recomposes everything, including the pointer
@@ -636,6 +686,7 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	if packet.scroll_x != 0 {
 		d.on_app_pointer_horizontal_scroll(pointer_x, pointer_y, int(packet.scroll_x))
 	}
+	if packet.pressed!=0 { d.mark_session_gesture() }
 	return click
 }
 
@@ -652,6 +703,8 @@ fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
 	if raw.len > 0 && keys.str != raw.str {
 		unsafe { raw.free() }
 	}
+	if keys.len>0 { d.mark_session_gesture() }
+	if d.shell_dialog_keys(keys) || d.capture_session_shortcut(keys) || d.session_workspace_keys(keys) { if keys.len>0 { unsafe { keys.free() } }; return }
 
 	// Window controls own typing; global switching can replace a control.
 	// Empty reads also settle an incomplete terminal escape sequence.

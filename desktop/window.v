@@ -9,6 +9,7 @@
 module main
 
 import ui2
+import desktop.sessioncore
 
 enum Page {
 	welcome
@@ -18,6 +19,9 @@ enum Page {
 	external_error
 	// Says a newer Vinix release is out. See version_check.v.
 	outdated
+	session
+	dialog
+	open_with
 	// A window whose contents come from a native application process rather than
 	// from one of the pages below.
 	app
@@ -81,6 +85,10 @@ mut:
 	// A window belongs to exactly one workspace; its application keeps running
 	// while another workspace is shown.
 	workspace int
+	group int
+	display sessioncore.Text
+	recovery bool
+	id_retry string
 	// Index into Desktop.apps for a `.app` window, or -1 for a built-in page.
 	app_index int = -1
 	// Stable catalog identity for taskbar pinning; separate from the client slot.
@@ -122,6 +130,9 @@ fn (w &Window) content(width int, height int, desktop &Desktop) []ui2.Element {
 		.notes { notes_page(width, height) }
 		.external_error { external_error_page(width, desktop) }
 		.outdated { outdated_page(width, desktop) }
+		.session { desktop.session_hub_contents(width, height) }
+		.dialog { desktop.shell_dialog_contents(width, height) }
+		.open_with { desktop.open_with_contents(width) }
 		// An application's contents are built by the window manager, which is
 		// the only thing holding a mutable reference to it.
 		.app { []ui2.Element{} }

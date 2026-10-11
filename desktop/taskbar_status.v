@@ -292,6 +292,15 @@ fn (mut d Desktop) refresh_window_status(index int) {
 		}
 	}
 	// The compositor records the Capture window's own recording, as it owns
+	if d.windows[index].app_index>=0 && d.windows[index].app_index<d.apps.len {
+		app:=d.apps[d.windows[index].app_index]
+		if app is RemoteApp { for i:=d.hub.notifications.count-1; i>=0; i-- {
+			n:=d.hub.notifications.items[i]; owner:=n.owner.str()
+			if n.dismissed || !owner.starts_with('pid.') || owner['pid.'.len..].int()!=app.pid { continue }
+			if n.progress>=0 { next.progress=n.progress; next.progress_state=if n.progress==100 { TaskProgress.none_ } else { TaskProgress.normal } }
+			break
+		} }
+	}
 	// the video stream rather than the Capture process.
 	if d.windows[index].title == capture_app_title && d.capture.report.phase == .recording {
 		if next.badge.len > 0 {

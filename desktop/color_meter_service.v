@@ -300,6 +300,7 @@ fn (mut app RemoteApp) handle_desktop_service(data string) bool {
 			text := color_meter_value_text(report.rgb, request.command == .copy_hex)
 			app.desktop.clipboard.close_request()
 			copied := app.desktop.clipboard.set_local_text(text)
+	if copied { app.desktop.record_session_copy(text, app.pid, false) }
 			unsafe { text.free() }
 			report = ColorMeterReport{ ...report, status: if copied { ColorMeterStatus.copied } else { ColorMeterStatus.invalid } }
 		}

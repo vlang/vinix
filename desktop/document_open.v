@@ -8,7 +8,7 @@ import desktop.workflowcore
 
 const document_open_magic = u32(0x444f504e)
 
-struct DocumentOpenRequest { path string app string }
+struct DocumentOpenRequest { path string app string use_default bool }
 
 interface DocumentOpeningApp {
 mut:
@@ -38,7 +38,7 @@ fn (mut d Desktop) open_workflow_document(path string) {
 	defer { unsafe { associations.free() } }
 	ext := os.file_ext(path).to_lower()
 	defer { unsafe { ext.free() } }
-	name := associations[ext] or { workflow_default_app(path) }
+	name := d.session_document_app(path, associations[ext] or { workflow_default_app(path) })
 	for i, factory in available_apps { if factory.process_name == name { d.open_path_in_app(i, path); return } }
 }
 
@@ -54,7 +54,7 @@ fn native_app_document_request(mut app NativeApp) []u8 {
 fn (mut a FilesContextApp) queue_document_open(path string, app string) {
 	if !workflowcore.valid_path(path) || C.access(&char(path.str), C.R_OK) != 0 { a.operation_error('Document is unavailable or permission denied.'); return }
 	unsafe { a.document_request.free() }
-	a.document_request = json2.encode(DocumentOpenRequest{path: path, app: app})
+	a.document_request = json2.encode(DocumentOpenRequest{path: path, app: app, use_default: app.len > 0 && a.document_default})
 }
 
 fn (mut a FilesContextApp) take_document_open_request() []u8 {
@@ -74,6 +74,9 @@ fn (mut app RemoteApp) handle_document_open(data string) bool {
 	request := json2.decode[DocumentOpenRequest](text) or { return false }
 	defer { unsafe { request.path.free(); request.app.free() } }
 	if !workflowcore.valid_path(request.path) || C.access(&char(request.path.str), C.R_OK) != 0 { return false }
+	if request.use_default && app.desktop.session_sender_has_gesture(app.pid) {
+		app.desktop.session_associate_document(request.path, request.app)
+	}
 	if request.app.len == 0 { app.desktop.open_workflow_document(request.path) }
 	else { for i, factory in available_apps { if factory.process_name == request.app { app.desktop.open_path_in_app(i, request.path); break } } }
 	return true

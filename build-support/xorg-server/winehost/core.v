@@ -49,6 +49,16 @@ __global (
 	clipboard_text u64
 	clipboard_data [65536]u8
 	clipboard_length usize
+	clipboard_plain [65536]u8
+	clipboard_plain_length usize
+	clipboard_kind u8
+	clipboard_copy_due u64
+	clipboard_copy_deadline u64
+	clipboard_copy_target u64
+	clipboard_copy_kind u8
+	clipboard_html u64
+	clipboard_png u64
+	clipboard_uris u64
 )
 @[c_extern]
 __global C.stderr voidptr
@@ -62,6 +72,7 @@ fn C.snprintf(&char, usize, &char, ...) i32
 fn C.fprintf(voidptr, &char, ...) i32
 fn C.perror(&char)
 fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcmp(voidptr, voidptr, usize) i32
 fn C.memmove(voidptr, voidptr, usize) voidptr
 fn C.memset(voidptr, i32, usize) voidptr
 fn C.__builtin_alloca(usize) voidptr
@@ -92,6 +103,8 @@ fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
 fn C.fcntl(i32, i32, ...) i32
 fn C.read(i32, voidptr, usize) isize
+fn C.write(i32, voidptr, usize) isize
+fn C.rename(&char,&char) i32
 fn C.XOpenDisplay(&char) &C.Display
 fn C.XCloseDisplay(voidptr) i32
 fn C.XKeysymToKeycode(voidptr, u64) u8
@@ -122,6 +135,9 @@ fn C.XMoveResizeWindow(voidptr, u64, i32, i32, u32, u32) i32
 fn C.XRaiseWindow(voidptr, u64) i32
 fn C.XCreateSimpleWindow(voidptr, u64, i32, i32, u32, u32, u32, u64, u64) u64
 fn C.XSetSelectionOwner(voidptr, u64, u64, u64) i32
+fn C.XGetSelectionOwner(voidptr,u64) u64
+fn C.XConvertSelection(voidptr,u64,u64,u64,u64,u64) i32
+fn C.XGetWindowProperty(voidptr,u64,u64,i64,i64,i32,u64,voidptr,voidptr,voidptr,voidptr,voidptr) i32
 fn C.XChangeProperty(voidptr, u64, u64, u64, i32, i32, voidptr, i32) i32
 fn C.XDamageQueryExtension(voidptr, voidptr, voidptr) i32
 fn C.XDamageQueryVersion(voidptr, voidptr, voidptr) i32
@@ -170,8 +186,8 @@ fn remove_display_files(number i32) {
 fn remove_surface_files(directory &char) {
 	unsafe {
 		mut path := [4096]char{}
-		names := [&char(c'Xvfb_screen0'), &char(c'Xvfb_screen1'), &char(c'damage')]!
-		for index := 0; index < 3; index++ {
+		names := [&char(c'Xvfb_screen0'), &char(c'Xvfb_screen1'), &char(c'damage'), &char(c'clipboard'), &char(c'.clipboard')]!
+		for index := 0; index < names.len; index++ {
 			if C.snprintf(&path[0], sizeof(path), c'%s/%s', directory, names[index]) < i32(sizeof(path)) { C.unlink(&path[0]) }
 		}
 	}
@@ -528,7 +544,7 @@ fn fill_top_window(display &C.Display) {
 		C.XFlush(display)
 	}
 }
-fn paste_clipboard(display &C.Display, text &u8, length usize) {
+fn clipboard_initialize(display &C.Display) {
 	unsafe {
 		if clipboard_window == 0 {
 			clipboard_window = C.XCreateSimpleWindow(display, C.DefaultRootWindow(display), 0, 0, 1, 1, 0, 0, 0)
@@ -536,9 +552,59 @@ fn paste_clipboard(display &C.Display, text &u8, length usize) {
 			clipboard_utf8 = C.XInternAtom(display, c'UTF8_STRING', 0)
 			clipboard_targets = C.XInternAtom(display, c'TARGETS', 0)
 			clipboard_text = C.XInternAtom(display, c'TEXT', 0)
+			clipboard_html=C.XInternAtom(display,c'text/html',0)
+			clipboard_png=C.XInternAtom(display,c'image/png',0)
+			clipboard_uris=C.XInternAtom(display,c'text/uri-list',0)
 		}
+	}
+}
+
+fn paste_clipboard(display &C.Display, text &u8, length usize) {
+	paste_clipboard_kind(display,0,text,length)
+}
+
+// Fixed storage keeps rich selections intact while plain-text clients receive
+// readable HTML text, without tags or embedded control commands.
+fn clipboard_html_text(input &u8, length usize, output &u8) usize {
+	unsafe {
+		entities := [&char(c'&lt;'), &char(c'&gt;'), &char(c'&quot;'), &char(c'&#39;'), &char(c'&nbsp;'), &char(c'&amp;')]!
+		lengths := [usize(4), 4, 6, 5, 6, 5]!
+		values := [u8(`<`), `>`, `"`, `'`, ` `, `&`]!
+		mut used := usize(0)
+		mut at := usize(0)
+		mut in_tag := false
+		for at < length {
+			byte := input[at]
+			at++
+			if byte == `<` { in_tag = true; continue }
+			if byte == `>` && in_tag { in_tag = false; continue }
+			if in_tag || (byte < 32 && byte != 9 && byte != 10 && byte != 13) { continue }
+			mut decoded := byte
+			if byte == `&` {
+				for i in 0 .. entities.len {
+					if length - (at - 1) >= lengths[i] && C.memcmp(input + at - 1, entities[i], lengths[i]) == 0 {
+						decoded = values[i]
+						at += lengths[i] - 1
+						break
+					}
+				}
+			}
+			output[used] = decoded
+			used++
+		}
+		return used
+	}
+}
+
+fn paste_clipboard_kind(display &C.Display,kind u8,text &u8,length usize) {
+	clipboard_initialize(display)
+	unsafe {
+		if length>sizeof(clipboard_data) || kind>3 { return }
+		clipboard_kind=kind
 		C.memcpy(&clipboard_data[0], text, length)
 		clipboard_length = length
+		clipboard_plain_length = if kind == 1 { clipboard_html_text(text, length, &clipboard_plain[0]) } else { length }
+		if kind != 1 { C.memcpy(&clipboard_plain[0], text, length) }
 		C.XSetSelectionOwner(display, clipboard_selection, clipboard_window, 0)
 		control := C.XKeysymToKeycode(display, u64(C.XK_Control_L))
 		v := C.XKeysymToKeycode(display, u64(C.XK_v))
@@ -546,6 +612,32 @@ fn paste_clipboard(display &C.Display, text &u8, length usize) {
 		C.XTestFakeKeyEvent(display, u32(v), 1, 0)
 		C.XTestFakeKeyEvent(display, u32(v), 0, 0)
 		C.XTestFakeKeyEvent(display, u32(control), 0, 0)
+	}
+}
+
+fn clipboard_copy_reply(display &C.Display,event &C.XSelectionEvent,directory &char) {
+	unsafe {
+		if event.requestor!=clipboard_window || event.selection!=clipboard_selection || event.target!=clipboard_copy_target || event.property==0 || clipboard_copy_deadline==0 || monotonic_millis()>clipboard_copy_deadline { return }
+		mut actual:=u64(0); mut format:=i32(0); mut count:=u64(0); mut after:=u64(0); mut data:=&u8(nil)
+		if C.XGetWindowProperty(display,clipboard_window,event.property,0,16385,1,u64(C.AnyPropertyType),&actual,&format,&count,&after,&data)!=0 { return }
+		if !is_null(data) {
+			if event.target==clipboard_targets && actual==u64(C.XA_ATOM) && format==32 && count<=256 && after==0 {
+				clipboard_copy_target=clipboard_utf8; clipboard_copy_kind=0
+				atoms:=&u64(data)
+				for i in 0 .. count { if atoms[i]==clipboard_html { clipboard_copy_target=clipboard_html; clipboard_copy_kind=1 }; if atoms[i]==clipboard_uris { clipboard_copy_target=clipboard_uris; clipboard_copy_kind=2 } }
+				for i in 0 .. count { if atoms[i]==clipboard_png { clipboard_copy_target=clipboard_png; clipboard_copy_kind=3 } }
+				C.XFree(data); C.XConvertSelection(display,clipboard_selection,clipboard_copy_target,clipboard_utf8,clipboard_window,0); C.XFlush(display); return
+			}
+			clipboard_copy_deadline=0
+			if actual==clipboard_copy_target && format==8 && count>0 && count<=65536 && after==0 {
+				mut temp:=[4096]char{}; mut path:=[4096]char{}
+				if C.snprintf(&temp[0],sizeof(temp),c'%s/.clipboard',directory)<i32(sizeof(temp)) && C.snprintf(&path[0],sizeof(path),c'%s/clipboard',directory)<i32(sizeof(path)) {
+					fd:=C.open(&temp[0],C.O_WRONLY|C.O_CREAT|C.O_TRUNC|C.O_NOFOLLOW|C.O_CLOEXEC,u32(0o600))
+					if fd>=0 { prefix:=C.write(fd,&clipboard_copy_kind,1); mut written:=usize(0); for prefix==1 && written<count { n:=C.write(fd,data+written,usize(count)-written); if n<=0 { break }; written+=usize(n) }; C.close(fd); if written==count { C.rename(&temp[0],&path[0]) } else { C.unlink(&temp[0]) } }
+				}
+			}
+			C.XFree(data)
+		}
 	}
 }
 fn clipboard_selection_request(display &C.Display, request &C.XSelectionRequestEvent) {
@@ -562,19 +654,22 @@ fn clipboard_selection_request(display &C.Display, request &C.XSelectionRequestE
 		reply.xselection.property = 0
 		if request.selection == clipboard_selection && request.owner == clipboard_window {
 			if request.target == clipboard_targets {
-				targets := [clipboard_targets, clipboard_utf8, clipboard_text, u64(C.XA_STRING)]!
+				kind_atom:=match clipboard_kind { 1 { clipboard_html } 2 { clipboard_uris } 3 { clipboard_png } else { clipboard_utf8 } }
+				targets := [clipboard_targets,kind_atom,if clipboard_kind==3 { kind_atom } else { clipboard_utf8 },if clipboard_kind==0 { u64(C.XA_STRING) } else { kind_atom }]!
 				C.XChangeProperty(display, request.requestor, property, u64(C.XA_ATOM), 32, C.PropModeReplace, voidptr(&targets[0]), 4)
 				reply.xselection.property = property
-			} else if request.target == clipboard_utf8 || request.target == clipboard_text {
-				C.XChangeProperty(display, request.requestor, property, clipboard_utf8, 8, C.PropModeReplace, voidptr(&clipboard_data[0]), i32(clipboard_length))
+			} else if (clipboard_kind==1 && request.target==clipboard_html) || (clipboard_kind==2 && request.target==clipboard_uris) || (clipboard_kind==3 && request.target==clipboard_png) {
+				C.XChangeProperty(display,request.requestor,property,request.target,8,C.PropModeReplace,voidptr(&clipboard_data[0]),i32(clipboard_length)); reply.xselection.property=property
+			} else if clipboard_kind!=3 && (request.target == clipboard_utf8 || request.target == clipboard_text) {
+				C.XChangeProperty(display, request.requestor, property, clipboard_utf8, 8, C.PropModeReplace, voidptr(&clipboard_plain[0]), i32(clipboard_plain_length))
 				reply.xselection.property = property
-			} else if request.target == u64(C.XA_STRING) {
+			} else if clipboard_kind!=3 && request.target == u64(C.XA_STRING) {
 				mut latin1 := [65536]u8{}
 				mut used := usize(0)
-				for at := usize(0); at < clipboard_length; at++ {
-					ch := clipboard_data[at]
+				for at := usize(0); at < clipboard_plain_length; at++ {
+					ch := clipboard_plain[at]
 					if ch < 0x80 { latin1[used] = ch; used++ }
-					else if (ch == 0xc2 || ch == 0xc3) && at + 1 < clipboard_length { at++; latin1[used] = u8((ch & 3) << 6) | (clipboard_data[at] & 0x3f); used++ }
+					else if (ch == 0xc2 || ch == 0xc3) && at + 1 < clipboard_plain_length { at++; latin1[used] = u8((ch & 3) << 6) | (clipboard_plain[at] & 0x3f); used++ }
 					else if (ch & 0xc0) != 0x80 { latin1[used] = `?`; used++ }
 				}
 				C.XChangeProperty(display, request.requestor, property, u64(C.XA_STRING), 8, C.PropModeReplace, voidptr(&latin1[0]), i32(used))
@@ -596,8 +691,9 @@ fn process_event(display &C.Display, event &HostEvent, payload &u8) bool {
 			7 { C.XTestFakeButtonEvent(display, 3, 1, 0) }
 			8 { C.XTestFakeButtonEvent(display, 3, 0, 0) }
 			9, 10 { button := if event.kind == 9 { u32(4) } else { u32(5) }; C.XTestFakeButtonEvent(display, button, 1, 0); C.XTestFakeButtonEvent(display, button, 0, 0) }
-			4 { focus_top_window(display); send_keys(display, payload, usize(event.length)) }
+			4 { focus_top_window(display); send_keys(display, payload, usize(event.length)); for i in 0 .. event.length { if payload[i]==3 || payload[i]==24 { clipboard_copy_due=monotonic_millis()+150 } } }
 			11 { focus_top_window(display); paste_clipboard(display, payload, usize(event.length)) }
+			12 { if event.length>1 && payload[0]<=3 { focus_top_window(display); paste_clipboard_kind(display,payload[0],payload+1,usize(event.length-1)) } }
 			else { return false }
 		}
 		C.XFlush(display)
@@ -648,7 +744,7 @@ fn stop_application(initial_pid i32, group i32) {
 @[export: 'vinix_wine_host_main']
 pub fn host_main(argc i32, argv &&char) i32 {
 	unsafe {
-		mut input := [65556]u8{}
+		mut input := [65557]u8{}
 		mut used := usize(0)
 		mut chosen_display := [16]char{}
 		mut wine_pid := i32(-1)
@@ -739,7 +835,7 @@ pub fn host_main(argc i32, argv &&char) i32 {
 			else if C.vwh_errno() != C.EAGAIN && C.vwh_errno() != C.EWOULDBLOCK && C.vwh_errno() != C.EINTR { C.vwh_set_running(0) }
 			for used >= sizeof(HostEvent) {
 				C.memcpy(host_event, &input[0], sizeof(HostEvent))
-				if host_event.magic != u32(0x56574831) || host_event.length > 65536 || (host_event.kind != 4 && host_event.kind != 11 && host_event.length != 0) { C.vwh_set_running(0); break }
+				if host_event.magic != u32(0x56574831) || host_event.length > (if host_event.kind==12 { u32(65537) } else { u32(65536) }) || (host_event.kind != 4 && host_event.kind != 11 && host_event.kind != 12 && host_event.length != 0) { C.vwh_set_running(0); break }
 				record_size := sizeof(HostEvent) + usize(host_event.length)
 				if used < record_size { break }
 				process_event(display, host_event, &input[0] + sizeof(HostEvent))
@@ -747,12 +843,17 @@ pub fn host_main(argc i32, argv &&char) i32 {
 				used -= record_size
 			}
 			if used == sizeof(input) { C.vwh_set_running(0) }
+			if clipboard_copy_due>0 && monotonic_millis()>=clipboard_copy_due {
+				clipboard_copy_due=0; clipboard_initialize(display)
+				if C.XGetSelectionOwner(display,clipboard_selection)!=clipboard_window { clipboard_copy_deadline=monotonic_millis()+2000; clipboard_copy_target=clipboard_targets; C.XConvertSelection(display,clipboard_selection,clipboard_targets,clipboard_utf8,clipboard_window,0); C.XFlush(display) }
+			}
 			if fill_surface { if fill_tick % 10 == 0 { fill_top_window(display) }; fill_tick++ }
 			mut drawn := false
 			for C.XPending(display) > 0 {
 				C.memset(x_event, 0, sizeof(C.XEvent))
 				C.XNextEvent(display, x_event)
 				if x_event.@type == C.SelectionRequest { clipboard_selection_request(display, &x_event.xselectionrequest) }
+				if x_event.@type == C.SelectionNotify { clipboard_copy_reply(display,&x_event.xselection,directory) }
 				if damage != 0 && x_event.@type == damage_event_base + C.XDamageNotify { drawn = true }
 			}
 			if drawn { C.XDamageSubtract(display, damage, 0, 0); C.XFlush(display); damage_sequence++; C.vwh_damage_store(damage_counter, damage_sequence) }

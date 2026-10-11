@@ -108,6 +108,7 @@ const available_apps = [
 		width: firefox_window_width
 		height: firefox_window_height + default_title_height
 		process_name: 'vinix-firefox'
+		clipboard_copy: true
 		polling: true
 		poll_interval_ms: 50
 		keyboard: true

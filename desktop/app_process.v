@@ -18,6 +18,7 @@ module main
 import math.bits
 import ui2
 import os
+import desktop.sessioncore
 
 const app_protocol_magic = u32(0x56415050) // VAPP
 const app_protocol_version = u8(11)
@@ -49,7 +50,8 @@ const app_feature_capture_cursor = u8(16)
 const app_feature_horizontal_scroll = u8(32)
 // The Windows 7 theme, and its glass colour above the theme in the state.
 const app_feature_glass = u8(64)
-const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy | app_feature_capture_cursor | app_feature_horizontal_scroll | app_feature_glass
+const app_feature_rich_clipboard = u8(128)
+const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy | app_feature_capture_cursor | app_feature_horizontal_scroll | app_feature_glass | app_feature_rich_clipboard
 // Header byte 7 was reserved and zero in version 10. Bit 0 now requests a
 // cursor-free Capture frame, with the unchanged header/state sizes. Older
 // compositors do not advertise the feature, so new Capture clients send zero.
@@ -110,6 +112,7 @@ enum AppCommand as u8 {
 	paste_input
 	prepare_close
 	desktop_service_reply
+	rich_paste
 }
 
 struct AppPointerPayload {
@@ -914,7 +917,7 @@ fn receive_app_request(fd int) !(AppCommand, int, int, AppWireState, string) {
 	if magic != app_protocol_magic || version != app_protocol_version
 		|| state_flags & ~app_state_hide_cursor != 0
 		|| (state_flags != 0 && features & app_feature_capture_cursor == 0)
-		|| command_value < int(AppCommand.build) || command_value > int(AppCommand.desktop_service_reply)
+		|| command_value < int(AppCommand.build) || command_value > int(AppCommand.rich_paste)
 		|| payload_length < 0 || payload_length > app_protocol_max_payload {
 		return error('invalid application request')
 	}
@@ -1144,10 +1147,11 @@ fn run_app_process(options AppProcessOptions) {
 				}
 			}
 			.handle {
-				app.handle(payload) or {
+				if !native_app_session_action(mut app,payload) { app.handle(payload) or {
 					send_app_error(options.response_fd, app_current_state(desktop), err.msg())
 					free_app_payload(payload)
 					continue
+				}
 				}
 				if !send_native_app_operation_response(options.response_fd, app_current_state(desktop), mut app) {
 					free_app_payload(payload)
@@ -1178,6 +1182,10 @@ fn run_app_process(options AppProcessOptions) {
 					free_app_payload(payload)
 					break
 				}
+			}
+			.rich_paste {
+				if payload.len>1 && payload.len<=sessioncore.clipboard_limit+1 && payload[0]<=3 { native_rich_paste(mut app,unsafe { sessioncore.DataKind(payload[0]) },unsafe { tos(&payload.str[1],payload.len-1) }) }
+				if !send_native_app_operation_response(options.response_fd,app_current_state(desktop),mut app) { free_app_payload(payload); break }
 			}
 			.poll {
 				poll_payload := native_app_poll_reply(mut app)
@@ -1358,7 +1366,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 		keyboard:         factory.keyboard
 		standalone:       factory.standalone
 		desktop_services: factory.desktop_services
-		clipboard_copy: factory.clipboard_copy
+		clipboard_copy: factory.clipboard_copy || hosted_session_client(factory.process_name)
 		pointer:          factory.pointer
 		us_keys:          factory.us_keys
 		desktop:          desktop

@@ -7,10 +7,12 @@
 // composition, focus, the taskbar and Cmd-Tab expose only the active one.
 module main
 
-const workspace_count = 4
+const workspace_count = 16
 const action_workspace_prefix = 'workspace.'
-const workspace_action_ids = ['workspace.0', 'workspace.1', 'workspace.2', 'workspace.3']
-const workspace_labels = ['1', '2', '3', '4']
+const workspace_action_ids = ['workspace.0', 'workspace.1', 'workspace.2', 'workspace.3',
+	'workspace.4', 'workspace.5', 'workspace.6', 'workspace.7', 'workspace.8', 'workspace.9',
+	'workspace.10', 'workspace.11', 'workspace.12', 'workspace.13', 'workspace.14', 'workspace.15']
+const workspace_labels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16']
 
 fn workspace_valid(workspace int) bool {
 	return workspace >= 0 && workspace < workspace_count
@@ -40,7 +42,7 @@ fn (mut d Desktop) focus_top_window_in_current_workspace() {
 }
 
 fn (mut d Desktop) switch_workspace(workspace int) {
-	if !workspace_valid(workspace) || workspace == d.current_workspace {
+	if !workspace_valid(workspace) || workspace >= d.workspace_total() || workspace == d.current_workspace {
 		return
 	}
 	// Modal compositor UI belongs to the old view. Dropping pointer capture also
@@ -68,7 +70,7 @@ fn (mut d Desktop) switch_workspace(workspace int) {
 }
 
 fn (mut d Desktop) move_window_to_workspace(id int, workspace int) {
-	if !workspace_valid(workspace) {
+	if !workspace_valid(workspace) || workspace >= d.workspace_total() {
 		return
 	}
 	index := d.window_index(id) or { return }
@@ -86,8 +88,13 @@ fn (mut d Desktop) move_window_to_workspace(id int, workspace int) {
 	}
 	was_focused := d.focus == id
 	// Moving a hidden window elsewhere ends the old workspace's claim on it.
-	d.windows[index].hidden_by_isolation = false
-	d.windows[index].workspace = workspace
+	group := d.windows[index].group
+	for i in 0 .. d.windows.len {
+		if d.windows[i].id == id || (group > 0 && d.windows[i].group == group) {
+			d.windows[i].hidden_by_isolation = false
+			d.windows[i].workspace = workspace
+		}
+	}
 	if d.drag.window_id == id {
 		d.drag = Drag{}
 		d.drag_damage = DamageRect{}

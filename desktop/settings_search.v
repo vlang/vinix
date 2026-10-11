@@ -13,7 +13,7 @@ struct SettingsSearchEntry {
 const settings_search_limit = 128
 // Room for every entry below to match at once: SettingsApp keeps the indices
 // of its results inline. An entry added here needs one more.
-const settings_search_capacity = 32
+const settings_search_capacity = 45
 const settings_search_entries = [
 	SettingsSearchEntry{.appearance, 'settings.appearance.buttons', [
 		'settings.appearance.buttons_note',
@@ -271,11 +271,27 @@ const settings_search_entries = [
 		'',
 		'',
 	]!},
+	SettingsSearchEntry{.sound,'Sound',['volume','mute','output','microphone','','']!},
+	SettingsSearchEntry{.bluetooth,'Bluetooth',['pair','devices','radio','','','']!},
+	SettingsSearchEntry{.printers,'Printers',['printing','queue','CUPS','','','']!},
+	SettingsSearchEntry{.users,'Users',['password','account','login','','','']!},
+	SettingsSearchEntry{.network,'Network',['interface','DHCP','address','','','']!},
+	SettingsSearchEntry{.privacy,'Privacy',['permissions','clipboard','capture','','','']!},
+	SettingsSearchEntry{.storage,'Storage',['disks','space','mount','','','']!},
+	SettingsSearchEntry{.updates,'Updates',['release','version','system','','','']!},
+	SettingsSearchEntry{.accessibility,'Accessibility',['scale','text','speech','','','']!},
+	SettingsSearchEntry{.clock,'Clock',['timezone','time','synchronization','NTP','','']!},
+	SettingsSearchEntry{.session,'Session',['startup','services','workspaces','restore','','']!},
+	SettingsSearchEntry{.shortcuts,'Shortcuts',['keyboard','customize','bindings','','','']!},
+	SettingsSearchEntry{.gestures,'Gestures',['corners','pointer','swipe','','','']!},
 ]!
 
 const settings_category_actions = ['settings.category.0', 'settings.category.1', 'settings.category.2',
 	'settings.category.3', 'settings.category.4', 'settings.category.5', 'settings.category.6',
-	'settings.category.7', 'settings.category.8', 'settings.category.9', 'settings.category.10']!
+	'settings.category.7', 'settings.category.8', 'settings.category.9', 'settings.category.10',
+	'settings.category.11','settings.category.12','settings.category.13','settings.category.14',
+	'settings.category.15','settings.category.16','settings.category.17','settings.category.18',
+	'settings.category.19','settings.category.20','settings.category.21','settings.category.22','settings.category.23']!
 const settings_search_actions = ['settings.search.result.0', 'settings.search.result.1',
 	'settings.search.result.2', 'settings.search.result.3', 'settings.search.result.4',
 	'settings.search.result.5', 'settings.search.result.6', 'settings.search.result.7',
@@ -350,6 +366,8 @@ fn (mut a SettingsApp) clear_search() {
 fn (mut a SettingsApp) choose_category(category SettingsCategory) {
 	a.clear_search()
 	a.category = category
+	a.category_page = int(category)/11
+	if int(category) >= int(SettingsCategory.sound) { a.refresh_session_settings(true) }
 	match category {
 		.about { a.about.refresh() }
 		.battery { a.battery_read(true) }
@@ -442,6 +460,7 @@ fn (mut a SettingsApp) search_move(direction int) {
 }
 
 fn (mut a SettingsApp) key_input(input string) {
+	if a.session_settings_key(input) { return }
 	if a.search_language != desktop_language { a.refilter_search() }
 	mut at := 0
 	for at < input.len {
@@ -535,7 +554,10 @@ fn (mut a SettingsApp) expire_search_escape(now u64) bool {
 	return true
 }
 
-fn (mut a SettingsApp) poll() bool { return a.expire_search_escape(desktop_monotonic_ms()) }
+fn (mut a SettingsApp) poll() bool {
+	if int(a.category)>=int(SettingsCategory.sound) { return a.refresh_session_settings(false) }
+	return a.expire_search_escape(desktop_monotonic_ms())
+}
 
 fn (a &SettingsApp) next_poll_ms() u64 {
 	return if a.search_escape_len > 0 { u64(100) } else { u64(2000) }

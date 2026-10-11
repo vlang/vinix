@@ -14,6 +14,7 @@
 module main
 
 import ui2
+import desktop.sessioncore
 
 enum SettingsCategory {
 	appearance
@@ -27,10 +28,24 @@ enum SettingsCategory {
 	power
 	keyboard
 	about
+	sound
+	bluetooth
+	printers
+	users
+	network
+	privacy
+	storage
+	updates
+	accessibility
+	clock
+	session
+	shortcuts
+	gestures
 }
 
 const settings_categories = [SettingsCategory.appearance, .date_time, .language, .theme, .wallpaper,
-	.wifi, .display, .battery, .power, .keyboard, .about]
+	.wifi, .display, .battery, .power, .keyboard, .about, .sound, .bluetooth, .printers,
+	.users, .network, .privacy, .storage, .updates, .accessibility, .clock, .session, .shortcuts, .gestures]
 
 fn (c SettingsCategory) title() string {
 	return match c {
@@ -45,6 +60,19 @@ fn (c SettingsCategory) title() string {
 		.power { tr('settings.category.power') }
 		.keyboard { tr('settings.category.keyboard') }
 		.about { tr('settings.category.about') }
+		.sound { 'Sound' }
+		.bluetooth { 'Bluetooth' }
+		.printers { 'Printers' }
+		.users { 'Users' }
+		.network { 'Network' }
+		.privacy { 'Privacy' }
+		.storage { 'Storage' }
+		.updates { 'Updates' }
+		.accessibility { 'Accessibility' }
+		.clock { 'Clock & timezone' }
+		.session { 'Session' }
+		.shortcuts { 'Shortcuts' }
+		.gestures { 'Gestures & corners' }
 	}
 }
 
@@ -151,6 +179,12 @@ mut:
 	search_escape [16]u8
 	search_escape_len int
 	search_escape_ms u64
+	category_page int
+	service_status sessioncore.SettingsStatus
+	service_poll_ms i64
+	service_value sessioncore.Text
+	service_edit bool
+	service_actions [8]string
 }
 
 fn (mut d Desktop) open_settings() !NativeApp {
@@ -163,6 +197,7 @@ fn (mut d Desktop) open_settings() !NativeApp {
 fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
+	if int(a.category) >= int(SettingsCategory.sound) && !a.searching() { a.refresh_session_settings(false) }
 	if a.search_language != desktop_language { a.refilter_search() }
 
 	mut children := frame_elements(3)
@@ -219,6 +254,7 @@ fn (mut a SettingsApp) build(size ui2.Rect) !ui2.Element {
 // the same way. The remaining panes are desktop preferences and have nothing
 // to show without one.
 fn (a &SettingsApp) pane(width int, height int) []ui2.Element {
+	if int(a.category) >= int(SettingsCategory.sound) { return a.session_settings_pane(width,height) }
 	match a.category {
 		.about { return a.about.pane(width) }
 		.wifi {
@@ -253,8 +289,9 @@ fn (a &SettingsApp) category_rows() []ui2.Element {
 	mut rows := frame_elements(settings_categories.len + 1)
 	rows << a.search_field()
 	for index, category in settings_categories {
+		if index / 11 != a.category_page { continue }
 		selected := category == a.category
-		y := 56 + index * settings_category_pitch
+		y := 56 + (index % 11) * settings_category_pitch
 		mut label := frame_elements(1)
 		label << ui2.label('', category.title(), ui2.rect(18, 0, f64(settings_sidebar_width - 24), 28), ui2.TextStyle{
 			color: if selected { body_heading } else { body_text }
@@ -266,6 +303,8 @@ fn (a &SettingsApp) category_rows() []ui2.Element {
 			transparent: !selected
 		}, label)
 	}
+	rows << settings_choice('settings.categories.previous','<',8,378,52,false)
+	rows << settings_choice('settings.categories.next','>',70,378,52,false)
 	return rows
 }
 
@@ -550,6 +589,9 @@ fn (a &SettingsApp) wallpaper_pane(width int) []ui2.Element {
 }
 
 fn (mut a SettingsApp) handle(event_id string) ! {
+	if event_id == 'settings.categories.previous' { if a.category_page>0 { a.category_page-- }; return }
+	if event_id == 'settings.categories.next' { if a.category_page < (settings_categories.len-1)/11 { a.category_page++ }; return }
+	if a.handle_session_settings(event_id) { return }
 	if a.handle_search(event_id) { return }
 	if event_id.starts_with(settings_action_category) {
 		for index, action in settings_category_actions {

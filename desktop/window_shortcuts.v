@@ -36,7 +36,7 @@ fn window_shortcut_prefix(input string, at int) bool {
 			return true
 		}
 	}
-	for workspace in 0 .. workspace_count {
+	for workspace in 0 .. key_super_workspaces.len {
 		if match_at(input, at, key_super_workspaces[workspace]) == seq_partial
 			|| match_at(input, at, key_super_shift_workspaces[workspace]) == seq_partial {
 			return true
@@ -49,7 +49,7 @@ fn window_shortcut_sequence(sequence string) bool {
 	for key in window_shortcut_keys {
 		if sequence == key { return true }
 	}
-	for workspace in 0 .. workspace_count {
+	for workspace in 0 .. key_super_workspaces.len {
 		if sequence == key_super_workspaces[workspace]
 			|| sequence == key_super_shift_workspaces[workspace] { return true }
 	}
@@ -132,9 +132,11 @@ fn (mut d Desktop) take_window_shortcuts(keys string) string {
 	mut kept := []u8{cap: keys.len}
 	mut i := 0
 	for i < keys.len {
-		mut matched := match_at(keys, i, key_cmd_w)
+		custom:=d.take_session_chord(keys,i)
+		if custom>0 { i+=custom; continue }
+		mut matched := if d.session_binding_exists('close') { seq_none } else { match_at(keys, i, key_cmd_w) }
 		if matched <= seq_none {
-			matched = match_at(keys, i, key_alt_f4)
+			matched = if d.session_binding_exists('close') { seq_none } else { match_at(keys, i, key_alt_f4) }
 		}
 		if matched > seq_none {
 			if d.focus != 0 {
@@ -143,13 +145,13 @@ fn (mut d Desktop) take_window_shortcuts(keys string) string {
 			i += matched
 			continue
 		}
-		matched = match_at(keys, i, key_super_d)
+		matched = if d.session_binding_exists('show-desktop') { seq_none } else { match_at(keys, i, key_super_d) }
 		if matched > seq_none {
 			d.toggle_show_desktop()
 			i += matched
 			continue
 		}
-		matched = match_at(keys, i, key_super_m)
+		matched = if d.session_binding_exists('minimize') { seq_none } else { match_at(keys, i, key_super_m) }
 		if matched > seq_none {
 			d.minimize(d.focus)
 			i += matched
@@ -212,7 +214,7 @@ fn (mut d Desktop) take_window_shortcuts(keys string) string {
 			continue
 		}
 		mut workspace_taken := false
-		for workspace in 0 .. workspace_count {
+		for workspace in 0 .. key_super_workspaces.len {
 			matched = match_at(keys, i, key_super_workspaces[workspace])
 			if matched > seq_none {
 				d.switch_workspace(workspace)

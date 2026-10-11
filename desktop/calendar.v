@@ -168,6 +168,7 @@ fn (mut a CalendarApp) refresh_labels() {
 }
 
 fn (mut a CalendarApp) go_today() {
+	a.tz_offset=session_timezone_offset(a.tz_offset)
 	seconds, _ := desktop_realtime()
 	civil := if seconds >= 0 {
 		civil_from_epoch(seconds + a.tz_offset)

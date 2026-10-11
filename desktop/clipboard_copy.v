@@ -57,9 +57,11 @@ fn (mut app RemoteApp) handle_native_operation(data string) bool {
 }
 
 fn (mut app RemoteApp) handle_text_copy(data string) bool {
+	if !app.standalone && unsafe { app.desktop!=nil } && !app.desktop.hub.policy.clipboard_apps { return false }
 	if !app.clipboard_copy || app.standalone || app.peer_features & app_feature_text_copy == 0
 		|| unsafe { app.desktop == nil } { return false }
 	sequence := text_copy_into_session(mut app.desktop.clipboard, data) or { return false }
+	app.desktop.record_session_copy(unsafe { tos(&data.str[text_copy_header_size], data.len - text_copy_header_size) }, app.pid, false)
 	bytes := text_copy_reply(sequence, true)
 	defer { unsafe { bytes.free() } }
 	answer := app.transact(.desktop_service_reply, 0, 0, editor_bytes_text(bytes)) or { return false }

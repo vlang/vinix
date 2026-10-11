@@ -17,6 +17,7 @@ const clock_running_poll_ms = u64(100)
 
 struct ClockApp {
 mut:
+	tz_sample_ms u64
 	tz_offset       i64
 	time_text       string
 	date_text       string
@@ -38,6 +39,7 @@ mut:
 	lap_text           [clock_lap_limit]string
 	timer_text         string
 	timers             [clock_timer_limit]ClockTimer
+	next_timer_id int
 	timer_count        int
 	selected_timer     int
 	name_focus         bool
@@ -95,6 +97,8 @@ fn clock_replace_text(old string, next string) string {
 
 fn (mut a ClockApp) refresh() {
 	a.initialize_timers()
+	now:=desktop_monotonic_ms()
+	if a.tz_sample_ms==0 || now-a.tz_sample_ms>=5000 { a.tz_offset=session_timezone_offset(a.tz_offset); a.tz_sample_ms=now }
 	seconds, _ := desktop_realtime()
 	if seconds < 0 {
 		a.time_text = clock_replace_text(a.time_text, '--:--:--'.clone())
@@ -116,9 +120,9 @@ fn (mut a ClockApp) refresh() {
 	}
 	a.shown_seconds = seconds
 	a.language = desktop_language
-	now := desktop_monotonic_ms()
-	a.stopwatch_text = clock_replace_text(a.stopwatch_text, clock_stopwatch_text(a.elapsed(now)))
-	a.update_timer(now)
+	timer_now := desktop_monotonic_ms()
+	a.stopwatch_text = clock_replace_text(a.stopwatch_text, clock_stopwatch_text(a.elapsed(timer_now)))
+	a.update_timer(timer_now)
 	a.timer_text = clock_replace_text(a.timer_text, clock_timer_text(a.timer_remaining(now)))
 	a.last_refresh_ms = now
 }

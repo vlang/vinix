@@ -21,7 +21,7 @@ const action_shortcut_prefix = 'shortcut.'
 // their spelling collides with one of these prefixes.
 const desktop_action_prefixes = ['taskbar.', 'task.', 'win.', 'shortcut.', 'start.',
 	action_switch_prefix, action_workspace_prefix, taskbar_pin_action_prefix,
-	taskbar_preview_prefix, 'tray.']
+	taskbar_preview_prefix, 'tray.', 'session.', 'dialog.']
 
 enum DragKind {
 	none_
@@ -87,6 +87,8 @@ mut:
 	next_id            int = 1
 	focus              int
 	current_workspace  int
+	session ShellSession
+	hub ShellHub
 	drag               Drag
 	hover              string // owned; update through set_hover
 
@@ -264,6 +266,7 @@ fn (mut d Desktop) spawn(title string, page Page, x int, y int, width int, heigh
 		id_minimize:    '${prefix}.minimize'
 		id_divider:     '${prefix}.divider'
 		id_body:        '${prefix}.body'
+		id_retry:       'session.retry.${id}'
 		id_resize:      '${prefix}.resize'
 		id_resize_sw:   '${prefix}.resize_sw'
 		id_resize_nw:   '${prefix}.resize_nw'
@@ -320,6 +323,7 @@ fn (mut d Desktop) raise(id int) {
 }
 
 fn (mut d Desktop) close_window(id int) {
+	if d.hub.dialog.pid>0 && d.hub.dialog.window==id { d.finish_shell_dialog(''); return }
 	index := d.window_index(id) or { return }
 	closing_capture := d.windows[index].title == capture_app_title
 	app_index := d.windows[index].app_index
@@ -382,10 +386,11 @@ fn (mut d Desktop) maximize(id int) {
 	if d.windows[index].snap == .none_ {
 		d.remember_restore_frame(index)
 	}
-	d.windows[index].x = 0
-	d.windows[index].y = 0
-	d.windows[index].width = d.canvas.width
-	d.windows[index].height = d.canvas.height - taskbar_height
+	area:=d.window_display_area(index)
+	d.windows[index].x = area.x
+	d.windows[index].y = area.y
+	d.windows[index].width = area.w
+	d.windows[index].height = area.h
 	d.windows[index].maximized = true
 	d.windows[index].snap = .none_
 	d.raise(id)
@@ -410,7 +415,9 @@ fn (mut d Desktop) snap_window(id int, snap WindowSnap) {
 	if !d.windows[index].maximized && d.windows[index].snap == .none_ {
 		d.remember_restore_frame(index)
 	}
-	d.apply_snap_geometry(index, snap, d.canvas.width, d.canvas.height)
+	area:=d.window_display_area(index)
+	d.apply_snap_geometry(index, snap, area.w, area.h+taskbar_height)
+	d.windows[index].x+=area.x; d.windows[index].y+=area.y
 	d.windows[index].maximized = false
 	d.windows[index].snap = snap
 	d.raise(id)
@@ -521,6 +528,7 @@ fn (mut d Desktop) build_tree() ui2.Element {
 	if actions := d.window_actions_element() {
 		children << ui2.Element{ ...actions }
 	}
+	if banner := d.session_banner() { children << banner }
 
 	return ui2.view('desktop', ui2.rect(0, 0, f64(d.canvas.width), f64(d.canvas.height)), ui2.BoxStyle{
 		transparent: true
@@ -849,6 +857,7 @@ fn window_resize_action(action string) bool {
 // background becomes the body's and its children are placed straight into it.
 fn (mut d Desktop) window_contents(window_index int, body_width int, body_height int) (u32, []ui2.Element) {
 	window := &d.windows[window_index]
+	if window.recovery { return d.theme().window_body, d.session_recovery_contents(window_index, body_width) }
 	if window.app_index < 0 || window.app_index >= d.apps.len {
 		return d.theme().window_body, window.content(body_width, body_height, d)
 	}
@@ -863,10 +872,8 @@ fn (mut d Desktop) window_contents(window_index int, body_width int, body_height
 	root := app.build(size) or {
 		// An application that cannot lay itself out should say so in its own
 		// window rather than take the desktop down with it.
-		mut error_children := frame_elements(2)
-		error_children << body_line(tr('wm.app_failed'), 18, 18, body_width - 36)
-		error_children << muted_line(err.msg(), 18, 40, body_width - 36)
-		return d.theme().window_body, error_children
+		d.windows[window_index].recovery = true
+		return d.theme().window_body, d.session_recovery_contents(window_index, body_width)
 	}
 	return root.box.bg, root.children
 }
@@ -1587,12 +1594,14 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// overview. Numbered buttons match the Super+1..4 shortcuts and dim empty
 	// workspaces while keeping every destination clickable.
 	workspace_x := if dock { x } else { workspace_x_fixed }
-	for workspace in 0 .. workspace_count {
+	workspace_start := (d.current_workspace / 4) * 4
+	workspace_end := if workspace_start + 4 > d.workspace_total() { d.workspace_total() } else { workspace_start + 4 }
+	for workspace in workspace_start .. workspace_end {
 		id := workspace_action_ids[workspace]
 		active := workspace == d.current_workspace
 		occupied := d.workspace_window_count(workspace) > 0
 		children << ui2.button(id, workspace_labels[workspace], ui2.rect(f64(workspace_x +
-			workspace * (workspace_button_width + workspace_button_gap)), f64(item_y),
+			(workspace - workspace_start) * (workspace_button_width + workspace_button_gap)), f64(item_y),
 			f64(workspace_button_width), f64(item_height)), ui2.BoxStyle{
 			bg:     if active {
 				theme.accent
@@ -1609,6 +1618,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 			align: .center
 		})
 	}
+	if d.workspace_total() > 4 {
+		for i, action in ['session.workspace.previous', 'session.workspace.next']! {
+			children << ui2.button(action, if i == 0 { '<' } else { '>' },
+				ui2.rect(f64(workspace_x + 4 * (workspace_button_width + workspace_button_gap) + i * 22), f64(item_y), 20, f64(item_height)),
+				ui2.BoxStyle{bg:theme.taskbar_item_bg,radius:5}, ui2.TextStyle{color:theme.taskbar_text_active,size:12,align:.center})
+		}
+	}
 	if dock {
 		x = workspace_x + workspace_width + taskbar_item_gap
 	}
@@ -1618,7 +1634,9 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// source goes right up against the time, in the room its box leaves free.
 	tray_x := if dock { x } else { status_right - status_width }
 	d.tray_elements(mut children, tray_x, item_y, item_height)
-	build_x := tray_x + tray_span
+	center_x := tray_x + tray_span
+	build_x := center_x + 24
+	children << ui2.Element{...ui2.button('session.center','N',ui2.rect(f64(center_x),f64(item_y),20,f64(item_height)),ui2.BoxStyle{transparent:true},ui2.TextStyle{color:theme.taskbar_text_active,size:12}),accessibility_label:'Notifications and session controls'}
 	clock_x := build_x + build_width + taskbar_item_gap + d.input_menu_span()
 	if d.input_menu_shown() {
 		children << d.input_menu_button(clock_x + clock_width - d.clock_text_width() -
@@ -1709,15 +1727,16 @@ fn (d &Desktop) taskbar_layout(entry_count int) TaskbarLayout {
 	// presentation as well as on an unscaled framebuffer.
 	tray_width := d.tray_width()
 	tray_span := if tray_width > 0 { tray_width + taskbar_item_gap } else { 0 }
-	status_width := tray_span + taskbar_build_width + taskbar_item_gap + d.input_menu_span() +
+	status_width := tray_span + 24 + taskbar_build_width + taskbar_item_gap + d.input_menu_span() +
 		taskbar_clock_width
 	status_right := if dock {
 		0
 	} else {
 		d.canvas.width - taskbar_show_desktop_width - taskbar_item_gap
 	}
-	workspace_width := workspace_count * workspace_button_width +
-		(workspace_count - 1) * workspace_button_gap
+	visible_workspaces := if d.workspace_total() > 4 { 4 } else { d.workspace_total() }
+	workspace_width := visible_workspaces * workspace_button_width +
+		(visible_workspaces - 1) * workspace_button_gap + if d.workspace_total() > 4 { 46 } else { 0 }
 	workspace_x := status_right - status_width - taskbar_item_gap - workspace_width
 	entries_right := if dock { d.canvas.width } else { workspace_x - taskbar_item_gap }
 	// Entries share whatever room is left rather than each taking a fixed
@@ -2044,6 +2063,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 	}
 	d.pointer_x = x
 	d.pointer_y = y
+	if d.session_file_move(x,y) { return }
 	if d.window_overlay_active() {
 		d.set_hover(d.hit_action(x, y))
 		return
@@ -2254,6 +2274,7 @@ fn (mut d Desktop) add_damage_rect(x int, y int, width int, height int) {
 // windows retain the looser reachable-title-bar rule so they can still be
 // dragged to every clipped edge.
 fn (mut d Desktop) clamp_to_screen(index int) {
+	if d.session.state.display_count>1 { d.clamp_to_display(index); return }
 	margin := 60
 	available_width := d.canvas.width
 	available_height := d.canvas.height - taskbar_height
@@ -2320,6 +2341,16 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	d.clear_taskbar_press()
 	action, world := d.hit_action_world(x, y)
 	d.trace_selector(action, world)
+	if world == .desktop && d.handle_session_hub_action(action) {
+		d.chrome_pointer_capture = true
+		return
+	}
+	if world == .desktop && d.handle_shell_dialog(action) { return }
+	if world == .desktop && action.starts_with('session.retry.') {
+		d.retry_session_window(action['session.retry.'.len..].int())
+		d.chrome_pointer_capture = true
+		return
+	}
 	d.set_hover(action)
 	d.dirty = true
 	if d.window_actions.active && d.window_actions_pointer_down(action, world) {
@@ -2402,6 +2433,9 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	// under the pointer over its private RPC pipe. Their spelling never grants
 	// access to desktop actions, including Start, window chrome and shortcuts.
 	if world == .application {
+		for i:=d.windows.len-1; i>=0; i-- { w:=d.windows[i]; if x>=w.x && x<w.x+w.width && y>=w.y && y<w.y+w.height && w.workspace==d.current_workspace && !w.minimized { d.raise(w.id); break } }
+		d.mark_session_gesture()
+		if d.session_file_press(action,x,y) { return }
 		d.forward_to_app(x, y, action)
 		return
 	}
@@ -2530,6 +2564,8 @@ fn (d &Desktop) trace_selector(action string, world ActionWorld) {
 }
 
 fn (mut d Desktop) on_pointer_up(x int, y int) {
+	if d.session_file_release(x,y) { return }
+	if d.complete_session_drop(x,y) { return }
 	if d.window_overlay_active() {
 		// A chooser opened from the keyboard can cancel a held app gesture
 		// without receiving its press. Its release still belongs to the modal.
@@ -2584,6 +2620,7 @@ fn (mut d Desktop) on_pointer_up(x int, y int) {
 // Finish the placement preview's half, quarter or maximize gesture.
 fn (mut d Desktop) finish_window_drag(x int, y int) {
 	id := d.drag.window_id
+	if d.drag.moved { d.remember_window_display(id) }
 	d.finish_window_placement(x, y)
 	if d.drag.moved {
 		d.open_window_snap_assist(id)

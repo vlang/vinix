@@ -122,6 +122,7 @@ mut:
 	// keyboard is read 64 bytes at a time, so that can be the next key_input.
 	pending     [4]u8
 	pending_len int
+	portal_open bool
 }
 
 fn open_editor(mut _ Desktop) !NativeApp {
@@ -650,7 +651,7 @@ fn (mut a TextEditorApp) key_input(input string) {
 				continue
 			}
 			0x0f {
-				a.open_document()
+				a.choose_open_document()
 				i++
 				continue
 			}
@@ -872,7 +873,7 @@ fn (mut a TextEditorApp) handle(event_id string) ! {
 		editor_action_replace_all { a.replace_all() }
 		editor_action_find_close { a.close_find() }
 		editor_action_new { a.new_document() }
-		editor_action_open { a.open_document() }
+		editor_action_open { a.choose_open_document() }
 		editor_action_save { a.save_document() }
 		editor_action_path {
 			a.focus = .path

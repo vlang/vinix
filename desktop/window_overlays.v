@@ -180,7 +180,7 @@ fn (mut d Desktop) take_window_overlay_keys(keys string) string {
 			// Releasing a chord rearms Quick Launch but leaves menus open.
 			d.take_switcher_sequence(sequence, 0)
 			changed = true
-		} else if complete && !d.window_overlay_active() && window_shortcut_sequence(sequence) {
+		} else if complete && !d.window_overlay_active() && (window_shortcut_sequence(sequence) || d.session_shortcut_sequence(sequence)) {
 			d.take_window_shortcuts(sequence)
 			owned_input = owned_input || d.window_overlay_active()
 			changed = true

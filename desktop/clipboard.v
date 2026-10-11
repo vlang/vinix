@@ -143,6 +143,8 @@ fn (mut d Desktop) request_host_paste() {
 }
 
 fn (mut d Desktop) request_paste(force_host bool) {
+	if !d.hub.policy.clipboard_apps { return }
+	if !force_host && d.paste_session_data() { return }
 	if !force_host && d.clipboard.local_available {
 		text := unsafe { tos(&d.clipboard.local_bytes[0], d.clipboard.local_length) }
 		if d.start_menu_open { d.paste_start_menu_text(text) }

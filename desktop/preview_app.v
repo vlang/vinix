@@ -48,6 +48,7 @@ enum PreviewFocus {
 struct PreviewApp {
 mut:
 	open_path          []u8
+	portal_open bool
 	export_path        []u8
 	loaded_path        string
 	source             []u8

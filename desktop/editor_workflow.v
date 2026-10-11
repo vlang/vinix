@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import os
+
+fn (mut a TextEditorApp) choose_open_document() {
+	if a.portal_open { return }
+	directory:=os.dir(editor_bytes_text(a.path))
+	defer { unsafe { directory.free() } }
+	a.portal_open=session_dialog_open('editor.open',0,'Open document',if directory.starts_with('/') { directory } else { desktop_home },'', 'text/plain')
+	if !a.portal_open { a.open_document() }
+}
+
 enum EditorPendingAction { none_ close new_document open_document }
 
 const editor_action_save_as = 'editor.save_as'

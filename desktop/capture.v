@@ -630,6 +630,12 @@ fn (mut d Desktop) capture_finish_video(show_owner bool) {
 }
 
 fn (mut d Desktop) accept_capture_request(request CaptureRequest) {
+	if !d.hub.policy.allow_capture && request.command != .stop {
+		d.capture.request = request
+		d.capture.report.handled_sequence = request.sequence
+		d.capture_fail()
+		return
+	}
 	if request.sequence == 0 || request.sequence == d.capture.request.sequence {
 		return
 	}

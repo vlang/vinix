@@ -20,6 +20,10 @@ or installable integrations.
 The window-management comparison with macOS and Windows, implemented gestures
 and prioritized remaining gaps are in [WINDOW_EXPERIENCE.md](WINDOW_EXPERIENCE.md).
 
+Configurable workspaces, display recovery, session restoration, notifications,
+supervised services, shared dialogs, clipboard exchange and system Settings are
+documented in [SESSION.md](SESSION.md).
+
 What it does:
 
 - a wallpaper, and a taskbar with Start, open windows, the desktop build date
@@ -38,7 +42,7 @@ What it does:
 - dragging a window by its title bar, with top-edge maximize, side halves,
   corner quarters and a translucent placement preview; shake the title bar to
   hide other windows on its workspace, and shake again to restore them
-- four workspaces with a taskbar pager, isolated focus/task lists and
+- one to sixteen configurable workspaces with a taskbar pager, isolated focus/task lists and
   Super+1..4 switching (Super+Shift+1..4 moves the focused window)
 - Linux-style Super+Arrow keyboard tiling into halves and quarters, with
   Super+Up/Down maximizing, restoring and minimizing windows

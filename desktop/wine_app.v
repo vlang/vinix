@@ -8,6 +8,7 @@
 module main
 
 import ui2
+import desktop.sessioncore
 
 const firefox_surface_width = 1280
 const firefox_surface_height = 900
@@ -90,6 +91,7 @@ enum WineHostEventKind as u32 {
 	wheel_up
 	wheel_down
 	paste
+	rich_paste
 }
 
 struct WineHostEvent {
@@ -121,6 +123,11 @@ mut:
 	last_blit_ms    i64
 	failed          bool
 	failure         HostedText
+	uri sessioncore.Text
+	uri_step int
+	uri_due i64
+	portal_open bool
+	open_file bool
 }
 
 // HostedText is what a hosted window says in place of its surface. The window
@@ -487,7 +494,14 @@ fn (mut app HostedX11App) build(size ui2.Rect) !ui2.Element {
 	return ui2.screen(0xf3f4f6, children)
 }
 
-fn (mut app HostedX11App) handle(_ string) ! {}
+fn (mut app HostedX11App) handle(action string) ! {
+	if !action.starts_with(jump_open_prefix) { return }
+	value:=action[jump_open_prefix.len..]
+	if !value.starts_with('/') && (app.icon !in ['asset:firefox','asset:chromium'] || (!value.starts_with('https://') && !value.starts_with('http://'))) { return }
+	app.uri.set(value)!
+	app.open_file=value.starts_with('/')
+	app.uri_step=1; app.uri_due=monotonic_millis()+500
+}
 
 fn (mut app HostedX11App) poll() bool {
 	if app.host_pid > 0 && desktop_child_exited(app.host_pid) {
@@ -506,8 +520,28 @@ fn (mut app HostedX11App) poll() bool {
 		app.ready = true
 		return true
 	}
+	if app.uri_step>0 && monotonic_millis()>=app.uri_due {
+		match app.uri_step { 1 { app.send_host_event(.keys,0,0,if app.open_file { '\x0f' } else { '\x0c' }) } 2 { if app.open_file { app.send_host_event(.keys,0,0,'\x0c') } else { app.paste_input(app.uri.str()) } } 3 { if app.open_file { app.paste_input(app.uri.str()) } else { app.send_host_event(.keys,0,0,'\r') } } else { app.send_host_event(.keys,0,0,'\r') } }
+		last:=if app.open_file { 4 } else { 3 }
+		app.uri_step=if app.uri_step==last { 0 } else { app.uri_step+1 }; app.uri_due=monotonic_millis()+300
+	}
+	if app.portal_open { if path:=session_dialog_take('hosted.open') { app.portal_open=false; if path.len>0 { action:='${jump_open_prefix}${path}'; app.handle(action) or {}; unsafe { action.free() } }; unsafe { path.free() } } }
 	return app.surface_changed()
 }
+
+fn (mut app HostedX11App) take_clipboard_copy_request() []u8 {
+	path:='${app.directory}/clipboard'; defer { unsafe { path.free() } }
+	text:=sessioncore.load(path,clipboard_max_bytes+1) or { return []u8{} }
+	defer { unsafe { text.free() } }
+	C.unlink(&char(path.str))
+	if text.len<2 || text[0]>3 { return []u8{} }
+	data:=unsafe { tos(&text.str[1],text.len-1) }
+	if text[0]==0 { return text_copy_request(1,data) }
+	_ = session_offer_data(unsafe { sessioncore.DataKind(text[0]) },data,false)
+	return []u8{}
+}
+
+fn (mut app HostedX11App) receive_clipboard_copy_reply(_ string) {}
 
 // Xvfb changes its shared XWD mapping in place, so nothing in the ui2 model
 // says that a new frame arrived. The host watches the X DAMAGE stream and
@@ -572,7 +606,7 @@ fn (mut app HostedX11App) pointer_input_enabled() bool {
 }
 
 fn (mut app HostedX11App) send_host_event(kind WineHostEventKind, x int, y int, keys string) {
-	if app.input_fd < 0 || keys.len > clipboard_max_bytes {
+	if app.input_fd < 0 || keys.len > clipboard_max_bytes+if kind==.rich_paste { 1 } else { 0 } {
 		return
 	}
 	event := WineHostEvent{
@@ -643,6 +677,7 @@ fn (mut app HostedX11App) pointer_event(phase AppPointerPhase, button AppPointer
 }
 
 fn (mut app HostedX11App) key_input(text string) {
+	if text=='\x0f' && !app.portal_open { app.portal_open=session_dialog_open('hosted.open',0,'Open file',desktop_home,'',''); if app.portal_open { return } }
 	if text.len > 0 {
 		app.send_host_event(.keys, 0, 0, text)
 	}
@@ -652,6 +687,11 @@ fn (mut app HostedX11App) paste_input(text string) {
 	if text.len > 0 {
 		app.send_host_event(.paste, 0, 0, text)
 	}
+}
+
+fn (mut app HostedX11App) paste_data(kind sessioncore.DataKind,data string) {
+	mut bytes:=[]u8{cap:data.len+1}; bytes<<u8(kind); for byte in data { bytes<<byte }
+	app.send_host_event(.rich_paste,0,0,unsafe { tos(bytes.data,bytes.len) }); unsafe { bytes.free() }
 }
 
 fn (mut app HostedX11App) close_app() {
