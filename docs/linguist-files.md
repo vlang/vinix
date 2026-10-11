@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `eff690f6c8559180fba471f042216a4ea54062fb`,
+at source commit `7a27a2544f6e2ecd5000da79b0e9aa2e8a78ef74`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 567 | 2,365,422 | 6.16% |
-| Python | 274 | 1,434,984 | 3.74% |
-| Shell | 560 | 1,359,414 | 3.54% |
+| C | 567 | 2,365,422 | 6.15% |
+| Python | 267 | 1,394,382 | 3.62% |
+| Shell | 563 | 1,358,207 | 3.53% |
 
-All `.v` files are classified as V. The resulting V share is 78.45%, with no
+All `.v` files are classified as V. The resulting V share is 78.59%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,434,984 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,394,382 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev eff690f6c8559180fba471f042216a4ea54062fb --breakdown --json
+github-linguist --rev 7a27a2544f6e2ecd5000da79b0e9aa2e8a78ef74 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -679,7 +679,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
-| `build-support/venus/prepare-qemu.py` | 3,270 |
 | `build-support/venus/tests/run.py` | 6,197 |
 | `build-support/xorg-server/compile-v-host.py` | 1,972 |
 | `desktop/tools/_font_native.py` | 9,708 |
@@ -834,13 +833,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dhewm3/_guest_native.py` | 3,724 |
 | `tests/dhewm3/prepare-debian.py` | 1,073 |
 | `tests/dhewm3/run.py` | 3,664 |
-| `tests/dota2/_game_vm_native.py` | 2,621 |
 | `tests/dota2/_native.py` | 3,559 |
-| `tests/dota2/_prepare_native.py` | 8,651 |
 | `tests/dota2/_vulkan_fixture_native.py` | 6,287 |
 | `tests/dota2/_vulkan_vm_native.py` | 830 |
-| `tests/dota2/run-test.py` | 5,348 |
-| `tests/dota2/run.py` | 6,163 |
 | `tests/dota2/vulkan-run.py` | 2,115 |
 | `tests/dota2/vulkan-stage-test.py` | 4,722 |
 | `tests/ext2-xattr/host.py` | 6,852 |
@@ -894,8 +889,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/virtio-gpu-virgl/_native.py` | 957 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 5,650 |
 | `tools/_package_store_native.py` | 4,314 |
-| `tools/dota2/_ext2_native.py` | 8,261 |
-| `tools/dota2/ext2_export.py` | 6,288 |
 | `tools/host_clipboard.py` | 1,332 |
 | `tools/qemu-package-store.py` | 4,917 |
 | `tools/verified-boot/_native.py` | 2,322 |
@@ -978,6 +971,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/storage-tools/stage` | 163 |
 | `build-support/uname` | 1,025 |
 | `build-support/v-command` | 1,409 |
+| `build-support/venus/prepare-qemu` | 210 |
 | `build-support/vinix-desktop-build` | 12,928 |
 | `build-support/vinix-desktop-reload` | 3,872 |
 | `build-support/vinix-files-sync` | 2,361 |
@@ -1003,7 +997,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/build-wine-host.sh` | 1,990 |
 | `build-support/xorg-server/compile-v-host` | 162 |
 | `build-support/xorg-server/startx` | 2,994 |
-| `desktop/tools/screenshot.sh` | 2,055 |
+| `desktop/tools/screenshot.sh` | 258 |
 | `desktop/tools/test-activity.sh` | 2,473 |
 | `desktop/tools/test-battery.sh` | 673 |
 | `desktop/tools/test-clipboard.sh` | 1,824 |
@@ -1081,7 +1075,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/deploy-m1-efi.sh` | 21,910 |
 | `scripts/kek.sh` | 16,153 |
 | `scripts/push-to-m1.sh` | 6,967 |
-| `scripts/run-aarch64.sh` | 63,292 |
+| `scripts/run-aarch64.sh` | 63,281 |
 | `scripts/run-amd64-alpine.sh` | 5,108 |
 | `scripts/run-desktop-aarch64.sh` | 16,575 |
 | `scripts/run-desktop-amd64.sh` | 2,920 |
@@ -1178,7 +1172,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/export-test` | 217 |
 | `tests/dota2/game-init.sh` | 2,517 |
 | `tests/dota2/lavapipe-run` | 202 |
+| `tests/dota2/run` | 193 |
 | `tests/dota2/run-mmap32` | 200 |
+| `tests/dota2/run-test` | 198 |
 | `tests/dota2/steam-smoke-init.sh` | 2,498 |
 | `tests/dota2/steam-smoke-run` | 205 |
 | `tests/dota2/vulkan-init.sh` | 3,187 |
