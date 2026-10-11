@@ -1,0 +1,8 @@
+description = Add a user account
+auth = admin
+exec = /usr/sbin/vinix-account
+arg = add
+param = name
+param = text
+param = choice:admin,standard
+input = secret

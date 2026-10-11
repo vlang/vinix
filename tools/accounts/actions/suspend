@@ -1,0 +1,5 @@
+description = Put the computer to sleep
+auth = session
+exec = /usr/sbin/vinix-system
+arg = power
+arg = suspend

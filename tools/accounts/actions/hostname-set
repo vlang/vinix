@@ -1,0 +1,5 @@
+description = Change the name of this computer
+auth = admin
+exec = /usr/sbin/vinix-system
+arg = hostname
+param = hostname

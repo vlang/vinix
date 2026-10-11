@@ -435,3 +435,27 @@ fn gone_shadow(db Database, name string) bool {
 	db.shadow(name) or { return true }
 	return false
 }
+
+fn test_configured_cost() ! {
+	dir := os.join_path(os.temp_dir(), 'vinix-cost-${os.getpid()}')
+	os.rmdir_all(dir) or {}
+	os.mkdir_all(dir)!
+	defer { os.rmdir_all(dir) or {} }
+	path := os.join_path(dir, 'auth.conf')
+	assert configured_cost(path, false)! == default_cost
+	os.write_file(path, '# more work\nscrypt_ln = 16\nscrypt_p = 2\n')!
+	os.chmod(path, 0o644)!
+	cost := configured_cost(path, false)!
+	assert cost.ln == 16 && cost.r == 8 && cost.p == 2
+	for bad in ['scrypt_ln = 9\n', 'scrypt_ln = 19\n', 'scrypt_p = 0\n', 'scrypt_ln = many\n',
+		'scrypt_ln 16\n', 'kdf = md5\n', 'scrypt_ln = 16 = 17\n'] {
+		os.write_file(path, bad)!
+		configured_cost(path, false) or { continue }
+		assert false, bad
+	}
+	// A settings file anyone can write decides nothing.
+	os.write_file(path, 'scrypt_ln = 10\n')!
+	os.chmod(path, 0o666)!
+	configured_cost(path, false) or { return }
+	assert false
+}

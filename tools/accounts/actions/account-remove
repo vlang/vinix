@@ -1,0 +1,5 @@
+description = Remove a user account
+auth = admin
+exec = /usr/sbin/vinix-account
+arg = remove
+param = name

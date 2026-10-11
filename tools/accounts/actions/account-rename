@@ -1,0 +1,6 @@
+description = Change the full name of an account
+auth = admin
+exec = /usr/sbin/vinix-account
+arg = rename
+param = name
+param = text

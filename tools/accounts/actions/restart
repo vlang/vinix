@@ -1,0 +1,5 @@
+description = Restart the computer
+auth = session
+exec = /usr/sbin/vinix-system
+arg = power
+arg = restart

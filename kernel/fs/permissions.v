@@ -170,3 +170,26 @@ pub fn syscall_umask(_ voidptr, mask u32) (u64, u64) {
 	process.umask = mask & 0o777
 	return old, 0
 }
+
+// Whether the caller may give `node` another name: Linux's
+// protected_hardlinks. Its owner may, CAP_FOWNER may, and so may anyone who
+// could read and write it anyway, as long as it is an ordinary file that
+// carries no identity of its own. Otherwise an account could pin someone
+// else's file under a name it controls: the file would outlive its owner
+// removing it, and a privileged program that later changes "the file in
+// /tmp" by name would change that one.
+fn may_link(node &VFSNode) ? {
+	process := proc.current_thread().process
+	mode := node.resource.stat.mode
+	if holds_capability(process, proc.cap_fowner, true) || process.euid == node.resource.stat.uid {
+		return
+	}
+	if !stat.isreg(mode) || mode & 0o4000 != 0 || mode & 0o2010 == 0o2010 {
+		errno.set(errno.eperm)
+		return none
+	}
+	check_access(node, access_read | access_write, true) or {
+		errno.set(errno.eperm)
+		return none
+	}
+}

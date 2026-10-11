@@ -241,6 +241,13 @@ fn prepare_state_directory(path string) !string {
 // passed, 1 when one failed, 2 for a mistake in the invocation or the setup
 // and 130 when the run was interrupted.
 pub fn run(arguments []string, controller_source string) int {
+	return run_suite(Suite{
+		scenarios: scenarios
+	}, arguments, controller_source)
+}
+
+// The same for any suite.
+pub fn run_suite(suite Suite, arguments []string, controller_source string) int {
 	options := parse_options(arguments) or {
 		eprintln('run: ${err.msg()}')
 		eprintln(usage)
@@ -250,15 +257,15 @@ pub fn run(arguments []string, controller_source string) int {
 		println(usage)
 		return 0
 	}
-	validate_scenarios(scenarios) or {
+	validate_scenarios(suite.scenarios) or {
 		eprintln('run: scenario table: ${err.msg()}')
 		return 2
 	}
 	if options.list {
-		println(list_text(scenarios, options.arch))
+		println(list_text(suite.scenarios, options.arch))
 		return 0
 	}
-	selection := select_scenarios(scenarios, options.arch, options.scenarios) or {
+	selection := select_scenarios(suite.scenarios, options.arch, options.scenarios) or {
 		eprintln('run: ${err.msg()}')
 		return 2
 	}
@@ -288,21 +295,31 @@ pub fn run(arguments []string, controller_source string) int {
 		}
 	}
 	watch_interrupts()
-	status := run_selection(host, selection, kernel, work, options.timeout, keep, options.failures_only)
+	status := run_selection(host, suite, selection, kernel, work, options.timeout, keep,
+		options.failures_only)
 	if !keep {
 		release_work_directory(work)
 	}
 	return status
 }
 
-fn run_selection(host Host, selection Selection, kernel string, work string, timeout int, keep bool, failures_only bool) int {
+fn run_selection(host Host, suite Suite, selection Selection, kernel string, work string, timeout int, keep bool, failures_only bool) int {
 	guest_directory := os.join_path(work, 'guest')
-	guest := build_guest(host, guest_directory) or {
+	guest := build_program(host, os.join_path(host.root, suite.guest), guest_directory,
+		'init', suite.module_paths) or {
 		if err is Interrupted {
 			eprintln('run: interrupted')
 			return 130
 		}
 		eprintln('run: cannot build the guest program:\n${err.msg()}')
+		return 2
+	}
+	extras := build_extras(host, suite, guest_directory) or {
+		if err is Interrupted {
+			eprintln('run: interrupted')
+			return 130
+		}
+		eprintln('run: cannot build the root file system:\n${err.msg()}')
 		return 2
 	}
 	mut passed := 0
@@ -312,6 +329,7 @@ fn run_selection(host Host, selection Selection, kernel string, work string, tim
 		outcome := run_scenario(host, scenario, Run{
 			kernel:  kernel
 			guest:   guest
+			extras:  extras
 			state:   os.join_path(work, scenario.name)
 			// A scenario that says it needs longer than the run allows gets it.
 			timeout:       if scenario.timeout > timeout { scenario.timeout } else { timeout }
@@ -339,6 +357,6 @@ fn run_selection(host Host, selection Selection, kernel string, work string, tim
 	for scenario in selection.skipped {
 		println('SKIP ${host.arch} ${scenario.name} (${scenario.left_out()})')
 	}
-	println('hardware-platform ${host.arch}: ${passed} passed, ${failed} failed, ${selection.skipped.len} skipped')
+	println('${suite.name} ${host.arch}: ${passed} passed, ${failed} failed, ${selection.skipped.len} skipped')
 	return if failed == 0 { 0 } else { 1 }
 }

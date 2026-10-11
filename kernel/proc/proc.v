@@ -192,6 +192,10 @@ pub fn default_rlimits() [rlimit_nlimits]RLimit {
 		cur: max_pid - 1
 		max: max_pid - 1
 	}
+	// No real-time priority without privilege, as on Linux: a process that
+	// could make itself SCHED_FIFO could keep a processor from everyone
+	// else. Root is not asked (may_set_sched_params).
+	limits[rlimit_rtprio] = RLimit{}
 	return limits
 }
 

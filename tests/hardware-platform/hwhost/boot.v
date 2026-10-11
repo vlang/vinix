@@ -16,18 +16,28 @@ const tool_seconds = 300
 
 // The guest is one V program for every scenario, compiled once per run. V
 // writes C, and the musl cross compiler of the architecture links it
-// statically: the initramfs has no libraries and no other files.
-pub fn build_guest(host Host, directory string) !string {
+// statically: the initramfs has no libraries. `source` is a V file or a
+// directory of them, built into `directory`/`name`; a suite's other
+// programs are built the same way.
+pub fn build_program(host Host, source string, directory string, name string, module_paths []string) !string {
 	os.mkdir_all(directory)!
-	source := os.join_path(host.root, 'tests', 'hardware-platform', 'guest')
-	c_file := os.join_path(directory, 'init.c')
-	binary := os.join_path(directory, 'init')
+	c_file := os.join_path(directory, name + '.c')
+	binary := os.join_path(directory, name)
 	log := os.join_path(directory, 'build.log')
 	v_arch := if host.arch == 'aarch64' { 'arm64' } else { 'amd64' }
 	// No collector and no backtraces: PID 1 of a test kernel should need as
 	// little of that kernel as it can, and what it allocates dies with it.
-	run_tool([host.v, '-os', 'linux', '-arch', v_arch, '-gc', 'none', '-d', 'no_backtrace', '-o',
-		c_file, source], map[string]string{}, log, tool_seconds)!
+	mut compile := [host.v, '-os', 'linux', '-arch', v_arch, '-gc', 'none', '-d', 'no_backtrace']
+	if module_paths.len > 0 {
+		// Modules a suite's programs share with the tools they test.
+		mut lookup := ['@vlib', '@vmodules']
+		for path in module_paths {
+			lookup << os.join_path(host.root, path)
+		}
+		compile << ['-path', lookup.join('|')]
+	}
+	compile << ['-o', c_file, source]
+	run_tool(compile, map[string]string{}, log, tool_seconds)!
 	if host.arch == 'aarch64' {
 		sysroot := environment_or('VINIX_AARCH64_SYSROOT', shared_path(host.root, os.join_path('build-aarch64-userland',
 			'sysroot')))
@@ -35,11 +45,14 @@ pub fn build_guest(host Host, directory string) !string {
 			return error('no AArch64 musl sysroot at ${sysroot}; set VINIX_AARCH64_SYSROOT')
 		}
 		run_tool([environment_or('CC_AARCH64', 'clang'), '--target=aarch64-linux-musl',
-			'--sysroot=' + sysroot, '-static', '-O1', '-w', '-fno-stack-protector',
+			'--sysroot=' + sysroot, '-static', '-O1', '-w', '-D_GNU_SOURCE', '-fno-stack-protector',
 			'-L' + os.join_path(sysroot, 'lib'), '-fuse-ld=lld', '-o', binary, c_file, '-lm',
 			'-lpthread'], map[string]string{}, log, tool_seconds)!
 	} else {
-		run_tool([environment_or('CC_AMD64', 'x86_64-linux-musl-gcc'), '-static', '-O1', '-w',
+		// -fpermissive: V's own library passes an i64 where C wants an int
+		// pointer (os.Process and waitpid), which gcc 14 refuses outright and
+		// clang, above, only warns about.
+		run_tool([environment_or('CC_AMD64', 'x86_64-linux-musl-gcc'), '-static', '-O1', '-w', '-fpermissive', '-D_GNU_SOURCE',
 			'-o', binary, c_file, '-lm', '-lpthread'], map[string]string{}, log, tool_seconds)!
 	}
 	return binary
@@ -47,8 +60,17 @@ pub fn build_guest(host Host, directory string) !string {
 
 // The root file system: the guest as /sbin/init, the name of the scenario it
 // is to run, and the empty directories the kernel mounts things on.
-pub fn build_initramfs(guest string, scenario string, state string) !string {
+pub fn build_initramfs(guest string, scenario string, state string, extras string) !string {
 	rootfs := os.join_path(state, 'rootfs')
+	if extras != '' {
+		// What the suite adds, first: the directories below are then only
+		// made where it did not bring them. cp -p, because the modes are
+		// part of what it adds: a /tmp anyone may write, a file only root
+		// may read.
+		os.mkdir_all(rootfs)!
+		run_tool(['cp', '-Rp', extras + '/.', rootfs], map[string]string{}, os.join_path(state,
+			'image.log'), tool_seconds)!
+	}
 	for directory in ['sbin', 'etc', 'dev', 'proc', 'sys', 'tmp', 'root'] {
 		os.mkdir_all(os.join_path(rootfs, directory))!
 	}

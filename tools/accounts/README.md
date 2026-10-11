@@ -1,0 +1,51 @@
+# Account tools
+
+Users, groups, passwords, the authentication service and sessions.
+[`docs/accounts.md`](../../docs/accounts.md) describes the design and the
+rules; this page is where things are.
+
+| Path | What |
+| --- | --- |
+| `accountcore/` | The account database: `model.v` (what is valid), `parse.v` (the three files' text), `store.v` (reading and replacing them), `ops.v` (add, remove, lock ...), `password.v` (scrypt records), `throttle.v` (the wait after wrong passwords). |
+| `authproto/` | The frame format on the service's socket. |
+| `authcore/` | What the service decides (`service.v`), the action files (`action.v`) and how an allowed action is started (`run.v`). |
+| `authclient/` | Connect, send one request, read one reply. |
+| `sessioncore/` | `become`: a root process turned into an account's. |
+| `actions/` | The action files that ship, installed in `/usr/share/vinix/actions`. |
+| `authd.v` | `vinix-authd` |
+| `auth.v` | `vinix-auth` |
+| `account.v` | `vinix-account` |
+| `session.v` | `vinix-session` |
+| `system.v` | `vinix-system` |
+
+## Building
+
+    tools/accounts/build aarch64|x86_64 ROOT
+
+builds the five programs statically for a Vinix machine and lays them and
+the action files out under `ROOT` as they are installed.
+
+A system starts using them with, as root and in this order:
+
+    vinix-account init      # at every boot
+    vinix-authd &           # before anything that logs in
+
+## Tests
+
+Host tests are beside the modules (`*_test.v`); `v test tools/accounts`
+runs them. They cover the parsers with malformed and hostile input, the
+password records against RFC 7914's vector, every rule of the service with a
+stand-in for starting programs, and the shipped action files.
+
+[`tests/accounts`](../../tests/accounts/README.md) boots a kernel and runs
+the real programs as real accounts.
+
+## Adding an action
+
+Write a file in `actions/` (the format is at the top of
+`authcore/action.v`), and a program for it to run if `vinix-system` or
+`vinix-account` does not already do the thing. Keep the program to one
+operation with arguments it checks itself: the service checks them too, but
+the program is what runs as root. `authcore/shipped_actions_test.v` fails if
+a shipped file does not parse or lets someone who merely sits at the machine
+change accounts.

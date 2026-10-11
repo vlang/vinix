@@ -772,6 +772,15 @@ pub fn (mut this InetSocket) recvfrom_flags(handle voidptr, buf voidptr, count u
 fn (mut this InetSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	mut endpoint := unsafe { &C.vinix_net_endpoint(C.vinix_stack_alloc(sizeof(C.vinix_net_endpoint))) }
 	fill_endpoint(_addr, addrlen, this.family, mut endpoint)?
+	// Ports below 1024 are the system's: a service on one of them is taken
+	// for the machine's own. Only CAP_NET_BIND_SERVICE binds them, as on
+	// Linux; the port is in network byte order.
+	port := (endpoint.port >> 8) | ((endpoint.port & 0xff) << 8)
+	if port != 0 && port < 1024
+		&& !proc.current_has_capability(proc.cap_net_bind_service) {
+		errno.set(errno.eacces)
+		return none
+	}
 	net_lock.acquire()
 	ret := C.vinix_socket_bind_endpoint(this.handle, endpoint)
 	this.refresh_status()

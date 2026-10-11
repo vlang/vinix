@@ -1,0 +1,6 @@
+description = Change who may administer this computer
+auth = admin
+exec = /usr/sbin/vinix-account
+arg = admin
+param = name
+param = choice:on,off

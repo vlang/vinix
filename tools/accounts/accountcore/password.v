@@ -363,3 +363,51 @@ pub fn login_name_for(display string) string {
 	}
 	return name
 }
+
+// The cost new password records are made at: the default, or what the
+// administrator's settings file asks for.
+//
+//	# /etc/vinix/auth.conf
+//	scrypt_ln = 16
+//	scrypt_p = 2
+//
+// More work than the default is the point of the file. Less is accepted
+// down to ln = 10, for tests and for machines on which the default would
+// make a login take minutes; the file is root's, and so is that decision.
+// A file that cannot be read as this is an error, not a reason to guess.
+pub fn configured_cost(path string, owned bool) !Cost {
+	if !os.exists(path) && !os.is_link(path) {
+		return default_cost
+	}
+	text := read_trusted(path, false, owned)!
+	mut ln := default_cost.ln
+	mut p := default_cost.p
+	for line in text.split_into_lines() {
+		trimmed := line.trim_space()
+		if trimmed == '' || trimmed.starts_with('#') {
+			continue
+		}
+		parts := trimmed.split('=')
+		if parts.len != 2 {
+			return error('${path}: expected key = value')
+		}
+		key := parts[0].trim_space()
+		value := parse_small(parts[1].trim_space()) or {
+			return error('${path}: ${key} is not a number')
+		}
+		match key {
+			'scrypt_ln' { ln = value }
+			'scrypt_p' { p = value }
+			else { return error('${path}: unknown setting ${key}') }
+		}
+	}
+	cost := Cost{
+		ln: ln
+		r:  8
+		p:  p
+	}
+	if !cost.valid() {
+		return error('${path}: scrypt_ln must be ${min_ln}..${max_ln} and scrypt_p 1..${max_p}')
+	}
+	return cost
+}

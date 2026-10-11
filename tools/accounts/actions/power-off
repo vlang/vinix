@@ -1,0 +1,5 @@
+description = Turn the computer off
+auth = session
+exec = /usr/sbin/vinix-system
+arg = power
+arg = off

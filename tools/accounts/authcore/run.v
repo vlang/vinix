@@ -17,12 +17,12 @@ import os
 #include <fcntl.h>
 
 fn C.fork() int
-fn C.pipe(fds &int) int
+fn C.pipe(fds &i32) int
 fn C.dup2(old int, new int) int
 fn C.setsid() int
 fn C.execve(path &char, argv &&char, envp &&char) int
 fn C._exit(status int)
-fn C.waitpid(pid int, status &int, options int) int
+fn C.waitpid(pid int, status &i32, options int) int
 fn C.kill(pid int, signal int) int
 fn C.poll(fds voidptr, count u64, timeout int) int
 fn C.chdir(path &char) int
@@ -30,7 +30,7 @@ fn C.umask(mask u32) u32
 
 struct PollFd {
 mut:
-	fd      int
+	fd      i32
 	events  i16
 	revents i16
 }
@@ -52,8 +52,8 @@ pub fn run_action(action Action, argv []string, input []u8, peer Peer, user stri
 	if !trusted_program(action.exec, true) {
 		return RunResult{}
 	}
-	mut to_child := [2]int{}
-	mut from_child := [2]int{}
+	mut to_child := [2]i32{}
+	mut from_child := [2]i32{}
 	if C.pipe(&to_child[0]) != 0 {
 		return RunResult{}
 	}
@@ -114,7 +114,7 @@ pub fn run_action(action Action, argv []string, input []u8, peer Peer, user stri
 			fd:     from_child[0]
 			events: 1
 		}
-		ready := C.poll(&poll_fd, 1, 1000)
+		ready := C.poll(voidptr(&poll_fd), 1, 1000)
 		if ready == 0 {
 			waited += 1000
 			if waited >= run_timeout_ms {
@@ -142,7 +142,7 @@ pub fn run_action(action Action, argv []string, input []u8, peer Peer, user stri
 		C.kill(-child, C.SIGKILL)
 		C.kill(child, C.SIGKILL)
 	}
-	mut status := 0
+	mut status := i32(0)
 	for C.waitpid(child, &status, 0) < 0 {
 		if C.errno != C.EINTR {
 			return RunResult{}

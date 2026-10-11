@@ -1559,6 +1559,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	if stat.isdir(old_node.resource.stat.mode) {
 		return errno.err, errno.eperm
 	}
+	may_link(old_node) or { return errno.err, errno.get() }
 	mac_node(old_node, proc.mac_metadata) or { return errno.err, errno.get() }
 	if !policy_check_link(old_node, newparent, basename) {
 		return errno.err, errno.get()

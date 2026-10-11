@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (c) 2026 Alexander Medvednikov
+//
+// The guest half of the account tests: /sbin/init of a machine whose root
+// file system holds the account tools and nothing else.
+//
+// The controller puts the name of one scenario in /etc/hwtest-scenario.
+// This program runs it and reports on the serial port, in the lines the
+// hardware tests use (tests/hardware-platform/guest/main.v).
+//
+// The same binary is also what the scenarios run *as an account* to see
+// what that account can do: `/sbin/init probe <what>` (probe.v). Nothing in
+// the image is a shell.
+module main
+
+import os
+
+fn main() {
+	if os.args.len > 1 && os.args[1] == 'probe' {
+		exit(run_probe(os.args[2..]))
+	}
+	if os.args.len > 1 && os.args[1] == '-l' {
+		// Started as someone's login shell.
+		exit(run_probe(['ids']))
+	}
+	mut t := new_test()
+	name := read_text('/etc/hwtest-scenario').trim_space()
+	t.scenario = if name == '' { 'unknown' } else { name }
+	t.say('HWTEST START ${t.scenario}')
+	// Root's home is root's alone on a real system; the test image's tar
+	// made it like every other directory.
+	os.chmod('/root', 0o700) or {}
+	match name {
+		'accounts' { scenario_accounts(mut t) }
+		'elevation' { scenario_elevation(mut t) }
+		'unprivileged' { scenario_unprivileged(mut t) }
+		else { t.check(false, 'the guest program has no scenario of this name') }
+	}
+	t.finish()
+}

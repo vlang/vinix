@@ -32,6 +32,7 @@ pub struct Run {
 pub:
 	kernel  string
 	guest   string // the guest binary, already built
+	extras  string // what the suite adds to the root file system, or ''
 	state   string // this scenario's state directory
 	timeout int    // seconds the machine may run
 	keep    bool   // leave the images in the state directory
@@ -183,7 +184,7 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 		return error('${socket} is too long for a unix socket; use a shorter --state-dir')
 	}
 	os.mkdir_all(state)!
-	initramfs := build_initramfs(run.guest, scenario.name, state)!
+	initramfs := build_initramfs(run.guest, scenario.name, state, run.extras)!
 	mut media := boot_media(host, run.kernel, initramfs, scenario.cmdline, state)!
 	mut media_cmdline := scenario.cmdline
 	for disk in scenario.disks {

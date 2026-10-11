@@ -1,0 +1,6 @@
+description = Lock or unlock a user account
+auth = admin
+exec = /usr/sbin/vinix-account
+arg = lock
+param = name
+param = choice:on,off
