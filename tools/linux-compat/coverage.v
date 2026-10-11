@@ -58,7 +58,7 @@ fn coverage(root string) !Coverage {
 	mut entries := []Entry{}
 	mut inputs := map[string]string{}
 	for path in ['kernel/syscall/table/linux_compat.v', 'kernel/syscall/table/linux_common.v',
-		'kernel/fs/vfs.v'] {
+		'kernel/fs/vfs.v', 'kernel/fs/mount_policy.v'] {
 		inputs[path] = sha256.sum(os.read_bytes(root + '/' + path)!).hex()
 	}
 	for arch in ['aarch64', 'x86_64'] {

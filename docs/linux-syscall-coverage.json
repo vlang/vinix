@@ -1,9 +1,10 @@
 {
     "baseline": "musl 1.2.5 Linux syscall namespace; native ELF64",
     "inputs": {
-        "kernel/fs/vfs.v": "32ac2ae0819d4ac9b2fa250bd608d7a5bb7e7b5422c089ea1e42f154e188e3c4",
+        "kernel/fs/mount_policy.v": "6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a",
+        "kernel/fs/vfs.v": "4e71ab7eb794feb159b24a3a42348ba7a57e3af42cb68161171d01d36bf08bed",
         "kernel/syscall/table/linux_common.v": "3cfa7354db5161faf2be8084c4ac0416a5c6a36085437f21b29258f5c2131f59",
-        "kernel/syscall/table/linux_compat.v": "8acae7794b3a78b26636886a19f162ac656ce7b3ef3a8a29d38de4fe3e13cfd1",
+        "kernel/syscall/table/linux_compat.v": "6270dd9bd29a6750f206a1c31422ee9b30c27c7b08d711e484ed643f72b78672",
         "kernel/syscall/table/linux_table_amd64.v": "864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9",
         "kernel/syscall/table/syscall_table_arm64.v": "129d268a8c7fe4ee71489edd257f595db624478c4c54a60ddd9f815de97419a3",
         "tools/linux-compat/reference/aarch64-syscall.h": "7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816",

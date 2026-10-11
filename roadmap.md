@@ -577,6 +577,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and translated x86-64 TLS/atomic/SIMD/JIT/page-size results plus SQLite/HTTP
   workload receipts and unsupported dependencies. See the
   [qualification report](docs/linux-posix-qualification.md).
+- [x] Enforce openat2 NO_SYMLINKS, NO_MAGICLINKS and NO_XDEV, including bind
+  mount identities, creation and procfs descriptor jumps; qualify O_PATH link
+  handles, trailing-slash errors and exclusive creation on both architectures.
+- [x] Qualify AArch64 Go compilation/execution and OpenJDK compilation,
+  threaded file/network workloads and JAR execution with recorded runtime
+  hashes and the required privileged Java launch policy. Installation, updates
+  and desktop integration remain unqualified.
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
