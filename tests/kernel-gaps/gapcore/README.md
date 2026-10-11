@@ -1,5 +1,10 @@
 # Disposable guest controller
 
+Maintained standalone commands now use the
+[native guest supervisor](../../native-guest-tools/README.md), including
+`../run-native`. The object interface described below remains for earlier
+Python callers awaiting their complete native ports.
+
 `main.v` owns guest compiler commands, private rootfs/image construction,
 architecture boot policy and hypervisor forwarding. `pty.v` owns the PTY
 read loop, marker decisions, bounded QMP/signal stop and transcript retirement.

@@ -13,8 +13,8 @@ instruction byte matches the former global assembly block.
 After building an isolated kernel, boot it with:
 
 ```
-python3 tests/hypervisor/run-vm.py --arch x86_64 --kernel-dir /path/to/kernel
-python3 tests/hypervisor/run-vm.py --arch aarch64 --kernel-dir /path/to/kernel
+tests/hypervisor/run-vm --arch x86_64 --kernel-dir /path/to/kernel
+tests/hypervisor/run-vm --arch aarch64 --kernel-dir /path/to/kernel
 ```
 
 The guest reports whether VT-x was available. An absent `/dev/hypervisor`

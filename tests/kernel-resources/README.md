@@ -15,8 +15,8 @@ accounts and denied lazy-root allocation followed by retry and disposal.
 Boot the native-page guest on each architecture:
 
 ```sh
-python3 tests/kernel-resources/run.py --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /tmp/resources-arm
-python3 tests/kernel-resources/run.py --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /tmp/resources-x86
+tests/kernel-resources/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /tmp/resources-arm
+tests/kernel-resources/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /tmp/resources-x86
 ```
 
 Each state directory must be new. Images contain only disposable fixture files;

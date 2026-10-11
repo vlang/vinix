@@ -1,6 +1,6 @@
 # Isolated kernel guest tests
 
-`run.py` compiles a static C program as PID 1, boots the requested kernel in
+`run-native` compiles a static C or V program as PID 1, boots the requested kernel in
 QEMU, and requires every supplied success marker. A panic, failure marker,
 nonzero runner exit, or timeout without all markers fails the run. The runner
 waits two seconds after success to catch late failures, then stops QEMU if the
@@ -10,7 +10,7 @@ Build the kernel in a separate worktree first. Do not build two architectures
 into the same `kernel/obj` directory concurrently.
 
 ```sh
-python3 tests/kernel-gaps/run.py \
+tests/kernel-gaps/run-native \
   --source tests/my-feature/test.c --arch aarch64 \
   --kernel-dir /path/to/worktree/kernel --expect 'MY FEATURE: PASS'
 ```
@@ -29,5 +29,9 @@ heap during a measurement. Networking remains enabled for ordinary test boots.
 Host checks for the runner's failure handling:
 
 ```sh
-python3 tests/kernel-gaps/test_runner.py
+tests/kernel-gaps/test-runner
 ```
+
+The maintained command uses the [native guest supervisor](../native-guest-tools/README.md).
+ARM uses the pinned disposable ISO builder and starts QEMU directly. The older
+Python import interface remains for callers awaiting their complete ports.

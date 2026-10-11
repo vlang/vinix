@@ -12,10 +12,10 @@ directory for each CPU configuration:
 
 ```sh
 VINIX_V_COMPILER=/path/to/v CC_AMD64=x86_64-linux-musl-gcc \
-  python3 tests/amd64-exceptions/run.py --state-dir /tmp/exceptions-build-1 \
+  tests/amd64-exceptions/run --state-dir /tmp/exceptions-build-1 \
   --kernel-dir kernel --guest-state-dir /tmp/exceptions-guest-1 --cpus 1
 VINIX_V_COMPILER=/path/to/v CC_AMD64=x86_64-linux-musl-gcc \
-  python3 tests/amd64-exceptions/run.py --state-dir /tmp/exceptions-build-4 \
+  tests/amd64-exceptions/run --state-dir /tmp/exceptions-build-4 \
   --kernel-dir kernel --guest-state-dir /tmp/exceptions-guest-4 --cpus 4
 ```
 

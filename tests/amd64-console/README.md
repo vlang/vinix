@@ -4,7 +4,7 @@ Build the x86_64 kernel, then run the independent V fixture with the native
 musl compiler and an unused guest state directory:
 
 ```sh
-CC_AMD64=x86_64-linux-musl-gcc python3 tests/amd64-console/run.py \
+CC_AMD64=x86_64-linux-musl-gcc tests/amd64-console/run \
   --kernel-dir /path/to/worktree/kernel --state-dir /path/to/new/guest
 ```
 

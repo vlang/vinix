@@ -4,7 +4,7 @@ The independent fixture is maintained in `pollfixture/core.v`. Build with an
 x86_64 musl GCC toolchain and run against an isolated kernel:
 
 ```sh
-CC_AMD64=x86_64-linux-musl-gcc python3 tests/amd64-poll/run.py \
+CC_AMD64=x86_64-linux-musl-gcc tests/amd64-poll/run \
   --kernel-dir /path/to/isolated/kernel \
   --state-dir /path/to/new/poll-build \
   --guest-state-dir /path/to/new/poll-guest
