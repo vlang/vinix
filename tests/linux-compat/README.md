@@ -50,6 +50,12 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
   invalid positive value and a zero-extended -1, and that file-backed mappings
   consume only the low signed C-int descriptor. Invalid file descriptors still
   return EBADF. The test writes anonymous pages and verifies mapped file data.
+- Namespace feature discovery checks user/network/time requests through
+  clone/clone3/unshare/setns and verifies EINVAL without identity changes,
+  including mixed supported/unsupported flags. Writes to uid_map, gid_map and
+  setgroups must return EPERM and retain the initial namespace's contents.
+  This rejects identity-only or ignored-write success; it does not qualify
+  those namespace kinds as implemented isolation.
 
 The [coverage matrix](../../docs/linux-posix-compatibility.md) separates missing
 interfaces from implemented behavior and lists unsupported dependencies.

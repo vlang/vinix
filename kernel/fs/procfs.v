@@ -905,10 +905,9 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 }
 
 fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?i64 {
-	// The writable tunables a container runtime sets. Vinix keeps only what it
-	// can act on -- oom_score_adj is remembered, the user-namespace id maps are
-	// accepted and applied identity-only -- and takes the rest without storing
-	// it so that a runtime configuring a container is not stopped by an EPERM.
+	// A write must change the advertised state or return an error. User-id
+	// remapping and setgroups namespace policy are not implemented; never let
+	// a runtime infer that writing these files established isolation.
 	match this.kind {
 		.oom_score_adj {
 			// Read in place: copying the bytes out, into a string and a
@@ -941,7 +940,8 @@ fn (mut this ProcFSResource) write(_handle voidptr, buf voidptr, _loc u64, count
 			return i64(count)
 		}
 		.uid_map, .gid_map, .setgroups {
-			return i64(count)
+			errno.set(errno.eperm)
+			return none
 		}
 		.security_events {
 			// A trusted service reporting a decision of its own:

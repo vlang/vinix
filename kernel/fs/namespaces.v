@@ -319,6 +319,9 @@ pub fn syscall_unshare(_ voidptr, flags u64) (u64, u64) {
 	if flags & ~unshare_allowed != 0 {
 		return errno.err, errno.einval
 	}
+	if flags & proc.unsupported_namespace_flags != 0 {
+		return errno.err, errno.einval
+	}
 	if flags & proc.clone_namespace_flags & ~proc.clone_newuser != 0
 		&& !proc.current_has_capability(proc.cap_sys_admin) {
 		return errno.err, errno.eperm
@@ -374,6 +377,9 @@ pub fn syscall_setns(_ voidptr, fdnum int, nstype int) (u64, u64) {
 	// onto the heap at every call.
 	mut ns := res.ns
 	if nstype != 0 && u64(nstype) != ns.kind {
+		return errno.err, errno.einval
+	}
+	if ns.kind & proc.unsupported_namespace_flags != 0 {
 		return errno.err, errno.einval
 	}
 	if !proc.current_has_capability(proc.cap_sys_admin) {

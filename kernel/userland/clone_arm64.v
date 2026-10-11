@@ -89,6 +89,7 @@ fn do_clone_into(state &cpulocal.GPRState, flags u64, child_stack u64, parent_ti
 	// Returning a PID while leaving the requested pidfd word untouched would
 	// falsely report success. Descriptor construction/rollback is unsupported.
 	if flags & clone_pidfd != 0 { return errno.err, errno.einval }
+	if flags & proc.unsupported_namespace_flags != 0 { return errno.err, errno.einval }
 	// A new namespace other than a user namespace takes CAP_SYS_ADMIN, and none
 	// can be made for a thread, which shares its process' namespaces.
 	if flags & proc.clone_namespace_flags != 0 {

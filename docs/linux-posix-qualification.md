@@ -119,6 +119,22 @@ The registry is bounded to 256 detected backends and retains the same volume
 lifetimes as the cache registry. Discovery of newly formatted or hot-plugged
 volumes needs separate qualification.
 
+The `namespace-after-*.json` receipts pass all six native ABI cases, including
+the namespace regression, on both architectures. User, network and time
+namespace requests previously changed only identities. Clone, clone3, unshare
+and setns now return EINVAL for these unavailable kinds, following Linux's
+disabled-namespace behavior ([user](https://github.com/torvalds/linux/blob/v6.12/include/linux/user_namespace.h),
+[network](https://github.com/torvalds/linux/blob/v6.12/include/net/net_namespace.h),
+[time](https://github.com/torvalds/linux/blob/v6.12/include/linux/time_namespace.h)).
+Rejected mixed flags preserve every namespace identity rather than partially
+applying the supported flags. Writes to uid_map, gid_map and setgroups return
+EPERM instead of reporting an applied mapping/policy; the initial namespace's
+contents remain unchanged. Matching prior-kernel controls fail on the ignored
+write. This qualifies feature discovery and refusal, not user/network/time
+isolation. Applications that require these kinds need an implementation or
+an explicit maintained port before sandbox qualification. Earlier tests that
+created identity-only user namespaces do not establish working remapping.
+
 The additional wide-offset/time64 fixture passes on both native architectures
 and both translated x86 paths. It seeks past 8 GiB, verifies current and negative
 relative offsets and EOF, reads a normalized realtime clock, then arms a

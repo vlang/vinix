@@ -30,6 +30,10 @@ pub const clone_newnet = u64(0x40000000)
 
 pub const clone_namespace_flags = clone_newtime | clone_newns | clone_newcgroup | clone_newuts | clone_newipc | clone_newuser | clone_newpid | clone_newnet
 
+// An identity without isolated state is not a namespace implementation.
+// Refuse these requests before clone/unshare changes any process state.
+pub const unsupported_namespace_flags = clone_newuser | clone_newnet | clone_newtime
+
 @[heap]
 pub struct Namespace {
 pub mut:

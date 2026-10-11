@@ -90,6 +90,7 @@ fn do_clone(state &cpulocal.GPRState, flags u64, child_stack u64, parent_tid u64
 	// Returning a PID while leaving the requested pidfd word untouched would
 	// falsely report success. Descriptor construction/rollback is unsupported.
 	if flags & clone_pidfd != 0 { return errno.err, errno.einval }
+	if flags & proc.unsupported_namespace_flags != 0 { return errno.err, errno.einval }
 	// The TLS pointer becomes the child's FS base. A non-canonical one would
 	// fault the kernel's own WRMSR, so it is refused as Linux refuses it.
 	if flags & clone_settls != 0 && tls >= memory.user_address_limit() {
