@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `9b5e25ee1d2ea80c0a5424785981933b03300fa9`,
-Linguist 7.27.0 reports **Python 3.39%** (251 files, 1,309,323 bytes) and
-**V 78.89%** (3,097 files, 30,480,537 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `b1f701cac0dca56ed75d7aa491f1450c3fe370e3`,
+Linguist 7.27.0 reports **Python 2.99%** (241 files, 1,159,396 bytes) and
+**V 79.33%** (3,137 files, 30,737,901 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,896,962 Python bytes**. All remaining
-1,309,323 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **4,046,889 Python bytes**. All remaining
+1,159,396 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 57 stages below remove **278 Python files / 1,051,710 original bytes** and
+The 58 stages below remove **288 Python files / 1,201,637 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -88,6 +88,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Game capture, screenshot, export diagnostics and Venus QEMU preparation | `tests/dota2/nativehost`, native PTY/NBD/QMP owners, screenshot encoder and QEMU patcher | 40,602 / 1,030 | `7a27a254` |
 | Verified-root and verified-boot builders, pinned loader, host tests and guest controllers | `tools/verified-boot/bundlehost`, `tests/verified-boot/verifiedhost`, eight native commands and sparse-image helper | 55,350 / 1,199 | `dc893c8b` |
 | Minecraft fetching, Microsoft sign-in, LWJGL JAR patching and guest staging | `build-support/minecraft/minecraftnative`, `lwjglpatch`, four native commands and four independent host suites | 29,709 / 824 | `9b5e25ee` |
+| Saved allocation-campaign comparison, recomputation, integrity fixtures and Git evidence recovery | `tests/alloc-bench/comparecore`, `reportcore`, `reportfixture`, `evidencearchive`, ten native commands and two host suites | 149,927 / 2,760 | `b1f701ca` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -720,9 +721,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 57 stages.
+or hidden in these 58 stages.
 
-The next nineteen stages remove 126 Python files / 553,367 original bytes.
+The next twenty stages remove 136 Python files / 703,294 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -735,11 +736,12 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **156 Python files / 687,644 original bytes**. Temporary qualification
+translates **166 Python files / 837,571 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
-detached. Their local receipts are no longer available. Fresh Minecraft checks
-and inputs are retained on disk under
-`/Users/alex/.cache/vinix-minecraft-native-20261011`; each stage's qualification
+detached. Those older local receipts are no longer available. Fresh Minecraft
+and saved-campaign analysis checks and inputs are retained on disk under
+`/Users/alex/.cache/vinix-minecraft-native-20261011` and
+`/Users/alex/.cache/vinix-benchmark-native-20261011`; each stage's qualification
 document records its results and retention limits.
 
 ## Earlier completed stages
@@ -2858,3 +2860,15 @@ x86 QEMU guests run native curl and pass full/cache/index-only/checksum
 preservation plus sign-in preflight with frozen production kernels. No Python
 is run or kernel rebuilt; live account sign-in and game rendering are not
 qualified. See [qualification and limits](../build-support/minecraft/native-tools.md).
+
+The saved allocation-campaign analysis stage retires ten Python scripts in one
+complete dependency closure, including all three preserved comparator copies,
+recomputation and negative fixture suites, and the evidence materializer.
+Every saved JSON observation/provenance value and Markdown report body matches;
+all 170 original checks plus native CLI tampering pass per campaign. All 145
+archived blobs verify and all 111 historical source records recover exactly.
+ARM, Rosetta x86 and ASan/UBSan cold builds, CLI and public-bootstrap checks,
+100-cycle descriptor measurements, SIGINT/SIGTERM and exited-leader/descendant
+retirement checks pass. The saved captures, plans, manifests and reports remain
+unchanged. No Python runs, new timing captures or kernel rebuilds are used.
+See [native analysis qualification](../tests/alloc-bench/native-reports.md).
