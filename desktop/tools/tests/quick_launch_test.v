@@ -50,7 +50,7 @@ fn test_cmd_space_opens_spotlight_style_app_search_and_owns_typing() {
 
 	root := desktop.build_tree()
 	assert quick_launch_element_named(root, quick_launch_panel_action) != none
-	assert quick_launch_tree_has_text(root, 'Search applications')
+	assert quick_launch_tree_has_text(root, 'Search applications and documents')
 	assert quick_launch_tree_has_text(root, 'Files')
 	assert !quick_launch_tree_has_text(root, 'Shut down')
 	free_tree(root)

@@ -824,10 +824,10 @@ jump.unpin
 Détacher ce programme de la barre des tâches
 -----
 quick_launch.empty
-Aucune application trouvée
+Aucune application ni aucun document trouvé
 -----
 quick_launch.search
-Rechercher des applications
+Rechercher des applications et des documents
 -----
 registration.button.create
 Créer le compte

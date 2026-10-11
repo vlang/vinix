@@ -14,6 +14,8 @@ __global launcher_documents = workflowcore.SearchIndex{}
 __global launcher_index_worker = int(0)
 __global launcher_index_home = ''
 __global launcher_index_started = u64(0)
+__global launcher_policy_checked = u64(0)
+__global launcher_index_seen = workflowcore.Identity{}
 
 const quick_launch_key = '\x1b[32;9u'
 const quick_launch_cmd_release = '\x1b[57444;1:3u'
@@ -97,13 +99,25 @@ fn (mut d Desktop) start_workflow_search() {
 }
 
 fn (mut d Desktop) poll_workflow_search() {
-	if launcher_index_worker <= 0 { return }
-	mut status := 0
-	if C.waitpid(launcher_index_worker, &status, C.WNOHANG) != launcher_index_worker { return }
-	launcher_index_worker = 0
-	if status != 0 { return }
+	mut completed := false
+	if launcher_index_worker > 0 {
+		mut status := 0
+		if C.waitpid(launcher_index_worker, unsafe { &status }, C.WNOHANG) == launcher_index_worker { launcher_index_worker = 0; completed = true }
+	}
+	if !d.switcher.quick_launch && !completed { return }
+	now := desktop_monotonic_ms()
+	if !completed && now >= launcher_policy_checked && now - launcher_policy_checked < 1000 { return }
+	launcher_policy_checked = now
+	path := os.join_path(d.home, '.vinix-search', 'index.json')
+	defer { unsafe { path.free() } }
+	id := workflowcore.identify(path) or {
+		if launcher_documents.records.len > 0 { launcher_documents.close(); d.dirty = true }
+		return
+	}
+	if !completed && launcher_index_seen.unchanged(id) { return }
+	launcher_index_seen = id
 	launcher_documents.close()
-	launcher_documents = workflowcore.load_index(launcher_index_home) or { workflowcore.SearchIndex{} }
+	launcher_documents = workflowcore.load_index(d.home) or { workflowcore.SearchIndex{} }
 	if d.switcher.quick_launch { d.switcher.index = 0; d.dirty = true }
 }
 

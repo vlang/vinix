@@ -58,9 +58,11 @@ fn (mut a FilesContextApp) start_indexing() ! {
 		mut index := workflowcore.SearchIndex{}
 		index.begin(a.index_search.index.roots)
 		for index.indexing { index.tick() }
-		for path, ids in a.files.settings.assignments {
+		// Read tags after the scan so edits made during indexing are included.
+		settings := load_files_settings(files_service_home())
+		for path, ids in settings.assignments {
 			mut tags := []string{}
-			for id in ids { for tag in a.files.settings.tags { if tag.id == id { tags << tag.name.clone() } } }
+			for id in ids { for tag in settings.tags { if tag.id == id { tags << tag.name.clone() } } }
 			index.set_tags(path, tags)
 			unsafe { tags.free() }
 		}
@@ -70,6 +72,19 @@ fn (mut a FilesContextApp) start_indexing() ! {
 	a.index_search.worker = pid
 	unsafe { a.index_search.status.free() }
 	a.index_search.status = 'Indexing in background. You can keep browsing.'.clone()
+}
+
+fn (mut a FilesContextApp) sync_index_tags(path string) {
+	mut latest := workflowcore.load_index(files_service_home()) or { return }
+	defer { latest.close() }
+	mut tags := []string{}
+	defer { unsafe { tags.free() } }
+	ids := a.files.settings.assignments[path] or { []int{} }
+	for id in ids { for tag in a.files.settings.tags { if tag.id == id { tags << tag.name.clone() } } }
+	latest.set_tags(path, tags)
+	latest.save(files_service_home()) or { a.operation_error('Could not update tag search; rebuild the index.'); return }
+	a.index_search.index.set_tags(path, tags)
+	if a.index_search.open { a.index_query() }
 }
 
 fn (mut a FilesContextApp) poll_index_search() bool {

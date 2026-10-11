@@ -28,7 +28,8 @@ fn workflow_default_app(path string) string {
 	ext := os.file_ext(path).to_lower()
 	defer { unsafe { ext.free() } }
 	if ext == '.vgraph' { return 'vinix-grapher' }
-	if ext in ['.zip', '.tar', '.gz', '.bz2', '.xz', '.tgz', '.7z', '.rar']! { return 'vinix-archive' }
+	if ext == '.tar' { return 'vinix-archive' }
+	if ext in ['.zip', '.gz', '.bz2', '.xz', '.tgz', '.7z', '.rar']! { return 'vinix-preview' }
 	if ext in ['.png', '.jpg', '.jpeg', '.jpe', '.jps', '.gif', '.bmp', '.pdf', '.docx', '.xlsx', '.pptx', '.odt', '.ods', '.odp', '.epub', '.doc', '.xls', '.ppt', '.rtf', '.mp4', '.mkv', '.webm', '.mov', '.avi', '.mp3', '.wav', '.ogg', '.flac', '.m4a']! { return 'vinix-preview' }
 	return 'vinix-editor'
 }

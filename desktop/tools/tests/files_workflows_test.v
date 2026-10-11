@@ -89,3 +89,20 @@ fn test_files_undo_renames_and_permissions_and_refuses_replaced_items() {
 	app.undo_file_operation() or { assert os.read_file(home + '/renamed')! == 'external'; return }
 	assert false, 'undo must preserve later edits'
 }
+
+fn test_drag_in_tag_view_uses_tag_results_instead_of_the_current_folder() {
+	home := files_workflow_test_home()
+	defer { os.rmdir_all(home) or {} }
+	os.mkdir_all(home + '/different-folder')!
+	os.write_file(home + '/different-folder/document', 'tagged document')!
+	mut app := FilesContextApp{}
+	app.files.browser.read(home.clone())
+	defer { app.close_app() }
+	app.files.settings = default_files_settings()
+	app.files.settings.toggle_tag(home + '/different-folder/document', 7)
+	app.files.active_tag_id = 7
+	app.files.rows_top = 100
+	app.files.rows_height = 300
+	assert app.path_at(files_content_left(800) + 40, 110, 800) == ''
+	assert app.path_at(files_content_left(800) + 40, 126, 800) == home + '/different-folder/document'
+}

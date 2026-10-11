@@ -824,10 +824,10 @@ jump.unpin
 このアプリのタスクバー固定を解除
 -----
 quick_launch.empty
-アプリが見つかりません
+アプリや書類が見つかりません
 -----
 quick_launch.search
-アプリを検索
+アプリと書類を検索
 -----
 registration.button.create
 ユーザーを作成

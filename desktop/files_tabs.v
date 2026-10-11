@@ -165,6 +165,13 @@ fn (mut a FilesContextApp) workflow_toolbar(size ui2.Rect) []ui2.Element {
 
 fn (a &FilesContextApp) path_at(x int, y int, width int) string {
 	if y < a.files.rows_top || y >= a.files.rows_top + a.files.rows_height || x < files_content_left(width) { return '' }
+	if a.files.active_tag_id >= 0 {
+		if y < a.files.rows_top + 26 { return '' }
+		paths := a.files.settings.tagged_paths(a.files.active_tag_id)
+		defer { unsafe { paths.free() } }
+		i := (y - a.files.rows_top - 26) / files_row_height() + a.files.browser.scroll
+		return if i >= 0 && i < paths.len { paths[i].clone() } else { '' }
+	}
 	row := (y - a.files.rows_top) / files_row_height()
 	if a.files.view_mode == .commander {
 		pane := files_commander_pane_at(x, width)

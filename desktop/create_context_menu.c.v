@@ -884,6 +884,7 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 			id := event_id[files_picker_toggle_prefix.len..].int()
 			a.files.settings.toggle_tag(a.context_path, id)
 			a.files.settings.save(desktop_home)
+			a.sync_index_tags(a.context_path)
 		}
 		return
 	}

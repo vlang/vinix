@@ -3,6 +3,20 @@ module main
 import os
 import desktop.workflowcore
 
+fn test_index_returns_named_folders_with_tags_and_live_permission_guards() {
+	root := os.real_path(os.temp_dir()) + '/vinix-folder-index-' + C.getpid().str()
+	os.mkdir_all(root + '/Projects')!
+	defer { os.chmod(root + '/Projects', 0o700) or {}; os.rmdir_all(root) or {} }
+	mut index := workflowcore.SearchIndex{}
+	defer { index.close() }
+	index.begin([workflowcore.SearchRoot{path: root, identity: workflowcore.identify(root)!, enabled: true, contents: true}])
+	for index.indexing { index.tick() }
+	index.set_tags(root + '/Projects', ['Work'])
+	assert index.query('projects type:folder tag:work', 10) == [root + '/Projects']
+	os.chmod(root + '/Projects', 0o600)!
+	assert index.query('projects', 10).len == 0
+}
+
 fn test_index_content_metadata_policy_revocation_and_volume_replacement() {
 	root := os.real_path(os.temp_dir()) + '/vinix-index-${os.getpid()}'
 	os.mkdir_all(root + '/remote')!

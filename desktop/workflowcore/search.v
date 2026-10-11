@@ -73,6 +73,10 @@ pub fn (mut index SearchIndex) tick() bool {
 		if id.device != root.identity.device || id.link() { continue }
 		if C.access(&char(path.str), C.R_OK | if id.directory() { C.X_OK } else { 0 }) != 0 { index.denied++; continue }
 		if id.directory() {
+			if path != root.path {
+				if index.records.len >= 100000 { index.limited = true; index.indexing = false; break }
+				index.records << SearchRecord{path: path.clone(), identity: id, name: os.file_name(path).to_lower(), extension: '.folder'}
+			}
 			names := os.ls(path) or { index.denied++; continue }
 			defer { unsafe { names.free() } }
 			for name in names {
@@ -131,7 +135,7 @@ pub fn (index &SearchIndex) query(text string, limit int) []string {
 		}
 		if !matches { continue }
 		index.root_for(record.path) or { continue }
-		if C.access(&char(record.path.str), C.R_OK) != 0 { continue }
+		if C.access(&char(record.path.str), C.R_OK | if record.identity.directory() { C.X_OK } else { 0 }) != 0 { continue }
 		current := identify(record.path) or { continue }
 		if !record.identity.unchanged(current) { continue }
 		results << record.path.clone()
