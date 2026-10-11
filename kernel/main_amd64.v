@@ -214,6 +214,7 @@ fn kmain_thread() {
 	acpipm.initialise()
 	// Its thermal zones and fans.
 	acpipm.initialise_thermal()
+	acpipm.initialise_backlight()
 
 	userland.start_program(false, vfs_root, '/sbin/init', ['/sbin/init'], [], '/dev/console',
 		'/dev/console', '/dev/console') or { panic('Could not start init process') }

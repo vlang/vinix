@@ -213,3 +213,18 @@ pub fn (p &Package) package(index int) ?Package {
 	}
 	return inner
 }
+
+// uACPI's number for a device among the kinds of namespace object.
+const kind_device = u32(1) << 6
+
+// Call `found` for every device in the namespace, whatever its hardware ID or
+// lack of one: for what is told apart by the methods it has, as a panel with
+// a backlight is.
+pub fn for_each_device_node(found fn (context voidptr, node Node), context voidptr) {
+	search := DeviceSearch{
+		found:   found
+		context: context
+	}
+	C.uacpi_namespace_for_each_child(C.uacpi_namespace_root(), voidptr(device_found), unsafe { nil },
+		kind_device, ~u32(0), voidptr(&search))
+}
