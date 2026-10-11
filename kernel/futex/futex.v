@@ -131,10 +131,17 @@ pub fn wait(virt u64, expected int) (u64, u64) {
 }
 
 pub fn wait_key(virt u64, expected int, private bool) (u64, u64) {
+	return wait_mask_key(virt, expected, private, u32(0xffffffff))
+}
+
+pub fn wait_mask_key(virt u64, expected int, private bool, bitset u32) (u64, u64) {
 	mut f := get(virt, true, private) or { return errno.err, errno.efault }
 	defer {
 		put(mut f)
 	}
+	mut t := proc.current_thread()
+	t.futex_bitset = bitset
+	defer { t.futex_bitset = 0 }
 	mut e := &f.event
 	generation := event.generation(mut e)
 
@@ -161,10 +168,17 @@ pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
 }
 
 pub fn wait_timeout_key(virt u64, expected int, duration time.TimeSpec, private bool) (u64, u64) {
+	return wait_timeout_mask_key(virt, expected, duration, private, u32(0xffffffff))
+}
+
+pub fn wait_timeout_mask_key(virt u64, expected int, duration time.TimeSpec, private bool, bitset u32) (u64, u64) {
 	mut f := get(virt, true, private) or { return errno.err, errno.efault }
 	defer {
 		put(mut f)
 	}
+	mut t := proc.current_thread()
+	t.futex_bitset = bitset
+	defer { t.futex_bitset = 0 }
 	mut e := &f.event
 	generation := event.generation(mut e)
 
@@ -215,11 +229,15 @@ pub fn wake_n(virt u64, maximum int) u64 {
 }
 
 pub fn wake_n_key(virt u64, maximum int, private bool) u64 {
+	return wake_mask_key(virt, maximum, private, u32(0xffffffff))
+}
+
+pub fn wake_mask_key(virt u64, maximum int, private bool, bitset u32) u64 {
 	mut f := get(virt, false, private) or { return 0 }
 	// The original Linux futex ABI wakes one for a nonpositive count when
 	// waiters exist. FUTEX2's strict zero-count behavior is a separate ABI.
 	count := if maximum > 0 { u64(maximum) } else { u64(1) }
-	woken := event.trigger_n(mut f.event, count)
+	woken := event.trigger_n_bitset(mut f.event, count, bitset)
 	put(mut f)
 	return woken
 }

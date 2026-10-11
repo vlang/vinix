@@ -78,6 +78,9 @@ pub mut:
 	comm              string
 	attached_events   [max_events]&eventstruct.Event
 	attached_events_i u64
+	// Valid only while this thread owns an ordinary futex wait frame. The
+	// event lock publishes it to selective wakers; detach precedes clearing.
+	futex_bitset u32
 	// Linux thread bookkeeping
 	clear_child_tid  u64  // set_tid_address()/CLONE_CHILD_CLEARTID futex word
 	robust_list_head u64  // set_robust_list() head, walked on thread exit

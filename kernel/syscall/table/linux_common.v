@@ -37,11 +37,12 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 		}
 		7 { return futex.unlock_pi(uaddr) }
 		0, 9 { // FUTEX_WAIT, FUTEX_WAIT_BITSET
-			if op == 9 && val3 == 0 {
+			if op == 9 && u32(val3) == 0 {
 				return errno.err, errno.einval
 			}
+			bitset := if op == 9 { u32(val3) } else { u32(0xffffffff) }
 			if timeout == 0 {
-				return futex.wait_key(uaddr, int(val), private)
+				return futex.wait_mask_key(uaddr, int(val), private, bitset)
 			}
 
 			mut duration := time.TimeSpec{}
@@ -66,10 +67,12 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 					return errno.err, errno.etimedout
 				}
 			}
-			return futex.wait_timeout_key(uaddr, int(val), duration, private)
+			return futex.wait_timeout_mask_key(uaddr, int(val), duration, private, bitset)
 		}
 		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
-			return futex.wake_n_key(uaddr, int(i32(val)), private), 0
+			if op == 10 && u32(val3) == 0 { return errno.err, errno.einval }
+			bitset := if op == 10 { u32(val3) } else { u32(0xffffffff) }
+			return futex.wake_mask_key(uaddr, int(i32(val)), private, bitset), 0
 		}
 		5 { // FUTEX_WAKE_OP
 			// Decode FUTEX_OP(op, oparg, cmp, cmparg). In particular Qt's

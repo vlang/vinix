@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "678cfe4a6eac9cfdab27ae5cd5b77ee4c02b8fb5ff7df6a564d1e8a55ec4e07d",
+    "results": [
+        {
+            "name": "futexbits",
+            "source_sha256": "6e28bf81420fbc4befe541d0dac72d6ddea475bb5571aeb325da2fb625398e35",
+            "init_sha256": "5c52de8a0e4ae7823d71c3ec22d87142616a486fd068d9e65c9e5bda28e8f00b",
+            "iso_sha256": "0960ffd3e167ec210e3c99496e6bb0a58c4ed0ceb07d31c763ee011d16d4311c",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

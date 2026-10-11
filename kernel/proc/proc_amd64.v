@@ -133,6 +133,9 @@ pub mut:
 	comm              string
 	attached_events   [max_events]&eventstruct.Event
 	attached_events_i u64
+	// Valid only while this thread owns an ordinary futex wait frame. The
+	// event lock publishes it to selective wakers; detach precedes clearing.
+	futex_bitset u32
 	// Monotonic reading taken when this thread was last put on a CPU, or 0
 	// when it is not running. What it owes is charged to its process at the
 	// moment it is switched away, so the running total never counts a span

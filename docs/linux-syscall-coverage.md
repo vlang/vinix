@@ -697,22 +697,24 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 
 | Input | SHA-256 |
 | --- | --- |
-| `kernel/event/event.v` | `431c5a8a397611c65c3d5cf6696d57f8fe2cc729ddf08c4eaa22d9545ae8e81e` |
+| `kernel/event/event.v` | `a92daf2add03c5304742ad1b112ca04635b94f49e4279e8316f2bee57da6b708` |
 | `kernel/file/file.v` | `4013b0fb868bf7fc3a0b0f7294c2623219995c75e26e4bc3913ea44568ec0e47` |
 | `kernel/fs/mount.v` | `c009fda428222d80ad0407f307b0c6bc629fd8c1a0a79a9d2b788f115a3e9fd4` |
 | `kernel/fs/mount_policy.v` | `6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a` |
 | `kernel/fs/procfs.v` | `03e600e90db26d094e4169e94a9721730342c46b813d780690d32947a33b9eac` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
 | `kernel/fs/vfs.v` | `fa9cba4bcec37824b7e62cf9e6065bbc2fa7d7fc1243179208779b98509c6248` |
-| `kernel/futex/futex.v` | `1b35c3fe9bd5b068cf496a97439fc778826f1c74c38543e6e23f7a55e2c56e6c` |
+| `kernel/futex/futex.v` | `e6042d3c602152288d2f545d3df62799901453f1ba195b2c4ca23c71273cb564` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/memory/mmap/linux.v` | `71c091b8310ff8af5d8f39c11897b57ba33e3d52c14bc56edcc8ba9616a3fbb7` |
 | `kernel/memory/mmap/mmap.v` | `a6aadc35e0bc7d6018c192fa3f5616d152a8c7f358c8cc499050e209e541684c` |
 | `kernel/proc/container.v` | `8a614355ad29ae3595820fc0ef1e07b7958f09741f1f268929e793295f2346e7` |
 | `kernel/proc/proc.v` | `faa486b29869cecc594ce220b7f1547007a51cea80d900f6ce16ca0311f5433a` |
+| `kernel/proc/proc_amd64.v` | `f0e35ad1dae37c66ae7066b3d598c51db60afd768df24b59c80f4fb37c5981bf` |
+| `kernel/proc/proc_arm64.v` | `acc488a38d106815e1260a3690f619dc54ddc005a7aa2ab15bc3c463396d83a0` |
 | `kernel/proc/seccomp.v` | `0adf7fcb8d8b4f3a2af5bc5e7ba570ec09ae92ba0670b6f30e4f6514d34d5b7b` |
 | `kernel/syscall/table/container.v` | `e4c8fc7823b9194ef7937e864f1869f97223163952d2e4a6b1e6b000ebe37e11` |
-| `kernel/syscall/table/linux_common.v` | `ecd8b5dbd46b43a574d1522e066d7c13d66330558438e92348562e0bddb2474e` |
+| `kernel/syscall/table/linux_common.v` | `05c48ac94c840749e9f7340076385dfba19d8372fae08c7597fb118b775f5705` |
 | `kernel/syscall/table/linux_compat.v` | `6270dd9bd29a6750f206a1c31422ee9b30c27c7b08d711e484ed643f72b78672` |
 | `kernel/syscall/table/linux_table_amd64.v` | `864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `cf70c23cb544cef0eedfb300f8410640ac7fc644feb7bbc3d467aaf08606c704` |
@@ -722,6 +724,6 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/linux_signal_amd64.v` | `cd84d3265e38cd99189a1c0c27f30b5db6c01f7dd23208daef1bdbcd51f37077` |
 | `kernel/userland/seccomp_signal.v` | `b6fb6b23e10c8663d88b6d3fd6794eae1d906e162797b0c298e9bc674182f1f4` |
 | `kernel/userland/userland_arm64.v` | `bfb40ad41a2b227d2688bf55b0977f37a4916872045e3964e56f91a0a9ded39e` |
-| `tools/linux-compat/coverage.v` | `9b4413bb6d51ca44558b8dbd3596c7ee8de2fba96e6c4e227e7141ff5732ee47` |
+| `tools/linux-compat/coverage.v` | `d2986b5cf7f361b384cba63673f5141d4d213c245e353810f7358e0878417de2` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

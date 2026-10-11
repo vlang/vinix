@@ -501,3 +501,25 @@ and all ten passing native ABI cases in the
 [dated results](../tests/linux-compat/results/2026-10-11/).
 These checks do not qualify priority-inheritance keys, cross-process shared
 file page eviction, bitset filtering or real requeue behavior.
+
+## Futex bitset selection
+
+Both architectures pass 36 timed and twelve untimed pthread waits with three
+distinct masks. A nonintersecting wake must return zero and leave every waiter
+blocked. Selective calls wake exactly the requested number from the matching
+group, preserving the other groups and overflow listeners. Combined masks
+drain the remaining matching groups. Plain WAIT uses MATCH_ANY, including the
+highest mask bit. Both bitset operations reject zero masks with EINVAL after
+narrowing val3 to the Linux u32 argument. See
+[Linux's bitset matching](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/waitwake.c#L148).
+
+The mask lives in the existing thread object during its single futex wait.
+The event lock publishes it to wakers, and wait teardown detaches listeners
+before clearing it. Timer listeners and generic event broadcasts retain their
+existing behavior. No additional allocation or allocation lifetime is added.
+
+`futex-bits-before-*` retains both prior kernels incorrectly waking a
+nonmatching waiter. `futex-bits-after-*` retains the same fixture and all eleven
+passing native ABI cases in the
+[dated results](../tests/linux-compat/results/2026-10-11/).
+Real requeue, PI interaction and shared-file page eviction remain unqualified.

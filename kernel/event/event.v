@@ -396,6 +396,17 @@ pub fn trigger(mut e eventstruct.Event, drop bool) u64 {
 // listeners attached, including timed waits that also listen to their timer.
 // The generic broadcast trigger above retains its existing behavior.
 pub fn trigger_n(mut e eventstruct.Event, maximum u64) u64 {
+	return trigger_limit(mut e, maximum, false, 0)
+}
+
+// A thread can block in one futex wait, optionally with a timer listener.
+// Its mask lives until that wait detaches both listeners. Generic events do
+// not inspect the mask and retain their ordinary wake behavior.
+pub fn trigger_n_bitset(mut e eventstruct.Event, maximum u64, bitset u32) u64 {
+	return trigger_limit(mut e, maximum, true, bitset)
+}
+
+fn trigger_limit(mut e eventstruct.Event, maximum u64, masked bool, bitset u32) u64 {
 	if maximum == 0 { return 0 }
 	ints := interrupt_state()
 	interrupt_toggle(false)
@@ -408,6 +419,7 @@ pub fn trigger_n(mut e eventstruct.Event, maximum u64) u64 {
 	for i < e.listeners_i && woken < maximum {
 		listener := e.slot(i)
 		mut t := unsafe { &proc.Thread(listener.thrd) }
+		if masked && t.futex_bitset & bitset == 0 { i++; continue }
 		if katomic.load(&t.is_in_queue) { i++; continue }
 		t.which_event = listener.which
 		if !sched.enqueue_thread(t, false) { i++; continue }
