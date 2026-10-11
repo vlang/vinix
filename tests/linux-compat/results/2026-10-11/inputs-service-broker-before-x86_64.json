@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "execution_path": "native-x86_64",
+    "cases": "serviceunits",
+    "inputs": {
+        "kernel": "5c6693f437830f49be54d0fe2de3ccf9b42845d74453535338498e6bae65833d",
+        "workloads": "b94f8a9c2c7934c86b362859dcbbc26f5d8b851cb99a72a4259555316a91c055",
+        "runtime-probe": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+        "rootfs_manifest": "c22edf74df0d604044c6e8f3c691877f9bdcbf29d29955c86e49e2c3003871e7",
+        "init_source": "796750bf61b36e28f015f34fa6f4591278dd8b895d7cc4a6007212ceb98888c6",
+        "guest_report": "9610b4184079d72b468b4d2161ba563f9864d0a43bd9a0430cdcf4b06fb3c629",
+        "snapshot_kernel": "5c6693f437830f49be54d0fe2de3ccf9b42845d74453535338498e6bae65833d"
+    },
+    "exit_code": 1
+}

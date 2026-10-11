@@ -1,0 +1,40 @@
+{
+    "architecture": "x86_64",
+    "libc": "musl",
+    "commands": [
+        [
+            "/Users/alex/.local/bin/v",
+            "-os",
+            "linux",
+            "-arch",
+            "amd64",
+            "-gc",
+            "none",
+            "-prod",
+            "-o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-driver-service-x86-3/workloads.c",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-services/tools/linux-compat/workloads"
+        ],
+        [
+            "x86_64-linux-musl-gcc",
+            "-static",
+            "-pthread",
+            "-w",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-driver-service-x86-3/workloads.c",
+            "-lm",
+            "-o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-driver-service-x86-3/linux-compat-workloads"
+        ]
+    ],
+    "inputs": {
+        "tools/linux-compat/workloads/main.v": "eb8e6ff5d82f047b754918d41d94c9c7004512661461011f14b10c8621fa6be7",
+        "tools/linux-compat/workloads/debugger.v": "95d39a019412164d190af4142bc849f91de77b472791f12098a914fac4eace36",
+        "tools/linux-compat/workloads/packages.v": "a56fa2d3026ea950df165c000ee2acd4f91652a0cea7e14f48458d91f9fdc2c7",
+        "tools/linux-compat/workloads/games.v": "bc1f4b3e5a40cd2dc557fa6f2243a0ef774d4192604b617f9a3c721d40626b12",
+        "tools/linux-compat/workloads/service_units.v": "8691a1d480c24d2a41d8012240f3365e0c8203861ea5393e7e61be67266c33d8",
+        "tests/go/smoke.go": "f58f7865f0d668a13f2fe0a81f56b45cbe1cda463da4aa57cd17c6b9c0711fb5",
+        "tests/java/VinixJavaSmoke.java": "3db7a5dbb4eb3e6e1387680b5570a211417bc1adc25686d04c5b0da0cb77a92d",
+        "generated_c": "8908ede24d91eb11353299339d37c0a48ac10da61d15dba1de6618f1d76e4774"
+    },
+    "executable_sha256": "b4d7c71a9b962ff50949fd37af25806a8bd309181237fd51cb0c6ee80abe29b0"
+}

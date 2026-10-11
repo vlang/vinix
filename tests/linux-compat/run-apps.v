@@ -80,7 +80,7 @@ fn main() {
 	cases := options.value('--cases', 'runtime,server')
 	for name in cases.split(',') {
 		if name !in ['sqlite', 'media', 'office', 'chromium', 'firefox', 'go', 'java', 'v', 'server',
-			'runtime', 'debugger', 'packages', 'portal', 'games'] {
+			'runtime', 'debugger', 'packages', 'portal', 'games', 'serviceunits'] {
 			eprintln('unknown case')
 			exit(2)
 		}

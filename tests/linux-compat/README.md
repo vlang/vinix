@@ -93,6 +93,17 @@ unique response, recording its response and termination. Missing
 executables are `unsupported`, nonzero exits/timeouts are `failed`, and either
 causes a failing suite exit. There is no sandbox-disable fallback.
 
+The `serviceunits` case requires the cross-compiled native `vinix-desktop` broker
+and BusyBox Extras. It imports a supported Linux HTTP service unit disabled,
+starts it explicitly, checks its response and failure restart, restores its
+saved definition across broker restarts, then stops and removes it. Unauthorized
+imports, unsupported security directives and removal of active services must
+fail without changing saved configuration. RPC replies are recorded separately
+from command exit codes. The native Services tab exposes import/start/stop/remove;
+see the [unit contract](../../docs/linux-posix-qualification.md#linux-service-unit-integration).
+Build guest brokers with `desktop/tools/session_check.v cross`: production
+compilation embeds VML assets instead of leaving host-path startup dependencies.
+
 The application guest init supplies the usual login environment (HOME, user
 names, UTF-8 locale and XDG_RUNTIME_DIR). Prepared office roots also need real
 fonts; DejaVu and the Alpine Gnumeric dependency closure qualify the native

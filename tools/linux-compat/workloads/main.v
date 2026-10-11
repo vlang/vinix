@@ -9,7 +9,7 @@ import strconv
 import time
 
 const catalog = ['sqlite', 'media', 'office', 'chromium', 'firefox', 'go', 'java', 'v', 'server',
-	'runtime', 'debugger', 'packages', 'portal', 'games']
+	'runtime', 'debugger', 'packages', 'portal', 'games', 'serviceunits']
 
 struct CommandResult {
 	argv              []string
@@ -51,6 +51,7 @@ struct Report {
 	debuggers                    []DebugResult
 	packages                     []PackageResult
 	games                        []GameResult
+	service_units                []ServiceUnitResult
 }
 
 struct Suite {
@@ -68,6 +69,8 @@ mut:
 	debuggers []DebugResult
 	packages []PackageResult
 	games []GameResult
+	service_units []ServiceUnitResult
+	unit_requests []ServiceUnitRequest
 }
 
 fn stop(mut child os.Process) {
@@ -320,6 +323,7 @@ fn (mut suite Suite) run(name string) ! {
 			expect(suite.execute(suite.work + '/v-smoke', [suite.work + '/v-data'])!.trim_space() == '42', 'V compile/file workload failed')!
 		}
 		'server' { suite.server()! }
+		'serviceunits' { suite.service_units()! }
 		'runtime' {
 			if suite.runtime == '' {
 				return error('unsupported: supply --runtime-probe with the matching ELF fixture')
@@ -491,7 +495,7 @@ fn main() {
 	} else {
 		''
 	}
-	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages, suite.games}
+	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages, suite.games, suite.service_units}
 	os.write_file(suite.work + '/report.json', json2.encode(report, prettify: true) + '\n') or {
 		eprintln(err.msg())
 		exit(1)

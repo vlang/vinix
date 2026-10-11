@@ -1,0 +1,244 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "b4d7c71a9b962ff50949fd37af25806a8bd309181237fd51cb0c6ee80abe29b0",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "serviceunits",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/bin/busybox-extras",
+                "--list"
+            ],
+            "executable_sha256": "a63d1c0c647867440dd7b01fb06f02d7fde3b2256d34adff86d017c0d1c67a54",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "arch\nconspy\ndnsd\ndumpleases\nfakeidentd\nftpd\nftpget\nftpput\nhttpd\ninetd\nreadahead\ntcpsvd\ntelnet\ntelnetd\ntftp\ntftpd\nudhcpd\n",
+            "stderr": ""
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [
+        {
+            "unit_sha256": "cab005fa9c65dbfe00662ce4271af204aba1e4780534387a0129aba9e7abb27a",
+            "broker_sha256": "f61adf137fb83872add5812f4ce13f3dd6e5d4df0c027129364156adca8bbb46",
+            "first_pid": 28523,
+            "restarted_pid": 33,
+            "restored_pid": 15562,
+            "response": "HTTP/1.1 200 OK\r\nDate: Sun, 11 Oct 2026 13:30:18 GMT\r\nConnection: close\r\nContent-type: text/html\r\nAccept-Ranges: bytes\r\nLast-Modified: Sun, 11 Oct 2026 13:30:17 GMT\r\nETag: \"6acb8f69-57\"\r\nContent-Length: 87\r\n\r\nvinix-imported-service-8fb884fc052d68e0ac7cbdba44827ea01441f8fd09d0dcc66991347f3bd67567",
+            "unsupported_rejected": true,
+            "unauthorized_rejected": true,
+            "active_remove_rejected": true,
+            "configuration_restored": true,
+            "removed": true,
+            "broker_retired": true,
+            "requests": [
+                {
+                    "arguments": [
+                        "ping"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "service.import",
+                        "linux-http.service",
+                        "/tmp/linux-compat-evidence/unit-home/http.service",
+                        "0"
+                    ],
+                    "reply": "error\tdenied",
+                    "rejected": true
+                },
+                {
+                    "arguments": [
+                        "attach"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "service.import",
+                        "unsupported.service",
+                        "/tmp/linux-compat-evidence/unit-home/unsupported.service",
+                        "1"
+                    ],
+                    "reply": "error\tdenied",
+                    "rejected": true
+                },
+                {
+                    "arguments": [
+                        "service.import",
+                        "linux-http.service",
+                        "/tmp/linux-compat-evidence/unit-home/http.service",
+                        "0"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\nservice\t0\t6c696e75782d687474702e73657276696365\t0\t0\t0\t0\t0\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "service.enable",
+                        "0",
+                        "1"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\nservice\t0\t6c696e75782d687474702e73657276696365\t2\t28523\t0\t1\t0\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "service.remove",
+                        "linux-http.service"
+                    ],
+                    "reply": "error\tdenied",
+                    "rejected": true
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\nservice\t0\t6c696e75782d687474702e73657276696365\t2\t28523\t0\t1\t0\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\nservice\t0\t6c696e75782d687474702e73657276696365\t4\t0\t9\t1\t1\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\nservice\t0\t6c696e75782d687474702e73657276696365\t2\t33\t9\t1\t1\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "shutdown"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "ping"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "attach"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\nservice\t0\t6c696e75782d687474702e73657276696365\t2\t15562\t0\t1\t0\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "service.enable",
+                        "0",
+                        "0"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\nservice\t0\t6c696e75782d687474702e73657276696365\t3\t15562\t0\t0\t0\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\nservice\t0\t6c696e75782d687474702e73657276696365\t0\t0\t15\t0\t0\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "service.remove",
+                        "linux-http.service"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "shutdown"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "ping"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "attach"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "services"
+                    ],
+                    "reply": "vinix-service-status\t1\n",
+                    "rejected": false
+                },
+                {
+                    "arguments": [
+                        "shutdown"
+                    ],
+                    "reply": "ok",
+                    "rejected": false
+                }
+            ]
+        }
+    ]
+}

@@ -209,7 +209,7 @@ fn session_call(command string, arguments []string) !string {
 	defer { unsafe { request.free() } }
 	if !session_send_message(fd, request) { return error('could not send session request') }
 	reply := session_receive_timeout(fd, if command in ['quiet', 'alarm', 'alarm.cancel', 'settings.set',
-		'policy.set', 'service.enable', 'dismiss'] {
+		'policy.set', 'service.enable', 'service.import', 'service.remove', 'dismiss'] {
 		2000
 	} else {
 		300
@@ -566,6 +566,65 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		i := int(sessioncore.number(message.fields[1].str(), 0, daemon.notifications.alarm_count - 1)!)
 		daemon.notifications.alarms[i].active = false
 		daemon.changed = true
+		return 'ok'
+	}
+	if command == 'service.import' && f.count == 4 {
+		if daemon.stop { return error('session is shutting down') }
+		name := message.fields[1].str()
+		path := message.fields[2].str()
+		if !path.starts_with('/') { return error('unit path must be absolute') }
+		unit := sessioncore.load(path, 64 * 1024)!
+		defer { unsafe { unit.free() } }
+		service := sessioncore.import_linux_service(name, unit,
+			sessioncore.number(message.fields[3].str(), 0, 1)! != 0)!
+		if daemon.supervisor.count == sessioncore.max_services { return error('service registry full') }
+		for i in 0 .. daemon.supervisor.count {
+			if daemon.supervisor.services[i].name.str() == name { return error('service already installed') }
+		}
+		// Publish the candidate before making it eligible for process launch.
+		mut candidate := daemon.supervisor
+		candidate.services[candidate.count] = service
+		candidate.count++
+		candidate.validate()!
+		record := candidate.encode()
+		config := '${daemon.home}/.vinix-services'
+		defer { unsafe { record.free(); config.free() } }
+		sessioncore.save(config, record)!
+		daemon.supervisor = candidate
+		return 'ok'
+	}
+	if command == 'service.remove' && f.count == 2 {
+		mut index := -1
+		for i in 0 .. daemon.supervisor.count {
+			if daemon.supervisor.services[i].name.str() == message.fields[1].str() { index = i; break }
+		}
+		if index < 0 { return error('unknown service') }
+		service := daemon.supervisor.services[index]
+		if service.enabled || service.pid != 0 || service.state !in [.stopped, .failed] {
+			return error('disable and stop the service before removal')
+		}
+		for i in 0 .. daemon.supervisor.count {
+			if daemon.supervisor.services[i].dependencies & (u32(1) << index) != 0 {
+				return error('service has installed dependents')
+			}
+		}
+		mut candidate := daemon.supervisor
+		for i in index + 1 .. candidate.count { candidate.services[i - 1] = candidate.services[i] }
+		candidate.count--
+		candidate.services[candidate.count] = sessioncore.Service{}
+		for i in 0 .. candidate.count {
+			mask := candidate.services[i].dependencies
+			lower := (u32(1) << index) - 1
+			candidate.services[i].dependencies = (mask & lower) | ((mask >> 1) & ~lower)
+		}
+		candidate.validate()!
+		record := candidate.encode()
+		config := '${daemon.home}/.vinix-services'
+		defer { unsafe { record.free(); config.free() } }
+		sessioncore.save(config, record)!
+		daemon.supervisor = candidate
+		for i in index + 1 .. daemon.supervisor.count + 1 { daemon.service_leases[i - 1] = daemon.service_leases[i] }
+		daemon.service_leases[daemon.supervisor.count] = 0
 		return 'ok'
 	}
 	if command == 'service.enable' && f.count == 3 {

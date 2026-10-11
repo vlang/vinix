@@ -15,6 +15,52 @@ fn session_test_wait() {
 	assert false, 'session broker did not become ready'
 }
 
+fn test_services_file_chooser_import_and_remove_keep_authorization_and_disabled_state() {
+	base := '${os.temp_dir()}/vinix-service-import-test-${C.getpid()}'
+	os.mkdir(base)!
+	os.chmod(base, 0o700)!
+	previous := os.getenv_opt('VINIX_SESSION_RUNTIME')
+	os.setenv('VINIX_SESSION_RUNTIME', base, true)
+	defer {
+		if value := previous { os.setenv('VINIX_SESSION_RUNTIME', value, true) }
+		else { os.unsetenv('VINIX_SESSION_RUNTIME') }
+		os.rmdir_all(base) or {}
+	}
+	home := '${base}/home'
+	os.mkdir(home)!
+	config := '${home}/.vinix-services'
+	os.write_file(config, 'vinix-services\t1\n')!
+	unit := '${home}/example.service'
+	os.write_file(unit, '[Service]\nType=simple\nExecStart=/bin/sleep 60\n')!
+	binary := os.real_path('build/session-runtime/vinix-desktop')
+	mut broker := os.new_process(binary)
+	broker.set_args(['--session-services', '--session-home=${home}'])
+	broker.run()
+	defer { broker.signal_kill(); broker.wait(); broker.close() }
+	session_test_wait()
+	assert !session_call_ok('service.import', ['example.service', unit, '0'])
+	assert session_call_ok('attach', [])
+	mut d := Desktop{home: home, canvas: Canvas{width: 1600, height: 900}}
+	d.initialize_shell_hub()
+	d.hub.attached = true
+	assert d.handle_session_hub_action('session.service.import')
+	assert d.hub.service_import
+	assert session_call_ok('dialog.result', [C.getpid().str(), 'linux-service', unit])
+	d.poll_shell_services()
+	assert !d.hub.service_import && d.hub.service_count == 1
+	assert d.hub.service_names[0].str() == 'example.service'
+	assert !d.hub.service_enabled[0]
+	assert d.hub.service_status.str() == 'Service installed. Select Start to run it.'
+	restored := sessioncore.decode_services(os.read_file(config)!, false)!
+	assert restored.count == 1 && !restored.services[0].enabled && restored.services[0].pid == 0
+	assert d.handle_session_hub_action('session.service.remove.0')
+	assert d.hub.service_count == 0 && d.hub.service_status.str() == 'Service removed.'
+	assert os.read_file(config)! == 'vinix-services\t1\n'
+	assert session_call_ok('shutdown', [])
+	broker.wait()
+	assert broker.code == 0
+}
+
 fn test_local_file_uri_decoding_rejects_remote_hosts_and_nul() {
 	for uri in ['file:///home/user/My%20File.txt', 'file://localhost/home/user/My%20File.txt',
 		'file:/home/user/My%20File.txt#section'] {

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "cases": "serviceunits",
+    "inputs": {
+        "kernel": "1cba1b55844b58b12c62460998cdd6d0ef3f94d5b3dfd1bac50af1f50285cf2e",
+        "workloads": "12ef7cc43eb5d8b25674c14590da4a832657c50f1884d0139ce26b71ab7316e6",
+        "runtime-probe": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+        "rootfs_manifest": "8321977bd17594144ef765d7cb0b7ddb557b9ff86c8cce70d59a91043d8935b2",
+        "init_source": "796750bf61b36e28f015f34fa6f4591278dd8b895d7cc4a6007212ceb98888c6",
+        "guest_report": "3d23e0c4410287f2eb2d42fcf80f46fa1fc54b3b11f4548e81265689e8c3a493",
+        "snapshot_kernel": "1cba1b55844b58b12c62460998cdd6d0ef3f94d5b3dfd1bac50af1f50285cf2e"
+    },
+    "exit_code": 1
+}

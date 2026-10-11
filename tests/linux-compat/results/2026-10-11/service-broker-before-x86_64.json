@@ -1,0 +1,37 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "b94f8a9c2c7934c86b362859dcbbc26f5d8b851cb99a72a4259555316a91c055",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "serviceunits",
+            "status": "failed",
+            "detail": "session service broker failed to start: exit=1 stdout= stderr=V panic: EmbedFileData error: files \"calculator.vml\" and \"/Volumes/VIssueFix1011/vinix-linux-posix-services/build/session-amd64/calculator.vml\" do not exist\n v hash: a436b4f\n    pid: 0x59ec\n    tid: 0x59ec\nbacktrace_symbols is missing => printing backtraces is not available.\nSome libc implementations like musl simply do not provide it.\n"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/bin/busybox-extras",
+                "--list"
+            ],
+            "executable_sha256": "a63d1c0c647867440dd7b01fb06f02d7fde3b2256d34adff86d017c0d1c67a54",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "arch\nconspy\ndnsd\ndumpleases\nfakeidentd\nftpd\nftpget\nftpput\nhttpd\ninetd\nreadahead\ntcpsvd\ntelnet\ntelnetd\ntftp\ntftpd\nudhcpd\n",
+            "stderr": ""
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": []
+}

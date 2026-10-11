@@ -574,6 +574,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [ ] Run application-driven regression suites for browsers, office/media tools,
   language runtimes, databases, servers and games; publish unsupported dependencies.
 
+- [x] Integrate a bounded Linux foreground-service unit subset with the native
+  Services chooser and qualify HTTP start/restart/configuration restore/removal
+  plus authorization and unsupported-directive refusals on both architectures.
+  See [the unit contract and receipts](docs/linux-posix-qualification.md#linux-service-unit-integration).
+
 - [x] Replace placeholder BPF/openat2 success with explicit errors and enforce
   faccessat2 empty-path permissions, with regression checks on both architectures.
 - [x] Establish V build/guest/application qualification tools and publish native

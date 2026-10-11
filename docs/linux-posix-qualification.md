@@ -289,9 +289,52 @@ the qualification guest uses a privileged launcher. Unprivileged launches
 without administrator policy, other Java architectures, persistent package
 transactions and desktop integration remain unqualified.
 
+## Linux service-unit integration
+
+Both native architectures pass `serviceunits` with the native session broker:
+an actual BusyBox HTTP unit is installed disabled, explicitly started, killed
+to exercise failure restart, restored after a clean broker restart, stopped,
+removed, and confirmed absent after another broker restart. Every run verifies
+the exact HTTP body and different process IDs, three successful broker exits,
+and unchanged saved configuration after unauthorized import, unsupported
+`PrivateNetwork=yes`, and active-service removal are refused.
+
+The Services tab's **Import Linux service…** chooser installs the selected
+`.service` file disabled. **Start**, **Stop**, and **Remove** use the existing
+compositor authorization; ordinary CLI children cannot acquire that authority
+from their parent. The host integration test exercises the real chooser ticket,
+result delivery, registry refresh, disabled state, and removal.
+
+The supported contract is explicit `Type=simple`, an absolute `ExecStart`
+without command prefixes or expansions, up to 16 arguments, `Restart=no`,
+`on-failure` or `always`, and restart/stop durations from 100 ms to 60 seconds.
+Quoted whole arguments and the documented basic escapes preserve literal argv;
+no shell is inserted. The native supervisor limits failure restarts to five.
+`Description` and `WantedBy=default.target` are accepted metadata. Installation
+never enables a service solely because a target appears in its unit.
+Dependencies, credentials, environment/working-directory changes, notify or
+forking services, privileged prefixes, specifiers, continuations, and sandbox
+directives are errors. This is a maintained native integration for that subset;
+full systemd and system service management remain unsupported.
+
+Receipts are `service-units-{aarch64,x86_64}.json`, matching guest-input and
+driver-build receipts, and `build-service-broker-{aarch64,x86_64}.json` in the
+[dated results](../tests/linux-compat/results/2026-10-11/). The broker manifests
+hash all staged V/C inputs and the executable. Earlier guest failures in
+`service-broker-before-*` retain the actual startup panic: a cross-compiled
+desktop tried to read `calculator.vml` from a host build directory. Production
+cross-compilation now embeds those assets; both isolated guest brokers start
+and complete the lifecycle. The before reports use earlier driver builds and
+are startup controls, not identical-driver semantic comparisons.
+
+Persistence here means synchronized configuration restored across broker
+restarts. Cold boot on a persistent home, package-triggered unit discovery,
+visual guest interaction, and systemd/portal/sandbox integration need their
+own acceptance checks. Whole-application lifecycle qualification stays false.
+
 Outstanding dependencies include browser and V packages, desktop integration
 for the qualified office/media workloads, Go/Java on unqualified paths, D-Bus and a real portal backend,
-systemd/service-unit integration, Flatpak/Snap/FUSE and enforced Linux sandbox
+full systemd integration, Flatpak/Snap/FUSE and enforced Linux sandbox
 interfaces, and title-specific game assets, GPU/audio/input and vendor APIs.
 The [behavior matrix](linux-posix-compatibility.md) lists the broader limits.
 Every application report keeps `complete_lifecycle_qualified` false until its

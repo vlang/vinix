@@ -3,6 +3,7 @@ module main
 
 import desktop.sessioncore
 import net.urllib
+import os
 import ui2
 
 const session_hub_tabs = ['Workspaces', 'Notifications', 'Clipboard', 'Services', 'Help']!
@@ -29,10 +30,13 @@ mut:
 	notice_open_actions [64]string
 	clip_actions        [16]string
 	service_actions     [32]string
+	service_remove_actions [32]string
 	service_names       [32]sessioncore.Text
 	service_states      [32]sessioncore.Text
 	service_enabled     [32]bool
 	service_count       int
+	service_import      bool
+	service_status      sessioncore.Text
 	banner_id           i64
 	banner_until        i64
 	seen_notice_id      i64
@@ -80,6 +84,7 @@ fn (mut d Desktop) initialize_shell_hub() {
 	for i in 0 .. d.hub.alarm_actions.len { d.hub.alarm_actions[i] = 'session.alarm.${i}' }
 	for i in 0 .. d.hub.clip_actions.len { d.hub.clip_actions[i] = 'session.clip.${i}' }
 	for i in 0 .. d.hub.service_actions.len { d.hub.service_actions[i] = 'session.service.${i}' }
+	for i in 0 .. d.hub.service_remove_actions.len { d.hub.service_remove_actions[i] = 'session.service.remove.${i}' }
 	for i in 0 .. d.hub.open_actions.len { d.hub.open_actions[i] = 'session.open.app.${i}' }
 	d.hub.associations.set('text/plain', 'vinix-editor', false) or {}
 	d.hub.associations.set('image/png', 'vinix-preview', false) or {}
@@ -140,6 +145,26 @@ fn (mut d Desktop) poll_shell_services() {
 		}
 	}
 	d.refresh_shell_policy()
+	if d.hub.service_import {
+		if path := session_dialog_take('linux-service') {
+			d.hub.service_import = false
+			defer { unsafe { path.free() } }
+			if path.len == 0 {
+				d.hub.service_status.set('Service import cancelled.') or {}
+			} else {
+				name := os.file_name(path)
+				args := [name, path, '0']
+				defer { unsafe { name.free(); (&array(&args)).free() } }
+				if session_call_ok('service.import', args) {
+					d.hub.service_status.set('Service installed. Select Start to run it.') or {}
+				} else {
+					d.hub.service_status.set('Service could not be installed. Check its directives and the session log.') or {}
+				}
+				d.refresh_service_status()
+			}
+			d.dirty = true
+		}
+	}
 	history := session_call('history', []) or {
 		d.hub.attached = false
 		d.hub.available = false
@@ -785,6 +810,29 @@ fn (mut d Desktop) handle_session_hub_action(action string) bool {
 		d.dirty = true
 		return true
 	}
+	if action == 'session.service.import' {
+		if !d.hub.service_import {
+			d.hub.service_import = session_dialog_open('linux-service', 0, 'Import a Linux service unit', d.home, '', 'application/x-systemd-unit')
+			if !d.hub.service_import { d.hub.service_status.set('Service file chooser unavailable.') or {} }
+		}
+		d.dirty = true
+		return true
+	}
+	if action.starts_with('session.service.remove.') {
+		i := action['session.service.remove.'.len..].int()
+		if i >= 0 && i < d.hub.service_count {
+			args := [d.hub.service_names[i].str()]
+			if session_call_ok('service.remove', args) {
+				d.hub.service_status.set('Service removed.') or {}
+			} else {
+				d.hub.service_status.set('Stop the service and its dependents before removing it.') or {}
+			}
+			unsafe { (&array(&args)).free() }
+			d.refresh_service_status()
+			d.dirty = true
+		}
+		return true
+	}
 	if action.starts_with('session.service.') {
 		i := action['session.service.'.len..].int()
 		if i >= 0 && i < d.hub.service_count {
@@ -915,14 +963,18 @@ fn (d &Desktop) session_hub_contents(width int, height int) []ui2.Element {
 		3 {
 			out << body_line('Services start after their dependencies and stop before them.', 16, y, inner)
 			y += 26
+			out << settings_choice('session.service.import', 'Import Linux service…', 16, y, 210, false)
+			out << muted_line(d.hub.service_status.str(), 238, y + 6, inner - 222)
+			y += 38
 			if d.hub.service_count == 0 {
 				out << body_line('No configured services.', 16, y, inner)
 			}
 			for slot in 0 .. 8 {
 				i := d.hub.page * 8 + slot
 				if i >= d.hub.service_count { break }
-				out << body_line(d.hub.service_names[i].str(), 16, y, inner - 260)
-				out << muted_line(d.hub.service_states[i].str(), width - 250, y, 110)
+				out << body_line(d.hub.service_names[i].str(), 16, y, inner - 360)
+				out << muted_line(d.hub.service_states[i].str(), width - 350, y, 110)
+				out << settings_choice(d.hub.service_remove_actions[i], 'Remove', width - 236, y - 4, 98, false)
 				out << settings_choice(d.hub.service_actions[i], if d.hub.service_enabled[i] {
 					'Stop'
 				} else {
