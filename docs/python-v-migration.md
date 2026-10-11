@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `da792787a460146757709390d52d6d3983cb249f`,
-Linguist 7.27.0 reports **Python 5.20%** (395 files, 1,931,223 bytes) and
-**V 76.43%** (2,685 files, 28,392,513 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `2fed61f84177aea947785d27abdc3b9b0bdc6a68`,
+Linguist 7.27.0 reports **Python 5.09%** (387 files, 1,892,762 bytes) and
+**V 76.53%** (2,693 files, 28,434,945 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,275,062 Python bytes**. All remaining
-1,931,223 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,313,523 Python bytes**. All remaining
+1,892,762 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 36 stages below remove **137 Python files / 430,125 original bytes** and
+The 37 stages below remove **145 Python files / 468,586 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -67,6 +67,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Guest controllers, PTY/QMP supervision and independent verdict tests | `tests/native-guest-tools/guesthost`, eight native entrypoints | 20,584 / 434 | `6d2661b6` |
 | Independent tracker, console, diagnostic and random-hook guests, compiler APIs and hypervisor ABI launcher | `tests/native-guest-tools/guesthost/policy.v`, seven native entrypoints | 23,919 / 482 | `543480fb` |
 | Fifteen ABI guest runners, strict marker controller and native ARM ext2/ISO setup | `tests/native-guest-tools/guesthost/abi*.v`, fifteen native fronts | 66,059 / 1,172 | `da792787` |
+| Steam and Office generators and host/guest proofs, randomness and N64 bridge tooling | `build-support/native-compat-tools/compathost`, eight native fronts | 38,461 / 684 | `2fed61f8` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -636,12 +637,41 @@ No Python was run. Between `543480fb` and `da792787`, counted Python declines
 by exactly 66,059 bytes and fifteen files; concurrent changes affect other
 languages.
 
+Eight more complete command ports retire **38,461 Python bytes / 684 lines**.
+Steam preload generation and both host/guest checks, Office DLL generation and
+both host/guest checks, the randomness runner and N64 bridge now run through
+native V. Their original C controls, ABI/layout assertions, compiler recipes,
+marker predicates and public options remain. Native workspaces are fresh and
+default temporary owners retire on success/failure. Steam/Office runtime staging
+preserves execute permissions and timestamps, snapshots an existing ARM kernel
+and owns QEMU directly. Desktop cache inputs and N64 corresponding-source
+staging include the transitive native and embedded-fixture dependencies.
+
+Fresh ARM, Rosetta x86 and ARM ASan/UBSan hosts pass both Steam differentials
+and actual i386/x86_64 links, Office sanitizer goldens and all 33 Windows64 DLL
+exports, and the randomness original-C/V sanitizer comparison. Real ARM guests
+pass all four Steam original/V executables and both Office Windows64 fixtures
+through staged Wine. ARM and x86 randomness guests pass. The N64 bridge passes
+on ARM and the sanitizer controller with the existing ARM archive and a local
+homebrew ROM, including replacement, frames, save, reset and cleanup.
+All eight cold fronts pass outside the checkout, as does the N64 front from
+a copied corresponding-source tree. Declaration/ABI parsing, runtime byte/stat
+copying, CLI errors, prior-state preservation and twelve failed-build owner
+retirements pass separately on each of the three profiles. The three cache-key
+test files pass, and the updated N64 source policy compiles. macOS uses
+`detect_leaks=0` because Apple's runtime rejects LeakSanitizer; supported hosts
+retain leak detection. ASan/UBSan and the allocator-import guard remain. No
+new x86 N64 archive, production kernel, physical hardware or macOS leak-check
+result is claimed. No Python was run. Between `da792787` and `2fed61f8`, counted
+Python declines by exactly eight files and 38,461 bytes. See the
+[native compatibility qualification](../build-support/native-compat-tools/README.md).
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 36 stages.
+or hidden in these 37 stages.
 
 ## Earlier completed stages
 

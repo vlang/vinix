@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `da792787a460146757709390d52d6d3983cb249f`,
+at source commit `2fed61f84177aea947785d27abdc3b9b0bdc6a68`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -12,15 +12,15 @@ This is a snapshot; regenerate it when source files change.
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
 | C | 564 | 2,345,798 | 6.31% |
-| Python | 395 | 1,931,223 | 5.20% |
-| Shell | 451 | 1,361,756 | 3.67% |
+| Python | 387 | 1,892,762 | 5.09% |
+| Shell | 459 | 1,363,643 | 3.67% |
 
-All `.v` files are classified as V. The resulting V share is 76.43%, with no
+All `.v` files are classified as V. The resulting V share is 76.53%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,931,223 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,892,762 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev da792787a460146757709390d52d6d3983cb249f --breakdown --json
+github-linguist --rev 2fed61f84177aea947785d27abdc3b9b0bdc6a68 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -669,7 +669,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/musl/stage.py` | 4,754 |
 | `build-support/n64-homebrew/build.py` | 5,005 |
 | `build-support/n64/build.py` | 2,829 |
-| `build-support/n64/test-bridge.py` | 2,530 |
 | `build-support/native_host.py` | 6,504 |
 | `build-support/opengothic/build.py` | 1,979 |
 | `build-support/ps1/build.py` | 8,162 |
@@ -682,14 +681,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/security-tools/compile-v-core.py` | 2,919 |
 | `build-support/security-tools/stage.py` | 3,614 |
 | `build-support/staging-cache.py` | 2,980 |
-| `build-support/steam/compile-v-robust.py` | 2,967 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
 | `build-support/storage-tools/stage.py` | 2,679 |
 | `build-support/venus/prepare-qemu.py` | 3,270 |
 | `build-support/venus/tests/run.py` | 6,197 |
-| `build-support/x86-translation/compile-v-office.py` | 1,516 |
 | `build-support/xorg-server/compile-v-host.py` | 1,972 |
 | `desktop/tools/_font_native.py` | 9,708 |
 | `desktop/tools/_input_native.py` | 792 |
@@ -944,11 +941,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/n64/rsp-budget.py` | 3,714 |
 | `tests/n64/run.py` | 7,152 |
 | `tests/native-host/stdio-test.py` | 3,995 |
-| `tests/net-random/run.py` | 6,889 |
 | `tests/numa/_native.py` | 969 |
 | `tests/numa/run_vm.py` | 5,369 |
-| `tests/office-compat/run-vm.py` | 7,047 |
-| `tests/office-compat/run.py` | 4,134 |
 | `tests/openbsd-security/_native.py` | 963 |
 | `tests/openbsd-security/run_vm.py` | 6,978 |
 | `tests/opengothic/_native.py` | 3,643 |
@@ -993,8 +987,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/sound/run_vm.py` | 9,126 |
 | `tests/speculation-policy/run.py` | 7,078 |
 | `tests/stack-protector/run.py` | 5,134 |
-| `tests/steam/run-robust-vm.py` | 5,456 |
-| `tests/steam/test-robust-list.py` | 7,922 |
 | `tests/storage-volumes/host.py` | 7,882 |
 | `tests/storage-volumes/run.py` | 6,625 |
 | `tests/tlb/run.py` | 483 |
@@ -1062,6 +1054,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/make-docker-image` | 168 |
 | `build-support/minecraft/minecraft-xinitrc` | 47 |
 | `build-support/minecraft/run-minecraft` | 10,431 |
+| `build-support/n64/test-bridge` | 161 |
 | `build-support/obs/run-obs` | 1,305 |
 | `build-support/opengothic/run-opengothic` | 1,674 |
 | `build-support/patch-elf-interpreter` | 176 |
@@ -1076,6 +1069,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
 | `build-support/stage-uname.sh` | 656 |
 | `build-support/steam/bash` | 433 |
+| `build-support/steam/compile-v-robust` | 165 |
 | `build-support/steam/ldd` | 1,459 |
 | `build-support/steam/steam` | 8,733 |
 | `build-support/steam/steam-hosted` | 3,522 |
@@ -1094,6 +1088,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/vinix-pkg-wrapper` | 616 |
 | `build-support/vinix-version-check` | 1,591 |
 | `build-support/virglrenderer/build-host.sh` | 3,251 |
+| `build-support/x86-translation/compile-v-office` | 165 |
 | `build-support/x86-translation/patch-msxml-unicode` | 177 |
 | `build-support/x86-translation/patch-wine-i386-qemu` | 178 |
 | `build-support/x86-translation/patch-wine-service-timeout` | 184 |
@@ -1135,7 +1130,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,613 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 92,879 |
+| `scripts/build-desktop-aarch64.sh` | 93,398 |
 | `scripts/build-desktop-amd64.sh` | 14,984 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
@@ -1166,7 +1161,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-qemu-system-aarch64.sh` | 5,225 |
 | `scripts/build-roblox-aarch64.sh` | 139 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
-| `scripts/build-steam-aarch64.sh` | 13,716 |
+| `scripts/build-steam-aarch64.sh` | 13,694 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
 | `scripts/build-userland-aarch64.sh` | 24,987 |
 | `scripts/build-userland-amd64.sh` | 6,019 |
@@ -1177,7 +1172,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-voffice-aarch64.sh` | 6,899 |
 | `scripts/build-x11-aarch64.sh` | 20,713 |
 | `scripts/build-x11-amd64.sh` | 197 |
-| `scripts/build-x86-translation-aarch64.sh` | 22,832 |
+| `scripts/build-x86-translation-aarch64.sh` | 22,821 |
 | `scripts/cross-compile-activity.sh` | 227 |
 | `scripts/cross-compile-app.sh` | 4,139 |
 | `scripts/cross-compile-files.sh` | 212 |
@@ -1334,7 +1329,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mounted-disk-policy/check-generated` | 178 |
 | `tests/n64/frame` | 180 |
 | `tests/native-boundaries/run` | 104 |
-| `tests/net-random/run.sh` | 294 |
+| `tests/net-random/run` | 183 |
+| `tests/net-random/run.sh` | 283 |
 | `tests/network-ipv6/run-host.sh` | 124 |
 | `tests/network-options/compile-core` | 177 |
 | `tests/network-options/run` | 186 |
@@ -1344,6 +1340,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/network/guest-tools-boot.sh` | 1,623 |
 | `tests/network/tools-smoke.sh` | 393 |
 | `tests/numa/run.sh` | 1,476 |
+| `tests/office-compat/run` | 184 |
+| `tests/office-compat/run-vm` | 185 |
 | `tests/office/libreoffice-init.sh` | 4,214 |
 | `tests/office/run.sh` | 1,237 |
 | `tests/openbsd-security/run.sh` | 2,134 |
@@ -1419,9 +1417,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/stack-protector/run-diagnostic` | 178 |
 | `tests/steam/hosted-test.sh` | 3,480 |
 | `tests/steam/launcher-test.sh` | 6,952 |
+| `tests/steam/run-robust-vm` | 185 |
 | `tests/steam/run.sh` | 1,573 |
 | `tests/steam/steam-init.sh` | 11,673 |
 | `tests/steam/steam-smoke` | 4,054 |
+| `tests/steam/test-robust-list` | 184 |
 | `tests/storage/run.sh` | 210 |
 | `tests/storage/test-qemu-storage.sh` | 3,030 |
 | `tests/syscall-policy/run` | 185 |
