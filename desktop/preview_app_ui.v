@@ -45,6 +45,7 @@ fn preview_status_error(key string) bool {
 }
 
 fn (mut a PreviewApp) build(size ui2.Rect) !ui2.Element {
+	if panel := a.workflow_preview_panel(size) { return panel }
 	width := int(size.width)
 	height := int(size.height)
 	available_height := if height > preview_toolbar_height + preview_status_height {

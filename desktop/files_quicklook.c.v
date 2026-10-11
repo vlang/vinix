@@ -4,6 +4,8 @@
 module main
 
 import ui2
+import os
+import desktop.workflowcore
 
 #include "quicklook_stb.h"
 
@@ -23,6 +25,7 @@ enum FilesQuickLookKind {
 	none_
 	image
 	text
+	document
 }
 
 struct FilesQuickLook {
@@ -38,6 +41,9 @@ mut:
 	message        string
 	truncated      bool
 	surface_serial u64
+	worker int
+	work_directory string
+	source_identity workflowcore.Identity
 }
 
 fn files_quicklook_kind(path string) FilesQuickLookKind {
@@ -55,10 +61,13 @@ fn files_quicklook_kind(path string) FilesQuickLookKind {
 			return .text
 		}
 	}
+	for extension in ['.pdf', '.docx', '.xlsx', '.pptx', '.odt', '.ods', '.odp', '.epub', '.doc', '.xls', '.ppt', '.rtf', '.zip', '.tar', '.tgz', '.gz', '.bz2', '.xz', '.7z', '.rar', '.mp4', '.mkv', '.webm', '.mov', '.avi', '.mp3', '.wav', '.ogg', '.flac', '.m4a']! { if lower.ends_with(extension) { return .document } }
 	return .none_
 }
 
 fn (mut p FilesQuickLook) close() {
+	if p.worker > 0 { C.kill(-p.worker, C.SIGTERM); C.kill(p.worker, C.SIGTERM); mut status := 0; C.waitpid(p.worker, &status, C.WNOHANG); p.worker = 0 }
+	if p.work_directory.len > 0 { os.rmdir_all(p.work_directory) or {}; unsafe { p.work_directory.free() }; p.work_directory = '' }
 	if p.surface_path.len > 0 {
 		desktop_unlink(p.surface_path)
 		unsafe { p.surface_path.free() }
@@ -227,17 +236,20 @@ fn (mut p FilesQuickLook) show(path string) {
 	if p.kind == .none_ {
 		return
 	}
-	p.path = path.clone()
+	p.path = workflowcore.canonical(path) or { path.clone() }
+	p.source_identity = workflowcore.identify(p.path) or { workflowcore.Identity{} }
 	p.open = true
 	ok := match p.kind {
 		.image { p.load_image() }
 		.text { p.load_text() }
+		.document { p.start_document_preview() }
 		.none_ { false }
 	}
 	if !ok {
 		// close() frees the message, so it is the preview's own copy.
 		p.message = tr('files.quicklook.cannot_preview').clone()
 	}
+	if ok && p.kind == .image { files_store_thumbnail(p.path, p.surface_path, p.source_identity) or {} }
 }
 
 fn files_quicklook_panel(size ui2.Rect) (int, int, int, int) {
@@ -254,7 +266,7 @@ fn (p &FilesQuickLook) visible_lines(height int) int {
 }
 
 fn (mut p FilesQuickLook) scroll_by(delta int, height int) {
-	if !p.open || p.kind != .text {
+	if !p.open || p.kind !in [.text, .document] {
 		return
 	}
 	maximum := p.lines.len - p.visible_lines(height)
@@ -279,9 +291,10 @@ fn (p &FilesQuickLook) build(size ui2.Rect) ui2.Element {
 	if p.message != '' {
 		// The only message is this one. It is looked up as it is drawn, so a
 		// preview left open follows a change of language.
-		body << ui2.label('', tr('files.quicklook.cannot_preview'), ui2.rect(18, 62, f64(width - 36), 24), ui2.TextStyle{
+		body << ui2.label('', p.message, ui2.rect(18, 62, f64(width - 36), 80), ui2.TextStyle{
 			color: files_error
 			size:  13
+			lines: 4
 		})
 	} else if p.kind == .image {
 		available_width := width - 32

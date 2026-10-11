@@ -58,5 +58,34 @@ fn test_files_worker_reports_progress_copies_batch_and_undo_trashes_copy() {
 	assert app.undo_operations.len == 2
 	app.undo_file_operation()!
 	assert !os.exists(home + '/destination/two')
-	assert app.trash.entries.len == 1
+	assert !os.exists(home + '/destination/one')
+	assert app.trash.entries.len == 2
+}
+
+fn test_files_undo_renames_and_permissions_and_refuses_replaced_items() {
+	home := files_workflow_test_home()
+	defer { os.rmdir_all(home) or {} }
+	os.write_file(home + '/original', 'original')!
+	mut app := FilesContextApp{}
+	app.files.browser.read(home.clone())
+	defer { app.close_app() }
+	app.begin_rename(home + '/original')
+	app.rename_text.clear(); editor_append(mut app.rename_text, 'renamed')
+	app.commit_rename()!
+	assert os.exists(home + '/renamed')
+	app.undo_file_operation()!
+	assert os.exists(home + '/original') && !os.exists(home + '/renamed')
+	app.files.info.read(home + '/original', 0)
+	old_mode := app.files.info.mode & 0o777
+	app.files.info.pending_mode = 0o600
+	app.workflow_permission_action('files.permissions.apply')
+	assert app.files.info.mode & 0o777 == 0o600
+	app.files.info.close()
+	if old_mode != 0o600 { app.undo_file_operation()! }
+	app.begin_rename(home + '/original')
+	app.rename_text.clear(); editor_append(mut app.rename_text, 'renamed')
+	app.commit_rename()!
+	os.write_file(home + '/renamed', 'external')!
+	app.undo_file_operation() or { assert os.read_file(home + '/renamed')! == 'external'; return }
+	assert false, 'undo must preserve later edits'
 }

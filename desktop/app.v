@@ -95,6 +95,7 @@ const available_apps = [
 		width: 700
 		height: 400
 		process_name: 'vinix-files'
+		desktop_services: true
 		polling: true
 		poll_interval_ms: 100
 		keyboard: true
@@ -469,6 +470,8 @@ const available_apps = [
 		width: 800
 		height: 600
 		process_name: 'vinix-preview'
+		polling: true
+		poll_interval_ms: 200
 		keyboard: true
 		pointer: true
 		open: open_preview
@@ -557,6 +560,8 @@ const available_apps = [
 		width: 840
 		height: 660
 		process_name: 'vinix-grapher'
+		polling: true
+		poll_interval_ms: 2000
 		keyboard: true
 		open: open_grapher_app
 	},

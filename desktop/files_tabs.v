@@ -20,14 +20,20 @@ fn (mut a FilesContextApp) ensure_tabs() {
 }
 
 fn (mut tab FilesTab) close() {
-	unsafe { tab.path.free(); tab.back.free(); tab.forward.free(); tab.selection.free(); tab.action.free() }
+	workflow_free_strings(tab.back)
+	workflow_free_strings(tab.forward)
+	workflow_free_strings(tab.selection)
+	unsafe { tab.path.free(); tab.action.free() }
 	tab = FilesTab{}
 }
 
 fn (mut a FilesContextApp) save_tab() {
 	a.ensure_tabs()
 	mut tab := &a.tabs[a.active_tab]
-	unsafe { tab.path.free(); tab.back.free(); tab.forward.free(); tab.selection.free() }
+	workflow_free_strings(tab.back)
+	workflow_free_strings(tab.forward)
+	workflow_free_strings(tab.selection)
+	unsafe { tab.path.free() }
 	tab.path = a.files.current_path().clone()
 	tab.mode = a.files.view_mode
 	tab.scroll = a.files.browser.scroll
@@ -62,7 +68,14 @@ fn (mut a FilesContextApp) tab_action(event string) bool {
 	if event == 'files.selection.toggle' { a.multi_select = !a.multi_select; return true }
 	if event == 'files.selection.all' {
 		a.clear_selection_paths()
-		if a.files.view_mode == .list {
+		if a.files.active_tag_id >= 0 {
+			paths := a.files.settings.tagged_paths(a.files.active_tag_id)
+			for path in paths { a.selection << path.clone() }
+			unsafe { paths.free() }
+		} else if a.files.view_mode == .columns && a.files.columns.len > 0 {
+			browser := &a.files.columns[a.files.columns.len - 1].browser
+			for entry in browser.entries { a.selection << files_child_path(browser.path, entry.name) }
+		} else if a.files.view_mode == .list {
 			for entry in a.files.browser.entries { a.selection << files_child_path(a.files.browser.path, entry.name) }
 		} else if a.files.view_mode == .commander {
 			browser := if a.files.active_pane == 0 { &a.files.dual_left } else { &a.files.dual_right }
@@ -100,6 +113,12 @@ fn (a &FilesContextApp) is_row_action(event string) bool {
 }
 
 fn (a &FilesContextApp) row_path(action string) string {
+	if action.starts_with(files_action_tag_row) {
+		paths := a.files.settings.tagged_paths(a.files.active_tag_id)
+		defer { unsafe { paths.free() } }
+		i := action[files_action_tag_row.len..].int()
+		return if i >= 0 && i < paths.len { paths[i].clone() } else { '' }
+	}
 	if row := parse_miller_row_action(action) {
 		for col in a.files.columns { if col.id == row.column_id && row.row >= 0 && row.row < col.browser.entries.len { return files_child_path(col.browser.path, col.browser.entries[row.row].name) } }
 		return ''
@@ -118,6 +137,8 @@ fn (a &FilesContextApp) highlight_selection(mut element ui2.Element) {
 	if a.is_row_action(element.id) {
 		path := a.row_path(element.id)
 		if a.selection.index(path) >= 0 { element = ui2.Element{...element, box: ui2.BoxStyle{...element.box, bg: files_sidebar_selected, transparent: false}} }
+		thumbnail := files_thumbnail_image(path)
+		if thumbnail.len > 0 { element = ui2.Element{...element, image_path: thumbnail, key: workflow_owned_image_key} }
 		unsafe { path.free() }
 	}
 	for i in 0 .. element.children.len { a.highlight_selection(mut element.children[i]) }
@@ -133,8 +154,11 @@ fn (mut a FilesContextApp) workflow_toolbar(size ui2.Rect) []ui2.Element {
 	}
 	rows << ui2.button('files.tab.new', '+', ui2.rect(size.width - 120, 0, 32, 30), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 13})
 	rows << ui2.button('files.tab.close', 'Close tab', ui2.rect(size.width - 84, 0, 80, 30), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 11})
-	for i, pair in [['selection.toggle', if a.multi_select { 'Selecting' } else { 'Select' }], ['selection.all', 'All'], ['batch.copy', 'Copy'], ['batch.cut', 'Cut'], ['batch.paste', 'Paste'], ['batch.delete', 'Trash'], ['operation.undo', 'Undo']] {
-		rows << ui2.button('files.' + pair[0], pair[1], ui2.rect(f64(i * 68 + 4), 32, 64, 28), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 11})
+	actions := ['files.selection.toggle', 'files.selection.all', 'files.batch.copy', 'files.batch.cut', 'files.batch.paste', 'files.batch.delete', 'files.operation.undo', 'files.index.open', 'files.document.open', 'files.document.choose']!
+	labels := [if a.multi_select { 'Selecting' } else { 'Select' }, 'All', 'Copy', 'Cut', 'Paste', 'Trash', 'Undo', 'Search', 'Open', 'Open with']!
+	for i, action in actions {
+		button_width := (int(size.width) - 8) / 10
+		rows << ui2.button(action, labels[i], ui2.rect(f64(i * button_width + 4), 32, f64(button_width - 4), 28), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 11})
 	}
 	return rows
 }
@@ -184,7 +208,7 @@ fn (mut a FilesContextApp) workflow_drag(phase AppPointerPhase, button AppPointe
 				if info.is_dir {
 					paths := if a.selection.index(a.drag_path) >= 0 { a.selection.map(it.clone()) } else { [a.drag_path.clone()] }
 					a.start_transfer(paths, path, workflowcore.TransferKind.copy) or { a.operation_error(err.msg()) }
-					unsafe { paths.free() }
+					workflow_free_strings(paths)
 				}
 			}
 			unsafe { path.free() }

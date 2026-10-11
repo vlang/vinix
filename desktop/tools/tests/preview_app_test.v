@@ -310,12 +310,19 @@ fn test_preview_opens_png_and_rejected_paths_preserve_the_image() {
 	assert app.source.len > 0 && app.loaded_path == path
 	assert app.export_path.len == 0
 	old := app.pixels
-	bad := join_path(root, 'unsupported.pdf')
+	bad := join_path(root, 'malformed.pdf')
 	os.write_file(bad, '%PDF-1.7\n')!
 	preview_set_field(mut app.open_path, bad)
-	assert !app.open_image()
-	assert app.status_key == 'preview.status.pdf_unavailable'
+	assert app.open_image()
+	assert preview_documents.open && preview_documents.kind == .document
+	for _ in 0 .. 200 {
+		if preview_documents.poll_document_preview() { break }
+		desktop_sleep_ms(10)
+	}
+	assert preview_documents.worker == 0
+	assert preview_documents.message.len > 0
 	assert app.pixels == old && app.loaded_path == path
+	preview_documents.close()
 	preview_set_field(mut app.open_path, root)
 	assert !app.open_image() && app.pixels == old
 	preview_set_field(mut app.open_path, '')

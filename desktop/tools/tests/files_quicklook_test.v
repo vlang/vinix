@@ -164,7 +164,7 @@ fn test_files_quicklook_only_opens_supported_regular_files() {
 	assert files_quicklook_kind('IMAGE.JPG') == .image
 	assert files_quicklook_kind('stereo.jps') == .image
 	assert files_quicklook_kind('script.py') == .text
-	assert files_quicklook_kind('archive.zip') == .none_
+	assert files_quicklook_kind('archive.zip') == .document
 	mut preview := FilesQuickLook{}
 	preview.show('/tmp/does-not-exist.txt')
 	assert preview.open && preview.message != ''

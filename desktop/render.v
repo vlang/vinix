@@ -229,6 +229,12 @@ fn free_tree(el ui2.Element) {
 		}
 	} else if el.id == frame_owned_text_id {
 		unsafe { el.text.free() }
+	} else if el.key in [workflow_owned_id_key, workflow_owned_id_text_key, workflow_owned_text_key, workflow_owned_image_key]! {
+		unsafe {
+			if el.key in [workflow_owned_id_key, workflow_owned_id_text_key]! { el.id.free() }
+			if el.key in [workflow_owned_text_key, workflow_owned_id_text_key]! { el.text.free() }
+			if el.key == workflow_owned_image_key { el.image_path.free() }
+		}
 	}
 	if el.children.cap > 0 {
 		unsafe { el.children.free() }

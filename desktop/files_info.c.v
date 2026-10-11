@@ -229,8 +229,11 @@ fn (mut a FileBrowserApp) build_info_overlay(mut children []ui2.Element, width i
 		}
 		for i in 0 .. 9 {
 			bit := u32(1) << u32(8 - i)
-			text := ['Owner r', 'w', 'x', 'Group r', 'w', 'x', 'Others r', 'w', 'x'][i]
-			rows << ui2.button('files.permissions.bit.${i}', text, ui2.rect(f64(16 + i * 52), 356, 50, 28), ui2.BoxStyle{bg: if a.info.pending_mode & bit != 0 { files_sidebar_selected } else { body_panel }}, ui2.TextStyle{color: body_text, size: 10})
+			text := ['Owner r', 'w', 'x', 'Group r', 'w', 'x', 'Others r', 'w', 'x']![i]
+			bit_width := (panel_width - 32) / 9
+			number := i.str()
+			defer { unsafe { number.free() } }
+			rows << ui2.Element{...ui2.button('files.permissions.bit.' + number, text, ui2.rect(f64(16 + i * bit_width), 356, f64(bit_width - 2), 28), ui2.BoxStyle{bg: if a.info.pending_mode & bit != 0 { files_sidebar_selected } else { body_panel }}, ui2.TextStyle{color: body_text, size: 10}), key: workflow_owned_id_key}
 		}
 		rows << ui2.button('files.permissions.apply', 'Apply permissions', ui2.rect(16, 390, 160, 28), ui2.BoxStyle{bg: body_panel}, ui2.TextStyle{color: body_text, size: 12})
 		rows << ui2.label('', a.info.permission_message, ui2.rect(184, 388, f64(panel_width - 200), 40), ui2.TextStyle{color: body_text, size: 11, lines: 2})

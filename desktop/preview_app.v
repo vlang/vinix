@@ -183,6 +183,7 @@ fn (mut a PreviewApp) release_image() {
 }
 
 fn (mut a PreviewApp) open_image() bool {
+	if a.open_workflow_preview(editor_bytes_text(a.open_path)) { return true }
 	// The editable byte array is lent to UI text, but POSIX paths must have a
 	// terminator. A shorter edit can leave old bytes beyond the array's length.
 	path := editor_bytes_text(a.open_path).clone()
@@ -479,6 +480,7 @@ fn (mut a PreviewApp) pan(dx int, dy int) {
 }
 
 fn (mut a PreviewApp) close_app() {
+	preview_documents.close()
 	a.release_image()
 	unsafe {
 		a.open_path.free()

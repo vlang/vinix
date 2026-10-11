@@ -76,9 +76,10 @@ fn remote_app_poll_due(interval u64, sampled bool, last_poll_ms u64, now_ms u64)
 // actual dispatch and wire bytes can also be measured without an IPC fixture.
 fn native_app_poll_reply(mut app NativeApp) []u8 {
 	mut changed := false
+	if mut app is PreviewApp { changed = workflow_preview_poll() }
 	if mut app is PollingApp {
 		mut poller := PollingApp(app)
-		changed = poller.poll()
+		changed = poller.poll() || changed
 	}
 	// Quiet replies have at most five bytes; a desktop service adds24 bytes.
 	// Preallocate both so appends retain no old buffers under -manualfree.

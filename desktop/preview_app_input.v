@@ -67,6 +67,7 @@ fn (mut a PreviewApp) field_ascii(ch u8) {
 }
 
 fn (mut a PreviewApp) key_input(input string) {
+	if preview_documents.open { if input == '\x1b' { preview_documents.close() } else if input == '\x1b[B' { preview_documents.scroll_by(3, 600) } else if input == '\x1b[A' { preview_documents.scroll_by(-3, 600) }; return }
 	mut index := 0
 	for index < input.len {
 		ch := input[index]
@@ -191,6 +192,7 @@ fn (mut a PreviewApp) paste_input(input string) {
 }
 
 fn (mut a PreviewApp) handle(action string) ! {
+	if action == files_quicklook_close { preview_documents.close(); return }
 	a.pending_len = 0
 	if action.starts_with(jump_open_prefix) {
 		// The borrowed suffix lives until this command finishes; set_field

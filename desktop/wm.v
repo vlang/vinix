@@ -1022,6 +1022,7 @@ fn (mut d Desktop) invalidate_wallpaper() {
 // poll_apps gives every application that has something of its own going on a
 // chance to say so, and redraws if any of them did.
 fn (mut d Desktop) poll_apps() {
+	d.poll_workflow_search()
 	// Walk live windows rather than the backing store. Application slots
 	// stay stable after a window closes, but a closed terminal or clock should
 	// not keep doing background work forever. Minimized applications do keep

@@ -49,6 +49,7 @@ fn native_app_receive_text_copy(mut app NativeApp, payload string) {
 }
 
 fn (mut app RemoteApp) handle_native_operation(data string) bool {
+	if data.len >= 8 && color_meter_read_u32(data, 0) == document_open_magic { return app.handle_document_open(data) }
 	if data.len >= text_copy_header_size && color_meter_read_u32(data, 0) == text_copy_magic {
 		return app.handle_text_copy(data)
 	}

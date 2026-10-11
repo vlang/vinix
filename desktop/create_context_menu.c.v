@@ -7,6 +7,7 @@
 module main
 
 import ui2
+import desktop.workflowcore
 
 const create_context_new_folder = 'files.create.folder'
 const create_context_new_file = 'files.create.file'
@@ -336,8 +337,10 @@ mut:
 	worker_pid          int
 	job_path            string
 	job_sequence        u64
+	job_group           u64
 	job_recorded        bool
 	operation_open      bool
+	undo_pending        bool
 	operation           FilesTransferReport
 	undo_operations     []FilesUndo
 	tabs                []FilesTab
@@ -347,6 +350,13 @@ mut:
 	drag_start_y        int
 	drag_active         bool
 	suppress_row_once   bool
+	index_search        FilesIndexedSearch
+	document_request    string
+	document_choose     bool
+	document_default    bool
+	thumbnail_worker    int
+	thumbnail_directory string
+	thumbnail_scroll    int = -1
 }
 
 fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
@@ -378,6 +388,10 @@ fn open_files_with_context_menu(mut desktop Desktop) !NativeApp {
 		return error(app.files.browser.error)
 	}
 	app.restore_files_view_mode(desktop_home)
+	app.open_index_search()
+	app.start_indexing() or { app.index_search.status = err.msg().clone() }
+	app.index_search.open = false
+	app.restore_transfer_checkpoint()
 	return app
 }
 
@@ -686,6 +700,9 @@ fn (mut a FilesContextApp) build(size ui2.Rect) !ui2.Element {
 	}
 	if a.trash_open { return a.trash.build(size) }
 	if a.volumes_open { return a.volumes_panel(size) }
+	if a.index_search.open { return a.index_panel(size) }
+	if a.document_choose { return a.document_open_panel(size) }
+	a.start_visible_thumbnails()
 	browser_height := if size.height > 98 { size.height - 98 - if a.operation_open { 66 } else { 0 } } else { 1.0 }
 	browser_root := a.files.build(ui2.rect(size.x, size.y, size.width, browser_height))!
 	mut browser_children := frame_elements(8)
@@ -729,6 +746,7 @@ fn (mut a FilesContextApp) create_item(kind CreateItemKind) ! {
 		unsafe { directory.free() }
 		return err
 	}
+	if identity := workflowcore.identify(created) { a.job_sequence++; a.undo_operations << FilesUndo{destination: created.clone(), identity: identity, copy: true, group: a.job_sequence} }
 	a.refresh_to(directory)
 	a.set_context_path(created)
 	a.begin_rename(created)
@@ -771,6 +789,7 @@ fn (mut a FilesContextApp) commit_rename() ! {
 		}
 		return err
 	}
+	if new_path != old_path { if identity := workflowcore.identify(new_path) { a.job_sequence++; a.undo_operations << FilesUndo{source: old_path.clone(), destination: new_path.clone(), identity: identity, group: a.job_sequence} } }
 	next_current := file_context_rebased_path(current, old_path, new_path)
 	a.files.settings.rebase_path(old_path, new_path)
 	a.files.settings.save(desktop_home)
@@ -800,8 +819,10 @@ fn (mut a FilesContextApp) rename_key_input(input string) ! {
 
 fn (mut a FilesContextApp) handle(event_id string) ! {
 	a.follow_theme()
+	if a.document_open_action(event_id) { return }
+	if a.index_action(event_id) { return }
 	if a.operation_action(event_id) || a.tab_action(event_id) { return }
-	if a.files.permission_action(event_id) { return }
+	if a.workflow_permission_action(event_id) { return }
 	if a.suppress_row_once && a.is_row_action(event_id) { a.suppress_row_once = false; return }
 	if a.multi_select && a.is_row_action(event_id) {
 		a.select_action(event_id)
@@ -992,6 +1013,8 @@ fn (a &FilesContextApp) pointer_moves_matter() bool {
 fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointerButton,
 	scroll int, x int, y int, width int, height int) {
 	a.follow_theme()
+	if a.document_choose { return }
+	if a.index_search.open { if phase == .scroll { a.index_search.scroll = files_clamp(a.index_search.scroll - scroll, if a.index_search.results.len > 0 { a.index_search.results.len - 1 } else { 0 }) }; return }
 	if !a.settings_only && !a.trash_open && !a.preview.open && !a.volumes_open && !a.files.info.open && !a.tag_picker && a.workflow_drag(phase, button, x, y - 64, width) { return }
 	if a.volumes_open { return }
 	if a.trash_open {
@@ -1042,6 +1065,8 @@ fn (mut a FilesContextApp) pointer_event(phase AppPointerPhase, button AppPointe
 
 fn (mut a FilesContextApp) key_input(input string) {
 	a.follow_theme()
+	if a.document_choose { if input == '\x1b' { a.document_choose = false }; return }
+	if a.index_search.open { a.index_key(input); return }
 	if !a.settings_only && !a.files.search_focused && !a.trash_open && !a.preview.open && !a.tag_picker && !a.files.info.open && !a.volumes_open && a.rename_path.len == 0 && a.workflow_key(input) { return }
 	if a.trash_open {
 		a.trash.key(input)
@@ -1073,6 +1098,12 @@ fn (mut a FilesContextApp) key_input(input string) {
 }
 
 fn (mut a FilesContextApp) close_app() {
+	if a.thumbnail_worker > 0 { C.kill(a.thumbnail_worker, C.SIGTERM); mut status := 0; C.waitpid(a.thumbnail_worker, &status, C.WNOHANG); a.thumbnail_worker = 0 }
+	unsafe { a.thumbnail_directory.free() }
+	a.thumbnail_directory = ''
+	unsafe { a.document_request.free() }
+	a.document_request = ''
+	a.index_search.close()
 	a.close_workflows()
 	a.clear_volumes()
 	unsafe { a.volumes.free() }

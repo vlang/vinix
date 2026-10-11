@@ -7,6 +7,13 @@
 module main
 
 import ui2
+import os
+import desktop.workflowcore
+
+__global launcher_documents = workflowcore.SearchIndex{}
+__global launcher_index_worker = int(0)
+__global launcher_index_home = ''
+__global launcher_index_started = u64(0)
 
 const quick_launch_key = '\x1b[32;9u'
 const quick_launch_cmd_release = '\x1b[57444;1:3u'
@@ -42,15 +49,62 @@ fn (mut d Desktop) toggle_quick_launch() {
 		d.close_start_menu()
 	}
 	d.quick_launch_reset_query()
+	launcher_documents.close()
+	launcher_documents = workflowcore.load_index(d.home) or { workflowcore.SearchIndex{} }
+	d.start_workflow_search()
 	for d.switcher.ids.len < available_apps.len {
 		d.switcher.ids << '${action_switch_prefix}${d.switcher.ids.len}'
 	}
+	for d.switcher.ids.len < available_apps.len + quick_launch_max_results { d.switcher.ids << '${action_switch_prefix}${d.switcher.ids.len}' }
 	d.switcher.quick_launch = true
 	d.switcher.active = true
 	d.switcher.shown = true
 	d.switcher.index = 0
 	d.set_hover('')
 	d.dirty = true
+}
+
+fn (mut d Desktop) start_workflow_search() {
+	if launcher_index_worker > 0 || d.home.len == 0 { return }
+	now := desktop_monotonic_ms()
+	if launcher_index_home == d.home && now >= launcher_index_started && now - launcher_index_started < 60000 { return }
+	home := os.real_path(d.home)
+	defer { unsafe { home.free() } }
+	if launcher_documents.roots.len == 0 {
+		if id := workflowcore.identify(home) { launcher_documents.roots << workflowcore.SearchRoot{path: home.clone(), identity: id, enabled: true, contents: true} } else { return }
+	}
+	unsafe { launcher_index_home.free() }
+	launcher_index_home = d.home.clone()
+	launcher_index_started = now
+	pid := C.fork()
+	if pid < 0 { return }
+	if pid == 0 {
+		for fd in 3 .. 1024 { C.close(fd) }
+		mut index := workflowcore.SearchIndex{}
+		index.begin(launcher_documents.roots)
+		for index.indexing { index.tick() }
+		mut settings := load_files_settings(home)
+		for path, ids in settings.assignments {
+			mut tags := []string{}
+			for id in ids { for tag in settings.tags { if tag.id == id { tags << tag.name.clone() } } }
+			index.set_tags(path, tags)
+			unsafe { tags.free() }
+		}
+		index.publish(home) or { C._exit(1) }
+		C._exit(0)
+	}
+	launcher_index_worker = pid
+}
+
+fn (mut d Desktop) poll_workflow_search() {
+	if launcher_index_worker <= 0 { return }
+	mut status := 0
+	if C.waitpid(launcher_index_worker, &status, C.WNOHANG) != launcher_index_worker { return }
+	launcher_index_worker = 0
+	if status != 0 { return }
+	launcher_documents.close()
+	launcher_documents = workflowcore.load_index(launcher_index_home) or { workflowcore.SearchIndex{} }
+	if d.switcher.quick_launch { d.switcher.index = 0; d.dirty = true }
 }
 
 fn (mut d Desktop) quick_launch_reset_query() {
@@ -83,7 +137,9 @@ fn (d &Desktop) quick_launch_match_count() int {
 			count++
 		}
 	}
-	return count
+	paths := launcher_documents.query(query, quick_launch_max_results)
+	defer { unsafe { paths.free() } }
+	return count + paths.len
 }
 
 fn (d &Desktop) quick_launch_visible_limit() int {
@@ -141,9 +197,22 @@ fn (mut d Desktop) quick_launch_launch_selected() {
 	if d.switcher.query.len == 0 {
 		return
 	}
-	app_index := d.quick_launch_app_index(d.switcher.index) or { return }
+	if app_index := d.quick_launch_app_index(d.switcher.index) {
+		d.switcher_close()
+		d.launch_index(app_index)
+		return
+	}
+	query := d.quick_launch_query_text()
+	mut app_count := 0
+	for factory in available_apps { if app_matches(factory.title, query) { app_count++ } }
+	paths := launcher_documents.query(query, quick_launch_max_results)
+	defer { unsafe { paths.free() } }
+	i := d.switcher.index - app_count
+	if i < 0 || i >= paths.len { return }
+	path := paths[i].clone()
+	defer { unsafe { path.free() } }
 	d.switcher_close()
-	d.launch_index(app_index)
+	d.open_workflow_document(path)
 }
 
 // quick_launch_take_keys owns all keyboard input while the overlay is open.
@@ -339,6 +408,15 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 				bold: selected
 				align: .left
 			})
+			result++
+		}
+		paths := launcher_documents.query(query, quick_launch_max_results)
+		defer { unsafe { paths.free() } }
+		for path in paths {
+			if result >= result_count { break }
+			id := d.switcher.ids[result]
+			selected := result == d.switcher.index
+			panel_children << ui2.Element{...ui2.button_with_image(id, path.clone(), 'builtin:file', ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{bg: if selected { d.theme().accent } else { quick_launch_bg }, radius: 7}, ui2.TextStyle{color: if selected { u32(0xffffff) } else { quick_launch_text }, size: 12, align: .left}), key: workflow_owned_text_key}
 			result++
 		}
 	}

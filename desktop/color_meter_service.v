@@ -182,7 +182,8 @@ fn native_app_receive_desktop_service(mut app NativeApp, payload string) {
 }
 
 fn send_native_app_operation_response(fd int, state AppWireState, mut app NativeApp) bool {
-	mut bytes := native_app_text_copy_request(mut app)
+	mut bytes := native_app_document_request(mut app)
+	if bytes.len == 0 { bytes = native_app_text_copy_request(mut app) }
 	if bytes.len == 0 { bytes = native_app_desktop_service_request(mut app) }
 	sent := send_app_response(fd, true, state, bytes)
 	if bytes.cap > 0 { unsafe { bytes.free() } }
