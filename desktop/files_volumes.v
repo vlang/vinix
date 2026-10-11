@@ -2,6 +2,7 @@
 module main
 
 import ui2
+import desktop.workflowcore
 
 struct FilesVolume {
 	path string
@@ -25,13 +26,13 @@ fn (mut a FilesContextApp) refresh_volumes() {
 	defer { inventory.close_app() }
 	for mount in inventory.mounts {
 		if mount.filesystem in ['proc', 'sysfs', 'devtmpfs', 'devpts', 'cgroup', 'cgroup2'] { continue }
-		mut info := C.stat{}
-		if C.stat(&char(mount.target.str), unsafe { &info }) != 0 { continue }
+		info := workflowcore.identify(mount.target) or { continue }
+		if !info.directory() { continue }
 		network := mount.filesystem in ['nfs', 'nfs4', 'cifs', 'smb3', 'sshfs', 'fuse.sshfs', '9p']
 		removable := mount.target.starts_with('/media/') || mount.target.starts_with('/mnt/') || mount.target.starts_with('/run/media/')
 		index := a.volumes.len.str()
 		kind := if network { 'Network' } else if removable { 'Removable' } else { 'Local' }
-		a.volumes << FilesVolume{path: mount.target.clone(), label: '${mount.target} (${kind}, ${mount.filesystem})', action: 'files.volume.${index}', device: u64(info.st_dev), inode: u64(info.st_ino), network: network, removable: removable}
+		a.volumes << FilesVolume{path: mount.target.clone(), label: '${mount.target} (${kind}, ${mount.filesystem})', action: 'files.volume.${index}', device: info.device, inode: info.inode, network: network, removable: removable}
 		unsafe { index.free() }
 	}
 }
@@ -90,8 +91,8 @@ fn (mut a FilesContextApp) volume_action(event string) bool {
 	index := event['files.volume.'.len..].int()
 	if index < 0 || index >= a.volumes.len { return true }
 	volume := a.volumes[index]
-	mut current := C.stat{}
-	if C.stat(&char(volume.path.str), unsafe { &current }) != 0 || !files_trash_identity(current, volume.device, volume.inode) {
+	current := workflowcore.identify(volume.path) or { a.trash.status = 'files.trash.unavailable'; return true }
+	if current.device != volume.device || current.inode != volume.inode || !current.directory() {
 		a.trash.status = 'files.trash.unavailable'
 		return true
 	}
