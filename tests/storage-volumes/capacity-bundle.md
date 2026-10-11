@@ -57,9 +57,11 @@ bytes, confirms ordinary replay refuses the size mismatch, and explicitly
 applies growth through a retained descriptor. The descriptor writes and flushes
 the new page; its generation and an old held descriptor/data remain intact.
 Desired growth now uses `pool-grow`, bounded by the expanded tail member.
-The application persists the enlarged six-mapping bundle and its reboot marker.
-On the fourth boot, production init must restore before the application starts;
-old data/modes, both tail pages, correct physical disk identities and repeated
+After growth, a batch retains the writable tail row and adds a read-only neighbor
+whose raw page is flushed first. The application persists the complete seven-
+mapping bundle and its reboot marker. On the fourth boot, production init must
+restore all seven mappings before the application starts; old data/modes, both
+tail pages and the neighbor, correct physical disk identities and repeated
 adoption/boot replay are verified.
 The original two pool records and the newly expanded tail pool survive adoption
 and reboot; the fourth boot requires their exact eligible capacity reports.

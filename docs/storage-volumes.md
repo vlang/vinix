@@ -658,6 +658,58 @@ partition tables, filesystems, swap and other data; expansion does not reserve
 live extents. Administration must remain serialized. See
 [pool growth qualification](../tests/storage-volumes/pool-growth.md).
 
+## Atomic pool allocation batches
+
+```sh
+# Every request has a slot, decimal byte length and explicit rw/ro mode.
+vinix-volume pool-preview-batch /root/layout.vset 3 20 4194304 rw 21 1048576 ro
+vinix-volume pool-allocate-batch /root/layout.vset 3 20 4194304 rw 21 1048576 ro
+vinix-volume check-bundle /root/layout.vset
+vinix-volume restore-bundle /root/layout.vset
+```
+
+`pool-allocate-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [...]` plans 1–64
+requests into one pool and atomically publishes the complete bundle once.
+Requests run in argument order, each using saved member order and the lowest
+aligned contiguous gap. Earlier placements consume capacity for later requests.
+Each mapping stays on one disk. Request ordering can affect feasibility; the
+allocator does not reorder or backtrack to find a different packing.
+
+Slots must be distinct and below 64; lengths must be nonzero unsigned decimal
+bytes and fit a member's logical sector size. Modes are exactly `rw` or `ro`.
+Existing desired mappings and all pool metadata remain unchanged. A later
+invalid request, absent pool, occupied incompatible slot, fragmented gap or
+capacity failure preserves the entire previous bundle, with no placement
+report. The implementation builds a bounded private candidate before publication.
+
+A slot already present in the desired bundle is retained only when its length
+and mode match and its complete extent fits this pool's current region on its
+current disk. This includes a manually added row; pools do not tag ownership.
+Matching rows keep their disk, start and ordering, even if an earlier gap has
+become free. An incompatible existing row fails the whole batch; allocation
+does not grow, relocate or change its mode. New and matching rows may share a
+batch. Retrying a complete batch republishes and flushes even when every row
+matches, completing durability after a prior directory-fsync failure.
+
+`pool-preview-batch` accepts the same arguments and uses the same candidate
+planner. It prints all placements only after every request succeeds, without
+writing the bundle or entering the publisher. Reports include request index,
+disk index, slot, `action=allocate` or `action=keep`, offset, length and mode.
+Preview failure preserves the file and emits no placement rows. Buffered output
+errors return failure for both commands. After a publication succeeds, an output
+failure can leave the complete new file visible; inspect it or retry the same
+requests. Publisher failures retain the existing before/after-rename guarantees.
+
+Both commands open only the saved bundle. They do not inspect live devices,
+reserve live extents, or apply mappings. Run complete-set `check-bundle` and
+explicit replay separately; an unlisted live conflict on a later disk prevents
+every action during preflight. Administration must remain serialized: a preview
+does not pin the saved state against another editor, and live application keeps
+the existing partial-application rules. Batch metadata uses the unchanged
+version-2 format and existing boot restore. Spanning, RAID, encryption and
+filesystem resizing remain open. See
+[batch qualification](../tests/storage-volumes/pool-batch.md).
+
 ## Status ABI
 
 `tools/volumes/volumecli/volume.h` defines the native little-endian ABI shared by

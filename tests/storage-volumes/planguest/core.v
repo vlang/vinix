@@ -167,10 +167,12 @@ fn cycles(parent &char, count int) {
 		pool_members(c'/etc/vinix/volumes.vset')
 		pool_growth(c'/etc/vinix/volumes.vset', c'pool-expand', c'3', c'0', c'6299648', 0)
 		simple(c'pool-space', c'/etc/vinix/volumes.vset', c'3', 0)
-		pool_allocate(c'/etc/vinix/volumes.vset', c'3', c'14', c'4096', true, 0)
+		pool_batch(c'/etc/vinix/volumes.vset', c'3', c'14', c'4096', c'ro', c'15', c'8192', c'rw', true, 0, unsafe { nil })
+		pool_batch(c'/etc/vinix/volumes.vset', c'3', c'14', c'4096', c'ro', c'15', c'8192', c'rw', false, 0, unsafe { nil })
 		pool_growth(c'/etc/vinix/volumes.vset', c'pool-grow', c'3', c'14', c'8192', 0)
 		tool(c'check-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		simple(c'plan-remove', c'/etc/vinix/volumes.vset', c'14', 0)
+		simple(c'plan-remove', c'/etc/vinix/volumes.vset', c'15', 0)
 		simple(c'plan-enroll', c'/etc/vinix/volumes.vset', c'/root/offline.vmap', 0)
 		simple(c'plan-forget', c'/etc/vinix/volumes.vset', c'2', 0)
 		tool(c'restore-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
@@ -178,6 +180,7 @@ fn cycles(parent &char, count int) {
 	}
 	C.sleep(13)
 	missing(c'/dev/mapper/vinix14')
+	missing(c'/dev/mapper/vinix15')
 }
 
 @[direct_array_access]
@@ -431,6 +434,7 @@ fn first_boot(parent &char) {
 		planned_space(parent)
 		planned_pools(parent, wrong)
 		planned_pool_growth(parent)
+		planned_pool_batch(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }

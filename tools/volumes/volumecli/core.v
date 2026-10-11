@@ -65,11 +65,29 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES\n')
 	C.printf(c'       vinix-volume pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume pool-remove BUNDLE POOL_ID DISK_INDEX\n       vinix-volume pool-space BUNDLE POOL_ID\n       vinix-volume pool-allocate BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]\n')
 	C.printf(c'       vinix-volume pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES\n       vinix-volume pool-grow BUNDLE POOL_ID SLOT LENGTH_BYTES\n')
+	C.printf(c'       vinix-volume pool-allocate-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       vinix-volume pool-preview-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'pool-allocate-batch') == 0 || C.strcmp(argv[1], c'pool-preview-batch') == 0) {
+			if argc < 7 || argc > 196 || (argc - 4) % 3 != 0 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			if pool >= 64 { return usage() }
+			mut batch := &PoolBatch(C.alloca(sizeof(PoolBatch)))
+			*batch = PoolBatch{count: (argc - 4) / 3}
+			for i in 0 .. batch.count {
+				at := 4 + i * 3
+				slot := decimal(argv[at]) or { return usage() }
+				length := decimal(argv[at + 1]) or { return usage() }
+				if slot >= 64 || length == 0 || (C.strcmp(argv[at + 2], c'rw') != 0
+					&& C.strcmp(argv[at + 2], c'ro') != 0) { return usage() }
+				batch.rows[i] = Request{slot: u32(slot), length: length,
+					flags: if C.strcmp(argv[at + 2], c'ro') == 0 { u64(1) } else { u64(0) }}
+			}
+			return batch_pool_plan(argv[2], u32(pool), batch, C.strcmp(argv[1], c'pool-preview-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'pool-expand') == 0 || C.strcmp(argv[1], c'pool-grow') == 0) {
 			if argc != 6 { return usage() }
 			pool := decimal(argv[3]) or { return usage() }

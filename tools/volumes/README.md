@@ -92,6 +92,13 @@ bounds, preserving its disk, start and mode. Both publish offline, including
 equal-size durability retries; live growth uses separate explicit replay. See
 [pool expansion and growth rules](../../docs/storage-volumes.md#pool-expansion-and-mapping-growth).
 
+`pool-allocate-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [...]` plans 1–64
+ordered requests with explicit `rw`/`ro` modes and publishes them together.
+Matching existing rows remain fixed, allowing durable retries. A later failure
+preserves the entire saved state. `pool-preview-batch` reports the same complete
+placements without publication. Live checking/application remain separate. See
+[atomic batch rules](../../docs/storage-volumes.md#atomic-pool-allocation-batches).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

@@ -47,8 +47,8 @@ checks, removes the scratch entry, enrolls/forgets an empty offline disk,
 explicitly restores and runs boot replay.
 The scratch mapping must never exist. After 200 warmup and 200 measured cycles,
 all slab classes and large allocation pages must stay flat. The 1800-second
-boot allowance covers 6000 utility processes on x86 TCG, including physical
-capacity verification and pool membership/query/allocation/growth. A reordered
+boot allowance covers 6800 utility processes on x86 TCG, including physical
+capacity verification and pool membership/query/batch preview/allocation/growth. A reordered
 second boot uses production init and the actual disk-resident five-mapping bundle,
 requiring both new mappings, their data and read-only mode alongside previously
 grown extents. Replay remains idempotent.

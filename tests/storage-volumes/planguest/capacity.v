@@ -36,6 +36,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 			grown_view_data()
 			edited_view_data()
 			capacity_view_data()
+			pool_batch_boot_check(parent)
 			pool_boot_check()
 			pool_growth_boot_check()
 			check(status(c'/dev/mapper/vinix14').disk_id == status(parent).disk_id
@@ -105,6 +106,18 @@ fn physical_capacity_phase(parent &char, other &char) {
 		grown_view_data()
 		edited_view_data()
 		capacity_view_data()
+		// Retry an existing tail row and add its readonly neighbor in one batch.
+		raw := C.open(parent, C.O_RDWR)
+		for i in 0 .. 4096 { bytes[i] = 0xcc }
+		check(raw >= 0 && C.pwrite(raw, &bytes[0], 4096, 16785408) == 4096
+			&& C.fsync(raw) == 0 && C.close(raw) == 0, c'prepare persisted batch tail data')
+		pool_batch(c'/root/saved.vset', c'4', c'14', c'8192', c'rw', c'18', c'4096', c'ro', true, 0, &output[0])
+		check(contains(&output[0], c'slot=14 action=keep') && contains(&output[0], c'slot=18 action=allocate'), c'mixed existing/new batch preview')
+		pool_batch(c'/root/saved.vset', c'4', c'14', c'8192', c'rw', c'18', c'4096', c'ro', false, 0, nil)
+		missing(c'/dev/mapper/vinix18')
+		simple(c'restore-bundle', c'/root/saved.vset', nil, 0)
+		check(status(c'/dev/mapper/vinix14').generation == tail, c'mixed batch retains existing tail generation')
+		pool_batch_boot_check(parent)
 		copy_plan(c'/root/saved.vset', c'/etc/vinix/volumes.vset')
 		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0,
 			c'capacity aliases cleanup')

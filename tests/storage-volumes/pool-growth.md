@@ -46,10 +46,11 @@ Invalid growth requests preserve the saved file; equal-size expansion/growth
 retain its exact bytes and repeated replay keeps the generation. Scratch cleanup
 restores the exact original bundle and member order.
 
-Each of 200 warmup and 200 measured cycles now executes fifteen utility
-processes, including one expansion and one mapping growth: 6000 processes,
-400 expansions, 400 growths, 400 allocations/queries and 800 cycle member
-additions. No scratch view is created. Every slab class and the large-page
+Each of 200 warmup and 200 measured cycles now executes seventeen utility
+processes, including batch preview/publication, one expansion and one mapping
+growth: 6800 processes, 400 expansions, 400 growths, 800 scratch placements,
+400 pool queries and 800 cycle member additions. No scratch view is created.
+Every slab class and the large-page
 total must stay flat or decrease.
 
 The second boot restores the actual saved pool bundle with reordered physical
@@ -60,9 +61,10 @@ expands it to the full adopted tail, allocates and applies a writable view, then
 uses pool-aware desired growth and explicit replay through a held writable
 descriptor. Both durable tail pages and old data/modes/generations are verified.
 
-The fourth boot must restore all six mappings through production init, keep
+The fourth boot must restore all seven mappings through production init, keep
 the two original pool records, and report the expanded tail pool's exact
-`8380416` free bytes alongside its grown 8192-byte mapping.
+`8376320` free bytes alongside its grown 8192-byte mapping and new read-only
+batch neighbor. See [batch qualification](pool-batch.md).
 `PLAN POOL GROWTH BOOT PRESERVED` is required. The final file is a guest-published
 version-2 bundle with three regions; no host plan injection occurs.
 
