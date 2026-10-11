@@ -86,7 +86,9 @@ pub fn run() i32 {
 			return 1
 		}
 		options[n] = 0
-		mut arguments := [8]&char{}
+		// Three fixed arguments, up to five controller options (including
+		// command timeout and a package data device), then the terminating NULL.
+		mut arguments := [9]&char{}
 		arguments[0] = c'/usr/bin/linux-compat-workloads'
 		arguments[1] = c'--work=/tmp/linux-compat-evidence'
 		arguments[2] = c'--runtime-probe=/usr/share/linux-compat/runtime'

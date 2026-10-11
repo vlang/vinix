@@ -1,0 +1,40 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "ae92baafc3d65d6747b8101ce2d739253c02ca8826ca0df9401e08a776f11238",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "uid": 0,
+    "gid": 0,
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "runtime",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/share/linux-compat/runtime",
+                "--once"
+            ],
+            "executable_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "LINUX RUNTIME page_size=4096 pointer_bits=64\nLINUX RUNTIME PASS: atomics SIMD TLS\nLINUX RUNTIME PASS: JIT page sizes\nLINUX RUNTIME PASS: wide offsets time64\nLINUX RUNTIME: PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}

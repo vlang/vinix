@@ -1,0 +1,22 @@
+{
+    "architecture": "x86_64",
+    "execution_path": "native-x86_64",
+    "uid": 0,
+    "memory_mib": 1024,
+    "workload_timeout": 10,
+    "cases": "runtime",
+    "inputs": {
+        "data_disk_before": "3b6a07d0d404fab4e23b6d34bc6696a6a312dd92821332385e5af7c01c421351",
+        "kernel": "c8cc451f91f1e5b871517e3c74952fbfa03d1aed89d6f4d8d0e961adcb5a83fb",
+        "workloads": "ae92baafc3d65d6747b8101ce2d739253c02ca8826ca0df9401e08a776f11238",
+        "runtime-probe": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+        "rootfs_manifest": "33670838582eb8a361797432e5b0d3ceb05830e777cb01f6f9d742ea217b2172",
+        "guest_credentials": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "guest_options": "e3e73f9739c872e2509568688e534cc8fc97b93b53094325792e6b1c0ed55553",
+        "init_source": "bde6c7e44355d2fc72707eba435c3aa39a1c76c362bffba637fc2c8ffe81771b",
+        "guest_report": "5e1575dd2a84ee4e25bf9c4ae375470bcda8c67868b95e6788cac1f929e8900b",
+        "snapshot_kernel": "c8cc451f91f1e5b871517e3c74952fbfa03d1aed89d6f4d8d0e961adcb5a83fb",
+        "data_disk_after": "3b6a07d0d404fab4e23b6d34bc6696a6a312dd92821332385e5af7c01c421351"
+    },
+    "exit_code": 0
+}
