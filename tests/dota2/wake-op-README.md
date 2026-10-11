@@ -3,7 +3,7 @@ same x86-64 glibc fixture with explicit old and new native QEMU translators.
 It does not launch Steam or modify an existing translation/runtime layer.
 
 ```
-VINIX_PRUNE_BUILD=0 python3 tests/dota2/wake-op-run.py \
+VINIX_PRUNE_BUILD=0 tests/dota2/wake-op-run \
     --kernel-dir /path/to/isolated/kernel \
     --old-translator /path/to/unpatched/qemu-x86_64 \
     --new-translator /path/to/patched/qemu-x86_64 \

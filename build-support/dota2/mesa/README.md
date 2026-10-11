@@ -19,4 +19,4 @@ which crashed Dota while it loaded a local map. Both bind paths must also keep a
 null set's descriptor slots: shaders count the slots of every set layout before
 their own set, so skipping a null set, as Debian's graphics path did, moves
 the sets bound after it.
-`tests/dota2/lavapipe-run.py` checks all of these cases on Vinix.
+`tests/dota2/lavapipe-run` checks all of these cases on Vinix.

@@ -6,7 +6,7 @@ compiles the unchanged ARM payload and compares package byte ranges through
 guest `pread` and `mmap`, including direct and indirect boundaries. These
 commands use `tools/dota2/ext2host` directly.
 
-`env-run.py` checks the private glibc runtime's concurrent environment access
+`env-run` checks the private glibc runtime's concurrent environment access
 through Vinix's native AArch64 QEMU translator. It adapts GNU libc's
 [`tst-getenv-thread.c`](https://github.com/bminor/glibc/blob/glibc-2.41/stdlib/tst-getenv-thread.c):
 two readers repeatedly check a constant variable and a missing variable while
@@ -23,7 +23,7 @@ control must terminate with its original SIGSEGV; the fixed runtime must finish
 every round and exit successfully.
 
 ```sh
-python3 tests/dota2/env-run.py \
+tests/dota2/env-run \
   --old-glibc-root=/path/to/bookworm-runtime \
   --new-glibc-root=/path/to/fixed-glibc-root \
   --kernel-dir=/path/to/built-aarch64-kernel \
@@ -40,7 +40,7 @@ A pair which passes on both runtimes fails this regression because the
 negative control did not reproduce the defect. This test verifies libc
 compatibility; it does not establish Dota's environment writer or gameplay.
 
-`lavapipe-run.py` checks Lavapipe's compute descriptor-set binding, which Dota
+`lavapipe-run` checks Lavapipe's compute descriptor-set binding, which Dota
 reached while loading a local map. With `VK_EXT_graphics_pipeline_library`
 enabled, a program may bind `VK_NULL_HANDLE` sets and its independent-set
 pipeline layouts may omit set layouts. `lavapipe-null-sets.c` binds storage
@@ -54,7 +54,7 @@ in one boot. Each `--control` must pass the ordinary binding and terminate with
 `SIGSEGV` in the three null modes; the `--fixed` driver must pass all four.
 
 ```sh
-python3 tests/dota2/lavapipe-run.py \
+tests/dota2/lavapipe-run \
   --fixed build/dota2-runtime/mesa/out/libvulkan_lvp.so \
   --control /path/to/debian/libvulkan_lvp.so \
   --kernel-dir=/path/to/built-aarch64-kernel \
@@ -65,3 +65,13 @@ python3 tests/dota2/lavapipe-run.py \
 loader and the drivers' libraries, and `--vulkan-include` the headers from the
 prepared Mesa source. Repeat `--control` to compare several unfixed drivers,
 such as Debian's binary and an unpatched build from the same source.
+
+`wake-op-run`, `run-mmap32` and `steam-smoke-run` also run native V directly.
+Their controllers share `nativehost`, typed immutable file pins and the native
+PTY/process owner. WAKE_OP still compares explicit translators and requires
+`VINIX_PRUNE_BUILD=0`; preparation is the default and `--run` starts the guest.
+The mapping command retains optional original C library/probe controls. Steam
+retains its modes, repeatable target environment/preloads and loader options.
+Both mapping and Steam accept `--prepare-only` for inspecting a private fixture.
+The compressed evidence archive is retained; the ISO builder receives a separate
+uncompressed boot copy. See [native qualification](native-controller.md).

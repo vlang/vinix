@@ -1,5 +1,12 @@
 # Native Lavapipe comparison controller
 
+The maintained command is now `../lavapipe-run`, which runs
+`nativehost/lavapipe.v` and `nativehost/verdict.v` directly. File pins,
+dependency traversal, fixture preparation, guest ownership and paired verdicts
+are typed V operations. The Python command and binding below are retired;
+this directory preserves the historical object-bridge qualification.
+See [the current qualification](../native-controller.md).
+
 `lavapipe-run.py` retains argparse, imports, constants and the public helper
 signatures. This module owns hashing iteration, ELF validation and pinning,
 private-runtime dependency traversal, fixture construction, compiler commands,
