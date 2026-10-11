@@ -2262,22 +2262,72 @@ epoch handling; an initial fixture incorrectly assumed every completed token
 was `-1` and used a local token. Its failure is retained, and the corrected
 fixture uses static storage as required by the
 [Swift declaration](https://github.com/swiftlang/swift/blob/main/include/swift/Runtime/Once.h).
-This next entry remains unimplemented. Evidence is retained under
+At that stage this next entry was unimplemented. Evidence is retained under
 `swift-witness-checks`; full regression remains unpassed, the five published
 runners retain their last passing hashes, and playable Fortnite compatibility
 is still unverified.
+
+V now implements `_swift_once` with the ordinary C predicate/function/context
+argument order. Its callback receives a borrowed context in x0. The adapter
+uses dispatch's existing per-token mutex map, release publication and shutdown
+cleanup. A shared helper preserves dispatch-once's original argument order and
+`-1` convention. The global runtime lock is released before calling an
+initializer, allowing nested independent tokens and callbacks that join work
+on another thread. Same-token recursion fails through the inherited
+error-check mutex; cancellation and callbacks that do not return remain
+unsupported. Tokens must be aligned, zero-initialized words with static extent.
+The supplied frameworks' six call sites use three such tokens in `__bss`.
+
+Swift's Darwin compiler fast path can skip the runtime after a barrier-free
+load of `-1`. Vinix does not implement Darwin's global quiescence protocol,
+so the adapter publishes the opaque completed word `2`. Compiled callers
+therefore continue through its acquire load before reading initialized data.
+This preserves publication ordering at the cost of a runtime call on completed
+tokens. An already completed token needs no writable storage, valid callback,
+readable context or running runtime. Precompleted `-1` tokens are also accepted.
+Null, unaligned and overflowing token addresses, missing callbacks during
+initialization and initialization outside the runtime lifetime fail explicitly.
+
+The installed SwiftCore and V pass the same fixture under ASAN/UBSAN in both
+hash modes. Sixteen tokens each have eight readers that observe both callback
+writes exactly once through an emitted Darwin compiler fast path. Counters
+verify that V's completed tokens still enter the acquire adapter. Guarded raw
+initialization and 2,048 completed calls preserve x20/x21; x0 is ignored for the
+void return. Nested callbacks, independent thread joins, null contexts,
+unreadable completed callbacks/contexts and read-only boundary tokens pass.
+Two additional dispatch tokens retain their original behavior. The shared
+cache contains exactly twenty-two entries per runtime cycle, all workers join
+before shutdown, and two cycles drain it. Completed calls after teardown add
+no owner. Static witness lookup and the existing dispatch suite also pass host
+sanitizers. Generated C confirms the acquire/release order, unlocked callback,
+existing teardown and no successful hidden allocation or ARC in the adapter.
+
+All forty-one programs rebuild and all twenty-three focused Swift ABI guest
+checks pass. The IPA still exits with status 1 before entry, now at EOS's
+`_$s10ObjectiveC22_convertBoolToObjCBoolyAA0eF0VSbF` import from
+`libswiftObjectiveC.dylib`. Native measurements of both Boolean conversions
+preserve x20/x21 and return canonical 0/1 for valid input values. The retained
+ARM64 Mac and Mac Catalyst SDK interfaces define frozen `ObjCBool` with Swift
+`Bool` storage, and both native exports mask bit 0. A failed initial probe
+assumed any nonzero byte meant true; its source, output and status are retained.
+Additional raw-bit observations are not a contract for malformed Boolean
+values. These conversions remain unimplemented. Evidence is retained under
+`swift-once-checks`; full regression remains unpassed, the five published
+runners retain their last passing hashes, and gameplay remains unverified.
+EOS resilient witness instantiation, `Optional<TaskPriority>` and `CVarArg`
+existential metadata also remain unsupported.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,402 | 756 | 81 |
-| EOSSDK | 608 | 54 | 18 |
-| MarketplaceKitWrapper | 100 | 76 | 23 |
-| All images | 2,110 | 886 | 122 |
+| Fortnite executable | 1,403 | 755 | 81 |
+| EOSSDK | 609 | 53 | 18 |
+| MarketplaceKitWrapper | 101 | 75 | 23 |
+| All images | 2,113 | 883 | 122 |
 
-The C++/GLES/Text variant reports 2,123 resolved imports, 873 unresolved strong
+The C++/GLES/Text variant reports 2,126 resolved imports, 870 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

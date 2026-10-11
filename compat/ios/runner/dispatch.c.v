@@ -6,8 +6,12 @@ type DispatchFunction = fn (voidptr)
 fn C.ios_load_pointer(&u64) u64
 
 fn darwin_dispatch_once_f(predicate &u64, context voidptr, function DispatchFunction) {
+	dispatch_once_run(predicate, context, function, ~u64(0))
+}
+
+fn dispatch_once_run(predicate &u64, context voidptr, function DispatchFunction, done u64) {
 	if predicate == unsafe { nil } || function == unsafe { nil } { panic('iOS: invalid dispatch_once arguments') }
-	if C.ios_load_pointer(predicate) == ~u64(0) { return }
+	if C.ios_load_pointer(predicate) == done { return }
 	C.ios_objc_initialize_lock()
 	mut mutex := system_data.dispatch_once[u64(predicate)] or { unsafe { nil } }
 	if mutex == unsafe { nil } {
@@ -20,9 +24,9 @@ fn darwin_dispatch_once_f(predicate &u64, context voidptr, function DispatchFunc
 	// Other predicates and app threads remain independent during the callback.
 	if C.pthread_mutex_lock(mutex) != 0 { panic('iOS: recursive dispatch_once invocation') }
 	defer { C.pthread_mutex_unlock(mutex) }
-	if C.ios_load_pointer(predicate) != ~u64(0) {
+	if C.ios_load_pointer(predicate) != done {
 		function(context)
-		C.ios_store_pointer(predicate, ~u64(0))
+		C.ios_store_pointer(predicate, done)
 	}
 }
 
