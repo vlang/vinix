@@ -412,7 +412,34 @@ what it drew. Console text that arrives meanwhile is not drawn (it still
 reaches the serial port); a panic is. If there is no memory for the picture
 the screen stays lit, and `suspend_stats/screen_lit` counts it
 (`screen_dark` counts the others). A panel with a driver of its own --
-Apple's, through DCP -- is not reached by this, and its backlight stays on.
+Apple's, through DCP -- is not reached by this.
+
+**The backlight.** Behind a black picture a panel's backlight is still lit,
+and it is most of what a lit screen draws. Where firmware can set it -- a
+panel in the ACPI namespace with `_BCL` and `_BCM`, the video extensions --
+`kernel/x86/acpipm/video.v` lists it under `/sys/class/backlight/acpi_videoN/`
+by Linux's names (`brightness`, `max_brightness`, `actual_brightness`,
+`bl_power`, `type`; `kernel/brightness` is the class), puts it at its dimmest
+level when the devices are suspended and gives it its level back when they
+resume. A panel that cannot say what level it is at (no `_BQC`, or an answer
+that is not on its list) is left as it is for a sleep until it has been set
+once: nothing knows what to give it back. The levels are sorted out as Linux sorts them, the two firmware
+prefers told from the list. Firmware's brightness keys are a Notify to the
+panel -- brighter, dimmer, around, darkest -- and are acted on in the kernel,
+so they work with nothing running; the bus is told (`_DOS`) that brightness
+is not firmware's to change. `bl_power` 4 is the dimmest level, which
+firmware rarely makes dark. `vinix.acpi_backlight=off` leaves the panels
+alone.
+
+A panel whose `_BCM` hands the work to the graphics driver -- Intel's, through
+the OpRegion, on most laptops of the last decade -- is listed and takes
+levels that change nothing: there is no such driver. That, and whether any
+real panel dims, is not known. QEMU has no panel; the test gives it two in a
+table and reads what their methods were given off a port QEMU records
+(`acpi-backlight`: the levels, both keys, off and on, a sleep, 200 changes
+that leave the heap flat; `acpi-backlight-off`: nothing said). Apple's panel
+has a driver of its own and a device node (`/dev/apple-panel-bl`) and is not
+in this class.
 
 Wake sources (`kernel/wakesrc`, `/sys/class/wakeup/wakeupN/`): power button,
 sleep button, lid, keyboard, pointer, alarm, network, USB, battery, embedded
@@ -700,8 +727,9 @@ What this is not:
 - The VMX part (leaving and entering VMX operation around a sleep) has not
   executed: no emulator used here has VT-x.
 - The dark screen is a black picture, not a display switched off: there is
-  no backlight class and no display power control (DPMS), so a panel's
-  backlight stays lit behind it, and Apple's panel is not darkened at all.
+  no display power control (DPMS). A backlight firmware can set is put at
+  its dimmest (above); any other stays lit behind the picture, and Apple's
+  panel is not darkened at all.
   The desktop turns its display off before it asks for a sleep -- a black
   frame of its own, and the backlight at its minimum where it can set one --
   which on such a panel is all that goes dark; a sleep asked for any other
@@ -1128,6 +1156,7 @@ itself, which the SMC keys Linux names do not include.
 | `vinix.deep_sleep=force\|off` | x86-64: offer suspend to RAM although the kernel cannot bring the display back; never offer it |
 | `vinix.pci_d3=off` | keep every PCI function in D0 through a sleep |
 | `vinix.acpi_wake=off` | x86-64: do not arm the lid, buttons and keyboard to end a suspend to RAM |
+| `vinix.acpi_backlight=off` | x86-64: leave the panels whose backlight firmware sets alone |
 | `vinix.hibernate=<device>` | x86-64: the block device, by its name in `/dev`, that an image of memory is written to for a suspend to disk. It is overwritten, and looked at for an image at every start. Without the option there is no `disk` state and no disk is written to |
 
 ## What is not done
@@ -1148,8 +1177,9 @@ Beyond the limits stated in each section:
 - Suspend to RAM and suspend to disk on anything but QEMU's PC: see their
   sections for what is untested. For a suspend to disk also: ACPI's S4,
   an image that is encrypted, signed or compressed, an image carried from
-  one kernel build to another, and any of it on AArch64. Backlight and
-  display power control.
+  one kernel build to another, and any of it on AArch64. Display power
+  control, and a backlight that is not firmware's to set: one that needs
+  the graphics driver, and Apple's in the class the others are in.
 - Apple's SMC on a Mac. The battery, charger, temperatures, fans and charge
   limit are tested against a simulated SMC on the build machine and in
   QEMU; **no physical run**, of this or of the device nodes before it. Past
@@ -1183,8 +1213,8 @@ Beyond the limits stated in each section:
   - There is no screen lock: a display that comes back on, and a machine
     that wakes, show the session as it was left.
   - Display off is a black frame, with the backlight at its minimum where
-    the desktop can set one (`/dev/apple-panel-bl`). No panel is powered
-    down. The desktop does the same before a sleep, beside the kernel's own
+    the desktop can set one (`/dev/apple-panel-bl`; it does not use
+    `/sys/class/backlight` yet). No panel is powered down. The desktop does the same before a sleep, beside the kernel's own
     dark screen, which reaches only a boot framebuffer.
   - Only the first battery is shown, and the kernel's low and critical
     thresholds are not announced on screen.
@@ -1212,6 +1242,7 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `suspend`: rehearsal, alarm, key, power button, a source not allowed to wake | pass | pass |
 | `acpi-power`: scripted battery, charger and lid | pass | -- |
 | `acpi-thermal`: a scripted thermal zone, four fans of every kind, the passive limit, critical power-off | pass | -- |
+| `acpi-backlight`, `acpi-backlight-off`: two scripted panels -- levels, brightness keys, off and on, down for a sleep and back, what firmware was told read off a recorded port -- and none of it with `vinix.acpi_backlight=off` | pass | -- |
 | `acpi-ec-absent`, `acpi-ec-off`: a described embedded controller that nothing answers for; the driver switched off | pass | -- |
 | `iommu-intel`, `iommu-amd`, `iommu-off` | pass | -- |
 | `cpu-power`, `cpu-power-simulated` | pass | pass |

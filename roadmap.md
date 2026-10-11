@@ -232,6 +232,9 @@ consistent filesystem; backup restoration preserves content and metadata.
     device](docs/hardware-platform.md#sleep).
   - [x] [The screen dark for a sleep](docs/hardware-platform.md#sleep) where it is
     the boot framebuffer.
+  - [x] [A backlight class, and the panels firmware can dim](docs/hardware-platform.md#sleep)
+    (ACPI `_BCL`/`_BCM`): dimmest for a sleep, brightness keys acted on in
+    the kernel. Tested against scripted panels in QEMU; none real.
   - [x] [PCI devices put into D3hot for a sleep](docs/hardware-platform.md#pci-power-states)
     and given their configuration again, where the driver can bring the
     device back from nothing. Tested with the one card QEMU powers down.
@@ -255,9 +258,10 @@ consistent filesystem; backup restoration preserves content and metadata.
   - [ ] Suspend to RAM and suspend to disk on a physical machine, and for the
     drivers that cannot yet come back from a loss of power; an image that is
     encrypted, and one that is compressed; ACPI's S4; a suspend to disk on
-    AArch64; a `disk` entry in the desktop; backlight and display power
-    control; a screen lock, and a way for an application to keep the display
-    on.
+    AArch64; a `disk` entry in the desktop; a backlight that needs the
+    graphics driver, Apple's panel in the same class, the desktop using the
+    class, and display power control; a screen lock, and a way for an
+    application to keep the display on.
 - [ ] Restore all device and security state after sleep, firmware errors and
   hotplug; keep recovery possible when a driver fails.
   - [x] [CPU protection registers compared across every sleep; e1000 and AHCI

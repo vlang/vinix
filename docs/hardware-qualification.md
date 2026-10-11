@@ -57,7 +57,7 @@ State and evidence for the capabilities of [hardware-platform](hardware-platform
 | Suspend to idle, wake sources, alarm | implemented (VM) | implemented (VM) | untried | open: untried, and the idle loop polls |
 | Suspend to RAM | implemented (VM: ACPI S3 under OVMF with QEMU's standard VGA; e1000, AHCI, PS/2 and serial only; behind VT-d and AMD-Vi) | open (no platform sleep to ask for) | untried: no firmware's way back has been met, wake-up devices are not armed, and it is offered only where the display can be brought back or `vinix.deep_sleep=force` | open |
 | Hibernation (suspend to disk) | implemented (VM: an image on a named SATA disk, the machine switched off and the image gone back into at the next start under OVMF; behind VT-d and AMD-Vi; with four- and five-level page tables; not encrypted) | open (no `disk` state) | untried: it needs two boots to have the same memory, firmware regions and ACPI tables at the same addresses, which no firmware has been asked; ACPI S4 is not used; opt-in `vinix.hibernate=<device>` | open |
-| Screen sleep, backlight | partial (VM: the boot framebuffer is dark during a sleep; no backlight or display power control) | partial (VM: the same) | untried | partial: brightness through DCP, opt-in ([M1 AGX](m1-agx-bringup.md)); the panel is not darkened for a sleep |
+| Screen sleep, backlight | partial (VM: the boot framebuffer is dark during a sleep; a backlight firmware sets -- ACPI `_BCM` -- is dimmed for a sleep and its keys work, against scripted panels only; no display power control, no backlight that needs the graphics driver) | partial (VM: the same) | untried | partial: brightness through DCP, opt-in ([M1 AGX](m1-agx-bringup.md)); the panel is not darkened for a sleep |
 | Battery, charger, time left | implemented (VM: scripted ACPI battery, and one read through the simulated embedded controller) | implemented (VM: a simulated Apple SMC in a self-test kernel; the machine itself has no battery) | untried; read through the embedded controller on most laptops, and that driver has met only a simulated one | implemented (host, VM): status, the SMC's percentage and time estimates, charge, current, voltage and cycles in `/sys`, and the percentage and telemetry in `/dev`, against a simulated SMC ([M1 battery](m1-battery.md)); **no physical run** |
 | Charge limit | open | implemented (VM: the simulated SMC's `CHWA`, 80 or 100) | open | implemented (host, VM) on firmware with `CHWA`, written only on request and read back; whether this machine's firmware has the key is not known; no physical run |
 | CPU idle states | implemented (VM: HLT) | implemented (VM: WFI) | host: MWAIT tables; untried | open by default (polls); `vinix.apple_idle=wfi` untried |
@@ -165,6 +165,11 @@ hwcheck --rehearse-sleep > report.md
 4. **Display, input, audio.** Every built-in display at its native
    resolution; every key, the pointer, gestures; speakers, headphones and
    microphone, by ear and by recording.
+   The brightness keys: each press must move
+   `/sys/class/backlight/*/brightness` and the panel with it. A panel that
+   is listed there and does not change is one whose firmware hands the
+   work to a graphics driver this system does not have: record it, and
+   `vinix.acpi_backlight=off` takes it out of the way.
 5. **Power off and restart.** Twenty of each from the desktop's menu and
    twenty by the power button. The machine must go off, and come back with
    no filesystem repair.
