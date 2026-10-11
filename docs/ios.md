@@ -2307,8 +2307,10 @@ checks pass. The IPA still exits with status 1 before entry, now at EOS's
 `_$s10ObjectiveC22_convertBoolToObjCBoolyAA0eF0VSbF` import from
 `libswiftObjectiveC.dylib`. Native measurements of both Boolean conversions
 preserve x20/x21 and return canonical 0/1 for valid input values. The retained
-ARM64 Mac and Mac Catalyst SDK interfaces define frozen `ObjCBool` with Swift
-`Bool` storage, and both native exports mask bit 0. A failed initial probe
+ARM64 Mac SDK interface defines frozen `ObjCBool` with Swift `Bool` storage,
+and both measured native exports mask bit 0. The Mac Catalyst interface instead
+uses `Int8` storage and a nonzero comparison. These target differences are
+retained; the iOS conversion ABI still needs verification. A failed initial probe
 assumed any nonzero byte meant true; its source, output and status are retained.
 Additional raw-bit observations are not a contract for malformed Boolean
 values. These conversions remain unimplemented. Evidence is retained under
