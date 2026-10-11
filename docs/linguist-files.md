@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `b17c4f04e21bd289eedb12df1e9daf9fc5347487`,
+at source commit `f0ec18fb7c61e7c41baeb562449ce91bfc2edd2c`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 567 | 2,365,422 | 6.20% |
-| Python | 291 | 1,506,474 | 3.95% |
-| Shell | 547 | 1,356,694 | 3.56% |
+| C | 567 | 2,365,422 | 6.18% |
+| Python | 282 | 1,461,812 | 3.82% |
+| Shell | 555 | 1,358,409 | 3.55% |
 
-All `.v` files are classified as V. The resulting V share is 78.12%, with no
+All `.v` files are classified as V. The resulting V share is 78.32%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,506,474 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,461,812 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev b17c4f04e21bd289eedb12df1e9daf9fc5347487 --breakdown --json
+github-linguist --rev f0ec18fb7c61e7c41baeb562449ce91bfc2edd2c --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -821,7 +821,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/android/runtime-binding.py` | 5,461 |
 | `tests/android/split-test.py` | 2,283 |
 | `tests/android/test-runtime-v.py` | 4,546 |
-| `tests/block-storage/run.py` | 6,924 |
 | `tests/browsers/_native.py` | 5,357 |
 | `tests/browsers/run_vm.py` | 9,438 |
 | `tests/claude/smoke.py` | 7,250 |
@@ -844,8 +843,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/_vulkan_vm_native.py` | 830 |
 | `tests/dota2/_wake_native.py` | 4,250 |
 | `tests/dota2/env-run.py` | 3,087 |
-| `tests/dota2/export-run.py` | 6,102 |
-| `tests/dota2/export-test.py` | 3,363 |
 | `tests/dota2/lavapipe-run.py` | 3,703 |
 | `tests/dota2/run-mmap32.py` | 7,710 |
 | `tests/dota2/run-test.py` | 5,348 |
@@ -856,7 +853,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/wake-op-run.py` | 2,474 |
 | `tests/ext2-xattr/host.py` | 6,852 |
 | `tests/ext2-xattr/run.py` | 11,512 |
-| `tests/fsync-scope/run.py` | 5,958 |
 | `tests/gl-triangle/run-vm.py` | 5,439 |
 | `tests/gl-triangle/run.py` | 2,728 |
 | `tests/ios/desktop.py` | 7,962 |
@@ -889,8 +885,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/opengothic/run.py` | 3,425 |
 | `tests/packages/test-qemu-package-store.py` | 3,072 |
 | `tests/packages/x-window-check.py` | 5,985 |
-| `tests/pci-config/_native.py` | 512 |
-| `tests/pci-config/arm_vm.py` | 5,495 |
 | `tests/pointer-scroll/run.py` | 5,488 |
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/qemu-core/_vm_native.py` | 674 |
@@ -900,8 +894,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/roblox-windows/run.py` | 7,180 |
 | `tests/roblox/build-test.py` | 8,453 |
 | `tests/roblox/launcher-test.py` | 6,516 |
-| `tests/sound/_native.py` | 957 |
-| `tests/sound/run_vm.py` | 9,126 |
 | `tests/verified-boot/runtime.py` | 10,385 |
 | `tests/verified-boot/test.py` | 7,670 |
 | `tests/verified-root/run-host.py` | 7,267 |
@@ -909,7 +901,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/verified-root/test.py` | 3,150 |
 | `tests/virtio-gpu-virgl/_native.py` | 957 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 5,650 |
-| `tests/virtio-ro/run.py` | 6,225 |
 | `tools/_package_store_native.py` | 4,314 |
 | `tools/dota2/_ext2_native.py` | 8,261 |
 | `tools/dota2/ext2_export.py` | 6,288 |
@@ -1153,6 +1144,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/application-sandbox/test-host.sh` | 229 |
 | `tests/application-sandbox/test-ui.sh` | 759 |
 | `tests/archive-tools/run.sh` | 333 |
+| `tests/block-storage/run` | 201 |
 | `tests/browsers/chromium-init.sh` | 6,410 |
 | `tests/browsers/chromium-install-desktop-init.sh` | 1,916 |
 | `tests/browsers/desktop-init.sh` | 5,084 |
@@ -1189,6 +1181,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/docker/run.sh` | 2,060 |
 | `tests/docker/run_vm` | 215 |
 | `tests/docker/smoke.sh` | 4,119 |
+| `tests/dota2/export-run` | 220 |
+| `tests/dota2/export-test` | 217 |
 | `tests/dota2/game-init.sh` | 2,517 |
 | `tests/dota2/steam-smoke-init.sh` | 2,498 |
 | `tests/dota2/vulkan-init.sh` | 3,187 |
@@ -1201,6 +1195,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ext2-sparse/run-host.sh` | 2,056 |
 | `tests/fs-journal/run` | 214 |
 | `tests/fs-journal/run-host.sh` | 1,367 |
+| `tests/fsync-scope/run` | 220 |
 | `tests/fuzz/run` | 874 |
 | `tests/go/smoke.sh` | 558 |
 | `tests/hardware-platform/run` | 178 |
@@ -1324,6 +1319,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pagecache/run.sh` | 3,296 |
 | `tests/paging/run` | 215 |
 | `tests/paging/run-host.sh` | 178 |
+| `tests/pci-config/arm_vm` | 216 |
 | `tests/pci-config/run.sh` | 5,477 |
 | `tests/pci-config/topology` | 169 |
 | `tests/pci-hotplug/run` | 757 |
@@ -1393,7 +1389,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/smt-policy/run-host.sh` | 1,181 |
 | `tests/socket-io/check-generated` | 146 |
 | `tests/socket-io/run` | 180 |
-| `tests/sound/run.sh` | 1,419 |
+| `tests/sound/run.sh` | 1,408 |
+| `tests/sound/run_vm` | 214 |
 | `tests/speculation-policy/run` | 191 |
 | `tests/stack-policy/run` | 183 |
 | `tests/stack-protector/diagnostic` | 175 |
@@ -1422,6 +1419,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/userland-demo/run` | 186 |
 | `tests/virtio-gpu-virgl/desktop-guest-init.sh` | 1,941 |
 | `tests/virtio-gpu-virgl/guest-init.sh` | 1,464 |
+| `tests/virtio-ro/run` | 218 |
 | `tests/vlang/desktop-runtime-guest-init.sh` | 1,766 |
 | `tests/vlang/gpu-desktop-reload-guest-init.sh` | 1,872 |
 | `tests/vlang/guest-init.sh` | 2,913 |
@@ -1463,6 +1461,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/apple-backlight/test.sh` | 415 |
 | `tools/apple-smc/smcprobe` | 304 |
 | `tools/build-qemu-module-iso` | 164 |
+| `tools/dota2/ext2-export` | 220 |
 | `tools/hwcheck/build` | 1,429 |
 | `tools/keyring/build` | 1,771 |
 | `tools/m1-wifi/compile-v` | 155 |
