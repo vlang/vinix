@@ -197,15 +197,20 @@ consistent filesystem; backup restoration preserves content and metadata.
   - [x] [PCI hotplug and rescan](docs/hardware-platform.md#pci-hotplug-and-rescan):
     PCI Express ports the kernel watches, devices firmware announces through
     ACPI, and addresses for what arrives. Only the e1000 can be taken out again.
-  - [ ] A USB core; Apple's drivers in the device list and behind the DMA layer;
-    an IOMMU on by default once a PC has been tried; hotplug of bridges, and
-    drivers other than the e1000 that let go of a device.
+  - [x] [USB keyboards and pointers on x86-64 as on AArch64](docs/hardware-platform.md#usb-keyboards-and-pointers):
+    the root ports of one xHCI controller, polled, through every kind of
+    sleep. Tested with QEMU's controller only.
+  - [ ] A USB core -- hubs, hotplug, storage; Apple's drivers in the device
+    list and behind the DMA layer; an IOMMU on by default once a PC has been
+    tried; hotplug of bridges, and drivers other than the e1000 that let go
+    of a device.
 - [ ] Support the common storage, Ethernet, wireless, graphics and audio device
   families needed by the reference PC/laptop set; identify vendor dependencies.
   - [x] [What each machine class needs, the driver that is or is not there, and
     the vendor dependencies](docs/hardware-qualification.md#device-families-by-machine).
   - [ ] The drivers themselves: release-fit NVMe, the Ethernet and wireless cards
-    PCs have, USB on x86-64, qualified graphics and audio.
+    PCs have, USB beyond a keyboard and a pointer, qualified graphics and
+    audio.
 - [ ] Implement CPU idle/frequency control, thermal management, fan/sensor APIs,
   battery/charging policy and accurate remaining-time/energy reporting.
   - [x] [Idle states and frequency policies with Intel, AMD and Apple drivers;
