@@ -11,8 +11,8 @@ build-support/ps1/download-homebrew --output build/ps1/homebrew
 
 The three build scripts invoke these commands directly. PS1's complete core,
 homebrew and frontend build path no longer invokes Python. N64 and PS2 core
-builders and emulator guest/desktop controllers remain separate pending ports.
-No credit is assigned to those remaining Python files.
+builders now have [native commands](core-builders.md) too. Emulator guest and
+desktop controllers remain pending; no credit is assigned to those Python files.
 
 The homebrew builders retain the original LLVM search order, startup assembly,
 strict compiler flags and actual MIPS ABI models. V emits architecture-neutral

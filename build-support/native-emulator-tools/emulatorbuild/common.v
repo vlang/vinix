@@ -29,12 +29,14 @@ pub fn command(kind string, args []string) int {
 fn checked(kind string, args []string) ! {
 	mut specs := [hosttest.Option{ name: '--output', value: true }]
 	if kind != 'ps1-homebrew' { specs << hosttest.Option{ name: '--llvm-bin', value: true } }
-	if kind == 'ps1' {
+	if kind in ['ps1', 'n64', 'ps2'] {
 		specs << [hosttest.Option{ name: '--sysroot', value: true }, hosttest.Option{ name: '--jobs', value: true }]
 	}
+	if kind == 'n64' { specs << [hosttest.Option{ name: '--linux-headers', value: true }, hosttest.Option{ name: '--host' }] }
 	usage := 'Usage: ' + kind + ' ' + if kind in ['n64-homebrew', 'ps2-homebrew'] { '--output DIR' } else { '[--output DIR]' } +
 		if kind == 'ps1-homebrew' { '' } else { ' [--llvm-bin DIR]' } +
-		if kind == 'ps1' { ' [--sysroot DIR] [--jobs N]' } else { '' }
+		if kind in ['ps1', 'n64', 'ps2'] { ' [--sysroot DIR] [--jobs N]' } else { '' } +
+		if kind == 'n64' { ' [--linux-headers DIR] [--host]' } else { '' }
 	parsed := hosttest.parse_arguments(args, specs, 0, usage, 'Build pinned emulator inputs using native V.') or {
 		return ArgumentError{err.msg()}
 	}
@@ -42,7 +44,7 @@ fn checked(kind string, args []string) ! {
 		return ArgumentError{'missing required --output'}
 	}
 	output := hosttest.module_resolve(parsed.options['--output'] or {
-		policyhost.root() + if kind == 'ps1' { '/build/ps1' } else { '/build/ps1/homebrew' }
+		policyhost.root() + if kind == 'ps1-homebrew' { '/build/ps1/homebrew' } else { '/build/' + kind }
 	})!
 	llvm_argument := if '--llvm-bin' in parsed.options { if parsed.options['--llvm-bin'] == '' { '.' } else { parsed.options['--llvm-bin'] } } else { '' }
 	match kind {
@@ -50,6 +52,7 @@ fn checked(kind string, args []string) ! {
 		'ps2-homebrew' { ps2_homebrew(output, llvm_argument)! }
 		'ps1-homebrew' { ps1_homebrew(output)! }
 		'ps1' { ps1_build(output, parsed.options)! }
+		'n64', 'ps2' { core_build(kind, output, parsed.options)! }
 		else { return error('Unknown emulator build command') }
 	}
 }
@@ -83,6 +86,10 @@ fn tool(name string, directory string) !string {
 // curl owns HTTP framing and TLS; V owns the size/digest guard, same-directory
 // temporary, cancellation and atomic publication. Failed caches stay intact.
 pub fn fetch(path string, url string, digest string, maximum i64) ! {
+	fetch_as(path, url, digest, maximum, 'Vinix-PS1-build')!
+}
+
+fn fetch_as(path string, url string, digest string, maximum i64, agent string) ! {
 	policyhost.command_checkpoint()!
 	if !os.exists(path) {
 		work := private_directory(os.dir(path), 'vinix-fetch-')!
@@ -90,7 +97,7 @@ pub fn fetch(path string, url string, digest string, maximum i64) ! {
 		temporary := work + '/download'
 		run(['curl', '--fail', '--location', '--silent', '--show-error', '--connect-timeout', '120',
 			'--speed-limit', '1', '--speed-time', '120', '--max-filesize', maximum.str(),
-			'--user-agent', 'Vinix-PS1-build', '--output', temporary, '--', url])!
+			'--user-agent', agent, '--output', temporary, '--', url])!
 		if os.file_size(temporary) > maximum { return error('download exceeds pinned size limit') }
 		if hosttest.file_digest(temporary)! != digest { return error('upstream checksum mismatch: ' + url) }
 		policyhost.command_checkpoint()!
@@ -104,6 +111,10 @@ pub fn fetch(path string, url string, digest string, maximum i64) ! {
 // V parses member names without libarchive's macOS Unicode normalization.
 // Only regular files are extracted, with the original 32 MiB/member bound.
 pub fn unpack(archive string, destination string) ! {
+	unpack_limit(archive, destination, 32 * 1024 * 1024)!
+}
+
+fn unpack_limit(archive string, destination string, maximum i64) ! {
 	mut reader := tarstream.open(archive)!
 	defer { reader.close() }
 	for {
@@ -115,7 +126,7 @@ pub fn unpack(archive string, destination string) ! {
 			return error('unsafe source archive path: ' + name)
 		}
 		if member.kind == `5` { continue }
-		if !member.regular() || member.size > 32 * 1024 * 1024 {
+		if !member.regular() || member.size > maximum {
 			return error('unsupported source archive member: ' + name)
 		}
 		if parts.len < 2 { return error('missing archive root: ' + name) }
@@ -153,6 +164,7 @@ pub fn shell_word(value string) string {
 // Preserve the original sorted/default-spacing JSON cache key, including
 // ensure_ascii behavior for Unicode compiler paths and version strings.
 pub fn cache_json(value json2.Any) string {
+	if value is []json2.Any { return '[' + value.map(cache_json(it)).join(', ') + ']' }
 	if value is map[string]json2.Any {
 		mut keys := value.keys()
 		keys.sort()

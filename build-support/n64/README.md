@@ -9,9 +9,14 @@ JIT compilation and renderer worker threads are disabled. The upstream ROM
 database and PIF boot HLE are included; no console BIOS or proprietary game
 data is needed by the emulator itself.
 
-Run `python3 build-support/n64/build.py` for ARM64 musl; the app builder is
+Run `build-support/n64/build` for ARM64 musl; the app builder is
 `scripts/build-n64-aarch64.sh`. `--host --output=build/n64-host` builds an
 archive suitable for a native host smoke test.
+
+The builder and its parallel compiler workers are native V. Pinned patches,
+compiler/cache inputs, ordered archives and corresponding-source staging are
+maintained in `build-support/native-emulator-tools/emulatorbuild`. See the
+[qualification](../native-emulator-tools/core-builders.md).
 
 The first-party adapter is maintained in `bridgecore/core.v`. Its public
 callbacks retain the native const-qualified libretro types, and its native

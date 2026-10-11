@@ -33,5 +33,5 @@ Vinix V frontend: GPL version 2 or later, as indicated by source SPDX notices.
 
 The complete upstream archive and local corresponding sources are installed
 under /usr/share/vinix/n64/source alongside the optional executable. Source
-build-support/n64/build.py applies the documented patches reproducibly.
+build-support/n64/build applies the documented patches reproducibly.
 No commercial ROM or proprietary boot block is bundled.

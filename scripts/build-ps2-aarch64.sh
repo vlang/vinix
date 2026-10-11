@@ -30,7 +30,7 @@ for input in "$SYSROOT/usr/lib/libc.a" "$SYSROOT/usr/lib/crt1.o" "$GCCLIB/libgcc
         exit 1
     fi
 done
-python3 "$SCRIPT_DIR/build-support/ps2/build.py" --output "$OUTPUT" --sysroot "$SYSROOT" --llvm-bin "$LLVM_BIN"
+"$SCRIPT_DIR/build-support/ps2/build" --output "$OUTPUT" --sysroot "$SYSROOT" --llvm-bin "$LLVM_BIN"
 mkdir -p "$OUTPUT/staging/usr/bin" "$OUTPUT/staging/usr/share/games/ps2"
 if [ "$WITH_HOMEBREW" = 1 ]; then
     "$SCRIPT_DIR/build-support/ps2-homebrew/build" --output "$OUTPUT/homebrew" --llvm-bin "$LLVM_BIN"

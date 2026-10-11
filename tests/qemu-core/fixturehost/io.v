@@ -28,6 +28,8 @@ fn C.posix_spawn_file_actions_init(voidptr) i32
 fn C.posix_spawn_file_actions_destroy(voidptr) i32
 fn C.posix_spawn_file_actions_adddup2(voidptr, i32, i32) i32
 fn C.posix_spawn_file_actions_addclose(voidptr, i32) i32
+fn C.posix_spawn_file_actions_addinherit_np(voidptr, i32) i32
+fn C.posix_spawn_file_actions_addclosefrom_np(voidptr, i32) i32
 fn C.posix_spawn_file_actions_addchdir_np(&C.posix_spawn_file_actions_t, &char) i32
 fn C.waitpid(i32, &i32, i32) i32
 fn C.WIFEXITED(i32) i32
@@ -199,8 +201,32 @@ fn spawn_command_preferred(argv []string, env map[string]string, actions voidptr
 	defer { if isnil(actions) { C.posix_spawn_file_actions_destroy(&local_actions) } }
 	// close_fds preserves only the inherited standard streams. The live fd
 	// listing's own descriptor is closed before the actions are assembled.
-	mut descriptors := os.ls('/dev/fd') or { os.ls('/proc/self/fd') or { []string{} } }
-	if descriptors.len == 0 {
+	mut atomic_close := false
+	$if darwin {
+		if own_group {
+			// The SDK closes unmentioned descriptors at exec without taking a
+			// racy snapshot of another compiler worker's pipe lifetime.
+			atomic_close = true
+			for fd in 0 .. 3 {
+				flags := C.fcntl(fd, C.F_GETFD)
+				if flags >= 0 && flags & C.FD_CLOEXEC == 0 {
+					status := C.posix_spawn_file_actions_addinherit_np(action_pointer, fd)
+					if status != 0 { return file_error('', status) }
+				}
+			}
+		}
+	}
+	$if linux {
+		if own_group {
+			// glibc's child-side closefrom action avoids the same descriptor
+			// snapshot race while preserving the dup2/chdir actions above.
+			status := C.posix_spawn_file_actions_addclosefrom_np(action_pointer, 3)
+			if status != 0 { return file_error('', status) }
+			atomic_close = true
+		}
+	}
+	mut descriptors := if atomic_close { []string{} } else { os.ls('/dev/fd') or { os.ls('/proc/self/fd') or { []string{} } } }
+	if !atomic_close && descriptors.len == 0 {
 		limit := C.sysconf(C._SC_OPEN_MAX)
 		if limit < 0 { return error('Cannot enumerate inherited descriptors') }
 		for fd in 3 .. int(limit) { if C.fcntl(fd, C.F_GETFD) >= 0 { descriptors << fd.str() } }
@@ -208,7 +234,8 @@ fn spawn_command_preferred(argv []string, env map[string]string, actions voidptr
 	for name in descriptors {
 		if name.len == 0 || !name.bytes().all(it.is_digit()) { continue }
 		fd := name.int()
-		if fd < 3 || i32(fd) in excluded || C.fcntl(fd, C.F_GETFD) < 0 { continue }
+		flags := C.fcntl(fd, C.F_GETFD)
+		if fd < 3 || i32(fd) in excluded || flags < 0 { continue }
 		close_status := C.posix_spawn_file_actions_addclose(action_pointer, fd)
 		if close_status != 0 { return file_error('', close_status) }
 	}
@@ -238,7 +265,9 @@ fn spawn_command_preferred(argv []string, env map[string]string, actions voidptr
 		group_status := C.posix_spawnattr_setpgroup(&attributes, 0)
 		if group_status != 0 { return file_error('', group_status) }
 	}
-	configured := C.posix_spawnattr_setflags(&attributes, i16(C.POSIX_SPAWN_SETSIGDEF | if own_group { C.POSIX_SPAWN_SETPGROUP } else { 0 }))
+	mut spawn_flags := C.POSIX_SPAWN_SETSIGDEF | if own_group { C.POSIX_SPAWN_SETPGROUP } else { 0 }
+	$if darwin { if atomic_close { spawn_flags |= C.POSIX_SPAWN_CLOEXEC_DEFAULT } }
+	configured := C.posix_spawnattr_setflags(&attributes, i16(spawn_flags))
 	if configured != 0 { return file_error('', configured) }
 	apply_arch_preference(&attributes, host_arch)!
 	mut pid := i32(0)

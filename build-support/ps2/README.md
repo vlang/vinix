@@ -7,6 +7,10 @@ The pinned source archive has SHA-256
 Downloads are size limited, hash verified, and extracted as regular files with
 path traversal checks. Sources and generated objects stay in ignored `build/ps2`.
 
+Run `build-support/ps2/build`; `scripts/build-ps2-aarch64.sh` also builds the
+frontend and homebrew. The builder and parallel compiler workers are native V;
+see [qualification](../native-emulator-tools/core-builders.md).
+
 This release retains the portable cached EE interpreter, IOP/VU interpreters,
 and software GS rasterizer. No JIT, Vulkan, OpenGL, SDL library or desktop host
 frontend is linked. A small SDL types header satisfies the unused software
