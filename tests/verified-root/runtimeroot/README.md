@@ -1,3 +1,7 @@
+> Historical Python-object bridge. The public commands now use the direct V
+> `bundlehost` and `verifiedhost` modules. See
+> [native qualification](../../verified-boot/native-tools.md).
+
 # Native verified-root runtime helpers
 
 `runtime_query.v` compiles the maintained V command argument conversion,

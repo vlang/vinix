@@ -1,10 +1,9 @@
 # Verified block roots
 
-`build.py` appends a SHA-256 Merkle tree to a completed filesystem image.
-Its import and command-line interface forwards geometry, policy parsing, hashing,
-image construction and verification to the native V `verityimage` module.
-`build-support/run-v-tool.sh` selects the compiler; the temporary installed
-query executable is private to its Python process and removed at exit. The
+`build` runs the V `verityimage` module directly to append a SHA-256 Merkle
+tree to a completed filesystem image. Geometry, policy parsing, hashing, image
+construction, verification and command parsing run in V. The common compiler
+bootstrap builds a private executable and removes it at exit. The
 kernel's verified-root profile reads this image through a read-only block view
 and verifies each requested data block, including its path to the trusted root,
 before returning its bytes. A checksum calculated only at boot would not
@@ -24,13 +23,13 @@ feature set. For example, with e2fsprogs installed and `build/root-staging`
 already populated, create a new 128 MiB image:
 
 ```sh
-python3 -c 'with open("build/root.ext2", "xb") as image: image.truncate(128 << 20)'
+build-support/sparse-file build/root.ext2 134217728
 mke2fs -q -F -t ext2 -b 4096 -I 128 \
     -O filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum \
     -d build/root-staging build/root.ext2
 build-support/ext2-set-root-owner build/root.ext2
 
-python3 tools/verified-root/build.py build \
+tools/verified-root/build build \
     --data build/root.ext2 --output build/root.verity > build/root.verity.json
 ```
 
@@ -44,10 +43,10 @@ values with the trusted build output and supply them separately when checking
 an image or signing the boot bundle:
 
 ```sh
-python3 tools/verified-root/build.py verify build/root.verity \
+tools/verified-root/build verify build/root.verity \
     --data-blocks 32768 --root-hash TRUSTED_64_LOWERCASE_HEX_DIGITS
 
-python3 tools/verified-boot/build.py build --arch aarch64 \
+tools/verified-boot/build build --arch aarch64 \
     --loader build/verified-limine-aarch64/BOOTAA64.EFI \
     --kernel kernel/bin/vinix --initramfs build/bootstrap.tar \
     --verity-root build/root.verity --verity-device /dev/vda \
@@ -136,10 +135,10 @@ trusted build inputs themselves were compromised.
 
 ```sh
 build-support/run-v-tool.sh tools/verified-root/verityimage/core_test.v
-python3 tests/verified-root/test.py
-python3 tests/verified-root/run-host.py
+tests/verified-root/test
+tests/verified-root/run-host
 # On Linux with cryptsetup's real veritysetup available:
-python3 tests/verified-root/test.py --veritysetup /usr/sbin/veritysetup
+tests/verified-root/test --veritysetup /usr/sbin/veritysetup
 ```
 
 The tests cover tree-depth boundaries, data and every hash level, padding,
@@ -158,7 +157,7 @@ The runtime regression boots a real kernel on a 32 MiB ext2 fixture. For
 example, after building the ARM kernel and genuine Limine loader:
 
 ```sh
-python3 tests/verified-root/runtime.py --arch aarch64 \
+tests/verified-root/runtime --arch aarch64 \
     --kernel kernel/bin/vinix \
     --loader build/verified-limine-aarch64/BOOTAA64.EFI \
     --firmware-code /path/to/edk2-aarch64-code.fd \
@@ -183,14 +182,17 @@ Separate boots reject corrupted metadata,
 init data, every tree level, truncation, root mismatch, malformed or conflicting
 policies, and a correctly hashed root missing a required mountpoint.
 
-Add `--secure-boot --virt-fw-vars /path/to/virt-fw-vars` with a Secure Boot
+Add `--secure-boot` with a Secure Boot
 firmware image to sign the fixture and enroll its temporary certificate in a
 copied VM variable store. This checks the full firmware-to-root chain: actual
 firmware must reject an unsigned loader and a modified signed loader before
 the valid signed root may pass. It never modifies host
 firmware. Without that option the test exercises kernel enforcement with
 firmware Secure Boot disabled, and does not establish the firmware trust
-anchor. Fixture keys are temporary and removed after successful runs.
+anchor. Fixture keys are temporary and removed on success, failure and interruption.
+EDK II authenticated variable-store enrollment runs in V and preserves the
+input template. `--virt-fw-vars` accepts an explicit native editor binary for
+other firmware formats; interpreter scripts are rejected.
 
 This is read-only integrity, without encryption, writable authenticated
 storage, FEC, antirollback, attestation or signing-key management. Writable

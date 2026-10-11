@@ -1,6 +1,6 @@
 # Verified-boot protocol fixture
 
-`runtime.py` builds `bootfixture/core.v` as a standalone freestanding ELF,
+`runtime` builds `bootfixture/core.v` as a standalone freestanding ELF,
 then exercises the real pinned Limine loader. It prints the accepted handoff
 marker only when Limine supplies exactly one authenticated module. The fixture
 is separate from the Vinix kernel and has no CRT or unresolved runtime symbols.

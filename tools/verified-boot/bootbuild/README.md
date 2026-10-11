@@ -1,3 +1,7 @@
+> Historical Python-object bridge. The public commands now use the direct V
+> `bundlehost` and `verifiedhost` modules. See
+> [native qualification](../../../tests/verified-boot/native-tools.md).
+
 # Native boot bundle workflow
 
 `bundle_query.v` owns command construction, verified bundle traversal,

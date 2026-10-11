@@ -31,16 +31,16 @@ signature against a certificate supplied separately from the output tree.
 
 ## Build
 
-Python 3.9+, Clang, LLVM (`ld.lld`, `llvm-ar`, `llvm-objcopy`), make and patch
-are needed to obtain a loader. `get-loader.py` downloads the same repository
+V, Clang, LLVM (`ld.lld`, `llvm-ar`, `llvm-objcopy`), make and patch
+are needed to obtain a loader. `get-loader` downloads the same repository
 pinned Limine 12.8.0 source archive as `scripts/build-limine-aarch64.sh`, checks its
 SHA-256 before extraction, and builds the UEFI port for either architecture.
 For aarch64 it applies the existing Vinix protocol base revision 2 patch.
 An offline archive may be supplied with `--source-archive`.
 
 ```sh
-python3 tools/verified-boot/get-loader.py --arch x86_64 --output build/verified-limine-x86_64
-python3 tools/verified-boot/get-loader.py --arch aarch64 --output build/verified-limine-aarch64
+tools/verified-boot/get-loader --arch x86_64 --output build/verified-limine-x86_64
+tools/verified-boot/get-loader --arch aarch64 --output build/verified-limine-aarch64
 ```
 
 Use a privately held PEM signing key and a PEM X.509 certificate. The operator
@@ -49,14 +49,14 @@ Build the Vinix kernel and root archive with the existing architecture builder,
 then assemble a new bundle:
 
 ```sh
-python3 tools/verified-boot/build.py build --arch x86_64 \
+tools/verified-boot/build build --arch x86_64 \
     --loader build/verified-limine-x86_64/BOOTX64.EFI \
     --kernel build-amd64-kernel/bin/vinix \
     --initramfs build-amd64-userland/initramfs.tar \
     --key /private/signing/db.key --certificate /private/signing/db.crt \
     --output build/verified-boot-x86_64
 
-python3 tools/verified-boot/build.py verify build/verified-boot-x86_64 \
+tools/verified-boot/build verify build/verified-boot-x86_64 \
     --arch x86_64 --certificate /private/signing/db.crt
 ```
 
@@ -100,13 +100,13 @@ boot authentication.
 Host policy regressions:
 
 ```sh
-python3 tests/verified-boot/test.py
+tests/verified-boot/test
 ```
 
 Real signature regressions, with actual built Limine executables:
 
 ```sh
-python3 tests/verified-boot/test.py --backend osslsigncode \
+tests/verified-boot/test --backend osslsigncode \
     --x86_64-loader build/verified-limine-x86_64/BOOTX64.EFI \
     --aarch64-loader build/verified-limine-aarch64/BOOTAA64.EFI
 ```
@@ -121,12 +121,12 @@ handoff and rejection of modified config, kernel and initramfs. It is a
 bootloader enforcement test; the fixture is not the Vinix kernel.
 
 ```sh
-python3 tests/verified-boot/runtime.py --arch x86_64 \
+tests/verified-boot/runtime --arch x86_64 \
     --loader build/verified-limine-x86_64/BOOTX64.EFI \
     --firmware-code /path/to/edk2-x86_64-secure-code.fd \
     --firmware-vars /path/to/edk2-i386-vars.fd \
     --logs /tmp/vinix-verified-x86_64 \
-    --secure-boot --virt-fw-vars /path/to/virt-fw-vars --backend osslsigncode
+    --secure-boot --backend osslsigncode
 ```
 
 `--secure-boot` generates a temporary certificate, enrolls it into a **copy** of
@@ -135,7 +135,9 @@ It also checks that firmware rejects unsigned/modified EFI loaders and that
 Limine rejects an intentionally signed configuration with an unhashed module,
 even when that config requests relaxed hash handling. This last case verifies
 that Limine observes Secure Boot being enabled. The template and host firmware
-are never modified. `virt-fw-vars` is supplied by the `virt-firmware` package.
+are never modified. The V controller edits EDK II authenticated variable stores
+directly. An explicit `--virt-fw-vars` may select a native editor binary for
+other formats; interpreter scripts are rejected.
 For aarch64 use `--arch aarch64`, its loader and `edk2-aarch64-code.fd` with
 `edk2-arm-vars.fd`; omit `--secure-boot` if that firmware does not implement
 Secure Boot. The test states when firmware authentication was not exercised.
@@ -161,20 +163,14 @@ on mismatches, and disabled configuration editing under Secure Boot.
 The enrolled configuration hash is checked even when Secure Boot is disabled
 in [its configuration loader](https://github.com/Limine-Bootloader/Limine/blob/v12.8.0/common/lib/config.c).
 
-The literal command-line policy, PE enrollment-field parser, ELF header check,
-BLAKE2b streaming checksums and configuration generator are implemented in
-`bootpolicy` in V. The Python import interface forwards those calls to a private
-query executable installed through `build-support/run-v-tool.sh`; its directory
-is removed at process exit. The `verityimage` dependency is a relative symlink
-to the shared verified-root V module. Native parser regressions run with:
+The public builders and all five test commands run directly in V. `bundlehost`
+handles bundle inventory, signing, enrollment, atomic publication and command
+ownership; `bootpolicy` and the shared `verityimage` module enforce the trusted
+policy. `verifiedhost` builds independent fixtures, owns QEMU process groups,
+mutates live roots only after the matching READY marker, and retires temporary
+firmware copies after the child has exited.
 
-```sh
-build-support/run-v-tool.sh tools/verified-boot/bootpolicy/core_test.v
-```
-
-Signing command construction, bundle verification, configuration enrollment
-and publication run in `bootbuild` in V. The counted Python interface retains
-the original parser and public signatures, and borrows actual library objects
-through `tools/_package_store_native.py`. Temporary directories are retired
-after all signing, verification and rename callbacks finish. The optional
-genuine PE-signature integration and runtime fixtures remain independent.
+`VINIX_AARCH64_SYSROOT` and `VINIX_AMD64_SYSROOT` select the fixture compiler
+headers; both `include` and `usr/include` sysroot layouts are supported.
+[Native qualification](../../tests/verified-boot/native-tools.md) records host,
+real signature, firmware and kernel guest evidence separately.

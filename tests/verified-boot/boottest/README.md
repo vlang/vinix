@@ -1,3 +1,7 @@
+> Historical Python-object bridge. The public commands now use the direct V
+> `bundlehost` and `verifiedhost` modules. See
+> [native qualification](../native-tools.md).
+
 # Verified-boot policy fixture controller
 
 `test.py` retains its Python import interface, `unittest.TestCase` discovery,

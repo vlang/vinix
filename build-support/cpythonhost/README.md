@@ -19,16 +19,11 @@ the current unwind. Returned objects receive their independent public reference.
 The adapter retains only two Python syntax bindings: double keyword expansion
 and exact pair unpacking. Their private invocation operands retire on failure.
 
-The initial opt-in scope is the four verified-root helpers: command conversion,
-filesystem block parsing, loader enrollment and byte mutation. The main workflow
-and guest supervisor still use their existing backend. Build a matching host
-library and select it explicitly:
-
-```sh
-build-support/build-v-host-library.sh tests/verified-root/runtime_library.v /tmp/runtime.dylib
-VINIX_VERIFIED_ROOT_RUNTIME_LIBRARY=/tmp/runtime.dylib python3 -c \
-  'import runpy; runpy.run_path("tests/verified-root/runtime.py")["command"](["/bin/echo", "native V helper"])'
-```
+The initial verified-root helper integration has been retired. Its command,
+block parsing, enrollment, mutation and guest supervision now run directly in
+V through `tests/verified-root/runtime`; no interpreter or CPython backend is
+used by that command. The retained host backend supports historical adapter
+qualification while the remaining repository callers are migrated.
 
 The library must match the Python interpreter's architecture. `V` and
 `VINIX_V_COMPILER` follow the existing compiler discovery; `VINIX_HOST_PYTHON`
