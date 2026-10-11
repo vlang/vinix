@@ -705,3 +705,20 @@ Firefox on the same fixed x86-64 kernel still times out as UID/GID 1000 in a
 includes bounded proc diagnostics. This fix reduces sparse-fork allocation;
 it does not qualify browser startup or establish the cause of the remaining
 resource denials.
+
+## Seccomp capability query flags
+
+SECCOMP_GET_ACTION_AVAIL now rejects nonzero flags with EINVAL before reading
+its action argument, matching [Linux's syscall validation](https://github.com/torvalds/linux/blob/v6.12/kernel/seccomp.c#L1943).
+An unsupported action retains EOPNOTSUPP, and an inaccessible action pointer
+with valid flags retains EFAULT. Queries do not install filters or require
+privileged credentials.
+
+The native fixture runs as UID/GID 1000, queries all seven recognized actions,
+checks seven invalid flag bits with valid and invalid pointers, verifies
+unsigned-int narrowing of operation/flags and checks unchanged input and
+guard words. The [dated results](../tests/linux-compat/results/2026-10-12/)
+retain both prior kernels accepting flags=1, both fixed query passes and the
+existing filter/trap regression on each architecture. Both kernels build and
+the generated coverage inventory is current. Linux per-thread filter ownership,
+TSYNC and complete browser sandbox qualification remain open.

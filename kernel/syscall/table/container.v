@@ -162,8 +162,9 @@ const seccomp_filter_flag_log = u32(2)
 const seccomp_filter_flag_spec_allow = u32(4)
 const seccomp_filter_flag_tsync_esrch = u32(16)
 
-// seccomp(operation, flags, args); see proc/seccomp.v. Programs are the
-// process's, so TSYNC holds already. There are no listeners to hand user
+// seccomp(operation, flags, args); see proc/seccomp.v. Programs currently
+// belong to the process; Linux per-thread ownership and TSYNC need separate
+// qualification. There are no listeners to hand user
 // notifications to, so SECCOMP_FILTER_FLAG_NEW_LISTENER, like every flag
 // Linux does not know, is refused: libseccomp probes each flag this way and
 // leaves out what the kernel refuses.
@@ -183,6 +184,9 @@ fn syscall_linux_seccomp(_ voidptr, operation u32, flags u32, args u64) (u64, u6
 			return seccomp_install(args)
 		}
 		seccomp_get_action_avail {
+			if flags != 0 {
+				return errno.err, errno.einval
+			}
 			mut action := u32(0)
 			if !usercopy.copy_from_user(voidptr(&action), args, sizeof(u32)) {
 				return errno.err, errno.efault
