@@ -4,6 +4,7 @@ module futex
 import event
 import event.eventstruct
 import klock
+import memory
 import memory.mmap
 import errno
 import proc
@@ -17,7 +18,7 @@ import usercopy
 @[heap]
 struct Futex {
 mut:
-	event eventstruct.Event
+	waiters &Wait = unsafe { nil }
 	// The address space a private futex belongs to, or nil for a shared one,
 	// whose address is physical.
 	owner voidptr
@@ -27,6 +28,22 @@ mut:
 	// Other futexes whose keys share `addr`: the same virtual address in
 	// another process, most often another copy of the same program.
 	next &Futex = unsafe { nil }
+}
+
+// Each syscall frame owns its event. Requeue changes only its futex owner,
+// leaving event.await's listener pointers and timer stable until they detach.
+struct Wait {
+mut:
+	next &Wait = unsafe { nil }
+	futex &Futex = unsafe { nil }
+	event eventstruct.Event
+	bitset u32
+	woken bool
+}
+
+struct WaitEvents {
+mut:
+	items [2]&eventstruct.Event
 }
 
 __global (
@@ -57,12 +74,12 @@ fn key_for(virt u64, private bool) ?(voidptr, u64) {
 		return voidptr(pagemap), virt
 	}
 	if phys := pagemap.virt2phys(virt) {
-		return unsafe { nil }, phys
+		return unsafe { nil }, phys + (virt & (memory.page_size - 1))
 	}
 	// A shared page is mapped on first touch. Reading the word brings it in.
 	usercopy.read_u32(virt) or { return none }
 	phys := pagemap.virt2phys(virt) or { return none }
-	return unsafe { nil }, phys
+	return unsafe { nil }, phys + (virt & (memory.page_size - 1))
 }
 
 // Take a reference to the futex for `virt`. Only a waiter creates one: a
@@ -135,28 +152,7 @@ pub fn wait_key(virt u64, expected int, private bool) (u64, u64) {
 }
 
 pub fn wait_mask_key(virt u64, expected int, private bool, bitset u32) (u64, u64) {
-	mut f := get(virt, true, private) or { return errno.err, errno.efault }
-	defer {
-		put(mut f)
-	}
-	mut t := proc.current_thread()
-	t.futex_bitset = bitset
-	defer { t.futex_bitset = 0 }
-	mut e := &f.event
-	generation := event.generation(mut e)
-
-	// Read through the pagemap rather than dereferencing the user pointer: a
-	// bad address must come back as EFAULT, not as a fault in kernel mode.
-	current := usercopy.read_u32(virt) or { return errno.err, errno.efault }
-	if current != u32(expected) {
-		return errno.err, errno.eagain
-	}
-
-	event.await_one_from_generation(mut e, true, generation) or {
-		return errno.err, errno.eintr
-	}
-
-	return 0, 0
+	return wait_common(virt, expected, private, bitset, unsafe { nil })
 }
 
 // Block until the futex is woken or a relative timeout expires. Linux libc
@@ -172,56 +168,109 @@ pub fn wait_timeout_key(virt u64, expected int, duration time.TimeSpec, private 
 }
 
 pub fn wait_timeout_mask_key(virt u64, expected int, duration time.TimeSpec, private bool, bitset u32) (u64, u64) {
-	mut f := get(virt, true, private) or { return errno.err, errno.efault }
-	defer {
-		put(mut f)
-	}
-	mut t := proc.current_thread()
-	t.futex_bitset = bitset
-	defer { t.futex_bitset = 0 }
-	mut e := &f.event
-	generation := event.generation(mut e)
-
-	// Match wait(): validate and compare the userspace word before deciding that
-	// even a zero-length wait has timed out.
-	current := usercopy.read_u32(virt) or { return errno.err, errno.efault }
-	if current != u32(expected) {
-		return errno.err, errno.eagain
-	}
-	if duration.tv_sec == 0 && duration.tv_nsec == 0 {
-		return errno.err, errno.etimedout
-	}
-
-	mut timer := time.new_timer(duration)
-	defer {
-		timer.disarm()
-		unsafe { free(timer) }
-	}
-
-	mut storage := [e, &timer.event]!
-	mut events := unsafe { event.stack_list(&storage[0], storage.len) }
-	which := event.await_from_generation(mut events, true, 0, generation) or {
-		return errno.err, errno.eintr
-	}
-	if which == 1 {
-		return errno.err, errno.etimedout
-	}
-
-	return 0, 0
+	return wait_common(virt, expected, private, bitset, &duration)
 }
 
-// Wake everything blocked on the word, returning how many threads that was.
-// An address with no futex registered against it — including one that is not
-// mapped at all — simply has nothing to wake.
+// Called with futex_lock held. A frame remains referenced by its current
+// owner after wake removes it, until await has detached both event listeners.
+fn unlink_wait(mut f Futex, node &Wait) {
+	if voidptr(f.waiters) == voidptr(node) { f.waiters = node.next; return }
+	for previous := f.waiters; previous != unsafe { nil }; previous = previous.next {
+		if voidptr(previous.next) == voidptr(node) { previous.next = node.next; return }
+	}
+}
+
+fn append_wait(mut f Futex, node &Wait) {
+	if f.waiters == unsafe { nil } { f.waiters = node; return }
+	mut tail := f.waiters
+	for tail.next != unsafe { nil } { tail = tail.next }
+	tail.next = node
+}
+
+fn finish_wait(mut node Wait, error u64) (u64, u64) {
+	futex_lock.acquire()
+	mut owner := node.futex
+	if !node.woken { unlink_wait(mut owner, &node) }
+	woken := node.woken
+	futex_lock.release()
+	// Requeue transfers this one reference; the original owner is never used
+	// by this frame again. No queue reader retains node after this unlock.
+	put(mut owner)
+	if woken || error == 0 { return 0, 0 }
+	return errno.err, error
+}
+
+fn wait_common(virt u64, expected int, private bool, bitset u32, duration &time.TimeSpec) (u64, u64) {
+	// Resolve outside the queue lock, then compare again without faulting
+	// while holding it. Wakers take the same lock, closing check/enqueue races.
+	value := usercopy.read_u32(virt) or { return errno.err, errno.efault }
+	if value != u32(expected) { return errno.err, errno.eagain }
+	if duration != unsafe { nil } && duration.tv_sec == 0 && duration.tv_nsec == 0 {
+		return errno.err, errno.etimedout
+	}
+	mut timer := &time.Timer(unsafe { nil })
+	if duration != unsafe { nil } { timer = time.new_timer(*duration) }
+	defer {
+		if timer != unsafe { nil } { timer.disarm(); unsafe { free(timer) } }
+	}
+	mut node := unsafe { &Wait(C.__builtin_alloca(sizeof(Wait))) }
+	unsafe { *node = Wait{bitset: bitset} }
+	mut queued := false
+	for _ in 0..16 {
+		mut f := get(virt, true, private) or { return errno.err, errno.efault }
+		futex_lock.acquire()
+		current := usercopy.futex_read_u32_inatomic(virt) or {
+			futex_lock.release()
+			put(mut f)
+			usercopy.read_u32(virt) or { return errno.err, errno.efault }
+			continue
+		}
+		if current != u32(expected) {
+			futex_lock.release()
+			put(mut f)
+			return errno.err, errno.eagain
+		}
+		node.futex = f // Transfer get's reference to the live syscall frame.
+		append_wait(mut f, node)
+		queued = true
+		futex_lock.release()
+		break
+	}
+	if !queued { return errno.err, errno.eagain }
+	mut storage := unsafe { &WaitEvents(C.__builtin_alloca(sizeof(WaitEvents))) }
+	storage.items[0] = &node.event
+	storage.items[1] = if timer == unsafe { nil } { &node.event } else { &timer.event }
+	mut events := unsafe { event.stack_list(&storage.items[0], if timer == unsafe { nil } { 1 } else { 2 }) }
+	mut error := u64(0)
+	which := event.await(mut events, true) or { error = errno.eintr; u64(-1) }
+	if which == 1 { error = errno.etimedout }
+	return finish_wait(mut node, error)
+}
+
+// Wake and requeue hold futex_lock until their last use of each stack node.
+// Trigger retains a pending wake when the selected frame has not yet slept.
+fn wake_locked(mut f Futex, maximum u64, bitset u32) u64 {
+	mut woken := u64(0)
+	mut node := f.waiters
+	for node != unsafe { nil } && woken < maximum {
+		next := node.next
+		if node.bitset & bitset != 0 {
+			unlink_wait(mut f, node)
+			node.woken = true
+			event.trigger(mut node.event, false)
+			woken++
+		}
+		node = next
+	}
+	return woken
+}
+
 pub fn wake(virt u64) u64 {
 	return wake_key(virt, false)
 }
 
 pub fn wake_key(virt u64, private bool) u64 {
-	mut f := get(virt, false, private) or { return 0 }
-	woken := event.trigger(mut f.event, true)
-	put(mut f)
-	return woken
+	return wake_mask_key(virt, 0x7fffffff, private, u32(0xffffffff))
 }
 
 pub fn wake_n(virt u64, maximum int) u64 {
@@ -237,8 +286,53 @@ pub fn wake_mask_key(virt u64, maximum int, private bool, bitset u32) u64 {
 	// The original Linux futex ABI wakes one for a nonpositive count when
 	// waiters exist. FUTEX2's strict zero-count behavior is a separate ABI.
 	count := if maximum > 0 { u64(maximum) } else { u64(1) }
-	woken := event.trigger_n_bitset(mut f.event, count, bitset)
+	futex_lock.acquire()
+	woken := wake_locked(mut f, count, bitset)
+	futex_lock.release()
 	put(mut f)
 	return woken
+}
+
+// None means the comparison page must be faulted in outside futex_lock.
+fn requeue_attempt(source u64, target u64, wake_count int, move_count int, private bool, compare bool, expected u32) ?(u64, u64) {
+	mut from := get(source, true, private) or { return errno.err, errno.efault }
+	defer { put(mut from) }
+	mut to := get(target, true, private) or { return errno.err, errno.efault }
+	defer { put(mut to) }
+	futex_lock.acquire()
+	defer { futex_lock.release() }
+	if compare {
+		current := usercopy.futex_read_u32_inatomic(source) or { return none }
+		if current != expected { return errno.err, errno.eagain }
+	}
+	woken := wake_locked(mut from, u64(wake_count), u32(0xffffffff))
+	mut moved := u64(0)
+	if voidptr(from) == voidptr(to) {
+		for node := from.waiters; node != unsafe { nil } && moved < u64(move_count); node = node.next { moved++ }
+	} else {
+		for from.waiters != unsafe { nil } && moved < u64(move_count) {
+			mut node := from.waiters
+			from.waiters = node.next
+			node.next = unsafe { nil }
+			// Both temporary references keep the owners alive while each
+			// waiter's reference moves. Its event and timer never move.
+			to.users++
+			from.users--
+			node.futex = to
+			append_wait(mut to, node)
+			moved++
+		}
+	}
+	return woken + moved, 0
+}
+
+pub fn requeue(source u64, target u64, wake_count int, move_count int, private bool, compare bool, expected u32) (u64, u64) {
+	for _ in 0..16 {
+		if result, error := requeue_attempt(source, target, wake_count, move_count, private, compare, expected) {
+			return result, error
+		}
+		usercopy.read_u32(source) or { return errno.err, errno.efault }
+	}
+	return errno.err, errno.eagain
 }
 

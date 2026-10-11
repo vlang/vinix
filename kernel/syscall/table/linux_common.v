@@ -132,15 +132,14 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 			return woken, 0
 		}
 		3, 4 { // FUTEX_REQUEUE, FUTEX_CMP_REQUEUE
-			// Moving waiters over to uaddr2 would need a real wait queue.
-			// Waking them instead is heavier but still correct: pthread_cond
-			// waiters recheck their sequence and contend for the mutex, which
-			// is exactly what the requeue would have made them do.
-			woken := futex.wake_key(uaddr, private)
-			if uaddr2 != 0 {
-				futex.wake_key(uaddr2, private)
+			wake_count := int(i32(val))
+			move_count := int(i32(timeout))
+			if wake_count < 0 || move_count < 0 { return errno.err, errno.einval }
+			for address in [uaddr, uaddr2]! {
+				address_error := linux_futex_address_error(address, private)
+				if address_error != 0 { return errno.err, address_error }
 			}
-			return woken, 0
+			return futex.requeue(uaddr, uaddr2, wake_count, move_count, private, op == 4, u32(val3))
 		}
 		else {
 			return u64(-1), errno.enosys

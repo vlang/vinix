@@ -1,0 +1,62 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "c86d4c6e10780d321a724aa21730436bfd1780cd105a01d22f9e5e53a461ad82",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "uid": 1000,
+    "gid": 1000,
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "firefox",
+            "status": "failed",
+            "detail": "command failed: ['/usr/lib/firefox-esr/firefox-esr', '--headless', '--no-remote', '--profile', '/tmp/linux-compat-evidence/firefox-profile', '--window-size', '800,600', '--screenshot', '/tmp/linux-compat-evidence/firefox.png', 'http://127.0.0.1:59797/'] exit=137 timeout=true output_limit=false"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--version"
+            ],
+            "executable_sha256": "143aeed9b12686c25130cac64524508ee9342533e5da76d059aef5e26524601f",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Mozilla Firefox 128.14.0esr\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--headless",
+                "--no-remote",
+                "--profile",
+                "/tmp/linux-compat-evidence/firefox-profile",
+                "--window-size",
+                "800,600",
+                "--screenshot",
+                "/tmp/linux-compat-evidence/firefox.png",
+                "http://127.0.0.1:59797/"
+            ],
+            "executable_sha256": "143aeed9b12686c25130cac64524508ee9342533e5da76d059aef5e26524601f",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 137,
+            "timed_out": true,
+            "output_limited": false,
+            "stdout": "[GFX1-]: glxtest: libpci missing\n[GFX1-]: glxtest: libGL.so.1 missing\n[GFX1-]: No GPUs detected via PCI\n\n",
+            "stderr": "*** You are running in headless mode.\n[Parent 28416, IPC Launch] WARNING: fork() failed: Out of memory: file /home/buildozer/aports/community/firefox-esr/src/firefox-128.14.0/ipc/chromium/src/base/process_util_linux.cc:298\n[Parent 28416, IPC I/O Parent] WARNING: Failed to launch tab subprocess @fork (Error:12): file /home/buildozer/aports/community/firefox-esr/src/firefox-128.14.0/ipc/glue/GeckoChildProcessHost.cpp:821\n"
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}

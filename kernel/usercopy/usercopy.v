@@ -285,6 +285,18 @@ pub fn read_u32(address u64) ?u32 {
 	return value
 }
 
+// A queue comparison must not page in or require write permission. The
+// pagemap lock pins its readable physical word for this atomic load only.
+pub fn futex_read_u32_inatomic(address u64) ?u32 {
+	if address & 3 != 0 || !user_range(address, 4) { return none }
+	mut pagemap := proc.current_thread().process.pagemap
+	pagemap.l.acquire()
+	defer { pagemap.l.release() }
+	physical := pagemap.user_page_phys(address, false) or { return none }
+	ptr := voidptr(physical + (address & (page_size - 1)) + memory.get_hhdm_offset())
+	return word_load(ptr)
+}
+
 // PI queue operations must not fault while holding their wait-list lock.
 // Their caller resolves writable/COW storage before entering that section;
 // concurrent unmap or pageout fails here without sleeping under the PI lock.

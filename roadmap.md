@@ -596,6 +596,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 
 - [x] Replace placeholder BPF/openat2 success with explicit errors and enforce
   faccessat2 empty-path permissions, with regression checks on both architectures.
+- [x] Implement bounded futex REQUEUE/CMP_REQUEUE transfers, shared word keys,
+  wake counts, bitsets and exact argument/timeout errors; qualify both native
+  architectures plus real Go/OpenJDK threading workloads. See the
+  [futex qualification receipts](docs/linux-posix-qualification.md#futex-requeue-and-shared-word-offsets).
 - [x] Establish V build/guest/application qualification tools and publish native
   and translated x86-64 TLS/atomic/SIMD/JIT/page-size results plus SQLite/HTTP
   workload receipts and unsupported dependencies. See the

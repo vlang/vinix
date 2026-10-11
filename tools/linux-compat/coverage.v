@@ -65,6 +65,8 @@ fn coverage(root string) !Coverage {
 		'kernel/proc/proc.v', 'kernel/proc/proc_arm64.v', 'kernel/proc/proc_amd64.v',
 		'kernel/proc/container.v', 'kernel/proc/seccomp.v',
 		'kernel/futex/futex.v', 'kernel/futex/pi.v', 'kernel/event/event.v',
+		'kernel/usercopy/usercopy.v', 'kernel/usercopy/word_atomic_arm64.v',
+		'kernel/usercopy/word_atomic_amd64.v',
 		'kernel/userland/clone_arm64.v', 'kernel/userland/clone_amd64.v',
 		'kernel/userland/userland_arm64.v', 'kernel/userland/linux_signal_amd64.v',
 		'kernel/userland/seccomp_signal.v', 'kernel/memory/mmap/linux.v',

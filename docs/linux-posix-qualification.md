@@ -513,16 +513,17 @@ highest mask bit. Both bitset operations reject zero masks with EINVAL after
 narrowing val3 to the Linux u32 argument. See
 [Linux's bitset matching](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/waitwake.c#L148).
 
-The mask lives in the existing thread object during its single futex wait.
-The event lock publishes it to wakers, and wait teardown detaches listeners
-before clearing it. Timer listeners and generic event broadcasts retain their
-existing behavior. No additional allocation or allocation lifetime is added.
+In those dated kernels the mask lived in the thread object during its wait,
+published under the event lock and cleared after listener teardown. The later
+requeue implementation below stores it in a stable syscall-frame queue node.
+Generic event broadcasts retain their existing behavior.
 
 `futex-bits-before-*` retains both prior kernels incorrectly waking a
 nonmatching waiter. `futex-bits-after-*` retains the same fixture and all eleven
 passing native ABI cases in the
 [dated results](../tests/linux-compat/results/2026-10-11/).
-Real requeue, PI interaction and shared-file page eviction remain unqualified.
+Those bitset checks do not qualify requeue, PI interaction or shared-file page
+eviction; requeue has its own later receipts below.
 
 ## Native x86-64 language runtimes
 
@@ -570,7 +571,7 @@ No allocation or ownership change is introduced.
 and incorrectly waking on -2 compared with -1. `futex-op-after-*` retains the
 same fixture and all twelve passing native ABI cases in the
 [dated results](../tests/linux-compat/results/2026-10-11/).
-Requeue and PI interaction remain separate qualification requirements.
+These WAKE_OP checks do not qualify requeue or PI interaction.
 
 ## Futex address and timeout errors
 
@@ -594,4 +595,49 @@ unaligned WAIT. `futex-errors-after-*` retains the matching fixture and all
 thirteen passing native ABI cases in the
 [dated results](../tests/linux-compat/results/2026-10-11/).
 These changes introduce no allocation or ownership change. Read-only WAKE_OP
-targets, page eviction, requeue and PI interactions remain unqualified.
+targets, page eviction and PI interactions remain unqualified. Requeue has
+separate receipts below.
+
+## Futex requeue and shared word offsets
+
+Both native architectures pass REQUEUE and CMP_REQUEUE with 164 raw pthread
+waiters and 240 musl condition-variable waits. A comparison mismatch returns
+EAGAIN without waking or moving anything, including an empty queue. Negative
+counts return EINVAL; arguments are narrowed to Linux's signed C int. Both
+keys are validated. Read-only comparison words work without requiring write
+permission. See [Linux's requeue contract](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/requeue.c#L345).
+
+Transfers wake at most the requested number, move at most the second count
+and return their sum. Existing target waiters remain blocked. Requeued waits
+retain bitsets and their original timers. Tests cover private/shared keys,
+shared aliases, same-key counting, multiple transfers, timeout and signal
+cleanup, and repeated condition broadcasts while the mutex remains locked.
+Shared keys now include the word's offset within the native 4 KiB or 16 KiB
+page; neighboring shared words no longer alias one queue.
+
+Each wait owns a stack node with a stable event, plus one reference to its
+current futex. Requeue transfers that reference under the queue lock. Wake,
+timeout and signal cleanup serialize there, with an already-selected wake
+taking precedence. Event listeners detach before the frame can leave. The
+generated C confirms stack storage for the node/event list and no additional
+heap allocation for either. Word comparisons use a readable atomic load
+under the pagemap lock; missing-page resolution happens outside the queue
+lock. Repeated page-in races are bounded and can return EAGAIN after sixteen
+attempts. This does not qualify backing-page eviction or PI requeue.
+
+The [2026-10-12 results](../tests/linux-compat/results/2026-10-12/) retain the
+same fixture on both prior kernels accepting a mismatching comparison,
+the intermediate kernels colliding neighboring shared words, and all
+fourteen passing ABI cases on the final kernels. The native x86-64 Go workload
+also compiles and runs as UID/GID 1000; OpenJDK passes compilation, threaded
+file/TCP tests and JAR create/reopen with the existing privileged JIT policy.
+Their input manifests, package hashes, reports and logs are retained there.
+These extracted runtime inputs do not qualify package installation.
+
+Firefox 128.14.0esr was rerun as UID/GID 1000 in the same native x86-64 kernel,
+with 2048 MiB guest memory and its normal sandbox policy. It still times out
+without JavaScript/PNG proof, and this run reports ENOMEM when forking its tab
+process. The failed report, controller receipt, prepared-root manifest,
+package hashes and raw log remain visible alongside the passes. This result
+does not identify the cause of that allocation failure or qualify browsers,
+portals or the complete application lifecycle.

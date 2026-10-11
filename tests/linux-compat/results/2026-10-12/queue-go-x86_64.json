@@ -1,0 +1,82 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "c86d4c6e10780d321a724aa21730436bfd1780cd105a01d22f9e5e53a461ad82",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "uid": 1000,
+    "gid": 1000,
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "go",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/go",
+                "version"
+            ],
+            "executable_sha256": "3451084e5f9fb94d52b31324d2302a233febfdedf520b9759a8f61bc0d3758e4",
+            "environment_overrides": {
+                "GOROOT": "/usr/lib/go",
+                "GOCACHE": "/tmp/linux-compat-evidence/go-cache",
+                "CGO_ENABLED": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "go version go1.23.9 linux/amd64\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/go",
+                "build",
+                "-o",
+                "/tmp/linux-compat-evidence/go-smoke",
+                "/tmp/linux-compat-evidence/smoke.go"
+            ],
+            "executable_sha256": "3451084e5f9fb94d52b31324d2302a233febfdedf520b9759a8f61bc0d3758e4",
+            "environment_overrides": {
+                "GOROOT": "/usr/lib/go",
+                "GOCACHE": "/tmp/linux-compat-evidence/go-cache",
+                "CGO_ENABLED": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/tmp/linux-compat-evidence/go-smoke"
+            ],
+            "executable_sha256": "7f538d1d6c9b05142bfbccf61c40824d4ef5ce1275a3043c18737bff4acf987a",
+            "environment_overrides": {
+                "GOROOT": "/usr/lib/go",
+                "GOCACHE": "/tmp/linux-compat-evidence/go-cache",
+                "CGO_ENABLED": "0"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "VINIX AMD64 GO SMOKE\nLinux-compatible Go runtime              ok\nx86-64 Go runtime                        ok\n  [info] go1.23.9 linux/amd64\ncreate temporary directory               ok\nwrite a file                             ok\nread the file back                       ok\ntruncate an existing file                ok\nappend to an existing file               ok\nrename the file                          ok\ncreate a symbolic link                   ok\nenumerate directory entries              ok\ngoroutines, channels, and WaitGroup      ok\nruntime timer                            ok\nfork/exec subprocess                     ok\nSHA-256 standard library                 ok\ncrypto/rand                              ok\nTCP listener                             ok\nTCP loopback round trip                  ok\nGO SMOKE PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}
