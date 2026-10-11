@@ -26,7 +26,7 @@ fn unix_mkdir_parents(path string) ! {
 }
 
 // Embedded modules and assertions are the independent original V fixtures.
-// Keep the two phases around Python's metadata-preserving production copies.
+// Keep the two phases around the controller's metadata-preserving production copies.
 fn stubs(work string) ! {
 	names := ['stat/stat.v', 'errno/errno.v', 'klock/klock.v', 'resource/stub.v',
 		'security/level.v']

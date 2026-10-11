@@ -26,7 +26,7 @@ x86 QEMU TCG setup cannot provide that coverage.
 
 The maintained guest fixture is `guestfixture/core.v`. Its 15 assertions and
 failure line numbers remain those of the original independent C fixture.
-`python3 tests/hypervisor/host-test.py --state-dir /new/isolated/directory`
+`tests/hypervisor/host-test --state-dir /new/isolated/directory`
 compares both versions under ASan/UBSan in 19 success/failure cases. The host
 model checks the complete public ABI sequence and all 15 register values for
 each of five VMs; its Darwin ARM variadic entry uses an instruction-only native

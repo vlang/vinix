@@ -151,7 +151,7 @@ host allocation/I/O boundaries:
 V=/path/to/v tests/storage-volumes/host
 VINIX_HOST_SANITIZE=1 V=/path/to/v tests/storage-volumes/host
 V=/path/to/v python3 tests/block-storage/run.py
-V=/path/to/v python3 tests/mounted-disk-policy/host.py
+V=/path/to/v tests/mounted-disk-policy/host
 ```
 
 Build ordinary kernels in isolated worktrees and then run both disposable guest

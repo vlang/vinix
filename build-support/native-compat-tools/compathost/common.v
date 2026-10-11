@@ -45,7 +45,7 @@ fn needed(parsed hosttest.Arguments, names []string) ! {
 }
 
 pub fn command(args []string, family string) int {
-	result := command_checked(args, family) or { eprintln(err.msg()); return if err.code() == 2 { 2 } else { 1 } }
+	result := command_checked(args, family) or { eprintln(err.msg()); return if err.code() in [2, 130] { err.code() } else { 1 } }
 	return result
 }
 
@@ -87,6 +87,7 @@ fn command_checked(args []string, family string) !int {
 		'resource-groups' { return groups_command(args)! }
 		'speculation-policy' { return speculation_command(args)! }
 		'resource-accounting', 'pagecache', 'ext2-sparse' { return filesystem_command(args, family)! }
+		'hypervisor-host', 'mounted-disk-host', 'securelevel-host', 'securelevel-dispatch', 'securelevel-attributes' { return host_suite_command(args, family)! }
 		else { return error_with_code('Unknown compatibility command', 2) }
 	}
 }

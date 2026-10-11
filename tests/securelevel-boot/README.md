@@ -40,9 +40,9 @@ through fork, split, mremap, and final unmap; no page revocation is implemented.
 Run from an isolated worktree with a kernel built for the requested architecture:
 
 ```sh
-V=/Users/alex/code/v/v python3 tests/securelevel-boot/host.py
-V=/Users/alex/code/v/v python3 tests/securelevel-boot/dispatch.py
-V=/Users/alex/code/v/v python3 tests/securelevel-boot/attribute_faults.py
+V=/Users/alex/code/v/v tests/securelevel-boot/host
+V=/Users/alex/code/v/v tests/securelevel-boot/dispatch
+V=/Users/alex/code/v/v tests/securelevel-boot/attribute-faults
 python3 tests/kernel-gaps/test_runner.py
 python3 tests/securelevel-boot/run.py --arch aarch64 --state-dir /tmp/securelevel-arm
 python3 tests/securelevel-boot/run.py --arch x86_64 --state-dir /tmp/securelevel-x86
@@ -74,6 +74,13 @@ objects; the guest requires exactly zero growth in all 18 ARM64 or 14 x86 slab
 classes and large pages for both repeated paths and the control. These measurements cover the
 policy write and append dispatch paths, not every existing filesystem
 allocation site.
+
+These three host commands run V directly. Optional `--state-dir /new/directory`
+retains production-source hashes, commands and test logs; the directory must be
+fresh. Default scratch directories are removed after success, failure or
+interrupt. The attribute fixture retains the original assertions and models the
+non-journaled branch with current transaction/read-only signatures. Journal
+calls deliberately stop the fixture; journal durability is a separate suite.
 
 Remaining findings: SEC3 needs an administrator trust/key format, signed ELF
 metadata and executable fault validation bound to writable aliases; SEC4 needs

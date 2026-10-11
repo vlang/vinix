@@ -4,6 +4,7 @@ module fixturehost
 import os
 import hosttest
 import strings
+import time
 
 #include <stdio.h>
 #include <errno.h>
@@ -382,6 +383,14 @@ pub:
 // nonzero exit statuses to its caller. Drain both pipes before waiting so a
 // full stderr pipe cannot block a child whose stdout is being consumed.
 pub fn capture_both_preferred(argv []string, env map[string]string, host_arch string) !CapturedCommand {
+	return capture_bounded(argv, env, host_arch, '', -1, unsafe { nil })
+}
+
+// A negative deadline and absent interrupt callback keep the unbounded API's
+// original blocking behavior. Bounded callers own kill/reap on every failure,
+// including a child that closes its output streams before it exits.
+pub fn capture_bounded(argv []string, env map[string]string, host_arch string, directory string,
+	timeout int, should_cancel fn () bool) !CapturedCommand {
 	mut output_pipe := [2]i32{}
 	mut error_pipe := [2]i32{}
 	if C.pipe(&output_pipe[0]) != 0 {
@@ -424,6 +433,11 @@ pub fn capture_both_preferred(argv []string, env map[string]string, host_arch st
 	initialized := C.posix_spawn_file_actions_init(&actions)
 	if initialized != 0 { return file_error('', initialized) }
 	defer { C.posix_spawn_file_actions_destroy(&actions) }
+	if directory != '' {
+		if directory.contains('\x00') { return error('embedded null byte') }
+		changed := C.posix_spawn_file_actions_addchdir_np(&actions, directory.str)
+		if changed != 0 { return file_error(directory, changed) }
+	}
 	for configured in [C.posix_spawn_file_actions_adddup2(&actions, output_pipe[1], 1),
 		C.posix_spawn_file_actions_adddup2(&actions, error_pipe[1], 2),
 		C.posix_spawn_file_actions_addclose(&actions, output_pipe[0]),
@@ -434,6 +448,8 @@ pub fn capture_both_preferred(argv []string, env map[string]string, host_arch st
 	}
 	pid := spawn_command_preferred(argv, env, &actions,
 		[output_pipe[0], output_pipe[1], error_pipe[0], error_pipe[1]], host_arch)!
+	started := time.sys_mono_now()
+	bounded := timeout >= 0 || should_cancel != unsafe { nil }
 	mut reaped := false
 	defer {
 		if !reaped {
@@ -451,7 +467,8 @@ pub fn capture_both_preferred(argv []string, env map[string]string, host_arch st
 	mut errors := strings.new_builder(8192)
 	mut buffer := [8192]u8{}
 	for output_read_open || error_read_open {
-		if C.poll(&descriptors[0], 2, -1) < 0 {
+		capture_checkpoint(started, timeout, should_cancel)!
+		if C.poll(&descriptors[0], 2, if bounded { 100 } else { -1 }) < 0 {
 			number := C.errno
 			if number == C.EINTR { continue }
 			return file_error('', number)
@@ -473,7 +490,27 @@ pub fn capture_both_preferred(argv []string, env map[string]string, host_arch st
 			if index == 0 { output.write(buffer[..int(count)])! } else { errors.write(buffer[..int(count)])! }
 		}
 	}
-	status := wait(pid)!
+	mut status := 0
+	if bounded {
+		mut raw := i32(0)
+		for {
+			capture_checkpoint(started, timeout, should_cancel)!
+			result := C.waitpid(pid, &raw, C.WNOHANG)
+			if result == pid {
+				status = if C.WIFEXITED(raw) != 0 { int(C.WEXITSTATUS(raw)) } else { -int(C.WTERMSIG(raw)) }
+				break
+			}
+			if result < 0 && C.errno != C.EINTR { return file_error('', C.errno) }
+			time.sleep(10 * time.millisecond)
+		}
+	} else { status = wait(pid)! }
 	reaped = true
 	return CapturedCommand{status, output.str(), errors.str()}
+}
+
+fn capture_checkpoint(started u64, timeout int, should_cancel fn () bool) ! {
+	if should_cancel != unsafe { nil } && should_cancel() { return error_with_code('Host test interrupted', 130) }
+	if timeout >= 0 && time.sys_mono_now() - started >= u64(timeout) * u64(time.second) {
+		return error('Command timed out after ' + timeout.str() + ' seconds')
+	}
 }

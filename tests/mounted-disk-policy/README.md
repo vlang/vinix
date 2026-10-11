@@ -33,7 +33,7 @@ issued DMA.
 Build tracked production kernels on both architectures, then run:
 
 ```sh
-V=/path/to/v python3 tests/mounted-disk-policy/host.py
+V=/path/to/v tests/mounted-disk-policy/host
 tests/mounted-disk-policy/check-generated --arch=aarch64 kernel/obj/blob.c
 tests/mounted-disk-policy/check-generated --arch=amd64 build-amd64-kernel/obj/blob.c
 VINIX_VM_RUNNER_ROOT=/path/to/vinix \
@@ -67,7 +67,7 @@ synchronous libc calls. The permanent 512-byte buffers use static storage.
 No V allocator is imported by the native fixture object. The 50 warmup batches,
 6,000 measured denials, `after <= old + 16` slab assertion, all source-consumption
 and offset checks, 128 writeback operations and original 300-second guest
-allowance remain unchanged. `host.py` and native `check-generated` remain independent
+allowance remain unchanged. Native `host` and `check-generated` remain independent
 production-policy checks; their embedded C fixtures are a separate migration
 scope.
 

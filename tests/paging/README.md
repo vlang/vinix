@@ -21,7 +21,7 @@ active writes, pending mounts, mounted extents, overlapping aliases and disjoint
 devices:
 
 ```sh
-V=/path/to/v python3 tests/mounted-disk-policy/host.py
+V=/path/to/v tests/mounted-disk-policy/host
 ```
 
 Build the kernels in isolated worktrees with their untracked dependencies linked,

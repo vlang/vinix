@@ -21,6 +21,10 @@ encrypted-swap staging and the independent 6,144-case production policy oracle.
 The [filesystem commands](filesystem-tools.md) provide native resource
 accounting, read-ahead and sparse-file power-cut/restart workflows.
 
+The [host policy commands](host-tests.md) provide the independent hypervisor ABI
+differential, mounted-disk admission, securelevel parser, append allocation guard
+and attribute-publication fault checks.
+
 ```sh
 build-support/steam/compile-v-robust OUTPUT [--i386] [--host]
 tests/steam/test-robust-list [--output-dir FRESH-DIR] [--native]
