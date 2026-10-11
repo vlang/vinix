@@ -175,10 +175,12 @@ fn stage(root string, dest string) ! {
 		}
 		os.write_file(vml, source)!
 	}
-	for name in ['file_dialog_linux.v', 'message_box_linux.v'] {
-		path := '${modules}/ui2/linux/${name}'
-		if os.exists(path) {
-			os.write_file(path, os.read_file(path)!.replace('os.execute(command)', "os.exec(['/bin/sh', '-c', command])"))!
+	for directory in ['ui', 'linux'] {
+		for name in ['file_dialog_linux.v', 'message_box_linux.v'] {
+			path := '${modules}/ui2/${directory}/${name}'
+			if os.exists(path) {
+				os.write_file(path, os.read_file(path)!.replace('os.execute(command)', "os.exec(['/bin/sh', '-c', command])"))!
+			}
 		}
 	}
 	calculator := os.read_file('${ui}/examples/calculator/main.v')!
@@ -378,7 +380,8 @@ fn publish(root string) ! {
 
 fn cross_build(root string, dest string, v string, arch string) ! {
 	stage(root, dest)!
-	args := ['-new-compiler', '-nocache', '-os', 'linux', '-arch', arch, '-gc', 'none', '-manualfree',
+	// Guest binaries must embed VML/data assets; host build paths are absent.
+	args := ['-new-compiler', '-nocache', '-prod', '-os', 'linux', '-arch', arch, '-gc', 'none', '-manualfree',
 		'-enable-globals', '-d', 'ui2_headless', '-path',
 		'@vlib|${dest}/modules|@vmodules|${root}|${root}/third_party', '-o', '${dest}/desktop.c',
 		dest]
