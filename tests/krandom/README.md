@@ -12,7 +12,7 @@ libc consumes the borrowed cursor before the producer returns. Run its native
 integer/float/long-double/stack oracle on either architecture:
 
 ```sh
-python3 tests/krandom/run_hooks.py --arch aarch64 \
+tests/krandom/run-hooks --arch aarch64 \
   --kernel-dir /path/to/kernel --state-dir /path/to/new/guest
 ```
 

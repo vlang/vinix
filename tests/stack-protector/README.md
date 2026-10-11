@@ -24,7 +24,7 @@ zero, all-one and high-bit values. Allocator imports are rejected. The actual
 fault probes and recovery labels live in architecture assembly files and are
 exercised by the opt-in kernel-stack-guards QEMU fixtures.
 
-`python3 run_diagnostic.py --arch aarch64 --kernel-dir /path/to/kernel
+`./run-diagnostic --arch aarch64 --kernel-dir /path/to/kernel
 --state-dir /path/to/new/guest` runs the same oracle with the unchanged V
 diagnostic policy on a native guest. Use `--arch x86_64` and `CC_AMD64` for
 the other architecture. The original 55-line C oracle is recoverable at

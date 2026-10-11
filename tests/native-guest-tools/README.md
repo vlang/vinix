@@ -1,5 +1,8 @@
 # Native guest commands
 
+The [independent policy commands](policy-guests.md) also provide native tracker,
+console, stack-diagnostic, random-hook and public hypervisor ABI checks.
+
 These commands compile and run V directly:
 
 ```sh

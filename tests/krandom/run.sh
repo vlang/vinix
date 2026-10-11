@@ -36,7 +36,7 @@ case "$(uname -m)" in
     x86_64|amd64) native_arch=x86_64 ;;
     *) echo 'Unsupported random-generator host ABI' >&2; exit 1 ;;
 esac
-V="$v" python3 "$root/tests/krandom/compile-v-hooks.py" --arch "$native_arch" \
+V="$v" "$root/tests/krandom/compile-hooks" --arch "$native_arch" \
     "$work/host.o" "$cc" -O2 -Wall -Wextra -Werror
 # From the module's own directory, whose v.mod lets krandom find klock.
 cd "$work"

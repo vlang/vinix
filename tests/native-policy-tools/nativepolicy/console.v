@@ -4,7 +4,7 @@ module nativepolicy
 import hosttest
 import os
 
-fn prepare_console(work string) ! {
+pub fn prepare_console(work string) ! {
 	os.mkdir(work + '/policy')!
 	for name in ['policy', 'entries'] {
 		write(work + '/policy/' + name + '.v', read(root() + '/kernel/kprint/printf_' + name + '.v')!
@@ -18,6 +18,10 @@ fn prepare_console(work string) ! {
 	write(work + '/host.h', '#include <stdint.h>\nvoid fixture_serial(unsigned char, int);\nvoid fixture_terminal(char *, uint64_t);\nvoid fixture_kwrite(char *, uint64_t);\nvoid fixture_acquire(void);\nvoid fixture_release(void);\n')!
 	write(work + '/v.mod', "Module { name: 'print_test' }\n")!
 	write(work + '/entry.v', 'module main\nimport policy as _\n')!
+}
+
+pub fn generate_console(work string, output string, selected string, prod bool) ! {
+	generate_project(work, output, selected, prod, []string{})!
 }
 
 fn console() ! {
