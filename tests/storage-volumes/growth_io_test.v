@@ -2,6 +2,12 @@
 @[has_globals]
 module volumecli
 
+fn C.fork() i32
+fn C.dup2(i32, i32) i32
+fn C.waitpid(i32, &i32, i32) i32
+fn C._exit(i32)
+fn C.setvbuf(voidptr, &char, i32, usize) i32
+
 struct GrowthIO {
 mut:
 	parent  Status
@@ -11,6 +17,10 @@ mut:
 	creates int
 	grows   int
 	mode    int
+	discovered int
+	discover_fail_at int
+	reads [2]int
+	expected_writable bool
 }
 
 __global growth_io GrowthIO
@@ -86,19 +96,21 @@ fn growth_mock_open(path &char, flags i32) i32 {
 }
 
 fn growth_mock_close(fd i32) i32 {
-	assert fd >= 200 && fd < 264 && growth_io.balance > 0
+	assert (fd == 100 || fd == 101 || (fd >= 200 && fd < 264)) && growth_io.balance > 0
 	growth_io.balance--
 	return 0
 }
 
 fn growth_mock_pread(fd i32, output voidptr, size usize, offset i64) i64 {
-	assert fd == 100 && size == 1024 && offset == 0
+	assert (fd == 100 || fd == 101) && size == 1024 && offset == 0
+	growth_io.reads[fd - 100]++
 	unsafe {
 		for i in 0 .. 1024 {
 			(&u8(output))[i] = 0
 		}
 	}
-	put_le(&u8(output), 440, 4, 0x12345678)
+	identity := if growth_io.mode == 5 && growth_io.reads[fd - 100] == 3 { u32(0xdeadbeef) } else { u32(0x12345678 + fd - 100) }
+	put_le(&u8(output), 440, 4, identity)
 	put_le(&u8(output), 510, 2, 0xaa55)
 	return 1024
 }
@@ -106,13 +118,14 @@ fn growth_mock_pread(fd i32, output voidptr, size usize, offset i64) i64 {
 fn growth_mock_ioctl(fd i32, request u64, output voidptr) i32 {
 	if request == 0x56560004 {
 		unsafe {
-			*(&Status(output)) = if fd == 100 { growth_io.parent } else { growth_io.views[fd - 200] }
+			*(&Status(output)) = if fd == 100 || fd == 101 { growth_io.parent } else { growth_io.views[fd - 200] }
+			if fd == 101 { (&Status(output)).disk_id = 9 }
 		}
 		return 0
 	}
 	row := unsafe { *(&Request(output)) }
 	if request == 0x56560001 {
-		assert fd == 100
+		assert fd == 100 || fd == 101
 		growth_io.creates++
 		if growth_io.mode == 2 {
 			unsafe {
@@ -127,7 +140,7 @@ fn growth_mock_ioctl(fd i32, request u64, output voidptr) i32 {
 			bytes:      row.length
 			sector:     512
 			flags:      12 | row.flags
-			disk_id:    7
+			disk_id:    if fd == 100 { u64(7) } else { u64(9) }
 			start:      row.offset
 			slot:       row.slot
 			generation: 100
@@ -146,6 +159,94 @@ fn growth_mock_ioctl(fd i32, request u64, output voidptr) i32 {
 	assert row.length > growth_io.views[fd - 200].bytes
 	growth_io.views[fd - 200].bytes = row.length
 	return 0
+}
+
+fn growth_mock_discover(plan &Plan, directory &char, writable bool, name &char) i32 {
+	assert C.strcmp(directory, c'/dev') == 0 && writable == growth_io.expected_writable
+	growth_io.discovered++
+	if growth_io.discovered == growth_io.discover_fail_at { return -1 }
+	assert growth_io.discovered <= 2 && plan.key.id[0] == u8(0x77 + growth_io.discovered)
+	C.snprintf(name, 256, c'mock%u', u32(growth_io.discovered))
+	growth_io.balance++
+	return i32(99 + growth_io.discovered)
+}
+
+fn growth_check_set(mut set PlanSet) {
+	mut plan := growth_fixture()
+	assert append_plan(mut set, &plan)
+	put_le(&plan.key.id[0], 0, 4, 0x12345679)
+	plan.count = 1
+	plan.rows[0].slot = 9
+	assert append_plan(mut set, &plan)
+}
+
+fn test_read_only_set_check_preflights_all_disks_captures_actions_and_closes_without_application() {
+	mut set := PlanSet{}
+	growth_check_set(mut set)
+	growth_io.exists[5] = true
+	growth_io.views[5] = Status{version: 1, bytes: 8192, sector: 512, flags: 13,
+		disk_id: 7, start: 2097152, slot: 5, generation: 100}
+	before := growth_io.views
+	mut state := SetRestore{}
+	assert prepare_plan_set(&set, mut state, true, false)
+	assert state.opened == 2 && restore_action(&state.states[0], 0) == 2
+	assert restore_action(&state.states[0], 1) == 1 && state.states[0].generation[1] == 100
+		&& state.states[0].previous_bytes[1] == 8192
+	assert restore_action(&state.states[1], 0) == 0
+	close_plan_set(&state)
+	assert growth_io.balance == 0 && growth_io.views == before
+	growth_io.discovered = 0
+	assert check_plan_set(&set, true) == 0 && growth_io.balance == 0
+	assert growth_io.grows == 0 && growth_io.creates == 0 && growth_io.views == before
+}
+
+fn test_set_check_closes_retained_disks_on_late_discovery_preflight_and_identity_failures() {
+	for failure in 0 .. 4 {
+		mut set := PlanSet{}
+		growth_check_set(mut set)
+		if failure == 0 { growth_io.discover_fail_at = 2 }
+		if failure == 1 {
+			growth_io.exists[9] = true
+			growth_io.views[9] = growth_io.views[2]
+			growth_io.views[9].disk_id = 9
+			growth_io.views[9].slot = 9
+			growth_io.views[9].start = 3145728
+		}
+		if failure == 2 { growth_io.mode = 5 }
+		before := growth_io.views
+		assert check_plan_set(&set, failure != 3) == 1
+		assert growth_io.balance == 0 && growth_io.grows == 0 && growth_io.creates == 0
+		assert growth_io.views == before
+	}
+}
+
+fn test_shared_set_preflight_preserves_writable_restoration_and_in_place_growth() {
+	mut set := PlanSet{}
+	growth_check_set(mut set)
+	growth_io.expected_writable = true
+	assert restore_plan_set_mode(&set, true) == 0 && growth_io.balance == 0
+	assert growth_io.grows == 1 && growth_io.creates == 2
+	assert growth_io.views[2].generation == 99 && growth_io.views[9].disk_id == 9
+}
+
+fn test_set_check_closes_every_disk_when_its_buffered_report_cannot_flush() {
+	mut set := PlanSet{}
+	growth_check_set(mut set)
+	assert C.fflush(C.stdout) == 0
+	child := C.fork()
+	assert child >= 0
+	if child == 0 {
+		fd := C.open(c'/dev/null', C.O_RDONLY)
+		if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }
+		C.close(fd)
+		mut buffer := [4096]char{}
+		if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+		result := check_plan_set(&set, true)
+		clean := growth_io.balance == 0 && growth_io.grows == 0 && growth_io.creates == 0
+		C._exit(if result == 1 && clean { 0 } else { 4 })
+	}
+	mut status := i32(-1)
+	assert C.waitpid(child, &status, 0) == child && status == 0
 }
 
 fn test_growth_restore_is_opt_in_and_keeps_generations_with_idempotent_replay() {

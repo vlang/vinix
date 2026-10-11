@@ -35,11 +35,15 @@ fn planned_growth(parent &char, other &char) {
 		}
 		tool(c'plan-grow', c'/root/saved.vset', c'12', c'8192', &char(nil), 1)
 		bundle_unchanged(c'/root/saved.vset', &planned[0], size)
+		check_planned_bundle()
+		bundle_unchanged(c'/root/saved.vset', &planned[0], size)
 		simple(c'restore-bundle', c'/root/saved.vset', &char(nil), 1)
 		check(status(c'/dev/mapper/vinix2').bytes == 4096, c'default restore cannot grow')
 		// A conflict on the later disk must not grow the first disk's view.
 		simple(c'remove', c'/dev/mapper/vinix9', &char(nil), 0)
+		check_missing_bundle()
 		tool(c'create', other, c'9', c'3145728', c'4096', 0)
+		check_conflicting_bundle()
 		tool(c'restore-bundle', c'/root/saved.vset', c'grow', &char(nil), &char(nil), 1)
 		check(status(c'/dev/mapper/vinix2').bytes == 4096,
 			c'later disk preflight leaves capacity unchanged')
@@ -47,6 +51,7 @@ fn planned_growth(parent &char, other &char) {
 		tool(c'create', other, c'9', c'1048576', c'4096', 0)
 		// An unlisted extent in the extension also blocks growth before mutation.
 		tool(c'create', parent, c'12', c'1052672', c'4096', 0)
+		check_conflicting_bundle()
 		tool(c'restore-bundle', c'/root/saved.vset', c'grow', &char(nil), &char(nil), 1)
 		check(status(c'/dev/mapper/vinix2').bytes == 4096,
 			c'extension overlap leaves capacity unchanged')
@@ -75,5 +80,6 @@ fn planned_growth(parent &char, other &char) {
 		// Publish the resulting geometry for ordinary boot replay after reboot.
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, other, &char(nil), 0)
 		C.printf(c'PLAN GROWTH PASSED: offline planning, complete preflight, in-place capacity and stable descriptors\n')
+		C.printf(c'PLAN CHECK PASSED: offline identities, read-only action preview, complete preflight and unchanged mappings\n')
 	}
 }

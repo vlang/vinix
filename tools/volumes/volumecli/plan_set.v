@@ -13,6 +13,7 @@ mut:
 
 struct SetRestore {
 mut:
+	opened int
 	fds [64]i32
 	states [64]RestoreState
 }
@@ -131,32 +132,47 @@ fn restore_plan_set_mode(set &PlanSet, grow bool) i32 {
 	if set.count == 0 { return 0 }
 	mut state := unsafe { &SetRestore(C.alloca(sizeof(SetRestore))) }
 	unsafe { *state = SetRestore{} }
-	mut opened := 0
-	defer { for i := 0; i < opened; i++ { C.close(state.fds[i]) } }
+	defer { close_plan_set(state) }
+	if !prepare_plan_set(set, mut state, grow, true) { return 1 }
+	for i := 0; i < set.count; i++ {
+		if apply_restore(state.fds[i], unsafe { &set.plans[i] }, unsafe { &state.states[i] }) != 0 { return 1 }
+	}
+	return 0
+}
+
+// The caller owns every descriptor published in state, even on failure.
+// Checking uses readable disks; application retains its ordinary writable opens.
+@[direct_array_access]
+fn prepare_plan_set(set &PlanSet, mut state SetRestore, grow bool, writable bool) bool {
+	if set.count < 0 || set.count > 64 || (set.count > 0 && !bundle_set_valid(set)) {
+		plan_error(c'invalid plan set'); return false
+	}
 	for i := 0; i < set.count; i++ {
 		plan := unsafe { &set.plans[i] }
 		mut name := [256]char{}
-		fd := discover_disk(plan, c'/dev', plan_writable(plan), &name[0])
-		if fd < 0 { return 1 }
+		fd := discover_disk(plan, c'/dev', writable && plan_writable(plan), &name[0])
+		if fd < 0 { return false }
 		state.fds[i] = fd
-		opened++
+		state.opened++
 		C.printf(c'vinix-volume: matched /dev/%s\n', &name[0])
-		if !prepare_restore_mode(fd, plan, mut state.states[i], grow) { return 1 }
+		if !prepare_restore_mode(fd, plan, mut state.states[i], grow) { return false }
 		for j := 0; j < i; j++ {
 			if state.states[i].parent.disk_id == state.states[j].parent.disk_id {
-				return plan_error(c'multiple plans resolved to the same physical disk')
+				plan_error(c'multiple plans resolved to the same physical disk'); return false
 			}
 		}
 	}
 	// Recheck every retained disk after the last plan's preflight. No path is
 	// reopened and no create is issued until this pass succeeds for the set.
 	for i := 0; i < set.count; i++ {
-		if !verify_restore_disk(state.fds[i], unsafe { &set.plans[i] }, unsafe { &state.states[i].parent }) { return 1 }
+		if !verify_restore_disk(state.fds[i], unsafe { &set.plans[i] }, unsafe { &state.states[i].parent }) { return false }
 	}
-	for i := 0; i < set.count; i++ {
-		if apply_restore(state.fds[i], unsafe { &set.plans[i] }, unsafe { &state.states[i] }) != 0 { return 1 }
-	}
-	return 0
+	return true
+}
+
+@[direct_array_access]
+fn close_plan_set(state &SetRestore) {
+	for i := 0; i < state.opened; i++ { C.close(state.fds[i]) }
 }
 
 fn restore_set_directory(path &char) i32 {

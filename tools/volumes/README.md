@@ -47,6 +47,11 @@ growth after complete-set preflight, retaining generations and open descriptors.
 Ordinary and boot replay retain exact-size matching for existing views. See
 [capacity planning and replay](../../docs/storage-volumes.md#planned-capacity-growth).
 
+`show-bundle BUNDLE` displays verified saved identities and mapping geometry
+offline. `check-bundle BUNDLE [grow]` opens devices read-only and uses restoration's
+complete-set preflight to preview create/keep/grow actions and captured generations.
+See [inspection and check limits](../../docs/storage-volumes.md#bundle-inspection-and-preflight).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

@@ -283,6 +283,47 @@ in place; replay resumes from matching entries. The saved desired lengths remain
 published even if runtime application fails. An explicit growth replay is needed
 to resume a live view that is still smaller than its saved plan.
 
+## Bundle inspection and preflight
+
+```sh
+vinix-volume show-bundle /root/capacity.vset
+vinix-volume check-bundle /root/capacity.vset
+# Preview a plan that explicitly allows existing smaller views to grow:
+vinix-volume check-bundle /root/capacity.vset grow
+vinix-volume restore-bundle /root/capacity.vset grow
+```
+
+`show-bundle BUNDLE` validates the complete checksummed configuration and prints
+each disk's size, sector size and MBR signature or canonical GPT GUID, followed
+by its mapping slots, offsets, desired lengths and read-only modes. Disk numbers
+in this report are indices in the bundle's saved order. Inspection works offline
+and opens only the saved file. It accepts the same bounded regular-file format
+and rejects final symlinks and corruption without changing the file.
+
+`check-bundle BUNDLE [grow]` discovers the saved physical disks and runs the same
+complete-set preflight as restoration, opening devices read-only. It checks disk
+identity/geometry, requested slots and existing extents, including unlisted views
+in a planned extension. Every retained disk identity is rechecked after the last
+disk's preflight. A malformed file, missing or ambiguous disk, wrong existing
+mapping or extent conflict returns failure. Action rows are printed only after
+the entire set passes.
+
+Each row reports `action=create`, `action=keep` or `action=grow`, the slot and
+offset, current and desired lengths, read-only mode and captured generation.
+Missing views report zero current length and generation. A final line counts
+each action. Growth requires the explicit `grow` token, with the same matching
+rules as explicit growth replay; the default check requires existing lengths
+to match exactly. Checking creates or grows no mappings and preserves the bundle.
+Both report commands return failure if printing or flushing their output fails.
+
+A successful check describes current discovery and geometry. It does not reserve
+extents or test mutation-time management privileges, mounted/swap protection or
+resource limits. Administration must remain serialized, and applying the plan
+still performs the kernel's ordinary checks and generation/length revalidation.
+Read access suffices for a check even when the bundle describes writable views.
+
+See [inspection and preflight qualification](../tests/storage-volumes/check-bundle.md).
+
 ## Status ABI
 
 `tools/volumes/volumecli/volume.h` defines the native little-endian ABI shared by

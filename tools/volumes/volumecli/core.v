@@ -58,11 +58,21 @@ fn decimal(text &char) ?u64 {
 fn usage() i32 {
 	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume health DEVICE\n       vinix-volume monitor DEVICE INTERVAL_SECONDS [SAMPLES]\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n       vinix-volume save DEVICE PLAN\n       vinix-volume restore DEVICE PLAN\n       vinix-volume discover PLAN\n       vinix-volume restore-auto PLAN\n       vinix-volume restore-set DIRECTORY\n       vinix-volume boot-restore\n')
 	C.printf(c'       vinix-volume save-set BUNDLE DEVICE [DEVICE ...]\n       vinix-volume plan-grow BUNDLE SLOT LENGTH_BYTES\n       vinix-volume restore-bundle BUNDLE [grow]\n')
+	C.printf(c'       vinix-volume show-bundle BUNDLE\n       vinix-volume check-bundle BUNDLE [grow]\n')
 	return 2
 }
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'show-bundle') == 0 {
+			if argc != 3 { return usage() }
+			return inspect_bundle(argv[2], false, false)
+		}
+		if argc >= 2 && C.strcmp(argv[1], c'check-bundle') == 0 {
+			if argc != 3 && argc != 4 { return usage() }
+			if argc == 4 && C.strcmp(argv[3], c'grow') != 0 { return usage() }
+			return inspect_bundle(argv[2], true, argc == 4)
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'save-set') == 0 {
 			if argc < 4 || argc > 67 { return usage() }
 			return save_bundle(argv[2], int(argc - 3), argv + 3)

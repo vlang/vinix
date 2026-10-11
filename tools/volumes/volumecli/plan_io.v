@@ -306,10 +306,10 @@ fn prepare_restore_mode(fd i32, plan &Plan, mut state RestoreState, grow bool) b
 						plan_error(c'plan conflicts with an existing mapping'); return false
 					}
 					state.grow[i] = true
-					state.generation[i] = status.generation
-					state.previous_bytes[i] = status.bytes
 				}
 				state.present[i] = true
+				state.generation[i] = status.generation
+				state.previous_bytes[i] = status.bytes
 			} else if status.flags & 8 != 0 && status.disk_id == state.parent.disk_id {
 				if status.start > plan.key.bytes || status.bytes > plan.key.bytes - status.start {
 					plan_error(c'existing mapping has incompatible geometry'); return false
