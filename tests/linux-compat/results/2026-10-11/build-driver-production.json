@@ -1,0 +1,39 @@
+{
+    "architecture": "aarch64",
+    "commands": [
+        [
+            "/Users/alex/.local/bin/v",
+            "-os",
+            "linux",
+            "-arch",
+            "arm64",
+            "-gc",
+            "none",
+            "-prod",
+            "-o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-driver-production-release/workloads.c",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-roadmap/tools/linux-compat/workloads"
+        ],
+        [
+            "clang",
+            "--target=aarch64-linux-musl",
+            "--sysroot=/Volumes/VIssueFix1011/vinix-linux-posix-roadmap/build-aarch64-userland/sysroot",
+            "-fuse-ld=lld",
+            "-L/Volumes/VIssueFix1011/vinix-linux-posix-roadmap/build-aarch64-userland/sysroot/lib",
+            "-static",
+            "-pthread",
+            "-w",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-driver-production-release/workloads.c",
+            "-lm",
+            "-o",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-driver-production-release/linux-compat-workloads"
+        ]
+    ],
+    "inputs": {
+        "tools/linux-compat/workloads/main.v": "ecee5a5954aac25819f7c60e9144083394680b810b5e99c67c0faf5b0133af3f",
+        "tests/go/smoke.go": "f58f7865f0d668a13f2fe0a81f56b45cbe1cda463da4aa57cd17c6b9c0711fb5",
+        "tests/java/VinixJavaSmoke.java": "3db7a5dbb4eb3e6e1387680b5570a211417bc1adc25686d04c5b0da0cb77a92d",
+        "generated_c": "9144ecd22e59e419426421b00126aed7d6f0876928fb86a8e1e52e11c730c7cc"
+    },
+    "executable_sha256": "e43c661b2f914fbe44b2fff75f2ca18d436c2af376e3bf87796736e48f89f0cd"
+}

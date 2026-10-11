@@ -64,7 +64,7 @@ fn main() {
 			}, '-d', 'nofloat']
 	} else {
 		[compiler, '-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
-			'-gc', 'none', '-o', work + '/workloads.c', root + '/tools/linux-compat/workloads']
+			'-gc', 'none', '-prod', '-o', work + '/workloads.c', root + '/tools/linux-compat/workloads']
 	}
 	mut compile := []string{}
 	i386_sdk := if arch == 'i386' { os.getenv('VINIX_I386_SYSROOT') } else { '' }

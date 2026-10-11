@@ -69,8 +69,10 @@ Flatpak/Snap or every glibc software dependency.
 
 Cross-build static musl executables with the maintained V builder. It generates
 C through V, invokes the selected target compiler and verifies the ELF machine
-and class. The output directory must be fresh; `build.json` records sources,
-generated C, command arguments and executable hashes. Both modes currently name
+and class. Production mode embeds the Go/Java application sources in the driver
+so they are available inside the guest. The output directory must be fresh;
+`build.json` records sources, generated C, command arguments and executable hashes.
+Both modes currently name
 their output `linux-compat-workloads`, so keep the driver and probe in different
 directories:
 

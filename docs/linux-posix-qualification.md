@@ -65,8 +65,19 @@ Those Darwin results validate workload predicates and report handling only.
 They are not Vinix application results. Host tests also verify that a missing
 executable, a nonzero command and an actual timeout cannot produce success.
 
-Outstanding dependencies include the browser/office/media and Go/Java/V
-packages in the prepared guest roots, D-Bus and a real portal backend,
+A later, separate AArch64 guest with the existing staged Go 1.23.9 toolchain
+passes compilation and execution of the Go application fixture: filesystem
+create/read/truncate/append/rename/link/enumeration, 16 goroutines and channels,
+timers, a subprocess, SHA-256, randomness and TCP loopback. Its report, input
+receipt and production driver build are checked in as `go-aarch64.json`,
+`inputs-go-aarch64.json` and `build-driver-production.json`. The driver embeds
+application sources and sets the trimmed Alpine toolchain's GOROOT, private
+cache and CGO_ENABLED=0 in its child environment. This qualifies that pure-Go
+workload; cgo, x86-64 Go, toolchain installation/update and desktop integration
+remain separate. The original minimal-root catalog reports remain unchanged.
+
+Outstanding dependencies include the browser/office/media and Java/V
+packages, Go on unqualified paths, D-Bus and a real portal backend,
 systemd/service-unit integration, Flatpak/Snap/FUSE and enforced Linux sandbox
 interfaces, and title-specific game assets, GPU/audio/input and vendor APIs.
 The [behavior matrix](linux-posix-compatibility.md) lists the broader limits.

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "cases": "go",
+    "inputs": {
+        "kernel": "f5f79311ed5b7d880a485d593ff98076630dc06d18665bc8ac72c328694aafe1",
+        "workloads": "e43c661b2f914fbe44b2fff75f2ca18d436c2af376e3bf87796736e48f89f0cd",
+        "runtime-probe": "8c7f44cdbb35924233d177b367377a8644eeffc849a24cf0e5cecd3727b1b395",
+        "rootfs_manifest": "6c0b4c50aaff62260a87dc8d73ac0ab005020de6ee6a17357445bcf0bbe037ec",
+        "init_source": "27356f2eb32a687a08bdf9611e115b571d689ce8b4f65470709cffa338e7a9b0",
+        "guest_report": "7c4e2e8886e6d8d28a521d7e2ff4ffafeb2c1880dd00f0dc5447a89d4a80fd9e",
+        "snapshot_kernel": "f5f79311ed5b7d880a485d593ff98076630dc06d18665bc8ac72c328694aafe1"
+    },
+    "exit_code": 0
+}
