@@ -55,7 +55,7 @@ pub fn stage(destination string, compiler string, v string, revision string) ! {
 }
 
 pub fn cli(argv []string) int {
-	args := hosttest.parse_arguments(argv, [hosttest.Option{'cc', true, []string{}}, hosttest.Option{'v', true, []string{}}, hosttest.Option{'revision', true, []string{}}], 1, 'stage_host_gpu <staged-desktop-directory> [--cc CC] [--v V] [--revision COMMIT]', 'stage_host_gpu') or { eprintln(err); return if err.code() == 0 { 0 } else { 2 } }
-	stage(args.positional[0], args.options['cc'] or { hosttest.env_default('CC', 'clang') }, args.options['v'] or { os.getenv('V') }, args.options['revision'] or { 'HEAD' }) or { eprintln(err); return if policyhost.command_interrupted() { 130 } else { 1 } }
+	args := hosttest.parse_arguments(argv, [hosttest.Option{'--cc', true, []string{}}, hosttest.Option{'--v', true, []string{}}, hosttest.Option{'--revision', true, []string{}}], 1, 'stage_host_gpu <staged-desktop-directory> [--cc CC] [--v V] [--revision COMMIT]', 'stage_host_gpu') or { eprintln(err); return 2 }
+	stage(args.positional[0], args.options['--cc'] or { hosttest.env_default('CC', 'clang') }, args.options['--v'] or { os.getenv('V') }, args.options['--revision'] or { 'HEAD' }) or { eprintln(err); return if policyhost.command_interrupted() { 130 } else { 1 } }
 	return 0
 }
