@@ -1,0 +1,151 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7b813404cf5dbc76a07aab724b0ae12b074bdf3ef8e9930f7739e4f3f7107bfc",
+    "results": [
+        {
+            "name": "mapstorage",
+            "source_sha256": "36373f2f43d3c92564c53df64071c885f3fee8917fcf7185c9485b09da1da7b4",
+            "init_sha256": "d9d36e4c1429f4f6996bfb436642105bf143fdea5842260dd79e9432c5f9f407",
+            "iso_sha256": "42aca6ee1f5172d3f4c5d54ea0855b801af2aeb2ceae8705971e6e338c5be33d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "budget",
+            "source_sha256": "b6d09c5deb0048fb444c99daf3da0a04a25ac38300857fd231b9ec5ef1348dc6",
+            "init_sha256": "a48e7593658c4df9de94b128d1dddb2bacd98abfe5c1db1ea1829e9a6d6ad5b5",
+            "iso_sha256": "e5d1796a2901d8f3d84c9d79ba412e53c824742dd0e3904c88e6bffc3e359c42",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "mmap",
+            "source_sha256": "110291a245baf0ed947d3575dcc54b97006d532d3a6265572697b90d8a3fa624",
+            "init_sha256": "4a9853f7d497e8b6cc13f35297fc46454440f919f47265da0ddac263d4666132",
+            "iso_sha256": "f2febbbb615f5383d320207e87fbf7a0876c1c12eef34973b0398a5b0ea48f8f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sparsefork",
+            "source_sha256": "c81c3b9566ec76cd4b52cc3e3aa8eaf9ac29cb0d9bc4d96c8f97a6f48f8198a3",
+            "init_sha256": "adb00bb71b464d4b81ab17079ee3e822a0e94dc0ca683347cb61891a92a2130a",
+            "iso_sha256": "3d15135aeb86e7dea349be58ba1785505f5ca09d6079878bdcff11bc16b771f3",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "bpf",
+            "source_sha256": "c9808ba6ef87fc5e28f98a586d944f86f754a8081faa02259f01993e9eb80e16",
+            "init_sha256": "de2e1606a6d221b59ba43535b921587e0a75977f177c627a917e0c06d7a006d6",
+            "iso_sha256": "e8785ef917bb9e65d2bad445bf724de707d75d8f458cf0eb56939f0f29555b97",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "access",
+            "source_sha256": "0beb5ce37d58a5dff50b24f5ce87bd479bc39718d39b29490e72076183b2c1db",
+            "init_sha256": "a828228da509bfd306fe2b3636e131aa5e5f1bb750042b26d2ffbe558fb1dbf9",
+            "iso_sha256": "8d3387b5799544b673d796b4fdaa2c778bdc0f10fca3868be4aee5379fde5123",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "fded00f015b042d6ee2f0ebd39b2940847622d7637e0c4bf6938f137a102181b",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "1f8e87a46e32c9743248a4727e1b2340e30933e3d949b604a3eb5572db5678f3",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "namespace",
+            "source_sha256": "50262bc779a7d3114c9db4499152d668acd8085670904d81b9c85d74b92fcef9",
+            "init_sha256": "4773d9d69b3b77c2456dda9276efc40866a8ebb94fc25977a504f101161403f9",
+            "iso_sha256": "2337de4cbd1c8ef36fedd76effc82014907d018667a95db3c35c5b4005e9b0a8",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sharedmem",
+            "source_sha256": "99ee2c57a20feb6bcf30b333373985c214e4142769506e76374626e4ccc71f44",
+            "init_sha256": "f013d12f9f1faa2f7136eb171d1197102b306e780f6a89c18db77a05fd420676",
+            "iso_sha256": "2a6aa1d7c2f41c8e4790cc42a60ba393c958583ad76f2a7ec34647def4535698",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccomp",
+            "source_sha256": "fa786d3dbf56b7a0ad48273a8f2ac09984d6c22a9e9930bda91b8f7711d25dc3",
+            "init_sha256": "2ae611cb0aa90bdc3b55c8af460cbe3c588a31afc6bbf5af07db4904ef018c98",
+            "iso_sha256": "7c3b4e5903863426ca64db0afbaddfe2a866456940d26ce2404e08f1919900b0",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futex",
+            "source_sha256": "2319eb993ee19d6abf7cc94e5f5921ae2c98d45640e9061584e2cfcad4872743",
+            "init_sha256": "51e001499fcbc5a47a320e8e8812a92c5c7b131669778ce4927a02e2ee58222c",
+            "iso_sha256": "d6574b533352500b09fac0ddc44b5a18065b6d2ac067f3fbe7c9bf7fd2cc2a1c",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexkeys",
+            "source_sha256": "37381c372e83aa88069bb9b62b0c2f50216e0307a4ace701a007b6e4fdd17227",
+            "init_sha256": "fa558c7baa355d024387891b68198c9409da538bf72e6ce3076fbab08db657d9",
+            "iso_sha256": "b4339f2153cb244a331680ae68dbdafe7e67184749696f7de232da521505d422",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexbits",
+            "source_sha256": "6e28bf81420fbc4befe541d0dac72d6ddea475bb5571aeb325da2fb625398e35",
+            "init_sha256": "5c52de8a0e4ae7823d71c3ec22d87142616a486fd068d9e65c9e5bda28e8f00b",
+            "iso_sha256": "523004ad5809e5509b6272819377a787c224bd2dcdd5c3157db0bd416e1f01ea",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexop",
+            "source_sha256": "b106beee9e10b1e75c9417d4294421011e05cb06d4a8172c26844b5b3432c483",
+            "init_sha256": "7a89bc0fb0c416b36d31a83cdbf382751fdec6ce139db83344896d2de0c830f9",
+            "iso_sha256": "7c4aecae1704f06d092b00f0760dbdee1f7610767ad3c109799a27323aa513ae",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexerror",
+            "source_sha256": "23ae970412d591bebeb69133d9370591e17bbc9cb56d2f500871b8360dd6a451",
+            "init_sha256": "8460b10c8225b26326c7de058dd3321efbeabccd223e47f706e7e5a0fe4ae470",
+            "iso_sha256": "ba5579bdd055be67c15531e8c1c4c6825375ccdfb18c06de95856331f5950b63",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexqueue",
+            "source_sha256": "9c881bb3bad609ab72d2161a39a994486e0b222b6c053709c16754c5d3c1d9cf",
+            "init_sha256": "5b32b91c590bc5f83285435a354e9f47a1aaa1be693ddb57a355ecd3ec7aab42",
+            "iso_sha256": "0aca07d0d7835864fb70f6df91bda4d0d94d5db41f54c5ed2f00b796247cc598",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccompquery",
+            "source_sha256": "5637d2c445b75ada6741004a59b184b339020378c7bfd6427b47cec5455dbc77",
+            "init_sha256": "03c41879948e1f6de14a49ecea365cdd0b3046d83d8d6da350c7900ed7086b71",
+            "iso_sha256": "281d2089414e3f3fe85376305ba2fbf44f8d0196a6739eb9412336a1b2d3e31f",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

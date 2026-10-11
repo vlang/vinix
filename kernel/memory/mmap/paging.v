@@ -470,6 +470,10 @@ fn remap_shared_anonymous(mut pagemap memory.Pagemap, old_address u64, old_lengt
 		dont_fork:    local.dont_fork
 		wipe_on_fork: local.wipe_on_fork
 	})? @[freed]
+	ensure_range_capacity_unlocked(mut pagemap, pagemap.mmap_ranges.len + 3) or {
+		free_local_range(moved)
+		return none
+	}
 	if !prepare_mapping_lock_unlocked(&pagemap, process, moved, flags & mremap_fixed != 0,
 		old_length, MmapOptions{ credit_base: old_address, credit_serial: serial }) {
 		unsafe { free_local_range(moved) }
@@ -482,6 +486,11 @@ fn remap_shared_anonymous(mut pagemap memory.Pagemap, old_address u64, old_lengt
 		}
 	}
 	range_locals_lock.acquire()
+	global.ensure_local_capacity(global.locals.len + 1) or {
+		range_locals_lock.release()
+		free_local_range(moved)
+		return none
+	}
 	global.length = max_u64(global.length, u64(moved.offset - global.offset) + new_length)
 	global.add_local(moved)
 	range_locals_lock.release()

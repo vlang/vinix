@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "41707a18a64a1295de8c13d289b6533e25ddbe21ceb54b83dfe4bfb10c478f8e",
+    "results": [
+        {
+            "name": "mapstorage",
+            "source_sha256": "36373f2f43d3c92564c53df64071c885f3fee8917fcf7185c9485b09da1da7b4",
+            "init_sha256": "8e7538b0eff713a059bce021a79959eeda33f5bf032998a50e4307830a1264f1",
+            "iso_sha256": "77effaa9d077ad86edbac1cfd58bb347ff309249dc7cc3ce2d89667da5923ae8",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

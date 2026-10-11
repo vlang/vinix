@@ -67,7 +67,7 @@ pub fn new_pagemap() &Pagemap {
 }
 
 pub fn new_user_pagemap(owner kbudget.Owner) ?&Pagemap {
- charge := proc.reserve_kernel_for(owner, .mapping, page_size + u64(sizeof(Pagemap)) * 2 + 128)?
+ charge := proc.reserve_kernel_for(owner, .mapping, page_size + pagemap_storage_bytes(0)?)?
  if !user_room(1) { kbudget.release(charge); errno.set(errno.enomem); return none }
 	mut top_level := &u64(pmm_alloc_fallible(1))
 	if top_level == 0 {

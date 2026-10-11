@@ -105,7 +105,10 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			})?
-			split_off_unlocked(mut pagemap, local_range, postsplit_range)
+			split_off_unlocked(mut pagemap, local_range, postsplit_range) or {
+				free_local_range(postsplit_range)
+				return none
+			}
 		}
 
 		if snip_size == local_range.length {
@@ -124,7 +127,10 @@ fn mimmutable_unlocked(mut pagemap memory.Pagemap, base u64, length u64) ? {
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			})?
-			split_off_unlocked(mut pagemap, local_range, immutable_range)
+			split_off_unlocked(mut pagemap, local_range, immutable_range) or {
+				free_local_range(immutable_range)
+				return none
+			}
 		}
 		current = snip_end
 	}

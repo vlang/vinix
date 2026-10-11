@@ -3,6 +3,7 @@ module memory
 
 import kbudget
 import errno
+import vmstorage
 
 fn user_table_levels() int {
 	$if aarch64 {
@@ -30,11 +31,19 @@ fn table_page_count(table &u64, levels int, root bool) u64 {
 	return count
 }
 
-// Adopt an address space built before its Process existed, or initialize an
-// empty private shadow. Only unattached or locked page maps are passed here.
+pub fn pagemap_storage_bytes(capacity int) ?u64 {
+	if capacity < 0 { errno.set(errno.einval); return none }
+	object := vmstorage.allocation_bytes(u64(sizeof(Pagemap))) or { errno.set(errno.enomem); return none }
+	buffer := vmstorage.allocation_bytes(u64(capacity) * u64(sizeof(voidptr))) or { errno.set(errno.enomem); return none }
+	return object + buffer
+}
+
+// Adopt a standalone address space built before its Process existed. An
+// embedded shadow is already charged by its enclosing global range.
+// Only unattached or locked page maps are passed here.
 pub fn account_pagemap(mut pagemap Pagemap, owner kbudget.Owner) ? {
 	if owner.slot == 0 || pagemap.kernel_charge.owner.slot != 0 { return }
-	bytes := table_page_count(pagemap.top_level, user_table_levels(), true) * page_size + 128
+	bytes := table_page_count(pagemap.top_level, user_table_levels(), true) * page_size + pagemap_storage_bytes(pagemap.mmap_ranges.cap)?
 	pagemap.kernel_charge = kbudget.reserve(owner, .mapping, bytes) or {
 		errno.set(errno.enomem)
 		return none
@@ -104,9 +113,15 @@ fn dispose_table(table &u64, levels int, root bool) {
 
 // The address space is detached and every data leaf has been unmapped. Walk
 // any empty tables left by a failed allocation, in addition to its root.
-pub fn dispose_pagemap_tables(mut pagemap Pagemap) {
+pub fn free_pagemap_tables(mut pagemap Pagemap) {
 	dispose_table(pagemap.top_level, user_table_levels(), true)
 	pagemap.top_level = unsafe { nil }
+}
+
+// Standalone test/adoption callers may release the complete reservation here.
+// Heap owners free their object/arrays before releasing the saved charge.
+pub fn dispose_pagemap_tables(mut pagemap Pagemap) {
+	free_pagemap_tables(mut pagemap)
 	kbudget.release(pagemap.kernel_charge)
 	pagemap.kernel_charge = kbudget.Charge{}
 }

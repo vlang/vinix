@@ -117,7 +117,7 @@ pub fn run() i32 {
 		mut failure := i32(0)
 		for count < maps.len {
 			ptr := C.mmap(nil, length, C.PROT_READ | C.PROT_WRITE,
-				C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+				C.MAP_SHARED | C.MAP_ANONYMOUS, -1, 0)
 			if ptr == voidptr(-1) { failure = *C.__errno_location(); break }
 			maps[count] = ptr
 			count++
@@ -141,7 +141,8 @@ pub fn run() i32 {
 		}
 		for i in 0 .. count { if C.munmap(maps[i], length) != 0 { return 1 } }
 		retired := counters(fd, true) or { return 1 }
-		if retired.charged > initial.charged + 65536 || retired.owner_bytes != pressure.owner_bytes
+		// Array capacity and empty page-map tables remain owned after munmap.
+		if retired.charged > initial.charged + 4 * 1024 * 1024 || retired.owner_bytes != pressure.owner_bytes
 			|| retired.global_bytes != pressure.global_bytes || retired.denied != pressure.denied { return 1 }
 		ptr := C.mmap(nil, length, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 		if ptr == voidptr(-1) || C.munmap(ptr, length) != 0 { return 1 }

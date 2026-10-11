@@ -8,20 +8,21 @@ fn test_denied_lazy_root_preserves_its_owner_until_disposal() {
 	owner := kbudget.open_owner() or { panic('owner') }
 	mut shadow := Pagemap{ kernel_owner: owner }
 	account_pagemap(mut shadow, owner) or { panic('base charge') }
+	base := pagemap_storage_bytes(0) or { panic('storage bound') }
 	mut absent := false
 	shadow.lookup_root(false) or { absent = true }
-	assert absent && live_pages == 0 && shadow.kernel_charge.bytes == 128
+	assert absent && live_pages == 0 && shadow.kernel_charge.bytes == base
 	filler := kbudget.reserve(owner, .file, initial.owner_limit - shadow.kernel_charge.bytes) or { panic('quota') }
 	mut failed := false
 	shadow.lookup_root(true) or { failed = true }
 	assert failed && shadow.top_level == unsafe { nil }
-	assert shadow.kernel_charge.bytes == 128 && live_pages == 0
+	assert shadow.kernel_charge.bytes == base && live_pages == 0
 	kbudget.close_owner(owner)
 	assert kbudget.owned_bytes(owner) == initial.owner_limit
 	kbudget.release(filler)
 	root := shadow.lookup_root(true) or { panic('retry after freeing quota') }
 	assert root != unsafe { nil }
-	assert live_pages == 1 && shadow.kernel_charge.bytes == 128 + page_size
+	assert live_pages == 1 && shadow.kernel_charge.bytes == base + page_size
 	read_only := shadow.lookup_root(false) or { panic('existing root lookup') }
 	assert voidptr(read_only) == voidptr(shadow.top_level)
 	assert live_pages == 1

@@ -758,3 +758,53 @@ and 1,075,996 KiB of physical memory is free. This identifies the budget gate
 behind these three refusals; it does not establish every startup failure's
 cause. Reports, immutable input hashes, prepared-root manifest and raw log
 remain visible.
+
+## Mapping metadata storage reservations
+
+Mapping aliases now reserve the allocator bound for their local object rather
+than a fixed 8 KiB allowance. Global mappings separately own their embedded
+shadow map and alias vector; standalone page maps own their object and mapping
+vector. Capacity growth admits both old and new buffers before allocation,
+then retires the old buffer's reservation after V frees it. Retained capacity
+stays charged after unmapping. Fork rollback vectors are sized under the parent
+map lock and admitted before allocation. Split and shared-remap callers handle
+refused growth before publishing an alias. Object, vector and table storage is
+freed before its saved reservation is released.
+
+The bound covers heap/array headers, slab rounding and large allocations'
+rounded data pages plus their full metadata page. That metadata page is 16 KiB
+on AArch64. Host tests exercise both page geometries, overflow, real-array
+growth refusal without mutation, retry, capacity reuse and growth after the
+creator account closes. Generated C and a separate lifetime review verify the
+allocation and retirement order.
+
+The ordinary-user native fixture reserves 1024 untouched 64 MiB private spans,
+splits 512 with PROT_NONE, forks, checks independent zero pages and changed
+protections, unmaps, then repeats. Matching prior kernels fail the bound;
+both final kernels pass all 18 ABI cases. Reservations for the first mapping
+cycle are:
+
+| Native architecture | Prior kernel | Storage-accounted kernel |
+| --- | ---: | ---: |
+| AArch64, 16 KiB pages | 8,519,680 bytes | 1,883,904 bytes |
+| x86-64, 4 KiB pages | 8,519,680 bytes | 1,859,328 bytes |
+
+The [dated receipts and logs](../tests/linux-compat/results/2026-10-12/)
+include `metadata-storage-before/after-*.json`, the 200-cycle paging regression
+with every reported slab-class delta zero, and all seven memory-lock suites
+on each final kernel. Ordinary-user pressure still returns ENOMEM with the
+correct owner-limit evidence and recovers after unmapping. Native x86-64
+[Go](../tests/linux-compat/results/2026-10-12/metadata-go-x86_64.json) and
+[OpenJDK](../tests/linux-compat/results/2026-10-12/metadata-java-x86_64.json)
+workloads pass; Java retains its recorded privileged launch policy.
+
+The same 2 GiB, UID/GID 1000
+[Firefox rerun](../tests/linux-compat/results/2026-10-12/metadata-firefox-2g-x86_64.json)
+has zero kernel-budget denials and no fork-allocation error, but still times out
+without page/PNG proof. Its snapshot reports 147,934,476 bytes charged against
+190,899,712 and 885,136 KiB of free physical memory. Browser startup and the
+installation/sandbox acceptance gate remain open. This change does not qualify
+all VM metadata: existing PagedPage nodes remain uncharged, and heap allocation
+can still fail after budget admission. A fixed shared remap can remove its
+destination before a later reservation fails. The flat paging measurement
+does not replace the broader kernel operations/churn leak audit.

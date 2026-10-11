@@ -1,0 +1,9 @@
+{
+    "architecture": "aarch64",
+    "kernel_sha256": "7b813404cf5dbc76a07aab724b0ae12b074bdf3ef8e9930f7739e4f3f7107bfc",
+    "source_sha256": "879874bb057dfc717e86b9d6c66f33d14b31d154ccf5b50d79f9312704396e0e",
+    "controller_sha256": "3e00803131fe4fba8a3b00002a7c321624d15e7c0b71ad057abcb7c3abc350ae",
+    "init_sha256": "8a81222e2ce348d28ef1d41dd4300b1fbda9076ae9ff584d3e703e23a397c569",
+    "iso_sha256": "ab93261b5428f798bb9ebd073266ccbb7f6c10eea110a2aae3e62b96beec2f49",
+    "exit_code": 0
+}

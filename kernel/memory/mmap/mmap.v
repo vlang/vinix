@@ -12,6 +12,7 @@ import lib
 import event
 import security
 import pager
+import vmstorage
 
 pub const prot_none = 0x00
 pub const prot_read = 0x01
@@ -305,6 +306,7 @@ fn range_lower_bound(pagemap &memory.Pagemap, base u64) &MmapRangeLocal {
 }
 
 fn insert_range_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal) {
+	assert pagemap.mmap_ranges.len < pagemap.mmap_ranges.cap
 	mut local := unsafe { _local }
 	local.generation = katomic.inc(mut &next_range_generation)
 	local.tree_left = unsafe { nil }
@@ -314,6 +316,10 @@ fn insert_range_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal) {
 	pagemap.mmap_ranges << voidptr(local)
 	pagemap.mmap_root = range_tree_insert(unsafe { &MmapRangeLocal(pagemap.mmap_root) }, local)
 	register_file_global(local.global)
+}
+
+fn ensure_range_capacity_unlocked(mut pagemap memory.Pagemap, required int) ? {
+	vmstorage.ensure_capacity(mut pagemap.mmap_ranges, mut pagemap.kernel_charge, required)?
 }
 
 fn remove_range_unlocked(mut pagemap memory.Pagemap, local &MmapRangeLocal) {
@@ -644,11 +650,13 @@ fn delete_pagemap_impl(mut pagemap memory.Pagemap, trace bool) ? {
 	if trace {
 		println('exec[gpu]/vm: old range array freed; freeing top-level table')
 	}
-	memory.dispose_pagemap_tables(mut pagemap)
+	memory.free_pagemap_tables(mut pagemap)
 	if trace {
 		println('exec[gpu]/vm: old top-level table freed; freeing page-map object')
 	}
+	charge := pagemap.kernel_charge
 	unsafe { free(pagemap) }
+	kbudget.release(charge)
 	if trace {
 		println('exec[gpu]/vm: old page-map object freed')
 	}
@@ -661,19 +669,6 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 	mut new_pagemap := memory.new_user_pagemap(owner)?
 	mut completed := false
 	defer { if !completed { delete_pagemap(mut new_pagemap) or {} } }
-	// Sized for every range up front: grown one push at a time, each array
-	// lost the blocks it outgrew.
-	mut old_private_globals := []voidptr{cap: old_pagemap.mmap_ranges.len} @[freed]
-	mut new_private_globals := []&MmapRangeGlobal{cap: old_pagemap.mmap_ranges.len} @[freed]
- old_private_globals.flags |= .noslices
- new_private_globals.flags |= .noslices
-	defer {
-		unsafe {
-			old_private_globals.free()
-			new_private_globals.free()
-		}
-	}
-
 	begin_brk(mut old_pagemap)?
 	defer { end_brk(mut old_pagemap) }
 	old_pagemap.l.acquire()
@@ -683,6 +678,20 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 	defer {
 		new_pagemap.l.release()
 		old_pagemap.l.release()
+	}
+	ensure_range_capacity_unlocked(mut new_pagemap, old_pagemap.mmap_ranges.len)?
+	// Freeze the range count under the parent's lock. Both rollback buffers
+	// are admitted before allocation and freed before releasing their charge.
+	count := old_pagemap.mmap_ranges.len
+	buffer := vmstorage.allocation_bytes(u64(count) * u64(sizeof(voidptr))) or { errno.set(errno.enomem); return none }
+	scratch := proc.reserve_kernel_for(owner, .scratch, buffer * 2)?
+	mut old_private_globals := []voidptr{cap: count} @[freed]
+	mut new_private_globals := []&MmapRangeGlobal{cap: count} @[freed]
+	old_private_globals.flags |= .noslices
+	new_private_globals.flags |= .noslices
+	defer {
+		unsafe { old_private_globals.free(); new_private_globals.free() }
+		kbudget.release(scratch)
 	}
 
 	for ptr in old_pagemap.mmap_ranges {
@@ -722,6 +731,11 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 
 		if local_range.flags & map_shared != 0 {
 			range_locals_lock.acquire()
+			global_range.ensure_local_capacity(global_range.locals.len + 1) or {
+				range_locals_lock.release()
+				free_local_range(new_local_range)
+				return none
+			}
 			global_range.add_local(new_local_range)
 			range_locals_lock.release()
 			insert_range_unlocked(mut new_pagemap, new_local_range)
@@ -787,8 +801,8 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 						if new_global_range.handle != unsafe { nil } && new_global_range.handle_unref != unsafe { nil } {
 							new_global_range.handle_unref(new_global_range.handle)
 						} else if new_global_range.owns_resource_ref { resource.release_resource(mut retained) }
-						memory.dispose_pagemap_tables(mut new_global_range.shadow_pagemap)
-						unsafe { new_global_range.locals.free(); free(new_global_range) }
+						memory.free_pagemap_tables(mut new_global_range.shadow_pagemap)
+						unsafe { free_global_range(new_global_range) }
 						free_local_range(new_local_range)
 						return none
 					}
@@ -798,6 +812,11 @@ pub fn fork_pagemap(_old_pagemap &memory.Pagemap, owner kbudget.Owner) ?&memory.
 			}
 			new_local_range.global = new_global_range
 			range_locals_lock.acquire()
+			new_global_range.ensure_local_capacity(new_global_range.locals.len + 1) or {
+				range_locals_lock.release()
+				free_local_range(new_local_range)
+				return none
+			}
 			new_global_range.add_local(new_local_range)
 			range_locals_lock.release()
 			insert_range_unlocked(mut new_pagemap, new_local_range)
@@ -880,9 +899,14 @@ fn release_range_page(global &MmapRangeGlobal, virt u64, file_page u64,
 // list, so one that grows frees the buffer it outgrew: a split of a range
 // that already had two locals lost the old buffer.
 fn (mut g MmapRangeGlobal) add_local(local &MmapRangeLocal) {
+	assert g.locals.len < g.locals.cap
 	if g.serial == 0 { g.serial = katomic.inc(mut &range_global_serial) + 1 }
 	g.locals.flags |= .noslices
 	g.locals << unsafe { local }
+}
+
+fn (mut g MmapRangeGlobal) ensure_local_capacity(required int) ? {
+	vmstorage.ensure_capacity(mut g.locals, mut g.shadow_pagemap.kernel_charge, required)?
 }
 
 // Split `piece` off `_local`: a new range on the same global, covering the
@@ -892,10 +916,15 @@ fn (mut g MmapRangeGlobal) add_local(local &MmapRangeLocal) {
 // throughout. Shrunk first and added after, they were no one's in between,
 // and another process unmapping the same shared range then freed them under
 // this one's page tables. The caller holds the page map's lock.
-fn split_off_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal, piece &MmapRangeLocal) {
+fn split_off_unlocked(mut pagemap memory.Pagemap, _local &MmapRangeLocal, piece &MmapRangeLocal) ? {
 	mut local := unsafe { _local }
 	mut global := local.global
+	ensure_range_capacity_unlocked(mut pagemap, pagemap.mmap_ranges.len + 1)?
 	range_locals_lock.acquire()
+	global.ensure_local_capacity(global.locals.len + 1) or {
+		range_locals_lock.release()
+		return none
+	}
 	global.add_local(piece)
 	if piece.base == local.base {
 		local.offset += i64(piece.length)
@@ -1153,13 +1182,20 @@ pub fn map_range(mut pagemap memory.Pagemap, _virt_addr u64, phys_addr u64, _len
 
 	range_global.add_local(range_local)
 	memory.ensure_table_root(mut range_global.shadow_pagemap) or {
-		memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
+		memory.free_pagemap_tables(mut range_global.shadow_pagemap)
 		free_local_range(range_local)
-		unsafe { range_global.locals.free(); free(range_global) }
+		unsafe { free_global_range(range_global) }
 		return none
 	}
 
 	pagemap.l.acquire()
+	ensure_range_capacity_unlocked(mut pagemap, pagemap.mmap_ranges.len + 1) or {
+		pagemap.l.release()
+		memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+		free_local_range(range_local)
+		unsafe { free_global_range(range_global) }
+		return none
+	}
 	insert_range_unlocked(mut pagemap, range_local)
 	pagemap.l.release()
 
@@ -1201,13 +1237,20 @@ pub fn map_pages(mut pagemap memory.Pagemap, virt_addr u64, phys_pages []u64, pr
 	range_local.global = range_global
 	range_global.add_local(range_local)
 	memory.ensure_table_root(mut range_global.shadow_pagemap) or {
-		memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
+		memory.free_pagemap_tables(mut range_global.shadow_pagemap)
 		free_local_range(range_local)
-		unsafe { range_global.locals.free(); free(range_global) }
+		unsafe { free_global_range(range_global) }
 		return none
 	}
 
 	pagemap.l.acquire()
+	ensure_range_capacity_unlocked(mut pagemap, pagemap.mmap_ranges.len + 1) or {
+		pagemap.l.release()
+		memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+		free_local_range(range_local)
+		unsafe { free_global_range(range_global) }
+		return none
+	}
 	insert_range_unlocked(mut pagemap, range_local)
 	pagemap.l.release()
 
@@ -1433,9 +1476,8 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		if !range_is_free_unlocked(pagemap, base, length) {
 			pagemap.l.release()
 			unsafe {
-				memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
-				range_global.locals.free()
-				free(range_global)
+				memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+				free_global_range(range_global)
 				free_local_range(range_local)
 			}
 			errno.set(errno.eexist)
@@ -1445,9 +1487,8 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 			&& !mapping_fits_address_limit(pagemap, process, base, length, false, charged_length, limit_credit) {
 			pagemap.l.release()
 			unsafe {
-				memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
-				range_global.locals.free()
-				free(range_global)
+				memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+				free_global_range(range_global)
 				free_local_range(range_local)
 			}
 			errno.set(errno.enomem)
@@ -1459,9 +1500,8 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 			&& !mapping_fits_address_limit(pagemap, process, base, length, true, charged_length, limit_credit) {
 			pagemap.l.release()
 			unsafe {
-				memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
-				range_global.locals.free()
-				free(range_global)
+				memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+				free_global_range(range_global)
 				free_local_range(range_local)
 			}
 			errno.set(errno.enomem)
@@ -1473,9 +1513,8 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		base = find_free_base_unlocked(pagemap, process.mmap_anon_non_fixed_base, length) or {
 			pagemap.l.release()
 			unsafe {
-				memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
-				range_global.locals.free()
-				free(range_global)
+				memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+				free_global_range(range_global)
 				free_local_range(range_local)
 			}
 			return none
@@ -1486,9 +1525,8 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		&& !mapping_fits_address_limit(pagemap, process, base, length, false, charged_length, limit_credit) {
 		pagemap.l.release()
 		unsafe {
-			memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
-			range_global.locals.free()
-			free(range_global)
+			memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+			free_global_range(range_global)
 			free_local_range(range_local)
 		}
 		errno.set(errno.enomem)
@@ -1496,17 +1534,25 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 	}
 	range_local.base = base
 	range_global.base = base
+	// A fixed replacement may split an old range at both ends before adding
+	// this one. Admit retained vector storage before changing those ranges.
+	ensure_range_capacity_unlocked(mut pagemap, pagemap.mmap_ranges.len + if fixed { 3 } else { 1 }) or {
+		pagemap.l.release()
+		memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+		unsafe { free_global_range(range_global); free_local_range(range_local) }
+		return none
+	}
 	if !prepare_mapping_lock_unlocked(pagemap, process, range_local, fixed, limit_credit, options) {
 		pagemap.l.release()
-		memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
-		unsafe { range_global.locals.free(); free(range_global); free_local_range(range_local) }
+		memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+		unsafe { free_global_range(range_global); free_local_range(range_local) }
 		return none
 	}
 	if fixed {
 		munmap_unlocked(mut pagemap, addr, length) or {
 			pagemap.l.release()
-			memory.dispose_pagemap_tables(mut range_global.shadow_pagemap)
-			unsafe { range_global.locals.free(); free(range_global); free_local_range(range_local) }
+			memory.free_pagemap_tables(mut range_global.shadow_pagemap)
+			unsafe { free_global_range(range_global); free_local_range(range_local) }
 			return none
 		}
 	}
@@ -1953,7 +1999,10 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			})?
-			split_off_unlocked(mut pagemap, local_range, postsplit_range)
+			split_off_unlocked(mut pagemap, local_range, postsplit_range) or {
+				free_local_range(postsplit_range)
+				return none
+			}
 		}
 
 		mut new_range := &MmapRangeLocal(unsafe { nil })
@@ -1972,6 +2021,11 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			})?
+			// A refused metadata reservation must precede PTE changes.
+			split_off_unlocked(mut pagemap, local_range, new_range) or {
+				free_local_range(new_range)
+				return none
+			}
 		}
 		// Only a page that is there has a protection to change.
 		mut next_page := pagemap.next_present(snip_begin, snip_end)
@@ -1987,10 +2041,8 @@ pub fn mprotect_unlocked(mut pagemap memory.Pagemap, addr voidptr, _length u64, 
 			pagemap.flag_page(j, pt_flags) or {}
 		}
 
-		if snip_size == local_range.length {
+		if new_range == unsafe { nil } {
 			local_range.prot = prot
-		} else {
-			split_off_unlocked(mut pagemap, local_range, new_range)
 		}
 	}
 }
@@ -2107,7 +2159,10 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 				wipe_on_fork: local_range.wipe_on_fork
 				global: local_range.global
 			})?
-			split_off_unlocked(mut pagemap, local_range, postsplit_range)
+			split_off_unlocked(mut pagemap, local_range, postsplit_range) or {
+				free_local_range(postsplit_range)
+				return none
+			}
 		}
 
 		// Only the pages there are: MariaDB's 8 TiB reservation took ten
@@ -2152,7 +2207,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 					file_page := u64(global_range.offset) / page_size + (j - global_range.base) / page_size
 					release_range_page(global_range, j, file_page, voidptr(phys), local_range.flags)
 				}
-				memory.dispose_pagemap_tables(mut global_range.shadow_pagemap)
+				memory.free_pagemap_tables(mut global_range.shadow_pagemap)
 				if global_range.owns_mapping_ref {
 					mut retained := global_range.resource
 					resource.release_mapping_range(mut retained, global_range.handle,
@@ -2166,8 +2221,7 @@ fn munmap_unlocked_impl(mut pagemap memory.Pagemap, addr voidptr, _length u64,
 					resource.release_resource(mut retained)
 				}
 				unsafe {
-					global_range.locals.free()
-					free(global_range)
+					free_global_range(global_range)
 				}
 			}
 			remove_range_unlocked(mut pagemap, local_range)
@@ -2190,15 +2244,15 @@ fn min_u64(a u64, b u64) u64 {
 	return if a < b { a } else { b }
 }
 
-// One reservation per alias covers its range, the maximum array capacity,
-// a private global and rollback scratch. Page tables are charged separately. Shared globals have at
-// least one alias until destruction, so they are never left unaccounted.
+// Aliases own their local object. Globals and page maps separately own their
+// objects, retained array capacity and resident page-table pages.
 fn new_local_range(template MmapRangeLocal) ?&MmapRangeLocal {
 	return new_local_range_for(template, proc.kernel_owner())
 }
 
 fn new_local_range_for(template MmapRangeLocal, owner kbudget.Owner) ?&MmapRangeLocal {
-	charge := proc.reserve_kernel_for(owner, .mapping, 8192)?
+	bytes := vmstorage.allocation_bytes(u64(sizeof(MmapRangeLocal))) or { errno.set(errno.enomem); return none }
+	charge := proc.reserve_kernel_for(owner, .mapping, bytes)?
 	mut local := &MmapRangeLocal{} @[freed]
 	unsafe { *local = template }
 	local.kernel_charge = charge
@@ -2206,18 +2260,33 @@ fn new_local_range_for(template MmapRangeLocal, owner kbudget.Owner) ?&MmapRange
 }
 
 fn free_local_range(local &MmapRangeLocal) {
-	kbudget.release(local.kernel_charge)
+	charge := local.kernel_charge
 	unsafe { free(local) }
+	kbudget.release(charge)
+}
+
+fn free_global_range(global &MmapRangeGlobal) {
+	assert global.shadow_pagemap.top_level == unsafe { nil }
+	charge := global.shadow_pagemap.kernel_charge
+	unsafe { global.locals.free(); free(global) }
+	kbudget.release(charge)
 }
 
 // A shared mapping can survive its creator before its first page fault. The
 // empty shadow's base reservation pins that account until the last alias goes.
 fn allocate_global_range(template MmapRangeGlobal) ?&MmapRangeGlobal {
- mut global := &MmapRangeGlobal{} @[freed]
- unsafe { *global = template }
- memory.account_pagemap(mut global.shadow_pagemap, global.shadow_pagemap.kernel_owner) or {
-  unsafe { free(global) }
-  return none
- }
- return global
+	// All constructors pass empty, unattached storage. V's zero-capacity
+	// arrays have no allocation; reserve before either heap allocation below.
+	assert template.locals.cap == 0 && template.locals.len == 0
+	assert template.shadow_pagemap.top_level == unsafe { nil }
+	assert template.shadow_pagemap.kernel_charge.owner.slot == 0
+	object := vmstorage.allocation_bytes(u64(sizeof(MmapRangeGlobal))) or { errno.set(errno.enomem); return none }
+	buffer := vmstorage.allocation_bytes(2 * u64(sizeof(&MmapRangeLocal))) or { errno.set(errno.enomem); return none }
+	charge := proc.reserve_kernel_for(template.shadow_pagemap.kernel_owner, .mapping, object + buffer)?
+	mut global := &MmapRangeGlobal{} @[freed]
+	unsafe { *global = template }
+	global.shadow_pagemap.kernel_charge = charge
+	global.locals = []&MmapRangeLocal{cap: 2}
+	global.locals.flags |= .noslices
+	return global
 }

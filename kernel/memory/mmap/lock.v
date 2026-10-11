@@ -143,7 +143,10 @@ fn set_lock_flags_unlocked(mut pagemap memory.Pagemap, base u64, length u64, loc
 			piece.base = finish
 			piece.length = local.base + local.length - finish
 			piece.offset = local.offset + i64(finish - local.base)
-			split_off_unlocked(mut pagemap, local, piece)
+			split_off_unlocked(mut pagemap, local, piece) or {
+				free_local_range(piece)
+				return none
+			}
 		}
 		begin := if base > local.base { base } else { local.base }
 		mut changed := local
@@ -152,7 +155,10 @@ fn set_lock_flags_unlocked(mut pagemap memory.Pagemap, base u64, length u64, loc
 			changed.base = begin
 			changed.length = finish - begin
 			changed.offset = local.offset + i64(begin - local.base)
-			split_off_unlocked(mut pagemap, local, changed)
+			split_off_unlocked(mut pagemap, local, changed) or {
+				free_local_range(changed)
+				return none
+			}
 		}
 		if locked { changed.flags |= map_locked } else { changed.flags &= ~map_locked }
 	}
