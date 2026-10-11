@@ -19,7 +19,7 @@ fn files_trash_identity(info C.stat, device u64, inode u64) bool {
 
 fn files_trash_private_directory(fd int) bool {
 	mut info := C.stat{}
-	return unsafe { C.fstat(fd, &info) } == 0 && u32(info.st_mode) & u32(C.S_IFMT) == u32(C.S_IFDIR)
+	return C.fstat(fd, unsafe { &info }) == 0 && u32(info.st_mode) & u32(C.S_IFMT) == u32(C.S_IFDIR)
 		&& u32(info.st_uid) == C.getuid() && u32(info.st_mode) & 0o077 == 0
 }
 
@@ -29,8 +29,8 @@ fn (mut trash FilesTrash) ensure_store() string {
 	// the underlying directory or to a different device at the same path.
 	mut root_info := C.stat{}
 	mut root_now := C.stat{}
-	if unsafe { C.fstat(trash.home_fd, &root_info) } != 0
-		|| unsafe { C.lstat(&char(trash.home.str), &root_now) } != 0
+	if C.fstat(trash.home_fd, unsafe { &root_info }) != 0
+		|| C.lstat(&char(trash.home.str), unsafe { &root_now }) != 0
 		|| !files_trash_identity(root_now, u64(root_info.st_dev), u64(root_info.st_ino)) {
 		return 'files.trash.unavailable'
 	}
@@ -44,8 +44,8 @@ fn (mut trash FilesTrash) ensure_store() string {
 	mut info := C.stat{}
 	mut current := C.stat{}
 	if !files_trash_private_directory(trash.store_fd)
-		|| unsafe { C.fstat(trash.store_fd, &info) } != 0
-		|| unsafe { C.fstatat(trash.home_fd, &char(trash.store_name.str), &current, C.AT_SYMLINK_NOFOLLOW) } != 0
+		|| C.fstat(trash.store_fd, unsafe { &info }) != 0
+		|| C.fstatat(trash.home_fd, &char(trash.store_name.str), unsafe { &current }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| !files_trash_identity(current, u64(info.st_dev), u64(info.st_ino)) {
 		return 'files.trash.unavailable'
 	}
@@ -57,7 +57,7 @@ fn files_trash_lock(directory int) int {
 	fd := C.openat(directory, c'.lock', C.O_CREAT | C.O_RDWR | C.O_NONBLOCK | C.O_NOFOLLOW | C.O_CLOEXEC, 0o600)
 	if fd < 0 { return -1 }
 	mut info := C.stat{}
-	if unsafe { C.fstat(fd, &info) } != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG)
+	if C.fstat(fd, unsafe { &info }) != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG)
 		|| u32(info.st_uid) != C.getuid() || u32(info.st_mode) & 0o077 != 0 {
 		desktop_close(fd)
 		return -1
@@ -125,7 +125,7 @@ fn files_trash_read_metadata(directory int) ?FilesTrashEntry {
 	if fd < 0 { return none }
 	defer { desktop_close(fd) }
 	mut info := C.stat{}
-	if unsafe { C.fstat(fd, &info) } != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG)
+	if C.fstat(fd, unsafe { &info }) != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG)
 		|| info.st_size < 20 || info.st_size > files_trash_path_limit + 100 {
 		return none
 	}
@@ -143,13 +143,13 @@ fn files_trash_read_metadata(directory int) ?FilesTrashEntry {
 		at += int(n)
 	}
 	mut after := C.stat{}
-	if unsafe { C.fstat(fd, &after) } != 0 || after.st_size != info.st_size || after.st_mtime != info.st_mtime
-		|| unsafe { C.vinix_reminders_mtime_nsec(&after) } != unsafe { C.vinix_reminders_mtime_nsec(&info) } {
+	if C.fstat(fd, unsafe { &after }) != 0 || after.st_size != info.st_size || after.st_mtime != info.st_mtime
+		|| C.vinix_reminders_mtime_nsec(unsafe { &after }) != C.vinix_reminders_mtime_nsec(unsafe { &info }) {
 		return none
 	}
 	mut result := files_trash_parse(unsafe { tos(buffer.data, at) }) or { return none }
 	mut payload := C.stat{}
-	if unsafe { C.fstatat(directory, c'item', &payload, C.AT_SYMLINK_NOFOLLOW) } != 0
+	if C.fstatat(directory, c'item', unsafe { &payload }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| !files_trash_identity(payload, result.device, result.inode) || u32(payload.st_mode) != result.mode {
 		unsafe { result.path.free() }
 		return none
@@ -203,7 +203,7 @@ fn (mut trash FilesTrash) scan_locked() {
 			continue
 		}
 		mut info := C.stat{}
-		if !files_trash_private_directory(child) || unsafe { C.fstat(child, &info) } != 0 || !files_trash_bucket_complete(child) {
+		if !files_trash_private_directory(child) || C.fstat(child, unsafe { &info }) != 0 || !files_trash_bucket_complete(child) {
 			desktop_close(child)
 			unsafe { bucket.free() }
 			trash.damaged = true
@@ -235,7 +235,7 @@ fn (mut trash FilesTrash) scan_locked() {
 
 fn files_trash_remove_bucket(store int, name string, info C.stat) bool {
 	mut current := C.stat{}
-	return unsafe { C.fstatat(store, &char(name.str), &current, C.AT_SYMLINK_NOFOLLOW) } == 0
+	return C.fstatat(store, &char(name.str), unsafe { &current }, C.AT_SYMLINK_NOFOLLOW) == 0
 		&& files_trash_identity(current, u64(info.st_dev), u64(info.st_ino))
 		&& C.unlinkat(store, &char(name.str), C.AT_REMOVEDIR) == 0
 }
@@ -267,7 +267,7 @@ fn (mut trash FilesTrash) move_locked(parent int, leaf string, relative string, 
 	}
 	if bucket < 0 { return 'files.trash.failed' }
 	mut bucket_info := C.stat{}
-	if unsafe { C.fstat(bucket, &bucket_info) } != 0 || !files_trash_private_directory(bucket) {
+	if C.fstat(bucket, unsafe { &bucket_info }) != 0 || !files_trash_private_directory(bucket) {
 		return 'files.trash.failed'
 	}
 	mut moved := false
@@ -283,7 +283,7 @@ fn (mut trash FilesTrash) move_locked(parent int, leaf string, relative string, 
 	defer { unsafe { metadata.free() } }
 	fd := C.openat(bucket, c'info', C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC | C.O_NONBLOCK, 0o600)
 	if fd < 0 { return 'files.trash.failed' }
-	metadata_known = unsafe { C.fstat(fd, &metadata_info) } == 0
+	metadata_known = C.fstat(fd, unsafe { &metadata_info }) == 0
 	written := metadata_known && desktop_write_all(fd, metadata.str, u64(metadata.len)) && desktop_preferences_fsync(fd)
 	synced := written && reminders_sync_directory(bucket, fd)
 		&& reminders_sync_directory(trash.store_fd, fd)
@@ -294,7 +294,7 @@ fn (mut trash FilesTrash) move_locked(parent int, leaf string, relative string, 
 	}
 	moved = true
 	mut payload := C.stat{}
-	if unsafe { C.fstatat(bucket, c'item', &payload, C.AT_SYMLINK_NOFOLLOW) } != 0
+	if C.fstatat(bucket, c'item', unsafe { &payload }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| !files_trash_identity(payload, u64(info.st_dev), u64(info.st_ino)) || u32(payload.st_mode) != u32(info.st_mode) {
 		return 'files.trash.changed_moved'
 	}
@@ -310,7 +310,7 @@ fn files_trash_checked_bucket(store int, entry &FilesTrashEntry) int {
 	fd := C.openat(store, &char(entry.bucket.str), C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC, 0)
 	if fd < 0 { return -1 }
 	mut info := C.stat{}
-	if !files_trash_private_directory(fd) || unsafe { C.fstat(fd, &info) } != 0
+	if !files_trash_private_directory(fd) || C.fstat(fd, unsafe { &info }) != 0
 		|| !files_trash_identity(info, entry.bucket_device, entry.bucket_inode) || !files_trash_bucket_complete(fd) {
 		desktop_close(fd)
 		return -1
@@ -330,7 +330,7 @@ fn files_trash_checked_bucket(store int, entry &FilesTrashEntry) int {
 
 fn files_trash_cleanup_bucket(store int, bucket int, entry &FilesTrashEntry) bool {
 	mut info := C.stat{}
-	if unsafe { C.fstat(bucket, &info) } != 0 { return false }
+	if C.fstat(bucket, unsafe { &info }) != 0 { return false }
 	if C.unlinkat(bucket, c'info', 0) != 0 { return false }
 	return files_trash_remove_bucket(store, entry.bucket, info)
 }
@@ -416,28 +416,41 @@ fn files_trash_catalog_matches(store int, entries []FilesTrashEntry) bool {
 }
 
 fn files_trash_empty_one(store int, entry &FilesTrashEntry) bool {
+	mut progress := FilesTrashProgress{}
+	return files_trash_empty_one_progress(store, entry, mut progress)
+}
+
+fn files_trash_empty_one_progress(store int, entry &FilesTrashEntry, mut progress FilesTrashProgress) bool {
 	bucket := files_trash_checked_bucket(store, entry)
 	if bucket < 0 { return false }
 	defer { desktop_close(bucket) }
-	mut budget := [100000]!
-	if !files_trash_remove_tree(bucket, 'item', entry.device, 0, mut budget) { return false }
+	progress.remaining = 100000
+	if !files_trash_remove_tree_progress(bucket, 'item', entry.device, 0, mut progress) { return false }
 	return files_trash_cleanup_bucket(store, bucket, entry)
 }
 
 // Walk anchored descriptors, never symbolic links or nested mounted devices.
 // Failure retains the bucket/metadata so a partial removal remains visible.
 fn files_trash_remove_tree(parent int, name string, device u64, depth int, mut budget [1]int) bool {
-	if depth > 64 || budget[0] <= 0 { return false }
-	budget[0]--
+	mut progress := FilesTrashProgress{remaining: budget[0]}
+	ok := files_trash_remove_tree_progress(parent, name, device, depth, mut progress)
+	budget[0] = progress.remaining
+	return ok
+}
+
+fn files_trash_remove_tree_progress(parent int, name string, device u64, depth int, mut progress FilesTrashProgress) bool {
+	if progress.stop_requested() { return false }
+	if depth > 64 || progress.remaining <= 0 { return false }
+	progress.remaining--
 	mut before := C.stat{}
-	if unsafe { C.fstatat(parent, &char(name.str), &before, C.AT_SYMLINK_NOFOLLOW) } != 0
+	if C.fstatat(parent, &char(name.str), unsafe { &before }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| u64(before.st_dev) != device || !files_trash_kind_allowed(u32(before.st_mode)) { return false }
 	is_dir := u32(before.st_mode) & u32(C.S_IFMT) == u32(C.S_IFDIR)
 	if is_dir {
 		fd := C.openat(parent, &char(name.str), C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC, 0)
 		if fd < 0 { return false }
 		mut opened := C.stat{}
-		if unsafe { C.fstat(fd, &opened) } != 0 || !files_trash_identity(opened, u64(before.st_dev), u64(before.st_ino)) {
+		if C.fstat(fd, unsafe { &opened }) != 0 || !files_trash_identity(opened, u64(before.st_dev), u64(before.st_ino)) {
 			desktop_close(fd)
 			return false
 		}
@@ -451,7 +464,7 @@ fn files_trash_remove_tree(parent int, name string, device u64, depth int, mut b
 			child := unsafe { tos2(&u8(&entry.d_name[0])) }
 			if child == '.' || child == '..' { continue }
 			owned := child.clone()
-			ok = files_trash_remove_tree(fd, owned, device, depth + 1, mut budget)
+			ok = files_trash_remove_tree_progress(fd, owned, device, depth + 1, mut progress)
 			unsafe { owned.free() }
 			if !ok { break }
 		}
@@ -459,7 +472,11 @@ fn files_trash_remove_tree(parent int, name string, device u64, depth int, mut b
 		if !ok { return false }
 	}
 	mut now := C.stat{}
-	if unsafe { C.fstatat(parent, &char(name.str), &now, C.AT_SYMLINK_NOFOLLOW) } != 0
+	if progress.stop_requested() { return false }
+	if C.fstatat(parent, &char(name.str), unsafe { &now }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| !files_trash_identity(now, u64(before.st_dev), u64(before.st_ino)) { return false }
-	return C.unlinkat(parent, &char(name.str), if is_dir { C.AT_REMOVEDIR } else { 0 }) == 0
+	if C.unlinkat(parent, &char(name.str), if is_dir { C.AT_REMOVEDIR } else { 0 }) != 0 { return false }
+	progress.nodes++
+	progress.publish(false)
+	return true
 }

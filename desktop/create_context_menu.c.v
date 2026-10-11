@@ -343,6 +343,7 @@ mut:
 	job_recorded        bool
 	operation_open      bool
 	undo_pending        bool
+	trash_job           bool
 	operation           FilesTransferReport
 	undo_operations     []FilesUndo
 	tabs                []FilesTab
@@ -513,6 +514,9 @@ fn (mut a FilesContextApp) focus_path(path string) {
 // path is owned by the caller. List mode hands that ownership to FileBrowser;
 // column mode clones it into its retained columns and releases the temporary.
 fn (mut a FilesContextApp) refresh_to(path string) {
+	unsafe { a.thumbnail_directory.free() }
+	a.thumbnail_directory = ''
+	a.thumbnail_scroll = -1
 	if a.files.view_mode == .columns {
 		a.files.reset_miller_columns(path)
 		unsafe { path.free() }
@@ -846,6 +850,8 @@ fn (mut a FilesContextApp) handle(event_id string) ! {
 			a.trash.confirming = false
 			current := a.files.current_path().clone()
 			a.refresh_to(current)
+		} else if event_id == 'files.trash.confirm' {
+			a.start_trash_empty() or { a.operation_error(err.msg()) }
 		} else {
 			a.trash.action(event_id)
 		}

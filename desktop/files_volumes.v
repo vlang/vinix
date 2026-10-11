@@ -26,7 +26,7 @@ fn (mut a FilesContextApp) refresh_volumes() {
 	for mount in inventory.mounts {
 		if mount.filesystem in ['proc', 'sysfs', 'devtmpfs', 'devpts', 'cgroup', 'cgroup2'] { continue }
 		mut info := C.stat{}
-		if unsafe { C.stat(&char(mount.target.str), &info) } != 0 { continue }
+		if C.stat(&char(mount.target.str), unsafe { &info }) != 0 { continue }
 		network := mount.filesystem in ['nfs', 'nfs4', 'cifs', 'smb3', 'sshfs', 'fuse.sshfs', '9p']
 		removable := mount.target.starts_with('/media/') || mount.target.starts_with('/mnt/') || mount.target.starts_with('/run/media/')
 		index := a.volumes.len.str()
@@ -91,7 +91,7 @@ fn (mut a FilesContextApp) volume_action(event string) bool {
 	if index < 0 || index >= a.volumes.len { return true }
 	volume := a.volumes[index]
 	mut current := C.stat{}
-	if unsafe { C.stat(&char(volume.path.str), &current) } != 0 || !files_trash_identity(current, volume.device, volume.inode) {
+	if C.stat(&char(volume.path.str), unsafe { &current }) != 0 || !files_trash_identity(current, volume.device, volume.inode) {
 		a.trash.status = 'files.trash.unavailable'
 		return true
 	}

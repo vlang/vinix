@@ -237,7 +237,7 @@ fn (mut a FilesContextApp) workflow_key(input string) bool {
 }
 
 fn (mut a FilesContextApp) close_workflows() {
-	if a.worker_pid > 0 { C.kill(a.worker_pid, C.SIGTERM); mut status := 0; C.waitpid(a.worker_pid, &status, C.WNOHANG); a.worker_pid = 0 }
+	if a.worker_pid > 0 { C.kill(a.worker_pid, C.SIGTERM); mut status := 0; C.waitpid(a.worker_pid, unsafe { &status }, C.WNOHANG); a.worker_pid = 0 }
 	a.clear_selection_paths()
 	for i in 0 .. a.tabs.len { a.tabs[i].close() }
 	for undo in a.undo_operations { unsafe { undo.source.free(); undo.destination.free(); undo.trash_root.free(); undo.trash_bucket.free(); undo.backup.free() } }

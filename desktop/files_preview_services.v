@@ -40,7 +40,7 @@ fn (mut p FilesQuickLook) start_document_preview() bool {
 fn (mut p FilesQuickLook) poll_document_preview() bool {
 	if p.worker <= 0 { return false }
 	mut status := 0
-	if C.waitpid(p.worker, &status, C.WNOHANG) != p.worker { return false }
+	if C.waitpid(p.worker, unsafe { &status }, C.WNOHANG) != p.worker { return false }
 	p.worker = 0
 	unsafe { p.message.free() }
 	p.message = ''
@@ -164,7 +164,7 @@ fn (mut a FilesContextApp) start_visible_thumbnails() {
 fn (mut a FilesContextApp) poll_thumbnails() bool {
 	if a.thumbnail_worker <= 0 { return false }
 	mut status := 0
-	if C.waitpid(a.thumbnail_worker, &status, C.WNOHANG) != a.thumbnail_worker { return false }
+	if C.waitpid(a.thumbnail_worker, unsafe { &status }, C.WNOHANG) != a.thumbnail_worker { return false }
 	a.thumbnail_worker = 0
 	return true
 }

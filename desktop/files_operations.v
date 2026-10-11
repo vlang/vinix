@@ -91,6 +91,7 @@ fn (mut a FilesContextApp) start_transfer(paths []string, directory string, kind
 }
 
 fn (mut a FilesContextApp) launch_transfer(mut job workflowcore.Transfer) ! {
+	a.trash_job = false
 	store := files_job_store()!
 	defer { unsafe { store.free() } }
 	unsafe { a.job_path.free() }
@@ -135,7 +136,7 @@ fn files_transfer_lease(journal string) int {
 	fd := C.open(&char(path.str), C.O_RDWR | C.O_CREAT | C.O_NOFOLLOW | C.O_CLOEXEC, 0o600)
 	if fd < 0 { return -1 }
 	mut info := C.stat{}
-	if unsafe { C.fstat(fd, &info) } != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG) || info.st_uid != C.getuid() || u32(info.st_mode) & 0o077 != 0 || C.flock(fd, C.LOCK_EX | C.LOCK_NB) != 0 { C.close(fd); return -1 }
+	if C.fstat(fd, unsafe { &info }) != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG) || info.st_uid != C.getuid() || u32(info.st_mode) & 0o077 != 0 || C.flock(fd, C.LOCK_EX | C.LOCK_NB) != 0 { C.close(fd); return -1 }
 	return fd
 }
 
@@ -191,6 +192,11 @@ fn files_transfer_worker(journal string) {
 
 fn (mut a FilesContextApp) transfer_command(command string) {
 	if a.job_path.len == 0 { return }
+	if a.trash_job && command == 'retry' {
+		if a.worker_pid <= 0 { a.open_trash(); a.trash.confirming = false }
+		return
+	}
+	if a.trash_job && command != 'cancel' { return }
 	if command == 'retry' && a.worker_pid <= 0 { C.unlink(&char((a.job_path + '.command').str)); a.spawn_transfer_worker() or { a.operation_error(err.msg()) }; return }
 	bytes := command.bytes()
 	workflowcore.atomic_save(a.job_path + '.command', bytes, workflowcore.SaveOptions{}) or {}
@@ -202,9 +208,10 @@ fn (mut a FilesContextApp) poll() bool {
 	preview_changed := a.preview.poll_document_preview()
 	thumbnails_changed := a.poll_thumbnails()
 	if a.job_path.len == 0 || !a.operation_open { return index_changed || preview_changed || thumbnails_changed }
+	if a.trash_job { return a.poll_trash_empty() || index_changed || preview_changed || thumbnails_changed }
 	if a.worker_pid > 0 {
 		mut status := 0
-		if C.waitpid(a.worker_pid, &status, C.WNOHANG) == a.worker_pid { a.worker_pid = 0 }
+		if C.waitpid(a.worker_pid, unsafe { &status }, C.WNOHANG) == a.worker_pid { a.worker_pid = 0 }
 	}
 	bytes := workflowcore.read_regular(a.job_path + '.report', 65536) or {
 		if a.worker_pid == 0 && a.operation.state == .running { a.operation_error('Worker stopped before reporting. Retry resumes its saved checkpoint.'); return true }
@@ -375,7 +382,7 @@ fn (mut a FilesContextApp) operation_action(event string) bool {
 		'files.batch.paste' { a.batch_paste() or { a.operation_error(err.msg()) }; return true }
 		'files.batch.delete' { a.batch_delete() or { a.operation_error(err.msg()) }; return true }
 		'files.operation.undo' { a.undo_file_operation() or { a.operation_error(err.msg()) }; return true }
-		'files.operation.cancel' { a.transfer_command('cancel'); if a.worker_pid > 0 { C.kill(a.worker_pid, C.SIGTERM) }; a.operation.state = .cancelled; return true }
+		'files.operation.cancel' { a.transfer_command('cancel'); if a.worker_pid > 0 && !a.trash_job { C.kill(a.worker_pid, C.SIGTERM) }; a.operation.state = .cancelled; return true }
 		'files.operation.retry' { a.transfer_command('retry'); return true }
 		'files.operation.skip' { a.transfer_command('skip'); return true }
 		'files.operation.keep_both' { a.transfer_command('keep_both'); return true }

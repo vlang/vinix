@@ -75,7 +75,7 @@ fn (mut a FilesContextApp) start_indexing() ! {
 fn (mut a FilesContextApp) poll_index_search() bool {
 	if a.index_search.worker <= 0 { return false }
 	mut status := 0
-	if C.waitpid(a.index_search.worker, &status, C.WNOHANG) != a.index_search.worker { return false }
+	if C.waitpid(a.index_search.worker, unsafe { &status }, C.WNOHANG) != a.index_search.worker { return false }
 	a.index_search.worker = 0
 	unsafe { a.index_search.status.free() }
 	if status != 0 { a.index_search.status = 'Indexing failed; previous results retained. Retry Rebuild.'.clone(); return true }
@@ -161,7 +161,7 @@ fn (a &FilesContextApp) index_panel(size ui2.Rect) ui2.Element {
 }
 
 fn (mut search FilesIndexedSearch) close() {
-	if search.worker > 0 { C.kill(search.worker, C.SIGTERM); mut status := 0; C.waitpid(search.worker, &status, C.WNOHANG) }
+	if search.worker > 0 { C.kill(search.worker, C.SIGTERM); mut status := 0; C.waitpid(search.worker, unsafe { &status }, C.WNOHANG) }
 	search.index.close()
 	unsafe { search.query.free(); search.results.free(); search.status.free() }
 	search = FilesIndexedSearch{}

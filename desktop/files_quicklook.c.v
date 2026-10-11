@@ -66,7 +66,7 @@ fn files_quicklook_kind(path string) FilesQuickLookKind {
 }
 
 fn (mut p FilesQuickLook) close() {
-	if p.worker > 0 { C.kill(-p.worker, C.SIGTERM); C.kill(p.worker, C.SIGTERM); mut status := 0; C.waitpid(p.worker, &status, C.WNOHANG); p.worker = 0 }
+	if p.worker > 0 { C.kill(-p.worker, C.SIGTERM); C.kill(p.worker, C.SIGTERM); mut status := 0; C.waitpid(p.worker, unsafe { &status }, C.WNOHANG); p.worker = 0 }
 	if p.work_directory.len > 0 { os.rmdir_all(p.work_directory) or {}; unsafe { p.work_directory.free() }; p.work_directory = '' }
 	if p.surface_path.len > 0 {
 		desktop_unlink(p.surface_path)
@@ -116,12 +116,12 @@ fn (mut p FilesQuickLook) load_image() bool {
 	mut width := 0
 	mut height := 0
 	mut channels := 0
-	if C.stbi_info_from_memory(source.data, source.len, &width, &height, &channels) == 0
+	if C.stbi_info_from_memory(source.data, source.len, unsafe { &width }, unsafe { &height }, unsafe { &channels }) == 0
 		|| width <= 0 || height <= 0 || width > 8192 || height > 8192
 		|| i64(width) * i64(height) > files_quicklook_max_pixels {
 		return false
 	}
-	pixels := C.stbi_load_from_memory(source.data, source.len, &width, &height, &channels, 4)
+	pixels := C.stbi_load_from_memory(source.data, source.len, unsafe { &width }, unsafe { &height }, unsafe { &channels }, 4)
 	if pixels == unsafe { nil } {
 		return false
 	}

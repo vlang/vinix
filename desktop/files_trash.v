@@ -34,6 +34,7 @@ mut:
 	damaged      bool
 	confirming   bool
 	status       string = 'files.trash.ready' // borrowed translation key
+	progress     FilesTrashProgress
 }
 
 fn files_trash_new(home string) FilesTrash {
@@ -202,7 +203,7 @@ fn (mut trash FilesTrash) move(path string) bool {
 		return false
 	}
 	mut info := C.stat{}
-	if unsafe { C.fstatat(parent, &char(leaf.str), &info, C.AT_SYMLINK_NOFOLLOW) } != 0
+	if C.fstatat(parent, &char(leaf.str), unsafe { &info }, C.AT_SYMLINK_NOFOLLOW) != 0
 		|| !files_trash_kind_allowed(u32(info.st_mode)) {
 		trash.status = 'files.trash.unsafe'
 		return false
@@ -264,12 +265,14 @@ fn (mut trash FilesTrash) empty_confirmed() {
 		}
 	}
 	for index in 0 .. trash.entries.len {
-		if !files_trash_empty_one(trash.store_fd, &trash.entries[index]) {
+		trash.progress.index = index
+		if trash.progress.stop_requested() || !files_trash_empty_one_progress(trash.store_fd, &trash.entries[index], mut trash.progress) {
 			trash.scan_locked()
 			trash.status = 'files.trash.partial'
 			return
 		}
 	}
+	trash.progress.index = trash.entries.len
 	trash.scan_locked()
 	trash.status = if trash.damaged || trash.entries.len > 0 {
 		'files.trash.partial'
