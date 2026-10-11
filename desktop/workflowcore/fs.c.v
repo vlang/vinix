@@ -6,23 +6,27 @@ import os
 
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
 
 $if macos {
 	#define vinix_workflow_rename(a,b,c,d) renameatx_np(a,b,c,d,RENAME_EXCL)
+	#define vinix_workflow_exchange(a,b,c,d) renameatx_np(a,b,c,d,RENAME_SWAP)
 	#define vinix_workflow_mtime_ns(s) ((s)->st_mtimespec.tv_nsec)
 	#define vinix_workflow_ctime_ns(s) ((s)->st_ctimespec.tv_nsec)
 } $else {
 	#include <sys/syscall.h>
 	#define vinix_workflow_rename(a,b,c,d) syscall(SYS_renameat2,a,b,c,d,1)
+	#define vinix_workflow_exchange(a,b,c,d) syscall(SYS_renameat2,a,b,c,d,2)
 	#define vinix_workflow_mtime_ns(s) ((s)->st_mtim.tv_nsec)
 	#define vinix_workflow_ctime_ns(s) ((s)->st_ctim.tv_nsec)
 }
 fn C.vinix_workflow_mtime_ns(&C.stat) i64
 fn C.vinix_workflow_ctime_ns(&C.stat) i64
 fn C.vinix_workflow_rename(int, &char, int, &char) int
+fn C.vinix_workflow_exchange(int, &char, int, &char) int
 fn C.fstat(int, &C.stat) int
 fn C.fstatat(int, &char, &C.stat, int) int
 fn C.fchmod(int, u32) int
@@ -32,6 +36,7 @@ fn C.openat(int, &char, int, ...int) int
 fn C.mkdirat(int, &char, u32) int
 fn C.unlinkat(int, &char, int) int
 fn C.fsync(int) int
+fn C.flock(int, int) int
 fn C.lseek(int, i64, int) i64
 fn C.read(int, voidptr, usize) isize
 fn C.write(int, voidptr, usize) isize
@@ -70,21 +75,31 @@ fn from_stat(s C.stat) Identity {
 
 pub fn valid_path(path string) bool {
 	if path.len < 2 || path.len > 4096 || !path.starts_with('/') || path.ends_with('/') || path.contains('\x00') { return false }
-	for part in path[1..].split('/') { if part == '' || part == '.' || part == '..' { return false } }
+	mut start := 1
+	for i in 1 .. path.len + 1 {
+		if i < path.len && path[i] != `/` { continue }
+		length := i - start
+		if length == 0 || (length == 1 && path[start] == `.`) || (length == 2 && path[start] == `.` && path[start + 1] == `.`) { return false }
+		start = i + 1
+	}
 	return true
 }
 
 // Resolve parent aliases once; keep the final component (including a link).
 pub fn canonical(path string) !string {
 	if !valid_path(path) { return error('invalid path') }
-	parent := os.real_path(os.dir(path))
+	directory := os.dir(path)
+	name := os.file_name(path)
+	parent := os.real_path(directory)
+	defer { unsafe { directory.free(); name.free(); parent.free() } }
 	if parent == '' || !os.is_dir(parent) { return error('parent unavailable') }
-	return os.join_path(parent, os.file_name(path))
+	return os.join_path(parent, name)
 }
 
 pub fn open_parent(path string) !(int, string) {
 	if !valid_path(path) { return error('invalid path') }
 	parts := path[1..].split('/')
+	defer { unsafe { parts.free() } }
 	mut fd := C.open(c'/', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC, 0)
 	if fd < 0 { return error('root unavailable') }
 	for i in 0 .. parts.len - 1 {
@@ -118,6 +133,11 @@ pub fn identify(path string) !Identity {
 	fd, leaf := open_parent(path)!
 	defer { C.close(fd); unsafe { leaf.free() } }
 	return identify_at(fd, leaf)!
+}
+
+pub fn item_exists(path string) bool {
+	if _ := identify(path) { return true }
+	return false
 }
 
 fn copy_metadata(fd int, id Identity) ! {
@@ -217,6 +237,18 @@ pub fn rename_exclusive(source string, destination string, expected Identity) ! 
 	if !expected.unchanged(identify_at(src, src_name)!) { return error('source changed') }
 	if C.vinix_workflow_rename(src, &char(src_name.str), dst, &char(dst_name.str)) != 0 { return error('move failed (${C.errno})') }
 	if C.fsync(src) != 0 || C.fsync(dst) != 0 { return error('move completed; directory sync failed') }
+}
+
+// Exchange publishes a replacement without a moment when the old destination
+// is missing. The old inode remains at source for undo and crash recovery.
+pub fn exchange(source string, destination string, expected Identity, replaced Identity) ! {
+	src, src_name := open_parent(source)!
+	defer { C.close(src); unsafe { src_name.free() } }
+	dst, dst_name := open_parent(destination)!
+	defer { C.close(dst); unsafe { dst_name.free() } }
+	if !expected.unchanged(identify_at(src, src_name)!) || !replaced.unchanged(identify_at(dst, dst_name)!) { return error('replacement changed') }
+	if C.vinix_workflow_exchange(src, &char(src_name.str), dst, &char(dst_name.str)) != 0 { return error('atomic replacement unavailable (${C.errno}); original retained') }
+	if C.fsync(src) != 0 || C.fsync(dst) != 0 { return error('replacement published; directory sync failed') }
 }
 
 pub fn chmod(path string, expected Identity, mode u32) ! {
