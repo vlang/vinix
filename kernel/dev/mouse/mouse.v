@@ -122,6 +122,9 @@ pub mut:
 	pointer_buttons  u32
 	pointer_pressed  u32
 	pointer_released u32
+	// Wheel movement since /dev/pointer was last read; only a USB pointer
+	// reports any.
+	pointer_scroll   int
 	packet_bytes     int
 	five_buttons     bool
 }
@@ -146,9 +149,11 @@ fn (mut this Pointer) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 		buttons: mouse_res.pointer_buttons
 		pressed: mouse_res.pointer_pressed
 		released: mouse_res.pointer_released
+		scroll: i32(mouse_res.pointer_scroll)
 	}
 	mouse_res.pointer_pressed = 0
 	mouse_res.pointer_released = 0
+	mouse_res.pointer_scroll = 0
 	mouse_res.l.release()
 	this.status &= ~file.pollin
 	this.l.release()
@@ -471,4 +476,79 @@ fn mouse_resume(mut _ devcore.Device) bool {
 	}
 	katomic.store(mut &ps2_mouse_restart, u32(1))
 	return console.pointer_interrupt(true)
+}
+
+// ── A pointer that is not the PS/2 mouse ────────────────────────────────────
+//
+// A USB mouse or tablet (dev/xhci) moves the same pointer, as /dev/pointer
+// gives it: programs read one position whoever moved it. /dev/mouse, which
+// hands out the PS/2 mouse's own packets, hears nothing of these.
+
+// Say that the position changed, to whoever is waiting on /dev/pointer.
+fn pointer_moved() {
+	// A pointer ends a sleep, if it is allowed to.
+	wakesrc.report(.pointer)
+	mut notify := false
+	pointer_res.l.acquire()
+	if pointer_res.status & file.pollin == 0 {
+		pointer_res.status |= file.pollin
+		notify = true
+	}
+	pointer_res.l.release()
+	if notify {
+		event.trigger(mut pointer_res.event, false)
+	}
+}
+
+// A pointer that reports where it is, 0 to `max_x` and 0 to `max_y`, rather
+// than how far it moved, gives /dev/pointer its own range: programs scale
+// from whatever range they are told.
+pub fn usb_declare(absolute bool, max_x int, max_y int) {
+	if !absolute || max_x <= 0 || max_y <= 0 {
+		return
+	}
+	mouse_res.l.acquire()
+	mouse_res.pointer_max_x = max_x
+	mouse_res.pointer_max_y = max_y
+	mouse_res.pointer_x = max_x / 2
+	mouse_res.pointer_y = max_y / 2
+	mouse_res.l.release()
+}
+
+pub fn usb_absolute(x int, y int) {
+	mouse_res.l.acquire()
+	mouse_res.pointer_x = clamp_pointer_axis(x, mouse_res.pointer_max_x)
+	mouse_res.pointer_y = clamp_pointer_axis(y, mouse_res.pointer_max_y)
+	mouse_res.l.release()
+	pointer_moved()
+}
+
+// A USB mouse counts downwards as positive, as the screen does.
+pub fn usb_relative(dx int, dy int) {
+	mouse_res.l.acquire()
+	mouse_res.pointer_x = clamp_pointer_axis(mouse_res.pointer_x + dx, mouse_res.pointer_max_x)
+	mouse_res.pointer_y = clamp_pointer_axis(mouse_res.pointer_y + dy, mouse_res.pointer_max_y)
+	mouse_res.l.release()
+	pointer_moved()
+}
+
+pub fn usb_scroll(delta int) {
+	mouse_res.l.acquire()
+	mouse_res.pointer_scroll += delta
+	mouse_res.l.release()
+	pointer_moved()
+}
+
+// The whole button state, bit 0 the left button, bit 1 the right, bit 2 the
+// middle: the layout /dev/pointer has.
+pub fn usb_buttons(buttons u32) {
+	mouse_res.l.acquire()
+	changed := buttons != mouse_res.pointer_buttons
+	mouse_res.pointer_pressed |= buttons & ~mouse_res.pointer_buttons
+	mouse_res.pointer_released |= mouse_res.pointer_buttons & ~buttons
+	mouse_res.pointer_buttons = buttons
+	mouse_res.l.release()
+	if changed {
+		pointer_moved()
+	}
 }
