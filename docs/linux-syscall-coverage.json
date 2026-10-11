@@ -1,0 +1,4725 @@
+{
+    "baseline": "musl 1.2.5 Linux syscall namespace; native ELF64",
+    "inputs": {
+        "kernel/fs/vfs.v": "32ac2ae0819d4ac9b2fa250bd608d7a5bb7e7b5422c089ea1e42f154e188e3c4",
+        "kernel/syscall/table/linux_common.v": "3cfa7354db5161faf2be8084c4ac0416a5c6a36085437f21b29258f5c2131f59",
+        "kernel/syscall/table/linux_compat.v": "8acae7794b3a78b26636886a19f162ac656ce7b3ef3a8a29d38de4fe3e13cfd1",
+        "kernel/syscall/table/linux_table_amd64.v": "864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9",
+        "kernel/syscall/table/syscall_table_arm64.v": "129d268a8c7fe4ee71489edd257f595db624478c4c54a60ddd9f815de97419a3",
+        "tools/linux-compat/reference/aarch64-syscall.h": "7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816",
+        "tools/linux-compat/reference/x86_64-syscall.h": "c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd"
+    },
+    "syscalls": [
+        {
+            "arch": "aarch64",
+            "number": 0,
+            "name": "io_setup",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 1,
+            "name": "io_destroy",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 2,
+            "name": "io_submit",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 3,
+            "name": "io_cancel",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 4,
+            "name": "io_getevents",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 5,
+            "name": "setxattr",
+            "handler": "fs.syscall_setxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 6,
+            "name": "lsetxattr",
+            "handler": "fs.syscall_lsetxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 7,
+            "name": "fsetxattr",
+            "handler": "fs.syscall_fsetxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 8,
+            "name": "getxattr",
+            "handler": "fs.syscall_getxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 9,
+            "name": "lgetxattr",
+            "handler": "fs.syscall_lgetxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 10,
+            "name": "fgetxattr",
+            "handler": "fs.syscall_fgetxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 11,
+            "name": "listxattr",
+            "handler": "fs.syscall_listxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 12,
+            "name": "llistxattr",
+            "handler": "fs.syscall_llistxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 13,
+            "name": "flistxattr",
+            "handler": "fs.syscall_flistxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 14,
+            "name": "removexattr",
+            "handler": "fs.syscall_removexattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 15,
+            "name": "lremovexattr",
+            "handler": "fs.syscall_lremovexattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 16,
+            "name": "fremovexattr",
+            "handler": "fs.syscall_fremovexattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 17,
+            "name": "getcwd",
+            "handler": "fs.syscall_getcwd",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 18,
+            "name": "lookup_dcookie",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 19,
+            "name": "eventfd2",
+            "handler": "file.syscall_eventfd2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 20,
+            "name": "epoll_create1",
+            "handler": "file.syscall_epoll_create1",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 21,
+            "name": "epoll_ctl",
+            "handler": "file.syscall_epoll_ctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 22,
+            "name": "epoll_pwait",
+            "handler": "file.syscall_epoll_pwait",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 23,
+            "name": "dup",
+            "handler": "syscall_linux_dup",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 24,
+            "name": "dup3",
+            "handler": "file.syscall_dup3",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 25,
+            "name": "fcntl",
+            "handler": "file.syscall_fcntl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 26,
+            "name": "inotify_init1",
+            "handler": "fs.syscall_inotify_init",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 27,
+            "name": "inotify_add_watch",
+            "handler": "fs.syscall_inotify_add_watch",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 28,
+            "name": "inotify_rm_watch",
+            "handler": "fs.syscall_inotify_rm_watch",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 29,
+            "name": "ioctl",
+            "handler": "fs.syscall_ioctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 30,
+            "name": "ioprio_set",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 31,
+            "name": "ioprio_get",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 32,
+            "name": "flock",
+            "handler": "file.syscall_flock",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 33,
+            "name": "mknodat",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 34,
+            "name": "mkdirat",
+            "handler": "fs.syscall_mkdirat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 35,
+            "name": "unlinkat",
+            "handler": "fs.syscall_unlinkat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 36,
+            "name": "symlinkat",
+            "handler": "fs.syscall_symlinkat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 37,
+            "name": "linkat",
+            "handler": "fs.syscall_linkat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 38,
+            "name": "renameat",
+            "handler": "fs.syscall_renameat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 39,
+            "name": "umount2",
+            "handler": "fs.syscall_umount",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 40,
+            "name": "mount",
+            "handler": "fs.syscall_mount",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 41,
+            "name": "pivot_root",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 42,
+            "name": "nfsservctl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 43,
+            "name": "statfs",
+            "handler": "fs.syscall_statfs",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 44,
+            "name": "fstatfs",
+            "handler": "fs.syscall_fstatfs",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 45,
+            "name": "truncate",
+            "handler": "fs.syscall_truncate",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 46,
+            "name": "ftruncate",
+            "handler": "file.syscall_ftruncate",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 47,
+            "name": "fallocate",
+            "handler": "file.syscall_fallocate",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 48,
+            "name": "faccessat",
+            "handler": "syscall_linux_faccessat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 49,
+            "name": "chdir",
+            "handler": "fs.syscall_chdir",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 50,
+            "name": "fchdir",
+            "handler": "fs.syscall_fchdir",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 51,
+            "name": "chroot",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 52,
+            "name": "fchmod",
+            "handler": "fs.syscall_fchmod",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 53,
+            "name": "fchmodat",
+            "handler": "fs.syscall_fchmodat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 54,
+            "name": "fchownat",
+            "handler": "fs.syscall_fchownat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 55,
+            "name": "fchown",
+            "handler": "fs.syscall_fchown",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 56,
+            "name": "openat",
+            "handler": "syscall_linux_openat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 57,
+            "name": "close",
+            "handler": "fs.syscall_close",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 58,
+            "name": "vhangup",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 59,
+            "name": "pipe2",
+            "handler": "pipe.syscall_pipe_checked",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 60,
+            "name": "quotactl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 61,
+            "name": "getdents64",
+            "handler": "syscall_linux_getdents64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 62,
+            "name": "lseek",
+            "handler": "fs.syscall_seek",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 63,
+            "name": "read",
+            "handler": "fs.syscall_read",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 64,
+            "name": "write",
+            "handler": "fs.syscall_write",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 65,
+            "name": "readv",
+            "handler": "syscall_linux_readv",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 66,
+            "name": "writev",
+            "handler": "syscall_linux_writev",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 67,
+            "name": "pread64",
+            "handler": "syscall_linux_pread64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 68,
+            "name": "pwrite64",
+            "handler": "syscall_linux_pwrite64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 69,
+            "name": "preadv",
+            "handler": "syscall_linux_preadv",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 70,
+            "name": "pwritev",
+            "handler": "syscall_linux_pwritev",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 71,
+            "name": "sendfile",
+            "handler": "syscall_linux_sendfile",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 72,
+            "name": "pselect6",
+            "handler": "file.syscall_pselect6",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 73,
+            "name": "ppoll",
+            "handler": "file.syscall_ppoll",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 74,
+            "name": "signalfd4",
+            "handler": "userland.syscall_signalfd4",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 75,
+            "name": "vmsplice",
+            "handler": "pipe.syscall_vmsplice",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 76,
+            "name": "splice",
+            "handler": "pipe.syscall_splice",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 77,
+            "name": "tee",
+            "handler": "pipe.syscall_tee",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 78,
+            "name": "readlinkat",
+            "handler": "fs.syscall_readlinkat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 79,
+            "name": "newfstatat",
+            "handler": "syscall_linux_fstatat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 80,
+            "name": "fstat",
+            "handler": "syscall_linux_fstat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 81,
+            "name": "sync",
+            "handler": "fs.syscall_sync",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 82,
+            "name": "fsync",
+            "handler": "file.syscall_fsync",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 83,
+            "name": "fdatasync",
+            "handler": "file.syscall_fsync",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 84,
+            "name": "sync_file_range",
+            "handler": "file.syscall_sync_file_range",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 85,
+            "name": "timerfd_create",
+            "handler": "file.syscall_timerfd_create",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 86,
+            "name": "timerfd_settime",
+            "handler": "file.syscall_timerfd_settime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 87,
+            "name": "timerfd_gettime",
+            "handler": "file.syscall_timerfd_gettime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 88,
+            "name": "utimensat",
+            "handler": "fs.syscall_utimensat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 89,
+            "name": "acct",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 90,
+            "name": "capget",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 91,
+            "name": "capset",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 92,
+            "name": "personality",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 93,
+            "name": "exit",
+            "handler": "userland.syscall_exit",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 94,
+            "name": "exit_group",
+            "handler": "userland.syscall_exit_group",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 95,
+            "name": "waitid",
+            "handler": "userland.syscall_waitid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 96,
+            "name": "set_tid_address",
+            "handler": "userland.syscall_set_tid_address",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 97,
+            "name": "unshare",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 98,
+            "name": "futex",
+            "handler": "syscall_linux_futex",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 99,
+            "name": "set_robust_list",
+            "handler": "userland.syscall_set_robust_list",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 100,
+            "name": "get_robust_list",
+            "handler": "userland.syscall_get_robust_list",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 101,
+            "name": "nanosleep",
+            "handler": "sys.syscall_nanosleep",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 102,
+            "name": "getitimer",
+            "handler": "syscall_linux_getitimer",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 103,
+            "name": "setitimer",
+            "handler": "syscall_linux_setitimer",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 104,
+            "name": "kexec_load",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 105,
+            "name": "init_module",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 106,
+            "name": "delete_module",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 107,
+            "name": "timer_create",
+            "handler": "posixtimer.syscall_timer_create",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 108,
+            "name": "timer_gettime",
+            "handler": "posixtimer.syscall_timer_gettime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 109,
+            "name": "timer_getoverrun",
+            "handler": "posixtimer.syscall_timer_getoverrun",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 110,
+            "name": "timer_settime",
+            "handler": "posixtimer.syscall_timer_settime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 111,
+            "name": "timer_delete",
+            "handler": "posixtimer.syscall_timer_delete",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 112,
+            "name": "clock_settime",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 113,
+            "name": "clock_gettime",
+            "handler": "sys.syscall_clock_gettime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 114,
+            "name": "clock_getres",
+            "handler": "sys.syscall_clock_getres",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 115,
+            "name": "clock_nanosleep",
+            "handler": "sys.syscall_clock_nanosleep",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 116,
+            "name": "syslog",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 117,
+            "name": "ptrace",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 118,
+            "name": "sched_setparam",
+            "handler": "syscall_linux_sched_setparam",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 119,
+            "name": "sched_setscheduler",
+            "handler": "syscall_linux_sched_setscheduler",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 120,
+            "name": "sched_getscheduler",
+            "handler": "syscall_linux_sched_getscheduler",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 121,
+            "name": "sched_getparam",
+            "handler": "syscall_linux_sched_getparam",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 122,
+            "name": "sched_setaffinity",
+            "handler": "syscall_linux_sched_setaffinity",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 123,
+            "name": "sched_getaffinity",
+            "handler": "syscall_linux_sched_getaffinity",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 124,
+            "name": "sched_yield",
+            "handler": "syscall_linux_sched_yield",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 125,
+            "name": "sched_get_priority_max",
+            "handler": "syscall_linux_sched_get_priority_max",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 126,
+            "name": "sched_get_priority_min",
+            "handler": "syscall_linux_sched_get_priority_min",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 127,
+            "name": "sched_rr_get_interval",
+            "handler": "syscall_linux_sched_rr_get_interval",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 128,
+            "name": "restart_syscall",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 129,
+            "name": "kill",
+            "handler": "userland.syscall_kill",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 130,
+            "name": "tkill",
+            "handler": "userland.syscall_tkill",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 131,
+            "name": "tgkill",
+            "handler": "userland.syscall_tgkill",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 132,
+            "name": "sigaltstack",
+            "handler": "userland.syscall_sigaltstack",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 133,
+            "name": "rt_sigsuspend",
+            "handler": "userland.syscall_rt_sigsuspend",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 134,
+            "name": "rt_sigaction",
+            "handler": "userland.syscall_rt_sigaction",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 135,
+            "name": "rt_sigprocmask",
+            "handler": "userland.syscall_rt_sigprocmask",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 136,
+            "name": "rt_sigpending",
+            "handler": "syscall_linux_rt_sigpending",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 137,
+            "name": "rt_sigtimedwait",
+            "handler": "userland.syscall_rt_sigtimedwait",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 138,
+            "name": "rt_sigqueueinfo",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 139,
+            "name": "rt_sigreturn",
+            "handler": "userland.syscall_sigreturn",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 140,
+            "name": "setpriority",
+            "handler": "syscall_linux_setpriority",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 141,
+            "name": "getpriority",
+            "handler": "syscall_linux_getpriority",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 142,
+            "name": "reboot",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 143,
+            "name": "setregid",
+            "handler": "userland.syscall_setregid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 144,
+            "name": "setgid",
+            "handler": "userland.syscall_setgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 145,
+            "name": "setreuid",
+            "handler": "userland.syscall_setreuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 146,
+            "name": "setuid",
+            "handler": "userland.syscall_setuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 147,
+            "name": "setresuid",
+            "handler": "userland.syscall_setresuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 148,
+            "name": "getresuid",
+            "handler": "userland.syscall_getresuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 149,
+            "name": "setresgid",
+            "handler": "userland.syscall_setresgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 150,
+            "name": "getresgid",
+            "handler": "userland.syscall_getresgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 151,
+            "name": "setfsuid",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 152,
+            "name": "setfsgid",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 153,
+            "name": "times",
+            "handler": "syscall_linux_times",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 154,
+            "name": "setpgid",
+            "handler": "syscall_linux_setpgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 155,
+            "name": "getpgid",
+            "handler": "syscall_linux_getpgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 156,
+            "name": "getsid",
+            "handler": "userland.syscall_getsid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 157,
+            "name": "setsid",
+            "handler": "userland.syscall_setsid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 158,
+            "name": "getgroups",
+            "handler": "userland.syscall_getgroups",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 159,
+            "name": "setgroups",
+            "handler": "userland.syscall_setgroups",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 160,
+            "name": "uname",
+            "handler": "syscall_linux_uname",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 161,
+            "name": "sethostname",
+            "handler": "net.syscall_sethostname",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 162,
+            "name": "setdomainname",
+            "handler": "net.syscall_setdomainname",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 163,
+            "name": "getrlimit",
+            "handler": "syscall_linux_getrlimit",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 164,
+            "name": "setrlimit",
+            "handler": "syscall_linux_setrlimit",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 165,
+            "name": "getrusage",
+            "handler": "sys.syscall_getrusage",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 166,
+            "name": "umask",
+            "handler": "fs.syscall_umask",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 167,
+            "name": "prctl",
+            "handler": "syscall_linux_prctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 168,
+            "name": "getcpu",
+            "handler": "numa.syscall_getcpu",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 169,
+            "name": "gettimeofday",
+            "handler": "sys.syscall_gettimeofday",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 170,
+            "name": "settimeofday",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 171,
+            "name": "adjtimex",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 172,
+            "name": "getpid",
+            "handler": "userland.syscall_getpid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 173,
+            "name": "getppid",
+            "handler": "userland.syscall_getppid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 174,
+            "name": "getuid",
+            "handler": "userland.syscall_getuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 175,
+            "name": "geteuid",
+            "handler": "userland.syscall_geteuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 176,
+            "name": "getgid",
+            "handler": "userland.syscall_getgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 177,
+            "name": "getegid",
+            "handler": "userland.syscall_getegid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 178,
+            "name": "gettid",
+            "handler": "syscall_linux_gettid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 179,
+            "name": "sysinfo",
+            "handler": "sys.syscall_sysinfo",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 180,
+            "name": "mq_open",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 181,
+            "name": "mq_unlink",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 182,
+            "name": "mq_timedsend",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 183,
+            "name": "mq_timedreceive",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 184,
+            "name": "mq_notify",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 185,
+            "name": "mq_getsetattr",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 186,
+            "name": "msgget",
+            "handler": "sysvmsg.syscall_msgget",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 187,
+            "name": "msgctl",
+            "handler": "sysvmsg.syscall_msgctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 188,
+            "name": "msgrcv",
+            "handler": "sysvmsg.syscall_msgrcv",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 189,
+            "name": "msgsnd",
+            "handler": "sysvmsg.syscall_msgsnd",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 190,
+            "name": "semget",
+            "handler": "sysvsem.syscall_semget",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 191,
+            "name": "semctl",
+            "handler": "sysvsem.syscall_semctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 192,
+            "name": "semtimedop",
+            "handler": "sysvsem.syscall_semtimedop",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 193,
+            "name": "semop",
+            "handler": "sysvsem.syscall_semop",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 194,
+            "name": "shmget",
+            "handler": "sysvshm.syscall_shmget",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 195,
+            "name": "shmctl",
+            "handler": "sysvshm.syscall_shmctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 196,
+            "name": "shmat",
+            "handler": "sysvshm.syscall_shmat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 197,
+            "name": "shmdt",
+            "handler": "sysvshm.syscall_shmdt",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 198,
+            "name": "socket",
+            "handler": "socket.syscall_socket",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 199,
+            "name": "socketpair",
+            "handler": "socket.syscall_socketpair",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 200,
+            "name": "bind",
+            "handler": "socket.syscall_bind",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 201,
+            "name": "listen",
+            "handler": "socket.syscall_listen",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 202,
+            "name": "accept",
+            "handler": "syscall_linux_accept",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 203,
+            "name": "connect",
+            "handler": "socket.syscall_connect",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 204,
+            "name": "getsockname",
+            "handler": "socket.syscall_getsockname",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 205,
+            "name": "getpeername",
+            "handler": "socket.syscall_getpeername",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 206,
+            "name": "sendto",
+            "handler": "syscall_linux_sendto",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 207,
+            "name": "recvfrom",
+            "handler": "syscall_linux_recvfrom",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 208,
+            "name": "setsockopt",
+            "handler": "socket.syscall_setsockopt",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 209,
+            "name": "getsockopt",
+            "handler": "socket.syscall_getsockopt",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 210,
+            "name": "shutdown",
+            "handler": "socket.syscall_shutdown",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 211,
+            "name": "sendmsg",
+            "handler": "syscall_linux_sendmsg",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 212,
+            "name": "recvmsg",
+            "handler": "socket.syscall_recvmsg",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 213,
+            "name": "readahead",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 214,
+            "name": "brk",
+            "handler": "mmap.syscall_brk",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 215,
+            "name": "munmap",
+            "handler": "mmap.syscall_munmap",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 216,
+            "name": "mremap",
+            "handler": "mmap.syscall_mremap",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 217,
+            "name": "add_key",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 218,
+            "name": "request_key",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 219,
+            "name": "keyctl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 220,
+            "name": "clone",
+            "handler": "userland.syscall_clone",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 221,
+            "name": "execve",
+            "handler": "userland.syscall_execve",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 222,
+            "name": "mmap",
+            "handler": "syscall_linux_mmap",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 223,
+            "name": "fadvise64",
+            "handler": "file.syscall_fadvise64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 224,
+            "name": "swapon",
+            "handler": "fs.syscall_swapon",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 225,
+            "name": "swapoff",
+            "handler": "fs.syscall_swapoff",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 226,
+            "name": "mprotect",
+            "handler": "mmap.syscall_mprotect",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 227,
+            "name": "msync",
+            "handler": "mmap.syscall_msync",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 228,
+            "name": "mlock",
+            "handler": "mmap.syscall_mlock",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 229,
+            "name": "munlock",
+            "handler": "mmap.syscall_munlock",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 230,
+            "name": "mlockall",
+            "handler": "mmap.syscall_mlockall",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 231,
+            "name": "munlockall",
+            "handler": "mmap.syscall_munlockall",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 232,
+            "name": "mincore",
+            "handler": "mmap.syscall_mincore",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 233,
+            "name": "madvise",
+            "handler": "mmap.syscall_madvise",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 234,
+            "name": "remap_file_pages",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 235,
+            "name": "mbind",
+            "handler": "numa.syscall_mbind",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 236,
+            "name": "get_mempolicy",
+            "handler": "numa.syscall_get_mempolicy",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 237,
+            "name": "set_mempolicy",
+            "handler": "numa.syscall_set_mempolicy",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 238,
+            "name": "migrate_pages",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 239,
+            "name": "move_pages",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 240,
+            "name": "rt_tgsigqueueinfo",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 241,
+            "name": "perf_event_open",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 242,
+            "name": "accept4",
+            "handler": "syscall_linux_accept4",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 243,
+            "name": "recvmmsg",
+            "handler": "syscall_linux_recvmmsg",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 245,
+            "name": "vinix_private",
+            "handler": "cpu.syscall_set_tls",
+            "status": "private"
+        },
+        {
+            "arch": "aarch64",
+            "number": 246,
+            "name": "vinix_private",
+            "handler": "userland.syscall_sigentry",
+            "status": "private"
+        },
+        {
+            "arch": "aarch64",
+            "number": 260,
+            "name": "wait4",
+            "handler": "userland.syscall_wait4",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 261,
+            "name": "prlimit64",
+            "handler": "syscall_linux_prlimit64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 262,
+            "name": "fanotify_init",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 263,
+            "name": "fanotify_mark",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 264,
+            "name": "name_to_handle_at",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 265,
+            "name": "open_by_handle_at",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 266,
+            "name": "clock_adjtime",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 267,
+            "name": "syncfs",
+            "handler": "fs.syscall_syncfs",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 268,
+            "name": "setns",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 269,
+            "name": "sendmmsg",
+            "handler": "syscall_linux_sendmmsg",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 270,
+            "name": "process_vm_readv",
+            "handler": "syscall_linux_process_vm_readv",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 271,
+            "name": "process_vm_writev",
+            "handler": "syscall_linux_process_vm_writev",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 272,
+            "name": "kcmp",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 273,
+            "name": "finit_module",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 274,
+            "name": "sched_setattr",
+            "handler": "syscall_linux_sched_setattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 275,
+            "name": "sched_getattr",
+            "handler": "syscall_linux_sched_getattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 276,
+            "name": "renameat2",
+            "handler": "fs.syscall_renameat2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 277,
+            "name": "seccomp",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 278,
+            "name": "getrandom",
+            "handler": "syscall_linux_getrandom",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 279,
+            "name": "memfd_create",
+            "handler": "fs.syscall_memfd_create",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 280,
+            "name": "bpf",
+            "handler": "syscall_linux_bpf",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 281,
+            "name": "execveat",
+            "handler": "userland.syscall_execveat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 282,
+            "name": "userfaultfd",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 283,
+            "name": "membarrier",
+            "handler": "syscall_linux_membarrier",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 284,
+            "name": "mlock2",
+            "handler": "mmap.syscall_mlock2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 285,
+            "name": "copy_file_range",
+            "handler": "pipe.syscall_copy_file_range",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 286,
+            "name": "preadv2",
+            "handler": "syscall_linux_preadv2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 287,
+            "name": "pwritev2",
+            "handler": "syscall_linux_pwritev2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 288,
+            "name": "pkey_mprotect",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 289,
+            "name": "pkey_alloc",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 290,
+            "name": "pkey_free",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 291,
+            "name": "statx",
+            "handler": "syscall_linux_statx",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 292,
+            "name": "io_pgetevents",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 293,
+            "name": "rseq",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 294,
+            "name": "kexec_file_load",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 424,
+            "name": "pidfd_send_signal",
+            "handler": "userland.syscall_pidfd_send_signal",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 425,
+            "name": "io_uring_setup",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 426,
+            "name": "io_uring_enter",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 427,
+            "name": "io_uring_register",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 428,
+            "name": "open_tree",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 429,
+            "name": "move_mount",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 430,
+            "name": "fsopen",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 431,
+            "name": "fsconfig",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 432,
+            "name": "fsmount",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 433,
+            "name": "fspick",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 434,
+            "name": "pidfd_open",
+            "handler": "userland.syscall_pidfd_open",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 435,
+            "name": "clone3",
+            "handler": "userland.syscall_clone3",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 436,
+            "name": "close_range",
+            "handler": "file.syscall_close_range",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 437,
+            "name": "openat2",
+            "handler": "syscall_linux_openat2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 438,
+            "name": "pidfd_getfd",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 439,
+            "name": "faccessat2",
+            "handler": "syscall_linux_faccessat2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 440,
+            "name": "process_madvise",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 441,
+            "name": "epoll_pwait2",
+            "handler": "file.syscall_epoll_pwait2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "aarch64",
+            "number": 442,
+            "name": "mount_setattr",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 444,
+            "name": "landlock_create_ruleset",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 445,
+            "name": "landlock_add_rule",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 446,
+            "name": "landlock_restrict_self",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 448,
+            "name": "process_mrelease",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 449,
+            "name": "futex_waitv",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 450,
+            "name": "set_mempolicy_home_node",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 451,
+            "name": "cachestat",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 452,
+            "name": "fchmodat2",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "aarch64",
+            "number": 511,
+            "name": "vinix_private",
+            "handler": "syscall_seccomp_verdict",
+            "status": "private"
+        },
+        {
+            "arch": "x86_64",
+            "number": 0,
+            "name": "read",
+            "handler": "fs.syscall_read",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 1,
+            "name": "write",
+            "handler": "fs.syscall_write",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 2,
+            "name": "open",
+            "handler": "syscall_linux_open",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 3,
+            "name": "close",
+            "handler": "fs.syscall_close",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 4,
+            "name": "stat",
+            "handler": "syscall_linux_stat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 5,
+            "name": "fstat",
+            "handler": "syscall_linux_fstat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 6,
+            "name": "lstat",
+            "handler": "syscall_linux_lstat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 7,
+            "name": "poll",
+            "handler": "file.syscall_poll",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 8,
+            "name": "lseek",
+            "handler": "fs.syscall_seek",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 9,
+            "name": "mmap",
+            "handler": "syscall_linux_mmap",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 10,
+            "name": "mprotect",
+            "handler": "mmap.syscall_mprotect",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 11,
+            "name": "munmap",
+            "handler": "mmap.syscall_munmap",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 12,
+            "name": "brk",
+            "handler": "mmap.syscall_brk",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 13,
+            "name": "rt_sigaction",
+            "handler": "userland.syscall_rt_sigaction",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 14,
+            "name": "rt_sigprocmask",
+            "handler": "userland.syscall_rt_sigprocmask",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 15,
+            "name": "rt_sigreturn",
+            "handler": "userland.syscall_linux_rt_sigreturn",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 16,
+            "name": "ioctl",
+            "handler": "fs.syscall_ioctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 17,
+            "name": "pread64",
+            "handler": "syscall_linux_pread64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 18,
+            "name": "pwrite64",
+            "handler": "syscall_linux_pwrite64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 19,
+            "name": "readv",
+            "handler": "syscall_linux_readv",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 20,
+            "name": "writev",
+            "handler": "syscall_linux_writev",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 21,
+            "name": "access",
+            "handler": "syscall_linux_access",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 22,
+            "name": "pipe",
+            "handler": "syscall_linux_pipe",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 23,
+            "name": "select",
+            "handler": "file.syscall_select",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 24,
+            "name": "sched_yield",
+            "handler": "syscall_linux_sched_yield",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 25,
+            "name": "mremap",
+            "handler": "mmap.syscall_mremap",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 26,
+            "name": "msync",
+            "handler": "mmap.syscall_msync",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 27,
+            "name": "mincore",
+            "handler": "mmap.syscall_mincore",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 28,
+            "name": "madvise",
+            "handler": "mmap.syscall_madvise",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 29,
+            "name": "shmget",
+            "handler": "sysvshm.syscall_shmget",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 30,
+            "name": "shmat",
+            "handler": "sysvshm.syscall_shmat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 31,
+            "name": "shmctl",
+            "handler": "sysvshm.syscall_shmctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 32,
+            "name": "dup",
+            "handler": "syscall_linux_dup",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 33,
+            "name": "dup2",
+            "handler": "syscall_linux_dup2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 34,
+            "name": "pause",
+            "handler": "userland.syscall_pause",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 35,
+            "name": "nanosleep",
+            "handler": "sys.syscall_nanosleep",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 36,
+            "name": "getitimer",
+            "handler": "syscall_linux_getitimer",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 37,
+            "name": "alarm",
+            "handler": "syscall_linux_alarm",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 38,
+            "name": "setitimer",
+            "handler": "syscall_linux_setitimer",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 39,
+            "name": "getpid",
+            "handler": "userland.syscall_getpid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 40,
+            "name": "sendfile",
+            "handler": "syscall_linux_sendfile",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 41,
+            "name": "socket",
+            "handler": "socket.syscall_socket",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 42,
+            "name": "connect",
+            "handler": "socket.syscall_connect",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 43,
+            "name": "accept",
+            "handler": "syscall_linux_accept",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 44,
+            "name": "sendto",
+            "handler": "socket.syscall_sendto",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 45,
+            "name": "recvfrom",
+            "handler": "socket.syscall_recvfrom",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 46,
+            "name": "sendmsg",
+            "handler": "socket.syscall_sendmsg",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 47,
+            "name": "recvmsg",
+            "handler": "socket.syscall_recvmsg",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 48,
+            "name": "shutdown",
+            "handler": "socket.syscall_shutdown",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 49,
+            "name": "bind",
+            "handler": "socket.syscall_bind",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 50,
+            "name": "listen",
+            "handler": "socket.syscall_listen",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 51,
+            "name": "getsockname",
+            "handler": "socket.syscall_getsockname",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 52,
+            "name": "getpeername",
+            "handler": "socket.syscall_getpeername",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 53,
+            "name": "socketpair",
+            "handler": "socket.syscall_socketpair",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 54,
+            "name": "setsockopt",
+            "handler": "socket.syscall_setsockopt",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 55,
+            "name": "getsockopt",
+            "handler": "socket.syscall_getsockopt",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 56,
+            "name": "clone",
+            "handler": "userland.syscall_clone",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 57,
+            "name": "fork",
+            "handler": "userland.syscall_fork",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 58,
+            "name": "vfork",
+            "handler": "userland.syscall_vfork",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 59,
+            "name": "execve",
+            "handler": "userland.syscall_execve",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 60,
+            "name": "exit",
+            "handler": "userland.syscall_exit",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 61,
+            "name": "wait4",
+            "handler": "userland.syscall_wait4",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 62,
+            "name": "kill",
+            "handler": "userland.syscall_kill",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 63,
+            "name": "uname",
+            "handler": "syscall_linux_uname",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 64,
+            "name": "semget",
+            "handler": "sysvsem.syscall_semget",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 65,
+            "name": "semop",
+            "handler": "sysvsem.syscall_semop",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 66,
+            "name": "semctl",
+            "handler": "sysvsem.syscall_semctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 67,
+            "name": "shmdt",
+            "handler": "sysvshm.syscall_shmdt",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 68,
+            "name": "msgget",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 69,
+            "name": "msgsnd",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 70,
+            "name": "msgrcv",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 71,
+            "name": "msgctl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 72,
+            "name": "fcntl",
+            "handler": "file.syscall_fcntl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 73,
+            "name": "flock",
+            "handler": "file.syscall_flock",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 74,
+            "name": "fsync",
+            "handler": "file.syscall_fsync",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 75,
+            "name": "fdatasync",
+            "handler": "file.syscall_fsync",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 76,
+            "name": "truncate",
+            "handler": "fs.syscall_truncate",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 77,
+            "name": "ftruncate",
+            "handler": "file.syscall_ftruncate",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 78,
+            "name": "getdents",
+            "handler": "syscall_linux_getdents",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 79,
+            "name": "getcwd",
+            "handler": "fs.syscall_getcwd",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 80,
+            "name": "chdir",
+            "handler": "fs.syscall_chdir",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 81,
+            "name": "fchdir",
+            "handler": "fs.syscall_fchdir",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 82,
+            "name": "rename",
+            "handler": "syscall_linux_rename",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 83,
+            "name": "mkdir",
+            "handler": "syscall_linux_mkdir",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 84,
+            "name": "rmdir",
+            "handler": "syscall_linux_rmdir",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 85,
+            "name": "creat",
+            "handler": "syscall_linux_creat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 86,
+            "name": "link",
+            "handler": "syscall_linux_link",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 87,
+            "name": "unlink",
+            "handler": "syscall_linux_unlink",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 88,
+            "name": "symlink",
+            "handler": "syscall_linux_symlink",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 89,
+            "name": "readlink",
+            "handler": "syscall_linux_readlink",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 90,
+            "name": "chmod",
+            "handler": "syscall_linux_chmod",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 91,
+            "name": "fchmod",
+            "handler": "fs.syscall_fchmod",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 92,
+            "name": "chown",
+            "handler": "syscall_linux_chown",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 93,
+            "name": "fchown",
+            "handler": "fs.syscall_fchown",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 94,
+            "name": "lchown",
+            "handler": "syscall_linux_lchown",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 95,
+            "name": "umask",
+            "handler": "fs.syscall_umask",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 96,
+            "name": "gettimeofday",
+            "handler": "sys.syscall_gettimeofday",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 97,
+            "name": "getrlimit",
+            "handler": "syscall_linux_getrlimit",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 98,
+            "name": "getrusage",
+            "handler": "sys.syscall_getrusage",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 99,
+            "name": "sysinfo",
+            "handler": "sys.syscall_sysinfo",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 100,
+            "name": "times",
+            "handler": "syscall_linux_times",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 101,
+            "name": "ptrace",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 102,
+            "name": "getuid",
+            "handler": "userland.syscall_getuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 103,
+            "name": "syslog",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 104,
+            "name": "getgid",
+            "handler": "userland.syscall_getgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 105,
+            "name": "setuid",
+            "handler": "userland.syscall_setuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 106,
+            "name": "setgid",
+            "handler": "userland.syscall_setgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 107,
+            "name": "geteuid",
+            "handler": "userland.syscall_geteuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 108,
+            "name": "getegid",
+            "handler": "userland.syscall_getegid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 109,
+            "name": "setpgid",
+            "handler": "syscall_linux_setpgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 110,
+            "name": "getppid",
+            "handler": "userland.syscall_getppid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 111,
+            "name": "getpgrp",
+            "handler": "syscall_linux_getpgrp",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 112,
+            "name": "setsid",
+            "handler": "userland.syscall_setsid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 113,
+            "name": "setreuid",
+            "handler": "userland.syscall_setreuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 114,
+            "name": "setregid",
+            "handler": "userland.syscall_setregid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 115,
+            "name": "getgroups",
+            "handler": "userland.syscall_getgroups",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 116,
+            "name": "setgroups",
+            "handler": "userland.syscall_setgroups",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 117,
+            "name": "setresuid",
+            "handler": "userland.syscall_setresuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 118,
+            "name": "getresuid",
+            "handler": "userland.syscall_getresuid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 119,
+            "name": "setresgid",
+            "handler": "userland.syscall_setresgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 120,
+            "name": "getresgid",
+            "handler": "userland.syscall_getresgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 121,
+            "name": "getpgid",
+            "handler": "syscall_linux_getpgid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 122,
+            "name": "setfsuid",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 123,
+            "name": "setfsgid",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 124,
+            "name": "getsid",
+            "handler": "userland.syscall_getsid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 125,
+            "name": "capget",
+            "handler": "syscall_linux_capget",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 126,
+            "name": "capset",
+            "handler": "syscall_linux_capset",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 127,
+            "name": "rt_sigpending",
+            "handler": "syscall_linux_rt_sigpending",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 128,
+            "name": "rt_sigtimedwait",
+            "handler": "userland.syscall_rt_sigtimedwait",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 129,
+            "name": "rt_sigqueueinfo",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 130,
+            "name": "rt_sigsuspend",
+            "handler": "userland.syscall_rt_sigsuspend",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 131,
+            "name": "sigaltstack",
+            "handler": "userland.syscall_sigaltstack",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 132,
+            "name": "utime",
+            "handler": "syscall_linux_utime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 133,
+            "name": "mknod",
+            "handler": "syscall_linux_mknod",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 134,
+            "name": "uselib",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 135,
+            "name": "personality",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 136,
+            "name": "ustat",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 137,
+            "name": "statfs",
+            "handler": "fs.syscall_statfs",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 138,
+            "name": "fstatfs",
+            "handler": "fs.syscall_fstatfs",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 139,
+            "name": "sysfs",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 140,
+            "name": "getpriority",
+            "handler": "syscall_linux_getpriority",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 141,
+            "name": "setpriority",
+            "handler": "syscall_linux_setpriority",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 142,
+            "name": "sched_setparam",
+            "handler": "syscall_linux_sched_setparam",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 143,
+            "name": "sched_getparam",
+            "handler": "syscall_linux_sched_getparam",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 144,
+            "name": "sched_setscheduler",
+            "handler": "syscall_linux_sched_setscheduler",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 145,
+            "name": "sched_getscheduler",
+            "handler": "syscall_linux_sched_getscheduler",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 146,
+            "name": "sched_get_priority_max",
+            "handler": "syscall_linux_sched_get_priority_max",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 147,
+            "name": "sched_get_priority_min",
+            "handler": "syscall_linux_sched_get_priority_min",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 148,
+            "name": "sched_rr_get_interval",
+            "handler": "syscall_linux_sched_rr_get_interval",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 149,
+            "name": "mlock",
+            "handler": "mmap.syscall_mlock",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 150,
+            "name": "munlock",
+            "handler": "mmap.syscall_munlock",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 151,
+            "name": "mlockall",
+            "handler": "mmap.syscall_mlockall",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 152,
+            "name": "munlockall",
+            "handler": "mmap.syscall_munlockall",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 153,
+            "name": "vhangup",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 154,
+            "name": "modify_ldt",
+            "handler": "syscall_linux_modify_ldt",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 155,
+            "name": "pivot_root",
+            "handler": "fs.syscall_pivot_root",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 156,
+            "name": "_sysctl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 157,
+            "name": "prctl",
+            "handler": "syscall_container_prctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 158,
+            "name": "arch_prctl",
+            "handler": "syscall_linux_arch_prctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 159,
+            "name": "adjtimex",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 160,
+            "name": "setrlimit",
+            "handler": "syscall_linux_setrlimit",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 161,
+            "name": "chroot",
+            "handler": "fs.syscall_chroot",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 162,
+            "name": "sync",
+            "handler": "fs.syscall_sync",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 163,
+            "name": "acct",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 164,
+            "name": "settimeofday",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 165,
+            "name": "mount",
+            "handler": "fs.syscall_mount",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 166,
+            "name": "umount2",
+            "handler": "fs.syscall_umount",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 167,
+            "name": "swapon",
+            "handler": "fs.syscall_swapon",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 168,
+            "name": "swapoff",
+            "handler": "fs.syscall_swapoff",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 169,
+            "name": "reboot",
+            "handler": "syscall_linux_reboot",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 170,
+            "name": "sethostname",
+            "handler": "net.syscall_sethostname",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 171,
+            "name": "setdomainname",
+            "handler": "net.syscall_setdomainname",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 172,
+            "name": "iopl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 173,
+            "name": "ioperm",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 174,
+            "name": "create_module",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 175,
+            "name": "init_module",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 176,
+            "name": "delete_module",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 177,
+            "name": "get_kernel_syms",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 178,
+            "name": "query_module",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 179,
+            "name": "quotactl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 180,
+            "name": "nfsservctl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 181,
+            "name": "getpmsg",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 182,
+            "name": "putpmsg",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 183,
+            "name": "afs_syscall",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 184,
+            "name": "tuxcall",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 185,
+            "name": "security",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 186,
+            "name": "gettid",
+            "handler": "syscall_linux_gettid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 187,
+            "name": "readahead",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 188,
+            "name": "setxattr",
+            "handler": "fs.syscall_setxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 189,
+            "name": "lsetxattr",
+            "handler": "fs.syscall_lsetxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 190,
+            "name": "fsetxattr",
+            "handler": "fs.syscall_fsetxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 191,
+            "name": "getxattr",
+            "handler": "fs.syscall_getxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 192,
+            "name": "lgetxattr",
+            "handler": "fs.syscall_lgetxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 193,
+            "name": "fgetxattr",
+            "handler": "fs.syscall_fgetxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 194,
+            "name": "listxattr",
+            "handler": "fs.syscall_listxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 195,
+            "name": "llistxattr",
+            "handler": "fs.syscall_llistxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 196,
+            "name": "flistxattr",
+            "handler": "fs.syscall_flistxattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 197,
+            "name": "removexattr",
+            "handler": "fs.syscall_removexattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 198,
+            "name": "lremovexattr",
+            "handler": "fs.syscall_lremovexattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 199,
+            "name": "fremovexattr",
+            "handler": "fs.syscall_fremovexattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 200,
+            "name": "tkill",
+            "handler": "userland.syscall_tkill",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 201,
+            "name": "time",
+            "handler": "syscall_linux_time",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 202,
+            "name": "futex",
+            "handler": "syscall_linux_futex",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 203,
+            "name": "sched_setaffinity",
+            "handler": "syscall_linux_sched_setaffinity",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 204,
+            "name": "sched_getaffinity",
+            "handler": "syscall_linux_sched_getaffinity",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 205,
+            "name": "set_thread_area",
+            "handler": "syscall_linux_set_thread_area",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 206,
+            "name": "io_setup",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 207,
+            "name": "io_destroy",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 208,
+            "name": "io_getevents",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 209,
+            "name": "io_submit",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 210,
+            "name": "io_cancel",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 211,
+            "name": "get_thread_area",
+            "handler": "syscall_linux_get_thread_area",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 212,
+            "name": "lookup_dcookie",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 213,
+            "name": "epoll_create",
+            "handler": "syscall_linux_epoll_create",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 214,
+            "name": "epoll_ctl_old",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 215,
+            "name": "epoll_wait_old",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 216,
+            "name": "remap_file_pages",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 217,
+            "name": "getdents64",
+            "handler": "syscall_linux_getdents64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 218,
+            "name": "set_tid_address",
+            "handler": "userland.syscall_set_tid_address",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 219,
+            "name": "restart_syscall",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 220,
+            "name": "semtimedop",
+            "handler": "sysvsem.syscall_semtimedop",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 221,
+            "name": "fadvise64",
+            "handler": "file.syscall_fadvise64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 222,
+            "name": "timer_create",
+            "handler": "posixtimer.syscall_timer_create",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 223,
+            "name": "timer_settime",
+            "handler": "posixtimer.syscall_timer_settime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 224,
+            "name": "timer_gettime",
+            "handler": "posixtimer.syscall_timer_gettime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 225,
+            "name": "timer_getoverrun",
+            "handler": "posixtimer.syscall_timer_getoverrun",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 226,
+            "name": "timer_delete",
+            "handler": "posixtimer.syscall_timer_delete",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 227,
+            "name": "clock_settime",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 228,
+            "name": "clock_gettime",
+            "handler": "sys.syscall_clock_gettime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 229,
+            "name": "clock_getres",
+            "handler": "sys.syscall_clock_getres",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 230,
+            "name": "clock_nanosleep",
+            "handler": "sys.syscall_clock_nanosleep",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 231,
+            "name": "exit_group",
+            "handler": "userland.syscall_exit_group",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 232,
+            "name": "epoll_wait",
+            "handler": "syscall_linux_epoll_wait",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 233,
+            "name": "epoll_ctl",
+            "handler": "file.syscall_epoll_ctl",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 234,
+            "name": "tgkill",
+            "handler": "userland.syscall_tgkill",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 235,
+            "name": "utimes",
+            "handler": "syscall_linux_utimes",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 236,
+            "name": "vserver",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 237,
+            "name": "mbind",
+            "handler": "numa.syscall_mbind",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 238,
+            "name": "set_mempolicy",
+            "handler": "numa.syscall_set_mempolicy",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 239,
+            "name": "get_mempolicy",
+            "handler": "numa.syscall_get_mempolicy",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 240,
+            "name": "mq_open",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 241,
+            "name": "mq_unlink",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 242,
+            "name": "mq_timedsend",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 243,
+            "name": "mq_timedreceive",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 244,
+            "name": "mq_notify",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 245,
+            "name": "mq_getsetattr",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 246,
+            "name": "kexec_load",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 247,
+            "name": "waitid",
+            "handler": "userland.syscall_waitid",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 248,
+            "name": "add_key",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 249,
+            "name": "request_key",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 250,
+            "name": "keyctl",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 251,
+            "name": "ioprio_set",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 252,
+            "name": "ioprio_get",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 253,
+            "name": "inotify_init",
+            "handler": "syscall_linux_inotify_init",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 254,
+            "name": "inotify_add_watch",
+            "handler": "fs.syscall_inotify_add_watch",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 255,
+            "name": "inotify_rm_watch",
+            "handler": "fs.syscall_inotify_rm_watch",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 256,
+            "name": "migrate_pages",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 257,
+            "name": "openat",
+            "handler": "syscall_linux_openat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 258,
+            "name": "mkdirat",
+            "handler": "fs.syscall_mkdirat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 259,
+            "name": "mknodat",
+            "handler": "fs.syscall_mknodat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 260,
+            "name": "fchownat",
+            "handler": "fs.syscall_fchownat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 261,
+            "name": "futimesat",
+            "handler": "syscall_linux_futimesat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 262,
+            "name": "newfstatat",
+            "handler": "syscall_linux_fstatat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 263,
+            "name": "unlinkat",
+            "handler": "fs.syscall_unlinkat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 264,
+            "name": "renameat",
+            "handler": "fs.syscall_renameat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 265,
+            "name": "linkat",
+            "handler": "fs.syscall_linkat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 266,
+            "name": "symlinkat",
+            "handler": "fs.syscall_symlinkat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 267,
+            "name": "readlinkat",
+            "handler": "fs.syscall_readlinkat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 268,
+            "name": "fchmodat",
+            "handler": "fs.syscall_fchmodat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 269,
+            "name": "faccessat",
+            "handler": "syscall_linux_faccessat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 270,
+            "name": "pselect6",
+            "handler": "file.syscall_pselect6",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 271,
+            "name": "ppoll",
+            "handler": "file.syscall_ppoll",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 272,
+            "name": "unshare",
+            "handler": "fs.syscall_unshare",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 273,
+            "name": "set_robust_list",
+            "handler": "userland.syscall_set_robust_list",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 274,
+            "name": "get_robust_list",
+            "handler": "userland.syscall_get_robust_list",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 275,
+            "name": "splice",
+            "handler": "pipe.syscall_splice",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 276,
+            "name": "tee",
+            "handler": "pipe.syscall_tee",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 277,
+            "name": "sync_file_range",
+            "handler": "file.syscall_sync_file_range",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 278,
+            "name": "vmsplice",
+            "handler": "pipe.syscall_vmsplice",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 279,
+            "name": "move_pages",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 280,
+            "name": "utimensat",
+            "handler": "fs.syscall_utimensat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 281,
+            "name": "epoll_pwait",
+            "handler": "file.syscall_epoll_pwait",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 282,
+            "name": "signalfd",
+            "handler": "syscall_linux_signalfd",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 283,
+            "name": "timerfd_create",
+            "handler": "file.syscall_timerfd_create",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 284,
+            "name": "eventfd",
+            "handler": "syscall_linux_eventfd",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 285,
+            "name": "fallocate",
+            "handler": "file.syscall_fallocate",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 286,
+            "name": "timerfd_settime",
+            "handler": "file.syscall_timerfd_settime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 287,
+            "name": "timerfd_gettime",
+            "handler": "file.syscall_timerfd_gettime",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 288,
+            "name": "accept4",
+            "handler": "syscall_linux_accept4",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 289,
+            "name": "signalfd4",
+            "handler": "userland.syscall_signalfd4",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 290,
+            "name": "eventfd2",
+            "handler": "file.syscall_eventfd2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 291,
+            "name": "epoll_create1",
+            "handler": "file.syscall_epoll_create1",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 292,
+            "name": "dup3",
+            "handler": "file.syscall_dup3",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 293,
+            "name": "pipe2",
+            "handler": "pipe.syscall_pipe_checked",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 294,
+            "name": "inotify_init1",
+            "handler": "fs.syscall_inotify_init",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 295,
+            "name": "preadv",
+            "handler": "syscall_linux_preadv",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 296,
+            "name": "pwritev",
+            "handler": "syscall_linux_pwritev",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 297,
+            "name": "rt_tgsigqueueinfo",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 298,
+            "name": "perf_event_open",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 299,
+            "name": "recvmmsg",
+            "handler": "syscall_linux_recvmmsg",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 300,
+            "name": "fanotify_init",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 301,
+            "name": "fanotify_mark",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 302,
+            "name": "prlimit64",
+            "handler": "syscall_linux_prlimit64",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 303,
+            "name": "name_to_handle_at",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 304,
+            "name": "open_by_handle_at",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 305,
+            "name": "clock_adjtime",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 306,
+            "name": "syncfs",
+            "handler": "fs.syscall_syncfs",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 307,
+            "name": "sendmmsg",
+            "handler": "syscall_linux_sendmmsg",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 308,
+            "name": "setns",
+            "handler": "fs.syscall_setns",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 309,
+            "name": "getcpu",
+            "handler": "numa.syscall_getcpu",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 310,
+            "name": "process_vm_readv",
+            "handler": "syscall_linux_process_vm_readv",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 311,
+            "name": "process_vm_writev",
+            "handler": "syscall_linux_process_vm_writev",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 312,
+            "name": "kcmp",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 313,
+            "name": "finit_module",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 314,
+            "name": "sched_setattr",
+            "handler": "syscall_linux_sched_setattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 315,
+            "name": "sched_getattr",
+            "handler": "syscall_linux_sched_getattr",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 316,
+            "name": "renameat2",
+            "handler": "fs.syscall_renameat2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 317,
+            "name": "seccomp",
+            "handler": "syscall_linux_seccomp",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 318,
+            "name": "getrandom",
+            "handler": "syscall_linux_getrandom",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 319,
+            "name": "memfd_create",
+            "handler": "fs.syscall_memfd_create",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 320,
+            "name": "kexec_file_load",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 321,
+            "name": "bpf",
+            "handler": "syscall_linux_bpf",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 322,
+            "name": "execveat",
+            "handler": "userland.syscall_execveat",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 323,
+            "name": "userfaultfd",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 324,
+            "name": "membarrier",
+            "handler": "syscall_linux_membarrier",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 325,
+            "name": "mlock2",
+            "handler": "mmap.syscall_mlock2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 326,
+            "name": "copy_file_range",
+            "handler": "pipe.syscall_copy_file_range",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 327,
+            "name": "preadv2",
+            "handler": "syscall_linux_preadv2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 328,
+            "name": "pwritev2",
+            "handler": "syscall_linux_pwritev2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 329,
+            "name": "pkey_mprotect",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 330,
+            "name": "pkey_alloc",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 331,
+            "name": "pkey_free",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 332,
+            "name": "statx",
+            "handler": "syscall_linux_statx",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 333,
+            "name": "io_pgetevents",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 334,
+            "name": "rseq",
+            "handler": "syscall_linux_rseq",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 424,
+            "name": "pidfd_send_signal",
+            "handler": "userland.syscall_pidfd_send_signal",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 425,
+            "name": "io_uring_setup",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 426,
+            "name": "io_uring_enter",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 427,
+            "name": "io_uring_register",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 428,
+            "name": "open_tree",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 429,
+            "name": "move_mount",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 430,
+            "name": "fsopen",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 431,
+            "name": "fsconfig",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 432,
+            "name": "fsmount",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 433,
+            "name": "fspick",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 434,
+            "name": "pidfd_open",
+            "handler": "userland.syscall_pidfd_open",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 435,
+            "name": "clone3",
+            "handler": "userland.syscall_clone3",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 436,
+            "name": "close_range",
+            "handler": "file.syscall_close_range",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 437,
+            "name": "openat2",
+            "handler": "syscall_linux_openat2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 438,
+            "name": "pidfd_getfd",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 439,
+            "name": "faccessat2",
+            "handler": "syscall_linux_faccessat2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 440,
+            "name": "process_madvise",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 441,
+            "name": "epoll_pwait2",
+            "handler": "file.syscall_epoll_pwait2",
+            "status": "wired; unqualified"
+        },
+        {
+            "arch": "x86_64",
+            "number": 442,
+            "name": "mount_setattr",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 444,
+            "name": "landlock_create_ruleset",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 445,
+            "name": "landlock_add_rule",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 446,
+            "name": "landlock_restrict_self",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 447,
+            "name": "memfd_secret",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 448,
+            "name": "process_mrelease",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 449,
+            "name": "futex_waitv",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 450,
+            "name": "set_mempolicy_home_node",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 451,
+            "name": "cachestat",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 452,
+            "name": "fchmodat2",
+            "handler": "vacant",
+            "status": "unavailable"
+        },
+        {
+            "arch": "x86_64",
+            "number": 511,
+            "name": "vinix_private",
+            "handler": "syscall_seccomp_verdict",
+            "status": "private"
+        }
+    ]
+}
