@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "cases": "java",
+    "inputs": {
+        "kernel": "69302175e62e31d821506c2fbe2389f64529b19e043d49d86789081a353d5c5f",
+        "workloads": "318c857141d08facda23ea6900c287e94b55f3a07ba282c37907bd5aef6ce236",
+        "runtime-probe": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+        "rootfs_manifest": "e408020834d7304722f47dc95fa6bb6627cc736de2aeefff1d3761da64ee5e01",
+        "init_source": "27356f2eb32a687a08bdf9611e115b571d689ce8b4f65470709cffa338e7a9b0",
+        "guest_report": "c633c26c5b7bb6991402771e82cc63cad413f060f498540104ba1d5219d0217c",
+        "snapshot_kernel": "69302175e62e31d821506c2fbe2389f64529b19e043d49d86789081a353d5c5f"
+    },
+    "exit_code": 1
+}

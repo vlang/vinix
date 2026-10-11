@@ -66,6 +66,13 @@ cache and `CGO_ENABLED=0`, matching the existing pure-Go smoke workflow. Child
 environment overrides and removed variable names are recorded per command and
 cleared between workloads; inherited environment values are not serialized.
 
+The Java case compiles the existing input and runs it from a class directory
+and a newly created JAR, with a bounded heap. HotSpot requires writable
+executable code pages: its children request VINIX_ALLOW_WX=1, which still
+requires Vinix's [privileged launch or wxallowed mount policy](../../docs/mount-execution-policy.md).
+That requirement is recorded in command receipts; ordinary unprivileged
+launches without the administrator's policy are not qualified.
+
 `--host` labels host-only evidence and prohibits installation. `--path` chooses
 native AArch64/x86-64 or AArch64's translated x86-64/i386 launcher. Native paths
 must match the driver architecture. `--runtime-probe` chooses the corresponding

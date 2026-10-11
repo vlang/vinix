@@ -117,8 +117,22 @@ cache and CGO_ENABLED=0 in its child environment. This qualifies that pure-Go
 workload; cgo, x86-64 Go, toolchain installation/update and desktop integration
 remain separate. The original minimal-root catalog reports remain unchanged.
 
-Outstanding dependencies include the browser/office/media and Java/V
-packages, Go on unqualified paths, D-Bus and a real portal backend,
+A separate AArch64 guest with staged Alpine OpenJDK 25.0.4_p7 and musl 1.2.6
+passes Java version discovery, javac compilation, NIO file roundtrip, SHA-256,
+threaded TCP loopback, JAR creation and execution from that archive. The five
+commands all exit successfully. `java-aarch64.json`, its input/build receipts
+and `packages-java-aarch64.json` retain the exact runtime and archive hashes.
+The first default-policy run failed during HotSpot executable-page setup;
+`java-default-policy-aarch64.json` retains that failure. The passing workload
+requests VINIX_ALLOW_WX=1 only in its children and limits application heaps to
+128 MiB. This remains subject to the kernel's
+[privileged-launcher or wxallowed mount policy](mount-execution-policy.md);
+the qualification guest uses a privileged launcher. Unprivileged launches
+without administrator policy, other Java architectures, persistent package
+transactions and desktop integration remain unqualified.
+
+Outstanding dependencies include the browser/office/media and V
+packages, Go/Java on unqualified paths, D-Bus and a real portal backend,
 systemd/service-unit integration, Flatpak/Snap/FUSE and enforced Linux sandbox
 interfaces, and title-specific game assets, GPU/audio/input and vendor APIs.
 The [behavior matrix](linux-posix-compatibility.md) lists the broader limits.

@@ -1,0 +1,167 @@
+[
+    {
+        "repository": "main",
+        "name": "alsa-lib-1.2.15.3-r0.apk",
+        "sha256": "b2fa6d6c13bc17f3e24b94af245fb7943aed7678def1d621154b8b2438e44c68"
+    },
+    {
+        "repository": "main",
+        "name": "brotli-libs-1.2.0-r1.apk",
+        "sha256": "e0e7a7892f28326a9f18e09607b1aea72baedda470bc4e3d2b11262b9ae5dda3"
+    },
+    {
+        "repository": "main",
+        "name": "ca-certificates-20260611-r0.apk",
+        "sha256": "be5bd3346e2057d1771ea461cb1f790ef03521450572f0698b9bebf35b4c14d2"
+    },
+    {
+        "repository": "main",
+        "name": "ca-certificates-bundle-20260611-r0.apk",
+        "sha256": "bc5d3ae0b602748852e0bc601a4348cabc4f654f12f27578919cbf3c810f1c1e"
+    },
+    {
+        "repository": "main",
+        "name": "freetype-2.14.3-r0.apk",
+        "sha256": "8f36a4b4b6c75574f2f51d62c3df27d23ec7054ae1cae97d54adad72e725e027"
+    },
+    {
+        "repository": "main",
+        "name": "giflib-5.2.2-r2.apk",
+        "sha256": "1d1c6ec06010019f288223fcddc29c7fe0f7521a0e70fdb1c6131814ebae75fc"
+    },
+    {
+        "repository": "community",
+        "name": "java-cacerts-1.1-r0.apk",
+        "sha256": "7d3a1b2f2de4ba64353aaabc7d333c6b7616653f32dbf2ac813fbcf163043173"
+    },
+    {
+        "repository": "community",
+        "name": "java-common-1.0-r2.apk",
+        "sha256": "9cff44b38dc37a8695c9611f365203466748fd955666c528fc1d742a8f69394e"
+    },
+    {
+        "repository": "main",
+        "name": "lcms2-2.19-r0.apk",
+        "sha256": "05c9e865ac443b8ff467c8e7c176ef323fac6c34f710410ef4f26c94478be7cd"
+    },
+    {
+        "repository": "main",
+        "name": "libbsd-0.12.2-r0.apk",
+        "sha256": "1c4129bef0862afa2a7414217e8c3a50609abfe2e264b6f7ba6a5452ed6c3b35"
+    },
+    {
+        "repository": "main",
+        "name": "libbz2-1.0.8-r6.apk",
+        "sha256": "28cb76bb6d11d2a55c3061b5fcb2ab84996412a248b2c9fe52bb710d0a2a84e7"
+    },
+    {
+        "repository": "main",
+        "name": "libcrypto3-3.5.8-r0.apk",
+        "sha256": "35b892813c23664a3592e4fc8c12a03538a22c579057655361c7043305272a9a"
+    },
+    {
+        "repository": "main",
+        "name": "libffi-3.5.2-r1.apk",
+        "sha256": "9a67280b0c7c62db658c2d4d32ed1199903bef859c32dd4245e1a7e35c89ab4b"
+    },
+    {
+        "repository": "main",
+        "name": "libjpeg-turbo-3.1.3-r0.apk",
+        "sha256": "0e82bb8d0abad143d9a84ee32152707e5a71176bd803b070b6179e85e11bf2be"
+    },
+    {
+        "repository": "main",
+        "name": "libmd-1.2.0-r0.apk",
+        "sha256": "cb94430ebc45dbd5dd6882bfd296bb73ea3c337691f469bd1438e696a6e867eb"
+    },
+    {
+        "repository": "main",
+        "name": "libpng-1.6.58-r1.apk",
+        "sha256": "98d3a69a159ea506a5587bff07de5fa3e91d0cc10501c17e3905e4314d1d30b8"
+    },
+    {
+        "repository": "main",
+        "name": "libtasn1-4.21.0-r0.apk",
+        "sha256": "c9fcd102c576a05675ebf4d61f147e5209fd4518e8627f229032240afaf7624b"
+    },
+    {
+        "repository": "main",
+        "name": "libx11-1.8.13-r0.apk",
+        "sha256": "177e63beb3c219f4b811a4453b84651814444547f11a890d688f1129961e4dd5"
+    },
+    {
+        "repository": "main",
+        "name": "libxau-1.0.12-r0.apk",
+        "sha256": "179a76248d0eea545f3affafc1275358dc671547a2ab76ff3e93edecb612864b"
+    },
+    {
+        "repository": "main",
+        "name": "libxcb-1.17.0-r2.apk",
+        "sha256": "21dbe6dfbc477baa1bad13b82b8e61b83e34e1c474d3913f33ad5fc5b890afa0"
+    },
+    {
+        "repository": "main",
+        "name": "libxdmcp-1.1.5-r1.apk",
+        "sha256": "4f6fe6269deadf99d2cd69b0a77cdaae1cab414738edf59df4ae79f4871c7adb"
+    },
+    {
+        "repository": "main",
+        "name": "libxext-1.3.7-r0.apk",
+        "sha256": "06886b15075a537fcd499c243facd0ec8c3e38eddef19be68ef185c079c462e4"
+    },
+    {
+        "repository": "main",
+        "name": "libxi-1.8.3-r0.apk",
+        "sha256": "4735bd464940a424aa9c9b569fe2e028c45875c9acf226d35cf6e2ee3338c5db"
+    },
+    {
+        "repository": "main",
+        "name": "libxrender-0.9.12-r0.apk",
+        "sha256": "bdd1ac2c5b70b45c2a09bffbab54073d5dafb9a6fe989583fb439b15952ccf2b"
+    },
+    {
+        "repository": "main",
+        "name": "libxtst-1.2.5-r0.apk",
+        "sha256": "fa0edf9a4fa15b808a07c153933f6896104ad002620c39c275ad010349b6dec9"
+    },
+    {
+        "repository": "main",
+        "name": "musl-1.2.6-r2.apk",
+        "sha256": "5e9674b7f41152fe2119093b5cb4c13eaaadb19c2d5422b2d7267913e663ee6e"
+    },
+    {
+        "repository": "community",
+        "name": "openjdk25-jdk-25.0.4_p7-r0.apk",
+        "sha256": "5035d2d5070e560dca722b890f9e5193b5ca410b45821e0105cd2e52e1cc9d9d"
+    },
+    {
+        "repository": "community",
+        "name": "openjdk25-jmods-25.0.4_p7-r0.apk",
+        "sha256": "b2d087f01943a42c2aed402c049fd5f5a0aacc7a555c5bc5193decc3567a326b"
+    },
+    {
+        "repository": "community",
+        "name": "openjdk25-jre-25.0.4_p7-r0.apk",
+        "sha256": "29001183f7ec23f8a6d6f428d38fa175b229033bb80f3be0ff18b62a55d471e7"
+    },
+    {
+        "repository": "community",
+        "name": "openjdk25-jre-headless-25.0.4_p7-r0.apk",
+        "sha256": "41452179586c4256b0e126dbde999f471bbf003c01e6356dcf54f3638dfcf203"
+    },
+    {
+        "repository": "main",
+        "name": "p11-kit-0.26.2-r0.apk",
+        "sha256": "0ad7cbbc011491b604b4d8fb8aafb6ce2a271c19eb8b785dd51f1704c61c58a5"
+    },
+    {
+        "repository": "main",
+        "name": "p11-kit-trust-0.26.2-r0.apk",
+        "sha256": "6a39cb8ba9a68a178f404300409398b7f806bdfe3060621b5428f42abcf7173c"
+    },
+    {
+        "repository": "main",
+        "name": "zlib-1.3.2-r0.apk",
+        "sha256": "a535991af7c9e8369ebbf33c1e388c1bc63c87ead5142eddaee71f65836c33e3"
+    }
+]

@@ -1,0 +1,32 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-aarch64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "318c857141d08facda23ea6900c287e94b55f3a07ba282c37907bd5aef6ce236",
+    "runtime_probe_sha256": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "java",
+            "status": "failed",
+            "detail": "command failed: ['/usr/bin/java', '-version'] exit=1 timeout=false output_limit=false"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/java",
+                "-version"
+            ],
+            "executable_sha256": "c79a7a6b3bbda8960cf226779ff052d630d1b77b78c3b76daf50bb2223e69f82",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 1,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Error occurred during initialization of VM\nFailed to mark memory page as executable - check if grsecurity/PaX is enabled\n",
+            "stderr": ""
+        }
+    ],
+    "services": []
+}

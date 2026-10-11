@@ -1,0 +1,111 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-aarch64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "3fa4db84a4ac7368e2802b5c82e0416dfe7459cb6101b86b7e12bd3048fb2f9d",
+    "runtime_probe_sha256": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "java",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/java",
+                "-version"
+            ],
+            "executable_sha256": "c79a7a6b3bbda8960cf226779ff052d630d1b77b78c3b76daf50bb2223e69f82",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "openjdk version \"25.0.4\" 2026-07-21\nOpenJDK Runtime Environment (build 25.0.4+7-alpine-r0)\nOpenJDK 64-Bit Server VM (build 25.0.4+7-alpine-r0, mixed mode, sharing)\n"
+        },
+        {
+            "argv": [
+                "/usr/bin/javac",
+                "/tmp/linux-compat-evidence/VinixJavaSmoke.java"
+            ],
+            "executable_sha256": "1935a0b05fd53f0a9bcdb68d7559300ee7dc5bfd3f1eb6c93be097961d3f8955",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/java",
+                "-Xms16m",
+                "-Xmx128m",
+                "-cp",
+                "/tmp/linux-compat-evidence",
+                "VinixJavaSmoke"
+            ],
+            "executable_sha256": "c79a7a6b3bbda8960cf226779ff052d630d1b77b78c3b76daf50bb2223e69f82",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "OpenJDK 25 (OpenJDK 64-Bit Server VM) on Vinix: PASS\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/jar",
+                "--create",
+                "--file",
+                "/tmp/linux-compat-evidence/vinix-java-smoke.jar",
+                "-C",
+                "/tmp/linux-compat-evidence",
+                "VinixJavaSmoke.class"
+            ],
+            "executable_sha256": "56ddc6d5d54bb13dec1e3782ca103efe964e3abe9f3912982810ac2df2380649",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/java",
+                "-Xms16m",
+                "-Xmx128m",
+                "-cp",
+                "/tmp/linux-compat-evidence/vinix-java-smoke.jar",
+                "VinixJavaSmoke"
+            ],
+            "executable_sha256": "c79a7a6b3bbda8960cf226779ff052d630d1b77b78c3b76daf50bb2223e69f82",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "OpenJDK 25 (OpenJDK 64-Bit Server VM) on Vinix: PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": []
+}

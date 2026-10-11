@@ -279,11 +279,19 @@ fn (mut suite Suite) run(name string) ! {
 				return error('unsupported: existing Java application fixture asserts os.arch=aarch64')
 			}
 			suite.package('openjdk21-jdk')!
+			// HotSpot needs writable executable code pages. Request the existing
+			// compatibility exception only for these children; exec still
+			// requires a privileged launcher or an administrator's wxallowed mount.
+			suite.environment['VINIX_ALLOW_WX'] = '1'
 			suite.execute('java', ['-version'])!
 			os.write_file(suite.work + '/VinixJavaSmoke.java', $embed_file('../../../tests/java/VinixJavaSmoke.java').to_string())!
 			suite.execute('javac', [suite.work + '/VinixJavaSmoke.java'])!
-			output := suite.execute('java', ['-cp', suite.work, 'VinixJavaSmoke'])!
+			output := suite.execute('java', ['-Xms16m', '-Xmx128m', '-cp', suite.work, 'VinixJavaSmoke'])!
 			expect(output.contains('on Vinix: PASS'), 'Java application did not pass')!
+			archive := suite.work + '/vinix-java-smoke.jar'
+			suite.execute('jar', ['--create', '--file', archive, '-C', suite.work, 'VinixJavaSmoke.class'])!
+			archived := suite.execute('java', ['-Xms16m', '-Xmx128m', '-cp', archive, 'VinixJavaSmoke'])!
+			expect(archived.contains('on Vinix: PASS'), 'Java JAR application did not pass')!
 		}
 		'v' {
 			suite.execute('v', ['version'])!
