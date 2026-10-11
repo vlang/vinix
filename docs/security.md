@@ -181,6 +181,30 @@ remain unverified or unimplemented. See [Intel's enumeration](https://www.intel.
 and [Linux's mitigation guidance](https://docs.kernel.org/admin-guide/hw-vuln/spectre.html)
 for the hardware distinctions.
 
+## ARM pointer authentication and branch target identification
+
+Neither is used. The AArch64 kernel is built without
+`-mbranch-protection`, does not turn on the pointer authentication keys or
+BTI for itself, and does not offer them to programs: the hardware
+capability bits for both are never set, an EL0 read of the ID registers
+does not show them, there are no per-process keys, and `mmap` has no
+`PROT_BTI`. A program built with pointer authentication still runs -- its
+instructions are in the space that does nothing on a processor without the
+feature enabled -- and is exactly as protected as one built without.
+
+What that leaves: on AArch64 a corrupted return address or function pointer
+is not caught by the processor, in the kernel or in a program. What stands
+in the way is what is there on both architectures -- the kernel's stack
+protector, kernel text and read-only data that cannot be written, signed
+signal frames, address-space randomisation, and for programs whatever they
+were built with ([`docs/openbsd-security.md`](openbsd-security.md)). The M1
+has pointer authentication and not BTI; nothing here has been tried on it.
+
+Turning them on needs keys made at exec and switched with the thread, the
+capability bits, `PROT_BTI` and the guarded-page attribute, a kernel built
+with branch protection, and a decision about Apple's processors under a
+hypervisor. None of it is started.
+
 [`tests/verified-root`](../tools/verified-root/README.md#validation-and-limits)
 checks the authenticated root and read-only mapping lifetimes;
 [`tests/security-mac`](../tests/security-mac/README.md) checks the mandatory

@@ -61,7 +61,7 @@ code; this roadmap does not reclassify their historical test results.
 | Networking and peripherals | Ethernet networking, IPv4/IPv6, selected USB/input paths, sound playback, experimental M1 Wi-Fi and Apple drivers | General hotplug/classes, wireless IP connectivity, Bluetooth, recording, peripheral coverage and power management. See [networking status](docs/openbsd-feature-implementation.md#networking), [Wi-Fi limits](docs/apple-wifi.md) and [M1 audio](docs/m1-speakers.md). |
 | Graphics | Native framebuffer composition, X11, an AArch64 Hyprland path, VirtIO graphics work and Apple/Intel bring-up | Qualified hardware GPU/display pipelines, complete driver integration, resets and interoperable composition. See [i915 integration](docs/linux-i915.md#remaining-driver-integration) and [M1 AGX](docs/m1-agx-bringup.md). |
 | Applications | Package frontend, browsers, office/media ports, Wine, x86 translation and iOS/Android subsets | Broad compatibility qualification, consistent desktop integration and macOS desktop runtime work. See [packages](README.md#packages-on-aarch64), [Wine](docs/wine.md), [iOS](docs/ios.md) and [Android](docs/android.md). |
-| Security and sessions | Capabilities, mount policies, confinement mechanisms, selected audit collection, optional authenticated UEFI/root and a persistent desktop profile | Real multiuser login and unprivileged sessions, secure default launch policy, credential services and complete deployment lifecycle. See [security scope](docs/security.md) and [single-user registration](desktop/registration_store.v). |
+| Security and sessions | Capabilities, mount policies, confinement mechanisms, accounts with an authentication service and a session manager, a record of security decisions, a credential store, optional authenticated UEFI/root and a persistent desktop profile | A desktop that logs in and runs as the person at it, secure default launch policy, and a complete deployment lifecycle. See [security scope](docs/security.md), [accounts](docs/accounts.md) and [single-user registration](desktop/registration_store.v). |
 | Virtualization | Running as a VM guest; a small experimental Intel VT-x host interface; QEMU software emulation | General VM hosting, multiple vCPUs, practical memory sizes, additional architectures and device/lifecycle support. See [virtualization limits](docs/virtualization.md). |
 
 Unchecked items below identify unfinished capabilities or acceptance work. They
@@ -343,22 +343,77 @@ continue or recover correctly across network changes and sleep.
 
 - [ ] Replace the single-user registration model with real users/groups,
   unprivileged desktop sessions, login/logout, locking and user switching.
+  - [x] [Users, groups and passwords, the registered person imported as the
+    first administrator, and homes only their owners can
+    read](docs/accounts.md#accounts), tested in
+    [QEMU guests](tests/accounts/README.md) on both architectures.
+  - [x] [Sessions that are not root's, logins the kernel knows, and a seat
+    that the display and input devices follow](docs/accounts.md#sessions).
+  - [x] [A session manager: a login screen's own account, login, a logout
+    that ends every process of the login, and switching by stopping the
+    session that leaves](docs/accounts.md#the-session-manager), tested with
+    stand-ins for the login screen and the desktop.
+  - [ ] The desktop itself: a login screen and a lock screen, the compositor
+    and its applications running as the person logged in, and init starting
+    the session manager. Until then the desktop is root's and nothing above
+    protects it.
 - [ ] Provide authenticated privilege elevation through narrow services; move
   routine applications and desktop operations out of unrestricted root contexts.
+  - [x] [An authentication service that runs listed actions as root for an
+    administrator who gives their own password; no set-user-id
+    programs](docs/accounts.md#the-authentication-service). Ten actions:
+    power, the host name, accounts.
+  - [ ] The desktop and its applications using it instead of being root, and
+    actions for what they do as root today: packages, disks, the network,
+    the clock.
 - [ ] Apply measured default sandbox profiles to native apps, browsers, ports
   and compatibility runtimes; mediate files, network, devices and IPC.
+  - [x] [Display, input and sound devices refused to whatever is not the
+    session at the machine; disks, the console and serial lines refused to
+    every account](docs/accounts.md#what-the-kernel-refuses-an-ordinary-account).
+  - [ ] The profiles: nothing is measured and nothing is confined by default
+    beyond Calculator. Network and IPC are not mediated per application.
 - [ ] Add a permission UI for camera, microphone, location, screen capture,
   notifications and sensitive filesystem access, with revocation and auditing.
+  - [ ] Not started. It needs applications that are not root and that the
+    system can tell apart.
 - [ ] Ship an encrypted credential/key store, certificate management, secure
   unlock, password changes/recovery and hardware-backed credentials where available.
+  - [x] [A per-account credential store, opened at login with the password
+    that was typed, with password change and a recovery
+    key](tools/keyring/README.md).
+  - [ ] Certificate management; keys held in hardware (there is no TPM or
+    secure-enclave driver); the login and store passwords changed in one
+    step; a place in the desktop for any of it.
 - [ ] Complete production verified boot/root policy, executable/package trust,
   signing-key enrollment/revocation, antirollback and recovery-key lifecycle.
+  - [ ] Not started beyond [what was there](docs/security.md#authenticated-uefi-images):
+    an administrator's own key, no revocation, no antirollback, unsigned
+    release images.
 - [ ] Complete architecture hardening and mitigation coverage, including x86
   isolation/speculation gaps and ARM PAC/BTI where supported; document residual risk.
+  - [x] [What not having pointer authentication and BTI leaves
+    open](docs/security.md#arm-pointer-authentication-and-branch-target-identification),
+    written down; the x86 gaps are those
+    [already listed](docs/x86-cpu-mitigations.md).
+  - [ ] Pointer authentication and BTI themselves, for the kernel and for
+    programs; the x86 gaps closed.
 - [ ] Extend mandatory policy and audit coverage to general IPC/network/security
   decisions, with session attribution, durable collection and retention controls.
+  - [x] [A kernel record of security decisions attributed to the login,
+    reports from trusted services, and a collector with exact loss accounting
+    and retention settings](tools/security-events/README.md).
+  - [ ] Mandatory policy for the network and for IPC in general; a record
+    root cannot alter; the collector started at boot.
 - [ ] Review kernel/userland parsers, drivers, privileged services and isolation
   boundaries; establish fuzzing, vulnerability reporting and a security-update process.
+  - [x] [A fuzzer for the parsers that build on the host](tests/fuzz/README.md),
+    [how to report a vulnerability](SECURITY.md), and
+    [the process](docs/security-process.md), which also lists what has had no
+    second reader.
+  - [ ] The reviews themselves; fuzzing of the kernel's parsers of hostile
+    input and of the system call interface; private reporting switched on
+    for the repository; an update mechanism to deliver a fix with.
 
 Acceptance: an ordinary desktop user cannot administer the machine or read
 another user's private data; revoked permissions and failed confinement take effect.
