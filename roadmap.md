@@ -539,8 +539,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 
 ### 15. Linux and POSIX compatibility
 
-- [ ] Build an ABI coverage matrix for both architectures, including syscalls,
+- [x] Build an ABI coverage matrix for both architectures, including syscalls,
   ioctls, signals, threading, filesystem behavior, proc/sysfs and runtime expectations.
+  See [the behavior matrix](docs/linux-posix-compatibility.md) and the generated
+  [native syscall inventory](docs/linux-syscall-coverage.md); dispatch coverage
+  is separate from semantic qualification.
 - [ ] Complete missing semantics required by mainstream musl and glibc software;
   use real error behavior and conformance tests rather than placeholder success.
 - [ ] Support ordinary Linux desktop and CLI application installation, including
@@ -549,6 +552,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   including atomics, SIMD, TLS, JITs, debugging and memory/page-size assumptions.
 - [ ] Run application-driven regression suites for browsers, office/media tools,
   language runtimes, databases, servers and games; publish unsupported dependencies.
+
+- [x] Replace placeholder BPF/openat2 success with explicit errors and enforce
+  faccessat2 empty-path permissions, with regression checks on both architectures.
+- [x] Establish V build/guest/application qualification tools and publish native
+  and translated x86-64 TLS/atomic/SIMD/JIT/page-size results plus SQLite/HTTP
+  workload receipts and unsupported dependencies. See the
+  [qualification report](docs/linux-posix-qualification.md).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
