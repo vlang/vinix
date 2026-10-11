@@ -226,6 +226,11 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		// Darwin SwiftError owners use Cocoa ARC, including boxed Swift errors
+		// and toll-free NSError/CFError objects. These entries use ordinary C
+		// calls, rather than Swift's strong-word or bridge-object encoding.
+		'_swift_errorRetain' { u64(unsafe { voidptr(objc_retain) }) }
+		'_swift_errorRelease' { u64(unsafe { voidptr(objc_release) }) }
 		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
 		'_swift_deallocObject', '_swift_deallocClassInstance' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
 		'_swift_deallocUninitializedObject' { u64(unsafe { voidptr(swift_heap_deallocate_uninitialized) }) }

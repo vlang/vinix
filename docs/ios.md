@@ -2075,17 +2075,43 @@ The heap probe now exits with status 1 before entry at EOSSDK's
 real CFError reference counts and final domain disposal. Full regression remains
 unpassed, and the five published runners retain their last passing hashes.
 
+V now supplies `_swift_errorRetain` and `_swift_errorRelease` through the existing
+Objective-C ownership functions, matching Darwin's ordinary C error ARC ABI.
+Error retain returns the same owner; final release runs the existing dealloc,
+weak-slot and owned-field cleanup. These exports add no Swift arenas, allocation
+registries or ARC adapters. Swift error boxing, stored error values and Error
+protocol witnesses remain unimplemented.
+
+Installed SwiftCore and V error ARC, String and typed Array suites pass
+ASAN/UBSAN in both seed modes. Error checks cover real native CFErrors, reference
+count transitions, four signed error codes, separately retained domains surviving
+final error destruction, and raw ARM64 calls preserving x20/x21 through dealloc.
+Eight creation and shared-owner workers pass. V checks also verify weak zeroing,
+owned-child disposal, reentrant destruction, a resolver thread awaited inside
+dealloc, nil calls before/after initialization and two drained runtime cycles.
+Generated ownership bodies introduce no hidden V allocations. All thirty-six
+programs rebuild, and all eighteen focused Swift ABI guest checks pass.
+
+The error ARC probe exits with status 1 before entry at EOSSDK's
+`_swift_getErrorValue` import. Evidence is retained under `swift-error-checks`,
+including 256 native CFError extraction calls with guarded scratch/output words,
+borrowed owner references, stable genuine type metadata and Error witnesses,
+and unchanged reference counts. Native boxed Swift error values remain
+unmeasured. A corrected host fixture header conflict is preserved with the
+passing results. Full regression remains unpassed, and the five published
+runners retain their last passing hashes.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,391 | 767 | 81 |
-| EOSSDK | 601 | 61 | 18 |
-| MarketplaceKitWrapper | 93 | 83 | 23 |
-| All images | 2,085 | 911 | 122 |
+| Fortnite executable | 1,393 | 765 | 81 |
+| EOSSDK | 603 | 59 | 18 |
+| MarketplaceKitWrapper | 95 | 81 | 23 |
+| All images | 2,091 | 905 | 122 |
 
-The C++/GLES/Text variant reports 2,098 resolved imports, 898 unresolved strong
+The C++/GLES/Text variant reports 2,104 resolved imports, 892 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
