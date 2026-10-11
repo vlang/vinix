@@ -24,6 +24,7 @@ pub const at_eaccess = 0x200
 pub const seek_cur = 1
 pub const seek_end = 2
 pub const seek_set = 0
+pub const resolve_no_xdev = u64(0x01)
 pub const resolve_no_magiclinks = u64(0x02)
 pub const resolve_no_symlinks = u64(0x04)
 
@@ -151,9 +152,12 @@ fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effectiv
 	if unsafe { node.redir != 0 } {
 		return reduce_node_resolved(node.redir, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
+	previous_mount := lib.mount_context_top(identity)
 	if !self_mount_at(node, identity) { return unsafe { nil } }
+	if !resolve_mount_allowed(resolve, previous_mount, identity) { return unsafe { nil } }
 	mounted := mount_of(node)
 	if mounted != unsafe { nil } {
+		if resolve & resolve_no_xdev != 0 { errno.set(errno.exdev); return unsafe { nil } }
 		if !mount_at(node, mounted, identity) { return unsafe { nil } }
 		return reduce_node_resolved(mounted, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
@@ -175,6 +179,7 @@ fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effectiv
 		}
 		target := magic_link_mount(node, identity)
 		if target == unsafe { nil } { return unsafe { nil } }
+		if !resolve_mount_allowed(resolve, previous_mount, identity) { return unsafe { nil } }
 		return reduce_node_resolved(target, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
 	if follow_symlinks && procfs_is_dynamic_link(node) {
@@ -239,9 +244,12 @@ fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, i
 	}
 	mut index := u64(0)
 	mut current_node := reduce_node_resolved(parent, false, depth + 1, effective, identity, resolve)
+	if current_node == unsafe { nil } { return 0, 0, '' }
 
 	if path[index] == `/` {
+		previous_mount := lib.mount_context_top(identity)
 		root := root_with_context(identity) or { return 0, 0, '' }
+		if !resolve_mount_allowed(resolve, previous_mount, identity) { return 0, 0, '' }
 		current_node = reduce_node_resolved(root, false, depth + 1, effective, identity, resolve)
 		for path[index] == `/` {
 			if index == u64(path.len) - 1 {
@@ -280,8 +288,10 @@ fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, i
 		if elem_str == '..' {
 			// The way out of a directory depends on how it was reached: see
 			// logical_parent().
+			previous_mount := lib.mount_context_top(identity)
 			parent_node := parent_on_mount(current_node, identity)
 			if parent_node == unsafe { nil } { return 0, 0, '' }
+			if !resolve_mount_allowed(resolve, previous_mount, identity) { return 0, 0, '' }
 			new_node = reduce_node_resolved(parent_node, false, depth + 1,
 				effective, identity, resolve)
 		} else {
@@ -321,6 +331,14 @@ fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, i
 
 	errno.set(errno.enoent)
 	return 0, 0, ''
+}
+
+fn resolve_mount_allowed(resolve u64, previous voidptr, identity &lib.MountContext) bool {
+	if resolve & resolve_no_xdev != 0 && previous != lib.mount_context_top(identity) {
+		errno.set(errno.exdev)
+		return false
+	}
+	return true
 }
 
 // Whether a directory descriptor argument is AT_FDCWD. A descriptor is a C
@@ -1006,7 +1024,7 @@ pub fn syscall_openat(gpr_state voidptr, dirfd int, path charptr, flags int, mod
 }
 
 pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, flags int, mode u32, resolve u64) (u64, u64) {
-	if resolve & ~(resolve_no_magiclinks | resolve_no_symlinks) != 0 {
+	if resolve & ~(resolve_no_xdev | resolve_no_magiclinks | resolve_no_symlinks) != 0 {
 		return errno.err, errno.eopnotsupp
 	}
 	mut current_thread := proc.current_thread()

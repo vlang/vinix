@@ -27,8 +27,10 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
   intermediate/final/nested/procfs links and creation, and final link handles.
   Trailing slashes require directory resolution even with O_PATH|O_NOFOLLOW;
   failed O_CREAT requests cannot leave regular files behind.
-  Remaining RESOLVE modes and combinations requesting them return EOPNOTSUPP;
-  this does not qualify BENEATH/IN_ROOT containment or mount/cache constraints.
+  NO_XDEV checks tmpfs and same-filesystem bind mounts, alias-relative opens,
+  '..', absolute symlink targets, creation and procfs descriptor jumps.
+  BENEATH, IN_ROOT, CACHED and combinations requesting them return EOPNOTSUPP;
+  this does not qualify containment or cache-only lookup.
 - `runtime` checks four concurrent pthreads, isolated libc errno/TLS and keys,
   64-bit atomic increments, SSE2/NEON across scheduling, auxv/sysconf page sizes
   and an actual RW-to-RX JIT function. It prints pointer width and page size.

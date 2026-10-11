@@ -5,6 +5,7 @@ module openfixture
 #include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -21,6 +22,7 @@ fn C.read(i32, voidptr, usize) isize
 fn C.pipe(&i32) i32
 fn C.getpid() i32
 fn C.access(&char, i32) i32
+fn C.mount(&char, &char, &char, usize, voidptr) i32
 fn C.snprintf(&char, usize, &char, ...) i32
 fn C.printf(&char, ...) i32
 fn C.puts(&char) i32
@@ -28,14 +30,60 @@ fn C.fflush(voidptr) i32
 fn C.pause() i32
 
 fn open_result(path &char, how voidptr, size usize, expected i32) bool {
+	return open_at_result(C.AT_FDCWD, path, how, size, expected)
+}
+
+fn open_at_result(dirfd i32, path &char, how voidptr, size usize, expected i32) bool {
 	unsafe {
 		errno_ptr := C.__errno_location()
 		*errno_ptr = 0
-		result := C.syscall(isize(C.SYS_openat2), isize(C.AT_FDCWD), path, how, isize(size))
-		valid := if expected == 0 { result >= 0 } else { result == -1 && *errno_ptr == expected }
+		result := C.syscall(isize(C.SYS_openat2), isize(dirfd), path, how, isize(size))
+		actual_errno := *errno_ptr
+		valid := if expected == 0 { result >= 0 } else { result == -1 && actual_errno == expected }
 		if result >= 0 { C.close(i32(result)) }
-		if !valid { C.printf(c'LINUX OPEN FAIL: result=%ld errno=%d expected=%d\n', result, *errno_ptr, expected) }
+		if !valid { C.printf(c'LINUX OPEN FAIL: dirfd=%d path=%s result=%ld errno=%d expected=%d\n', dirfd, path, result, actual_errno, expected) }
 		return valid
+	}
+}
+
+fn mount_constraints() bool {
+	unsafe {
+		if C.mkdir(c'/tmp/linux-open-mount', u32(0o700)) != 0
+			|| C.mkdir(c'/tmp/linux-open-bind', u32(0o700)) != 0
+			|| C.mount(c'tmpfs', c'/tmp/linux-open-mount', c'tmpfs', 0, nil) != 0
+			|| C.mount(c'/tmp/linux-open-dir', c'/tmp/linux-open-bind', nil, usize(C.MS_BIND), nil) != 0
+			|| C.symlink(c'/tmp/linux-open-target', c'/tmp/linux-open-dir/outside') != 0 { return false }
+		fd := C.open(c'/tmp/linux-open-bind', C.O_PATH | C.O_DIRECTORY)
+		mountfd := C.open(c'/tmp/linux-open-mount', C.O_PATH | C.O_DIRECTORY)
+		if fd < 0 || mountfd < 0 { return false }
+		mut how := How{resolve: 1}
+		ok := open_result(c'/tmp/linux-open-target', &how, 24, 0)
+			&& open_result(c'/tmp/linux-open-mount', &how, 24, C.EXDEV)
+			&& open_result(c'/tmp/linux-open-bind/new', &how, 24, C.EXDEV)
+			&& open_at_result(fd, c'new', &how, 24, 0)
+			&& open_at_result(fd, c'../linux-open-target', &how, 24, C.EXDEV)
+			&& open_at_result(fd, c'outside', &how, 24, C.EXDEV)
+			&& open_at_result(mountfd, c'.', &how, 24, 0)
+			&& open_at_result(mountfd, c'..', &how, 24, C.EXDEV)
+		how = How{resolve: 7}
+		combined := open_result(c'/tmp/linux-open-target', &how, 24, 0)
+			&& open_result(c'/tmp/linux-open-bind', &how, 24, C.EXDEV)
+		how = How{flags: u64(C.O_CREAT | C.O_RDWR), mode: 0o600, resolve: 1}
+		created := open_at_result(mountfd, c'inside', &how, 24, 0)
+			&& open_result(c'/tmp/linux-open-mount/escape', &how, 24, C.EXDEV)
+			&& C.access(c'/tmp/linux-open-mount/escape', C.F_OK) == -1
+			&& *C.__errno_location() == C.ENOENT
+		mut proc_path := [64]u8{}
+		C.snprintf(&char(&proc_path[0]), usize(proc_path.len), c'/proc/%d/fd', C.getpid())
+		procfd := C.open(&char(&proc_path[0]), C.O_PATH | C.O_DIRECTORY)
+		C.snprintf(&char(&proc_path[0]), usize(proc_path.len), c'%d', fd)
+		how = How{resolve: 1}
+		magic := procfd >= 0 && open_at_result(procfd, &char(&proc_path[0]), &how, 24, C.EXDEV)
+		how.flags = u64(C.O_PATH | C.O_NOFOLLOW)
+		link_only := procfd >= 0 && open_at_result(procfd, &char(&proc_path[0]), &how, 24, 0)
+		if procfd >= 0 { C.close(procfd) }
+		C.close(fd); C.close(mountfd)
+		return ok && combined && created && magic && link_only
 	}
 }
 
@@ -135,7 +183,7 @@ pub fn run() i32 {
 		C.snprintf(&char(&pipe_path[0]), usize(pipe_path.len), c'/proc/self/fd/%d', pipes[0])
 		if !link_descriptor(&char(&pipe_path[0]), false, 0)
 			|| !link_descriptor(&char(&pipe_path[0]), true, 0)
-			|| !link_constraints(pipes[0]) || !trailing_slashes() { return 1 }
+			|| !link_constraints(pipes[0]) || !trailing_slashes() || !mount_constraints() { return 1 }
 		C.close(pipes[0]); C.close(pipes[1])
 		mut how := How{}
 		if !open_result(c'/tmp/linux-open-target', &how, 24, 0)
@@ -154,7 +202,7 @@ pub fn run() i32 {
 		if !open_result(c'/tmp/linux-open-target', &how, 24, C.EINVAL) { return 1 }
 		how.resolve = 0x18
 		if !open_result(c'/tmp/linux-open-target', &how, 24, C.EINVAL) { return 1 }
-		for constraint in [u64(1), 8, 16, 32, 5, 10, 20, 38]! {
+		for constraint in [u64(8), 16, 32, 9, 10, 20, 38]! {
 			how.resolve = constraint
 			if !open_result(c'/tmp/linux-open-dir/link/linux-open-target', &how, 24, C.EOPNOTSUPP) { return 1 }
 		}

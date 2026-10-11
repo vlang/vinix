@@ -176,7 +176,11 @@ fn root_with_context(identity &lib.MountContext) ?&VFSNode {
 	root := proc.snapshot_root_directory(calling_process(), identity)
 	node := if root == unsafe { nil } { vfs_root } else { unsafe { &VFSNode(root) } }
 	if identity.depth == 0 && !native_context(node, identity) { return none }
-	return node
+	// The boot root is a covered sentinel. Establish the effective root and
+	// its mount before lookup constraints compare subsequent transitions.
+	result := reduce_node_on_mount(node, false, 0, true, identity)
+	if result == unsafe { nil } { return none }
+	return result
 }
 
 // Capture the directory and its route together before resolving an *at path.

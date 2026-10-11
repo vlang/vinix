@@ -26,6 +26,7 @@ and openat2 exercise the same behavior, following the
 | faccessat2 permissions, exact errors, empty/deleted/O_PATH paths and credentials | passed | passed | not tested | not tested |
 | openat2 ordinary opens and exact validation/rejection of unsupported resolution | passed | passed | not tested | not tested |
 | openat2 NO_SYMLINKS/NO_MAGICLINKS lookup, creation and final O_PATH link handles | passed | passed | not tested | not tested |
+| openat2 NO_XDEV including bind aliases, '..', absolute and magic-link targets | passed | passed | not tested | not tested |
 | Concurrent pthread TLS/errno/keys, 64-bit atomics, SIMD and RW-to-RX JIT | passed | passed | passed | passed |
 | File offsets past 8 GiB, normalized clock and time64 timerfd deadline roundtrip | passed | passed | passed | passed |
 | auxv/sysconf page size, pointer width | 16 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 32 bits |
@@ -36,7 +37,7 @@ NO_SYMLINKS and NO_MAGICLINKS to the O_PATH baseline. Constraints propagate
 through the actual lookup, nested targets and creation retries; forbidden
 link traversal returns ELOOP. NO_MAGICLINKS permits ordinary links, including
 /proc/self, and final O_PATH|O_NOFOLLOW handles preserve symlink inodes.
-BENEATH, IN_ROOT, NO_XDEV and CACHED still return EOPNOTSUPP, including mixed
+BENEATH, IN_ROOT and CACHED still return EOPNOTSUPP, including mixed
 requests. Containment and complete sandbox support remain unqualified. The
 [Linux openat2 contract](https://man7.org/linux/man-pages/man2/openat2.2.html)
 defines these distinctions. The runtime fixture covers NEON or SSE2, not the complete AVX/ARM feature
@@ -49,6 +50,14 @@ ending in a slash. Regular files return ENOTDIR, dangling links return ENOENT,
 directory links resolve even with O_PATH|O_NOFOLLOW, and NO_SYMLINKS still
 returns ELOOP. O_CREAT rejects a final slash with EISDIR after validating the
 prefix; the fixture verifies that rejection leaves no created file.
+
+The `xdev-root-*.json` receipts additionally qualify NO_XDEV on both native
+architectures. Entering tmpfs or a bind alias, leaving a mount with '..',
+an absolute symlink target crossing mounts and a procfs descriptor jump return
+EXDEV. Relative access and creation inside the held mount succeed; a final
+O_PATH|O_NOFOLLOW magic link remains a link handle. The test checks same-filesystem
+bind boundaries by mount identity and verifies blocked creation leaves no file.
+The effective boot root is established before checking subsequent transitions.
 
 An initial i386 attempt failed before linking because V's amd64 inline assembly
 could not target i386. The revised fixture uses SSE2 compiler intrinsics; it
