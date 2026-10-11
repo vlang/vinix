@@ -453,6 +453,72 @@ fn wake_bench() []u8 {
 	])
 }
 
+// acpi-backlight: a panel whose backlight firmware sets.
+//
+// The display bus GFX0 has one output, LCD0, with five levels. The levels are
+// the character codes of 1, 3, 5, 7 and 9, so that what _BCM is given can be
+// written as it is to the port QEMU records and read off the record. _BCL
+// gives them as firmware does: the level for the charger and the level for
+// the battery first (9 and 5), then the list in no order (7, 3, 9, 1, 5).
+// The panel starts at 7 and says so through _BQC.
+//
+// Two of the levels stand for a brightness key being pressed, which nothing
+// outside the machine can do: set to 3 the panel sends "brighter", and set
+// to 9 it sends "dimmer". _DOS on the bus writes D and the digit it was
+// given.
+//
+// A second output, LCD1, is a panel as careless firmware describes one: three
+// levels (2, 4, 6) with the two preferred ones left out of the front of the
+// list, and no way to ask where it is.
+pub const backlight_bench_levels = '13579'
+
+fn backlight_bench() []u8 {
+	said := aml_name('\\_SB.BLSD')
+	level := aml_name('LVL')
+	lcd := aml_name('\\_SB.GFX0.LCD0')
+	return aml_table('SSDT', 'HWTEST', [
+		aml_scope('\\_SB', [
+			aml_region('BLDR', 1, u64(wake_bench_port), 1),
+			aml_field('BLDR', aml_byte_access, [aml_field_unit('BLSD', 8)]),
+			aml_device('GFX0', [
+				aml_named('_ADR', aml_integer(0x001e0000)),
+				aml_method_taking('_DOS', 1, [
+					aml_store(aml_integer(u64(`D`)), said),
+					aml_store(aml_add(aml_integer(u64(`0`)), aml_argument(0)), said),
+				]),
+				aml_device('LCD0', [
+					aml_named('_ADR', aml_integer(0x0400)),
+					aml_named('LVL', aml_integer(u64(`7`))),
+					aml_method('_BCL', [
+						aml_return(aml_package([aml_integer(u64(`9`)), aml_integer(u64(`5`)),
+							aml_integer(u64(`7`)), aml_integer(u64(`3`)), aml_integer(u64(`9`)),
+							aml_integer(u64(`1`)), aml_integer(u64(`5`))])),
+					]),
+					aml_method_taking('_BCM', 1, [
+						aml_store(aml_argument(0), level),
+						aml_store(aml_argument(0), said),
+						aml_if(aml_equal(aml_argument(0), aml_integer(u64(`3`))), [
+							aml_notify(lcd, aml_integer(0x86)),
+						]),
+						aml_if(aml_equal(aml_argument(0), aml_integer(u64(`9`))), [
+							aml_notify(lcd, aml_integer(0x87)),
+						]),
+					]),
+					aml_method('_BQC', [aml_return(level)]),
+				]),
+				aml_device('LCD1', [
+					aml_named('_ADR', aml_integer(0x0100)),
+					aml_method('_BCL', [
+						aml_return(aml_package([aml_integer(u64(`2`)), aml_integer(u64(`4`)),
+							aml_integer(u64(`6`))])),
+					]),
+					aml_method_taking('_BCM', 1, [aml_store(aml_argument(0), said)]),
+				]),
+			]),
+		]),
+	])
+}
+
 // The table called `name`, or an error for a name no scenario should use.
 pub fn acpi_table(name string) ![]u8 {
 	return match name {
@@ -463,6 +529,7 @@ pub fn acpi_table(name string) ![]u8 {
 		'ec-ecdt' { ecdt_table(bench_ec_command, bench_ec_data, bench_ec_uid, bench_ec_gpe, bench_ec_path) }
 		'ec-absent' { ec_absent() }
 		'wake-bench' { wake_bench() }
+		'backlight-bench' { backlight_bench() }
 		else { error('no ACPI table called ${name}') }
 	}
 }

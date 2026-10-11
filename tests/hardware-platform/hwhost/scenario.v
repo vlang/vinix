@@ -290,6 +290,26 @@ const wake_both = '= 0x03'
 const wake_button_only = '= 0x02'
 const wake_none = '= 0x00'
 
+// acpi-backlight: everything the panel's firmware was told, in order, as the
+// table writes it down (backlight_bench in acpi_bench.v; the levels are the
+// digits 1 3 5 7 9, the panel starts at 7):
+//
+//	D4D4    the bus told, once for each panel, that brightness is not
+//	        firmware's to change
+//	1       the dimmest level asked for
+//	35      3 asked for, which presses "brighter": stepped to 5
+//	97      9 asked for, which presses "dimmer": stepped to 7
+//	1 7     switched off (the dimmest there is) and on again
+//	1       down for a sleep: the first panel only, the second being at a
+//	        level nobody knows
+//	D47 D4  back: the bus told for each, the first given its level
+//	4       the second panel set, for once
+//	2 1     down for a sleep, the second panel first
+//	D47 D44 back: the bus told again and each given its level
+//
+// and then a hundred times 1 and 5, measured for what they leave behind.
+const backlight_said = 'D4D413597171D47D4421D47D44' + '15'.repeat(100)
+
 const hotplug_add = '{"execute":"device_add","arguments":{"driver":"e1000","bus":"hwport0","id":"hwcard0","netdev":"hwhot0"}}'
 const hotplug_remove = '{"execute":"device_del","arguments":{"id":"hwcard0"}}'
 
@@ -522,6 +542,39 @@ pub const scenarios = [
 		qemu:     ['-acpitable', 'file={state}/power-bench.aml']
 		required: ['HWTEST START acpi-power', 'HWTEST PASS acpi-power']
 		ending:   .poweroff
+	},
+	Scenario{
+		name:     'acpi-backlight'
+		about:    'a panel whose backlight firmware sets: levels, brightness keys, off and on, and down for a sleep'
+		arches:   ['x86_64']
+		tables:   ['backlight-bench']
+		qemu:     ['-acpitable', 'file={state}/backlight-bench.aml', '-chardev', 'file,id=hwsaid,path={state}/firmware-said.txt',
+			'-device', 'isa-debugcon,iobase=0x505,chardev=hwsaid']
+		required: ['HWTEST START acpi-backlight', 'HWTEST PASS acpi-backlight']
+		ending:   .poweroff
+		writings: [
+			Writing{
+				file: 'firmware-said.txt'
+				text: backlight_said
+			},
+		]
+	},
+	Scenario{
+		name:     'acpi-backlight-off'
+		about:    'vinix.acpi_backlight=off: the same panels are left alone'
+		arches:   ['x86_64']
+		cmdline:  'vinix.acpi_backlight=off'
+		tables:   ['backlight-bench']
+		qemu:     ['-acpitable', 'file={state}/backlight-bench.aml', '-chardev', 'file,id=hwsaid,path={state}/firmware-said.txt',
+			'-device', 'isa-debugcon,iobase=0x505,chardev=hwsaid']
+		required: ['HWTEST START acpi-backlight-off', 'HWTEST PASS acpi-backlight-off']
+		ending:   .poweroff
+		writings: [
+			Writing{
+				file: 'firmware-said.txt'
+				text: ''
+			},
+		]
 	},
 	Scenario{
 		name:     'acpi-thermal'

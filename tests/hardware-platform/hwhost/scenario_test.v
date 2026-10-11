@@ -357,3 +357,23 @@ fn test_a_writing_that_nothing_writes_is_refused() {
 		},
 	]) == ''
 }
+
+fn test_the_backlight_record_is_what_the_two_panels_are_told() {
+	lit := find_scenario(scenarios, 'acpi-backlight') or { panic('no acpi-backlight scenario') }
+	assert lit.writings.len == 1
+	said := lit.writings[0].text
+	// The bus told once for each panel, then the first panel's levels.
+	assert said.starts_with('D4D413597')
+	// The first sleep leaves the second panel alone; the second, with it set,
+	// puts it down first and gives each its level back.
+	assert said.contains('1D47D4421D47D44')
+	// Every level written is one a panel has.
+	for letter in said.replace('D4', '') {
+		assert (backlight_bench_levels + '246').contains(letter.ascii_str())
+	}
+	assert said.len == 26 + 200
+	off := find_scenario(scenarios, 'acpi-backlight-off') or {
+		panic('no acpi-backlight-off scenario')
+	}
+	assert off.cmdline.contains('vinix.acpi_backlight=off') && off.writings[0].text == ''
+}

@@ -25,6 +25,8 @@ fn run_scenario(name string, mut t Test) bool {
 		'acpi-ec-absent' { scenario_acpi_ec_absent(mut t) }
 		'acpi-ec-off' { scenario_acpi_ec_off(mut t) }
 		'acpi-ec-selftest', 'acpi-ec-selftest-dsdt' { scenario_acpi_ec_selftest(mut t) }
+		'acpi-backlight' { scenario_acpi_backlight(mut t) }
+		'acpi-backlight-off' { scenario_acpi_backlight_off(mut t) }
 		'acpi-power' { scenario_acpi_power(mut t) }
 		'acpi-thermal' { scenario_acpi_thermal(mut t) }
 		'apple-smc-selftest' { scenario_apple_smc_selftest(mut t) }
