@@ -114,7 +114,8 @@ fn (mut a TextEditorApp) selection_navigation(final u8) {
 }
 
 fn (mut a TextEditorApp) expire_key_escape(now u64) bool {
-	if !a.key_csi_active || (now != ~u64(0) && now >= a.key_csi_ms && now - a.key_csi_ms < 100) { return false }
+	document_changed := a.poll_document_service(now)
+	if !a.key_csi_active || (now != ~u64(0) && now >= a.key_csi_ms && now - a.key_csi_ms < 100) { return document_changed }
 	bare := a.key_csi_len == -1
 	a.key_csi_active = false
 	a.key_csi_len = 0

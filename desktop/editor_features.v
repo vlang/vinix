@@ -326,6 +326,7 @@ fn (mut a TextEditorApp) paste_field(text string) {
 }
 
 fn (mut a TextEditorApp) close_app() {
+	a.close_document_service()
 	a.reset_history()
 	unsafe {
 		a.undo_history.free()

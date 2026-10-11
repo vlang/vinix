@@ -107,8 +107,7 @@ fn (mut a TextEditorApp) create_save_as() bool {
 	path := editor_bytes_text(a.save_as_path).clone()
 	defer { unsafe { path.free() } }
 	if !editor_valid_save_path(path) { a.set_status('editor.workflow.invalid_path') return false }
-	result := editor_create_file(path, a.text)
-	if result != '' { a.set_status(result) return false }
+	if !a.save_through_document_service(path, true) { return false }
 	a.set_path(path)
 	a.document_path.clear()
 	editor_append(mut a.document_path, path)

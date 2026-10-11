@@ -117,6 +117,7 @@ mut:
 	save_as_path []u8
 	match_start   int = -1
 	match_end     int = -1
+	documents EditorDocuments
 	// pending gathers a multibyte character until its last byte arrives. The
 	// keyboard is read 64 bytes at a time, so that can be the next key_input.
 	pending     [4]u8
@@ -132,6 +133,7 @@ fn open_editor(mut _ Desktop) !NativeApp {
 	editor_append(mut app.document_path, editor_bytes_text(app.default_path))
 	app.set_path(editor_bytes_text(app.default_path))
 	app.set_status('editor.status.new_document')
+	app.initialize_document_service(editor_bytes_text(app.path))
 	return app
 }
 
@@ -294,6 +296,7 @@ fn (mut a TextEditorApp) follow_language() {
 }
 
 fn (mut a TextEditorApp) perform_new_document() {
+	a.close_document_service()
 	a.reset_history()
 	a.text.clear()
 	a.cursor = 0
@@ -316,29 +319,13 @@ fn (mut a TextEditorApp) perform_open_document() bool {
 	// needs a NUL-terminated copy, rather than the frame's borrowed view.
 	path := editor_bytes_text(a.path).clone()
 	defer { unsafe { path.free() } }
-	info := desktop_stat(path) or {
-		a.set_file_status('editor.status.cannot_open')
-		return false
-	}
-	if info.is_dir {
-		a.set_file_status('editor.status.is_directory')
-		return false
-	}
-	if info.size > editor_max_file_size {
-		a.set_status('editor.status.too_large')
-		return false
-	}
+	mut document := workflow_editor_open(path) or { a.document_error(err.msg()); a.set_status('editor.status.cannot_open'); return false }
+	mut next := document.load(editor_max_file_size) or { document.close(); a.document_error(err.msg()); a.set_status('editor.status.cannot_read'); return false }
+	a.close_document_service()
+	a.initialize_document_service(path)
+	a.documents.document.close()
+	a.documents.document = document
 
-	mut next := []u8{len: int(info.size)}
-	got := if next.len == 0 { i64(0) } else { desktop_read_file(path, next.data, info.size) }
-	if got < 0 {
-		unsafe { next.free() }
-		a.set_file_status('editor.status.cannot_read')
-		return false
-	}
-	if got < i64(next.len) {
-		next.trim(int(got))
-	}
 	a.reset_history()
 	unsafe { a.text.free() }
 	a.text = next
@@ -363,14 +350,8 @@ fn (mut a TextEditorApp) save_document() bool {
 	}
 	path := editor_bytes_text(a.path).clone()
 	defer { unsafe { path.free() } }
-	mut data := voidptr(unsafe { nil })
-	if a.text.len > 0 {
-		data = voidptr(a.text.data)
-	}
-	if !desktop_write_file(path, data, u64(a.text.len)) {
-		a.set_file_status('editor.status.cannot_save')
-		return false
-	}
+	if !a.save_through_document_service(path, false) { return false }
+
 	a.document_has_save = true
 	a.saved_revision = a.revision
 	a.modified = false
@@ -778,7 +759,8 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 		radius: 5
 	}, path_label)
 	a.build_edit_toolbar(mut children)
-	mut document_top := editor_toolbar_height + if a.find_open { editor_find_height } else { 0 }
+	a.build_document_services(mut children, width, editor_toolbar_height)
+	mut document_top := editor_toolbar_height + 54 + if a.find_open { editor_find_height } else { 0 }
 	if a.find_open { a.build_find_panel(mut children, width) }
 	if a.save_as_open {
 		a.build_save_as_panel(mut children, width, document_top)
@@ -846,6 +828,7 @@ fn (mut a TextEditorApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a TextEditorApp) handle(event_id string) ! {
+	if a.document_service_action(event_id) { return }
 	// A click between the two reads of a split character abandons it.
 	a.pending_len = 0
 	a.key_csi_active = false
