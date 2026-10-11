@@ -1,0 +1,24 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Compile and start the fuzzer. Its targets are modules of the tools and of
+# the kernel, which is why this does not go through
+# build-support/run-v-tool.sh: that has no way to name where they are.
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo=$(CDPATH= cd -- "$here/../.." && pwd)
+. "$repo/build-support/find-v.sh"
+work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-fuzz.XXXXXX")
+trap 'rm -rf "$work"' 0
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+# -gc none: a target runs in a process forked from this one, and the
+# collector's threads do not survive a fork.
+"$V" -cc cc -nocache -gc none \
+    -path "@vlib|@vmodules|$repo/tools/accounts|$repo/tools/security-events|$repo/kernel" \
+    -o "$work/fuzz" "$here" >&2
+set +e
+"$work/fuzz" "$@"
+status=$?
+set -e
+exit "$status"

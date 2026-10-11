@@ -81,6 +81,10 @@ fn test_parse_group_and_shadow() ! {
 	groups := parse_group('root:x:0:\nwheel:x:10:alex,sam\n')!
 	assert groups[1].members == ['alex', 'sam']
 	assert format_group(groups) == 'root:x:0:\nwheel:x:10:alex,sam\n'
+	// A group password is refused, like a password in passwd.
+	parse_group('wheel:secret:10:alex\n') or {
+		assert err.msg().contains('password field')
+	}
 	parse_group('wheel:x:10\n') or {
 		shadows := parse_shadow('root:*:19000:0:99999:7:::\nalex:!x:1::::::\n')!
 		assert shadows[0].ageing == ['0', '99999', '7', '', '', '']

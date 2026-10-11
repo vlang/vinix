@@ -106,6 +106,12 @@ pub fn parse_group(text string) ![]Group {
 			return error('group line ${index + 1}: expected 4 fields')
 		}
 		gid := parse_id(fields[2]) or { return error('group line ${index + 1}: invalid gid') }
+		// Group passwords are not a thing here: a field that held one would
+		// be a credential nothing checks, and would be lost when the file
+		// is next written.
+		if fields[1] != 'x' {
+			return error('group line ${index + 1}: password field must be x')
+		}
 		mut members := []string{}
 		if fields[3] != '' {
 			members = fields[3].split(',')
