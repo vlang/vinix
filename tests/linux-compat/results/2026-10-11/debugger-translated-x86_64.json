@@ -1,0 +1,48 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "translated-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "155cf107b26a58f3b343116b49fa9e39c944406bd44a68e727f09515b221f00e",
+    "runtime_probe_sha256": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+    "runtime_libc": "glibc",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "debugger",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [],
+    "services": [],
+    "debuggers": [
+        {
+            "argv": [
+                "/usr/bin/qemu-x86_64",
+                "-g",
+                "19016",
+                "-B",
+                "0x100000000",
+                "-L",
+                "/usr/libexec/vinix-glibc/x86_64",
+                "-0",
+                "/usr/share/linux-compat/runtime",
+                "/usr/share/linux-compat/runtime",
+                "--once"
+            ],
+            "executable_sha256": "9025933dcbd195d6fe2fbaaa2dd697173befd8379a10ff1df9040e6a8c941671",
+            "runtime_probe_sha256": "df5fd926c4872a65317829d1153a13a46ad59556289cac5c26f1454f17a2d89e",
+            "initial_pc": 8791978339184,
+            "stepped_pc": 8791978339187,
+            "registers_sha256": "bd4b9c1fb207bbabd6995d8572ac1d60f8cad62b27586b79efd06e25caefae51",
+            "memory_address": 8791978179904,
+            "memory_hex": "02",
+            "breakpoint_hit": true,
+            "memory_restored": true,
+            "exit_code": 0,
+            "stdout": "LINUX RUNTIME libc=glibc version=2.36\nLINUX RUNTIME page_size=4096 pointer_bits=64\nLINUX RUNTIME PASS: atomics SIMD TLS\nLINUX RUNTIME PASS: JIT page sizes\nLINUX RUNTIME PASS: wide offsets time64\nLINUX RUNTIME: PASS\n",
+            "stderr": "",
+            "retired": true
+        }
+    ]
+}

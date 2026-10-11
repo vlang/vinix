@@ -31,6 +31,7 @@ and openat2 exercise the same behavior, following the
 | File offsets past 8 GiB, normalized clock and time64 timerfd deadline roundtrip | passed | passed | passed | passed |
 | auxv/sysconf page size, pointer width | 16 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 32 bits |
 | Same runtime predicates with unmodified Debian glibc 2.36 | passed | passed | passed | passed |
+| Remote register/memory reads, stack mutation/restoration, breakpoint and step | unavailable | unavailable | passed | passed |
 
 BPF is unavailable: passing its error regression means callers can discover
 that limitation. The later `link-policy-*.json` receipts test kernels that add
@@ -42,7 +43,7 @@ BENEATH, IN_ROOT and CACHED still return EOPNOTSUPP, including mixed
 requests. Containment and complete sandbox support remain unqualified. The
 [Linux openat2 contract](https://man7.org/linux/man-pages/man2/openat2.2.html)
 defines these distinctions. The runtime fixture covers NEON or SSE2, not the complete AVX/ARM feature
-set, debugger operations, signal delivery through translation or every JIT.
+set, native debugger operations, signal delivery through translation or every JIT.
 The x86-64 translated result uses the existing QEMU-user launcher in `--direct` mode
 with a static musl x86-64 fixture, not a glibc application runtime.
 
@@ -101,7 +102,7 @@ record the revision. The i386 SDK's musl 1.2.5-r11, compiler-rt 19.1.4-r1, CRT
 and builtins hashes are recorded with the build and package inputs. The static
 probe bypasses the wrapper's dynamic musl loader and confines its W^X opt-in to
 the translator child. Native ELF32 entry, x32, arbitrary glibc applications, complete
-large-file/time ABI coverage, loader interoperability and debugger operations
+large-file/time ABI coverage, loader interoperability and native debugger operations
 remain unqualified.
 
 The additional wide-offset/time64 fixture passes on both native architectures
@@ -128,7 +129,24 @@ failing before that fix with shared-object descriptor allocation error 9.
 Translated probes use the real GNU interpreter in a private root and confine
 W^X opt-in and environment cleanup to the translator child. These results
 qualify the exercised GNU runtime APIs; arbitrary glibc applications, native
-ELF32/x32, debugger operations and complete legacy time32 behavior remain open.
+ELF32/x32, native debugger operations and complete legacy time32 behavior remain open.
+
+The `debugger-translated-*.json` receipts qualify the QEMU-user GDB remote stub
+for both GNU x86 paths on AArch64. A V protocol client reads the initial
+registers and instruction memory, mutates and restores a stack byte, inserts
+and hits a software breakpoint, removes it, single-steps and verifies a changed
+instruction pointer. Continuing then exits successfully with all TLS, atomic,
+SIMD, JIT, page-size and wide-offset/time64 runtime predicates still passing.
+The driver validates packet checksums and bounds, uses socket deadlines and
+retires the translator. Emulator, probe, driver and kernel hashes accompany
+the raw replies' register hash and observed addresses. The translator child
+uses the same private GNU root and scoped W^X/environment policy as the runtime
+case. This tests the [QEMU-user remote stub](https://www.qemu.org/docs/master/user/main.html)
+through the [GDB remote protocol](https://sourceware.org/gdb/current/onlinedocs/gdb.html/Packets.html).
+Native ptrace remains unavailable; source-level symbols, stack unwinding, core
+dumps, JIT symbol registration and tracing of arbitrary applications remain
+separate checks. Remote writes respect guest page permissions; the fixture
+mutates writable stack data and restores it before execution.
 
 The application suite also attempts all categories and preserves missing
 dependencies as unsupported, with a nonzero complete-suite exit. Test roots

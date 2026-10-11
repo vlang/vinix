@@ -9,7 +9,7 @@ import strconv
 import time
 
 const catalog = ['sqlite', 'media', 'office', 'chromium', 'firefox', 'go', 'java', 'v', 'server',
-	'runtime', 'portal', 'games']
+	'runtime', 'debugger', 'portal', 'games']
 
 struct CommandResult {
 	argv              []string
@@ -48,6 +48,7 @@ struct Report {
 	results                      []Verdict
 	commands                     []CommandResult
 	services                     []ServiceResult
+	debuggers                    []DebugResult
 }
 
 struct Suite {
@@ -61,6 +62,7 @@ mut:
 	environment map[string]string
 	commands []CommandResult
 	services []ServiceResult
+	debuggers []DebugResult
 }
 
 fn stop(mut child os.Process) {
@@ -323,6 +325,7 @@ fn (mut suite Suite) run(name string) ! {
 			}
 			expect(output.contains('LINUX RUNTIME PASS: atomics SIMD TLS') && output.contains('LINUX RUNTIME PASS: JIT page sizes') && output.contains('LINUX RUNTIME PASS: wide offsets time64') && output.contains('LINUX RUNTIME: PASS'), 'runtime predicates did not all pass')!
 		}
+		'debugger' { suite.debug_runtime()! }
 		'portal' {
 			suite.execute('gdbus', ['call', '--session', '--dest', 'org.freedesktop.portal.Desktop',
 				'--object-path', '/org/freedesktop/portal/desktop', '--method',
@@ -482,7 +485,7 @@ fn main() {
 	} else {
 		''
 	}
-	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services}
+	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services, suite.debuggers}
 	os.write_file(suite.work + '/report.json', json2.encode(report, prettify: true) + '\n') or {
 		eprintln(err.msg())
 		exit(1)

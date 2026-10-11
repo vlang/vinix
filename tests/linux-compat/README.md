@@ -174,7 +174,18 @@ its interpreter at the normal Linux path: `/lib64/ld-linux-x86-64.so.2` or
 directly with this private root, scoped W^X opt-in and removed foreign library
 environment variables. The driver requires the probe's GNU libc version marker
 as well as every runtime predicate. Dated receipts cover both native and both
-translated paths; these checks do not qualify every GNU application or debugger.
+translated paths; these checks do not qualify every GNU application.
+
+Select `--cases debugger` with either translated path and its matching runtime
+probe to qualify the QEMU-user GDB remote stub. The V client verifies register
+and instruction-memory reads, stack memory write/read/restore, a software
+breakpoint, single stepping and successful continuation through every runtime
+predicate. The report records the exact translator/probe hashes, addresses,
+register-packet hash and child cleanup. The stub listens on guest loopback port
+19016; packets and output are bounded, and socket operations have deadlines.
+Native paths report unsupported because ptrace has no syscall dispatch.
+Source-level symbols, unwinding, core dumps and JIT debugger registration need
+their own qualification.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 
