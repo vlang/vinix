@@ -1,0 +1,109 @@
+{
+    "schema": 1,
+    "source_commit": "84767d1865d98c3d69d94e90224acbf70c2a972b",
+    "translated_python_files": 10,
+    "translated_python_bytes": 149927,
+    "historical_archive_translation_credit": 0,
+    "replacements": [
+        {
+            "original_path": "tests/alloc-bench/materialize-evidence.py",
+            "original_sha256": "d12ccf766ff5be037b26c7c9efd22e6ef357d69d1a86f80e30fb39a94c8f87ff",
+            "original_bytes": 7895,
+            "original_lines": 183,
+            "original_blob": "cd6f66512b375435325a8dae119661de07ca818a",
+            "native_paths": [
+                "tests/alloc-bench/materialize-evidence.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-02-userspace/compare.py",
+            "original_sha256": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+            "original_bytes": 17094,
+            "original_lines": 324,
+            "original_blob": "6db0552c890fe5c3bfe9525b282b5c5ad81b4fa8",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-02-userspace/compare.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-02-userspace/recompute.py",
+            "original_sha256": "41e508287da923233f2fcafd4b55d80494babfa51b07336b5760db1b4bc1f483",
+            "original_bytes": 15946,
+            "original_lines": 292,
+            "original_blob": "a5fa80a7cf669719f10d137f69112343a3c3ca5a",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-02-userspace/recompute.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-02-userspace/check-recompute.py",
+            "original_sha256": "6a5cec67029323241be8ddeaf26d2bc0236913ebe764bfb3db7cb596fbac8217",
+            "original_bytes": 14178,
+            "original_lines": 242,
+            "original_blob": "34769078ec047b25f8acfb7c2c613e6f59f807f8",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-02-userspace/check-recompute.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-03-userspace-v5/compare.py",
+            "original_sha256": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+            "original_bytes": 17094,
+            "original_lines": 324,
+            "original_blob": "6db0552c890fe5c3bfe9525b282b5c5ad81b4fa8",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-03-userspace-v5/compare.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-03-userspace-v5/recompute.py",
+            "original_sha256": "0e373348db0d34008144e355705a038c8805ccffbaf74c052f8e984c838ad7a5",
+            "original_bytes": 15946,
+            "original_lines": 292,
+            "original_blob": "446183a841e51e3c85cf9f4d88fbd29598297520",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-03-userspace-v5/recompute.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute.py",
+            "original_sha256": "2518188f50f146f0687a8a312ff8c0964ff1886bb50f221e1005465384ba57f5",
+            "original_bytes": 14226,
+            "original_lines": 242,
+            "original_blob": "0d9ffc8709bd77161e18e4a59bb8d6ee97449fd9",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-03-userspace-v6/compare.py",
+            "original_sha256": "e12ec5a8c90cab335c40e68257d596e0a2d0ba9f284b1e4bfe911fffa352dd06",
+            "original_bytes": 17094,
+            "original_lines": 324,
+            "original_blob": "6db0552c890fe5c3bfe9525b282b5c5ad81b4fa8",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-03-userspace-v6/compare.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-03-userspace-v6/recompute.py",
+            "original_sha256": "66c68465612fa1dcc2d747c9d1e873f123e4d9391e64d5a725cae3f71a9c9f58",
+            "original_bytes": 16228,
+            "original_lines": 295,
+            "original_blob": "dca2302f2dfc7d391e9078d0005c8734cc8505e2",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-03-userspace-v6/recompute.v"
+            ]
+        },
+        {
+            "original_path": "tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute.py",
+            "original_sha256": "f07723ba62475acbc8da57756321c5a2025e18cfe749e8d113e9a877cf040087",
+            "original_bytes": 14226,
+            "original_lines": 242,
+            "original_blob": "0843e2179e25a59b99c182b4b34964e3a3029566",
+            "native_paths": [
+                "tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute.v"
+            ]
+        }
+    ]
+}

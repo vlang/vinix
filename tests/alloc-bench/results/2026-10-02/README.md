@@ -279,14 +279,14 @@ sampler; only its complete `ALLOC-*` user-space records feed the user table.
 From the repository root, validate the preserved comparisons:
 
 ```sh
-python3 tests/alloc-bench/compare.py \
+tests/alloc-bench/compare \
   tests/alloc-bench/results/2026-10-02/user-vinix/serial.log \
   tests/alloc-bench/results/2026-10-02/user-macos/serial.log
 for run in 1 2 3; do
-  python3 tests/alloc-bench/compare-kernel.py \
+  tests/alloc-bench/compare-kernel \
     tests/alloc-bench/results/2026-10-02/kernel-vinix-before/run-$run/serial.log \
     tests/alloc-bench/results/2026-10-02/kernel-macos-$run/serial.log
-  python3 tests/alloc-bench/compare-kernel.py \
+  tests/alloc-bench/compare-kernel \
     tests/alloc-bench/results/2026-10-02/kernel-vinix-after/run-$run/serial.log \
     tests/alloc-bench/results/2026-10-02/kernel-macos-$run/serial.log
 done

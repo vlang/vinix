@@ -174,7 +174,7 @@ until `ALLOC-DONE`. Preserve all `ALLOC-SAMPLE` lines, including outliers, along
 with the complete metadata and results. Treat `ALLOC-ERROR`, `ALLOC-FAIL`, an
 incomplete workload or a missing completion record as a failed collection.
 The recorded collector allowed up to 3,600 seconds. After collection, validate
-the log with the saved [strict validator](../compare.py).
+the log with the saved [strict validator](../compare).
 
 The measurement controller resumes and pauses only this runtime's QMP socket:
 `qmp_capabilities`, `cont` before measurement, and `stop` after completion or
@@ -185,5 +185,10 @@ records. Preserve that recovery in the cohort metadata.
 
 Run Vinix and Catalina timing jobs sequentially. Copy each accepted completed
 capture to the corresponding numbered final directory, then run
-[recompute.py](../recompute.py). Every numbered final cohort participates, and
+[recompute](../recompute). Every numbered final cohort participates, and
 both per-cohort and pooled parity booleans must be considered.
+
+The maintained commands above now run V replacements. Original comparator
+fingerprints and historical validation findings remain unchanged; the native
+policy is pinned separately and passes all original checks plus native CLI
+tampering. See [native analysis qualification](../../../native-reports.md).

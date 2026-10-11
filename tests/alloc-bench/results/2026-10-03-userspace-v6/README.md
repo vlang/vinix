@@ -44,18 +44,18 @@ slower captures, must participate. Each individual cohort and all 14 pooled
 samples per guest/workload must place every Vinix median at or below Catalina.
 
 ```sh
-python3 tests/alloc-bench/results/2026-10-03-userspace-v6/recompute.py
-python3 tests/alloc-bench/results/2026-10-03-userspace-v6/recompute.py --json
-python3 tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute.py
+tests/alloc-bench/results/2026-10-03-userspace-v6/recompute
+tests/alloc-bench/results/2026-10-03-userspace-v6/recompute --json
+tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute
 ```
 
-[recompute.py](recompute.py) pins the original plan's complete byte hash and
+[recompute](recompute) pins the original plan's complete byte hash and
 requires precisely its four captures, actual exit-zero driver records,
 explicit UTC declaration/start/finish times, ABBA order and nonoverlap.
-The unchanged [strict validator](compare.py) requires complete metadata, all
+The native [strict validator](compare) requires complete metadata, all
 six workloads, 42 distinct samples per capture, payload checksums, consistent
 printed statistics and `ALLOC-DONE`. The unchanged [benchmark source](../source-archive.json) and
-validator are pinned by [source fingerprints](source-snapshots.json).
+original comparator are pinned by [source fingerprints](source-snapshots.json).
 The original C bytes are recovered through the [source archive](../SOURCE-ARCHIVE.md),
 with zero translation credit.
 The kernel remains the approved v5 x86 kernel `16140916…`; final v6 loader,
@@ -223,3 +223,8 @@ by the original fixed protocol. No temporary fixture or diagnostic becomes
 campaign data. The preceding [v4 results and diagnostics](../2026-10-02-userspace/README.md)
 remain preserved, including ops/churn growth and four-vCPU waiter stalls;
 successful two-vCPU suites do not establish universal SMP stability.
+
+The maintained commands above now run V replacements. Original comparator
+fingerprints and historical validation findings remain unchanged; the native
+policy is pinned separately and passes all original checks plus native CLI
+tampering. See [native analysis qualification](../../native-reports.md).

@@ -41,17 +41,17 @@ must show every Vinix median at or below Catalina's median. No samples,
 outliers or complete slower captures are filtered out.
 
 ```sh
-python3 tests/alloc-bench/results/2026-10-03-userspace-v5/recompute.py
-python3 tests/alloc-bench/results/2026-10-03-userspace-v5/recompute.py --json
-python3 tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute.py
+tests/alloc-bench/results/2026-10-03-userspace-v5/recompute
+tests/alloc-bench/results/2026-10-03-userspace-v5/recompute --json
+tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute
 ```
 
-[recompute.py](recompute.py) requires exactly the four declared captures,
+[recompute](recompute) requires exactly the four declared captures,
 explicit UTC predeclaration/start/end times, ABBA order and nonoverlap. The
-preserved [strict validator](compare.py) requires complete metadata, all six
+native [strict validator](compare) requires complete metadata, all six
 workloads, 42 distinct samples, payload checksums, internally consistent
 printed statistics and `ALLOC-DONE`. The unchanged [benchmark source](../source-archive.json) and
-validator are pinned by [source fingerprints](source-snapshots.json).
+original comparator are pinned by [source fingerprints](source-snapshots.json).
 The original C bytes are recovered through the [source archive](../SOURCE-ARCHIVE.md),
 with zero translation credit.
 The final kernel, loader, static archive and allocator patch are pinned to
@@ -205,3 +205,8 @@ The implementation changes are committed as `37884975` (allocator framing)
 and `9d6f3e1a` (x86 page-table teardown and boundary regression). All final
 source/object/runtime proofs are retained here; shared historical validation
 is linked to the committed v4 report rather than duplicated.
+
+The maintained commands above now run V replacements. Original comparator
+fingerprints and historical validation findings remain unchanged; the native
+policy is pinned separately and passes all original checks plus native CLI
+tampering. See [native analysis qualification](../../native-reports.md).

@@ -27,18 +27,19 @@ historical validation directories. They do not participate in recomputation.
 The two rejected v4 kernel candidates were never booted.
 
 ```sh
-python3 tests/alloc-bench/results/2026-10-02-userspace/recompute.py
-python3 tests/alloc-bench/results/2026-10-02-userspace/recompute.py --json
-python3 tests/alloc-bench/results/2026-10-02-userspace/check-recompute.py
+tests/alloc-bench/results/2026-10-02-userspace/recompute
+tests/alloc-bench/results/2026-10-02-userspace/recompute --json
+tests/alloc-bench/results/2026-10-02-userspace/check-recompute
 ```
 
-[recompute.py](recompute.py) requires exactly the four declared captures,
+[recompute](recompute) requires exactly the four declared captures,
 actual driver exit zero, explicit UTC start/end timestamps, predeclaration,
 ABBA order and nonoverlap. Each capture needs complete metadata, all six
 workloads, all 42 distinct raw samples, matching payload checksums, consistent
-printed statistics and a completion record. The preserved
-[strict validator](compare.py) and [benchmark source](../source-archive.json) are pinned to the
-hashes in [source-snapshots.json](source-snapshots.json).
+printed statistics and a completion record. The [native strict validator](compare)
+implements the preserved comparator policy. The original comparator and
+[benchmark source](../source-archive.json) remain pinned to the hashes in
+[source-snapshots.json](source-snapshots.json).
 The original C bytes are recovered through the [source archive](../SOURCE-ARCHIVE.md),
 with zero translation credit.
 
@@ -63,7 +64,7 @@ pooled result. Pooling uses all raw samples rather than cohort medians or ratios
 [Report integrity checks](validation/recompute-review.json) pass 170 cases,
 including retention of every sample, complete slower data remaining a failed
 target, and rejection of malformed, inconsistent or mismatched records and
-provenance. [check-recompute.py](check-recompute.py) uses actual v3 raw records
+provenance. [check-recompute](check-recompute) uses actual v3 raw records
 only inside temporary fixtures with synthetic v4 config and timestamps. These
 fixtures are never saved or published as v4 measurements.
 
@@ -232,3 +233,8 @@ the previous four-vCPU 80-waiter baseline and candidate both stalled during
 thread creation. Those records remain linked in
 [v3 validation](earlier-candidate/v3-validation.md). These two-vCPU checks do
 not establish universal SMP stability or leak-free kernel behavior.
+
+The maintained commands above now run V replacements. Original comparator
+fingerprints and historical validation findings remain unchanged; the native
+policy is pinned separately and passes all original checks plus native CLI
+tampering. See [native analysis qualification](../../native-reports.md).
