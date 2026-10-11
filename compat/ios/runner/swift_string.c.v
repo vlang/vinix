@@ -110,12 +110,17 @@ fn swift_buffer_refs(object u64, delta i64) !u64 {
 		C.ios_objc_initialize_unlock()
 		return swift_strong_limit // Immortal storage never reports unique.
 	}
-	if object !in ios_runtime.swift_buffers && object !in ios_runtime.swift_strings && object !in ios_runtime.swift_arrays {
+	if object !in ios_runtime.swift_buffers && object !in ios_runtime.swift_strings
+		&& object !in ios_runtime.swift_arrays && object !in ios_runtime.swift_heap {
 		C.ios_objc_initialize_unlock()
 		return error('iOS: Swift ARC for application heap objects is not implemented')
 	}
 	location := unsafe { &u64(object + 8) }
 	bits := C.ios_load_pointer(location)
+	if bits & 0x80000001ffffffff != 3 {
+		C.ios_objc_initialize_unlock()
+		return error('iOS: unsupported Swift deinitializing/unowned/side-table ARC state')
+	}
 	refs := (bits >> 33) + 1
 	if delta > 0 && u64(delta) > swift_strong_limit - refs {
 		C.ios_objc_initialize_unlock()
@@ -130,6 +135,13 @@ fn swift_buffer_refs(object u64, delta i64) !u64 {
 		// Retire before callbacks. Keep the bytes alive until all Element
 		// witnesses return; callbacks may resolve symbols or release other owners.
 		C.ios_store_pointer(location, 3 | (u64(1) << 32))
+		if mut storage := ios_runtime.swift_heap[object] {
+			storage.deiniting = true
+			ios_runtime.swift_heap[object] = storage
+			C.ios_objc_initialize_unlock()
+			swift_heap_destroy(object, storage.metadata, storage.generation)!
+			return 0
+		}
 		if storage := ios_runtime.swift_arrays[object] {
 			ios_runtime.swift_arrays.delete(object)
 			C.ios_objc_initialize_unlock()
@@ -176,7 +188,8 @@ fn swift_unknown_is_native(object u64) bool {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if object == ios_runtime.swift_empty_array || object in ios_runtime.swift_buffers
-		|| object in ios_runtime.swift_strings || object in ios_runtime.swift_arrays { return true }
+		|| object in ios_runtime.swift_strings || object in ios_runtime.swift_arrays
+		|| object in ios_runtime.swift_heap { return true }
 	if object in ios_runtime.objects || object in ios_runtime.classes || object in ios_runtime.constants
 		|| object in ios_runtime.block_refs { return false }
 	panic('iOS: Swift unknown-object ARC for unregistered objects is not implemented')
@@ -198,6 +211,7 @@ fn swift_buffers_stop() {
 	unsafe { ios_runtime.swift_buffers.free() }
 	unsafe { ios_runtime.swift_strings.free() }
 	swift_array_storage_stop()
+	swift_heap_stop()
 	swift_arc_stop()
 	swift_metadata_stop()
 	swift_hash_stop()
@@ -212,6 +226,9 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'_swift_allocObject' { u64(unsafe { voidptr(swift_heap_allocate) }) }
+		'_swift_deallocObject', '_swift_deallocClassInstance' { u64(unsafe { voidptr(swift_heap_deallocate) }) }
+		'_swift_deallocUninitializedObject' { u64(unsafe { voidptr(swift_heap_deallocate_uninitialized) }) }
 		'__swift_stdlib_reportUnimplementedInitializerInFile' { u64(unsafe { voidptr(swift_initializer_report_in_file) }) }
 		'__swift_stdlib_reportUnimplementedInitializer' { u64(unsafe { voidptr(swift_initializer_report) }) }
 		'__swift_stdlib_operatingSystemVersion' { u64(unsafe { voidptr(ios_operating_system_version) }) }

@@ -247,11 +247,10 @@ fn test_swift_string_metadata_and_witnesses() {
 		assert runtime_symbol(library, '_$sSSMn') or { panic(err) } == read64(api.metadata + 8)
 		swift_metadata_run(api)
 		swift_metadata_reentry(api)
-		if _ := runtime_symbol(library, '_swift_allocObject') { assert false }
 		if _ := runtime_symbol(library, '_swift_getTypeByMangledNameInContext') { assert false }
 		assert ios_runtime.swift_buffers.len == 0 && ios_runtime.objects.len == 0 && ios_runtime.live == 0
 		objc_stop()
 		assert ios_runtime.swift_metadata_arena == 0 && ios_runtime.swift_arc_code == 0 && ios_runtime.live == 0
 	}
-	println('IOS-SWIFT-METADATA: immutable String metadata, relative nominal descriptor and accessor, all eight witnesses, Optional/enum tags, acquire-before-publish and retire-after-publish ownership, copy/take assignments, reentrant deallocation without locked callbacks, concurrent copies, unsupported reflection/allocation and two empty teardowns')
+	println('IOS-SWIFT-METADATA: immutable String metadata, relative nominal descriptor and accessor, all eight witnesses, Optional/enum tags, acquire-before-publish and retire-after-publish ownership, copy/take assignments, reentrant deallocation without locked callbacks, concurrent copies, unsupported reflection and two empty teardowns')
 }

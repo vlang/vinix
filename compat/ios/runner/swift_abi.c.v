@@ -33,7 +33,12 @@ fn swift_arc_entry(releasing bool) u64 {
 			if code == unsafe { voidptr(-1) } { panic('iOS: cannot allocate Swift ARC thunks') }
 			swift_arc_emit(u64(code), u64(unsafe { voidptr(swift_retain) }))
 			swift_arc_emit(u64(code) + 64, u64(unsafe { voidptr(swift_release) }))
-			C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 128) })
+			// Ordinary C (destroyer, owner) -> Swift destroyer(self in x20).
+			for i, instruction in [u32(0xa9bf7bf4), 0xaa0003f0, 0xaa0103f4,
+				0xd63f0200, 0xa8c17bf4, 0xd65f03c0]! {
+				write32(u64(code) + 128 + u64(i) * 4, instruction)
+			}
+			C.__builtin___clear_cache(code, unsafe { voidptr(u64(code) + 152) })
 			if C.mprotect(code, page, C.PROT_READ | C.PROT_EXEC) != 0 {
 				C.munmap(code, page)
 				panic('iOS: cannot seal Swift ARC thunks')

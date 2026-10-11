@@ -129,6 +129,8 @@ mut:
 	swift_buffers map[u64]u64 // Owned UTF-8 array allocation -> element count, under the runtime lock.
 	swift_strings map[u64]u64 // Owned native-tail String allocation -> byte capacity, under the same lock.
 	swift_arrays map[u64]SwiftArrayStorage // Typed tails and Element destruction witnesses, under the same lock.
+	swift_heap map[u64]SwiftHeapStorage // Real app heap metadata and deallocation layout, under the same lock.
+	swift_heap_sequence u64 // Distinguishes reentrant allocations that reuse a freed address.
 	swift_empty_array u64 // Canonical sealed immortal empty storage, retired at quiescent shutdown.
 	swift_arc_code u64 // Sealed ARM64 preserve-most entry points, released at quiescent teardown.
 	swift_metadata_arena u64 // Adjacent sealed String metadata/accessor pages, under the runtime lock.

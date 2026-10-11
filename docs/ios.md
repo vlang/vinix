@@ -74,6 +74,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Dynamic linking | Chained pointer formats `DYLD_CHAINED_PTR_64` and `DYLD_CHAINED_PTR_64_OFFSET`, import formats 1/2/3; legacy rebase/bind/lazy/weak streams, export-trie lookup, signed addends and tagged RTTI pointers; app-bundled dylibs with `@executable_path`, `@loader_path` and own/executable `@rpath` lookup, shared mappings for repeated dependencies; checked lazy function slots resolve on first call through register-preserving ARM64 thunks; built-in and already-linked library `dlopen`/`dlsym`/`dlerror`, image/section lookup |
 | Image lifecycle | Superclass-first Objective-C `+load`, category attachment and category `+load` before C++ image constructors; checked `LC_ROUTINES_64`, initializer pointers/offsets, terminators and reverse-order image-scoped `atexit`/`__cxa_atexit`/`__cxa_finalize` callbacks; native `exit` and immediate `_exit` termination |
 | Thread-local storage | Darwin TLV descriptors, independent initialized and zero-filled templates for each image, lazy per-thread allocation and pthread-key cleanup; register-preserving ARM64 thunk |
+| Swift heap subset | Aligned allocation for native ARC classes and local/generic heap contexts; synchronized strong, batch, bridge and unknown ARC, x20 deallocating destructors, checked object/class and uninitialized deallocation; owners drain before metadata/thunk retirement |
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases, 144-byte stat records and native `utime` timestamps; version-4 UUIDs from native entropy; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread, `dispatch_once`, main/global/serial dispatch queues, delayed work and synchronous callbacks |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, caller-supplied instance construction and destruction, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
@@ -2035,20 +2036,56 @@ The initializer probe now exits with status 1 before entry at EOSSDK's
 including native heap-class metadata, allocation/deallocation/type/ARC
 instructions and eighteen aligned allocations with measured header/refcount
 transitions and real Array storage destruction. Heap-class allocation and ARC
-remain unimplemented in V. Full regression remains unpassed, and the five
+were unimplemented at that probe. Full regression remains unpassed, and the five
 published runners retain their last passing hashes.
+
+V now supplies `_swift_allocObject`, `_swift_deallocObject`,
+`_swift_deallocClassInstance` and `_swift_deallocUninitializedObject`. Native ARC
+classes and heap-local/generic contexts use real borrowed heap metadata,
+aligned storage and the measured two-word header initialized to three.
+Stored properties remain uninitialized until Swift constructs them. Final
+strong release marks the owner deinitializing before calling the metadata's
+deallocating destructor with self in x20. That destructor frees its own object
+through the deallocation entry; constructor-failure deallocation skips it.
+
+The registry checks allocation layout and tracks deinitialization and allocation
+generations under the runtime lock. Destructors run unlocked and can release
+children, wait for another resolver thread, or allocate again after freeing self.
+The outer release checks the generation without reading freed owner bytes.
+Strong/batch/bridge/unknown ARC uses the existing synchronized ownership paths;
+plain ARC preserves x9–x15 and x20 through final destruction. Metadata and sealed
+thunks stay alive until all owners drain. Weak/unowned/side-table ownership,
+further ARC during deinitialization, ObjC-counted classes, nonzero instance
+prefixes, reflection/casts and other heap runtime exports remain unsupported.
+
+Installed-library and V heap, String and typed Array suites pass ASAN/UBSAN in
+both seed modes. Heap checks cover 54 aligned layouts, initialized/uninitialized
+ownership, child destruction, reentrant callbacks and address reuse, eight
+allocation and shared-owner workers, invalid layouts/states and two drained
+runtime cycles. Generated successful paths have no hidden V temporaries;
+aligned storage and registry capacity are explicit allocations. Failure-only
+V error boxes are accounted for separately. All thirty-five programs rebuild,
+and all seventeen Swift ABI guest checks pass. Two host fixture mistakes and
+an obsolete guest assertion that allocation must remain unresolved are retained
+with their corrections and passing final results under `swift-heap-checks`.
+
+The heap probe now exits with status 1 before entry at EOSSDK's
+`_swift_errorRelease` import. Native measurements of that next entry and
+`_swift_errorRetain` show ordinary C calls using Objective-C ownership, including
+real CFError reference counts and final domain disposal. Full regression remains
+unpassed, and the five published runners retain their last passing hashes.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,388 | 770 | 81 |
-| EOSSDK | 599 | 63 | 18 |
-| MarketplaceKitWrapper | 91 | 85 | 23 |
-| All images | 2,078 | 918 | 122 |
+| Fortnite executable | 1,391 | 767 | 81 |
+| EOSSDK | 601 | 61 | 18 |
+| MarketplaceKitWrapper | 93 | 83 | 23 |
+| All images | 2,085 | 911 | 122 |
 
-The C++/GLES/Text variant reports 2,091 resolved imports, 905 unresolved strong
+The C++/GLES/Text variant reports 2,098 resolved imports, 898 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -2100,7 +2137,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all sixteen Swift ABI checks in a small, independent guest and
+`swift` runs all seventeen Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.
