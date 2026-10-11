@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `7a27a2544f6e2ecd5000da79b0e9aa2e8a78ef74`,
+at source commit `dc893c8b27cf9db79a977a897aa41a1459c583fa`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 567 | 2,365,422 | 6.15% |
-| Python | 267 | 1,394,382 | 3.62% |
-| Shell | 563 | 1,358,207 | 3.53% |
+| C | 567 | 2,365,422 | 6.14% |
+| Python | 257 | 1,339,032 | 3.48% |
+| Shell | 572 | 1,360,019 | 3.53% |
 
-All `.v` files are classified as V. The resulting V share is 78.59%, with no
+All `.v` files are classified as V. The resulting V share is 78.76%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,394,382 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,339,032 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 7a27a2544f6e2ecd5000da79b0e9aa2e8a78ef74 --breakdown --json
+github-linguist --rev dc893c8b27cf9db79a977a897aa41a1459c583fa --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -881,21 +881,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/roblox-windows/run.py` | 7,180 |
 | `tests/roblox/build-test.py` | 8,453 |
 | `tests/roblox/launcher-test.py` | 6,516 |
-| `tests/verified-boot/runtime.py` | 10,385 |
-| `tests/verified-boot/test.py` | 7,670 |
-| `tests/verified-root/run-host.py` | 7,267 |
-| `tests/verified-root/runtime.py` | 7,559 |
-| `tests/verified-root/test.py` | 3,150 |
 | `tests/virtio-gpu-virgl/_native.py` | 957 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 5,650 |
 | `tools/_package_store_native.py` | 4,314 |
 | `tools/host_clipboard.py` | 1,332 |
 | `tools/qemu-package-store.py` | 4,917 |
-| `tools/verified-boot/_native.py` | 2,322 |
-| `tools/verified-boot/build.py` | 7,139 |
-| `tools/verified-boot/get-loader.py` | 3,705 |
-| `tools/verified-root/_native.py` | 2,226 |
-| `tools/verified-root/build.py` | 3,927 |
 
 ## Shell files
 
@@ -957,6 +947,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/security-audit/run-collector` | 396 |
 | `build-support/security-tools/compile-v-core` | 167 |
 | `build-support/security-tools/stage` | 165 |
+| `build-support/sparse-file` | 178 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
 | `build-support/stage-uname.sh` | 656 |
 | `build-support/steam/bash` | 433 |
@@ -1410,6 +1401,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/uname/run` | 178 |
 | `tests/user-access/sites` | 180 |
 | `tests/userland-demo/run` | 186 |
+| `tests/verified-boot/runtime` | 205 |
+| `tests/verified-boot/test` | 202 |
+| `tests/verified-root/run-host` | 206 |
+| `tests/verified-root/runtime` | 205 |
+| `tests/verified-root/test` | 202 |
 | `tests/virtio-gpu-virgl/desktop-guest-init.sh` | 1,941 |
 | `tests/virtio-gpu-virgl/guest-init.sh` | 1,464 |
 | `tests/virtio-ro/run` | 218 |
@@ -1464,3 +1460,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/security-events/build` | 1,659 |
 | `tools/split-desktop-initramfs` | 166 |
 | `tools/split-qemu-initramfs` | 163 |
+| `tools/verified-boot/build` | 203 |
+| `tools/verified-boot/get-loader` | 208 |
+| `tools/verified-root/build` | 203 |
