@@ -1,0 +1,99 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-aarch64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "3a39acc079cfb64619f6b32eaff991d5618593cb3b04cba519a1ab938d0a2105",
+    "runtime_probe_sha256": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+    "runtime_libc": "musl",
+    "uid": 1000,
+    "gid": 1000,
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "firefox",
+            "status": "failed",
+            "detail": "command failed: ['/usr/lib/firefox-esr/firefox-esr', '--headless', '--no-remote', '--profile', '/tmp/linux-compat-evidence/firefox-profile', '--window-size', '800,600', '--screenshot', '/tmp/linux-compat-evidence/firefox.png', 'http://127.0.0.1:61138/'] exit=11 timeout=false output_limit=false"
+        },
+        {
+            "name": "chromium",
+            "status": "failed",
+            "detail": "command failed: ['/usr/lib/chromium/chromium', '--headless', '--user-data-dir=/tmp/linux-compat-evidence/chromium-profile', '--timeout=30000', '--dump-dom', 'http://127.0.0.1:54385/'] exit=191 timeout=false output_limit=false"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--version"
+            ],
+            "executable_sha256": "ff2f322995b22b6bb01f74f9ab643fbab4f6cf251c6104dc880490013e91c77d",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Mozilla Firefox 128.14.0esr\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--headless",
+                "--no-remote",
+                "--profile",
+                "/tmp/linux-compat-evidence/firefox-profile",
+                "--window-size",
+                "800,600",
+                "--screenshot",
+                "/tmp/linux-compat-evidence/firefox.png",
+                "http://127.0.0.1:61138/"
+            ],
+            "executable_sha256": "ff2f322995b22b6bb01f74f9ab643fbab4f6cf251c6104dc880490013e91c77d",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 11,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "*** You are running in headless mode.\n[Parent 48311, Main Thread] WARNING: read-only dup failed (Permission denied); not using memfd: file /home/buildozer/aports/community/firefox-esr/src/firefox-128.14.0/ipc/chromium/src/base/shared_memory_posix.cc:255\n[Parent 48311, Main Thread] WARNING: failed to open shm: Permission denied: file /home/buildozer/aports/community/firefox-esr/src/firefox-128.14.0/ipc/chromium/src/base/shared_memory_posix.cc:361\n[Parent 48311, Main Thread] WARNING: failed to open shm: Permission denied: file /home/buildozer/aports/community/firefox-esr/src/firefox-128.14.0/ipc/chromium/src/base/shared_memory_posix.cc:361\nExceptionHandler::GenerateDump attempting to generate:\u0000/tmp/linux-compat-evidence/firefox-profile/minidumps/230da700-4423-ae49-260e-0c513e196746.dmp\n"
+        },
+        {
+            "argv": [
+                "/usr/lib/chromium/chromium",
+                "--version"
+            ],
+            "executable_sha256": "fa9630a41addbad2a48c77e86a8766e224c9c9a6c02e3c4b4638ae076bedd761",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Chromium 136.0.7103.113 \n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/lib/chromium/chromium",
+                "--headless",
+                "--user-data-dir=/tmp/linux-compat-evidence/chromium-profile",
+                "--timeout=30000",
+                "--dump-dom",
+                "http://127.0.0.1:54385/"
+            ],
+            "executable_sha256": "fa9630a41addbad2a48c77e86a8766e224c9c9a6c02e3c4b4638ae076bedd761",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 191,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "[58312:58312:1011/134420.756037:FATAL:sandbox/linux/suid/client/setuid_sandbox_host.cc:163] The SUID sandbox helper binary was found, but is not configured correctly. Rather than run without sandboxing I'm aborting now. You need to make sure that /usr/lib/chromium/chrome-sandbox is owned by root and has mode 4755.\n[1011/134420.831929:ERROR:third_party/crashpad/crashpad/util/linux/scoped_ptrace_attach.cc:27] ptrace: Function not implemented (38)\n[1011/134420.846853:ERROR:third_party/crashpad/crashpad/handler/linux/exception_handler_server.cc:52] EPOLLERR: No error information (0)\n"
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}

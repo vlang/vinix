@@ -1,0 +1,18 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "uid": 1000,
+    "memory_mib": 4096,
+    "cases": "firefox",
+    "inputs": {
+        "kernel": "f99c99cb64b32455b788f71921dc9738abe2bdcce7a8140aad827e1399d4e976",
+        "workloads": "3a39acc079cfb64619f6b32eaff991d5618593cb3b04cba519a1ab938d0a2105",
+        "runtime-probe": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+        "rootfs_manifest": "e6106f02faca37498831fb185fc637a7ff71551be251c1a4e565918e024019c1",
+        "guest_credentials": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "init_source": "2e3fa966b4fe5d94899ba2cd449d11e4d16768f9fe13e4053148a38639c3133d",
+        "guest_report": "a19e4a36d3d0e7b769b273bdbc3103e04c130bbd0432705b361aa81c324db9f2",
+        "snapshot_kernel": "f99c99cb64b32455b788f71921dc9738abe2bdcce7a8140aad827e1399d4e976"
+    },
+    "exit_code": 1
+}

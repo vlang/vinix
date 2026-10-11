@@ -164,6 +164,21 @@ clang-compatible compiler when `VINIX_I386_SYSROOT` names an i386 musl SDK and
 the receipt also hashes the SDK CRT, libc and builtins; host GCC libraries are
 excluded. SSE2 intrinsics let this fixture build through V's i386 C backend.
 
+Use `--uid 1000` for ordinary-user workloads. The guest clears supplementary
+groups, drops GID/UID to 1000, and provides a private HOME and XDG runtime
+directory; the report records the observed credentials. `--memory 4096` gives
+large application dependency closures more RAM (1024..16384 MiB is supported).
+SQLite, HTTP and runtime predicates pass as UID 1000 on both architectures.
+
+The `firefox` and `chromium` cases require UID 1000 and invoke the real ELF
+engines directly with fresh profiles. An inherited Mozilla sandbox-disable
+environment fails the precondition. A private loopback page computes 6*7 in
+JavaScript and returns a fresh nonce and 42 to the V HTTP server. Chromium must
+also return the changed DOM; Firefox must render a PNG. Startup/version output,
+a page fetch, a wrong nonce/result or an image without the callback cannot pass.
+These are default-policy headless checks; failed sandbox setup and actual
+timeouts stay failed. See the [current browser failures and pinned inputs](../../docs/linux-posix-qualification.md#ordinary-user-application-and-browser-regressions).
+
 To qualify real CLI installation/update/removal, stage unchanged signed Alpine
 v3.20/v3.21 SQLite dependency closures and APK tooling with the V stager:
 

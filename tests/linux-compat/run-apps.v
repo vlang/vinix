@@ -10,6 +10,8 @@ import os
 struct AppReceipt {
 	architecture   string
 	execution_path string
+	uid            int
+	memory_mib     int
 	cases          string
 	inputs         map[string]string
 	exit_code      int
@@ -54,6 +56,8 @@ fn main() {
 		hosttest.Option{ name: '--workloads', value: true },
 		hosttest.Option{ name: '--runtime-probe', value: true },
 		hosttest.Option{ name: '--runtime-libc', value: true, choices: ['musl', 'glibc'] },
+		hosttest.Option{ name: '--uid', value: true, choices: ['0', '1000'] },
+		hosttest.Option{ name: '--memory', value: true },
 		hosttest.Option{ name: '--data-disk', value: true },
 		hosttest.Option{ name: '--cases', value: true },
 		hosttest.Option{ name: '--timeout', value: true },
@@ -106,6 +110,9 @@ fn main() {
 		exit(2)
 	}
 	mut inputs := map[string]string{}
+	uid := options.integer('--uid', 0) or { eprintln(err.msg()); exit(2) }
+	memory := options.integer('--memory', 1024) or { eprintln(err.msg()); exit(2) }
+	if memory < 1024 || memory > 16384 { eprintln('memory must be 1024..16384 MiB'); exit(2) }
 	if disk != '' {
 		inputs['data_disk_before'] = sha256.sum(os.read_bytes(disk) or { eprintln(err.msg()); exit(2) }).hex()
 	}
@@ -159,6 +166,9 @@ fn main() {
 			exit(1)
 		}
 	}
+	credentials := uid.str() + '\n'
+	os.write_file(state + '/rootfs/etc/linux-compat-uid', credentials) or { eprintln(err.msg()); exit(1) }
+	inputs['guest_credentials'] = sha256.sum(credentials.bytes()).hex()
 	os.write_file(state + '/rootfs/etc/linux-compat-options', '--cases=' + cases + '\x00--path=' + path + '\x00--runtime-libc=' + options.value('--runtime-libc', 'musl') + '\x00' + if disk != '' { '--data-device=' + if arch == 'aarch64' { '/dev/vda' } else { '/dev/sd0' } + '\x00' } else { '' }) or {
 		eprintln(err.msg())
 		exit(1)
@@ -195,10 +205,10 @@ fn main() {
 		exit(1)
 	}
 	inputs['init_source'] = sha256.sum(source.bytes()).hex()
-	mut code := if disk == '' {
+	mut code := if disk == '' && memory == 1024 {
 		guesthost.guest(os.real_path(state + '/sources/appinitfixture/core.v'), '', os.real_path(state), os.real_path(state + '/kernel'), arch, ['LINUX APPLICATIONS: PASS'], ['LINUX APPLICATIONS FAIL'], false, true, timeout) or { eprintln(err.msg()); 1 }
 	} else {
-		boot_with_disk(state, arch, disk, timeout) or { eprintln(err.msg()); 1 }
+		boot_application(state, arch, disk, memory, timeout) or { eprintln(err.msg()); 1 }
 	}
 	serial := (os.read_file(state + '/serial.log') or { '' }).replace('\r', '')
 	if serial.contains('LINUX APPLICATION REPORT BEGIN\n') && serial.contains('LINUX APPLICATION REPORT END') {
@@ -218,7 +228,7 @@ fn main() {
 	}
 	inputs['snapshot_kernel'] = sha256.sum(os.read_bytes(state + '/kernel/bin/vinix') or { []u8{} }).hex()
 	if disk != '' { inputs['data_disk_after'] = sha256.sum(os.read_bytes(disk) or { eprintln(err.msg()); exit(1) }).hex() }
-	os.write_file(state + '/application-inputs.json', json2.encode(AppReceipt{arch, path, cases, inputs, code},
+	os.write_file(state + '/application-inputs.json', json2.encode(AppReceipt{arch, path, uid, memory, cases, inputs, code},
 		prettify: true
 	)) or {
 		eprintln(err.msg())
@@ -227,20 +237,21 @@ fn main() {
 	exit(code)
 }
 
-fn boot_with_disk(state string, arch string, disk string, timeout int) !int {
+fn boot_application(state string, arch string, disk string, memory int, timeout int) !int {
 	work := os.real_path(state)
 	init := guesthost.compile_init(work + '/sources/appinitfixture/core.v', work, arch, false)!
 	archive := guesthost.image(init, work)!
-	if arch == 'x86_64' {
+	if arch == 'x86_64' && disk != '' {
 		// The release kernel starts SATA drivers when disk boot is requested.
 		// A small preformatted fixture volume cannot trigger auto-installation.
 		os.setenv('VINIX_CMDLINE', os.getenv('VINIX_CMDLINE') + ' vinix.disk=auto', true)
 	}
 	configured := guesthost.launch(init, archive, work, work + '/kernel', arch, true)!
 	mut command := configured.command.clone()
-	if arch == 'aarch64' {
+	command[command.index('-m') + 1] = memory.str()
+	if disk != '' && arch == 'aarch64' {
 		command << ['-drive', 'if=none,format=raw,file=' + disk + ',id=compat-data', '-device', 'virtio-blk-device,drive=compat-data']
-	} else {
+	} else if disk != '' {
 		command << ['-drive', 'if=ide,format=raw,file=' + disk]
 	}
 	positive, negative := guesthost.verdict_policy(['LINUX APPLICATIONS: PASS'], ['LINUX APPLICATIONS FAIL'], false)

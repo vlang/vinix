@@ -2,6 +2,7 @@
 module appinitfixture
 
 #include <fcntl.h>
+#include <grp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>
@@ -16,6 +17,11 @@ fn C.printf(&char, ...) i32
 fn C.fflush(voidptr) i32
 fn C.setenv(&char, &char, i32) i32
 fn C.mkdir(&char, u32) i32
+fn C.chmod(&char, u32) i32
+fn C.chown(&char, u32, u32) i32
+fn C.setgroups(usize, voidptr) i32
+fn C.setgid(u32) i32
+fn C.setuid(u32) i32
 fn C.fork() i32
 fn C.execv(&char, &&char) i32
 fn C._exit(i32)
@@ -38,6 +44,35 @@ pub fn run() i32 {
 		C.mkdir(c'/run/user', u32(0o755))
 		C.mkdir(c'/run/user/0', u32(0o700))
 		C.setenv(c'XDG_RUNTIME_DIR', c'/run/user/0', 1)
+		mut uid := u32(0)
+		credentials_fd := C.open(c'/etc/linux-compat-uid', C.O_RDONLY)
+		if credentials_fd >= 0 {
+			mut credentials := [8]u8{}
+			length := C.read(credentials_fd, &credentials[0], sizeof(credentials))
+			C.close(credentials_fd)
+			if length == 5 && credentials[0] == `1` && credentials[1] == `0`
+				&& credentials[2] == `0` && credentials[3] == `0` && credentials[4] == `\n` {
+				uid = 1000
+			} else if length != 2 || credentials[0] != `0` || credentials[1] != `\n` {
+				C.puts(c'LINUX APPLICATIONS FAIL: invalid credentials')
+				return 1
+			}
+		}
+		if uid == 1000 {
+			C.mkdir(c'/tmp', u32(0o1777))
+			C.mkdir(c'/home', u32(0o755))
+			C.mkdir(c'/home/compat', u32(0o700))
+			C.mkdir(c'/run/user/1000', u32(0o700))
+			if C.chmod(c'/tmp', u32(0o1777)) != 0 || C.chown(c'/home/compat', uid, uid) != 0
+				|| C.chown(c'/run/user/1000', uid, uid) != 0 {
+				C.puts(c'LINUX APPLICATIONS FAIL: user directories')
+				return 1
+			}
+			C.setenv(c'HOME', c'/home/compat', 1)
+			C.setenv(c'USER', c'compat', 1)
+			C.setenv(c'LOGNAME', c'compat', 1)
+			C.setenv(c'XDG_RUNTIME_DIR', c'/run/user/1000', 1)
+		}
 		mut options := [1024]char{}
 		fd := C.open(c'/etc/linux-compat-options', C.O_RDONLY)
 		if fd < 0 {
@@ -75,6 +110,10 @@ pub fn run() i32 {
 		}
 		child := C.fork()
 		if child == 0 {
+			if uid == 1000 && (C.setgroups(0, nil) != 0 || C.setgid(uid) != 0 || C.setuid(uid) != 0) {
+				C.puts(c'LINUX APPLICATIONS FAIL: credential transition')
+				C._exit(126)
+			}
 			C.execv(arguments[0], &arguments[0])
 			C._exit(127)
 		}

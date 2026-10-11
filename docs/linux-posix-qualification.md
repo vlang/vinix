@@ -332,7 +332,7 @@ restarts. Cold boot on a persistent home, package-triggered unit discovery,
 visual guest interaction, and systemd/portal/sandbox integration need their
 own acceptance checks. Whole-application lifecycle qualification stays false.
 
-Outstanding dependencies include browser and V packages, desktop integration
+Outstanding dependencies include browser rendering and sandbox interfaces, V packages, desktop integration
 for the qualified office/media workloads, Go/Java on unqualified paths, D-Bus and a real portal backend,
 full systemd integration, Flatpak/Snap/FUSE and enforced Linux sandbox
 interfaces, and title-specific game assets, GPU/audio/input and vendor APIs.
@@ -362,3 +362,44 @@ seven passing ABI cases on each architecture, plus the shared-memory serial
 logs, in the [dated results](../tests/linux-compat/results/2026-10-11/).
 These checks qualify shared-memory permissions, not complete browser or
 sandbox behavior.
+
+## Ordinary-user application and browser regressions
+
+`ordinary-user-{aarch64,x86_64}.json` passes SQLite WAL/integrity/reopen,
+exact-content HTTP serving and the runtime probe with observed UID/GID 1000,
+cleared supplementary groups, a private HOME and XDG runtime directory, and
+2 GiB guest RAM. Input receipts record credentials, kernel, init source,
+prepared-root manifest and driver/probe hashes. `build-driver-browsers-*`
+retains the production driver's V source and generated-C hashes. These checks
+exercise ordinary-user execution, without claiming package installation or a
+persistent login session.
+
+The AArch64 browser root contains the actual Alpine 3.21 Firefox 128.14.0esr
+and Chromium 136.0.7103.113 dependency closures. `packages-browsers-aarch64.json`
+pins repository indexes and archives; `selected-browsers-aarch64.json` records
+the dependency selection and `rootfs-browsers-aarch64.json` records installed
+input bytes and modes. This is disposable test-input extraction; browser
+package scripts, signature verification and installed-system registration are
+not claimed. The prepared Vinix musl interpreter is retained.
+
+Both engines run directly as UID 1000 with fresh profiles and their default
+sandbox policy. The regression requires a nonce-bearing JavaScript callback
+with value 42, plus Chromium's changed DOM or Firefox's PNG. Host tests prove
+that merely requesting the page, a wrong result and a wrong nonce cannot
+replace that proof. No browser sandbox-disable wrapper or environment override
+is accepted.
+
+The actual guest failures are retained in `browsers-before-aarch64.json`:
+Firefox exits 11 after shared-memory permission failures; Chromium exits 191
+because its packaged setuid helper has mode 0755 while the selected sandbox
+requires root ownership and mode 4755. Chromium's crash handler also reports
+missing ptrace. `firefox-shared-memory-aarch64.json` uses the same driver,
+engines and root manifest after the shared-memory kernel fix: permission
+errors disappear, but rendering times out after 120 seconds and the driver
+terminates its process group. Neither run has JavaScript/render proof, and
+both controller receipts exit nonzero. Headless graphics probing also reports
+missing libpci/libGL; its causal role in the timeout has not been established.
+
+These reports distinguish available browser packages from a qualified browser
+workflow. Native x86-64 browser execution, sandbox isolation, visible windows,
+portal requests and install/update/remove remain outstanding checks.

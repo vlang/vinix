@@ -1,0 +1,45 @@
+{
+    "architecture": "aarch64",
+    "libc": "musl",
+    "commands": [
+        [
+            "/Users/alex/.local/bin/v",
+            "-os",
+            "linux",
+            "-arch",
+            "arm64",
+            "-gc",
+            "none",
+            "-prod",
+            "-o",
+            "/Volumes/LinuxCompatApps1011/vinix-linux-posix-driver-browser-arm/workloads.c",
+            "/Volumes/VIssueFix1011/vinix-linux-posix-services/tools/linux-compat/workloads"
+        ],
+        [
+            "clang",
+            "--target=aarch64-linux-musl",
+            "--sysroot=/Volumes/VIssueFix1011/vinix-linux-posix-services/build-aarch64-userland/sysroot",
+            "-fuse-ld=lld",
+            "-L/Volumes/VIssueFix1011/vinix-linux-posix-services/build-aarch64-userland/sysroot/lib",
+            "-static",
+            "-pthread",
+            "-w",
+            "/Volumes/LinuxCompatApps1011/vinix-linux-posix-driver-browser-arm/workloads.c",
+            "-lm",
+            "-o",
+            "/Volumes/LinuxCompatApps1011/vinix-linux-posix-driver-browser-arm/linux-compat-workloads"
+        ]
+    ],
+    "inputs": {
+        "tools/linux-compat/workloads/main.v": "74f6257a71fe67e0145d2528d3b53cb1707f70fd50f424d9878e0110dcebd6a2",
+        "tools/linux-compat/workloads/debugger.v": "95d39a019412164d190af4142bc849f91de77b472791f12098a914fac4eace36",
+        "tools/linux-compat/workloads/packages.v": "a56fa2d3026ea950df165c000ee2acd4f91652a0cea7e14f48458d91f9fdc2c7",
+        "tools/linux-compat/workloads/games.v": "bc1f4b3e5a40cd2dc557fa6f2243a0ef774d4192604b617f9a3c721d40626b12",
+        "tools/linux-compat/workloads/service_units.v": "8691a1d480c24d2a41d8012240f3365e0c8203861ea5393e7e61be67266c33d8",
+        "tools/linux-compat/workloads/browsers.v": "3ff72f4439c952ac99f0896f81d17e25dee4a58173289c449ae59f8daa8a7e8e",
+        "tests/go/smoke.go": "f58f7865f0d668a13f2fe0a81f56b45cbe1cda463da4aa57cd17c6b9c0711fb5",
+        "tests/java/VinixJavaSmoke.java": "3db7a5dbb4eb3e6e1387680b5570a211417bc1adc25686d04c5b0da0cb77a92d",
+        "generated_c": "57212ce8c4da60a95fb423cf892768dfb30f4cbe407b90c43af3d10470c2cb88"
+    },
+    "executable_sha256": "3a39acc079cfb64619f6b32eaff991d5618593cb3b04cba519a1ab938d0a2105"
+}

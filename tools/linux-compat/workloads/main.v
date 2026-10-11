@@ -44,6 +44,8 @@ struct Report {
 	suite_sha256                 string
 	runtime_probe_sha256         string
 	runtime_libc                 string
+	uid                          int
+	gid                          int
 	complete_lifecycle_qualified bool
 	results                      []Verdict
 	commands                     []CommandResult
@@ -52,6 +54,7 @@ struct Report {
 	packages                     []PackageResult
 	games                        []GameResult
 	service_units                []ServiceUnitResult
+	browsers                     []BrowserResult
 }
 
 struct Suite {
@@ -71,6 +74,7 @@ mut:
 	games []GameResult
 	service_units []ServiceUnitResult
 	unit_requests []ServiceUnitRequest
+	browsers []BrowserResult
 }
 
 fn stop(mut child os.Process) {
@@ -266,21 +270,7 @@ fn (mut suite Suite) run(name string) ! {
 			suite.execute('ssconvert', [sheet, suite.work + '/reopened.csv'])!
 			expect(os.read_file(suite.work + '/reopened.csv')!.trim_space() == 'value\n42', 'spreadsheet save/reopen changed cells')!
 		}
-		'chromium', 'firefox' {
-			suite.package(name)!
-			suite.execute(name, ['--version'])!
-			page := suite.work + '/page.html'
-			os.write_file(page, '<!doctype html><meta charset="utf-8"><p id="verdict">pending</p><script>document.getElementById("verdict").textContent=6*7;</script>')!
-			if name == 'chromium' {
-				dom := suite.execute(name, ['--headless', '--dump-dom', 'file://' + page])!
-				expect(dom.contains('id="verdict">42</p>'), 'browser did not execute page JavaScript')!
-			} else {
-				png := suite.work + '/firefox.png'
-				suite.execute(name, ['--headless', '--screenshot', png, 'file://' + page])!
-				bytes := os.read_bytes(png)!
-				expect(bytes.len > 256 && bytes[..8] == [u8(137), 80, 78, 71, 13, 10, 26, 10], 'Firefox did not render a PNG')!
-			}
-		}
+		'chromium', 'firefox' { suite.browser(name)! }
 		'go' {
 			if suite.path != 'native-aarch64' {
 				return error('unsupported: existing Go application fixture asserts GOARCH=arm64')
@@ -495,7 +485,7 @@ fn main() {
 	} else {
 		''
 	}
-	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages, suite.games, suite.service_units}
+	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, int(C.getuid()), int(C.getgid()), false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages, suite.games, suite.service_units, suite.browsers}
 	os.write_file(suite.work + '/report.json', json2.encode(report, prettify: true) + '\n') or {
 		eprintln(err.msg())
 		exit(1)
