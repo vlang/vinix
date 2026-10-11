@@ -230,14 +230,13 @@ fn syscall_linux_openat2(gpr_state voidptr, dirfd int, path charptr, how_ptr u64
 	if how.mode != 0 && how.flags & u64(resource.o_creat) == 0 {
 		return errno.err, errno.einval
 	}
-	// No atomic constrained VFS walk exists yet. O_NOFOLLOW only controls
-	// the final component, so substituting it for NO_SYMLINKS lets an
-	// intermediate symlink escape. Likewise normal openat does not enforce
-	// BENEATH, IN_ROOT, mount boundaries, magic links or cache-only lookup.
-	// Refuse the operation rather than silently weaken a caller's sandbox.
-	if how.resolve != 0 { return errno.err, errno.eopnotsupp }
-
-	return fs.syscall_openat(gpr_state, dirfd, path, int(how.flags), u32(how.mode))
+	// Link constraints apply throughout the actual VFS walk and creation
+	// retry. Containment, mount boundaries and cache-only lookup still lack
+	// enforcement, so combinations requesting any of those are refused.
+	if how.resolve & ~u64(fs.resolve_no_symlinks | fs.resolve_no_magiclinks) != 0 {
+		return errno.err, errno.eopnotsupp
+	}
+	return fs.syscall_openat_resolved(gpr_state, dirfd, path, int(how.flags), u32(how.mode), how.resolve)
 }
 
 fn syscall_linux_getrlimit(gpr_state voidptr, which_resource int, old_limit u64) (u64, u64) {

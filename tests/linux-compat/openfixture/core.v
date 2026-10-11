@@ -19,6 +19,8 @@ fn C.symlink(&char, &char) i32
 fn C.fstat(i32, &C.stat) i32
 fn C.read(i32, voidptr, usize) isize
 fn C.pipe(&i32) i32
+fn C.getpid() i32
+fn C.access(&char, i32) i32
 fn C.snprintf(&char, usize, &char, ...) i32
 fn C.printf(&char, ...) i32
 fn C.puts(&char) i32
@@ -54,6 +56,41 @@ fn link_descriptor(path &char, via_openat2 bool, resolve u64) bool {
 	}
 }
 
+fn link_constraints(pipe_fd i32) bool {
+	unsafe {
+		mut how := How{resolve: 2}
+		if !open_result(c'/tmp/linux-open-dir/link/linux-open-target', &how, 24, 0)
+			|| !open_result(c'/proc/self/status', &how, 24, 0) { return false }
+		for constraint in [u64(2), 4, 6]! {
+			how = How{resolve: constraint}
+			if !open_result(c'/tmp/linux-open-target', &how, 24, 0)
+				|| !open_result(c'/proc/self/exe', &how, 24, C.ELOOP)
+				|| !open_result(c'/proc/self/cwd/linux-open-target', &how, 24, C.ELOOP)
+				|| !open_result(c'/proc/self/ns/mnt', &how, 24, C.ELOOP) { return false }
+			mut magic_path := [64]u8{}
+			C.snprintf(&char(&magic_path[0]), usize(magic_path.len), c'/proc/%d/exe', C.getpid())
+			if !link_descriptor(&char(&magic_path[0]), true, constraint) { return false }
+			C.snprintf(&char(&magic_path[0]), usize(magic_path.len), c'/proc/%d/fd/%d', C.getpid(), pipe_fd)
+			if !open_result(&char(&magic_path[0]), &how, 24, C.ELOOP)
+				|| !link_descriptor(&char(&magic_path[0]), true, constraint) { return false }
+			if constraint & 4 != 0 {
+				if !open_result(c'/tmp/linux-open-dir/link/linux-open-target', &how, 24, C.ELOOP)
+					|| !open_result(c'/tmp/linux-open-dangling', &how, 24, C.ELOOP)
+					|| !link_descriptor(c'/tmp/linux-open-dangling', true, constraint) { return false }
+			}
+		}
+		if C.symlink(c'/proc/self/exe', c'/tmp/linux-open-magic') != 0 { return false }
+		how = How{resolve: 2}
+		if !open_result(c'/tmp/linux-open-magic', &how, 24, C.ELOOP) { return false }
+		how = How{flags: u64(C.O_CREAT | C.O_RDWR), mode: 0o600, resolve: 4}
+		if !open_result(c'/tmp/linux-open-dir/new', &how, 24, 0)
+			|| !open_result(c'/tmp/linux-open-dir/link/linux-open-escape', &how, 24, C.ELOOP)
+			|| C.access(c'/tmp/linux-open-escape', C.F_OK) != -1
+			|| *C.__errno_location() != C.ENOENT { return false }
+		return true
+	}
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
@@ -73,7 +110,8 @@ pub fn run() i32 {
 		mut pipe_path := [64]u8{}
 		C.snprintf(&char(&pipe_path[0]), usize(pipe_path.len), c'/proc/self/fd/%d', pipes[0])
 		if !link_descriptor(&char(&pipe_path[0]), false, 0)
-			|| !link_descriptor(&char(&pipe_path[0]), true, 0) { return 1 }
+			|| !link_descriptor(&char(&pipe_path[0]), true, 0)
+			|| !link_constraints(pipes[0]) { return 1 }
 		C.close(pipes[0]); C.close(pipes[1])
 		mut how := How{}
 		if !open_result(c'/tmp/linux-open-target', &how, 24, 0)
@@ -92,7 +130,7 @@ pub fn run() i32 {
 		if !open_result(c'/tmp/linux-open-target', &how, 24, C.EINVAL) { return 1 }
 		how.resolve = 0x18
 		if !open_result(c'/tmp/linux-open-target', &how, 24, C.EINVAL) { return 1 }
-		for constraint in [u64(1), 2, 4, 8, 16, 32]! {
+		for constraint in [u64(1), 8, 16, 32, 5, 10, 20, 38]! {
 			how.resolve = constraint
 			if !open_result(c'/tmp/linux-open-dir/link/linux-open-target', &how, 24, C.EOPNOTSUPP) { return 1 }
 		}

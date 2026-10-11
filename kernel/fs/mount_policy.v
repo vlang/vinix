@@ -235,9 +235,14 @@ pub fn get_node_on_mount(parent &VFSNode, path string, follow_links bool,
 // absent. openat can attach it to the node it actually creates.
 fn get_node_with_mount_cursor(parent &VFSNode, path string, follow_links bool,
 	identity &lib.MountContext) ?&VFSNode {
-	_, node, _ := walk_path_on_mount(parent, path, 0, true, identity)
+	return get_node_resolved(parent, path, follow_links, identity, 0)
+}
+
+fn get_node_resolved(parent &VFSNode, path string, follow_links bool,
+	identity &lib.MountContext, resolve u64) ?&VFSNode {
+	_, node, _ := walk_path_resolved(parent, path, 0, true, identity, resolve)
 	if node == unsafe { nil } { return none }
-	result := reduce_node_on_mount(node, follow_links, 0, true, identity)
+	result := reduce_node_resolved(node, follow_links, 0, true, identity, resolve)
 	if result == unsafe { nil } { return none }
 	return result
 }

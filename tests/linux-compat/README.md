@@ -23,9 +23,10 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 - `open` checks open_how size/extensions, flags, invalid pointers, O_PATH,
   link inode descriptors for regular, dangling and procfs links with
   O_PATH|O_NOFOLLOW, and EBADF on reads through those descriptors,
-  mutually exclusive/unknown constraints, and rejection of all currently
-  unsupported RESOLVE modes. EOPNOTSUPP for known constraints is an explicit
-  Vinix limitation; this test does not claim Linux constrained traversal.
+  mutually exclusive/unknown constraints, NO_SYMLINKS and NO_MAGICLINKS on
+  intermediate/final/nested/procfs links and creation, and final link handles.
+  Remaining RESOLVE modes and combinations requesting them return EOPNOTSUPP;
+  this does not qualify BENEATH/IN_ROOT containment or mount/cache constraints.
 - `runtime` checks four concurrent pthreads, isolated libc errno/TLS and keys,
   64-bit atomic increments, SSE2/NEON across scheduling, auxv/sysconf page sizes
   and an actual RW-to-RX JIT function. It prints pointer width and page size.

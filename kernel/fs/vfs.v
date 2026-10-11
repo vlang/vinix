@@ -24,6 +24,8 @@ pub const at_eaccess = 0x200
 pub const seek_cur = 1
 pub const seek_end = 2
 pub const seek_set = 0
+pub const resolve_no_magiclinks = u64(0x02)
+pub const resolve_no_symlinks = u64(0x04)
 
 pub interface FileSystem {
 mut:
@@ -140,25 +142,40 @@ fn reduce_node_bounded(node &VFSNode, follow_symlinks bool, depth int, effective
 }
 
 fn reduce_node_on_mount(node &VFSNode, follow_symlinks bool, depth int, effective bool, identity &lib.MountContext) &VFSNode {
+	return reduce_node_resolved(node, follow_symlinks, depth, effective, identity, 0)
+}
+
+fn reduce_node_resolved(node &VFSNode, follow_symlinks bool, depth int, effective bool, identity &lib.MountContext, resolve u64) &VFSNode {
 	if depth > 64 { errno.set(errno.eloop); return unsafe { nil } }
 	if node == unsafe { nil } { errno.set(errno.enoent); return unsafe { nil } }
 	if unsafe { node.redir != 0 } {
-		return reduce_node_on_mount(node.redir, follow_symlinks, depth + 1, effective, identity)
+		return reduce_node_resolved(node.redir, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
 	if !self_mount_at(node, identity) { return unsafe { nil } }
 	mounted := mount_of(node)
 	if mounted != unsafe { nil } {
 		if !mount_at(node, mounted, identity) { return unsafe { nil } }
-		return reduce_node_on_mount(mounted, follow_symlinks, depth + 1, effective, identity)
+		return reduce_node_resolved(mounted, follow_symlinks, depth + 1, effective, identity, resolve)
+	}
+	// Check the inode actually being followed, including links reached inside
+	// another link's target. A separate pathname precheck races with rename.
+	if follow_symlinks && node.resource != unsafe { nil }
+		&& stat.islnk(node.resource.stat.mode) && resolve & resolve_no_symlinks != 0 {
+		errno.set(errno.eloop)
+		return unsafe { nil }
 	}
 	if follow_symlinks && !procfs_may_follow(node) {
 		errno.set(errno.eacces)
 		return unsafe { nil }
 	}
 	if follow_symlinks && node.magic_target != unsafe { nil } {
+		if resolve & resolve_no_magiclinks != 0 {
+			errno.set(errno.eloop)
+			return unsafe { nil }
+		}
 		target := magic_link_mount(node, identity)
 		if target == unsafe { nil } { return unsafe { nil } }
-		return reduce_node_on_mount(target, follow_symlinks, depth + 1, effective, identity)
+		return reduce_node_resolved(target, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
 	if follow_symlinks && procfs_is_dynamic_link(node) {
 		// /proc/self and /proc/thread-self name the reading process, so their
@@ -168,29 +185,33 @@ fn reduce_node_on_mount(node &VFSNode, follow_symlinks bool, depth int, effectiv
 			errno.set(errno.enoent)
 			return 0
 		}
-		_, next_node, _ := walk_path_on_mount(node.parent, target, depth + 1, effective, identity)
+		_, next_node, _ := walk_path_resolved(node.parent, target, depth + 1, effective, identity, resolve)
 		// Made afresh for every walk through the link, and nothing the walk
 		// returned points into it.
 		unsafe { target.free() }
 		if unsafe { next_node == 0 } {
 			return 0
 		}
-		return reduce_node_on_mount(next_node, follow_symlinks, depth + 1, effective, identity)
+		return reduce_node_resolved(next_node, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
 	// A descriptor that no name leads to is reached through the link itself.
 	if follow_symlinks && is_anonymous_descriptor_link(node) {
+		if resolve & resolve_no_magiclinks != 0 {
+			errno.set(errno.eloop)
+			return unsafe { nil }
+		}
 		return unsafe { node }
 	}
 	if node.symlink_target.len != 0 && follow_symlinks == true {
 		// Resolving a link reads its contents even when the target is public.
 		mac_node(node, proc.mac_read) or { return unsafe { nil } }
 		target := node.symlink_target
-		_, next_node, _ := walk_path_on_mount(node.parent, target, depth + 1,
-			effective, identity)
+		_, next_node, _ := walk_path_resolved(node.parent, target, depth + 1,
+			effective, identity, resolve)
 		if unsafe { next_node == 0 } {
 			return 0
 		}
-		return reduce_node_on_mount(next_node, follow_symlinks, depth + 1, effective, identity)
+		return reduce_node_resolved(next_node, follow_symlinks, depth + 1, effective, identity, resolve)
 	}
 	return unsafe { node }
 }
@@ -206,6 +227,10 @@ fn walk_path(parent &VFSNode, path string, depth int, effective bool) (&VFSNode,
 }
 
 fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, identity &lib.MountContext) (&VFSNode, &VFSNode, string) {
+	return walk_path_resolved(parent, path, depth, effective, identity, 0)
+}
+
+fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, identity &lib.MountContext, resolve u64) (&VFSNode, &VFSNode, string) {
 	if depth > 64 { errno.set(errno.eloop); return 0, 0, '' }
 	if path.len > 4096 { errno.set(errno.einval); return 0, 0, '' }
 	if path.len == 0 {
@@ -213,11 +238,11 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 		return 0, 0, ''
 	}
 	mut index := u64(0)
-	mut current_node := reduce_node_on_mount(parent, false, depth + 1, effective, identity)
+	mut current_node := reduce_node_resolved(parent, false, depth + 1, effective, identity, resolve)
 
 	if path[index] == `/` {
 		root := root_with_context(identity) or { return 0, 0, '' }
-		current_node = reduce_node_on_mount(root, false, depth + 1, effective, identity)
+		current_node = reduce_node_resolved(root, false, depth + 1, effective, identity, resolve)
 		for path[index] == `/` {
 			if index == u64(path.len) - 1 {
 				return current_node, current_node, ''
@@ -242,7 +267,7 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 
 		last := index == u64(path.len)
 
-		current_node = reduce_node_on_mount(current_node, false, depth + 1, effective, identity)
+		current_node = reduce_node_resolved(current_node, false, depth + 1, effective, identity, resolve)
 		if current_node == unsafe { nil } { return 0, 0, '' }
 
 		if current_node == unsafe { nil } || current_node.resource == unsafe { nil }
@@ -257,8 +282,8 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 			// logical_parent().
 			parent_node := parent_on_mount(current_node, identity)
 			if parent_node == unsafe { nil } { return 0, 0, '' }
-			new_node = reduce_node_on_mount(parent_node, false, depth + 1,
-				effective, identity)
+			new_node = reduce_node_resolved(parent_node, false, depth + 1,
+				effective, identity, resolve)
 		} else {
 			overlay_lookup_refresh(current_node)
 			child := lookup_child(current_node, elem_str)
@@ -270,8 +295,8 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 				return 0, 0, ''
 			}
 
-			new_node = reduce_node_on_mount(child, false,
-				depth + 1, effective, identity)
+			new_node = reduce_node_resolved(child, false,
+				depth + 1, effective, identity, resolve)
 		}
 
 		if last == true {
@@ -282,7 +307,7 @@ fn walk_path_on_mount(parent &VFSNode, path string, depth int, effective bool, i
 		current_node = new_node
 
 		if stat.islnk(current_node.resource.stat.mode) {
-			current_node = reduce_node_on_mount(current_node, true, depth + 1, effective, identity)
+			current_node = reduce_node_resolved(current_node, true, depth + 1, effective, identity, resolve)
 			if voidptr(current_node) == unsafe { nil } {
 				return 0, 0, ''
 			}
@@ -688,7 +713,21 @@ fn internal_create_with_acl(parent &VFSNode, name string, mode u32, access u32,
 
 fn internal_create_with_acl_locked(parent &VFSNode, name string, mode u32, access u32,
 	apply_umask bool) ?&VFSNode {
-	mut parent_of_tgt_node, mut target_node, basename := walk_path(parent, name, 0, true)
+	identity := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	if !starting_mount(parent, identity) { return none }
+	return internal_create_resolved_locked(parent, name, mode, access, apply_umask, identity, 0)
+}
+
+fn internal_create_resolved(parent &VFSNode, name string, mode u32, access u32,
+	identity &lib.MountContext, resolve u64) ?&VFSNode {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	return internal_create_resolved_locked(parent, name, mode, access, true, identity, resolve)
+}
+
+fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, access u32,
+	apply_umask bool, identity &lib.MountContext, resolve u64) ?&VFSNode {
+	mut parent_of_tgt_node, mut target_node, basename := walk_path_resolved(parent, name, 0, true, identity, resolve)
 
 	if access != 0 && parent_of_tgt_node != unsafe { nil }
 		&& !policy_check_name(parent_of_tgt_node, basename, access) {
@@ -962,7 +1001,14 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	return to_copy, 0
 }
 
-pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) (u64, u64) {
+pub fn syscall_openat(gpr_state voidptr, dirfd int, path charptr, flags int, mode u32) (u64, u64) {
+	return syscall_openat_resolved(gpr_state, dirfd, path, flags, mode, 0)
+}
+
+pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, flags int, mode u32, resolve u64) (u64, u64) {
+	if resolve & ~(resolve_no_magiclinks | resolve_no_symlinks) != 0 {
+		return errno.err, errno.eopnotsupp
+	}
 	mut current_thread := proc.current_thread()
 	mut process := current_thread.process
 
@@ -984,12 +1030,14 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 
 	open_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
 	parent := parent_and_mount_for(dirfd, path, open_mount) or { return errno.err, errno.get() }
+	parent_mount := unsafe { &lib.MountContext(C.vinix_stack_alloc(sizeof(lib.MountContext))) }
+	lib.copy_mount_context(parent_mount, open_mount)
 
 	creat_flags := flags & resource.file_creation_flags_mask
 	follow_links := flags & resource.o_nofollow == 0
 
 	mut created := false
-	mut node := get_node_with_mount_cursor(parent, path, follow_links, open_mount) or {
+	mut node := get_node_resolved(parent, path, follow_links, open_mount, resolve) or {
 		if creat_flags & resource.o_creat == 0 {
 			return errno.err, errno.get()
 		}
@@ -1000,15 +1048,17 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 		// preserve the requested permission bits instead of forcing every new
 		// regular file to 0644.
 		created = true
-		new_node := internal_create_with_acl(parent, path,
-			stat.ifreg | (mode & 0o7777), policy_open_access(flags), true) or {
+		lib.copy_mount_context(open_mount, parent_mount)
+		new_node := internal_create_resolved(parent, path,
+			stat.ifreg | (mode & 0o7777), policy_open_access(flags), open_mount, resolve) or {
 			// Another creator can publish after the initial lookup. A plain
 			// O_CREAT open then uses that file; O_EXCL still reports EEXIST.
 			if errno.get() != errno.eexist || creat_flags & resource.o_excl != 0 {
 				return errno.err, errno.get()
 			}
 			created = false
-			get_node_with_mount_cursor(parent, path, follow_links, open_mount) or {
+			lib.copy_mount_context(open_mount, parent_mount)
+			get_node_resolved(parent, path, follow_links, open_mount, resolve) or {
 				return errno.err, errno.get()
 			}
 		}
@@ -1028,7 +1078,7 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 
 	// O_PATH|O_NOFOLLOW holds the link itself, including dangling and procfs
 	// magic links. Following it here would replace the requested inode.
-	node = reduce_node_on_mount(node, follow_links, 0, true, open_mount)
+	node = reduce_node_resolved(node, follow_links, 0, true, open_mount, resolve)
 	if unsafe { node == 0 } {
 		return errno.err, errno.get()
 	}
