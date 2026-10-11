@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `76466b67df4822978faff2a9e23fc769eca53d9c`,
-Linguist 7.27.0 reports **Python 4.97%** (380 files, 1,863,005 bytes) and
-**V 76.81%** (2,758 files, 28,765,296 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `59fc4cc3ccf39e62dccbcf03dfc0fec902bcd403`,
+Linguist 7.27.0 reports **Python 4.76%** (363 files, 1,793,986 bytes) and
+**V 77.15%** (2,809 files, 29,107,428 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,343,280 Python bytes**. All remaining
-1,863,005 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,412,299 Python bytes**. All remaining
+1,793,986 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 38 stages below remove **152 Python files / 498,343 original bytes** and
+The 40 stages below remove **169 Python files / 567,362 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -69,6 +69,8 @@ changes remain separate from this per-stage scope and the measured graph.
 | Fifteen ABI guest runners, strict marker controller and native ARM ext2/ISO setup | `tests/native-guest-tools/guesthost/abi*.v`, fifteen native fronts | 66,059 / 1,172 | `da792787` |
 | Steam and Office generators and host/guest proofs, randomness and N64 bridge tooling | `build-support/native-compat-tools/compathost`, eight native fronts | 38,461 / 684 | `2fed61f8` |
 | Security/volume staging, volume host/guest and X11/Wine guest tooling | `build-support/native-compat-tools/compathost`, twelve native fronts and V host fixtures | 29,757 / 529 | `76466b67` |
+| Process, scheduler, TLB, memory retention, backlog, procfs and signal-return guest commands | `build-support/native-compat-tools/compathost`, nine native fronts | 31,440 / 542 | `70c0a19c` |
+| CPU/job/SysV regression supervision, retention, stack canaries, ELF host/guest, greetings and uname | `build-support/native-compat-tools/compathost`, eight native fronts and native PTY completion policy | 37,579 / 659 | `59fc4cc3` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -701,7 +703,21 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 38 stages.
+or hidden in these 40 stages.
+
+The next two stages remove seventeen Python files / 69,019 original bytes.
+The nine process commands retain seventeen target build profiles, independent
+C controls, exact retention/progress assertions, real musl signal return and
+private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
+passes; actual guest passes and prepared-kernel failures are recorded in
+[process-guests.md](../build-support/native-compat-tools/process-guests.md).
+The follow-on regression, protection and loader workflows are qualified in
+[regression-tools.md](../build-support/native-compat-tools/regression-tools.md).
+No Python was run. Together with the previous three batches, this continuation
+translates **47 Python files / 203,296 original bytes**. Temporary qualification
+caches were cleared during shared-machine disk cleanup; final follow-on
+checks and inputs are retained under
+`/Users/alex/.cache/vinix-python-zero-process-20261011`.
 
 ## Earlier completed stages
 

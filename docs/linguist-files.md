@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `76466b67df4822978faff2a9e23fc769eca53d9c`,
+at source commit `59fc4cc3ccf39e62dccbcf03dfc0fec902bcd403`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 564 | 2,345,795 | 6.26% |
-| Python | 380 | 1,863,005 | 4.97% |
-| Shell | 470 | 1,354,662 | 3.62% |
+| C | 564 | 2,345,795 | 6.22% |
+| Python | 363 | 1,793,986 | 4.76% |
+| Shell | 490 | 1,359,919 | 3.60% |
 
-All `.v` files are classified as V. The resulting V share is 76.81%, with no
+All `.v` files are classified as V. The resulting V share is 77.15%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,863,005 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,793,986 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 76466b67df4822978faff2a9e23fc769eca53d9c --breakdown --json
+github-linguist --rev 59fc4cc3ccf39e62dccbcf03dfc0fec902bcd403 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -708,7 +708,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/generate-bounds.py` | 2,882 |
 | `kernel/linuxkpi/upstream.py` | 1,586 |
 | `scripts/build-opengothic-aarch64.sh` | 169 |
-| `tests/aarch64-sigreturn/run.py` | 5,300 |
 | `tests/acpi-sync/run.py` | 2,414 |
 | `tests/activity-monitor/run.py` | 5,933 |
 | `tests/agx-fake-g17/_native.py` | 7,413 |
@@ -878,7 +877,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/vulkan-run.py` | 2,115 |
 | `tests/dota2/vulkan-stage-test.py` | 4,722 |
 | `tests/dota2/wake-op-run.py` | 2,474 |
-| `tests/elf-text/run.py` | 5,791 |
 | `tests/emulator-desktop/_native.py` | 3,457 |
 | `tests/ext2-sparse/run.py` | 7,614 |
 | `tests/ext2-xattr/host.py` | 6,852 |
@@ -896,14 +894,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/run.py` | 20,826 |
 | `tests/ios/uikit.py` | 5,993 |
 | `tests/ipv6-multicast/run_vm.py` | 3,835 |
-| `tests/kernel-cpu/run.py` | 4,763 |
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/compile-v-fixture.py` | 2,092 |
 | `tests/kernel-gaps/run.py` | 3,048 |
-| `tests/kernel-job-control/run.py` | 5,293 |
-| `tests/kernel-retention/run.py` | 5,204 |
 | `tests/kernel-stack-guards/run.py` | 4,358 |
-| `tests/kernel-sysvmsg/run.py` | 4,812 |
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/linuxkpi/_audit_native.py` | 7,668 |
 | `tests/linuxkpi/_guest_native.py` | 6,611 |
@@ -917,7 +911,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
 | `tests/linuxkpi/host_suite.py` | 1,162 |
 | `tests/linuxkpi/run_vm.py` | 1,671 |
-| `tests/listen-backlog/run.py` | 3,971 |
 | `tests/m1-wifi/run-control.py` | 1,826 |
 | `tests/m1-wifi/run-ctl-vm.py` | 811 |
 | `tests/m1-wifi/run-ctl.py` | 300 |
@@ -927,7 +920,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/m1-wifi/run.py` | 426 |
 | `tests/mapped-writeback/run.py` | 8,691 |
 | `tests/memlock/run_vm.py` | 1,113 |
-| `tests/memory-retention/run.py` | 449 |
 | `tests/memory/run-runtime.py` | 7,331 |
 | `tests/memory/test-big-io.py` | 6,072 |
 | `tests/minecraft/test-fetcher.py` | 4,085 |
@@ -953,10 +945,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/pci-config/_native.py` | 512 |
 | `tests/pci-config/arm_vm.py` | 5,495 |
 | `tests/pointer-scroll/run.py` | 5,488 |
-| `tests/proc-map-lookup/run.py` | 5,764 |
-| `tests/proc-thread-lock/run.py` | 5,066 |
 | `tests/process-churn/run.py` | 5,871 |
-| `tests/process-smp/run.py` | 5,100 |
 | `tests/ps1/desktop.py` | 7,528 |
 | `tests/ps1/run.py` | 6,744 |
 | `tests/ps2/desktop.py` | 8,979 |
@@ -969,12 +958,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/reboot-persistence/run_vm.py` | 5,086 |
 | `tests/resource-accounting/run.py` | 5,734 |
 | `tests/resource-groups/run.py` | 5,450 |
-| `tests/resource-open/run.py` | 4,792 |
 | `tests/roblox-windows/_native.py` | 5,099 |
 | `tests/roblox-windows/run.py` | 7,180 |
 | `tests/roblox/build-test.py` | 8,453 |
 | `tests/roblox/launcher-test.py` | 6,516 |
-| `tests/scheduler-qos/run.py` | 515 |
 | `tests/securelevel-boot/attribute_faults.py` | 3,599 |
 | `tests/securelevel-boot/dispatch.py` | 2,342 |
 | `tests/securelevel-boot/host.py` | 854 |
@@ -984,10 +971,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/sound/_native.py` | 957 |
 | `tests/sound/run_vm.py` | 9,126 |
 | `tests/speculation-policy/run.py` | 7,078 |
-| `tests/stack-protector/run.py` | 5,134 |
-| `tests/tlb/run.py` | 483 |
-| `tests/uname/run.py` | 2,859 |
-| `tests/userland-demo/run.py` | 3,723 |
 | `tests/verified-boot/runtime.py` | 10,385 |
 | `tests/verified-boot/test.py` | 7,670 |
 | `tests/verified-root/run-host.py` | 7,267 |
@@ -1171,7 +1154,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-x11-amd64.sh` | 197 |
 | `scripts/build-x86-translation-aarch64.sh` | 22,821 |
 | `scripts/cross-compile-activity.sh` | 227 |
-| `scripts/cross-compile-app.sh` | 4,139 |
+| `scripts/cross-compile-app.sh` | 4,496 |
 | `scripts/cross-compile-files.sh` | 212 |
 | `scripts/cross-compile-settings.sh` | 217 |
 | `scripts/deploy-iso.sh` | 18,650 |
@@ -1186,6 +1169,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/run-iso-virtualbox.sh` | 8,448 |
 | `scripts/test-gpu-kekvm.sh` | 274 |
 | `scripts/test-iso.sh` | 18,878 |
+| `tests/aarch64-sigreturn/run` | 190 |
 | `tests/abi-scratch/run` | 182 |
 | `tests/accounts/run` | 835 |
 | `tests/acpi-ec/run.sh` | 649 |
@@ -1263,11 +1247,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/steam-smoke-init.sh` | 2,498 |
 | `tests/dota2/vulkan-init.sh` | 3,187 |
 | `tests/dumpability/run` | 182 |
-| `tests/elf-text/run-host.sh` | 2,822 |
+| `tests/elf-text/run` | 181 |
+| `tests/elf-text/run-host.sh` | 260 |
 | `tests/execute-only/check-generated` | 178 |
 | `tests/execute-only/run` | 183 |
 | `tests/ext2-sparse/run-host.sh` | 2,056 |
 | `tests/fs-journal/run-host.sh` | 1,367 |
+| `tests/fuzz/run` | 874 |
 | `tests/go/smoke.sh` | 558 |
 | `tests/hardware-platform/run` | 178 |
 | `tests/hibernate/run.sh` | 681 |
@@ -1295,18 +1281,23 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-allocs/run.sh` | 4,115 |
 | `tests/kernel-allocs/sites` | 180 |
 | `tests/kernel-cpu/logic` | 168 |
+| `tests/kernel-cpu/run` | 183 |
 | `tests/kernel-gaps/run-native` | 168 |
 | `tests/kernel-gaps/test-runner` | 167 |
+| `tests/kernel-job-control/run` | 191 |
 | `tests/kernel-link-layout/check` | 180 |
 | `tests/kernel-print/run` | 170 |
 | `tests/kernel-print/run-native` | 173 |
 | `tests/kernel-resources/run` | 170 |
 | `tests/kernel-resources/run-host.sh` | 1,620 |
+| `tests/kernel-retention/run` | 189 |
+| `tests/kernel-sysvmsg/run` | 187 |
 | `tests/krandom/compile-hooks` | 175 |
 | `tests/krandom/run-hooks` | 172 |
 | `tests/krandom/run.sh` | 1,734 |
 | `tests/limine-aarch64/test-patch` | 111 |
 | `tests/linuxkpi/run.sh` | 11,272 |
+| `tests/listen-backlog/run` | 187 |
 | `tests/m1-deploy/run.sh` | 2,686 |
 | `tests/m1-wifi/build.sh` | 2,603 |
 | `tests/m1-wifi/compile-fixture` | 177 |
@@ -1318,6 +1309,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mapped-writeback/run-host.sh` | 3,848 |
 | `tests/memlock/run.sh` | 2,089 |
 | `tests/memory-pressure/run.sh` | 3,124 |
+| `tests/memory-retention/run` | 189 |
 | `tests/memory/run-big-metadata.sh` | 735 |
 | `tests/memory/run-pagetable` | 170 |
 | `tests/memory/run-runtime.sh` | 177 |
@@ -1367,8 +1359,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/posix-timer/run` | 182 |
 | `tests/power-supply/run` | 748 |
 | `tests/private-pages/run-host.sh` | 16,215 |
+| `tests/proc-map-lookup/run` | 188 |
+| `tests/proc-thread-lock/run` | 189 |
 | `tests/process-churn/check-generated` | 146 |
 | `tests/process-churn/check-results` | 144 |
+| `tests/process-smp/run` | 184 |
 | `tests/procfs-allocs/check-generated` | 146 |
 | `tests/procfs-allocs/run` | 184 |
 | `tests/procfs-mount/check-generated` | 146 |
@@ -1397,9 +1392,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/reboot-persistence/run.sh` | 2,604 |
 | `tests/resource-accounting/check-generated` | 146 |
 | `tests/resource-groups/run-host.sh` | 801 |
+| `tests/resource-open/run` | 186 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
 | `tests/scheduler-preemption/policy` | 152 |
 | `tests/scheduler-qos/policy` | 152 |
+| `tests/scheduler-qos/run` | 186 |
 | `tests/securelevel/run` | 182 |
 | `tests/security-audit/collector-run.sh` | 227 |
 | `tests/security-mac/host-run.sh` | 225 |
@@ -1412,6 +1409,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/sound/run.sh` | 1,419 |
 | `tests/stack-policy/run` | 183 |
 | `tests/stack-protector/diagnostic` | 175 |
+| `tests/stack-protector/run` | 188 |
 | `tests/stack-protector/run-diagnostic` | 178 |
 | `tests/steam/hosted-test.sh` | 3,480 |
 | `tests/steam/launcher-test.sh` | 6,952 |
@@ -1429,8 +1427,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/terminal-jobs/run` | 184 |
 | `tests/thermal/run.sh` | 502 |
 | `tests/tlb/policy` | 152 |
+| `tests/tlb/run` | 176 |
 | `tests/uname/guest-init.sh` | 1,886 |
+| `tests/uname/run` | 178 |
 | `tests/user-access/sites` | 180 |
+| `tests/userland-demo/run` | 186 |
 | `tests/virtio-gpu-virgl/desktop-guest-init.sh` | 1,941 |
 | `tests/virtio-gpu-virgl/guest-init.sh` | 1,464 |
 | `tests/vlang/desktop-runtime-guest-init.sh` | 1,766 |
@@ -1475,9 +1476,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/apple-smc/smcprobe` | 304 |
 | `tools/build-qemu-module-iso` | 164 |
 | `tools/hwcheck/build` | 1,429 |
+| `tools/keyring/build` | 1,771 |
 | `tools/m1-wifi/compile-v` | 155 |
 | `tools/m1-wifi/get-v.sh` | 2,538 |
 | `tools/m1-wifi/package` | 153 |
 | `tools/prune-build-artifacts` | 164 |
+| `tools/security-events/build` | 1,659 |
 | `tools/split-desktop-initramfs` | 166 |
 | `tools/split-qemu-initramfs` | 163 |
+
