@@ -230,6 +230,17 @@ Native paths report unsupported because ptrace has no syscall dispatch.
 Source-level symbols, unwinding, core dumps and JIT debugger registration need
 their own qualification.
 
+Select `--cases games` with a prepared native root containing `chocolate-doom`,
+its SDL libraries and a locally licensed IWAD at
+`/usr/share/games/doom/doom1.wad`. The workload runs `demo1` twice with SDL dummy
+video and software rendering, and requires completed gameplay and a matching
+tick count on replay. Chocolate Doom ends a successful timedemo with exit 255;
+the driver requires that exact exit and the complete timing record. Crashes,
+startup failures, timeouts and output limits remain failures. Assets are never
+replaced or included in receipts: their SHA-256 identifies the external input.
+Visible rendering, audio, input, saves and foreign runtime qualification are
+separate requirements. See the dated game receipt and its limits.
+
 Host verification of the report generator and timeout/nonzero-exit handling:
 
 ```sh

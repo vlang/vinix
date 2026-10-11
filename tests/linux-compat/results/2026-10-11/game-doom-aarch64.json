@@ -1,0 +1,118 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-aarch64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "3c5bd214f92ba92c815c49acfd4e6acadf390c6eaca1089efc63bd3ee6e616ae",
+    "runtime_probe_sha256": "a54ee98c77f419b0e34cb6e281fdad0d47c9ba38e6e61419d576de35c82c83ab",
+    "runtime_libc": "glibc",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "games",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/chocolate-doom",
+                "--version"
+            ],
+            "executable_sha256": "d53b04e4cdb42034591d3bec972199a3c13a596af8f94dacabb8822a5c258d6a",
+            "environment_overrides": {
+                "SDL_VIDEODRIVER": "dummy",
+                "SDL_RENDER_DRIVER": "software",
+                "SDL_AUDIODRIVER": "dummy",
+                "XDG_CONFIG_HOME": "/tmp/linux-compat-evidence/game-config"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Chocolate Doom 3.1.1\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/bin/chocolate-doom",
+                "-iwad",
+                "/usr/share/games/doom/doom1.wad",
+                "-timedemo",
+                "demo1",
+                "-nosound",
+                "-window",
+                "-width",
+                "320",
+                "-height",
+                "200",
+                "-nograb"
+            ],
+            "executable_sha256": "d53b04e4cdb42034591d3bec972199a3c13a596af8f94dacabb8822a5c258d6a",
+            "environment_overrides": {
+                "SDL_VIDEODRIVER": "dummy",
+                "SDL_RENDER_DRIVER": "software",
+                "SDL_AUDIODRIVER": "dummy",
+                "XDG_CONFIG_HOME": "/tmp/linux-compat-evidence/game-config"
+            },
+            "environment_unset": [],
+            "exit_code": 255,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "                         Chocolate Doom 3.1.1\nZ_Init: Init zone memory allocation daemon. \nzone memory: 0x80009898030, 2000000 allocated for zone\nUsing /root/.local/share/chocolate-doom/ for configuration and saves\nV_Init: allocate screens.\nM_LoadDefaults: Load system defaults.\nsaving config in /root/.local/share/chocolate-doom/default.cfg\nW_Init: Init WADfiles.\n adding /usr/share/games/doom/doom1.wad\n adding demo1.lmp\n couldn't open demo1.lmp\nPlaying demo demo1.lmp.\n===========================================================================\n                           The Ultimate DOOM\n===========================================================================\n Chocolate Doom is free software, covered by the GNU General Public\n License.  There is NO warranty; not even for MERCHANTABILITY or FITNESS\n FOR A PARTICULAR PURPOSE. You are welcome to change and distribute\n copies under certain conditions. See the source for more information.\n===========================================================================\nI_Init: Setting up machine state.\nNET_Init: Init network subsystem.\nM_Init: Init miscellaneous info.\nR_Init: Init DOOM refresh daemon - ..........................\nP_Init: Init Playloop state.\nS_Init: Setting up sound.\nD_CheckNetGame: Checking network game status.\nstartskill 2  deathmatch: 0  startmap: 1  startepisode: 1\nplayer 1 of 1 (1 nodes)\nEmulating the behavior of the 'Ultimate Doom' executable.\nHU_Init: Setting up heads up display.\nST_Init: Init status bar.\nCreateUpscaledTexture: Limited texture size to 0x0 (max 16000000 pixels, max texture size 0x0)\n",
+            "stderr": "timed 1710 gametics in 45 realtics (1330.000000 fps)\n\n"
+        },
+        {
+            "argv": [
+                "/usr/bin/chocolate-doom",
+                "-iwad",
+                "/usr/share/games/doom/doom1.wad",
+                "-timedemo",
+                "demo1",
+                "-nosound",
+                "-window",
+                "-width",
+                "320",
+                "-height",
+                "200",
+                "-nograb"
+            ],
+            "executable_sha256": "d53b04e4cdb42034591d3bec972199a3c13a596af8f94dacabb8822a5c258d6a",
+            "environment_overrides": {
+                "SDL_VIDEODRIVER": "dummy",
+                "SDL_RENDER_DRIVER": "software",
+                "SDL_AUDIODRIVER": "dummy",
+                "XDG_CONFIG_HOME": "/tmp/linux-compat-evidence/game-config"
+            },
+            "environment_unset": [],
+            "exit_code": 255,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "                         Chocolate Doom 3.1.1\nZ_Init: Init zone memory allocation daemon. \nzone memory: 0x8000fe04030, 2000000 allocated for zone\nUsing /root/.local/share/chocolate-doom/ for configuration and saves\nV_Init: allocate screens.\nM_LoadDefaults: Load system defaults.\nsaving config in /root/.local/share/chocolate-doom/default.cfg\nW_Init: Init WADfiles.\n adding /usr/share/games/doom/doom1.wad\n adding demo1.lmp\n couldn't open demo1.lmp\nPlaying demo demo1.lmp.\n===========================================================================\n                           The Ultimate DOOM\n===========================================================================\n Chocolate Doom is free software, covered by the GNU General Public\n License.  There is NO warranty; not even for MERCHANTABILITY or FITNESS\n FOR A PARTICULAR PURPOSE. You are welcome to change and distribute\n copies under certain conditions. See the source for more information.\n===========================================================================\nI_Init: Setting up machine state.\nNET_Init: Init network subsystem.\nM_Init: Init miscellaneous info.\nR_Init: Init DOOM refresh daemon - ..........................\nP_Init: Init Playloop state.\nS_Init: Setting up sound.\nD_CheckNetGame: Checking network game status.\nstartskill 2  deathmatch: 0  startmap: 1  startepisode: 1\nplayer 1 of 1 (1 nodes)\nEmulating the behavior of the 'Ultimate Doom' executable.\nHU_Init: Setting up heads up display.\nST_Init: Init status bar.\nCreateUpscaledTexture: Limited texture size to 0x0 (max 16000000 pixels, max texture size 0x0)\n",
+            "stderr": "timed 1710 gametics in 46 realtics (1301.086914 fps)\n\n"
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [
+        {
+            "title": "DOOM / Chocolate Doom",
+            "iwad_sha256": "77cd3852b5f7114ec64a07a1b1ef1f734736a13bbd186477c9111a7dd8c55f82",
+            "demo": "demo1",
+            "gametics": 1710,
+            "realtics": 45,
+            "video_driver": "SDL dummy / software rendering",
+            "replay_matched": false
+        },
+        {
+            "title": "DOOM / Chocolate Doom",
+            "iwad_sha256": "77cd3852b5f7114ec64a07a1b1ef1f734736a13bbd186477c9111a7dd8c55f82",
+            "demo": "demo1",
+            "gametics": 1710,
+            "realtics": 46,
+            "video_driver": "SDL dummy / software rendering",
+            "replay_matched": true
+        }
+    ]
+}

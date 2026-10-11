@@ -50,6 +50,7 @@ struct Report {
 	services                     []ServiceResult
 	debuggers                    []DebugResult
 	packages                     []PackageResult
+	games                        []GameResult
 }
 
 struct Suite {
@@ -66,6 +67,7 @@ mut:
 	services []ServiceResult
 	debuggers []DebugResult
 	packages []PackageResult
+	games []GameResult
 }
 
 fn stop(mut child os.Process) {
@@ -337,7 +339,7 @@ fn (mut suite Suite) run(name string) ! {
 			return error('unsupported: portal discovery does not qualify a user-mediated file chooser/save workflow')
 		}
 		'games' {
-			return error('unsupported: title-specific licensed assets, GPU/input/audio, save and anti-cheat qualification are required; see docs/linux-posix-compatibility.md')
+			suite.doom_timedemo()!
 		}
 		else { return error('unknown workload: ' + name) }
 	}
@@ -489,7 +491,7 @@ fn main() {
 	} else {
 		''
 	}
-	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages}
+	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages, suite.games}
 	os.write_file(suite.work + '/report.json', json2.encode(report, prettify: true) + '\n') or {
 		eprintln(err.msg())
 		exit(1)

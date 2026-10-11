@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "cases": "games",
+    "inputs": {
+        "guest_report": "8dda77b9f4cfbadc96f336b8d640a9f24d9049ca0d0a68f716f6079cecfeb282",
+        "init_source": "796750bf61b36e28f015f34fa6f4591278dd8b895d7cc4a6007212ceb98888c6",
+        "kernel": "32c0f256f00010424abc38d49582cc5ff80fd01c919736be5c2a880fec1ef335",
+        "rootfs_manifest": "8476a7500ba60546a1d994f907b412850b3cc0246822d6a38edf8205d76a2691",
+        "runtime-probe": "a54ee98c77f419b0e34cb6e281fdad0d47c9ba38e6e61419d576de35c82c83ab",
+        "snapshot_kernel": "32c0f256f00010424abc38d49582cc5ff80fd01c919736be5c2a880fec1ef335",
+        "workloads": "3c5bd214f92ba92c815c49acfd4e6acadf390c6eaca1089efc63bd3ee6e616ae"
+    },
+    "exit_code": 0
+}

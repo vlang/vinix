@@ -1,0 +1,10 @@
+{
+    "cmake/config.h": "09e7442307a1ae54ce71db478397d72c4787f5d0ff6c06193933dd6ba80aa746",
+    "source/src/doom/d_main.c": "0a0ad7a2edd21709f3686bc6d36179b76eb56071b4dc14f3031661eaedaa6645",
+    "source/src/doom/g_game.c": "09d4a04f2b662d71ec8f9e23b5d7bc902c93790827223911188af9ffca8420c4",
+    "source/src/i_system.c": "e001f8321bc2a3c3b157c361c943d4a8b078f16de3e255f96df99983c677bb8c",
+    "usr/bin/chocolate-doom": "d53b04e4cdb42034591d3bec972199a3c13a596af8f94dacabb8822a5c258d6a",
+    "usr/lib/libSDL2-2.0.so.0": "bf273ae88c33d9d41c736c147b509e2f8e025bf5ff5af185eccfe1d7416f057d",
+    "usr/lib/libSDL2_mixer-2.0.so.0": "61cb444cef57b6e7e86ac9a360d9b95d867bc34fc9a01b279288284562348a83",
+    "usr/share/games/doom/doom1.wad": "77cd3852b5f7114ec64a07a1b1ef1f734736a13bbd186477c9111a7dd8c55f82"
+}

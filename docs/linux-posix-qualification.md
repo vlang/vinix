@@ -2,8 +2,9 @@
 
 Section 15 remains partial. These are results for exact hashed binaries in
 disposable QEMU guests, plus explicitly separate host checks. They do not
-qualify every wired syscall or GNU libc API, persistent package installation,
-desktop integration or physical hardware.
+qualify every wired syscall or GNU libc API, every package runtime, desktop
+integration or physical hardware. The disk-backed SQLite package lifecycle
+below is qualified on both native architectures.
 
 The initial kernels were built in isolated worktrees from `ea6c4189` with the three
 Linux ABI fixes (`df484021`, `87611ce2`, `d9aee93e`). Concurrent changes in the
@@ -233,6 +234,21 @@ upgrade boot's initial hash. `packages-lifecycle-*.json` and
 These offline signed-repository transactions qualify this CLI workflow;
 network acquisition, interrupted upgrades, desktop package triggers, service
 installation and sandbox/portal runtimes remain separate acceptance checks.
+
+The `game-doom-aarch64.json` guest receipt runs Chocolate Doom 3.1.1's `demo1`
+timedemo twice against a locally licensed Ultimate DOOM IWAD. Each replay
+completes 1,710 gameplay ticks; the runs take 45 and 46 engine realtics.
+The driver requires a complete timing record, positive realticks and identical
+gameplay ticks, with no timeout or output-limit termination. Upstream ends
+timedemos through `I_Error` with exit 255; only that exact benchmark result is
+accepted, following the [timedemo interface](https://www.chocolate-doom.org/wiki/index.php/Command-line_arguments).
+Host regression checks reject crashes, startup errors, truncated records and
+ordinary nonzero exits. Build/input receipts retain the driver, kernel,
+SDL libraries, engine and IWAD hashes. Assets are not checked into this repository.
+This qualifies native AArch64 gameplay and repeatability with SDL's dummy video
+driver and software rendering. It does not qualify visible frames, GPU, audio,
+input, saves, installation/update or foreign game runtimes. The raw engine
+texture-size warning remains in the report.
 
 The host SQLite WAL/integrity/reopen and FFmpeg frame encode/probe checks pass.
 Those Darwin results validate workload predicates and report handling only.
