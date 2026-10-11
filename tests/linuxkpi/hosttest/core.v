@@ -183,7 +183,11 @@ pub fn work_dir(keep string, prefix string) !string {
 		return path
 	}
 	if prefix.contains('\x00') { return error('embedded null byte') }
-	mut pattern := (module_join(os.temp_dir(), prefix + 'XXXXXX') + '\x00').bytes()
+	// V's macOS temp_dir() always returns /tmp. Respect the caller's scratch
+	// volume so large guest builds do not fill the system volume.
+	configured_temp := os.getenv('TMPDIR')
+	temp := if configured_temp != '' { configured_temp } else { os.temp_dir() }
+	mut pattern := (module_join(temp, prefix + 'XXXXXX') + '\x00').bytes()
 	unsafe {
 		result := C.mkdtemp(&char(pattern.data))
 		if result == nil {

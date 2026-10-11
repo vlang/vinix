@@ -66,3 +66,23 @@ fn test_work_dir_temporary_prefix_rejects_embedded_null() {
 	}
 	assert false
 }
+
+fn test_work_dir_honors_configured_scratch_volume_and_private_permissions() {
+	work := work_dir('', 'vinix-temp-parent-') or { panic(err) }
+	defer { remove_work_dir(work) or { panic(err) } }
+	parent := work + '/literal\\scratch'
+	os.mkdir(parent) or { panic(err) }
+	previous := os.getenv_opt('TMPDIR')
+	os.setenv('TMPDIR', parent, true)
+	defer {
+		if value := previous { os.setenv('TMPDIR', value, true) }
+		else { os.unsetenv('TMPDIR') }
+	}
+	first := work_dir('', 'private-') or { panic(err) }
+	second := work_dir('', 'private-') or { panic(err) }
+	assert first != second
+	for path in [first, second] {
+		assert path.all_before_last('/') == parent
+		assert os.stat(path) or { panic(err) }.mode & 0o777 == 0o700
+	}
+}
