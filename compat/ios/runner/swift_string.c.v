@@ -216,6 +216,7 @@ fn swift_buffers_stop() {
 	swift_metadata_stop()
 	swift_hash_stop()
 	swift_fatal_stop()
+	swift_concurrency_stop()
 }
 
 fn swift_core_symbol(symbol string) ?u64 {

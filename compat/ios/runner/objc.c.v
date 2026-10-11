@@ -141,6 +141,8 @@ mut:
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
 	swift_error_arena u64 // Sealed ObjC value witnesses and the concrete CFError: Error conformance.
 	swift_objc_metadata map[u64]u64 // Class -> canonical sealed Swift wrapper, under the runtime lock.
+	swift_concurrency_code u64 // Sealed actor witness dispatcher and indirect priority getter.
+	swift_concurrency_retired bool // Reject new resolution after quiescent teardown.
 	swift_hash_code u64 // Sealed generic Hashable forwarding entries, retired after callbacks drain.
 	swift_fatal_code u64 // Assertion argument capture and BRK, retired at quiescent teardown.
 	names        map[string]u64
@@ -428,6 +430,7 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	if library == '/usr/lib/swift/libswift_Concurrency.dylib' { return swift_concurrency_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftObjectiveC.dylib' {
 		if address := swift_objc_bool_symbol(symbol) { return address }
 		return error('iOS: Swift Objective-C symbol is not implemented: ${symbol}')
