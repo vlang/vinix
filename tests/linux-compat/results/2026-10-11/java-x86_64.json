@@ -1,0 +1,119 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "c86d4c6e10780d321a724aa21730436bfd1780cd105a01d22f9e5e53a461ad82",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "uid": 0,
+    "gid": 0,
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "java",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/java",
+                "-version"
+            ],
+            "executable_sha256": "b6366610e57b7886b492416f3f33a46b7daf9ea129eeb16945aa22873f5d9a56",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "openjdk version \"21.0.10\" 2026-01-20\nOpenJDK Runtime Environment (build 21.0.10+7-alpine-r0)\nOpenJDK 64-Bit Server VM (build 21.0.10+7-alpine-r0, mixed mode, sharing)\n"
+        },
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/javac",
+                "/tmp/linux-compat-evidence/VinixJavaSmoke.java"
+            ],
+            "executable_sha256": "484ae8e0b0e6dfce0d788cc3805f77efd2aa576809787e4b86bf3de1485f76c7",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/java",
+                "-Xms16m",
+                "-Xmx128m",
+                "-cp",
+                "/tmp/linux-compat-evidence",
+                "VinixJavaSmoke"
+            ],
+            "executable_sha256": "b6366610e57b7886b492416f3f33a46b7daf9ea129eeb16945aa22873f5d9a56",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "OpenJDK 21 (OpenJDK 64-Bit Server VM) on Vinix: PASS\n",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/jar",
+                "--create",
+                "--file",
+                "/tmp/linux-compat-evidence/vinix-java-smoke.jar",
+                "-C",
+                "/tmp/linux-compat-evidence",
+                "VinixJavaSmoke.class"
+            ],
+            "executable_sha256": "8061356491d0f9d14af785354590dcd279a71de902f7a8ba003a2af6be7e5cfd",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": ""
+        },
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/java",
+                "-Xms16m",
+                "-Xmx128m",
+                "-cp",
+                "/tmp/linux-compat-evidence/vinix-java-smoke.jar",
+                "VinixJavaSmoke"
+            ],
+            "executable_sha256": "b6366610e57b7886b492416f3f33a46b7daf9ea129eeb16945aa22873f5d9a56",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "OpenJDK 21 (OpenJDK 64-Bit Server VM) on Vinix: PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}

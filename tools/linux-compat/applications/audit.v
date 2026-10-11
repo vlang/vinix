@@ -121,22 +121,10 @@ fn application_index(root string) !ApplicationIndex {
 			rows << evidence(root, category, workload, arch, 'catalog-' + arch, limits)!
 		}
 		for language in ['go', 'java'] {
-			name := if arch == 'aarch64' { language + '-aarch64' } else { 'applications-x86_64' }
-			// The initial catalog uses a legacy controller receipt basename.
-			if arch == 'x86_64' {
-				base := 'tests/linux-compat/results/2026-10-11/'
-				mut row := audit_application(os.read_file(root + '/' + base + name + '.json')!,
-					os.read_file(root + '/' + base + 'inputs-x86_64.json')!, arch, language)!
-				row.category = 'language runtimes'
-				row.report = base + name + '.json'
-				row.receipt = base + 'inputs-x86_64.json'
-				row.limitations = 'Initial catalog limitation; native x86-64 compiler/runtime workload remains unqualified'
-				rows << row
-			} else {
-				rows << evidence(root, 'language runtimes', language, arch, name,
-					if language == 'java' { 'OpenJDK thread/NIO/TCP and JAR workload needs the privileged VINIX_ALLOW_WX launch policy; ordinary-user JIT and desktop install/update unqualified' }
-					else { 'Go compilation, threads, files, timers and TCP; package install/update and desktop integration unqualified' })!
-			}
+			rows << evidence(root, 'language runtimes', language, arch, language + '-' + arch,
+				if language == 'java' { 'OpenJDK thread/NIO/TCP and JAR workload needs the privileged VINIX_ALLOW_WX launch policy; ordinary-user JIT and desktop install/update unqualified' }
+				else if arch == 'x86_64' { 'Go compiles and runs as UID 1000: threads, files, timers, subprocesses and TCP; extracted inputs do not qualify package installation or desktop integration' }
+				else { 'Go compilation, threads, files, timers and TCP; package install/update and desktop integration unqualified' })!
 		}
 		for browser in ['firefox', 'chromium'] {
 			name := if arch == 'x86_64' { 'browsers-x86_64' }

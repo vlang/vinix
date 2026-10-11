@@ -523,3 +523,30 @@ nonmatching waiter. `futex-bits-after-*` retains the same fixture and all eleven
 passing native ABI cases in the
 [dated results](../tests/linux-compat/results/2026-10-11/).
 Real requeue, PI interaction and shared-file page eviction remain unqualified.
+
+## Native x86-64 language runtimes
+
+The native x86-64 guest now compiles and runs the existing Go application as
+UID 1000/GID 1000. Go 1.23.9 passes files, symlinks, directory enumeration,
+goroutines/channels/WaitGroup, timers, subprocess execution, hashing, random
+bytes and a TCP loopback exchange. The generated executable's digest is
+recorded by the guest alongside the compiler command and its application
+output; that temporary executable is not exported from the guest.
+
+OpenJDK 21.0.10 passes javac compilation, threaded/NIO/TCP execution, JAR
+creation and execution from the saved JAR. All five commands come from the
+same complete JDK. This run uses UID 0 and VINIX_ALLOW_WX for HotSpot's code
+cache, with a 128 MiB application heap; it does not qualify ordinary-user JIT
+launch policy or package/desktop installation.
+
+Both receipts use disposable 2048 MiB QEMU guests and a 600-second child
+deadline, and record actual successful command exits without timeouts or
+truncated output. `go-x86_64` and `java-x86_64` reports, controller inputs and
+serial logs are in the [dated results](../tests/linux-compat/results/2026-10-11/).
+The shared root manifest, APK/index hashes and the V acquisition script retain
+the exact input provenance. The auditor verifies every unchanged prepared
+file and resolves executable links inside the guest root; PID 1's replacement
+is checked separately against the built init. These inputs were extracted for
+runtime diagnosis; no APK install scripts or signature validation were run.
+The earlier unsupported catalog receipts remain available, and the application
+index now selects these completed native runtime workloads.
