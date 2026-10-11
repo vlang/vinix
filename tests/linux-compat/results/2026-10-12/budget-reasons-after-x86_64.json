@@ -1,0 +1,31 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "41707a18a64a1295de8c13d289b6533e25ddbe21ceb54b83dfe4bfb10c478f8e",
+    "results": [
+        {
+            "name": "budget",
+            "source_sha256": "e58c9d283e91281386c38ff182706038f7147c2bab4c1cf7d70964b5612e3341",
+            "init_sha256": "28baaa370b4a174ec8f431cd85392570121bd4d54a546fb1d6002cbee5e89ac6",
+            "iso_sha256": "6e3208199755a09def98842dbe2a5eac702e08b0bb822c3b06af3579d9867d3d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "mmap",
+            "source_sha256": "110291a245baf0ed947d3575dcc54b97006d532d3a6265572697b90d8a3fa624",
+            "init_sha256": "85855eb8b9f83b8c12a7542a0505283bb3a3f5ffe2d3cf82650116f2fb6d69d3",
+            "iso_sha256": "6526b71ba11521f1d3e4241d0919b47031fe9bacba2fa401203a8791479a067f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sparsefork",
+            "source_sha256": "c81c3b9566ec76cd4b52cc3e3aa8eaf9ac29cb0d9bc4d96c8f97a6f48f8198a3",
+            "init_sha256": "f55399d7429818d43fbb1310c1c96bb869bd719a43c4973cc394e4e62f56362b",
+            "iso_sha256": "dd1b9f14173cefc608db392020b66e73ebc44d8b2695a54c3a14860597f18113",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

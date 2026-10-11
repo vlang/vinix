@@ -64,6 +64,7 @@ fn coverage(root string) !Coverage {
 		'kernel/fs/mount.v', 'kernel/fs/tmpfs.v', 'kernel/fs/procfs.v',
 		'kernel/proc/proc.v', 'kernel/proc/proc_arm64.v', 'kernel/proc/proc_amd64.v',
 		'kernel/proc/container.v', 'kernel/proc/seccomp.v',
+		'kernel/kbudget/budget.v', 'kernel/proc/kernel_budget.v',
 		'kernel/futex/futex.v', 'kernel/futex/pi.v', 'kernel/event/event.v',
 		'kernel/usercopy/usercopy.v', 'kernel/usercopy/word_atomic_arm64.v',
 		'kernel/usercopy/word_atomic_amd64.v',

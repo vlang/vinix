@@ -46,12 +46,30 @@ mut:
 	refs       u64
 }
 
+pub enum DenialReason {
+	invalid
+	accounts
+	objects
+	global
+	owner
+	group
+}
+
+pub const denial_reasons = 6
+
 pub struct Snapshot {
 pub mut:
 	limit       u64
 	owner_limit u64
 	bytes       u64
 	denials     u64
+	denied_by_reason [denial_reasons]u64
+	last_reason int = -1
+	last_owner Owner
+	last_kind Kind
+	last_requested u64
+	last_global_bytes u64
+	last_owner_bytes u64
 	accounts    u64
 	objects     [kinds]u64
 	charged     [kinds]u64
@@ -75,6 +93,7 @@ pub fn configure(total u64) {
 	if limit > 512 * 1024 * 1024 { limit = 512 * 1024 * 1024 }
 	resource_budget_stats.limit = limit
 	resource_budget_stats.owner_limit = limit / 2
+	if resource_budget_stats.denials == 0 { resource_budget_stats.last_reason = -1 }
 }
 
 pub fn open_owner() ?Owner {
@@ -88,7 +107,7 @@ pub fn open_owner() ?Owner {
 		resource_budget_stats.accounts++
 		return Owner{ slot: u32(i + 1), generation: resource_budget_generation }
 	}
-	resource_budget_stats.denials++
+	note_denial(.accounts, Owner{}, .process, 0)
 	return none
 }
 
@@ -124,19 +143,51 @@ pub fn bind_group_memory(owner Owner, group &cgcontrol.Group, tasks u64, anonymo
 	return true
 }
 
+// Called under resource_budget_lock. Capture the rejected reservation before
+// its caller rolls back earlier work; scalar evidence survives that rollback.
+fn note_denial(reason DenialReason, owner Owner, kind Kind, bytes u64) {
+	resource_budget_stats.denials++
+	resource_budget_stats.denied_by_reason[int(reason)]++
+	resource_budget_stats.last_reason = int(reason)
+	resource_budget_stats.last_owner = owner
+	resource_budget_stats.last_kind = kind
+	resource_budget_stats.last_requested = bytes
+	resource_budget_stats.last_global_bytes = resource_budget_stats.bytes
+	resource_budget_stats.last_owner_bytes = if valid(owner) {
+		resource_budget_accounts[owner.slot - 1].bytes
+	} else { u64(0) }
+}
+
+fn capacity_allowed(owner Owner, kind Kind, bytes u64, check_objects bool) bool {
+	if bytes == 0 || !valid(owner) {
+		note_denial(.invalid, owner, kind, bytes)
+		return false
+	}
+	if check_objects && resource_budget_stats.objects[int(kind)] >= object_limit(kind) {
+		note_denial(.objects, owner, kind, bytes)
+		return false
+	}
+	if bytes > resource_budget_stats.limit - resource_budget_stats.bytes {
+		note_denial(.global, owner, kind, bytes)
+		return false
+	}
+	if bytes > resource_budget_stats.owner_limit - resource_budget_accounts[owner.slot - 1].bytes {
+		note_denial(.owner, owner, kind, bytes)
+		return false
+	}
+	return true
+}
+
 pub fn reserve(owner Owner, kind Kind, bytes u64) ?Charge {
 	// Boot-time objects and internal kernel tasks have no user account.
 	if owner.slot == 0 { return Charge{} }
 	resource_budget_lock.acquire()
 	defer { resource_budget_lock.release() }
-	if bytes == 0 || !valid(owner) || resource_budget_stats.objects[int(kind)] >= object_limit(kind)
-		|| bytes > resource_budget_stats.limit - resource_budget_stats.bytes
-		|| bytes > resource_budget_stats.owner_limit - resource_budget_accounts[owner.slot - 1].bytes {
-		resource_budget_stats.denials++
+	if !capacity_allowed(owner, kind, bytes, true) {
 		return none
 	}
 	if !cgcontrol.reserve(resource_budget_accounts[owner.slot - 1].group, bytes, 0) {
-		resource_budget_stats.denials++
+		note_denial(.group, owner, kind, bytes)
 		return none
 	}
 	resource_budget_accounts[owner.slot - 1].refs++
@@ -154,13 +205,11 @@ pub fn grow(mut charge Charge, bytes u64) bool {
 	if charge.owner.slot == 0 || bytes == 0 { return true }
 	resource_budget_lock.acquire()
 	defer { resource_budget_lock.release() }
-	if !valid(charge.owner) || bytes > resource_budget_stats.limit - resource_budget_stats.bytes
-		|| bytes > resource_budget_stats.owner_limit - resource_budget_accounts[charge.owner.slot - 1].bytes {
-		resource_budget_stats.denials++
+	if !capacity_allowed(charge.owner, charge.kind, bytes, false) {
 		return false
 	}
 	if !charge.group_retired && !cgcontrol.reserve(resource_budget_accounts[charge.owner.slot - 1].group, bytes, 0) {
-		resource_budget_stats.denials++
+		note_denial(.group, charge.owner, charge.kind, bytes)
 		return false
 	}
 	resource_budget_accounts[charge.owner.slot - 1].bytes += bytes

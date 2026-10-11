@@ -11,6 +11,21 @@ V=/path/to/v tests/kernel-resources/run-host.sh
 The host suite exercises concurrent reserve/grow/shrink/release, owner limits,
 global limits, fixed account exhaustion, stale generations, surviving creator
 accounts and denied lazy-root allocation followed by retry and disposal.
+It also distinguishes invalid/stale requests, account/object exhaustion,
+global/owner byte ceilings and cgroup refusals. Rejected reservations preserve
+all live charges, while their reason and pre-rollback usage remain recorded.
+
+`/proc/kernel-resources` retains `Denied` plus six `Denied.<reason>` counters
+and the latest rejected owner identity, resource kind, byte request and global/
+owner usage. These describe the kernel-budget admission gate; physical-memory
+failures and unrelated syscall errors are outside these counters. Existing
+limits and admission order are unchanged.
+
+The V `budget` case in `tests/linux-compat/run` preopens the diagnostic file,
+exhausts an ordinary user's mapping allowance, checks its exact ENOMEM and
+owner-limit evidence with fixed buffers after releasing one mapping to allow
+the kernel's read scratch reservation, then unmaps everything and verifies
+allocation recovers. Its isolated guest runs on both native architectures.
 
 Boot the native-page guest on each architecture:
 

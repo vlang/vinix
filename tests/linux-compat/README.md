@@ -12,7 +12,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -129,6 +129,13 @@ seccomp action. Nonzero flags return EINVAL before the action pointer is read;
 unsupported actions return EOPNOTSUPP and inaccessible arguments return
 EFAULT. It checks Linux's unsigned-int narrowing, untouched input/guard words,
 and that queries leave seccomp disabled.
+
+The `budget` case preopens `/proc/kernel-resources`, exhausts the ordinary
+user's mapping allowance and requires ENOMEM with the matching owner-limit
+reason, resource kind and rejected byte request. Fixed diagnostic buffers
+avoid user allocations; one mapping is released for the kernel's read scratch
+reservation before inspecting its retained failure evidence. Unmapping restores
+the reservations, keeps the failure evidence, and permits another mapping.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,

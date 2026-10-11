@@ -563,7 +563,7 @@ fn (this &ProcFSResource) contents() string {
 		.kernel_resources {
 			usage := kbudget.snapshot()
 			mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
-   unsafe { *text = lib.new_text(512) }
+   unsafe { *text = lib.new_text(1024) }
 			text.add('Limit: '); text.add_unsigned(usage.limit)
 			text.add('\nOwnerLimit: '); text.add_unsigned(usage.owner_limit)
 			text.add('\nCharged: '); text.add_unsigned(usage.bytes)
@@ -574,6 +574,21 @@ fn (this &ProcFSResource) contents() string {
 			for i in 0 .. kbudget.kinds {
 				text.add(names[i]); text.add(' '); text.add_unsigned(usage.objects[i])
 				text.add(' '); text.add_unsigned(usage.charged[i]); text.add('\n')
+			}
+			reasons := ['invalid', 'accounts', 'objects', 'global', 'owner', 'cgroup']!
+			for i in 0 .. kbudget.denial_reasons {
+				text.add('Denied.'); text.add(reasons[i]); text.add(': ')
+				text.add_unsigned(usage.denied_by_reason[i]); text.add('\n')
+			}
+			if usage.last_reason >= 0 && usage.last_reason < kbudget.denial_reasons {
+				text.add('LastDenied: '); text.add(reasons[usage.last_reason])
+				text.add('\nLastDeniedOwner: '); text.add_unsigned(usage.last_owner.slot)
+				text.add('/'); text.add_unsigned(usage.last_owner.generation)
+				text.add('\nLastDeniedKind: '); text.add(names[int(usage.last_kind)])
+				text.add('\nLastDeniedRequested: '); text.add_unsigned(usage.last_requested)
+				text.add('\nLastDeniedGlobalBytes: '); text.add_unsigned(usage.last_global_bytes)
+				text.add('\nLastDeniedOwnerBytes: '); text.add_unsigned(usage.last_owner_bytes)
+				text.add('\n')
 			}
 			return lib.finish_text(*text)
 		}

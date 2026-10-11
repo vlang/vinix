@@ -722,3 +722,39 @@ retain both prior kernels accepting flags=1, both fixed query passes and the
 existing filter/trap regression on each architecture. Both kernels build and
 the generated coverage inventory is current. Linux per-thread filter ownership,
 TSYNC and complete browser sandbox qualification remain open.
+
+## Kernel resource denial reasons
+
+`/proc/kernel-resources` now splits kernel-budget denials into invalid/stale
+requests, account exhaustion, object exhaustion, global bytes, owner bytes and
+cgroup admission. It retains the latest rejected owner slot/generation, resource
+kind, byte request and global/owner usage before rollback. The existing quota,
+validation order and allocation lifetimes are preserved. These counters cover
+kernel-budget admission, rather than physical-memory exhaustion or every
+possible ENOMEM/EAGAIN source. Snapshots before the first rejection omit the
+last-denial fields.
+
+The production-helper host suite passes concurrent accounting, surviving owners,
+all six denial categories, growth failures and rollback. Both native guest
+tests exhaust an ordinary user's mapping allowance, receive ENOMEM with the
+correct owner-limit evidence, release one mapping for the kernel's read scratch
+reservation, and inspect the retained pre-rollback usage with fixed buffers.
+They unmap the remaining reservations and verify allocation recovers. Existing
+mmap and sparse-fork cases also pass on both final kernels. Matching prior
+kernels lack the diagnostic fields; all before/after receipts and logs are in
+the [dated results](../tests/linux-compat/results/2026-10-12/).
+Both kernels build and the four coverage-generator tests and inventory check
+pass. Generated C confirms scalar accounting updates without allocation.
+
+The [Firefox rerun](../tests/linux-compat/results/2026-10-12/budget-firefox-2g-x86_64.json)
+uses the same Firefox 128.14.0esr input, UID/GID 1000, 2048 MiB guest and normal
+sandbox policy. It still times out without page/PNG proof. All three recorded
+kernel-budget denials are global-byte refusals; the other five categories stay
+at zero. The latest rejected scratch reservation requests 139,520 bytes at
+190,897,484 bytes globally charged against a 190,904,320-byte ceiling. Its
+owner holds 92,975,726 bytes, below the 95,452,160-byte owner ceiling. At the
+timeout snapshot, rollback has reduced total reservations to 116,926,552 bytes
+and 1,075,996 KiB of physical memory is free. This identifies the budget gate
+behind these three refusals; it does not establish every startup failure's
+cause. Reports, immutable input hashes, prepared-root manifest and raw log
+remain visible.
