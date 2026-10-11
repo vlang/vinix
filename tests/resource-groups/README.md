@@ -15,8 +15,8 @@ creator objects, pressure recovery, swap lifetime, rate arithmetic and overflow.
 Boot the native fixture with a new state directory for each run:
 
 ```sh
-python3 tests/resource-groups/run.py --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /tmp/groups-arm
-python3 tests/resource-groups/run.py --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /tmp/groups-x86
+tests/resource-groups/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /tmp/groups-arm
+tests/resource-groups/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /tmp/groups-x86
 ```
 
 The runner defaults to four CPUs (`--smp` overrides it), creates its own

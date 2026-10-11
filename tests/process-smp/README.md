@@ -56,7 +56,7 @@ Run the remaining matrix on both kernels:
 | --- | --- | --- |
 | Job control, wait selection/restart, stop/continue and live-thread teardown | `tests/process-smp/run --arch ARCH --kernel-dir KERNEL --source tests/kernel-job-control/check.c --expect 'JOB-CHECK DONE failures=0' --state-dir STATE` | `JOB-CHECK DONE failures=0` |
 | Returning detached threads raced against kill/exit_group | Same job command plus `--define JOB_TEARDOWN_ONLY=1 --define JOB_DETACHED_CHURN=1 --define JOB_TEARDOWN_PROCESSES=60 --define JOB_TEARDOWN_BATCHES=6` | `JOB-CHECK DONE failures=0` |
-| Task/kernel-memory quotas, concurrent admission, pressure notifications, swap, OOM/fault/exit races and recovery | V runner pending for `tests/resource-groups/run.py` | `CGROUP PASS` |
+| Task/kernel-memory quotas, concurrent admission, pressure notifications, swap, OOM/fault/exit races and recovery | `tests/resource-groups/run` | `CGROUP PASS` |
 | Anonymous pageout/refault, COW and shared aliases under physical pressure | V runner pending for `tests/paging/run.py` | `PAGING encrypted-disk-swapoff PASS` and `PAGING PASS` |
 
 Also run `tests/posix-timer/run` on AArch64 and amd64, and the AArch64 desktop

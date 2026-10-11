@@ -84,6 +84,8 @@ fn command_checked(args []string, family string) !int {
 		'kernel-stack-guards', 'cpu-mitigations' { return optin_guest_command(args, family)! }
 		'smt-policy' { return smt_guest_command(args)! }
 		'acpi-sync' { return acpi_command(args)! }
+		'resource-groups' { return groups_command(args)! }
+		'speculation-policy' { return speculation_command(args)! }
 		else { return error_with_code('Unknown compatibility command', 2) }
 	}
 }

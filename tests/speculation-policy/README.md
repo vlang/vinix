@@ -1,6 +1,6 @@
 # Initial x86 speculation controls
 
-`python3 tests/speculation-policy/run.py` executes the original helper's V
+`tests/speculation-policy/run` executes the original helper's V
 implementation through an independent V oracle under ASan/UBSan, with mocked
 CPUID and MSR instructions. The active per-CPU policy is tested separately in
 [`tests/cpu-mitigations`](../cpu-mitigations/README.md). This helper checks every combination
