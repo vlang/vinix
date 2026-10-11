@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `a2fd5c1f35002201917b8f15c46c3f318131df1f`,
+at source commit `4a88dcb62aa0fd755c8c4214a2095e335d28b0c6`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -12,15 +12,15 @@ This is a snapshot; regenerate it when source files change.
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
 | C | 567 | 2,365,384 | 6.18% |
-| Python | 332 | 1,708,075 | 4.46% |
-| Shell | 514 | 1,364,384 | 3.56% |
+| Python | 329 | 1,696,406 | 4.43% |
+| Shell | 514 | 1,364,448 | 3.57% |
 
-All `.v` files are classified as V. The resulting V share is 77.64%, with no
+All `.v` files are classified as V. The resulting V share is 77.66%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,708,075 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 1,696,406 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev a2fd5c1f35002201917b8f15c46c3f318131df1f --breakdown --json
+github-linguist --rev 4a88dcb62aa0fd755c8c4214a2095e335d28b0c6 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -828,9 +828,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/android/runtime-binding.py` | 5,461 |
 | `tests/android/split-test.py` | 2,283 |
 | `tests/android/test-runtime-v.py` | 4,546 |
-| `tests/apple_display_hotplug/_native.py` | 976 |
-| `tests/apple_display_hotplug/run.py` | 3,551 |
-| `tests/apple_smc/run.py` | 7,142 |
 | `tests/block-storage/run.py` | 6,924 |
 | `tests/browsers/_native.py` | 5,357 |
 | `tests/browsers/run_vm.py` | 9,438 |
@@ -1180,10 +1177,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple-spi-keyboard/compile-fixture` | 190 |
 | `tests/apple-spi-keyboard/run.sh` | 203 |
 | `tests/apple-spi-touchpad/run.sh` | 203 |
-| `tests/apple_display_hotplug/run.sh` | 131 |
+| `tests/apple_display_hotplug/run.sh` | 163 |
 | `tests/apple_smc/compile-fixture` | 186 |
 | `tests/apple_smc/run-host.sh` | 641 |
-| `tests/apple_smc/run.sh` | 158 |
+| `tests/apple_smc/run.sh` | 190 |
 | `tests/application-sandbox/run-native.sh` | 1,281 |
 | `tests/application-sandbox/test-host.sh` | 229 |
 | `tests/application-sandbox/test-ui.sh` | 759 |
