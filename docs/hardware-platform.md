@@ -450,7 +450,10 @@ machine -- nothing arms a function to signal from D3. Bridges stay in D0. A
 function that does not take the state is left in D0; one that does not come
 back is not resumed, and is handed to recovery like any device that stopped
 answering. The same is done before a suspend to RAM, where D3hot is what the
-platform expects to find when it cuts the power.
+platform expects to find when it cuts the power. And before the image
+of a suspend to disk is taken, which no scenario has with a function that
+goes down: it was run once by hand with the 82574L in the machine of
+`hibernate`, twice down and back.
 
 `/sys/bus/pci/devices/<address>/power_state` is the state a function says it
 is in, `power/d3_count` how many sleeps it has spent in D3hot, and
@@ -1187,7 +1190,7 @@ Beyond the limits stated in each section:
     thresholds are not announced on screen.
 - `hwcheck` is built by hand (`tools/hwcheck/build`); no image ships it.
 
-## Qualification record, 2026-10-10
+## Qualification record, 2026-10-10 and 2026-10-11
 
 Kernels were built in a git worktree with `make ARCH=aarch64 LIMINE_MP=1` and
 `make ARCH=x86_64`, and run on QEMU 11.1.1 on an Apple Silicon Mac: x86-64
