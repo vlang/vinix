@@ -1047,6 +1047,11 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 	flags := if requested_flags & resource.o_path != 0 {
 		requested_flags & (resource.o_path | resource.o_cloexec | resource.o_directory | resource.o_nofollow)
 	} else { requested_flags }
+	// Validate this invalid creation combination before lookup or mutation.
+	// Otherwise a failed directory open can leave a new regular file behind.
+	if flags & (resource.o_creat | resource.o_directory) == (resource.o_creat | resource.o_directory) {
+		return errno.err, errno.einval
+	}
 	if resolve & ~(resolve_no_xdev | resolve_no_magiclinks | resolve_no_symlinks) != 0 {
 		return errno.err, errno.eopnotsupp
 	}

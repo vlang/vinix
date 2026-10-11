@@ -254,6 +254,37 @@ fn dangling_creation() bool {
 	}
 }
 
+fn invalid_directory_creation() bool {
+	unsafe {
+		flags := C.O_CREAT | C.O_DIRECTORY | C.O_RDWR
+		for path in [charptr(c'/tmp/linux-open-invalid-create'), charptr(c'/tmp/linux-open-dir'),
+			charptr(c'/tmp/linux-open-path-flags'), charptr(c'/tmp/linux-open-missing-parent/child')]! {
+			for via_openat in [false, true]! {
+				errno_ptr := C.__errno_location()
+				*errno_ptr = 0
+				fd := if via_openat {
+					C.syscall(isize(C.SYS_openat), isize(C.AT_FDCWD), path, isize(flags), isize(0o600))
+				} else { isize(C.open(path, flags, u32(0o600))) }
+				actual := *errno_ptr
+				if fd >= 0 { C.close(i32(fd)) }
+				if fd != -1 || actual != C.EINVAL {
+					C.printf(c'LINUX OPEN FAIL: O_CREAT|O_DIRECTORY result=%ld errno=%d\n', fd, actual)
+					return false
+				}
+			}
+			how := How{flags: u64(flags), mode: 0o600}
+			if !open_result(path, &how, 24, C.EINVAL) { return false }
+		}
+		if C.access(c'/tmp/linux-open-invalid-create', C.F_OK) != -1
+			|| *C.__errno_location() != C.ENOENT { return false }
+		// Legacy O_PATH normalization discards O_CREAT before validation.
+		fd := C.open(c'/tmp/linux-open-dir', flags | C.O_PATH, u32(0o600))
+		if fd < 0 { return false }
+		C.close(fd)
+		return true
+	}
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
@@ -275,7 +306,8 @@ pub fn run() i32 {
 		if !link_descriptor(&char(&pipe_path[0]), false, 0)
 			|| !link_descriptor(&char(&pipe_path[0]), true, 0)
 			|| !link_constraints(pipes[0]) || !trailing_slashes()
-			|| !exclusive_creation() || !dangling_creation() || !path_flags() || !mount_constraints() { return 1 }
+			|| !exclusive_creation() || !dangling_creation() || !path_flags()
+			|| !invalid_directory_creation() || !mount_constraints() { return 1 }
 		C.close(pipes[0]); C.close(pipes[1])
 		mut how := How{}
 		if !open_result(c'/tmp/linux-open-target', &how, 24, 0)

@@ -96,6 +96,15 @@ pass the complete open fixture. `dangling-before-x86_64.json` retains the
 prior kernel's actual failure to create the target. This follows Linux's
 [final-component open lookup](https://github.com/torvalds/linux/blob/v6.12/fs/namei.c).
 
+The `directory-create-after-*.json` receipts pass all six native cases after
+rejecting O_CREAT|O_DIRECTORY with EINVAL before lookup or creation. The raw
+fixture covers plain open, openat and openat2 against missing paths, a missing
+parent, an existing directory and an existing file, and verifies no missing
+file was created. Legacy O_PATH still discards O_CREAT before validation.
+The matching `directory-create-before-*.json` controls fail on both prior
+kernels with ENOTDIR. This follows Linux's
+[creation-flag validation](https://github.com/torvalds/linux/blob/v6.12/fs/open.c).
+
 An initial i386 attempt failed before linking because V's amd64 inline assembly
 could not target i386. The revised fixture uses SSE2 compiler intrinsics; it
 passes natively on both architectures and as a static i386 executable through

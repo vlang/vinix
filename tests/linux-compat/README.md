@@ -230,6 +230,12 @@ Native paths report unsupported because ptrace has no syscall dispatch.
 Source-level symbols, unwinding, core dumps and JIT debugger registration need
 their own qualification.
 
+The `open` fixture also checks invalid O_CREAT|O_DIRECTORY combinations in
+plain open/openat and openat2: EINVAL must precede path lookup and leave no new
+file. Legacy O_PATH normalization remains valid. Dated before/after receipts
+use identical fixture binaries on both architectures; the final kernels pass
+all six native cases.
+
 Select `--cases games` with a prepared native root containing `chocolate-doom`,
 its SDL libraries and a locally licensed IWAD at
 `/usr/share/games/doom/doom1.wad`. The workload runs `demo1` twice with SDL dummy

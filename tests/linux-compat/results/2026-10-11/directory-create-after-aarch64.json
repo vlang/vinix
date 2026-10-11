@@ -1,0 +1,55 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "1cba1b55844b58b12c62460998cdd6d0ef3f94d5b3dfd1bac50af1f50285cf2e",
+    "results": [
+        {
+            "name": "bpf",
+            "source_sha256": "c9808ba6ef87fc5e28f98a586d944f86f754a8081faa02259f01993e9eb80e16",
+            "init_sha256": "de2e1606a6d221b59ba43535b921587e0a75977f177c627a917e0c06d7a006d6",
+            "iso_sha256": "ff4f1eb47b748e695a3491492f5020fa6805e889dd37e77534665e5fb73a8593",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "access",
+            "source_sha256": "0beb5ce37d58a5dff50b24f5ce87bd479bc39718d39b29490e72076183b2c1db",
+            "init_sha256": "a828228da509bfd306fe2b3636e131aa5e5f1bb750042b26d2ffbe558fb1dbf9",
+            "iso_sha256": "59930e16002818d52510612037acce3025c04586f11e9d5e8a18582b01e8bce5",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "32639e2f81ae1a654adb8bde0c8be807629986f84f49ce2cef2f4c97a2c4c9fa",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "mmap",
+            "source_sha256": "110291a245baf0ed947d3575dcc54b97006d532d3a6265572697b90d8a3fa624",
+            "init_sha256": "4a9853f7d497e8b6cc13f35297fc46454440f919f47265da0ddac263d4666132",
+            "iso_sha256": "508672a353cc74b408f8086cc68397c936b7cef4372aa5211e7f8f376c8e2ad6",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "624ea842259a3e158355c8209fbcb5c92ebb87e9573845c166175cc7c5ca0290",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "namespace",
+            "source_sha256": "50262bc779a7d3114c9db4499152d668acd8085670904d81b9c85d74b92fcef9",
+            "init_sha256": "4773d9d69b3b77c2456dda9276efc40866a8ebb94fc25977a504f101161403f9",
+            "iso_sha256": "f616ede5f24c63d85c9b4772b096326481795fbc4c4d000d4988506ec3b48bc1",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
