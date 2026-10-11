@@ -1,0 +1,87 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "69f51ea0b398f59f584880b1010f9b3b6dc38d0437a620ca9fcf3ae384705607",
+    "results": [
+        {
+            "name": "bpf",
+            "source_sha256": "c9808ba6ef87fc5e28f98a586d944f86f754a8081faa02259f01993e9eb80e16",
+            "init_sha256": "e7152bb075c5fc4acbdd72c2cefebaf5edaf289cc5024bff8ed2cba95c10c7b4",
+            "iso_sha256": "26e5d5414a7775c6b33b08e8b0f4aa70b443c67272c89f7fdafac1eb02673e9f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "access",
+            "source_sha256": "0beb5ce37d58a5dff50b24f5ce87bd479bc39718d39b29490e72076183b2c1db",
+            "init_sha256": "2383380e229b19ee24642f3081e307ae49246ef6c43e5906c07dddd35e7e9cdd",
+            "iso_sha256": "96487baeb32a8c30da993c522fb1742dde294b9b145782df63da5861da4622b0",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "377071b25bf7f8a9b3a048c8eab9ec87c689beb7ca5791e8439a46a4131f222a",
+            "iso_sha256": "ea3652b5a53412dd455568cfd89076ffef79a69a67ff3aef2b0da13481210f5d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "mmap",
+            "source_sha256": "110291a245baf0ed947d3575dcc54b97006d532d3a6265572697b90d8a3fa624",
+            "init_sha256": "85855eb8b9f83b8c12a7542a0505283bb3a3f5ffe2d3cf82650116f2fb6d69d3",
+            "iso_sha256": "6abdb9bb767cbc80d06db1def865bf73526f02df4ae18ea9a0ad0eee5fb13238",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "7299efd26b67b8b4cff92630b42a2028019a84cc9289aec84f3f5c340df6734f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "namespace",
+            "source_sha256": "50262bc779a7d3114c9db4499152d668acd8085670904d81b9c85d74b92fcef9",
+            "init_sha256": "1cdc4a73259ea68007cefac1d2078c263b6c68ee8cf86a3317c50e03e78ac95b",
+            "iso_sha256": "7da07fc4493a37d48a69737d42b2123871e7c079debbf15a6cb354d71a09d140",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sharedmem",
+            "source_sha256": "99ee2c57a20feb6bcf30b333373985c214e4142769506e76374626e4ccc71f44",
+            "init_sha256": "d58f5693f10e7729ec5d4602879c605e0599b04a94015c3c243a971b6a92117a",
+            "iso_sha256": "6c1c9e9061ec5a22fb6a109902a15e76846efde1049651ab8e2bd46e4b406c12",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccomp",
+            "source_sha256": "fa786d3dbf56b7a0ad48273a8f2ac09984d6c22a9e9930bda91b8f7711d25dc3",
+            "init_sha256": "594490a182b4abe3c8f52a1e9dd61a2f62fd333aecea2103f02d833e8cf737de",
+            "iso_sha256": "748f27bafb9bdf15c59f90be53ecdaffaea59b6071bbde3cdef36ae723dd5dbe",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futex",
+            "source_sha256": "2319eb993ee19d6abf7cc94e5f5921ae2c98d45640e9061584e2cfcad4872743",
+            "init_sha256": "326cab9c0cc00dd79496f10e04aa2b440e3a12a3fe0dca0f0914d7cfc188a135",
+            "iso_sha256": "612ccba957ef1ebbc0f5c8b849868d3009e4c13dabbe92156918846219f64bce",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexkeys",
+            "source_sha256": "37381c372e83aa88069bb9b62b0c2f50216e0307a4ace701a007b6e4fdd17227",
+            "init_sha256": "488fccb13829e5484ab969ae2c3fa109de5295ca82e1aacb78460e5fb756842e",
+            "iso_sha256": "32f6969ea28324535774a84ef09f00c2fed113e587d07967ad8a34cf1dcf5d2c",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

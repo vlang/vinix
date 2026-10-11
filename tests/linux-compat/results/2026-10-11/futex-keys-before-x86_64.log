@@ -1,0 +1,74 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 17  248k   17 43559    0     0  59034      0  0:00:04 --:--:--  0:00:04 59023100  248k  100  248k    0     0   237k      0  0:00:01  0:00:01 --:--:--  237k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 2880k    0  5615    0     0   9203      0  0:05:20 --:--:--  0:05:20  9189 48 2880k   48 1391k    0     0   891k      0  0:00:03  0:00:01  0:00:02  891k 98 2880k   98 2831k    0     0  1117k      0  0:00:02  0:00:02 --:--:-- 1117k100 2880k  100 2880k    0     0  1129k      0  0:00:02  0:00:02 --:--:-- 1129k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  32966      0 --:--:-- --:--:-- --:--:-- 32983
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0100  207k  100  207k    0     0   144k      0  0:00:01  0:00:01 --:--:--  144k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 17 49092   17  8427    0     0  10446      0  0:00:04 --:--:--  0:00:04 10442100 49092  100 49092    0     0  50677      0 --:--:-- --:--:-- --:--:-- 50662
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0  117k    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0  97378      0  0:00:01  0:00:01 --:--:-- 97383
+==> Building the Limine host installer...
+==> Assembling /Volumes/VinixLinuxCompatContinue1011/keys-before-x86/futexkeys/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Volumes/VinixLinuxCompatContinue1011/keys-before-x86/futexkeys/.vinix-amd64.iso.x99wfb'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 12.6g free
+Added to ISO image: directory '/'='/Volumes/VinixLinuxCompatContinue1011/keys-before-x86/futexkeys/iso-build/.iso-staging.lnc22J/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13005 sectors
+Written to medium : 13005 sectors at LBA 0
+Writing to 'stdio:/Volumes/VinixLinuxCompatContinue1011/keys-before-x86/futexkeys/.vinix-amd64.iso.x99wfb' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xcb33.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Volumes/VinixLinuxCompatContinue1011/keys-before-x86/futexkeys/test.iso (26634240 bytes)
+Guest artifacts: /Volumes/VinixLinuxCompatContinue1011/keys-before-x86/futexkeys
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./dev/ sz=0
+!>+ [3] ./proc/ sz=0
+!>+ [4] ./root/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./sys/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=40968
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91600
+initramfs: Done (9 entries)
+LINUX FUTEXKEYS FAIL: wait=128 wrong-wake=129 returned=1 completed=1
+QEMU: Terminated
+Missing verdicts: ['LINUX FUTEXKEYS: PASS']; failures: ['FAIL:', 'LINUX FUTEXKEYS FAIL']
+Linux compatibility qualification failed; see /Volumes/VinixLinuxCompatContinue1011/keys-before-x86/receipt.json

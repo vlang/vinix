@@ -3,7 +3,7 @@
     "inputs": {
         "tools/linux-compat/coverage.v": "9b4413bb6d51ca44558b8dbd3596c7ee8de2fba96e6c4e227e7141ff5732ee47",
         "kernel/syscall/table/linux_compat.v": "6270dd9bd29a6750f206a1c31422ee9b30c27c7b08d711e484ed643f72b78672",
-        "kernel/syscall/table/linux_common.v": "00310f6a8efd826f96f19f5ab5778f3be45de8b34f946224fcabc9d8e7a0da7d",
+        "kernel/syscall/table/linux_common.v": "ecd8b5dbd46b43a574d1522e066d7c13d66330558438e92348562e0bddb2474e",
         "kernel/syscall/table/container.v": "e4c8fc7823b9194ef7937e864f1869f97223163952d2e4a6b1e6b000ebe37e11",
         "kernel/syscall/table/trace_amd64.v": "f99f6ab397a29bbfca42d3a8be2ae9c65b25e337dd341a1d763f3d8b67ef3fb5",
         "kernel/file/file.v": "4013b0fb868bf7fc3a0b0f7294c2623219995c75e26e4bc3913ea44568ec0e47",
@@ -15,7 +15,7 @@
         "kernel/proc/proc.v": "faa486b29869cecc594ce220b7f1547007a51cea80d900f6ce16ca0311f5433a",
         "kernel/proc/container.v": "8a614355ad29ae3595820fc0ef1e07b7958f09741f1f268929e793295f2346e7",
         "kernel/proc/seccomp.v": "0adf7fcb8d8b4f3a2af5bc5e7ba570ec09ae92ba0670b6f30e4f6514d34d5b7b",
-        "kernel/futex/futex.v": "f3ade3016e05148ce6523262257593d15f308edeab4e852efc47441da43f00e7",
+        "kernel/futex/futex.v": "1b35c3fe9bd5b068cf496a97439fc778826f1c74c38543e6e23f7a55e2c56e6c",
         "kernel/futex/pi.v": "69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba",
         "kernel/event/event.v": "431c5a8a397611c65c3d5cf6696d57f8fe2cc729ddf08c4eaa22d9545ae8e81e",
         "kernel/userland/clone_arm64.v": "b3fd0d2b894c6fb4d351fa2eac2ba917985f00d39a48f18e6beb287ada6b1793",

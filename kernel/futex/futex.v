@@ -22,6 +22,7 @@ mut:
 	// whose address is physical.
 	owner voidptr
 	addr  u64
+	private bool
 	users int
 	// Other futexes whose keys share `addr`: the same virtual address in
 	// another process, most often another copy of the same program.
@@ -47,9 +48,12 @@ pub fn initialise() {
 // asleep on the word stays filed under the old page while the thread that
 // wakes it looks under the new one -- which is how a Go program that has run a
 // subprocess ends up with a runtime thread asleep for good.
-fn key_for(virt u64) ?(voidptr, u64) {
+// FUTEX_PRIVATE_FLAG always selects the address-space/virtual key. It is also
+// part of queue identity on private mappings: Linux's shared anonymous key
+// and explicit private key must not match one another.
+fn key_for(virt u64, private bool) ?(voidptr, u64) {
 	mut pagemap := proc.current_thread().process.pagemap
-	if !mmap.is_shared_address(pagemap, virt) {
+	if private || !mmap.is_shared_address(pagemap, virt) {
 		return voidptr(pagemap), virt
 	}
 	if phys := pagemap.virt2phys(virt) {
@@ -63,8 +67,8 @@ fn key_for(virt u64) ?(voidptr, u64) {
 
 // Take a reference to the futex for `virt`. Only a waiter creates one: a
 // waker that finds none has nobody to wake.
-fn get(virt u64, create bool) ?&Futex {
-	owner, addr := key_for(virt)?
+fn get(virt u64, create bool, private bool) ?&Futex {
+	owner, addr := key_for(virt, private)?
 
 	futex_lock.acquire()
 	defer {
@@ -76,7 +80,7 @@ fn get(virt u64, create bool) ?&Futex {
 		head = unsafe { futexes[addr] }
 	}
 	for f := head; f != unsafe { nil }; f = f.next {
-		if f.owner == owner {
+		if f.owner == owner && f.private == private {
 			mut found := unsafe { f }
 			found.users++
 			return found
@@ -89,6 +93,7 @@ fn get(virt u64, create bool) ?&Futex {
 	f := &Futex{
 		owner: owner
 		addr:  addr
+		private: private
 		users: 1
 		next:  head
 	}
@@ -122,7 +127,11 @@ fn put(mut f Futex) {
 
 // Block until woken, unless the word no longer holds the expected value.
 pub fn wait(virt u64, expected int) (u64, u64) {
-	mut f := get(virt, true) or { return errno.err, errno.efault }
+	return wait_key(virt, expected, false)
+}
+
+pub fn wait_key(virt u64, expected int, private bool) (u64, u64) {
+	mut f := get(virt, true, private) or { return errno.err, errno.efault }
 	defer {
 		put(mut f)
 	}
@@ -148,7 +157,11 @@ pub fn wait(virt u64, expected int) (u64, u64) {
 // so ignoring the timeout can leave an otherwise healthy process asleep
 // forever.
 pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
-	mut f := get(virt, true) or { return errno.err, errno.efault }
+	return wait_timeout_key(virt, expected, duration, false)
+}
+
+pub fn wait_timeout_key(virt u64, expected int, duration time.TimeSpec, private bool) (u64, u64) {
+	mut f := get(virt, true, private) or { return errno.err, errno.efault }
 	defer {
 		put(mut f)
 	}
@@ -187,14 +200,22 @@ pub fn wait_timeout(virt u64, expected int, duration time.TimeSpec) (u64, u64) {
 // An address with no futex registered against it — including one that is not
 // mapped at all — simply has nothing to wake.
 pub fn wake(virt u64) u64 {
-	mut f := get(virt, false) or { return 0 }
+	return wake_key(virt, false)
+}
+
+pub fn wake_key(virt u64, private bool) u64 {
+	mut f := get(virt, false, private) or { return 0 }
 	woken := event.trigger(mut f.event, true)
 	put(mut f)
 	return woken
 }
 
 pub fn wake_n(virt u64, maximum int) u64 {
-	mut f := get(virt, false) or { return 0 }
+	return wake_n_key(virt, maximum, false)
+}
+
+pub fn wake_n_key(virt u64, maximum int, private bool) u64 {
+	mut f := get(virt, false, private) or { return 0 }
 	// The original Linux futex ABI wakes one for a nonpositive count when
 	// waiters exist. FUTEX2's strict zero-count behavior is a separate ABI.
 	count := if maximum > 0 { u64(maximum) } else { u64(1) }

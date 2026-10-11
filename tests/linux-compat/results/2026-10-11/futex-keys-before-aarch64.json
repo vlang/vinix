@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "75e039bff5b950786edebd4e3a22c7e96253e46dd37db771cc3db253aad2a9b9",
+    "results": [
+        {
+            "name": "futexkeys",
+            "source_sha256": "37381c372e83aa88069bb9b62b0c2f50216e0307a4ace701a007b6e4fdd17227",
+            "init_sha256": "fa558c7baa355d024387891b68198c9409da538bf72e6ce3076fbab08db657d9",
+            "iso_sha256": "16b179f08c6b46750febbe8b5d891baf1827679d1f3a23b5f68cafdce65b9656",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

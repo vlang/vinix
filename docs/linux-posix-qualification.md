@@ -480,5 +480,24 @@ allocates nothing. See [Linux's wake implementation](https://github.com/torvalds
 `futex-count-before-*` receipts retain both prior kernels returning twelve for
 a request of one. `futex-count-after-*` retain the same fixture and all nine
 passing ABI cases on both architectures in the [dated results](../tests/linux-compat/results/2026-10-11/).
-Bitset filtering, explicit private keys on shared mappings and real requeue
-behavior remain unqualified by these checks.
+Bitset filtering and real requeue behavior remain unqualified by these checks.
+
+## Futex private and shared keys
+
+Both architectures pass twenty timed pthread waits using one memfd mapped at
+two shared addresses and one private address. A private wake through another
+alias must return zero and leave the waiter blocked; the matching virtual
+address wakes exactly one. Shared waiters wake through another shared alias.
+Private and shared calls at the same virtual address select distinct queues
+on both shared and private mappings. The explicit flag is passed through
+ordinary WAIT/WAIT_BITSET, WAKE/WAKE_BITSET and both WAKE_OP queues; kernel
+internal callers retain their non-private key selection. References and
+waiter storage retain their existing ownership. See
+[Linux's key selection](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/core.c#L185).
+
+`futex-keys-before-*` retains both prior kernels incorrectly waking a private
+waiter through a different alias. `futex-keys-after-*` retains the same fixture
+and all ten passing native ABI cases in the
+[dated results](../tests/linux-compat/results/2026-10-11/).
+These checks do not qualify priority-inheritance keys, cross-process shared
+file page eviction, bitset filtering or real requeue behavior.

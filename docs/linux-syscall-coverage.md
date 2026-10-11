@@ -704,7 +704,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/procfs.v` | `03e600e90db26d094e4169e94a9721730342c46b813d780690d32947a33b9eac` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
 | `kernel/fs/vfs.v` | `fa9cba4bcec37824b7e62cf9e6065bbc2fa7d7fc1243179208779b98509c6248` |
-| `kernel/futex/futex.v` | `f3ade3016e05148ce6523262257593d15f308edeab4e852efc47441da43f00e7` |
+| `kernel/futex/futex.v` | `1b35c3fe9bd5b068cf496a97439fc778826f1c74c38543e6e23f7a55e2c56e6c` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/memory/mmap/linux.v` | `71c091b8310ff8af5d8f39c11897b57ba33e3d52c14bc56edcc8ba9616a3fbb7` |
 | `kernel/memory/mmap/mmap.v` | `a6aadc35e0bc7d6018c192fa3f5616d152a8c7f358c8cc499050e209e541684c` |
@@ -712,7 +712,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/proc/proc.v` | `faa486b29869cecc594ce220b7f1547007a51cea80d900f6ce16ca0311f5433a` |
 | `kernel/proc/seccomp.v` | `0adf7fcb8d8b4f3a2af5bc5e7ba570ec09ae92ba0670b6f30e4f6514d34d5b7b` |
 | `kernel/syscall/table/container.v` | `e4c8fc7823b9194ef7937e864f1869f97223163952d2e4a6b1e6b000ebe37e11` |
-| `kernel/syscall/table/linux_common.v` | `00310f6a8efd826f96f19f5ab5778f3be45de8b34f946224fcabc9d8e7a0da7d` |
+| `kernel/syscall/table/linux_common.v` | `ecd8b5dbd46b43a574d1522e066d7c13d66330558438e92348562e0bddb2474e` |
 | `kernel/syscall/table/linux_compat.v` | `6270dd9bd29a6750f206a1c31422ee9b30c27c7b08d711e484ed643f72b78672` |
 | `kernel/syscall/table/linux_table_amd64.v` | `864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `cf70c23cb544cef0eedfb300f8410640ac7fc644feb7bbc3d467aaf08606c704` |

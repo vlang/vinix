@@ -24,9 +24,9 @@ import usercopy
 
 // Linux futex(uaddr, futex_op, val, timeout/val2, uaddr2, val3).
 fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64, uaddr2 u64, val3 u64) (u64, u64) {
-	// Mapping ownership determines private/shared keys. FUTEX_CLOCK_REALTIME
-	// selects the clock used by
-	// absolute FUTEX_WAIT_BITSET deadlines.
+	// PRIVATE selects the address-space/virtual key even on shared mappings.
+	// CLOCK_REALTIME selects the clock for absolute WAIT_BITSET deadlines.
+	private := futex_op & 0x80 != 0
 	op := futex_op & 0x7f
 	match op {
 		6, 8, 13 { // FUTEX_LOCK_PI, TRYLOCK_PI, LOCK_PI2.
@@ -41,7 +41,7 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 				return errno.err, errno.einval
 			}
 			if timeout == 0 {
-				return futex.wait(uaddr, int(val))
+				return futex.wait_key(uaddr, int(val), private)
 			}
 
 			mut duration := time.TimeSpec{}
@@ -66,10 +66,10 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 					return errno.err, errno.etimedout
 				}
 			}
-			return futex.wait_timeout(uaddr, int(val), duration)
+			return futex.wait_timeout_key(uaddr, int(val), duration, private)
 		}
 		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
-			return futex.wake_n(uaddr, int(i32(val))), 0
+			return futex.wake_n_key(uaddr, int(i32(val)), private), 0
 		}
 		5 { // FUTEX_WAKE_OP
 			// Decode FUTEX_OP(op, oparg, cmp, cmparg). In particular Qt's
@@ -91,7 +91,7 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 			old := usercopy.futex_atomic_op_u32(uaddr2, operation & 7, u32(operand)) or {
 				return errno.err, errno.efault
 			}
-			woken := futex.wake_n(uaddr, int(i32(val)))
+			woken := futex.wake_n_key(uaddr, int(i32(val)), private)
 			matched := match comparison {
 				0 { i32(old) == compare_arg }
 				1 { i32(old) != compare_arg }
@@ -101,7 +101,7 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 				else { i32(old) >= compare_arg }
 			}
 			if matched {
-				return woken + futex.wake_n(uaddr2, int(i32(timeout))), 0
+				return woken + futex.wake_n_key(uaddr2, int(i32(timeout)), private), 0
 			}
 			return woken, 0
 		}
@@ -110,9 +110,9 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 			// Waking them instead is heavier but still correct: pthread_cond
 			// waiters recheck their sequence and contend for the mutex, which
 			// is exactly what the requeue would have made them do.
-			woken := futex.wake(uaddr)
+			woken := futex.wake_key(uaddr, private)
 			if uaddr2 != 0 {
-				futex.wake(uaddr2)
+				futex.wake_key(uaddr2, private)
 			}
 			return woken, 0
 		}
