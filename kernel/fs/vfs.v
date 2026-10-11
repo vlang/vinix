@@ -1393,12 +1393,34 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 	defer {
 		unsafe { path.free() }
 	}
-	if mode & ~u32(7) != 0 || flags & ~(at_eaccess | at_symlink_nofollow) != 0 {
+	if mode & ~u32(7) != 0 || flags & ~(at_eaccess | at_symlink_nofollow | at_empty_path) != 0 {
 		return errno.err, errno.einval
 	}
 
 	if path.len == 0 {
-		return errno.err, errno.enoent
+		if flags & at_empty_path == 0 { return errno.err, errno.enoent }
+		if is_fdcwd(dirfd) {
+			node := unsafe { &VFSNode(proc.current_directory_of(process)) }
+			return faccess_node(node, mode, flags & at_eaccess != 0)
+		}
+		// Hold the description until all metadata and ACL checks finish. An
+		// unlinked file or O_PATH descriptor still names its original inode.
+		mut fd := file.fd_from_fdnum(process, int(i32(dirfd))) or {
+			return errno.err, errno.get()
+		}
+		defer { fd.unref() }
+		if fd.handle.node != unsafe { nil } {
+			return faccess_node(unsafe { &VFSNode(fd.handle.node) }, mode,
+				flags & at_eaccess != 0)
+		}
+		// Pipes, sockets and anonymous files have metadata but no pathname.
+		// The scratch is borrowed only during these synchronous checks.
+		mut anonymous := VFSNode{resource: fd.handle.resource}
+		mac_node(unsafe { &anonymous }, proc.mac_inspect) or { return errno.err, errno.get() }
+		check_access(unsafe { &anonymous }, mode, flags & at_eaccess != 0) or {
+			return errno.err, errno.get()
+		}
+		return 0, 0
 	}
 
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
@@ -1407,6 +1429,10 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 
 	node := get_node_with_credentials(parent, path, follow_links,
 		flags & at_eaccess != 0) or { return errno.err, errno.get() }
+	return faccess_node(node, mode, flags & at_eaccess != 0)
+}
+
+fn faccess_node(node &VFSNode, mode u32, effective bool) (u64, u64) {
 	// pledge(2) asks only "rpath" of access(2); unveil(2) the access asked about.
 	mut policy_access := proc.policy_inspect
 	if mode & access_read != 0 {
@@ -1422,7 +1448,7 @@ pub fn syscall_faccessat(_ voidptr, dirfd int, _path charptr, mode u32, flags in
 		return errno.err, errno.get()
 	}
 	if mode != 0 {
-		check_access(node, mode, flags & at_eaccess != 0) or { return errno.err, errno.get() }
+		check_access(node, mode, effective) or { return errno.err, errno.get() }
 	}
 
 	return 0, 0

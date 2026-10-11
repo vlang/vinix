@@ -152,23 +152,6 @@ fn syscall_linux_faccessat2(gpr_state voidptr, dirfd int, path charptr, mode u32
 	if mode & ~u32(0x7) != 0 || flags & ~0x1300 != 0 {
 		return errno.err, errno.einval
 	}
-	mut first := u8(0)
-	if !usercopy.copy_from_user(voidptr(&first), u64(path), 1) {
-		return errno.err, errno.efault
-	}
-	if first == 0 {
-		if flags & fs.at_empty_path == 0 {
-			return errno.err, errno.enoent
-		}
-		if fs.is_fdcwd(dirfd) {
-			return 0, 0
-		}
-		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, dirfd) or {
-			return errno.err, errno.get()
-		}
-		checked_fd.unref()
-		return 0, 0
-	}
 	return fs.syscall_faccessat(gpr_state, dirfd, path, mode, flags)
 }
 
