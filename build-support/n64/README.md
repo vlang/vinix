@@ -44,7 +44,7 @@ leave the upstream archive uninstrumented and disable leak detection.
 After building a host archive, run the V boundary fixture with:
 
 ```sh
-python3 build-support/n64/test-bridge.py --rom build/n64/homebrew/paddle.z64
+build-support/n64/test-bridge --rom build/n64/homebrew/paddle.z64
 ```
 
 It checks native mixed variadic arguments, borrowed callback addresses,

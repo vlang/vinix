@@ -21,3 +21,9 @@ pub fn module_word_rune(ch rune) bool {
 // UTF-8 failures, newline conversion and literal Unix path bytes.
 pub fn module_read_text(path string) !string { return module_read(path)! }
 pub fn module_write_text(path string, text string) ! { module_write(path, text)! }
+
+// Runtime staging needs shutil.copy2 semantics, including execute permission.
+pub fn module_copy_file_preserving_stat(source string, destination string) ! {
+	module_copy_file(source, destination)!
+	module_copy_stat(source, destination)!
+}

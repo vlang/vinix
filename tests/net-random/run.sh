@@ -5,4 +5,4 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 . "$root/build-support/find-v.sh"
 export VINIX_V_COMPILER="$V"
-exec python3 "$root/tests/net-random/run.py" "$@"
+exec "$root/tests/net-random/run" "$@"

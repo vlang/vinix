@@ -230,7 +230,11 @@ fn notices_and_source(output string, archive string, zlib_archive string) ! {
 	for name in ['build-n64-aarch64.sh', 'build-support/find-v.sh', 'build-support/compile-v-module.py',
 		'build-support/aarch64-cc-shim', 'tools/_package_store_native.py',
 		'build-support/native_host.py', 'build-support/android/_boot_native.py',
-		'build-support/run-v-tool.sh', 'tests/linuxkpi/module_query.v', 'tests/linuxkpi/hosttest'] {
+		'build-support/run-v-tool.sh', 'tests/linuxkpi/module_query.v', 'tests/linuxkpi/hosttest',
+		'build-support/compile-v-module', 'tests/linuxkpi/generate_module.v',
+		'build-support/native-compat-tools', 'tests/qemu-core/fixturehost',
+		'tests/host-policy/policyhost', 'tests/native-guest-tools/guesthost',
+		'tests/native-policy-tools/nativepolicy', 'tests/native-policy-tools/cpufixture'] {
 		relative := if name.starts_with('build-support/') || name.starts_with('tools/') || name.starts_with('tests/') {
 			call('Path', v(ah.Value(name)))!
 		} else {
@@ -241,6 +245,7 @@ fn notices_and_source(output string, archive string, zlib_archive string) ! {
 		if is_dir(original)! {
 			invoke('shutil.copytree', [o(original), o(target)], {
 				'dirs_exist_ok': v(ah.Value(true))
+				'symlinks':      v(ah.Value(name == 'build-support/native-compat-tools'))
 			})!
 		} else if exists(original)! {
 			mkdir(attribute(target, 'parent')!, true)!

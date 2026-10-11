@@ -50,11 +50,11 @@ fn main() {
 		transformed << argument
 	}
 	args := hosttest.parse_arguments(transformed, [
-		hosttest.Option{'--arch', true, ['amd64', 'arm64']},
+		hosttest.Option{'--arch', true, ['amd64', 'arm64', 'i386']},
 		hosttest.Option{'--define', true, []string{}},
 		hosttest.Option{'--header', true, []string{}},
 	], 2,
-		'Usage: generate_module.v SOURCE OUTPUT [--arch amd64|arm64] [-d DEFINE] [--header HEADER]',
+		'Usage: generate_module.v SOURCE OUTPUT [--arch amd64|arm64|i386] [-d DEFINE] [--header HEADER]',
 		"Emit a freestanding V module's C build artifact without the V runtime.") or {
 		eprintln(err.msg())
 		exit(2)
