@@ -1023,7 +1023,13 @@ pub fn syscall_openat(gpr_state voidptr, dirfd int, path charptr, flags int, mod
 	return syscall_openat_resolved(gpr_state, dirfd, path, flags, mode, 0)
 }
 
-pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, flags int, mode u32, resolve u64) (u64, u64) {
+pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_flags int, mode u32, resolve u64) (u64, u64) {
+	// Linux open/openat ignore access, creation and status flags with O_PATH.
+	// Normalize before any mutation or permission decision. openat2 rejects
+	// these combinations separately while validating its stricter open_how.
+	flags := if requested_flags & resource.o_path != 0 {
+		requested_flags & (resource.o_path | resource.o_cloexec | resource.o_directory | resource.o_nofollow)
+	} else { requested_flags }
 	if resolve & ~(resolve_no_xdev | resolve_no_magiclinks | resolve_no_symlinks) != 0 {
 		return errno.err, errno.eopnotsupp
 	}

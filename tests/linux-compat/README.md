@@ -29,6 +29,8 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
   failed O_CREAT requests cannot leave regular files behind.
   Exclusive creation returns EEXIST for existing final symlinks, including
   dangling targets and supported link constraints, without creating a target.
+  Plain open/openat ignore creation, truncation and access flags with O_PATH;
+  data stays intact and descriptor flags remain correct. openat2 rejects them.
   NO_XDEV checks tmpfs and same-filesystem bind mounts, alias-relative opens,
   '..', absolute symlink targets, creation and procfs descriptor jumps.
   BENEATH, IN_ROOT, CACHED and combinations requesting them return EOPNOTSUPP;

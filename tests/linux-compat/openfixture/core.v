@@ -19,6 +19,8 @@ fn C.mkdir(&char, u32) i32
 fn C.symlink(&char, &char) i32
 fn C.fstat(i32, &C.stat) i32
 fn C.read(i32, voidptr, usize) isize
+fn C.write(i32, voidptr, usize) isize
+fn C.fcntl(i32, i32, ...) i32
 fn C.pipe(&i32) i32
 fn C.getpid() i32
 fn C.access(&char, i32) i32
@@ -179,6 +181,42 @@ fn exclusive_creation() bool {
 	}
 }
 
+fn path_flags() bool {
+	unsafe {
+		file := C.open(c'/tmp/linux-open-path-flags', C.O_CREAT | C.O_RDWR, u32(0o600))
+		if file < 0 { return false }
+		written := C.write(file, c'kept', 4)
+		C.close(file)
+		if written != 4 { return false }
+		pathfd := C.open(c'/tmp/linux-open-path-flags', C.O_PATH | C.O_CLOEXEC
+			| C.O_CREAT | C.O_EXCL | C.O_TRUNC | C.O_WRONLY, u32(0o600))
+		if pathfd < 0 { return false }
+		mut byte := u8(0)
+		ok := C.fcntl(pathfd, C.F_GETFL) == C.O_PATH
+			&& C.fcntl(pathfd, C.F_GETFD) == C.FD_CLOEXEC
+			&& C.read(pathfd, &byte, 1) == -1 && *C.__errno_location() == C.EBADF
+		C.close(pathfd)
+		if !ok { return false }
+		readfd := C.open(c'/tmp/linux-open-path-flags', C.O_RDONLY)
+		if readfd < 0 { return false }
+		mut content := [4]u8{}
+		length := C.read(readfd, &content[0], content.len)
+		C.close(readfd)
+		if length != 4 || content != [u8(`k`), `e`, `p`, `t`]! { return false }
+		dirfd := C.open(c'/tmp/linux-open-dir', C.O_PATH | C.O_RDWR | C.O_TRUNC)
+		if dirfd < 0 { return false }
+		C.close(dirfd)
+		missing := C.open(c'/tmp/linux-open-path-missing', C.O_PATH | C.O_CREAT, u32(0o600))
+		if missing >= 0 { C.close(missing); return false }
+		if *C.__errno_location() != C.ENOENT { return false }
+		for ignored in [C.O_CREAT, C.O_EXCL, C.O_TRUNC, C.O_WRONLY, C.O_RDWR]! {
+			how := How{flags: u64(C.O_PATH | ignored)}
+			if !open_result(c'/tmp/linux-open-path-flags', &how, 24, C.EINVAL) { return false }
+		}
+		return true
+	}
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
@@ -200,7 +238,7 @@ pub fn run() i32 {
 		if !link_descriptor(&char(&pipe_path[0]), false, 0)
 			|| !link_descriptor(&char(&pipe_path[0]), true, 0)
 			|| !link_constraints(pipes[0]) || !trailing_slashes()
-			|| !exclusive_creation() || !mount_constraints() { return 1 }
+			|| !exclusive_creation() || !path_flags() || !mount_constraints() { return 1 }
 		C.close(pipes[0]); C.close(pipes[1])
 		mut how := How{}
 		if !open_result(c'/tmp/linux-open-target', &how, 24, 0)

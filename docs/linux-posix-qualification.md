@@ -66,6 +66,13 @@ constraints, without creating the missing target. BPF errors, faccessat2,
 all open regressions and the wide-offset/time64/TLS/atomic/SIMD/JIT runtime
 checks pass on both architectures against the exact recorded kernel hashes.
 
+The `opath-mask-*.json` native receipts qualify flag normalization in plain
+open/openat: O_PATH ignores access, creation, exclusive-create and truncation
+flags, preserves file contents, and retains the requested descriptor flags.
+Missing paths still fail with ENOENT. openat2 rejects those combinations with
+EINVAL under its stricter contract. Both architectures pass the complete open
+fixture with these additional checks.
+
 An initial i386 attempt failed before linking because V's amd64 inline assembly
 could not target i386. The revised fixture uses SSE2 compiler intrinsics; it
 passes natively on both architectures and as a static i386 executable through
