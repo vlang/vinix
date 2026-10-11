@@ -1034,7 +1034,17 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, flags int, m
 	lib.copy_mount_context(parent_mount, open_mount)
 
 	creat_flags := flags & resource.file_creation_flags_mask
-	follow_links := flags & resource.o_nofollow == 0
+	require_directory := path[path.len - 1] == `/`
+	if require_directory && creat_flags & resource.o_creat != 0 {
+		// Resolve the prefix first so missing/non-directory prefixes retain
+		// their errors. open(O_CREAT) cannot create a regular name ending '/'.
+		prefix, _, _ := walk_path_resolved(parent, path, 0, true, open_mount, resolve)
+		if prefix == unsafe { nil } { return errno.err, errno.get() }
+		return errno.err, errno.eisdir
+	}
+	// A trailing slash makes the last name a directory component; NOFOLLOW
+	// only controls a final basename, and cannot return that symlink itself.
+	follow_links := flags & resource.o_nofollow == 0 || require_directory
 
 	mut created := false
 	mut node := get_node_resolved(parent, path, follow_links, open_mount, resolve) or {
@@ -1097,7 +1107,7 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, flags int, m
 		&& (stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)) {
 		return errno.err, errno.eacces
 	}
-	if !stat.isdir(node.resource.stat.mode) && flags & resource.o_directory != 0 {
+	if !stat.isdir(node.resource.stat.mode) && (flags & resource.o_directory != 0 || require_directory) {
 		return errno.err, errno.enotdir
 	}
 	mut requested := u32(0)

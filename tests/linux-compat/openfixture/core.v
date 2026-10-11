@@ -91,6 +91,30 @@ fn link_constraints(pipe_fd i32) bool {
 	}
 }
 
+fn trailing_slashes() bool {
+	unsafe {
+		mut how := How{}
+		for flags in [u64(0), u64(C.O_PATH | C.O_NOFOLLOW)]! {
+			how = How{flags: flags}
+			if !open_result(c'/tmp/linux-open-target/', &how, 24, C.ENOTDIR)
+				|| !open_result(c'/tmp/linux-open-dir/link/', &how, 24, 0)
+				|| !open_result(c'/tmp/linux-open-dangling/', &how, 24, C.ENOENT) { return false }
+		}
+		how.resolve = 4
+		if !open_result(c'/tmp/linux-open-dir/link/', &how, 24, C.ELOOP) { return false }
+		how = How{flags: u64(C.O_CREAT | C.O_RDWR), mode: 0o600}
+		if !open_result(c'/tmp/linux-open-created-slash/', &how, 24, C.EISDIR)
+			|| !open_result(c'/tmp/linux-open-missing-prefix/child/', &how, 24, C.ENOENT)
+			|| C.access(c'/tmp/linux-open-created-slash', C.F_OK) != -1
+			|| *C.__errno_location() != C.ENOENT { return false }
+		fd := C.open(c'/tmp/linux-open-dir/link/', C.O_PATH | C.O_NOFOLLOW)
+		mut info := C.stat{}
+		ok := fd >= 0 && C.fstat(fd, &info) == 0 && info.st_mode & u32(C.S_IFMT) == u32(C.S_IFDIR)
+		if fd >= 0 { C.close(fd) }
+		return ok
+	}
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
@@ -111,7 +135,7 @@ pub fn run() i32 {
 		C.snprintf(&char(&pipe_path[0]), usize(pipe_path.len), c'/proc/self/fd/%d', pipes[0])
 		if !link_descriptor(&char(&pipe_path[0]), false, 0)
 			|| !link_descriptor(&char(&pipe_path[0]), true, 0)
-			|| !link_constraints(pipes[0]) { return 1 }
+			|| !link_constraints(pipes[0]) || !trailing_slashes() { return 1 }
 		C.close(pipes[0]); C.close(pipes[1])
 		mut how := How{}
 		if !open_result(c'/tmp/linux-open-target', &how, 24, 0)

@@ -44,6 +44,12 @@ set, debugger operations, signal delivery through translation or every JIT.
 The x86-64 translated result uses the existing QEMU-user launcher in `--direct` mode
 with a static musl x86-64 fixture, not a glibc application runtime.
 
+The `trailing-*.json` native receipts add directory requirements for open paths
+ending in a slash. Regular files return ENOTDIR, dangling links return ENOENT,
+directory links resolve even with O_PATH|O_NOFOLLOW, and NO_SYMLINKS still
+returns ELOOP. O_CREAT rejects a final slash with EISDIR after validating the
+prefix; the fixture verifies that rejection leaves no created file.
+
 An initial i386 attempt failed before linking because V's amd64 inline assembly
 could not target i386. The revised fixture uses SSE2 compiler intrinsics; it
 passes natively on both architectures and as a static i386 executable through

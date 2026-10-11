@@ -25,6 +25,8 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
   O_PATH|O_NOFOLLOW, and EBADF on reads through those descriptors,
   mutually exclusive/unknown constraints, NO_SYMLINKS and NO_MAGICLINKS on
   intermediate/final/nested/procfs links and creation, and final link handles.
+  Trailing slashes require directory resolution even with O_PATH|O_NOFOLLOW;
+  failed O_CREAT requests cannot leave regular files behind.
   Remaining RESOLVE modes and combinations requesting them return EOPNOTSUPP;
   this does not qualify BENEATH/IN_ROOT containment or mount/cache constraints.
 - `runtime` checks four concurrent pthreads, isolated libc errno/TLS and keys,
