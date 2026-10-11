@@ -119,8 +119,10 @@ fn qemu_command(host Host, scenario Scenario, media []string, state string, boot
 		command << ['-object', 'rng-random,filename=/dev/urandom,id=vinix-rng', '-device',
 			'virtio-rng-device,rng=vinix-rng']
 		command << media
-		command << ['-device', 'virtio-keyboard-device', '-device', 'virtio-tablet-device', '-device',
-			'ramfb']
+		if !scenario.other_input {
+			command << ['-device', 'virtio-keyboard-device', '-device', 'virtio-tablet-device']
+		}
+		command << ['-device', 'ramfb']
 	} else {
 		// The machine the repository's amd64 scripts boot
 		// (scripts/run-desktop-amd64.sh), so a result here is about the

@@ -82,6 +82,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'suspend-deep-wake-off' { scenario_suspend_deep_wake_off(mut t) }
 		'suspend-deep-xapic' { scenario_suspend_deep_xapic(mut t) }
 		'thermal' { scenario_thermal(mut t) }
+		'usb-input' { scenario_usb_input(mut t) }
 		'thermal-selftest' { scenario_thermal_selftest(mut t) }
 		else { return false }
 	}

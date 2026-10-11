@@ -377,3 +377,21 @@ fn test_the_backlight_record_is_what_the_two_panels_are_told() {
 	}
 	assert off.cmdline.contains('vinix.acpi_backlight=off') && off.writings[0].text == ''
 }
+
+fn test_the_usb_scenario_gives_the_machine_no_other_keyboard() {
+	usb := find_scenario(scenarios, 'usb-input') or { panic('no usb-input scenario') }
+	// On the PC, no keyboard controller; on AArch64, no VirtIO input.
+	assert usb.qemu_arguments('x86_64').join(' ').contains('-machine i8042=off')
+	assert usb.other_input
+	for arch in architectures {
+		arguments := usb.qemu_arguments(arch).join(' ')
+		assert arguments.contains('qemu-xhci') && arguments.contains('usb-kbd') && arguments.contains('usb-mouse')
+	}
+	// Typed and moved three times: before any sleep, after a rehearsal, and
+	// after the last sleep; a key in between to end a suspend to idle.
+	assert usb.actions.filter(it.qmp == deep_type_a).len == 3
+	assert usb.actions.filter(it.qmp == deep_move_mouse).len == 3
+	assert usb.actions.filter(it.after == 'HWTEST STEP asleep for a key').len == 1
+	// Every other scenario keeps the input devices its machine comes with.
+	assert scenarios.filter(it.other_input).len == 1
+}

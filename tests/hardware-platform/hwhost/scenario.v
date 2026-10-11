@@ -201,6 +201,9 @@ pub:
 	// Files the machine wrote through QEMU (into {state}), and what each must
 	// hold.
 	writings     []Writing
+	// The scenario brings the keyboard and pointer itself: the AArch64 machine
+	// is not given its VirtIO ones, which would take what the host types.
+	other_input  bool
 	// The boots after the first; see Reboot. The markers, the actions and
 	// the events are those of all the boots together, in order.
 	reboots      []Reboot
@@ -741,6 +744,61 @@ pub const scenarios = [
 			},
 		]
 		ending:   .poweroff
+	},
+	Scenario{
+		name:         'usb-input'
+		about:        'a USB keyboard and mouse behind an xHCI controller: keys, the pointer, and every kind of sleep'
+		arches:       ['aarch64', 'x86_64']
+		other_input:  true
+		// The PC is given no keyboard controller: what is typed there can
+		// only have come over USB.
+		qemu_x86_64:  ['-machine', 'i8042=off', '-device', 'qemu-xhci,id=hwusb', '-device',
+			'usb-kbd,bus=hwusb.0', '-device', 'usb-mouse,bus=hwusb.0']
+		qemu_aarch64: ['-device', 'qemu-xhci,id=hwusb', '-device', 'usb-kbd,bus=hwusb.0', '-device',
+			'usb-mouse,bus=hwusb.0']
+		required:     ['HWTEST START usb-input', 'HWTEST PASS usb-input']
+		actions:      [
+			Action{
+				after:    'HWTEST STEP type on the keyboard'
+				delay_ms: 300
+				qmp:      deep_type_a
+			},
+			Action{
+				after:    'HWTEST STEP move the pointer'
+				delay_ms: 300
+				qmp:      deep_move_mouse
+			},
+			// After a rehearsal of a sleep.
+			Action{
+				after:    'HWTEST STEP type on the keyboard'
+				delay_ms: 300
+				qmp:      deep_type_a
+			},
+			Action{
+				after:    'HWTEST STEP move the pointer'
+				delay_ms: 300
+				qmp:      deep_move_mouse
+			},
+			// A suspend to idle, which a key on the USB keyboard ends.
+			Action{
+				after:    'HWTEST STEP asleep for a key'
+				delay_ms: 1500
+				qmp:      deep_press_shift
+			},
+			// After a suspend to RAM, where the machine has one, and after the
+			// suspend to idle where it has not.
+			Action{
+				after:    'HWTEST STEP type on the keyboard'
+				delay_ms: 300
+				qmp:      deep_type_a
+			},
+			Action{
+				after:    'HWTEST STEP move the pointer'
+				delay_ms: 300
+				qmp:      deep_move_mouse
+			},
+		]
+		ending:       .poweroff
 	},
 	Scenario{
 		name:     'screen-sleep'
