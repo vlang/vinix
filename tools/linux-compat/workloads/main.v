@@ -275,6 +275,9 @@ fn (mut suite Suite) run(name string) ! {
 			expect(output.contains('GO SMOKE PASS'), 'Go application did not pass')!
 		}
 		'java' {
+			if suite.path != 'native-aarch64' {
+				return error('unsupported: existing Java application fixture asserts os.arch=aarch64')
+			}
 			suite.package('openjdk21-jdk')!
 			suite.execute('java', ['-version'])!
 			os.write_file(suite.work + '/VinixJavaSmoke.java', $embed_file('../../../tests/java/VinixJavaSmoke.java').to_string())!

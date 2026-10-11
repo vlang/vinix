@@ -62,8 +62,8 @@ cleared between workloads; inherited environment values are not serialized.
 `--host` labels host-only evidence and prohibits installation. `--path` chooses
 native AArch64/x86-64 or AArch64's translated x86-64/i386 launcher. Native paths
 must match the driver architecture. `--runtime-probe` chooses the corresponding
-staged fixture. The existing Go input asserts ARM64 and is explicitly unsupported
-on other paths; translated HTTP service integration is also unqualified.
+staged fixture. The existing Go and Java inputs assert ARM64 and are explicitly
+unsupported on other paths; translated HTTP service integration is also unqualified.
 Portal discovery and games requiring licensed assets remain explicit unsupported
 results until real chooser/save and title-specific GPU/input/audio/save tests
 exist. The JSON report always keeps full lifecycle qualification false: these
