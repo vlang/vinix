@@ -1,35 +1,20 @@
 # ANS and classic ext2 fixture controller
 
-The argparse and work-directory frontend invokes native `run.v` phases for
-immutable oracle bytes, exact compiler commands, allocator guards, golden parity,
-provider-call audits and selected guest inputs. Actual Python print leaves stay
-between phases so their buffered, unbuffered and terminal output ordering is
-preserved. Phase metadata uses private JSON pipes; compiler and guest processes
-inherit the caller's standard descriptors. The temporary work-directory owner
-surrounds all phases and releases them on normal exit, failure and interruption.
+Run `tests/apple-ans/run.sh` for the native V command. `--state-dir FRESH-PATH`
+retains artifacts; the default owner creates a private directory in `/tmp` and
+retires it on success, failure or interruption. `--fixture ext2|ans` selects the
+native model. `--arch aarch64|x86_64` requires `--kernel-dir` and
+`--guest-state-dir`; `--build-only` stops after strict native objects and ELF.
 
-Existing C/V fixtures, serial production and assertions remain unchanged.
-Fixture literals receive zero migration credit. Qualification makes no new ANS
-hardware or kernel-boot claim.
+`run.v` calls `applehost.copy_provider` and native module/serial producers.
+Immutable C originals, compiler flags, allocator guards, exact output parity,
+provider-call audits, guest markers and deadlines retain their existing policy.
+The independent C/V fixture bodies and assertions have not changed.
 
-V 0.5.2 `6d549c2` currently emits undeclared `memdup` calls in the storage
-core. Untouched original and native controllers stop at the same strict-compile
-errors. Controlled compiler artifacts qualify controller policy; they do not
-establish passing independent fixture assertions or a QEMU boot.
+The current isolated ANS provider copies only `core.v`, whose accounting calls
+now depend on omitted `status.v`. ARM generation rejects `a_count_transfer` and
+`a_count_flush`; the x86 backend also rejects the retained ARM assembly. The
+original provider API uses the same native copy policy and has these same input
+limitations. They remain errors, with no passing ANS fixture or guest claim.
 
-The frontend retains actual Python buffered print calls. Host/native phase state
-uses an owned response descriptor above standard slots. Parent close-on-exec
-standard descriptors stay private; unchanged module generation retains its
-actual Python output leaves, including closed-stream failures. These transport
-and producer leaves receive no algorithm credit.
-
-Commands inherit an explicit snapshot of the invoking interpreter environment,
-carried as filesystem-encoded hex pairs. Private launcher/runtime additions do
-not become compiler inputs, and POSIX surrogate-escaped bytes remain intact.
-
-The nm text decoding leaf uses the actual invoking Python locale/UTF-8 mode
-and universal-newline policy before V applies allocation and Unicode word
-guards. This narrow process/text binding receives zero algorithm credit.
-
-The zero-credit nm text decoder receives the actual parent Python locale codec,
-including command-line UTF-8 mode, rather than re-reading child defaults.
+See [runner qualification](../apple-protocols/runners.md).

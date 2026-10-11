@@ -16,7 +16,6 @@ const quiet = ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-lab
 	'-fno-strict-aliasing']
 
 struct Config {
- text_encoding string
 	root        string
 	work        string
 	host_arch   string
@@ -50,11 +49,11 @@ fn (c Config) path(name string) string { return append_path(c.root, name) }
 fn (c Config) output(name string) string { return append_path(c.work, name) }
 
 fn (c Config) inherited(argv []string) ! {
-	fixturehost.inherited_command_environment_preferred(argv, os.environ(), c.caller_arch)!
+	applehost.inherited(argv, applehost.environment(), c.caller_arch)!
 }
 
 fn (c Config) capture(argv []string, directory string, binary bool) !string {
-	return fixturehost.capture_in_preferred(argv, '', os.environ(), false, directory, binary, c.caller_arch)!
+	return applehost.capture(argv, applehost.environment(), c.caller_arch, directory, binary)!
 }
 
 fn strings(values []string) json2.Any { return json2.Any(hosttest.strings(values)) }
@@ -114,11 +113,7 @@ fn imports_forbidden(text string, fixture bool) bool {
 }
 
 fn (c Config) audit(path string, fixture bool, nm string) !json2.Any {
-	// Decode nm with the actual invoking Python codec and newline policy.
- // This mechanical text/process leaf receives zero migration credit.
- decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
- wire := c.capture(['python3', '-c', decode, c.text_encoding, nm, '-u', path], '', true)!
- imports := hosttest.decode_json(wire)!.str()
+	imports := c.capture([nm, '-u', path], '', false)!
 	if imports_forbidden(imports, fixture) { return error('Allocator imports: ' + imports) }
 	return strings(lines(imports, true))
 }
@@ -231,7 +226,7 @@ fn (c Config) execute() ! {
 		fixturehost.write(c.output(name), os.read_file(append_path(here, name))!)!
 	}
 	receipt['host_provider'] = applehost.copy_provider(c.root, c.output('spkcore'), 'speaker', false, c.host_arch == 'arm64')!
-	hosttest.generate_module(c.output('spkcore'), c.output('core.c'), c.host_arch, ['nofloat'])!
+	applehost.generate(c.output('spkcore'), c.output('core.c'), c.host_arch, ['nofloat'])!
 	c.fixture(c.output('fixture.c'), c.host_arch, false)!
 	c.inherited([c.path('tests/apple-ans/compile-fixture'), '--kind', 'platform',
 		'--arch', c.host_arch, c.output('platform.c')])!
@@ -288,7 +283,7 @@ fn (c Config) execute() ! {
 	native_provider['original_fixture_calls'] = strings(called)
 	receipt['native_provider'] = native_provider
 	json_write(c.output('native-provider.json'), json2.Any(native_provider))!
-	hosttest.generate_module(c.output('native/spkcore'), c.output('core-native.c'), native_arch, ['nofloat'])!
+	applehost.generate(c.output('native/spkcore'), c.output('core-native.c'), native_arch, ['nofloat'])!
 	c.fixture(c.output('fixture-native.c'), native_arch, true)!
 	c.inherited([c.path('tests/apple-ans/compile-fixture'), '--kind', 'platform',
 		'--arch', native_arch, c.output('platform-native.c')])!
@@ -322,9 +317,7 @@ fn (c Config) execute() ! {
 		imports[name] = c.audit(c.output(name + '.o'), name == 'fixture-native', '/opt/homebrew/opt/llvm/bin/llvm-nm')!
 	}
 	serial := c.output('serial.o')
-	serial_call := 'import runpy,sys,json;runpy.run_path(sys.argv[1])["compile_serial"](sys.argv[2],sys.argv[3],json.loads(sys.argv[4]))'
-	c.inherited(['python3', '-c', serial_call, c.path('tests/kernel-gaps/compile-v-fixture.py'),
-		serial, c.arch, json2.encode(join(cc, flags))])!
+	applehost.serial(serial, c.arch, join(cc, flags))!
 	init := c.output('native-init')
 	c.inherited(join(cc, if c.arch == 'aarch64' { ['-fuse-ld=lld'] } else { []string{} }, [
 		'-static',
@@ -340,9 +333,7 @@ fn (c Config) execute() ! {
 	mut markers := groups.map('apple-speakers: ' + it + ' ok')
 	markers << 'apple-speakers: 20 tests passed'
 	if groups.len != 20 { return error('Incomplete native J313 groups') }
-	mut command := ['python3', c.path('tests/kernel-gaps/run.py'), '--arch', c.arch, '--prebuilt-init',
-		init, '--kernel-dir', c.kernel, '--state-dir', c.guest, '--no-network', '--timeout', '3600']
-	for marker in markers { command << ['--expect', marker] }
+	command := applehost.guest_command(c.root, init, c.arch, c.kernel, c.guest, '3600', markers, []string{})
 	json_write(c.output('native-inputs.json'), json2.Any({
 		'arch':             json2.Any(c.arch)
 		'provider':         json2.Any(native_provider)
@@ -353,36 +344,18 @@ fn (c Config) execute() ! {
 		'command':          strings(command)
 	}))!
 	if !c.build_only {
-		c.inherited(command)!
+		applehost.guest(init, c.arch, c.kernel, c.guest, '3600', markers, []string{})!
 		println('PASS all 20 native J313 injected transport/thermal groups ' + c.arch)
 	} else {
 		println('PASS strict native J313 fixture objects/ELF ' + c.arch)
 	}
 }
 
-fn main() {
-	parsed := hosttest.parse_arguments(os.args[1..], [
-		hosttest.Option{'--root', true, []},
-  hosttest.Option{'--text-encoding', true, []},
-		hosttest.Option{'--work', true, []},
-		hosttest.Option{'--host-arch', true, ['arm64', 'amd64']},
-		hosttest.Option{'--caller-arch', true, ['arm64', 'amd64']},
-		hosttest.Option{'--arch', true, ['aarch64', 'x86_64']},
-		hosttest.Option{'--build-only', false, []},
-		hosttest.Option{'--kernel-dir', true, []},
-		hosttest.Option{'--guest-state-dir', true, []},
-	], 0, 'J313 native controller', 'Validated original argparse frontend options') or {
-		eprintln(err)
-		exit(2)
-	}
-	values := parsed.options
-	if '--root' !in values || '--work' !in values {
-		eprintln('Missing root/work directory')
-		exit(2)
-	}
-	config := Config{ text_encoding: values['--text-encoding'], root: values['--root'], work: values['--work'], host_arch: values['--host-arch'], caller_arch: values['--caller-arch'], arch: values['--arch'], build_only: '--build-only' in values, kernel: values['--kernel-dir'], guest: values['--guest-state-dir'] }
-	config.execute() or {
-		eprintln(err.msg())
-		exit(1)
-	}
+fn run() ! {
+	r := applehost.runtime('speakers', os.args[1..])!
+	defer { r.close() or { eprintln(err.msg()) } }
+	c := Config{ root: r.root, work: r.work, caller_arch: r.caller_arch, arch: r.arch, kernel: r.kernel, guest: r.guest, host_arch: r.host_arch, build_only: r.build_only }
+	c.execute()!
 }
+
+fn main() { run() or { applehost.report(err) } }

@@ -1,31 +1,17 @@
-# Apple provider host controllers
+# Apple provider and test orchestration
 
-`applehost/providers.v` owns the source-copy and hardware-omission policies used
-by the ANS, SPI and speaker fixtures. The existing provider Python modules keep
-their import APIs, hardware-name constants and standard-library digest binding.
-Their copy operations call this native controller through a byte-safe adapter.
+`applehost.copy_provider` is the native V API used directly by ANS, SPI and
+speaker runners. Whole-definition omission, original ranges, reference checks,
+retained-chunk hashes and source bytes retain their existing policy. The three
+Python provider APIs and their import adapter have been retired.
 
-The controller preserves whole-definition removal, original line ranges,
-reference classification, retained-chunk hashes, receipt key order and copied
-source bytes. UTF-8 text reads retain the original newline conversion; ext2
-source remains raw bytes. Parser errors and partial filesystem states remain
-visible to callers. Private compiler/result directories and file descriptors
-have explicit owners.
+`applehost/orchestration.v` owns command parsing, fresh retained state, private
+`/tmp` work, interrupt handling, subprocess capture, native module and serial
+generation, and the native guest API. Binary fixture output stays byte-exact.
+Symbol/source text uses strict UTF-8 with universal-newline conversion; host
+environment and literal Unix path bytes are passed directly.
 
-Qualification compares frozen original providers against the installed adapter
-on ARM64, x86-64 and with ARM ASan/UBSan. It covers production source variants,
-malformed definitions, Unicode13 boundaries, overlapping ranges, read failures,
-literal Unix backslashes and raw-byte filename errors. Native tests exercise
-retained source bytes, omission ranges, parser errors and repeated descriptor
-retirement. Cold concurrent imports share one private installer and retire it
-when the process exits.
-
-This is host-controller qualification. It adds no physical Apple hardware or
-kernel/QEMU validation result. Independent fixture inputs and assertions stay
-unchanged.
-
-The broader ANS, SPI and speaker consumers currently fail under V 0.5.2
-`6d549c2f`: generated freestanding C uses undeclared `memdup`; x86 ANS also
-rejects the existing ARM inline assembly. Frozen original providers produce
-the same diagnostics and identical provider inputs on both host architectures.
-These comparisons establish baseline parity, not passing consumer fixtures.
+See [runner qualification](runners.md) for checks and current consumer limits.
+Provider tests cover omission ranges, malformed definitions, Unicode boundaries,
+raw ext2 bytes, read failures and repeated descriptor retirement. They also
+check fresh ownership, literal paths, empty path options and signal restoration.

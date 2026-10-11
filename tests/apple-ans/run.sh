@@ -1,3 +1,4 @@
 #!/bin/sh
 set -eu
-exec python3 "$(dirname "$0")/run.py" "$@"
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+exec "$root/build-support/run-v-tool.sh" "$root/tests/apple-ans/run.v" "$@"

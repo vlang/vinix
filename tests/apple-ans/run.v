@@ -5,13 +5,8 @@ import applehost
 import fixturehost
 import hosttest
 import json2
-import encoding.hex
 import os
 
-fn C.dup2(i32, i32) i32
-fn C.close(i32) i32
-fn C.fcntl(i32, i32, ...i32) i32
-fn C.write(i32, voidptr, usize) isize
 
 const original_revision = 'd4a056552913b73e57bf42905e8fb5914bc9065a'
 const hardware_only = ['a_kernel_read32', 'a_kernel_read64', 'a_kernel_write32', 'a_kernel_write64',
@@ -21,11 +16,11 @@ const quiet = ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-lab
 
 struct Config {
 	env map[string]string
-	text_encoding string
 	root        string
 	work        string
 	fixture     string
 	caller_arch string
+	build_only bool
 	arch        string
 	kernel      string
 	guest       string
@@ -54,11 +49,11 @@ fn (c Config) path(name string) string { return append_path(c.root, name) }
 fn (c Config) output(name string) string { return append_path(c.work, name) }
 
 fn (c Config) inherited(argv []string) ! {
-	fixturehost.inherited_command_environment_preferred(argv, c.env, c.caller_arch)!
+	applehost.inherited(argv, c.env, c.caller_arch)!
 }
 
 fn (c Config) capture(argv []string, directory string, binary bool) !string {
-	return fixturehost.capture_in_preferred(argv, '', c.env, false, directory, binary, c.caller_arch)!
+	return applehost.capture(argv, c.env, c.caller_arch, directory, binary)!
 }
 
 fn strings(values []string) json2.Any { return json2.Any(hosttest.strings(values)) }
@@ -118,11 +113,7 @@ fn imports_forbidden(text string, fixture bool) bool {
 }
 
 fn (c Config) audit(path string, fixture bool, nm string) !json2.Any {
-	// Preserve Python text=True default locale, UTF-8 mode and newline decoding.
-	// Only the allocation policy below is native; this decoding leaf is zero credit.
-	decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
-	wire := c.capture(['python3', '-c', decode, c.text_encoding, nm, '-u', path], '', true)!
-	imports := hosttest.decode_json(wire)!.str()
+	imports := c.capture([nm, '-u', path], '', false)!
 	if imports_forbidden(imports, fixture) { return error('Allocator imports: ' + imports) }
 	return strings(lines(imports, true))
 }
@@ -152,11 +143,8 @@ fn (c Config) fixture(output string, kind string, features []string) ! {
 	c.inherited(join([c.path('tests/apple-ans/compile-fixture'), '--kind', kind], features, [output]))!
 }
 
-// Keep the producer's actual interpreter output leaves and descriptor behavior.
-// The producer itself is an unchanged dependency and receives no port credit.
 fn (c Config) generate(source string, output string, arch string) ! {
-	call := 'import runpy,sys;runpy.run_path(sys.argv[1])["generate"](sys.argv[2],sys.argv[3],sys.argv[4],("nofloat",))'
-	c.inherited(['python3', '-c', call, c.path('build-support/compile-v-module.py'), source, output, arch])!
+	applehost.generate(source, output, arch, ['nofloat'])!
 }
 
 fn (c Config) prepare() !map[string]json2.Any {
@@ -303,9 +291,7 @@ fn (c Config) native(state map[string]json2.Any) ! {
 		], nm)!
 	}
 	serial := c.output('serial.o')
-	serial_call := 'import runpy,sys,json;runpy.run_path(sys.argv[1])["compile_serial"](sys.argv[2],sys.argv[3],json.loads(sys.argv[4]))'
-	c.inherited(['python3', '-c', serial_call, c.path('tests/kernel-gaps/compile-v-fixture.py'),
-		serial, c.arch, json2.encode(join(cc, flags))])!
+	applehost.serial(serial, c.arch, join(cc, flags))!
 	init := c.output('native-init')
 	c.inherited(join(cc, if c.arch == 'aarch64' { ['-fuse-ld=lld'] } else { []string{} }, [
 		'-static',
@@ -317,9 +303,7 @@ fn (c Config) native(state map[string]json2.Any) ! {
 		'-o',
 		init,
 	]))!
-	mut command := ['python3', c.path('tests/kernel-gaps/run.py'), '--arch', c.arch, '--prebuilt-init',
-		init, '--kernel-dir', c.kernel, '--state-dir', c.guest, '--no-network', '--timeout', '300']
-	for marker in markers[c.fixture]!.as_array().map(it.str()) { command << ['--expect', marker] }
+	command := applehost.guest_command(c.root, init, c.arch, c.kernel, c.guest, '300', markers[c.fixture]!.as_array().map(it.str()), []string{})
 	json_write(c.output('native-inputs.json'), json2.Any({
 		'arch':             json2.Any(c.arch)
 		'provider':         json2.Any(native_provider)
@@ -329,7 +313,7 @@ fn (c Config) native(state map[string]json2.Any) ! {
 		'expected_markers': markers[c.fixture]!
 		'command':          strings(command)
 	}))!
-	c.inherited(command)!
+	if !c.build_only { applehost.guest(init, c.arch, c.kernel, c.guest, '300', markers[c.fixture]!.as_array().map(it.str()), []string{})! }
 }
 
 fn (c Config) phase(name string, state json2.Any) !map[string]json2.Any {
@@ -345,87 +329,15 @@ fn (c Config) phase(name string, state json2.Any) !map[string]json2.Any {
 	}
 }
 
-fn main() {
-	parsed := hosttest.parse_arguments(os.args[1..], [
-		hosttest.Option{'--root', true, []},
-		hosttest.Option{'--phase', true, ['prepare', 'ext2', 'ans', 'finish', 'native']},
-		hosttest.Option{'--parent-stdin', true, []},
-		hosttest.Option{'--parent-stdout', true, []},
-		hosttest.Option{'--work', true, []},
-		hosttest.Option{'--fixture', true, ['ext2', 'ans']},
-		hosttest.Option{'--caller-arch', true, ['arm64', 'amd64']},
-		hosttest.Option{'--arch', true, ['aarch64', 'x86_64']},
-		hosttest.Option{'--kernel-dir', true, []},
-		hosttest.Option{'--guest-state-dir', true, []},
-	], 0, 'Storage native controller', 'Validated original argparse frontend options') or {
-		eprintln(err)
-		exit(2)
-	}
-	values := parsed.options
-	if '--root' !in values || '--work' !in values {
-		eprintln('Missing root/work directory')
-		exit(2)
-	}
-	input := fixturehost.read('/dev/stdin') or {
-		eprintln(err.msg())
-		exit(1)
-	}
-	decoded := hosttest.decode_json(input) or {
-		eprintln(err.msg())
-		exit(1)
-	}
-	row := decoded.as_map()
-	state := row['state']!
-	mut caller_env := map[string]string{}
-	for value in row['environment']!.as_array() {
-		pair := value.as_array()
-		key := hex.decode(pair[0].str()) or { eprintln(err.msg()); exit(1) }
-		data := hex.decode(pair[1].str()) or { eprintln(err.msg()); exit(1) }
-		caller_env[key.bytestr()] = data.bytestr()
-	}
-	config := Config{env: caller_env, text_encoding: row['text_encoding']!.str(),  root: values['--root'], work: values['--work'], fixture: values['--fixture'], caller_arch: values['--caller-arch'], arch: values['--arch'], kernel: values['--kernel-dir'], guest: values['--guest-state-dir'] }
-	protocol := C.fcntl(1, C.F_DUPFD_CLOEXEC, 3)
-	if protocol < 0 {
-		eprintln('Unable to retain response descriptor')
-		exit(1)
-	}
-	defer { C.close(protocol) }
-	for number, name in ['--parent-stdin', '--parent-stdout'] {
-		descriptor := (values[name] or {
-			eprintln('Missing parent descriptor')
-			exit(2)
-		}).int()
-		if descriptor >= 0 {
-			if C.dup2(i32(descriptor), i32(number)) < 0 {
-				eprintln('Unable to restore parent descriptor')
-				exit(1)
-			}
-			C.close(i32(descriptor))
-		} else {
-			C.close(i32(number))
-		}
-	}
-	phase := values['--phase'] or {
-		eprintln('Missing phase')
-		exit(2)
-	}
-	result := config.phase(phase, state) or {
-		eprintln(err.msg())
-		exit(1)
-	}
-	response := json2.encode(json2.Any(result))
-	mut offset := 0
-	for offset < response.len {
-		count := C.write(protocol, unsafe { response.str + offset }, usize(response.len - offset))
-		if count < 0 {
-			if C.errno == C.EINTR { continue }
-			eprintln('Unable to write controller response')
-			exit(1)
-		}
-		if count == 0 {
-			eprintln('Empty controller response write')
-			exit(1)
-		}
-		offset += int(count)
-	}
+fn run() ! {
+	r := applehost.runtime('ans', os.args[1..])!
+	defer { r.close() or { eprintln(err.msg()) } }
+	c := Config{ root: r.root, work: r.work, build_only: r.build_only, caller_arch: r.caller_arch, arch: r.arch, kernel: r.kernel, guest: r.guest, env: applehost.environment(), fixture: r.options['--fixture'] }
+	mut state := c.prepare()!
+	for kind in ['ext2', 'ans'] { state = c.golden(kind, state)!; print(state['text'].str()) }
+	state = c.finish(state)!
+	println('PASS independent C/V ANS/classic-ext2 goldens, C ABI, ASan/UBSan and no implicit allocator imports')
+	if c.arch != '' { c.native(state)! }
 }
+
+fn main() { run() or { applehost.report(err) } }

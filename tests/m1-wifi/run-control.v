@@ -3,6 +3,7 @@ module main
 
 import fixturehost
 import hosttest
+import applehost
 import json2
 import os
 
@@ -13,7 +14,6 @@ const scenarios = ['status', 'on', 'off', 'networks', 'invalid', 'scan', 'join',
 const quiet = ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-label', '-fwrapv', '-fno-strict-aliasing']
 
 struct Config {
- text_encoding string
 	root string
 	work string
 	host_arch string
@@ -40,11 +40,11 @@ fn (c Config) path(name string) string { return append_path(c.root, name) }
 fn (c Config) output(name string) string { return append_path(c.work, name) }
 
 fn (c Config) inherited(argv []string) ! {
-	fixturehost.inherited_command_environment_preferred(argv, os.environ(), c.caller_arch)!
+	applehost.inherited(argv, applehost.environment(), c.caller_arch)!
 }
 
 fn (c Config) capture(argv []string, directory string, binary bool) !string {
-	return fixturehost.capture_in_preferred(argv, '', os.environ(), false, directory, binary, c.caller_arch)!
+	return applehost.capture(argv, applehost.environment(), c.caller_arch, directory, binary)!
 }
 
 fn strings(values []string) json2.Any { return json2.Any(hosttest.strings(values)) }
@@ -106,11 +106,7 @@ fn imports_forbidden(text string) bool {
 }
 
 fn (c Config) audit(path string, nm string) !json2.Any {
-	// Decode nm with the actual invoking Python codec and newline policy.
- // This mechanical text/process leaf receives zero migration credit.
- decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
- wire := c.capture(['python3', '-c', decode, c.text_encoding, nm, '-u', path], '', true)!
- imports := hosttest.decode_json(wire)!.str()
+	imports := c.capture([nm, '-u', path], '', false)!
 	if imports_forbidden(imports) { return error('Allocator imports: ' + imports) }
 	return strings(text_lines(imports))
 }
@@ -197,10 +193,10 @@ fn (c Config) execute() ! {
 		if scenario == 'load-bad' { fixturehost.write(append_path(bundle, 'txcap.blob'), '')! }
 		mut args := [scenario]
 		if scenario.starts_with('load') { args << bundle }
-		mut env := os.environ()
+		mut env := applehost.environment()
 		env['UBSAN_OPTIONS'] = 'halt_on_error=1'
-		expected := fixturehost.capture_both_preferred(join([c.output('original-host')], args), env, c.caller_arch)!
-		actual := fixturehost.capture_both_preferred(join([c.output('v-host')], args), env, c.caller_arch)!
+		expected := applehost.capture_result(join([c.output('original-host')], args), env, c.caller_arch, '')!
+		actual := applehost.capture_result(join([c.output('v-host')], args), env, c.caller_arch, '')!
 		if expected.status != actual.status || expected.stdout != actual.stdout || expected.stderr != actual.stderr {
 			return error('Original/V Wi-Fi control result mismatch: ' + scenario)
 		}
@@ -237,30 +233,24 @@ fn (c Config) native_build(quotes []string) ! {
 	}
 	c.inherited(join(cc, ['-c', c.output('ctl_abi.S'), '-o', c.output('abi-native.o')]))!
 	serial := c.output('serial.o')
-	// Keep the existing serial producer dependency; no algorithm credit here.
-	serial_call := 'import runpy,sys,json;runpy.run_path(sys.argv[1])["compile_serial"](sys.argv[2],sys.argv[3],json.loads(sys.argv[4]))'
-	c.inherited(['python3', '-c', serial_call, c.path('tests/kernel-gaps/compile-v-fixture.py'), serial, c.arch, json2.encode(join(cc, flags))])!
+	// Generate the original serial constructor through the native producer.
+	applehost.serial(serial, c.arch, join(cc, flags))!
 	linker := if c.arch == 'aarch64' { ['-fuse-ld=lld'] } else { []string{} }
 	init := c.output('native-init')
 	c.inherited(join(cc, linker, ['-static', c.output('fixture-native.o'), c.output('abi-native.o'), c.output('core-native.o'), serial, '-o', init]))!
 	original_init := c.output('original-native-init')
 	c.inherited(join(cc, flags, linker, ['-static', c.output('original/ctl_guest.c'), c.output('core-native.o'), serial, '-o', original_init]))!
-	command := ['python3', c.path('tests/kernel-gaps/run.py'), '--arch', c.arch, '--prebuilt-init', init, '--kernel-dir', c.kernel, '--state-dir', c.guest, '--no-network', '--timeout', c.timeout, '--expect', 'VINIX_WIFI_CTL_VM_PASS']
+	command := applehost.guest_command(c.root, init, c.arch, c.kernel, c.guest, c.timeout, ['VINIX_WIFI_CTL_VM_PASS'], []string{})
 	json_write(c.output('native-inputs.json'), json2.Any({'arch': json2.Any(c.arch), 'object_imports': json2.Any(imports), 'fixture_sha256': json2.Any(hashes(init)!), 'original_fixture_sha256': json2.Any(hashes(original_init)!), 'kernel_sha256': json2.Any(hashes(append_path(c.kernel, 'bin/vinix'))!), 'expected_scenarios': strings(scenarios), 'command': strings(command)}))!
-	if !c.build_only { c.inherited(command)!; println('PASS all 11 native Wi-Fi control scenarios ' + c.arch) }
+	if !c.build_only { applehost.guest(init, c.arch, c.kernel, c.guest, c.timeout, ['VINIX_WIFI_CTL_VM_PASS'], []string{})!; println('PASS all 11 native Wi-Fi control scenarios ' + c.arch) }
 	else { println('PASS strict native Wi-Fi control fixture objects/ELF ' + c.arch) }
 }
 
-fn main() {
-	parsed := hosttest.parse_arguments(os.args[1..], [
-		hosttest.Option{'--root', true, []},
-  hosttest.Option{'--text-encoding', true, []}, hosttest.Option{'--work', true, []},
-		hosttest.Option{'--host-arch', true, ['arm64', 'amd64']}, hosttest.Option{'--caller-arch', true, ['arm64', 'amd64']},
-		hosttest.Option{'--arch', true, ['aarch64', 'x86_64']}, hosttest.Option{'--build-only', false, []},
-		hosttest.Option{'--kernel-dir', true, []}, hosttest.Option{'--guest-state-dir', true, []}, hosttest.Option{'--timeout', true, []},
-	], 0, 'Wi-Fi control fixture controller', 'Validated original argparse frontend options') or { eprintln(err); exit(2) }
-	v := parsed.options
-	if '--root' !in v || '--work' !in v { eprintln('Missing root/work directory'); exit(2) }
-	c := Config{text_encoding:v['--text-encoding'],root: v['--root'], work: v['--work'], host_arch: v['--host-arch'], caller_arch: v['--caller-arch'], arch: v['--arch'], build_only: '--build-only' in v, kernel: v['--kernel-dir'], guest: v['--guest-state-dir'], timeout: v['--timeout']}
-	c.execute() or { eprintln(err.msg()); exit(1) }
+fn run() ! {
+	r := applehost.runtime('wifi-control', os.args[1..])!
+	defer { r.close() or { eprintln(err.msg()) } }
+	c := Config{ root: r.root, work: r.work, caller_arch: r.caller_arch, arch: r.arch, kernel: r.kernel, guest: r.guest, host_arch: r.host_arch, build_only: r.build_only, timeout: r.timeout }
+	c.execute()!
 }
+
+fn main() { run() or { applehost.report(err) } }

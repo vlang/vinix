@@ -2,9 +2,9 @@
 module main
 
 import crypto.sha256
-import encoding.hex
 import fixturehost
 import hosttest
+import applehost
 import json2
 import os
 
@@ -12,11 +12,6 @@ import os
 #include <unistd.h>
 #include <errno.h>
 
-fn C.dup2(i32, i32) i32
-fn C.close(i32) i32
-fn C.fcntl(i32, i32, ...i32) i32
-fn C.open(&char, i32, ...i32) i32
-fn C.write(i32, voidptr, usize) isize
 
 const original_revision = '09e70d945ca7d63ebc4969213994afab9e7e1dbe'
 const quiet = ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-label', '-fwrapv', '-fno-strict-aliasing']
@@ -30,7 +25,6 @@ struct Config {
 	build_only bool
 	kernel string
 	guest string
-	text_encoding string
 	environment map[string]string
 }
 
@@ -49,34 +43,15 @@ fn (c Config) path(name string) string { return append_path(c.root, name) }
 fn (c Config) output(name string) string { return append_path(c.work, name) }
 
 fn (c Config) inherited(argv []string) ! {
-	fixturehost.inherited_command_environment_preferred(argv, c.environment, c.caller_arch)!
+	applehost.inherited(argv, c.environment, c.caller_arch)!
 }
 
 fn (c Config) capture(argv []string, directory string, binary bool) !string {
-	return c.capture_environment(argv, directory, binary, c.environment)!
+	return applehost.capture(argv, c.environment, c.caller_arch, directory, binary)!
 }
 
 fn (c Config) capture_environment(argv []string, directory string, binary bool, environment map[string]string) !string {
-	// The existing single-stream capture needs a reserved stdout slot when the
-	// caller has closed it, so its pipe read end cannot occupy fd 1.
-	closed := C.fcntl(1, C.F_GETFD) < 0
-	if closed {
-		descriptor := C.open(c'/dev/null', C.O_WRONLY)
-		if descriptor < 0 { return error('Unable to reserve closed stdout') }
-		if descriptor != 1 {
-			if C.dup2(descriptor, 1) < 0 {
-				C.close(descriptor)
-				return error('Unable to reserve closed stdout')
-			}
-			C.close(descriptor)
-		}
-		if C.fcntl(1, C.F_SETFD, C.FD_CLOEXEC) != 0 {
-			C.close(1)
-			return error('Unable to protect stdout reservation')
-		}
-	}
-	defer { if closed { C.close(1) } }
-	return fixturehost.capture_in_preferred(argv, '', environment, false, directory, binary, c.caller_arch)!
+	return applehost.capture(argv, environment, c.caller_arch, directory, binary)!
 }
 
 fn strings(values []string) json2.Any { return json2.Any(hosttest.strings(values)) }
@@ -138,10 +113,7 @@ fn imports_forbidden(text string, fixture bool) bool {
 }
 
 fn (c Config) audit(path string, fixture bool, nm string) !json2.Any {
-	// Keep the original locale and UTF-8 mode of subprocess text decoding.
-	decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
-	wire := c.capture(['python3', '-c', decode, c.text_encoding, nm, '-u', path], '', true)!
-	imports := hosttest.decode_json(wire)!.str()
+	imports := c.capture([nm, '-u', path], '', false)!
 	if imports_forbidden(imports, fixture) { return error('Allocator imports: ' + imports) }
 	return strings(text_lines(imports))
 }
@@ -176,10 +148,7 @@ fn (c Config) fixture(name string, arch string, guest bool) ! {
 }
 
 fn (c Config) generate(name string, arch string) ! {
-	// Call the unchanged producer through its original Python API boundary.
-	// Its stdout/error behavior remains observable even for a closed stdout.
-	call := 'import runpy,sys;from pathlib import Path;runpy.run_path(sys.argv[1])["generate"](Path(sys.argv[2]),Path(sys.argv[3]),sys.argv[4],("nofloat",))'
-	c.inherited(['python3', '-c', call, c.path('build-support/compile-v-module.py'), c.output('wificore'), c.output(name + '.c'), arch])!
+	applehost.generate(c.output('wificore'), c.output(name + '.c'), arch, ['nofloat'])!
 }
 
 fn (c Config) execute() !map[string]json2.Any {
@@ -259,66 +228,26 @@ fn (c Config) native_build(quotes []string, provider string, actual string) ! {
 		imports[name] = c.audit(c.output(name + '.o'), name == 'fixture-native', '/opt/homebrew/opt/llvm/bin/llvm-nm')!
 	}
 	serial := c.output('serial.o')
-	serial_call := 'import runpy,sys,json;runpy.run_path(sys.argv[1])["compile_serial"](sys.argv[2],sys.argv[3],json.loads(sys.argv[4]))'
-	c.inherited(['python3', '-c', serial_call, c.path('tests/kernel-gaps/compile-v-fixture.py'), serial, c.arch, json2.encode(join(cc, flags))])!
+	applehost.serial(serial, c.arch, join(cc, flags))!
 	init := c.output('native-init')
 	c.inherited(join(cc, if c.arch == 'aarch64' { ['-fuse-ld=lld'] } else { []string{} }, ['-static', c.output('fixture-native.o'), c.output('core-native.o'), serial, '-o', init]))!
 	markers := text_lines(actual)
-	mut command := ['python3', c.path('tests/kernel-gaps/run.py'), '--arch', c.arch, '--prebuilt-init', init, '--kernel-dir', c.kernel, '--state-dir', c.guest, '--no-network', '--timeout', '3600']
-	for marker in markers { command << ['--expect', marker] }
+	command := applehost.guest_command(c.root, init, c.arch, c.kernel, c.guest, '3600', markers, []string{})
 	json_write(c.output('native-inputs.json'), json2.Any({'arch': json2.Any(c.arch), 'provider_sha256': json2.Any(provider), 'object_imports': json2.Any(imports), 'fixture_sha256': json2.Any(hashes(init)!), 'kernel_sha256': json2.Any(hashes(append_path(c.kernel, 'bin/vinix'))!), 'expected_markers': strings(markers), 'command': strings(command)}))!
-	if !c.build_only { c.inherited(command)! }
+	if !c.build_only { applehost.guest(init, c.arch, c.kernel, c.guest, '3600', markers, []string{})! }
 }
 
-fn main() {
-	parsed := hosttest.parse_arguments(os.args[1..], [
-		hosttest.Option{'--root', true, []}, hosttest.Option{'--work', true, []},
-		hosttest.Option{'--phase', true, ['host', 'native']},
-		hosttest.Option{'--parent-stdin', true, []}, hosttest.Option{'--parent-stdout', true, []},
-		hosttest.Option{'--host-arch', true, ['arm64', 'amd64']}, hosttest.Option{'--caller-arch', true, ['arm64', 'amd64']},
-		hosttest.Option{'--arch', true, ['aarch64', 'x86_64']}, hosttest.Option{'--build-only', false, []},
-		hosttest.Option{'--kernel-dir', true, []}, hosttest.Option{'--guest-state-dir', true, []},
-	], 0, 'BCM4378 protocol fixture controller', 'Validated original argparse frontend options') or { eprintln(err); exit(2) }
-	v := parsed.options
-	if '--root' !in v || '--work' !in v { eprintln('Missing root/work directory'); exit(2) }
-	input := fixturehost.read('/dev/stdin') or { eprintln(err.msg()); exit(1) }
-	request := hosttest.decode_json(input) or { eprintln(err.msg()); exit(1) }
-	r := request.as_map()
-	mut environment := map[string]string{}
-	for value in r['environment'].as_array() {
-		pair := value.as_array()
-		key := hex.decode(pair[0].str()) or { eprintln(err.msg()); exit(1) }
-		content := hex.decode(pair[1].str()) or { eprintln(err.msg()); exit(1) }
-		environment[key.bytestr()] = content.bytestr()
-	}
-	c := Config{root: v['--root'], work: v['--work'], host_arch: v['--host-arch'], caller_arch: v['--caller-arch'], arch: v['--arch'], build_only: '--build-only' in v, kernel: v['--kernel-dir'], guest: v['--guest-state-dir'], text_encoding: r['text_encoding'].str(), environment: environment}
-	protocol := C.fcntl(1, C.F_DUPFD_CLOEXEC, 3)
-	if protocol < 0 { eprintln('Unable to retain response descriptor'); exit(1) }
-	defer { C.close(protocol) }
-	for number, name in ['--parent-stdin', '--parent-stdout'] {
-		descriptor := (v[name] or { eprintln('Missing parent descriptor'); exit(2) }).int()
-		if descriptor >= 0 {
-			if C.dup2(i32(descriptor), i32(number)) < 0 { eprintln('Unable to restore parent descriptor'); exit(1) }
-			C.close(i32(descriptor))
-		} else { C.close(i32(number)) }
-	}
-	phase := v['--phase'] or { eprintln('Missing phase'); exit(2) }
-	mut result := map[string]json2.Any{}
-	if phase == 'host' {
-		result = c.execute() or { eprintln(err.msg()); exit(1) }
-	} else {
-		state := r['state'].as_map()
-		c.native_build(['-iquote', c.path('kernel/c'), '-iquote', c.path('tests/m1-wifi')], state['provider_sha256'].str(), state['stdout'].str()) or { eprintln(err.msg()); exit(1) }
-	}
-	response := json2.encode(json2.Any(result))
-	mut offset := 0
-	for offset < response.len {
-		count := C.write(protocol, unsafe { response.str + offset }, usize(response.len - offset))
-		if count < 0 {
-			if C.errno == C.EINTR { continue }
-			eprintln('Unable to write controller response'); exit(1)
-		}
-		if count == 0 { eprintln('Empty controller response write'); exit(1) }
-		offset += int(count)
+fn run() ! {
+	r := applehost.runtime('wifi-protocol', os.args[1..])!
+	defer { r.close() or { eprintln(err.msg()) } }
+	c := Config{ root: r.root, work: r.work, caller_arch: r.caller_arch, arch: r.arch, kernel: r.kernel, guest: r.guest, host_arch: r.host_arch, build_only: r.build_only, environment: applehost.environment() }
+	state := c.execute()!
+	print(state['stdout'].str())
+	println('PASS original/V Wi-Fi firmware/ring goldens, C ABI and ASan/UBSan')
+	if c.arch != '' {
+		c.native_build(['-iquote', c.path('kernel/c'), '-iquote', c.path('tests/m1-wifi')], state['provider_sha256'].str(), state['stdout'].str())!
+		println(if c.build_only { 'PASS strict native BCM4378 fixture objects/ELF ' + c.arch } else { 'PASS all 26 native BCM4378 protocol groups ' + c.arch })
 	}
 }
+
+fn main() { run() or { applehost.report(err) } }

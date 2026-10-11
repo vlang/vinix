@@ -16,7 +16,6 @@ const quiet = ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-lab
 	'-Wno-unused-variable', '-fwrapv', '-fno-strict-aliasing']
 
 struct Config {
- text_encoding string
 	root        string
 	work        string
 	suite       string
@@ -72,11 +71,11 @@ fn (c Config) path(name string) string { return append_path(c.root, name) }
 fn (c Config) output(name string) string { return append_path(c.work, name) }
 
 fn (c Config) inherited(argv []string) ! {
-	fixturehost.inherited_command_environment_preferred(argv, os.environ(), c.caller_arch)!
+	applehost.inherited(argv, applehost.environment(), c.caller_arch)!
 }
 
 fn (c Config) capture(argv []string, directory string, binary bool) !string {
-	return fixturehost.capture_in_preferred(argv, '', os.environ(), false, directory, binary, c.caller_arch)!
+	return applehost.capture(argv, applehost.environment(), c.caller_arch, directory, binary)!
 }
 
 fn strings(values []string) json2.Any { return json2.Any(hosttest.strings(values)) }
@@ -132,11 +131,7 @@ fn imports_forbidden(text string) bool {
 }
 
 fn (c Config) audit(path string, nm string) !json2.Any {
-	// Decode nm with the actual invoking Python codec and newline policy.
- // This mechanical text/process leaf receives zero migration credit.
- decode := 'import json,subprocess,sys;value=subprocess.check_output(sys.argv[2:],text=True,encoding=sys.argv[1]);sys.stdout.buffer.write(json.dumps(value).encode("ascii"))'
- wire := c.capture(['python3', '-c', decode, c.text_encoding, nm, '-u', path], '', true)!
- imports := hosttest.decode_json(wire)!.str()
+	imports := c.capture([nm, '-u', path], '', false)!
 	if imports_forbidden(imports) { return error('Allocator imports: ' + imports) }
 	return strings(lines(imports, true))
 }
@@ -212,7 +207,7 @@ fn (c Config) execute() ! {
 	}
 	receipt['source_hashes'] = source_hashes
 	receipt['host_provider'] = applehost.copy_provider(c.root, c.output('spicore'), 'spi', false, c.host_arch == 'arm64')!
-	hosttest.generate_module(c.output('spicore'), c.output('core.c'), c.host_arch, ['nofloat'])!
+	applehost.generate(c.output('spicore'), c.output('core.c'), c.host_arch, ['nofloat'])!
 	c.inherited([c.path('tests/apple-ans/compile-fixture'), '--kind', 'platform',
 		'--arch', c.host_arch, c.output('platform.c')])!
 	quotes := ['-iquote', here, '-iquote', c.path('kernel/c'), '-iquote', c.path('tests/apple-ans'),
@@ -273,7 +268,7 @@ fn (c Config) execute() ! {
 	native_provider['original_fixture_calls'] = strings(called)
 	receipt['native_provider'] = native_provider
 	json_write(c.output('native-provider.json'), json2.Any(native_provider))!
-	hosttest.generate_module(c.output('native/spicore'), c.output('core-native.c'), arch, ['nofloat'])!
+	applehost.generate(c.output('native/spicore'), c.output('core-native.c'), arch, ['nofloat'])!
 	c.fixture(c.suite, c.output('fixture-native.c'), arch, ['--guest'])!
 	c.fixture(c.suite, c.output('reference-entry.c'), arch, ['--guest', '--reference'])!
 	c.inherited([c.path('tests/apple-ans/compile-fixture'), '--kind', 'platform',
@@ -307,10 +302,8 @@ fn (c Config) execute() ! {
 	c.inherited(join(cc, flags, ['-Dmain=vsf_reference_entry', '-c', original, '-o',
 		c.output('original-native.o')]))!
 	serial := c.output('serial.o')
-	// The unchanged serial generator and compiler policy remain the independent dependency.
-	serial_call := 'import runpy,sys,json;runpy.run_path(sys.argv[1])["compile_serial"](sys.argv[2],sys.argv[3],json.loads(sys.argv[4]))'
-	c.inherited(['python3', '-c', serial_call, c.path('tests/kernel-gaps/compile-v-fixture.py'),
-		serial, c.arch, json2.encode(join(cc, flags))])!
+	// Generate the original serial constructor through the native producer.
+	applehost.serial(serial, c.arch, join(cc, flags))!
 	for variant in ['original', 'v'] {
 		init := c.output(variant + '-native-init')
 		mut objects := if variant == 'original' {
@@ -323,11 +316,8 @@ fn (c Config) execute() ! {
 			'-o',
 			init,
 		]))!
-		mut command := ['python3', c.path('tests/kernel-gaps/run.py'), '--arch', c.arch,
-			'--prebuilt-init', init, '--kernel-dir', c.kernel, '--state-dir', c.guest + '-' + variant,
-			'--no-network', '--timeout', '3600', '--fail', 'SPI FIXTURE FAIL']
-		for marker in lines(expected, true) { command << ['--expect', marker] }
-		json_write(c.output(variant + '-native-inputs.json'), json2.Any({
+		command := applehost.guest_command(c.root, init, c.arch, c.kernel, c.guest + '-' + variant, '3600', lines(expected, true), ['SPI FIXTURE FAIL'])
+	json_write(c.output(variant + '-native-inputs.json'), json2.Any({
 			'arch':          json2.Any(c.arch)
 			'provider':      json2.Any(native_provider)
 			'imports':       json2.Any(imports)
@@ -336,37 +326,18 @@ fn (c Config) execute() ! {
 			'command':       strings(command)
 		}))!
 		if !c.build_only {
-			c.inherited(command)!
+			applehost.guest(init, c.arch, c.kernel, c.guest + '-' + variant, '3600', lines(expected, true), ['SPI FIXTURE FAIL'])!
 			println('PASS complete native SPI ' + c.suite + ' ' + variant + ' ' + c.arch)
 			C.fflush(unsafe { nil })
 		}
 	}
 }
 
-fn main() {
-	parsed := hosttest.parse_arguments(os.args[1..], [
-		hosttest.Option{'--root', true, []},
-  hosttest.Option{'--text-encoding', true, []},
-		hosttest.Option{'--work', true, []},
-		hosttest.Option{'--suite', true, ['keyboard', 'touchpad', 'both']},
-		hosttest.Option{'--host-arch', true, ['arm64', 'amd64']},
-		hosttest.Option{'--caller-arch', true, ['arm64', 'amd64']},
-		hosttest.Option{'--arch', true, ['aarch64', 'x86_64']},
-		hosttest.Option{'--build-only', false, []},
-		hosttest.Option{'--kernel-dir', true, []},
-		hosttest.Option{'--guest-state-dir', true, []},
-	], 0, 'SPI native controller', 'Validated original argparse frontend options') or {
-		eprintln(err)
-		exit(2)
-	}
-	values := parsed.options
-	if '--root' !in values || '--work' !in values {
-		eprintln('Missing root/work directory')
-		exit(2)
-	}
-	config := Config{ text_encoding: values['--text-encoding'], root: values['--root'], work: values['--work'], suite: values['--suite'], host_arch: values['--host-arch'], caller_arch: values['--caller-arch'], arch: values['--arch'], build_only: '--build-only' in values, kernel: values['--kernel-dir'], guest: values['--guest-state-dir'] }
-	config.execute() or {
-		eprintln(err.msg())
-		exit(1)
-	}
+fn run() ! {
+	r := applehost.runtime('spi', os.args[1..])!
+	defer { r.close() or { eprintln(err.msg()) } }
+	c := Config{ root: r.root, work: r.work, caller_arch: r.caller_arch, arch: r.arch, kernel: r.kernel, guest: r.guest, host_arch: r.host_arch, build_only: r.build_only, suite: r.options['--suite'] }
+	c.execute()!
 }
+
+fn main() { run() or { applehost.report(err) } }

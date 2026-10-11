@@ -60,13 +60,13 @@ on the host and cross-built as a static AArch64 binary for the desktop image;
 target userspace execution has not been validated on hardware.
 
 The independent protocol machine and its 98 assertions now live in
-`protocolfixture/` as V. `run-protocol.py` compares all 26 groups and
+`protocolfixture/` as V. `run-protocol` compares all 26 groups and
 100,000 parser mutations against immutable C fixture bytes from
 `09e70d945ca7d63ebc4969213994afab9e7e1dbe` on ARM and x86 hosts. Both
 native model guests require every original group marker. These results
 cover injected firmware/ring behavior; physical Wi-Fi remains unverified.
 The platform fixture and all 29 assertions now live in `platformfixture/`.
-`run-platform.py` compares the eight original simulated MMIO policy groups
+`run-platform` compares the eight original simulated MMIO policy groups
 against the same immutable revision; ARM and x86 native guests exercise every
 group using the unchanged production cores and injected platform hooks.
 
@@ -120,19 +120,19 @@ locally selected firmware in a test initramfs. The supplied ELF files are
 kernel-only build artifacts, not an installed boot image or hardware test.
 Keep your existing m1n1/U-Boot/Limine chain and a known-working boot entry.
 
-`python3 tests/m1-wifi/run-ctl.py` runs the maintained V utility against an
+`tests/m1-wifi/run-ctl` runs the maintained V utility against an
 independent native device fixture with ASan/UBSan. The same 11 scenarios run
-in ARM and x86 QEMU using `run-ctl-vm.py --arch aarch64|x86_64
+in ARM and x86 QEMU using `run-ctl-vm --arch aarch64|x86_64
 --kernel-dir <isolated-kernel> --state-dir <new-directory>`. These fixtures
 check control messages, polling, terminal restoration, credential wiping and
 file validation; physical firmware/association remain unverified.
 The device model and guest controller now live in `ctlfixture/` as V; all
-33 original assertions and 11 scenarios remain. `run-control.py` compares
+33 original assertions and 11 scenarios remain. `run-control` compares
 exit codes, stdout and stderr with the immutable original C fixture on both
 host ABIs, then builds and runs the complete native model guest. The native
 `open`/`ioctl` entry adapter contains only ABI instructions.
 The terminal, errno, byte-wipe and file-stat helpers also live in native V.
-`run-helpers.py` compares their SDK behavior with the frozen header bodies,
+`run-helpers` compares their SDK behavior with the frozen header bodies,
 including full terminal state, output sentinels on failed `fstat` and exact
 volatile byte stores, and can run the same checks in both model guests.
 
@@ -210,14 +210,15 @@ properties are from Linux `arch/arm64/boot/dts/apple/t8103*.dts*`. These are
 protocol/register references, not evidence that this implementation works on
 real hardware.
 
-## Control fixture host controller
+## Native command ownership
 
-`run-control.py` keeps the original argument parser and temporary-directory
-ownership. `run-control.v` owns immutable oracle recovery, metadata copies,
-compiler arguments, allocator import checks, bundle generation, all eleven
-stdout/stderr/status comparisons and the host/native receipt files. Both
-captured streams preserve raw bytes and are drained together before reaping
-the child. The original utility, independent device fixture, ABI assembly and
-serial producer remain the inputs to the build. Native guest commands retain
-the original marker and timeout. Host controller tests alone do not verify a
-fresh kernel build, guest boot or physical Wi-Fi operation.
+All Wi-Fi runners, including the control aliases and paired host entry point,
+now invoke V directly. `run-control.v` owns parsing, fresh work, immutable
+oracles, allocator guards, all eleven status/stdout/stderr comparisons, native
+objects and guest supervision. `run-ctl-vm` selects the same controller with
+required architecture/kernel/state arguments and places guest state under
+`STATE/guest`. Host and guest deadlines retain their previous values.
+
+The current protocol/platform fixture compile limitations and qualification
+results are recorded in [runner qualification](../apple-protocols/runners.md).
+Independent fixtures, production modules and assertions are unchanged.

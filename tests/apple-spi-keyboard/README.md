@@ -52,17 +52,17 @@ traffic, malformed packets, mode retry, continuous chip select, staged FIFO
 failures, frozen counters, final releases and 100,000 mutated messages.
 
 ```sh
-python3 tests/apple-spi-keyboard/run.py --host-arch amd64
-python3 tests/apple-spi-keyboard/run.py --suite keyboard --arch aarch64 \
+tests/apple-spi-keyboard/run.sh --host-arch amd64
+tests/apple-spi-keyboard/run.sh --suite keyboard --arch aarch64 \
   --kernel-dir /path/to/validated/kernel --guest-state-dir /tmp/spi-arm
-python3 tests/apple-spi-keyboard/run.py --suite keyboard --arch x86_64 \
+tests/apple-spi-keyboard/run.sh --suite keyboard --arch x86_64 \
   --kernel-dir /path/to/validated/kernel --guest-state-dir /tmp/spi-x86
 ```
 
 Native checks use both real musl SDKs and run complete original-C/V model pairs
 with every 21-keyboard or 19-touchpad group marker. Select `--suite touchpad`
 for the touchpad native pairs. ARM uses the full provider. The private x86 model
-omits five unexecuted ARM hardware definitions; `provider.py` records their
+omits five unexecuted ARM hardware definitions; `applehost.copy_provider` records their
 body hashes and call sites and verifies that every retained source byte is
 unchanged. It does not add x86 production support. Use `--state-dir` to retain
 source hashes, generated objects, allocator audits and golden outputs.
@@ -101,21 +101,12 @@ guessed register addresses.
 
 ## Native fixture controller
 
-`run.v` owns the frozen-source inventory, source hashes, compiler arguments,
-allocator guards, exact golden comparisons, native artifact inputs and selected
-guest command. The Python entry point retains argument parsing and ownership
-of the work directory. It imports the existing V provider and module producer
-directly; the independent C/V fixture sources and assertions remain unchanged.
-The serial object producer remains an unchanged dependency.
+`run.v` owns argument parsing, work lifetime, the frozen-source inventory,
+compiler recipes, import guards, exact golden comparisons and both original/V
+native guest inputs. Provider copies and module/serial producers use V directly.
+The keyboard and touchpad shell entry points both retain the original default
+`--suite both`; native execution requires selecting one suite.
 
-The transfer removes the original 8,408-byte, 106-line controller block and
-original-revision binding. Fixture literals contribute zero algorithm credit.
-The final receipt reports the net Python reduction including the frontend.
-
-Qualification compares both controllers with instrumented compiler inputs and
-real subprocess/filesystem ownership on ARM64, x86-64 and ARM ASan/UBSan, plus
-actual cold CLI builds. Literal Unix backslashes in caller work paths remain
-filename bytes during recursive directory creation. The unmodified SPI consumer still fails on generated
-`memdup` calls with V 0.5.2 `6d549c2f` and `c6bb06f`; the frozen original
-controller has the same failure. This stage makes no new successful SPI
-fixture, kernel, QEMU or physical-hardware claim.
+The current compiler still rejects undeclared `memdup` in the independent
+fixtures. Existing assertions and production source bytes remain unchanged.
+See [runner qualification](../apple-protocols/runners.md) for measured results.
