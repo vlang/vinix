@@ -89,6 +89,7 @@ fn get_u64(buf []u8, offset u64) u64 {
 // Deliver `which` to the calling Linux process on its way back to userspace.
 fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int, info_code int, info_addr u64, restarting bool, shared bool) {
 	mut t := unsafe { proc.current_thread() }
+	seccomp_info := take_seccomp_signal(mut t, which, shared)
 	sigaction := t.sigactions[which]
 	handler := u64(sigaction.sa_sigaction)
 
@@ -170,6 +171,13 @@ fn dispatch_linux_signal(context &cpulocal.GPRState, which int, info_signum int,
 		put_u32(mut buf, frame_siginfo + 8, u32(timer_info.code))
 		put_u32(mut buf, frame_siginfo + 20, u32(timer_info.overrun))
 		put_u64(mut buf, frame_siginfo + 24, timer_info.value)
+	}
+	if seccomp_info.pending {
+		put_u32(mut buf, frame_siginfo + 4, seccomp_info.data)
+		put_u32(mut buf, frame_siginfo + 8, 1) // SYS_SECCOMP
+		put_u64(mut buf, frame_siginfo + 16, seccomp_info.address)
+		put_u32(mut buf, frame_siginfo + 24, seccomp_info.syscall)
+		put_u32(mut buf, frame_siginfo + 28, proc.audit_arch_x86_64)
 	}
 	if !shared { posixtimer.acknowledge_signal(mut t, which) }
 

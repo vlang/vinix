@@ -75,7 +75,7 @@ const seccomp_verdict_nr = u64(511)
 fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
 	e := proc.current_thread().seccomp_errno
 	if e == 0 {
-		return 0, 0
+		return proc.current_thread().seccomp_return, 0
 	}
 	return errno.err, e
 }
@@ -84,6 +84,7 @@ fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
 // call itself, or the stand-in returning their verdict. A call is killed
 // here with SIGSYS when that is the verdict.
 fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
+	t.seccomp_return = 0
 	process := t.process
 	if process.seccomp_mode == proc.seccomp_mode_strict {
 		// read, write, exit and rt_sigreturn are all strict mode allows.
@@ -112,8 +113,10 @@ fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 			return seccomp_verdict_nr
 		}
 		proc.seccomp_ret_trap {
-			userland.sendsig(t, u8(31))
-			t.seccomp_errno = errno.enosys
+			userland.force_seccomp_signal(mut t, nr, gpr.pc, verdict & proc.seccomp_ret_data)
+			// syscall_rollback preserves the original argument in x0.
+			t.seccomp_return = gpr.x0
+			t.seccomp_errno = 0
 			return seccomp_verdict_nr
 		}
 		proc.seccomp_ret_trace, proc.seccomp_ret_user_notif {

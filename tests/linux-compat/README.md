@@ -12,7 +12,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -65,6 +65,14 @@ ownership, mode 0777 independent of umask, zero links, owner chmod and a
 read-only `/proc/self/fd` reopen with exact data. A write reopen after mode 0400
 must fail with EACCES. It also checks mounted `/dev/shm` mode 1777, ordinary-user
 file creation/ownership, and EPERM when removing a root-owned file there.
+
+The `seccomp` case installs a real classic-BPF filter, checks twenty trapped
+getpid calls, SYS_SECCOMP siginfo with exact filter data, syscall/architecture
+and call address, original return registers, and handler-supplied return values.
+Ordinary SIGSYS delivery before and after must carry no stale trap metadata.
+Separate children must die from SIGSYS when the synchronous trap is blocked
+or ignored. This qualifies trap delivery; filter thread ownership and complete
+application sandbox isolation remain separate checks.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,

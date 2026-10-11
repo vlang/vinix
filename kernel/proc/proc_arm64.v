@@ -154,6 +154,8 @@ pub mut:
 	syscall_x3 u64
 	// What the syscall a seccomp filter turned away returns: an errno, or 0.
 	seccomp_errno u64
+	seccomp_return u64
+	seccomp_signal SeccompSignal
 	// The promises a call this thread is making broke, with pledge_set, or
 	// 0; the thread is killed on its way back to userspace. And the call's
 	// number, for the report. See proc/pledge.v.

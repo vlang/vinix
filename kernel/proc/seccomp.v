@@ -34,6 +34,16 @@ pub const seccomp_ret_data = u32(0x0000ffff)
 pub const audit_arch_aarch64 = u32(0xc00000b7)
 pub const audit_arch_x86_64 = u32(0xc000003e)
 
+// A synchronous SIGSYS belongs to the triggering thread. It is consumed
+// when that private signal is selected, before building the user frame.
+pub struct SeccompSignal {
+pub mut:
+	pending bool
+	data u32
+	syscall u32
+	address u64
+}
+
 pub const bpf_max_instructions = 4096
 // Linux's bound on every program a call runs through, each counted with four
 // instructions more than it has.

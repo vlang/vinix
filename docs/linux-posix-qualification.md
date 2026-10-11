@@ -403,3 +403,25 @@ missing libpci/libGL; its causal role in the timeout has not been established.
 These reports distinguish available browser packages from a qualified browser
 workflow. Native x86-64 browser execution, sandbox isolation, visible windows,
 portal requests and install/update/remove remain outstanding checks.
+
+## Seccomp trap signal semantics
+
+Both native architectures now pass a real classic-BPF filter regression with
+twenty trapped getpid calls. Linux signal frames report SYS_SECCOMP, exact
+filter data 42, syscall number, audit architecture and the saved call address.
+The original return register survives the rejected call; the handler writes
+4242 to the public ucontext and the syscall returns that value after
+rt_sigreturn. Ordinary SIGSYS signals before and after carry no stale trap
+metadata. Separate children blocked or ignoring SIGSYS die from that signal,
+following Linux's forced synchronous disposition.
+
+This follows [Linux's seccomp trap handling](https://github.com/torvalds/linux/blob/v6.12/kernel/seccomp.c#L1167)
+and [force_sig_seccomp](https://github.com/torvalds/linux/blob/v6.12/kernel/signal.c#L1725).
+The prior kernel delivered an ordinary signal and overwrote the return
+register with ENOSYS; matching `seccomp-trap-before-*` receipts retain the
+identical fixture failure. `seccomp-trap-after-*` retains all eight passing
+ABI cases plus serial logs on both architectures in the dated results.
+The new metadata is stored inline in its triggering thread and consumed
+before the private signal frame is built; no allocation lifetime changes.
+Per-thread filter ownership, TSYNC, ptrace and full browser/container sandbox
+isolation remain unqualified by this regression.

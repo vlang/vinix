@@ -422,6 +422,7 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 	restarting := t.restarting_syscall
 	t.restarting_syscall = false
 	which, shared := take_pending_signal(mut t)
+	seccomp_info := take_seccomp_signal(mut t, which, shared)
 
 	if which == -1 {
 		return
@@ -573,6 +574,13 @@ fn dispatch_a_signal_with_fault(context &cpulocal.GPRState, synchronous bool, fa
 			if timer_info.found {
 				*&i32(info_base + 20) = i32(timer_info.overrun)
 				*&u64(info_base + 24) = timer_info.value
+			}
+			if seccomp_info.pending {
+				*&u32(info_base + 4) = seccomp_info.data
+				*&i32(info_base + 8) = 1 // SYS_SECCOMP
+				*&u64(info_base + 16) = seccomp_info.address
+				*&u32(info_base + 24) = seccomp_info.syscall
+				*&u32(info_base + 28) = proc.audit_arch_aarch64
 			}
 
 			// musl AArch64 ucontext_t offsets. The signal mask begins at 40;

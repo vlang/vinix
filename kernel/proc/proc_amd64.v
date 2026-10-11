@@ -219,6 +219,8 @@ pub mut:
 	sigaltstack_size u64
 	// What the syscall a seccomp filter turned away returns: an errno, or 0.
 	seccomp_errno u64
+	seccomp_return u64
+	seccomp_signal SeccompSignal
 	// The syscall this thread is in, or -1 when it is in userspace, and its
 	// first arguments, for what sysrq 't' reports. And the number it was made
 	// with, which the result overwrites in rax: a restarted syscall needs it
