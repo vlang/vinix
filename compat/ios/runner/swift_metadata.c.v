@@ -76,8 +76,8 @@ fn swift_string_enum_store(value u64, which_case u32, empty_cases u32, metadata 
 // range even when host text and heap addresses are far apart. Its first page
 // contains a V-emitted ARM64 metadata accessor; its second contains read-only
 // metadata, witnesses and descriptors. Publication happens only after sealing.
-// This nonreflectable nominal descriptor deliberately has no Fields record:
-// generic reflection/type lookup exports are still unsupported.
+// This nonreflectable nominal descriptor deliberately has no Fields record.
+// Bounded nominal lookup uses its accessor; field reflection is unsupported.
 fn swift_string_metadata() u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }

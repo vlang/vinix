@@ -2175,17 +2175,62 @@ Generic contexts, symbolic references and invalid names remain unmeasured.
 Evidence is retained under `swift-object-type-checks`; full regression remains
 unpassed, and the five published runners retain their last passing hashes.
 
+V now supplies bounded `_swift_getTypeByMangledNameInContext` lookup for `Int`,
+`String`, `Void`, nested Arrays, Objective-C class names and direct/indirect
+relative references to nongeneric class, struct and enum descriptors. Metadata
+comes from the existing canonical caches or the descriptor's borrowed accessor;
+lookup adds no metadata arena, owner registry or reference count changes.
+Binary symbolic offsets may contain zero bytes. Parsing respects the supplied
+length, checks the complete supported expression before invoking an accessor,
+and requires a complete metadata response. Borrowed accessors run outside the
+runtime lock. Generic substitution currently supports `x` in Array's canonical
+one-type-parameter context, including `Array<x>`.
+
+Installed SwiftCore and Vinix pass the mangled-name fixture under ASAN/UBSAN in
+both hash modes. Tests compare canonical pointers and raw ARM64 calls preserving
+x20/x21, including exact byte spans ending at a protected page, embedded zeros,
+nested Arrays, class wrappers and relative nominal accessors. V checks cover
+unlocked accessor reentry through another worker, incomplete response rejection,
+eight concurrent readers and two drained runtime cycles. Missing generic
+arguments and nongeneric contexts return null in the installed runtime and
+Vinix. Earlier fixture failures from a reserved identifier and a one-character
+C literal used as a pointer are retained; corrected fixtures pass.
+
+The framework inventory records eight calls to EOS's cached lookup helper with
+null context. Those calls request `ScPSg` (Optional<TaskPriority>) or a
+`CVarArg` protocol existential; both remain unsupported. Its type-reference
+section also contains `Int` and nominal class/enum references.
+MarketplaceKitWrapper's records are retained as well. Protocol, opaque,
+function, Optional and other compound types, general nominal name lookup,
+additional generic contexts and witness substitution remain unsupported.
+Empty or truncated supported expressions, missing classes and unavailable
+generic arguments return null; other unsupported expressions fail explicitly.
+
+All thirty-nine programs rebuild, and all twenty-one focused Swift ABI guest
+checks pass. Generated C verifies bounded reads, borrowed class-name keys,
+complete responses, unlocked accessor calls and no hidden successful V
+allocations. The actual IPA now exits with status 1 before entry at EOSSDK's
+`_swift_getWitnessTable` import. Installed SwiftCore measurements of that next
+ordinary C entry return canonical static Int Hashable/Equatable and String
+Hashable tables in 768 guarded raw and 768 direct calls preserving x20/x21.
+Generic, conditional and resilient witness lookup remains unmeasured. The
+remaining EOS type queries have native layout measurements: TaskPriority uses
+one byte, its Optional uses two, and the CVarArg existential uses forty.
+These measurements do not establish value ownership or concurrency execution.
+Evidence is retained under `swift-mangled-checks`; full regression remains
+unpassed and the five published runners retain their last passing hashes.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,400 | 758 | 81 |
-| EOSSDK | 606 | 56 | 18 |
-| MarketplaceKitWrapper | 98 | 78 | 23 |
-| All images | 2,104 | 892 | 122 |
+| Fortnite executable | 1,401 | 757 | 81 |
+| EOSSDK | 607 | 55 | 18 |
+| MarketplaceKitWrapper | 99 | 77 | 23 |
+| All images | 2,107 | 889 | 122 |
 
-The C++/GLES/Text variant reports 2,117 resolved imports, 879 unresolved strong
+The C++/GLES/Text variant reports 2,120 resolved imports, 876 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
