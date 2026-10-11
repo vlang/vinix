@@ -66,9 +66,11 @@ pub fn stage(root string, ui string, dest string, cross bool) ! {
 		for member in ['control_text', 'control_value', 'events', 'model', 'template', 'text_of', 'value_of'] { source = source.replace('app.${member}', 'vml_app.${member}') }
 		os.write_file(vml, source)!
 	}
-	for name in ['file_dialog_linux.v', 'message_box_linux.v'] {
-		path := '${dest}/modules/ui2/linux/${name}'
-		if os.exists(path) { os.write_file(path, os.read_file(path)!.replace('os.execute(command)', "os.exec(['/bin/sh', '-c', command])"))! }
+	for directory in ['ui', 'linux'] {
+		for name in ['file_dialog_linux.v', 'message_box_linux.v'] {
+			path := '${dest}/modules/ui2/${directory}/${name}'
+			if os.exists(path) { os.write_file(path, os.read_file(path)!.replace('os.execute(command)', "os.exec(['/bin/sh', '-c', command])"))! }
+		}
 	}
 	calculator := os.read_file('${ui}/examples/calculator/main.v')!
 	end := calculator.index('\nfn main()') or { return error('calculator entry point missing') }
