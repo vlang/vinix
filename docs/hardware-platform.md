@@ -53,7 +53,7 @@ pointed at.
 | `nvme` | PCI | yes | no | yes: flush and shutdown notification, set up again from nothing | shutdown notification | no | all of memory |
 | `ata` | PCI | yes | no | yes: requests held, drives waited for | no | no | all of memory |
 | `hda` | PCI | yes | no | yes: streams, rings and codec paths programmed again | streams stopped, controller in reset | no | all of memory |
-| `xhci` | PCI | yes | no | no | no | no | all of memory |
+| `xhci` | PCI | yes | no | yes: left running for a suspend to idle, set up again from nothing after a loss of power | no | no | all of memory |
 | `virtio_*` (AArch64 MMIO) | platform | listed from the device's own status | no | no | no | no | not behind an IOMMU |
 | `battery`, `ac`, `button` | ACPI | listed as claimed | no | -- | -- | -- | -- |
 | `ec` | ACPI | listed as claimed | no | holds its events back when it may not wake | stops taking events | asks a failed controller one question | -- |
@@ -63,6 +63,42 @@ A driver without `remove` cannot be unbound and `/sys` has no `unbind` file
 for it. Apple's platform drivers (SMC, ANS, DART, DCP, AGX, Wi-Fi, speakers,
 SPI keyboard, Type-C) still start the way they did and are **not listed** on
 the platform bus.
+
+### USB keyboards and pointers
+
+There is no USB core. There is one driver, `kernel/dev/xhci`, that does as
+much of xHCI as a keyboard and a pointer take: one controller, one
+interrupter, polled, the boot protocol for keyboards and the report
+descriptor for pointers. It began as AArch64's, for VirtualBox, and is now
+x86-64's as well, with a half for each (`xhci_arm64.v`, `xhci_amd64.v`): on
+x86-64 a key is given to the console as the scancode the same key has on a
+PS/2 keyboard, a pointer moves `/dev/pointer`, and a thread polls every
+8 ms. A PC with no PS/2 port has a keyboard; and a PC with no keyboard
+controller at all no longer has a thread waiting on one for ever.
+
+Through a sleep the controller is left in D0 and goes on being asked, so
+that a key ends a suspend to idle; after a sleep that cut its power it is
+found halted and set up again from nothing, its pages given back.
+`/sys/bus/usb/xhci` counts what it has and what it has said.
+`vinix.usb=off` leaves the controller to firmware.
+
+What it does not do, each of which a real machine will meet:
+
+- **Hubs.** A keyboard behind a hub -- a dock, a monitor, the front panel of
+  many desktops, the internal hub of some laptops -- is not seen.
+- **Hotplug.** What is plugged into a root port when the controller is
+  started is what there is, until the next start or the next suspend to RAM.
+- **Firmware's own keyboard.** Taking the controller from firmware (the
+  legacy-support handoff) ends firmware's emulation of a PS/2 keyboard for
+  USB ones. A keyboard that worked through that emulation and sits behind a
+  hub stops working; `vinix.usb=off` gives it back.
+- A second controller, interrupts instead of polling, anything that is not a
+  keyboard or a pointer, and isolation behind an IOMMU (the controller is
+  allowed all of memory).
+
+Tested with QEMU's `qemu-xhci`, `usb-kbd` and `usb-mouse` only
+(`usb-input`, both architectures, with no other keyboard in the machine).
+No physical controller has been tried on x86-64.
 
 ### Waiting and recovery
 
@@ -598,8 +634,7 @@ power and sleep button events are enabled again, and the drivers resume:
 they do on every resume; the keyboard controller, the PS/2 mouse and the
 serial ports are set up again only after a loss of power. A deep sleep is
 **refused while a bound PCI device's driver has no suspend and resume**:
-such a device would come back blank. Every PCI driver an x86-64 kernel has
-now has both; `xhci`, which has neither, is AArch64's.
+such a device would come back blank. Every PCI driver has both now.
 
 **Hot-plug slots, and what changed during the sleep.** The thread that
 watches PCI Express slots is kept off them from before the devices go down
@@ -667,8 +702,9 @@ holds the lid's and the sleep button's bits and no other, and with the lid
 not allowed only the button's; the methods write what they were called with
 to a port QEMU records, and the record is compared. With
 `vinix.acpi_wake=off` the register holds nothing and no method runs
-(`suspend-deep-wake-off`). PCI devices are not armed (PME), and a wake-up
-by USB needs a USB core.
+(`suspend-deep-wake-off`). PCI devices are not armed (PME), and a USB
+keyboard ends a suspend to idle but not a suspend to RAM: its controller is
+without power like the rest.
 
 **What ended it** is read on the way back: the clock's alarm (PM1 status),
 a byte waiting in the keyboard controller (keyboard or pointer), the power
@@ -1157,6 +1193,7 @@ itself, which the SMC keys Linux names do not include.
 | `vinix.pci_d3=off` | keep every PCI function in D0 through a sleep |
 | `vinix.acpi_wake=off` | x86-64: do not arm the lid, buttons and keyboard to end a suspend to RAM |
 | `vinix.acpi_backlight=off` | x86-64: leave the panels whose backlight firmware sets alone |
+| `vinix.usb=off` | leave the xHCI controller, and with it any USB keyboard, to firmware |
 | `vinix.hibernate=<device>` | x86-64: the block device, by its name in `/dev`, that an image of memory is written to for a suspend to disk. It is overwritten, and looked at for an image at every start. Without the option there is no `disk` state and no disk is written to |
 
 ## What is not done
@@ -1167,8 +1204,8 @@ Beyond the limits stated in each section:
   bridges behind a slot, no resizing of a port's windows, no SHPC or
   conventional PCI slots except through ACPI, and no driver but `e1000` that
   can let go of a device.
-- USB: no core, no hubs, no hotplug; xHCI drives boot keyboards and pointers
-  on AArch64 PCI only.
+- USB beyond keyboards and pointers on the root ports of one xHCI
+  controller: no core, no hubs, no hotplug, no storage; see its section.
 - Device power states beyond D3hot for a sleep: D1, D2 and D3cold, runtime
   power management, PME and wake-on-LAN.
 - Behind the embedded controller: a second controller, the SMBus host and
@@ -1188,9 +1225,10 @@ Beyond the limits stated in each section:
   during a sleep is not noticed), switching the machine off through the SMC,
   an interrupt-driven mailbox (each exchange is a busy wait, some fifteen a
   second), and the SMC after a sleep that cut its power.
-- Coming back from a loss of power for `xhci` and Apple's drivers;
+- Coming back from a loss of power for Apple's drivers;
   restoring a display the kernel has no mode-setting for; wake-up by a PCI
-  device (PME) or over USB; an RTC alarm more than a day ahead.
+  device (PME), or over USB from a suspend to RAM; an RTC alarm more than a
+  day ahead.
 - **Desktop.** The native desktop uses these interfaces now, and none of
   that has run against a kernel: it is tested on the host, against the text
   the kernel writes and a machine the tests stand in for. Settings and the
@@ -1249,6 +1287,7 @@ tests/hardware-platform/run --arch aarch64 --kernel kernel/bin/vinix
 | `thermal` | pass | pass |
 | `firmware` | pass | pass |
 | `screen-sleep`: pictures of the screen lit before, dark during and lit after a sleep and a rehearsal | pass | pass |
+| `usb-input`: a USB keyboard and mouse behind xHCI with no other keyboard in the machine -- typing, the pointer, a suspend to idle ended by a key, and (x86-64) the controller set up again after a suspend to RAM | pass | pass |
 | `pci-hotplug`: a card put into a port the kernel watches and taken out, twice; 100 remove/rescan cycles | pass | pass |
 | `pci-hotplug-acpi`: the same, announced and asked back by firmware | pass | -- |
 | `pci-hotplug-iommu`: the same behind Intel VT-d, the card isolated each time it arrives | pass | -- |

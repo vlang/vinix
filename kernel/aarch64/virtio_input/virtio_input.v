@@ -188,7 +188,7 @@ pub fn set_pointer_event_callback(callback voidptr) {
 	vi_ptr_callback = callback
 }
 
-// A USB keyboard or pointer (aarch64.xhci) reports through the same state as
+// A USB keyboard or pointer (dev.xhci) reports through the same state as
 // the virtio devices, so the console and /dev/pointer see one keyboard and one
 // pointer whichever bus they sit on. `callback` runs inside poll(), after the
 // virtio queues, and hands its events to the report_* functions below.

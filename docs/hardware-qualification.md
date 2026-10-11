@@ -88,7 +88,7 @@ driver has none, that is said.
 | Graphics | AMD, NVIDIA | none | open | |
 | Audio | Intel HD Audio | `dev/hda` | implemented (VM) | playback through QEMU's controller and codec is recorded and checked, across every kind of sleep (`drivers-sleep`); no recording, no jack detection, no physical codec tried |
 | Input | PS/2 keyboard and mouse | `dev/console`, `dev/mouse` | implemented (VM) | ISO checks; hardware-platform `suspend` (wake by key) |
-| Input | USB (xHCI) | none on x86 | open | most PC keyboards and all external ones |
+| Input | USB keyboard and pointer (xHCI) | `dev/xhci` | implemented (VM): root ports of one controller, polled | no hubs, no hotplug; taking the controller ends firmware's PS/2 emulation; untried on a PC |
 | Platform | ACPI (uACPI), LAPIC, IOAPIC, HPET | `uacpi`, `x86/*` | implemented (VM) | events, power button, sleep states S5; embedded controller (`x86/acpiec`): host tests of the protocol, and hardware-platform `acpi-ec-selftest` with a simulated controller behind uACPI; no physical controller tried |
 
 ### AArch64 VM
@@ -101,7 +101,7 @@ driver has none, that is said.
 | Ethernet | Intel 8254x | `dev/e1000` | implemented (VM) | hardware-platform `devices`, `suspend` |
 | Graphics | ramfb, VirtIO GPU | `aarch64/virtio_gpu`, `drm` | implemented (VM) | [kekvm-gpu](kekvm-gpu.md) |
 | Audio | VirtIO sound | `aarch64/virtio_snd` | implemented (VM) | `tests/sound`; playback only |
-| Input | VirtIO input, USB keyboard and pointer (xHCI, PCI) | `aarch64/virtio_input`, `aarch64/xhci` | implemented (VM) | no hubs, no hotplug |
+| Input | VirtIO input, USB keyboard and pointer (xHCI, PCI) | `aarch64/virtio_input`, `dev/xhci` | implemented (VM) | no hubs, no hotplug |
 
 ### Apple M1 MacBook Air (J313)
 
@@ -170,6 +170,11 @@ hwcheck --rehearse-sleep > report.md
    is listed there and does not change is one whose firmware hands the
    work to a graphics driver this system does not have: record it, and
    `vinix.acpi_backlight=off` takes it out of the way.
+   A USB keyboard and mouse plugged straight into the machine at start:
+   keys and the pointer work, and `/sys/bus/usb/xhci` counts their
+   reports. Then the same through a hub, which is expected not to work, to
+   know what the machine's own keyboard is behind; if a keyboard that worked
+   before no longer does, `vinix.usb=off` and record it.
 5. **Power off and restart.** Twenty of each from the desktop's menu and
    twenty by the power button. The machine must go off, and come back with
    no filesystem repair.
