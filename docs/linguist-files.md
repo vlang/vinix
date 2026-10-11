@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `5b9e309dba3b594168c7ad30dda42f509f47125d`,
+at source commit `541134e89028f6e24dc51b53a048567fe77fe074`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 569 | 2,367,190 | 6.09% |
-| Python | 228 | 1,115,330 | 2.87% |
-| Shell | 603 | 1,363,354 | 3.51% |
+| C | 570 | 2,367,492 | 6.10% |
+| Python | 217 | 969,145 | 2.50% |
+| Shell | 613 | 1,366,249 | 3.52% |
 
-All `.v` files are classified as V. The resulting V share is 79.51%, with no
+All `.v` files are classified as V. The resulting V share is 79.85%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 1,115,330 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 969,145 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 5b9e309dba3b594168c7ad30dda42f509f47125d --breakdown --json
+github-linguist --rev 541134e89028f6e24dc51b53a048567fe77fe074 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -362,6 +362,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/cpu-mitigations/guest.c` | 4,664 |
 | `tests/cpu-mitigations/segments.c` | 613 |
 | `tests/desktop-perf/measure.c` | 27,246 |
+| `tests/desktop-perf/perfconsole/abi.h` | 302 |
 | `tests/dhewm3/as-user.c` | 1,266 |
 | `tests/dhewm3/clock-probe.c` | 4,185 |
 | `tests/disk-no-sync/test.c` | 4,336 |
@@ -728,9 +729,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-final/run_vm.py` | 13,462 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-v4/run.py` | 602 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run-driver.py` | 2,815 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run.py` | 25,256 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run-driver.py` | 2,830 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run.py` | 25,268 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/runner.py` | 4,795 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/stage.py` | 11,764 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/run.py` | 3,226 |
@@ -751,7 +750,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run_vm.py` | 13,468 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/run.py` | 25,268 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/static-desktop/run-build.py` | 2,088 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/desktop-perf-controller/validate-completed.py` | 1,616 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/catalina-measure.py` | 2,225 |
@@ -768,10 +766,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/driver.py` | 15,387 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/evidence-audit.py` | 4,682 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/run.py` | 678 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/pipeline.py` | 2,733 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run-driver.py` | 2,830 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run.py` | 25,268 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/validate-completed.py` | 1,616 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/collect.py` | 6,463 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/collect-v6-verification.py` | 5,500 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-arm-driver.py` | 417 |
@@ -806,10 +800,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/browsers/run_vm.py` | 9,438 |
 | `tests/claude/smoke.py` | 7,250 |
 | `tests/codex/smoke.py` | 4,944 |
-| `tests/desktop-perf/_native_report.py` | 2,681 |
-| `tests/desktop-perf/_runner_native.py` | 11,681 |
-| `tests/desktop-perf/run.py` | 14,065 |
-| `tests/desktop-perf/test_runner.py` | 9,519 |
 | `tests/dhewm3/_guest_native.py` | 3,724 |
 | `tests/dhewm3/prepare-debian.py` | 1,073 |
 | `tests/dhewm3/run.py` | 3,664 |
@@ -1077,15 +1067,22 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/recompute` | 149 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/init.sh` | 2,156 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/perf-init.sh` | 6,852 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run` | 325 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/perf-init.sh` | 6,852 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run` | 322 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute` | 155 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/compare` | 147 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/recompute` | 149 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/perf-init.sh` | 6,852 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/run` | 322 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute` | 155 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/compare` | 147 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/recompute` | 149 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/perf-init.sh` | 6,852 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/pipeline` | 335 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run` | 322 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run-driver` | 378 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/validate-completed` | 426 |
 | `tests/alloc-bench/test-evidence-owner` | 153 |
 | `tests/alloc-bench/test-native-reports` | 153 |
 | `tests/alloc-bench/validate-kernel` | 161 |
@@ -1138,7 +1135,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/desktop-bootstrap/run-runner.sh` | 169 |
 | `tests/desktop-bootstrap/run.sh` | 224 |
 | `tests/desktop-perf/perf-init.sh` | 8,147 |
-| `tests/desktop-perf/run-host-tests.sh` | 286 |
+| `tests/desktop-perf/run` | 137 |
+| `tests/desktop-perf/run-host-tests.sh` | 321 |
+| `tests/desktop-perf/run-saved` | 143 |
+| `tests/desktop-perf/run-saved-driver` | 150 |
 | `tests/desktop/first-run-apps-init.sh` | 4,538 |
 | `tests/developer-tools/smoke.sh` | 4,577 |
 | `tests/devicetree-string-list/run.sh` | 240 |
