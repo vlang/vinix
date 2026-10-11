@@ -166,6 +166,17 @@ fn power(mut r Report) {
 	r.add('| may wake the machine | ${wake.join(', ')} |')
 	r.add('| screen across a sleep | dark ${word(sys + '/power/suspend_stats/screen_dark')} times, left lit ${word(sys +
 		'/power/suspend_stats/screen_lit')} |')
+	// Panels whose backlight the kernel can set: without one a dark screen is a
+	// black picture on a lit panel.
+	panels := listing(sys + '/class/backlight')
+	if panels.len == 0 {
+		r.add('| backlight | none the kernel can set |')
+	}
+	for name in panels {
+		panel := '${sys}/class/backlight/${name}'
+		r.add('| backlight ${name} | level ${word(panel + '/brightness')} of ${word(panel + '/max_brightness')}, the panel says ${word(panel +
+			'/actual_brightness')}; set by ${word(panel + '/type')}; ${one_line(panel + '/stats')} |')
+	}
 	r.add('| sleeps so far | ${word(sys + '/power/suspend_stats/success')} succeeded, ${word(sys +
 		'/power/suspend_stats/fail')} failed |')
 	cpu0 := sys + '/devices/system/cpu/cpu0'
