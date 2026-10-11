@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `e7e2b61527ebda3cd8b734ecd851ab2f541e05c4`,
+at source commit `6d2661b6748b643684bf75b0659e9a442bd26283`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 564 | 2,345,798 | 6.37% |
-| Python | 426 | 2,041,785 | 5.54% |
-| Shell | 420 | 1,355,790 | 3.68% |
+| C | 564 | 2,345,798 | 6.32% |
+| Python | 419 | 2,021,201 | 5.44% |
+| Shell | 429 | 1,357,821 | 3.66% |
 
-All `.v` files are classified as V. The resulting V share is 75.96%, with no
+All `.v` files are classified as V. The resulting V share is 76.18%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 2,041,785 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 2,021,201 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev e7e2b61527ebda3cd8b734ecd851ab2f541e05c4 --breakdown --json
+github-linguist --rev 6d2661b6748b643684bf75b0659e9a442bd26283 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -817,9 +817,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/test_v_sampler.py` | 2,841 |
 | `tests/alloc-track/run_guest.py` | 1,101 |
 | `tests/alloc-track/run_native.py` | 3,834 |
-| `tests/amd64-console/run.py` | 1,040 |
-| `tests/amd64-exceptions/run.py` | 5,611 |
-| `tests/amd64-poll/run.py` | 2,839 |
 | `tests/android/_run_native.py` | 16,117 |
 | `tests/android/activity-lifecycle-test.py` | 1,750 |
 | `tests/android/art-runtime-test.py` | 2,297 |
@@ -905,7 +902,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/gl-triangle/run.py` | 2,728 |
 | `tests/hypervisor/host-test.py` | 3,871 |
 | `tests/hypervisor/run-abi.py` | 1,082 |
-| `tests/hypervisor/run-vm.py` | 1,208 |
 | `tests/init-policy/compile-guest.py` | 1,044 |
 | `tests/init-policy/run-vm.py` | 4,345 |
 | `tests/ios/desktop.py` | 7,962 |
@@ -917,11 +913,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/compile-v-fixture.py` | 2,092 |
 | `tests/kernel-gaps/run.py` | 3,048 |
-| `tests/kernel-gaps/test_runner.py` | 4,085 |
 | `tests/kernel-job-control/run.py` | 5,293 |
 | `tests/kernel-print/compile-policy.py` | 2,197 |
 | `tests/kernel-print/run_native.py` | 5,163 |
-| `tests/kernel-resources/run.py` | 1,696 |
 | `tests/kernel-retention/run.py` | 5,204 |
 | `tests/kernel-stack-guards/run.py` | 4,358 |
 | `tests/kernel-sysvmsg/run.py` | 4,812 |
@@ -951,7 +945,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mapped-writeback/run.py` | 8,691 |
 | `tests/memlock/run_vm.py` | 1,113 |
 | `tests/memory-retention/run.py` | 449 |
-| `tests/memory/run-pagetable.py` | 4,105 |
 | `tests/memory/run-runtime.py` | 7,331 |
 | `tests/memory/test-big-io.py` | 6,072 |
 | `tests/minecraft/test-fetcher.py` | 4,085 |
@@ -1243,6 +1236,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/validate-kernel` | 161 |
 | `tests/alloc-track/run` | 170 |
+| `tests/amd64-console/run` | 168 |
+| `tests/amd64-exceptions/run` | 171 |
+| `tests/amd64-poll/run` | 165 |
 | `tests/android/guest-init.sh` | 25,551 |
 | `tests/android/run-activity-dispatch-test.sh` | 1,212 |
 | `tests/android/run-cookie-store-test.sh` | 1,299 |
@@ -1298,7 +1294,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/go/smoke.sh` | 558 |
 | `tests/hardware-platform/run` | 178 |
+| `tests/hibernate/run.sh` | 681 |
 | `tests/hypervisor/check-vmx` | 110 |
+| `tests/hypervisor/run-vm` | 171 |
 | `tests/hypervisor/run.sh` | 124 |
 | `tests/hyprland/smoke.sh` | 413 |
 | `tests/init-policy/run` | 169 |
@@ -1320,8 +1318,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-allocs/run.sh` | 4,115 |
 | `tests/kernel-allocs/sites` | 180 |
 | `tests/kernel-cpu/logic` | 168 |
+| `tests/kernel-gaps/run-native` | 168 |
+| `tests/kernel-gaps/test-runner` | 167 |
 | `tests/kernel-link-layout/check` | 180 |
 | `tests/kernel-print/run` | 170 |
+| `tests/kernel-resources/run` | 170 |
 | `tests/kernel-resources/run-host.sh` | 1,620 |
 | `tests/krandom/run.sh` | 1,747 |
 | `tests/limine-aarch64/test-patch` | 111 |
@@ -1338,6 +1339,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/memlock/run.sh` | 2,089 |
 | `tests/memory-pressure/run.sh` | 3,124 |
 | `tests/memory/run-big-metadata.sh` | 735 |
+| `tests/memory/run-pagetable` | 170 |
 | `tests/memory/run-runtime.sh` | 177 |
 | `tests/minecraft/smoke.sh` | 939 |
 | `tests/minecraft/test-launcher.sh` | 8,276 |

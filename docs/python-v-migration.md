@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `e7e2b61527ebda3cd8b734ecd851ab2f541e05c4`,
-Linguist 7.27.0 reports **Python 5.54%** (426 files, 2,041,785 bytes) and
-**V 75.96%** (2,623 files, 27,988,489 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `6d2661b6748b643684bf75b0659e9a442bd26283`,
+Linguist 7.27.0 reports **Python 5.44%** (419 files, 2,021,201 bytes) and
+**V 76.18%** (2,661 files, 28,280,820 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **3,164,500 Python bytes**. All remaining
-2,041,785 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **3,185,084 Python bytes**. All remaining
+2,021,201 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -23,7 +23,7 @@ archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 33 stages below remove **106 Python files / 319,563 original bytes** and
+The 34 stages below remove **113 Python files / 340,147 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -64,6 +64,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Scheduler, TLB and CPU policy host launchers | `tests/host-policy/policyhost`, four native commands | 4,174 / 93 | `6a533e64` |
 | Generated policy fixtures, CPU assembly and linked ELF checks | `tests/generated-policy-host/policyhost`, four native fixture commands and `tests/cpu-mitigations/linkedcheck` | 9,359 / 258 | `defd59e4` |
 | Production init, tracker, console, fault, CPU and network host commands | `tests/native-policy-tools/nativepolicy`, seven native entrypoints | 21,098 / 378 | `e7e2b615` |
+| Guest controllers, PTY/QMP supervision and independent verdict tests | `tests/native-guest-tools/guesthost`, eight native entrypoints | 20,584 / 434 | `6d2661b6` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -545,12 +546,38 @@ See [the native policy qualification](../tests/native-policy-tools/README.md).
 No Python was run. Between `defd59e4` and `e7e2b615`, counted Python declines by
 exactly 21,098 bytes and seven files; concurrent changes affect other languages.
 
+The following batch retires **seven Python files / 20,584 bytes**. The generic,
+hypervisor, console, resource, poll, exception and page-table commands now build
+and supervise guests directly in V. The independent runner test suite is also
+V. Compiler profiles, original C controls, allocator guards, source/executable
+hashes, expected/forbidden markers and raw serial evidence remain. ARM uses the
+pinned ISO builder and direct QEMU launch, completing the fixture path without
+the desktop script's Python package server.
+
+Fresh ARM, Rosetta x86 and ARM ASan/UBSan hosts pass all seven controller builds
+and the original twelve verdict methods. Additional checks cover QMP, SIGINT,
+failed exec, UTF-8 replacement and one hundred repeated FD/child retirements.
+Original C and V poll, exception and both-architecture page-table fixtures pass
+24 static builds across those hosts, with ELF machine IDs and manifest hashes
+verified. Nine further init compiler profiles, including linked sandbox/audit
+cores, also pass. All eight cold entrypoints pass outside the checkout.
+
+Actual hypervisor fixtures boot successfully on prepared ARM and x86 kernels
+under TCG and report hypervisor unavailable; VMX execution is not established.
+The V poll fixture and original C control both fail the line-48 predicate with
+errno 22 on the cached x86 kernel. Their ISOs contain identical kernel bytes.
+That guest verdict remains a failure. No new production kernel build or physical
+hardware run is claimed. See
+[the native guest qualification](../tests/native-guest-tools/README.md).
+No Python was run. Between `e7e2b615` and `6d2661b6`, counted Python declines by
+exactly 20,584 bytes and seven files; concurrent changes affect other languages.
+
 The remaining work includes Python callers and import bridges around earlier
 V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 33 stages.
+or hidden in these 34 stages.
 
 ## Earlier completed stages
 
