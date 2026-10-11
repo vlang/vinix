@@ -163,8 +163,8 @@ fn build_main(args string) ! {
 	}
 	call('reset_directory', o(attribute(args, 'work')!), o(protected))!
 	module_root := join(attribute(args, 'work')!, 'vmodules')!
-	stage := collection('list', [constant('sys.executable')!,
-		join(attribute(args, 'repo')!, 'desktop/tools/stage_ui2.py')!, join(module_root, 'ui2')!,
+	stage := collection('list', [
+		join(attribute(args, 'repo')!, 'desktop/tools/stage_ui2')!, join(module_root, 'ui2')!,
 		attribute(args, 'ui2_source')!,
 		join(attribute(args, 'repo')!, 'desktop/tools/ui2_vinix_backend.v')!])!
 	call('run', o(stage))!

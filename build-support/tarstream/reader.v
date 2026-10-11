@@ -37,6 +37,7 @@ mut:
 	started   bool
 	ended     bool
 	globals   map[string]string
+	metadata_limit i64 = 0x7fffffff
 }
 
 fn filter_error(stream &C.archive) IError {
@@ -54,6 +55,14 @@ pub fn open(path string) !Reader {
 // Boot module inputs are deliberately uncompressed, matching tar's r: mode.
 pub fn open_plain(path string) !Reader {
 	return open_filtered(path, false)
+}
+
+// Upload validators know the entire physical input size. Reject an extension
+// claiming more bytes before allocating its metadata buffer.
+pub fn open_plain_bounded(path string, metadata_limit i64) !Reader {
+	mut reader := open_filtered(path, false)!
+	reader.metadata_limit = metadata_limit
+	return reader
 }
 
 fn open_filtered(path string, compressed bool) !Reader {
@@ -232,7 +241,7 @@ pub fn (mut reader Reader) next() !tarcore.Member {
 		mut member := parse_header(data)!
 		if member.size < 0 { return error('negative archive member size') }
 		if member.kind in [u8(`x`), `g`, `X`, `L`, `K`] {
-			if member.size > 0x7fffffff { return error('archive metadata is too large') }
+			if member.size > reader.metadata_limit || member.size > 0x7fffffff { return error('archive metadata is too large') }
 			mut body := []u8{len: int(member.size)}
 			reader.exact(mut body, false)!
 			reader.padding = int((512 - member.size % 512) % 512)

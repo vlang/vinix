@@ -1,0 +1,164 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module sourcecommand
+
+import os
+import strings
+import time
+
+#flag -I @DIR
+#include "abi.h"
+#include <poll.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+@[typedef]
+struct C.vinix_source_child_info { si_pid i32 si_code i32 si_status i32 }
+@[typedef]
+struct C.posix_spawn_file_actions_t {}
+@[typedef]
+struct C.posix_spawnattr_t {}
+@[typedef]
+struct C.sigset_t {}
+struct C.pollfd { mut: fd i32 events i16 revents i16 }
+fn C.posix_spawnp(&i32, &char, voidptr, voidptr, &&char, &&char) i32
+fn C.posix_spawn_file_actions_init(voidptr) i32
+fn C.posix_spawn_file_actions_destroy(voidptr) i32
+fn C.posix_spawn_file_actions_adddup2(voidptr, i32, i32) i32
+fn C.posix_spawn_file_actions_addclose(voidptr, i32) i32
+fn C.posix_spawn_file_actions_addinherit_np(voidptr, i32) i32
+fn C.posix_spawnattr_init(voidptr) i32
+fn C.posix_spawnattr_destroy(voidptr) i32
+fn C.posix_spawnattr_setpgroup(voidptr, i32) i32
+fn C.posix_spawnattr_setflags(voidptr, i16) i32
+fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
+fn C.poll(&C.pollfd, usize, i32) i32
+fn C.waitid(i32, u32, &C.vinix_source_child_info, i32) i32
+fn C.waitpid(i32, &i32, i32) i32
+fn C.WIFEXITED(i32) i32
+fn C.WEXITSTATUS(i32) i32
+fn C.killpg(i32, i32) i32
+fn C.mkdtemp(&char) &char
+
+pub fn temporary(prefix string) !string {
+	base := if os.getenv('TMPDIR') != '' { os.getenv('TMPDIR') } else { os.temp_dir() }
+	mut name := (base + '/' + prefix + '.XXXXXX\x00').bytes()
+	if isnil(C.mkdtemp(name.data)) { return os.error_posix() }
+	return name.bytestr().all_before('\x00')
+}
+
+pub struct Output { pub: status int stdout string stderr string }
+
+// Keep the child unreaped until its private group is retired. Drain both pipes
+// concurrently, cap memory before append, and check cancellation on every poll.
+pub fn capture(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
+	return capture_observed(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, 0)
+}
+
+pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
+	observe fn (string, voidptr) !, context voidptr, shutdown_grace f64) !Output {
+	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid command') }
+	mut pipes := [i32(-1), -1, -1, -1]!
+	defer { for fd in pipes { if fd >= 0 { C.close(fd) } } }
+	if C.pipe(&pipes[0]) != 0 || C.pipe(&pipes[2]) != 0 { return os.error_posix() }
+	for index in 0 .. 4 {
+		if pipes[index] < 3 {
+			fd := C.fcntl(pipes[index], C.F_DUPFD_CLOEXEC, 3)
+			if fd < 0 { return os.error_posix() }
+			C.close(pipes[index]); pipes[index] = fd
+		}
+		if C.fcntl(pipes[index], C.F_SETFD, C.FD_CLOEXEC) != 0 { return os.error_posix() }
+	}
+	mut actions := C.posix_spawn_file_actions_t{}
+	if C.posix_spawn_file_actions_init(&actions) != 0 { return error('cannot initialize spawn actions') }
+	defer { C.posix_spawn_file_actions_destroy(&actions) }
+	for status in [C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1), C.posix_spawn_file_actions_adddup2(&actions, pipes[3], 2),
+		C.posix_spawn_file_actions_addclose(&actions, pipes[0]), C.posix_spawn_file_actions_addclose(&actions, pipes[1]),
+		C.posix_spawn_file_actions_addclose(&actions, pipes[2]), C.posix_spawn_file_actions_addclose(&actions, pipes[3])] {
+		if status != 0 { return error_with_code('cannot configure spawn actions', int(status)) }
+	}
+	mut attributes := C.posix_spawnattr_t{}
+	if C.posix_spawnattr_init(&attributes) != 0 { return error('cannot initialize spawn attributes') }
+	defer { C.posix_spawnattr_destroy(&attributes) }
+	mut signals := C.sigset_t{}
+	$if macos {
+		C.sigemptyset(unsafe { &u32(&signals) })
+		for signal in [C.SIGINT, C.SIGTERM, C.SIGPIPE] { C.sigaddset(unsafe { &u32(&signals) }, signal) }
+	} $else {
+		C.sigemptyset(&signals)
+		for signal in [C.SIGINT, C.SIGTERM, C.SIGPIPE] { C.sigaddset(&signals, signal) }
+	}
+	mut flags := i16(C.POSIX_SPAWN_SETPGROUP | C.POSIX_SPAWN_SETSIGDEF)
+	$if macos {
+		flags |= i16(C.POSIX_SPAWN_CLOEXEC_DEFAULT)
+		if C.fcntl(0, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, 0) != 0 { return error('cannot preserve command stdin') }
+	}
+	for status in [C.posix_spawnattr_setpgroup(&attributes, 0), C.posix_spawnattr_setsigdefault(&attributes, &signals),
+		C.posix_spawnattr_setflags(&attributes, flags)] {
+		if status != 0 { return error_with_code('cannot configure spawn attributes', int(status)) }
+	}
+	mut args := []&char{}
+	for value in argv { args << unsafe { &char(value.str) } }
+	args << &char(unsafe { nil })
+	mut env_text := []string{}
+	for name, value in env { if name.contains('\x00') || value.contains('\x00') { return error('invalid command environment') }; env_text << name + '=' + value }
+	mut environment := []&char{}
+	for value in env_text { environment << unsafe { &char(value.str) } }
+	environment << &char(unsafe { nil })
+	mut pid := i32(0)
+	spawn_status := C.posix_spawnp(&pid, argv[0].str, &actions, &attributes, args.data, environment.data)
+	if spawn_status != 0 { return error_with_code('cannot start ' + argv[0], int(spawn_status)) }
+	mut raw := i32(0)
+	defer {
+		if shutdown_grace > 0 {
+			C.killpg(pid, C.SIGTERM)
+			deadline := time.sys_mono_now() + u64(shutdown_grace * f64(time.second))
+			for time.sys_mono_now() < deadline {
+				mut observed := C.vinix_source_child_info{}
+				if C.waitid(C.P_PID, u32(pid), &observed, C.WEXITED | C.WNOHANG | C.WNOWAIT) == 0 && observed.si_pid == pid { break }
+				time.sleep(10 * time.millisecond)
+			}
+		}
+		C.killpg(pid, C.SIGKILL)
+		C.kill(pid, C.SIGKILL)
+		for { if C.waitpid(pid, &raw, 0) >= 0 || C.errno != C.EINTR { break } }
+	}
+	C.close(pipes[1]); pipes[1] = -1
+	C.close(pipes[3]); pipes[3] = -1
+	mut streams := [C.pollfd{fd: pipes[0], events: i16(C.POLLIN)}, C.pollfd{fd: pipes[2], events: i16(C.POLLIN)}]!
+	mut stdout := strings.new_builder(8192)
+	mut stderr := strings.new_builder(1024)
+	started := time.sys_mono_now()
+	mut buffer := [8192]u8{}
+	for {
+		if cancel != unsafe { nil } && cancel() { return error('command interrupted') }
+		if timeout >= 0 && f64(time.sys_mono_now() - started) >= timeout * f64(time.second) { return error('command timed out') }
+		mut observed := C.vinix_source_child_info{}
+		if C.waitid(C.P_PID, u32(pid), &observed, C.WEXITED | C.WNOHANG | C.WNOWAIT) != 0 && C.errno != C.EINTR { return os.error_posix() }
+		if streams[0].fd < 0 && streams[1].fd < 0 && observed.si_pid == pid { break }
+		if C.poll(&streams[0], 2, 50) < 0 { if C.errno == C.EINTR { continue }; return os.error_posix() }
+		for index in 0 .. 2 {
+			if streams[index].fd < 0 || streams[index].revents == 0 { continue }
+			count := C.read(streams[index].fd, &buffer[0], buffer.len)
+			if count < 0 { if C.errno == C.EINTR { continue }; return os.error_posix() }
+			if count == 0 { C.close(streams[index].fd); pipes[index * 2] = -1; streams[index].fd = -1; continue }
+			if index == 0 {
+				if stdout.len > limit - int(count) { return error('command output exceeds limit') }
+				stdout.write(buffer[..int(count)])!
+				if observe != unsafe { nil } { observe(buffer[..int(count)].bytestr(), context)! }
+			} else if stderr.len < 64 * 1024 {
+				stderr.write(buffer[..int_min(int(count), 64 * 1024 - stderr.len)])!
+			}
+		}
+	}
+	// Observe the SDK status while still reserving the PID; the defer retires
+	// the group and performs the only reap before any caller can reuse it.
+	mut info := C.vinix_source_child_info{}
+	if C.waitid(C.P_PID, u32(pid), &info, C.WEXITED | C.WNOWAIT) != 0 { return os.error_posix() }
+	return Output{child_status(info), stdout.str(), stderr.str()}
+}
+
+fn child_status(info C.vinix_source_child_info) int {
+	return if info.si_code == C.CLD_EXITED { int(info.si_status) } else { -int(info.si_status) }
+}

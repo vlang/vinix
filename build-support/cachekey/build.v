@@ -234,7 +234,7 @@ pub fn office_shared(input OfficeInputs) !string {
 	mut active := map[string]bool{}
 	for item in [BuildInput{input.builder, 'builder', false, ''},
 		BuildInput{join_path(parent_path(input.builder), 'build_cache.py'), 'cache-helper', false, ''},
-		BuildInput{join_path(input.repo, 'desktop/tools/stage_ui2.py'), 'stager', false, ''},
+		BuildInput{join_path(input.repo, 'desktop/tools/stage_ui2'), 'stager', false, ''},
 		BuildInput{join_path(input.repo, 'desktop/tools/ui2_vinix_backend.v'), 'backend', false, ''},
 		BuildInput{join_path(input.ui2, 'v.mod'), 'ui2-manifest', false, ''},
 		BuildInput{join_path(input.office, 'v.mod'), 'office-manifest', false, ''},
@@ -248,7 +248,9 @@ pub fn office_shared(input OfficeInputs) !string {
 		'tools/_package_store_native.py', 'build-support/native_host.py',
 		'build-support/android/_boot_native.py', 'build-support/android/androidhost',
 		'build-support/android/boothost', 'build-support/run-v-tool.sh', 'build-support/find-v.sh',
-		'desktop/tools/stage_query.v', 'desktop/tools/stagehost', 'desktop/tools/_stage_native.py',
+		'desktop/tools/stage_query.v', 'desktop/tools/stage_ui2.v', 'desktop/tools/stagehost',
+		'desktop/tools/hosttest', 'desktop/tools/fixturehost', 'desktop/tools/policyhost',
+		'tests/linuxkpi/hosttest', 'tests/qemu-core/fixturehost', 'tests/host-policy/policyhost',
 		'desktop/tools/androidhost', 'desktop/tools/boothost', 'desktop/tools/packagestore'] {
 		build_hash_path(mut digest, join_path(input.repo, path), 'office-native/' + path, false, '', mut active)!
 	}

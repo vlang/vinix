@@ -37,7 +37,8 @@ printf 'ready\n' >"$root/var/lib/vinix-pkg/base-ready"
 printf 'usr/share/base/replaced\n' >"$root/var/lib/vinix-pkg/package-files"
 printf 'new package library\n' >"$root/usr/share/base/replaced"
 
-python3 "$repo/tools/qemu-package-store.py" \
+"$repo/tools/qemu-package-store" --install-server "$work/package-store"
+"$work/package-store" \
 	--store "$store" --port 0 --ready-file "$ready" \
 	>"$work/server.log" 2>&1 &
 server_pid=$!

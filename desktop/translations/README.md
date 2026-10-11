@@ -13,7 +13,7 @@ files.items
 {0} элемент|{0} элемента|{0} элементов
 ```
 
-The build compiles these files in (`desktop/tools/stage_app.py` turns them
+The build compiles these files in (`desktop/tools/stage_app` turns them
 into `translations_data.v`), and [translations.v](../translations.v) loads
 them with `i18n.load_tr_map_from_files` and looks text up with `tr()`.
 

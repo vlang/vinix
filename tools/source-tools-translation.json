@@ -1,0 +1,75 @@
+{
+    "generated_c_translation_credit": 0,
+    "original_python_bytes": 32617,
+    "original_python_lines": 783,
+    "originals": [
+        {
+            "blob_sha1": "62360e897d98a20ee242a1ca3cfcd6200c933fb6",
+            "bytes": 2842,
+            "lines": 70,
+            "path": "desktop/tools/stage_app.py",
+            "sha256": "3e435bd8a4088e8d89617bec93210458f29b97d05a18380a808f7e3f88876901"
+        },
+        {
+            "blob_sha1": "eb395393b562cb37c12030ca1e0240854b8aa470",
+            "bytes": 990,
+            "lines": 33,
+            "path": "desktop/tools/stage_ui2.py",
+            "sha256": "588145895f150af84d04f30dabc94ead0d5b6f2b99a44c770a6b5b4d145f2c96"
+        },
+        {
+            "blob_sha1": "67b15862dd9b8fe228cdbbd04d2fe298b099591d",
+            "bytes": 6520,
+            "lines": 162,
+            "path": "desktop/tools/_stage_native.py",
+            "sha256": "9422a47a15a5999b32a77ff1c5375d688ae8a10fa6bff09a85ec4ed93f5470f7"
+        },
+        {
+            "blob_sha1": "57316658375a6bcfed929d09fbfb956e25aa9205",
+            "bytes": 3424,
+            "lines": 72,
+            "path": "desktop/tools/stage_host_gpu.py",
+            "sha256": "0959bf45c50055f8f92acd9278b1bb2747c9fc550e50eaf6aee9331d84199c52"
+        },
+        {
+            "blob_sha1": "ec3ccacd2fab5935b73e808553917b53426167cd",
+            "bytes": 4917,
+            "lines": 145,
+            "path": "tools/qemu-package-store.py",
+            "sha256": "9d830cdeffe279af9ddf3cbc64d25524c936dbfe962be71ac7a7314e8b5495f2"
+        },
+        {
+            "blob_sha1": "b09b12f6b8045b9b196ad3e6bc3b4f42997762f8",
+            "bytes": 1332,
+            "lines": 40,
+            "path": "tools/host_clipboard.py",
+            "sha256": "167ec124dde2cf6ad1de0d960a4085b21ff02340ca9b2b97ebe13c72e7688b33"
+        },
+        {
+            "blob_sha1": "7e9a10d10f6106ebbb560c658a3e7d8d3242a4d2",
+            "bytes": 3072,
+            "lines": 69,
+            "path": "tests/packages/test-qemu-package-store.py",
+            "sha256": "930f70a7a38ef081a471ab632b552dc951554733702c5fe08314c56e31e3e3f2"
+        },
+        {
+            "blob_sha1": "300b81132ec43c378b341d73e1c8b4eabe0ddf3c",
+            "bytes": 3780,
+            "lines": 76,
+            "path": "tests/clipboard/test_host.py",
+            "sha256": "e0e7f00108748e4b86e9193af4ae99a8d23d7b16bb282b11f894e99c6bdcaaac"
+        },
+        {
+            "blob_sha1": "e63c87ba08d7213943af62e378cb474e81fe656f",
+            "bytes": 5740,
+            "lines": 116,
+            "path": "tests/clipboard/run_vm.py",
+            "sha256": "37bc4898f88d5d206a684030e84b3af603ab4ef41f62bb6c19108e0c19379fce"
+        }
+    ],
+    "python_executed": false,
+    "python_files_retired": 9,
+    "qualification": "source-tools-native.md",
+    "schema": 1,
+    "source_commit": "2d1861f187647e34fdd94141c8a6b9b242b8d423"
+}

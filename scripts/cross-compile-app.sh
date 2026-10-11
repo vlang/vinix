@@ -24,7 +24,7 @@ BUILD_CACHE="$APPS_DIR/app-cross-cache"
 SYSROOT="${VINIX_AARCH64_SYSROOT:-$SCRIPT_DIR/build-aarch64-userland/staging}"
 
 # The applications a guest knows how to replace. Adding one here also needs it
-# in LIVE_APPS in tools/qemu-package-store.py, in build-support/vinix-files-sync
+# in LIVE_APPS in tools/qemu-package-store, in build-support/vinix-files-sync
 # and in LiveApp entries in build-support/init-aarch64/initcore/core.v.
 if [ "$#" -eq 0 ]; then
     echo "usage: $0 files|activity|settings..." >&2

@@ -18,16 +18,9 @@ printf 'module main\nconst host_revision = 1\n' > "$source_root/desktop/main.v"
 mkdir -p "$source_root/desktop/translations"
 printf 'app.files\nFiles\n' > "$source_root/desktop/translations/en.tr"
 mkdir -p "$source_root/desktop/assets"
-python3 - "$source_root/desktop/assets/terminal.qoi" <<'PY'
-import sys
-from pathlib import Path
-Path(sys.argv[1]).write_bytes(
-    b"qoif" + (1).to_bytes(4, "big") * 2 + bytes([4, 0, 0xff, 17, 34, 51, 255])
-    + b"\0" * 7 + b"\1"
-)
-PY
-cp "$repo/desktop/tools/stage_app.py" "$source_root/desktop/tools/stage_app.py"
-cp "$repo/desktop/tools/stage_ui2.py" "$source_root/desktop/tools/stage_ui2.py"
+"$repo/tests/packages/test-qemu-package-store" --install-fixture "$work/source-fixture"
+"$work/source-fixture" --write-icon "$source_root/desktop/assets/terminal.qoi"
+"$work/source-fixture" --install-stagers "$source_root"
 cp "$repo/desktop/tools/ui2_headless_bounds.v" \
 	"$source_root/desktop/tools/ui2_headless_bounds.v"
 printf 'Module { name: "ui2", subdirs: ["ui"] }\n' > "$ui2_root/v.mod"
@@ -40,7 +33,8 @@ git -C "$source_root" init -q
 git -C "$source_root" add .gitignore desktop/main.v
 
 ready=$work/ready
-python3 "$repo/tools/qemu-package-store.py" \
+"$repo/tools/qemu-package-store" --install-server "$work/package-store"
+"$work/package-store" \
 	--store "$work/packages.tar" --port 0 --ready-file "$ready" \
 	--source-root "$source_root" --ui2-source "$ui2_root" \
 	>"$work/server.log" 2>&1 &

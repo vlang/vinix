@@ -3,7 +3,6 @@ module stagehost
 
 import encoding.hex
 import json2
-import os
 
 pub struct BindingError {
 pub:
@@ -30,15 +29,11 @@ fn failure(value string) IError { return StageError{value} }
 fn decode(value string) !string { return hex.decode(value)!.bytestr() }
 
 fn callback(operation string, arguments map[string]json2.Any) !json2.Any {
-	println(json2.encode({
-		'callback':  json2.Any(operation)
-		'arguments': json2.Any(arguments)
-	},
-		escape_unicode: true
-	))
-	row := json2.decode[json2.Any](os.get_raw_line())!.as_map()
-	if 'error' in row { return BindingError{row['error']!.as_map()} }
-	return row['value']!
+	return native(operation, arguments) or {
+		if err is StageError { return err }
+		return BindingError{ {'message': json2.Any(err.msg().bytes().hex()),
+			'os_error': json2.Any(operation != 'regex')} }
+	}
 }
 
 fn encoded(values []string) json2.Any { return json2.Any(values.map(json2.Any(it.bytes().hex()))) }

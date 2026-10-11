@@ -59,7 +59,6 @@ The library must match the interpreter's architecture. To build it explicitly:
 ```sh
 build-support/build-v-host-library.sh tools/package_sdk_library.v /tmp/package-sdk.dylib \
   -d cpython_package -d use_bundled_libgc
-VINIX_PACKAGE_STORE_LIBRARY=/tmp/package-sdk.dylib python3 tools/qemu-package-store.py --help
 ```
 
 Normal query binaries continue using the existing process transport. The host
@@ -67,3 +66,8 @@ library implements the actual-object callbacks for those queries; it does not
 change their wire format or independently establish a fresh kernel, guest or
 hardware validation result. Private adapter traceback frames and post-return
 cyclic-GC order are not an exact compatibility contract.
+
+The QEMU loopback service now uses `packageserver`, `sourcecommand`, `hostclipboard`
+and native source staging. It does not load this CPython library. The shared
+borrowed-object bridge remains for the iOS and other controllers still being ported.
+Run `tools/qemu-package-store --help` for the native service's options.

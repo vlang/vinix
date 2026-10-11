@@ -324,7 +324,7 @@ execution has not been verified. Its configuration lives under the active
 user's `.local/share/vinix/ppsspp/Documents` directory.
 
 The Calculator model comes from ui2's own example and is not copied into this
-repository. `tools/stage_app.py` takes it straight from the ui2 checkout at
+repository. `tools/stage_app` takes it straight from the ui2 checkout at
 build time, removes the platform `fn main()` and its now-unused embedded source
 constant, and leaves the model and methods unmodified. Vinix's adapter adds
 memory, history and Scientific mode. The original VML remains compile-checked

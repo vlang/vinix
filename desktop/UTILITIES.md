@@ -637,7 +637,7 @@ semantics; editor window/session close refusal, Save As collision/retry and
 failed Open preserving the original Save destination; and Trash restore
 conflicts, confirmation/cancel, emptying and reopening. The host runners derive
 the software presenter's header and object from committed V sources using
-`stage_host_gpu.py`, so the headless tests also work after the presenter port.
+`stage_host_gpu`, so the headless tests also work after the presenter port.
 Clipboard/UTF-8 checks and all 29 Python performance-runner cases pass.
 
 The feature desktop (`995badf8`) cross-builds as a static AArch64 ELF and passes

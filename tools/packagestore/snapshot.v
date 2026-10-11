@@ -76,8 +76,8 @@ fn extra_files(root string, relative string) !string {
 }
 
 fn stage_desktop(root string, ui2 string, destination string) ! {
-	stage_app := join(root, 'desktop/tools/stage_app.py')!
-	stage_ui2 := join(root, 'desktop/tools/stage_ui2.py')!
+	stage_app := join(root, 'desktop/tools/stage_app')!
+	stage_ui2 := join(root, 'desktop/tools/stage_ui2')!
 	bridge := join(root, 'desktop/tools/ui2_headless_bounds.v')!
 	calculator := join(ui2, 'examples/calculator')!
 	for required in [stage_app, stage_ui2, bridge, join(ui2, 'v.mod')!, join(calculator, 'main.v')!] {
@@ -93,12 +93,11 @@ fn stage_desktop(root string, ui2 string, destination string) ! {
 		}
 	}
 	linked := join(attribute(destination, 'parent')!, 'linked')!
-	python := call('sys.executable')!
 	commands := [
-		collection('tuple', [python, call('os.fspath', o(stage_ui2))!,
+		collection('tuple', [call('os.fspath', o(stage_ui2))!,
 			call('os.fspath', o(join(linked, 'vmodules/ui2')!))!, call('os.fspath', o(ui2))!,
 			call('os.fspath', o(bridge))!])!,
-		collection('tuple', [python, call('os.fspath', o(stage_app))!,
+		collection('tuple', [call('os.fspath', o(stage_app))!,
 			call('os.fspath', o(join(linked, 'desktop')!))!,
 			call('os.fspath', o(join(root, 'desktop')!))!, call('os.fspath', o(calculator))!])!,
 	]

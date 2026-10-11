@@ -1037,10 +1037,10 @@ mkdir -p "$PACKAGE_RUNTIME_ROOT/etc/vinix-pkg" "$PACKAGE_RUNTIME_ROOT/root" \
     "$PACKAGE_RUNTIME_ROOT/etc/vinix" "$PACKAGE_RUNTIME_ROOT/usr/bin" \
     "$PACKAGE_RUNTIME_ROOT/usr/libexec"
 
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "ERROR: python3 is required for QEMU package persistence" >&2
-    exit 1
-fi
+# Install before starting the readiness clock: first-use V compilation can
+# take longer than the service's bounded ten-second startup window.
+PACKAGE_SERVER_BINARY="$PACKAGE_RUNTIME_DIR/package-store"
+"$SCRIPT_DIR/tools/qemu-package-store" --install-server "$PACKAGE_SERVER_BINARY"
 SOURCE_SERVER_ARGS=()
 case "$CLIPBOARD_ENABLED" in
     0) ;;
@@ -1051,12 +1051,12 @@ if [ "$HOST_SOURCE_ENABLED" -eq 1 ]; then
     SOURCE_SERVER_ARGS+=(--source-root "$HOST_SOURCE_ROOT" \
         --ui2-source "$HOST_UI2_SOURCE")
 fi
-python3 "$SCRIPT_DIR/tools/qemu-package-store.py" \
+"$PACKAGE_SERVER_BINARY" \
     --store "$PACKAGE_STORE" --port "$PACKAGE_STORE_PORT" \
     --ready-file "$PACKAGE_SERVER_READY" "${SOURCE_SERVER_ARGS[@]}" \
     >"$PACKAGE_SERVER_LOG" 2>&1 &
 PACKAGE_SERVER_PID=$!
-# Python startup can take more than a second while other VMs are loading.
+# Service startup can take more than a second while other VMs are loading.
 # Keep readiness bounded, and still stop immediately if the server exits.
 for package_server_attempt in {1..100}; do
     [ -s "$PACKAGE_SERVER_READY" ] && break

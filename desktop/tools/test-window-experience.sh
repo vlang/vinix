@@ -18,10 +18,10 @@ trap 'rm -rf "$work"' EXIT HUP INT TERM
 # Supply the same headless bridge on the macOS host used to run these tests.
 sed 's/(linux || vinix)/(linux || vinix || macos)/' \
     "$root/desktop/tools/ui2_headless_bounds.v" > "$work/headless_bounds.v"
-python3 "$root/desktop/tools/stage_ui2.py" "$work/modules/ui2" \
+"$root/desktop/tools/stage_ui2" "$work/modules/ui2" \
     "$ui2" "$work/headless_bounds.v"
 mkdir "$work/ui"
-python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$desktop_source" \
+"$root/desktop/tools/stage_app" "$work/ui" "$desktop_source" \
     "$ui2/examples/calculator" >/dev/null
 # Other sessions may edit the checkout while a test compiles. Materialize
 # staged links once so each suite reads the same complete source snapshot.
@@ -34,7 +34,7 @@ for path in Path(sys.argv[1]).iterdir():
         path.unlink()
         path.write_bytes(data)
 PY
-python3 "$root/desktop/tools/stage_host_gpu.py" "$work/ui" --v "$v"
+"$root/desktop/tools/stage_host_gpu" "$work/ui" --v "$v"
 rm -f "$work/ui/main.v"
 printf "Module { name: 'window_experience_tests' }\n" > "$work/ui/v.mod"
 

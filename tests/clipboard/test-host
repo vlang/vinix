@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+exec sh "$root/build-support/run-v-tool.sh" "$root/tools/test-source-tools.v" --clipboard-only "$@"

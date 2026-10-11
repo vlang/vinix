@@ -4,11 +4,11 @@ set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
-python3 "$root/desktop/tools/stage_ui2.py" \
+"$root/desktop/tools/stage_ui2" \
     "$work/modules/ui2" "$root/third_party/ui2" \
     "$root/desktop/tools/ui2_headless_bounds.v"
 mkdir "$work/ui"
-python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \
+"$root/desktop/tools/stage_app" "$work/ui" "$root/desktop" \
     "$root/third_party/ui2/examples/calculator" >/dev/null
 cp "$root/tests/application-sandbox/calculator_rpc.v" "$work/ui/main.v"
 "${V:-v}" -new-compiler -nocache -gc none -manualfree -enable-globals -d ui2_headless \

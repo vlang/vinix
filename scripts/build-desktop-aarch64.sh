@@ -401,7 +401,7 @@ mkdir -p "$BUILD_DIR"
 # has no platform window. Build against a disposable module overlay that adds
 # Vinix's bounds bridge without modifying the upstream checkout.
 UI2_MODULES="$BUILD_DIR/vmodules"
-python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
+"$SCRIPT_DIR/desktop/tools/stage_ui2" \
     "$UI2_MODULES/ui2" "$UI2_SOURCE" \
     "$SCRIPT_DIR/desktop/tools/ui2_headless_bounds.v"
 
@@ -413,7 +413,7 @@ python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
 # example itself.
 echo "==> Staging sources..."
 APP_SRC="$BUILD_DIR/app-src"
-python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
+"$SCRIPT_DIR/desktop/tools/stage_app" "$APP_SRC" "$SCRIPT_DIR/desktop" \
     "$UI2_SOURCE/examples/calculator"
 
 # The development image carries generated artifacts alongside their V source.

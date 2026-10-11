@@ -25,7 +25,7 @@ if [ "${CLIENTS_ONLY:-0}" = 1 ]; then exit 0; fi
 [ -f "$root/third_party/ui2/v.mod" ] || {
     echo 'ERROR: Settings UI tests require third_party/ui2.' >&2; exit 1;
 }
-python3 "$root/desktop/tools/stage_ui2.py" \
+"$root/desktop/tools/stage_ui2" \
     "$work/modules/ui2" "$root/third_party/ui2" \
     "$root/desktop/tools/ui2_headless_bounds.v"
 # Settings is a category of the whole desktop application now, so the UI tests
@@ -34,9 +34,9 @@ python3 "$root/desktop/tools/stage_ui2.py" \
 # so the tests build against the desktop that ships. main.v is then dropped: its
 # fn main() would collide with the test runner's.
 mkdir "$work/ui"
-python3 "$root/desktop/tools/stage_app.py" "$work/ui" "$root/desktop" \
+"$root/desktop/tools/stage_app" "$work/ui" "$root/desktop" \
     "$root/third_party/ui2/examples/calculator" >/dev/null
-python3 "$root/desktop/tools/stage_host_gpu.py" "$work/ui" --v "$v"
+"$root/desktop/tools/stage_host_gpu" "$work/ui" --v "$v"
 python3 - "$work/ui" <<'PYFREEZE'
 from pathlib import Path
 import sys

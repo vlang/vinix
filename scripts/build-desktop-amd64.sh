@@ -116,13 +116,13 @@ fi
 
 mkdir -p "$BUILD_DIR"
 UI2_MODULES="$BUILD_DIR/vmodules"
-python3 "$SCRIPT_DIR/desktop/tools/stage_ui2.py" \
+"$SCRIPT_DIR/desktop/tools/stage_ui2" \
     "$UI2_MODULES/ui2" "$UI2_SOURCE" \
     "$SCRIPT_DIR/desktop/tools/ui2_headless_bounds.v"
 
 echo "==> Staging desktop sources..."
 APP_SRC="$BUILD_DIR/app-src"
-python3 "$SCRIPT_DIR/desktop/tools/stage_app.py" "$APP_SRC" "$SCRIPT_DIR/desktop" \
+"$SCRIPT_DIR/desktop/tools/stage_app" "$APP_SRC" "$SCRIPT_DIR/desktop" \
     "$UI2_SOURCE/examples/calculator"
 
 python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
