@@ -182,38 +182,34 @@ fn bundle_pool_allocate(mut set PlanSet, pool u32, request &Request, disk &u32,
 // Regions and desired mappings use one checksummed atomic bundle, avoiding a
 // separate pool file whose membership could disagree with a published mapping.
 fn edit_pool_plan(path &char, region &PoolRegion, remove bool) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 {
-		C.perror(c'vinix-volume: open pool bundle')
-		return 1
-	}
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe { *set = PlanSet{} }
-	if !read_bundle(fd, mut set, false) { return 1 }
+	if !read_bundle(edit.source, mut set, false) { return 1 }
 	changed := if remove {
 		bundle_pool_remove(mut set, region.pool, region.disk)
 	} else {
 		bundle_pool_add(mut set, region)
 	}
-	if !changed || !publish_bundle(path, set) { return 1 }
+	if !changed || !publish_edit_bundle(edit, set) { return 1 }
 	return finish_bundle_report(C.printf(c'planned pool member pool=%u disk=%u removed=%u\n',
 		region.pool, region.disk, u32(remove)) >= 0)
 }
 
 fn allocate_pool_plan(path &char, pool u32, request &Request) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 {
-		C.perror(c'vinix-volume: open pool bundle')
-		return 1
-	}
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe { *set = PlanSet{} }
-	if !read_bundle(fd, mut set, false) { return 1 }
+	if !read_bundle(edit.source, mut set, false) { return 1 }
 	mut disk := u32(0)
 	mut chosen := Request{}
-	if !bundle_pool_allocate(mut set, pool, request, unsafe { &disk }, mut chosen) || !publish_bundle(path, set) {
+	if !bundle_pool_allocate(mut set, pool, request, unsafe { &disk }, mut chosen) || !publish_edit_bundle(edit, set) {
 		return 1
 	}
 	return finish_bundle_report(C.printf(c'planned pool allocation pool=%u disk=%u slot=%u offset=%lu bytes=%lu readonly=%lu\n',

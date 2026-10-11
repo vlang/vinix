@@ -110,32 +110,24 @@ fn publish_plan(path &char, plan &Plan) bool {
 @[direct_array_access]
 fn publish_bytes(path &char, bytes &u8, size int) bool {
 	if size <= 0 { return false }
-	mut parent := [4096]char{}
-	mut name := [256]char{}
-	mut length := 0
-	mut slash := -1
-	unsafe {
-		for path[length] != 0 {
-			if length >= 4095 { plan_error(c'plan path is too long'); return false }
-			if path[length] == char(`/`) { slash = length }
-			length++
-		}
-		basename := slash + 1
-		if length == basename || length - basename > 255 { plan_error(c'invalid plan filename'); return false }
-		for i := basename; i < length; i++ { name[i - basename] = path[i] }
-		if C.strcmp(&name[0], c'.') == 0 || C.strcmp(&name[0], c'..') == 0 { return false }
-		if slash < 0 { parent[0] = char(`.`) }
-		else if slash == 0 { parent[0] = char(`/`) }
-		else { for i := 0; i < slash; i++ { parent[i] = path[i] } }
-	}
-	directory := C.open(&parent[0], C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
-	if directory < 0 { C.perror(c'vinix-volume: open plan directory'); return false }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_destination(path, mut edit, true) { return false }
+	return publish_edit_bytes(edit, bytes, size)
+}
+
+// Consume an owned directory duplicate. Its lock shares the editor's open
+// description; temporary creation, rename and final flush use this same inode.
+@[direct_array_access]
+fn publish_bytes_at(directory i32, name &char, bytes &u8, size int) bool {
 	defer { C.close(directory) }
+	if size <= 0 { return false }
 	mut temporary := [64]char{}
 	mut fd := i32(-1)
 	for attempt := 0; attempt < 64; attempt++ {
 		C.snprintf(&temporary[0], 64, c'.vinix-volume-%ld-%u', i64(C.getpid()), u32(attempt))
-		if C.strcmp(&temporary[0], &name[0]) == 0 { continue }
+		if C.strcmp(&temporary[0], name) == 0 { continue }
 		fd = C.openat(directory, &temporary[0], C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_NOFOLLOW | C.O_CLOEXEC, u32(0o600))
 		if fd >= 0 || unsafe { C.errno != C.EEXIST } { break }
 	}
@@ -156,7 +148,7 @@ fn publish_bytes(path &char, bytes &u8, size int) bool {
 	closed := C.close(fd)
 	fd = -1
 	if closed != 0 { C.perror(c'vinix-volume: close plan'); return false }
-	if C.renameat(directory, &temporary[0], directory, &name[0]) != 0 {
+	if C.renameat(directory, &temporary[0], directory, name) != 0 {
 		C.perror(c'vinix-volume: publish plan'); return false
 	}
 	published = true
@@ -168,13 +160,17 @@ fn volume_path(slot u32, buffer &char) { C.snprintf(buffer, 64, c'/dev/mapper/vi
 
 @[direct_array_access]
 fn save_plan(device &char, path &char) i32 {
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_destination(path, mut edit, true) { return 1 }
 	fd := C.open(device, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if fd < 0 { C.perror(c'vinix-volume: open disk'); return 1 }
 	defer { C.close(fd) }
 	mut plan := unsafe { &Plan(C.alloca(sizeof(Plan))) }
 	unsafe { *plan = Plan{} }
 	mut parent := Status{}
-	if !snapshot_plan(fd, mut plan, mut parent) || !publish_plan(path, plan) { return 1 }
+	if !snapshot_plan(fd, mut plan, mut parent) || !publish_edit_plan(edit, plan) { return 1 }
 	C.printf(c'saved %u volume mappings\n', plan.count)
 	return 0
 }

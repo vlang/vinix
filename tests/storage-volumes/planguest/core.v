@@ -435,6 +435,7 @@ fn first_boot(parent &char) {
 		planned_pools(parent, wrong)
 		planned_pool_growth(parent)
 		planned_pool_batch(parent, wrong)
+		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }

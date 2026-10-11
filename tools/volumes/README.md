@@ -99,6 +99,14 @@ preserves the entire saved state. `pool-preview-batch` reports the same complete
 placements without publication. Live checking/application remain separate. See
 [atomic batch rules](../../docs/storage-volumes.md#atomic-pool-allocation-batches).
 
+Saved-plan writers acquire a nonblocking exclusive lock on the destination
+directory before reading or snapshotting, holding it through atomic publication.
+A busy directory returns failure; retry reads the latest complete state. All
+destinations in one directory coordinate, and another directory is independent.
+Close or process exit releases the lock without a lock file. Read-only queries
+and previews remain available. See
+[writer locking and live administration limits](../../docs/storage-volumes.md#saved-plan-writer-locking).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

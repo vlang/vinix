@@ -43,12 +43,10 @@ fn bundle_adopt_capacity(mut set PlanSet, disk int, key &DiskKey, expected u64) 
 // publication. Probe it twice to reject identity/geometry changes during work.
 @[direct_array_access]
 fn capacity_bundle_plan(path &char, disk int, device &char, expected u64) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 {
-		C.perror(c'vinix-volume: open bundle')
-		return 1
-	}
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	mut key := unsafe { &DiskKey(C.alloca(sizeof(DiskKey))) }
 	mut after := unsafe { &DiskKey(C.alloca(sizeof(DiskKey))) }
@@ -57,7 +55,7 @@ fn capacity_bundle_plan(path &char, disk int, device &char, expected u64) i32 {
 		*key = DiskKey{}
 		*after = DiskKey{}
 	}
-	if !read_bundle(fd, mut set, false) { return 1 }
+	if !read_bundle(edit.source, mut set, false) { return 1 }
 	if disk < 0 || disk >= set.count || expected < set.plans[disk].key.bytes
 		|| expected % set.plans[disk].key.sector != 0 {
 		return plan_error(c'absent disk, shrinking or unaligned expected capacity')
@@ -81,7 +79,7 @@ fn capacity_bundle_plan(path &char, disk int, device &char, expected u64) i32 {
 	}
 	// Republish even an unchanged size: retrying after a prior directory-flush
 	// failure must complete the durability protocol before reporting success.
-	if !publish_bundle(path, set) { return 1 }
+	if !publish_edit_bundle(edit, set) { return 1 }
 	return finish_bundle_report(C.printf(c'planned capacity disk=%u previous_bytes=%lu bytes=%lu changed=%u\n',
 		u32(disk), previous, expected, u32(previous != expected)) >= 0)
 }

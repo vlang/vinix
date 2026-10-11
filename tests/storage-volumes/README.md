@@ -84,6 +84,14 @@ buffered output failure. Guests check later-disk live conflicts, retained
 descriptors and a mixed keep/new batch across reboot. See
 [batch qualification](pool-batch.md).
 
+Saved-plan lock tests hold directory locks across independent processes, reject
+all writer families, keep read-only previews available and verify publication
+stays locked through rename/directory fsync. They cover directory aliases,
+independent destinations, path replacement, descriptor cleanup and killed-owner
+recovery. Guests exercise the packaged utility's contention/retry behavior on
+both architectures; repeated mutation cycles also measure lock retention. See
+[writer-lock qualification](plan-lock.md).
+
 Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init

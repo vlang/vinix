@@ -4,19 +4,17 @@ module volumecli
 // Import an existing single-disk snapshot without resnapshotting the other
 // desired mappings. Both readable inputs stay open through atomic publication.
 fn enroll_bundle_disk(path &char, source &char) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 {
-		C.perror(c'vinix-volume: open bundle')
-		return 1
-	}
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	mut plan := unsafe { &Plan(C.alloca(sizeof(Plan))) }
 	unsafe {
 		*set = PlanSet{}
 		*plan = Plan{}
 	}
-	if !read_bundle(fd, mut set, false) { return 1 }
+	if !read_bundle(edit.source, mut set, false) { return 1 }
 	input := C.open(source, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if input < 0 {
 		C.perror(c'vinix-volume: open enrollment plan')
@@ -24,7 +22,7 @@ fn enroll_bundle_disk(path &char, source &char) i32 {
 	}
 	defer { C.close(input) }
 	if !read_plan(input, mut plan, false) || !bundle_enroll_disk(mut set, plan)
-		|| !publish_bundle(path, set) {
+		|| !publish_edit_bundle(edit, set) {
 		return 1
 	}
 	return finish_bundle_report(C.printf(c'planned enrollment disk=%u mappings=%u\n',
@@ -32,18 +30,16 @@ fn enroll_bundle_disk(path &char, source &char) i32 {
 }
 
 fn forget_bundle_disk(path &char, disk int) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 {
-		C.perror(c'vinix-volume: open bundle')
-		return 1
-	}
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe {
 		*set = PlanSet{}
 	}
-	if !read_bundle(fd, mut set, false) || !bundle_forget_disk(mut set, disk)
-		|| !publish_bundle(path, set) {
+	if !read_bundle(edit.source, mut set, false) || !bundle_forget_disk(mut set, disk)
+		|| !publish_edit_bundle(edit, set) {
 		return 1
 	}
 	return finish_bundle_report(C.printf(c'planned disk removal disk=%u remaining=%u\n', u32(disk),

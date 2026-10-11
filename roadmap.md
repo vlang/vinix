@@ -170,6 +170,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Persistent multi-disk allocation pools with atomic membership, full-width free-capacity reporting and ordered contiguous allocation/replay](docs/storage-volumes.md#persistent-allocation-pools).
   - [x] [Pool eligibility expansion preserving allocation priority and bounded in-place desired mapping growth with durable retries and stable live descriptors](docs/storage-volumes.md#pool-expansion-and-mapping-growth).
   - [x] [Atomic ordered pool allocation batches with complete read-only placement previews, rollback on later failures and durable matching-row retries](docs/storage-volumes.md#atomic-pool-allocation-batches).
+  - [x] [Nonblocking saved-plan writer locks covering source reads and atomic publication, pinned directory identity and automatic owner-exit recovery](docs/storage-volumes.md#saved-plan-writer-locking).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

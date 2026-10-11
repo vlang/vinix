@@ -62,19 +62,20 @@ fn bundle_pool_grow(mut set PlanSet, pool u32, slot u32, length u64, disk &u32) 
 
 // Equal-size retries still republish and flush the complete desired bundle.
 fn grow_pool_plan(path &char, pool u32, index u32, size u64, expand bool) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 { C.perror(c'vinix-volume: open pool bundle'); return 1 }
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe { *set = PlanSet{} }
-	if !read_bundle(fd, mut set, false) { return 1 }
+	if !read_bundle(edit.source, mut set, false) { return 1 }
 	mut disk := index
 	changed := if expand {
 		bundle_pool_expand(mut set, pool, index, size)
 	} else {
 		bundle_pool_grow(mut set, pool, index, size, unsafe { &disk })
 	}
-	if !changed || !publish_bundle(path, set) { return 1 }
+	if !changed || !publish_edit_bundle(edit, set) { return 1 }
 	if expand {
 		return finish_bundle_report(C.printf(c'planned pool expansion pool=%u disk=%u end=%lu\n',
 			pool, disk, size) >= 0)

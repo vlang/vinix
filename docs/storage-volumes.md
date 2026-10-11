@@ -364,7 +364,8 @@ pre-publication I/O failure. As with capacity planning, directory-flush failure
 after rename returns an error with the new file visible and its durability
 unconfirmed. Reporting failure also returns an error after publication; inspect
 the file before retrying. Final symlinks and corrupt/nonregular files are
-rejected. Administration remains serialized to avoid concurrent edit overwrite.
+rejected. Cooperating saved-state writers use the
+[directory locking protocol](#saved-plan-writer-locking) below to prevent lost edits.
 
 Removing a desired entry does not remove a live view, invalidate its open
 descriptors, erase data or release its physical extent. Replay preserves
@@ -421,10 +422,10 @@ Omitting a disk stops requiring its identity during subsequent replay. Its
 live mappings, data and open descriptors remain usable, and replay keeps those
 unlisted mappings. Their physical extents still obey the ordinary runtime
 protections. Reenrollment imports the saved desired rows and resumes complete
-preflight; matching live views keep their generations. Administration remains
-serialized and live application remains a separate operation. A disk with pool
-membership must first have that membership removed before it can be forgotten;
-remaining pool disk indices follow the compacted saved order. Spanning volumes
+preflight; matching live views keep their generations. Saved membership edits
+use directory locking; live application remains a separate serialized operation.
+A disk with pool membership must first have that membership removed before it
+can be forgotten; remaining pool disk indices follow the compacted saved order. Spanning volumes
 and RAID are still separate work. See
 [disk membership qualification](../tests/storage-volumes/disk-bundle.md).
 
@@ -469,10 +470,10 @@ filesystem, swap and other data extents when choosing the region. Unlisted live
 mappings and protected extents may occupy an offline gap. `check-bundle` detects
 live mapping conflicts, and live application retains kernel extent protection
 and the ordinary partial-failure rules. Planning does not format, discard,
-reserve live storage or alter live descriptors. Administration must remain
-serialized; subsequent planning sees the newly saved row. Persistent allocation
-pools extend this selection across disk regions below. Spanning volumes and RAID
-remain separate work. See
+reserve live storage or alter live descriptors. Directory locking makes
+subsequent planning read the newly saved row. Live administration remains
+serialized. Persistent allocation pools extend this selection across disk
+regions below. Spanning volumes and RAID remain separate work. See
 [extent allocation qualification](../tests/storage-volumes/space-bundle.md).
 
 ## Adopting physical capacity growth
@@ -515,7 +516,9 @@ the same desired bytes, completing the durability protocol even after a prior
 directory-flush failure. Its result prints `previous_bytes`, `bytes` and
 `changed=0` or `1`. A directory-flush or output failure can return an error
 after the complete updated bundle is visible; inspect it and retry. Final
-bundle/device symlinks are refused. Administration must remain serialized.
+bundle/device symlinks are refused. The directory lock covers reading the saved
+state, both physical probes and publication. Live administration remains
+serialized.
 
 This command does not initiate controller capacity rescanning: the kernel must
 already expose the larger geometry, which may require reattachment or reboot
@@ -594,7 +597,8 @@ and open no devices. Membership edits and allocations use the existing
 write/fsync/close/rename/directory-fsync protocol, publishing metadata and desired
 rows together. Failure before rename preserves the previous complete file;
 directory-fsync or output failure can report an error after the complete new
-file is visible. Administration must remain serialized.
+file is visible. Saved edits use directory locking; live administration remains
+serialized.
 
 Choose regions that account for partition tables, filesystem data, swap and
 other extents. Reported capacity describes saved desired mappings rather than
@@ -655,7 +659,8 @@ read-only ones. Kernel extent protection and the existing partial-application
 rules continue to apply. Boot replay recreates the saved grown geometry and
 preserves pool metadata. Regions remain an administrative choice accounting for
 partition tables, filesystems, swap and other data; expansion does not reserve
-live extents. Administration must remain serialized. See
+live extents. Saved edits use directory locking; live administration remains
+serialized. See
 [pool growth qualification](../tests/storage-volumes/pool-growth.md).
 
 ## Atomic pool allocation batches
@@ -700,15 +705,58 @@ errors return failure for both commands. After a publication succeeds, an output
 failure can leave the complete new file visible; inspect it or retry the same
 requests. Publisher failures retain the existing before/after-rename guarantees.
 
-Both commands open only the saved bundle. They do not inspect live devices,
+Both commands operate only on saved state. They do not inspect live devices,
 reserve live extents, or apply mappings. Run complete-set `check-bundle` and
 explicit replay separately; an unlisted live conflict on a later disk prevents
-every action during preflight. Administration must remain serialized: a preview
-does not pin the saved state against another editor, and live application keeps
-the existing partial-application rules. Batch metadata uses the unchanged
-version-2 format and existing boot restore. Spanning, RAID, encryption and
+every action during preflight. Saved writes use directory locking. A preview
+does not pin the saved state against another editor, and live application
+requires serialized administration and keeps the existing partial-application
+rules. Batch metadata uses the unchanged version-2 format and existing boot
+restore. Spanning, RAID, encryption and
 filesystem resizing remain open. See
 [batch qualification](../tests/storage-volumes/pool-batch.md).
+
+## Saved-plan writer locking
+
+Every `save`, `save-set`, `plan-*` editor and `pool-*` editor acquires a
+nonblocking exclusive advisory `flock` on the destination's directory before
+opening the saved source or taking a live snapshot. This prevents cooperating
+writers from reading the same old bundle and overwriting each other's changes.
+If another writer holds the lock, the command returns 1 before reading the
+source, probing a disk or creating a temporary file. Retry after the other
+command exits; the retry reads the latest complete saved state.
+
+The lock is on the directory inode, covering all saved destinations in that
+directory. Different directories can be edited independently. Path aliases
+that resolve to the same directory share the lock. Locking the saved file
+itself would be insufficient because publication replaces that inode. No
+lock file is created, and closing the last directory descriptor or terminating
+the owner releases the lock automatically, including after `SIGKILL`.
+
+The source is opened relative to the locked directory descriptor. Temporary
+creation, atomic replacement and directory fsync use that same descriptor's
+inode, retaining the lock through publication and command reporting. If the
+directory is renamed or its path replaced during the command, the original
+directory receives the update and the replacement directory is untouched.
+Final directory/source symlinks are rejected; earlier path components follow
+normal path resolution. Directory and source descriptors use `CLOEXEC`.
+
+Read-only inspection, extent/pool queries, batch previews, preflight and replay
+do not acquire writer locks. Atomic replacement lets readers see a complete
+old or new file, but a preview does not reserve that state for later use.
+Existing formats, checksums and publication failure rules are unchanged: a
+directory-fsync failure can leave the complete new file visible with durability
+unconfirmed, and a retry must complete the publication protocol.
+
+These locks coordinate commands from this utility that target the same
+directory inode. Old utilities, external file writers, distinct directory
+inodes or separately saved configurations for the same physical extents do not
+participate in that exclusion. The filesystem must support directory `flock`;
+an unsupported or denied lock returns failure. Live snapshots, mapping changes
+and replay still require serialized administration because the kernel has no
+global configuration transaction. Spanning, RAID, filesystem resizing and
+encryption remain separate work. See
+[writer-lock qualification](../tests/storage-volumes/plan-lock.md).
 
 ## Status ABI
 

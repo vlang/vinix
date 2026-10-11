@@ -10,6 +10,16 @@ fn C.waitpid(i32, &i32, i32) i32
 fn C._exit(i32)
 fn C.setvbuf(voidptr, &char, i32, usize) i32
 
+// Reopen the inode to obtain an independent open description. Duplicating the
+// publisher descriptor would share its lock and would not test exclusion.
+fn bundle_assert_directory_locked(directory i32) {
+	probe := C.openat(directory, c'.', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC)
+	assert probe >= 0
+	assert C.flock(probe, C.LOCK_EX | C.LOCK_NB) == -1
+	assert unsafe { C.errno == C.EWOULDBLOCK || C.errno == C.EAGAIN }
+	assert C.close(probe) == 0
+}
+
 struct BundleIO {
 mut:
 	mode    int
@@ -40,6 +50,9 @@ fn bundle_mock_write(fd i32, buffer voidptr, bytes usize) i64 {
 
 fn bundle_mock_fsync(fd i32) i32 {
 	bundle_io.flushes++
+	mut info := C.stat{}
+	assert C.fstat(fd, &info) == 0
+	if info.st_mode & C.S_IFMT == C.S_IFDIR { bundle_assert_directory_locked(fd) }
 	if (bundle_io.mode == 3 && bundle_io.flushes == 1)
 		|| (bundle_io.mode == 4 && bundle_io.flushes == 2) {
 		unsafe {
@@ -64,6 +77,8 @@ fn bundle_mock_close(fd i32) i32 {
 
 fn bundle_mock_renameat(from_fd i32, from &char, to_fd i32, to &char) i32 {
 	bundle_io.renames++
+	assert from_fd == to_fd
+	bundle_assert_directory_locked(from_fd)
 	if bundle_io.mode == 6 {
 		unsafe {
 			C.errno = C.EIO

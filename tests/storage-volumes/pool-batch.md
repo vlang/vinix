@@ -70,4 +70,5 @@ runtime dependencies. Real guests cover VirtIO/ARM64 and AHCI/x86 with MBR and
 512-byte sectors; mixed sectors and maximum bounds have host coverage. Batch
 publication is atomic desired configuration, while live replay retains the
 existing preflight and partial-application rules. Spanning, RAID, encryption,
-concurrent administration and filesystem resizing remain outside this increment.
+concurrent live administration and filesystem resizing remain outside this increment.
+Saved-state writer coordination is qualified separately in [plan-lock.md](plan-lock.md).

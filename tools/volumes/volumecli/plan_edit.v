@@ -4,24 +4,22 @@ module volumecli
 // Only the saved configuration changes. Devices are opened by a later check
 // or restore, and omitted entries never request live removal during replay.
 fn edit_bundle_plan(path &char, disk int, row &Request, remove bool) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 {
-		C.perror(c'vinix-volume: open bundle')
-		return 1
-	}
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe {
 		*set = PlanSet{}
 	}
 	// Keep the descriptor alive through publication, as capacity planning does.
-	if !read_bundle(fd, mut set, false) { return 1 }
+	if !read_bundle(edit.source, mut set, false) { return 1 }
 	changed := if remove {
 		bundle_remove_row(mut set, row.slot)
 	} else {
 		bundle_add_row(mut set, disk, row)
 	}
-	if !changed || !publish_bundle(path, set) { return 1 }
+	if !changed || !publish_edit_bundle(edit, set) { return 1 }
 	if remove {
 		return finish_bundle_report(C.printf(c'planned removal slot=%u\n', row.slot) >= 0)
 	}

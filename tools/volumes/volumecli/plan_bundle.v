@@ -199,6 +199,10 @@ fn publish_bundle(path &char, set &PlanSet) bool {
 @[direct_array_access]
 fn save_bundle(path &char, count int, devices &&char) i32 {
 	if count <= 0 || count > 64 { return usage() }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_destination(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	mut plan := unsafe { &Plan(C.alloca(sizeof(Plan))) }
 	unsafe {
@@ -233,7 +237,7 @@ fn save_bundle(path &char, count int, devices &&char) i32 {
 			return 1
 		}
 	}
-	if !publish_bundle(path, set) { return 1 }
+	if !publish_edit_bundle(edit, set) { return 1 }
 	C.printf(c'saved bundle for %u disks\n', u32(set.count))
 	return 0
 }
@@ -257,13 +261,14 @@ fn restore_bundle(path &char, grow bool) i32 {
 // saved file; no device is opened and no live mapping is changed here.
 @[direct_array_access]
 fn grow_bundle_plan(path &char, slot u32, length u64) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 { C.perror(c'vinix-volume: open bundle'); return 1 }
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, true) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe { *set = PlanSet{} }
-	if !read_bundle(fd, mut set, false) { return 1 }
-	if !bundle_grow_row(mut set, slot, length) || !publish_bundle(path, set) { return 1 }
+	if !read_bundle(edit.source, mut set, false) { return 1 }
+	if !bundle_grow_row(mut set, slot, length) || !publish_edit_bundle(edit, set) { return 1 }
 	C.printf(c'planned slot=%u bytes=%lu\n', slot, length)
 	return 0
 }

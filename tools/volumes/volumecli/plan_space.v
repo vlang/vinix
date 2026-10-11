@@ -107,19 +107,17 @@ fn bundle_allocate_row(mut set PlanSet, disk int, window SpaceWindow, request &R
 }
 
 fn space_bundle_plan(path &char, disk int, window SpaceWindow, request &Request, allocate bool) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 {
-		C.perror(c'vinix-volume: open bundle')
-		return 1
-	}
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, allocate) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe { *set = PlanSet{} }
-	if !read_bundle(fd, mut set, false) { return 1 }
+	if !read_bundle(edit.source, mut set, false) { return 1 }
 	if allocate {
 		mut chosen := Request{}
 		if !bundle_allocate_row(mut set, disk, window, request, mut chosen)
-			|| !publish_bundle(path, set) {
+			|| !publish_edit_bundle(edit, set) {
 			return 1
 		}
 		return finish_bundle_report(C.printf(c'planned allocation disk=%u slot=%u offset=%lu bytes=%lu readonly=%lu\n',

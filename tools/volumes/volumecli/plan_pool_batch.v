@@ -77,15 +77,16 @@ fn bundle_pool_batch(mut set PlanSet, pool u32, batch &PoolBatch,
 // publisher or device open. Reports start only after the whole batch fits.
 @[direct_array_access]
 fn batch_pool_plan(path &char, pool u32, batch &PoolBatch, preview bool) i32 {
-	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
-	if fd < 0 { C.perror(c'vinix-volume: open pool batch bundle'); return 1 }
-	defer { C.close(fd) }
+	mut edit := unsafe { &PlanEdit(C.alloca(sizeof(PlanEdit))) }
+	unsafe { *edit = PlanEdit{} }
+	defer { close_plan_edit(mut edit) }
+	if !open_plan_edit(path, mut edit, !preview) { return 1 }
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe { *set = PlanSet{} }
 	mut placements := PoolPlacements{}
-	if !read_bundle(fd, mut set, false)
+	if !read_bundle(edit.source, mut set, false)
 		|| !bundle_pool_batch(mut set, pool, batch, mut placements) { return 1 }
-	if !preview && !publish_bundle(path, set) { return 1 }
+	if !preview && !publish_edit_bundle(edit, set) { return 1 }
 	operation := if preview { unsafe { &char(c'preview') } } else { unsafe { &char(c'planned') } }
 	mut ok := C.printf(c'pool=%u requests=%d operation=%s\n', pool, placements.count, operation) >= 0
 	for i in 0 .. placements.count {
