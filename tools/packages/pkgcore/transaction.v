@@ -1,0 +1,315 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module pkgcore
+
+import json2
+import os
+
+pub fn state_directory(root string) string {
+	return root.trim_right('/') + '/var/lib/vinix-packages'
+}
+
+pub fn load_config(root string) !Config {
+	path := root.trim_right('/') + '/etc/vinix-packages/config.json'
+	if root == '' || root == '/' {
+		for trusted in ['/etc/vinix-packages', path, state_directory(root)] {
+			if !os.exists(trusted) { continue }
+			info := os.lstat(trusted)!
+			if os.is_link(trusted) || info.uid != 0 || info.mode & 0o022 != 0 {
+				return error('package trust/state must be root-owned and not writable by other users: ${trusted}')
+			}
+		}
+	}
+	config := json2.decode[Config](read_metadata(path)!)!
+	config.validate()!
+	return config
+}
+
+pub fn read_state(directory string, architecture string) !State {
+	current := directory + '/current'
+	if !os.is_link(current) {
+		if os.exists(current) { return error('package activation pointer is not a symlink') }
+		return State{ architecture: architecture }
+	}
+	target := os.readlink(current)!
+	if !target.starts_with('generations/') || target.len <= 12 || !target[12..].bytes().all(it >= `0` && it <= `9`) {
+		return error('invalid package activation pointer')
+	}
+	state := json2.decode[State](read_metadata(directory + '/' + target + '/state.json')!)!
+	validate_state(state, architecture)!
+	if state.generation != target[12..].u64() {
+		return error('package generation identity mismatch')
+	}
+	return state
+}
+
+fn validate_state(state State, architecture string) ! {
+	if state.format != 1 || state.architecture != architecture || state.generation == 0
+		|| state.packages.len > 4096 || state.requested.any(!identifier(it)) {
+		return error('invalid persistent package state')
+	}
+	mut ids := map[string]bool{}
+	for installed in state.packages {
+		installed.package.validate()!
+		if installed.package.id in ids || installed.package.architecture !in [
+			architecture,
+			'all',
+		]
+			|| !identifier(installed.repository) || !digest_valid(installed.public_key) || installed.sequence == 0 {
+			return error('invalid installed package provenance')
+		}
+		ids[installed.package.id] = true
+	}
+	for id in state.requested {
+		if id !in ids { return error('persistent requested package is missing: ${id}') }
+	}
+	for installed in state.packages {
+		for dependency in installed.package.dependencies {
+			if !state.packages.any(dependency.accepts(it.package)) {
+				return error('persistent dependency closure is inconsistent: ${dependency.id}')
+			}
+		}
+	}
+}
+
+fn next_generation(directory string) !u64 {
+	mut maximum := u64(0)
+	for name in os.ls(directory + '/generations')! {
+		if name.len > 0 && name.bytes().all(it >= `0` && it <= `9`) {
+			if name.u64() > maximum { maximum = name.u64() }
+		}
+	}
+	if maximum == ~u64(0) { return error('package generation counter exhausted') }
+	return maximum + 1
+}
+
+pub fn estimate_space(plan Plan, directory string) !u64 {
+	mut needed := u64(4 * 1024 * 1024)
+	mut cache := map[string]bool{}
+	for installed in plan.packages {
+		for file in installed.package.files {
+			// A block per file plus payload, directory entries and metadata.
+			cost := file.bytes + 8192
+			if needed > ~u64(0) - cost { return error('package disk requirement overflow') }
+			needed += cost
+			if file.sha256 !in cache && !verified_file(directory + '/objects/' + file.sha256, file) {
+				if needed > ~u64(0) - cost { return error('package cache requirement overflow') }
+				needed += cost
+				cache[file.sha256] = true
+			}
+		}
+	}
+	return needed
+}
+
+fn cached_payload(config Config, installed Installed, payload Payload, directory string) !string {
+	path := directory + '/objects/' + payload.sha256
+	if verified_file(path, payload) { return path }
+	if os.exists(path) { os.rm(path)! }
+	part := path + '.part'
+	if os.exists(part) && (os.is_link(part) || os.file_size(part) > payload.bytes) { os.rm(part)! }
+	repositories := config.repositories.filter(it.id == installed.repository && it.public_key == installed.public_key)
+	if repositories.len != 1 {
+		return error('${installed.package.id}: repository was revoked or its key changed')
+	}
+	url := repositories[0].url.trim_right('/') + '/objects/' + payload.sha256
+	if !verified_file(part, payload) {
+		println('Downloading ${installed.package.id}/${payload.path} (${payload.bytes} bytes)')
+		fetch(url, part, payload.bytes, true, config.policy.offline)!
+	}
+	if !verified_file(part, payload) {
+		os.rm(part)!
+		return error('${installed.package.id}: payload checksum or size mismatch; partial data discarded, retry from the trusted repository')
+	}
+	os.chmod(part, 0o444)!
+	sync_file(part)!
+	os.rename(part, path)!
+	sync_directory(directory + '/objects')!
+	return path
+}
+
+fn desktop_entry(p Package) string {
+	return '[Desktop Entry]\nType=Application\nName=' + p.name + '\nComment=' + p.description +
+		'\nExec=/usr/bin/vinix-package run ' + p.id + ' %F\nTerminal=false\nMimeType=' + p.associations.join(';') +
+		';\nX-Vinix-Package=' + p.id + '\nX-Vinix-Runtime=' + p.runtime + '\n'
+}
+
+fn flush_tree(path string) ! {
+	os.chmod(path, 0o755)!
+	for name in os.ls(path)! {
+		child := path + '/' + name
+		if os.is_dir(child) { flush_tree(child)! }
+	}
+	sync_directory(path)!
+}
+
+fn activate(directory string, generation u64) ! {
+	temporary := directory + '/activate.new'
+	if os.is_link(temporary) || os.exists(temporary) { os.rm(temporary)! }
+	os.symlink('generations/' + generation.str(), temporary)!
+	replace_path(temporary, directory + '/current')!
+	// A failure here means activation occurred but durability is uncertain.
+	// Never delete the newly activated generation on this error.
+	sync_directory(directory) or { return error('package set activated, but its directory flush failed; check storage and inspect status: ${err}') }
+}
+
+pub struct TransactionOptions {
+pub:
+	// Used by the crash fixture. Production CLI never accepts this flag.
+	stop_before_activation bool
+}
+
+pub fn transact(config Config, directory string, operation string, names []string, options TransactionOptions) !State {
+	config.validate()!
+	guard := acquire(directory)!
+	defer { guard.release() }
+	// No writer can still own a stage while this flock is held. Complete
+	// generations remain available for rollback; only abandoned stages retire.
+	for name in os.ls(directory + '/generations')! {
+		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }
+	}
+	current := read_state(directory, config.architecture)!
+	roots := desired_roots(current, operation, names)!
+	// Removal must work even when a publisher is offline, expired or revoked.
+	// Resolve its retained closure entirely from installed versions, without
+	// applying new acquisition policy to applications it leaves in place.
+	catalog := if operation == 'remove' {
+		Catalog{ packages: current.packages }
+	} else {
+		load_catalog(config, directory)!
+	}
+	resolution_config := if operation == 'remove' {
+		Config{ ...config, policy: Policy{ allow_firmware: true, licenses: current.packages.map(it.package.license) } }
+	} else {
+		config
+	}
+	plan := resolve(catalog, resolution_config, current, roots, operation in ['upgrade', 'deploy'])!
+	if operation == 'remove' && plan.packages.any(it.package.id in names) {
+		return error('cannot remove a package still required by another installed application')
+	}
+	if current.requested == plan.requested && current.packages == plan.packages { return current }
+	disk_check(free_bytes(directory)!, estimate_space(plan, directory)!, config.policy.reserve_bytes)!
+	generation := next_generation(directory)!
+	stage := directory + '/generations/.stage-' + generation.str()
+	owned_directory(stage, 0o700)!
+	os.mkdir_all(stage + '/apps')!
+	os.mkdir_all(stage + '/share/applications')!
+	os.write_file(stage + '/lease', '')!
+	os.chmod(stage + '/lease', 0o444)!
+	sync_file(stage + '/lease')!
+	mut completed := false
+	defer {
+		if !completed { os.rmdir_all(stage) or {} }
+	}
+	mut done := 0
+	for installed in plan.packages {
+		p := installed.package
+		println('Installing ${p.name} ${p.version} (${done + 1}/${plan.packages.len}) from ${installed.repository}')
+		for file in p.files {
+			retained := directory + '/generations/' + current.generation.str() + '/apps/' + p.id + '/' + file.path
+			source := if operation == 'remove' && verified_file(retained, file) {
+				retained
+			} else {
+				cached_payload(config, installed, file, directory)!
+			}
+			target := stage + '/apps/' + p.id + '/' + file.path
+			os.mkdir_all(os.dir(target))!
+			copy_file(source, target, 0, file.bytes)!
+			os.chmod(target, if file.executable { 0o755 } else { 0o644 })!
+			sync_file(target)!
+		}
+		if p.kind !in ['data', 'runtime'] {
+			entry := stage + '/share/applications/vinix-' + p.id + '.desktop'
+			os.write_file(entry, desktop_entry(p))!
+			sync_file(entry)!
+		}
+		done++
+	}
+	state := State{
+		generation:   generation
+		previous:     current.generation
+		architecture: config.architecture
+		requested:    plan.requested
+		packages:     plan.packages
+	}
+	encoded := json2.encode(state)
+	if encoded.len > max_metadata { return error('installed state exceeds metadata limit') }
+	os.write_file(stage + '/state.json', encoded)!
+	os.chmod(stage + '/state.json', 0o644)!
+	sync_file(stage + '/state.json')!
+	flush_tree(stage)!
+	if options.stop_before_activation {
+		// Preserve the unfinished stage as a process killed here would.
+		completed = true
+		return error('fixture interrupted before activation')
+	}
+	os.rename(stage, directory + '/generations/' + generation.str())!
+	completed = true
+	sync_directory(directory + '/generations')!
+	activate(directory, generation)!
+	println('Activated package generation ${generation}')
+	return state
+}
+
+pub fn rollback(config Config, directory string) !State {
+	guard := acquire(directory)!
+	defer { guard.release() }
+	current := read_state(directory, config.architecture)!
+	if current.previous == 0 { return error('no previous package generation is available') }
+	old := json2.decode[State](read_metadata(directory + '/generations/' + current.previous.str() + '/state.json')!)!
+	validate_state(old, config.architecture)!
+	if old.generation != current.previous { return error('rollback generation identity mismatch') }
+	for installed in old.packages {
+		check_policy(installed.package, config.policy)!
+		if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
+			return error('${installed.package.id}: rollback repository key is no longer trusted')
+		}
+		for file in installed.package.files {
+			if !verified_file(directory + '/generations/' + old.generation.str() + '/apps/' + installed.package.id + '/' + file.path, file) {
+				return error('${installed.package.id}: rollback payload verification failed')
+			}
+		}
+	}
+	activate(directory, old.generation)!
+	println('Rolled back to generation ${old.generation}; application data was retained')
+	return old
+}
+
+pub fn collect(config Config, directory string) ! {
+	guard := acquire(directory)!
+	defer { guard.release() }
+	current := read_state(directory, config.architecture)!
+	for name in os.ls(directory + '/generations')! {
+		if name.bytes().all(it >= `0` && it <= `9`) && name.u64() !in [
+			current.generation,
+			current.previous,
+		] {
+			path := directory + '/generations/' + name
+			lease := C.open((path + '/lease').str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
+			if lease < 0 { return error('cannot check generation lease: ${name}') }
+			if C.flock(lease, C.LOCK_EX | C.LOCK_NB) == 0 {
+				os.rmdir_all(path) or {
+					C.close(lease)
+					return err
+				}
+			}
+			C.close(lease)
+		}
+	}
+	// Retain content needed by both the active and rollback generation.
+	mut keep := map[string]bool{}
+	for generation in [current.generation, current.previous] {
+		if generation == 0 { continue }
+		state := json2.decode[State](read_metadata(directory + '/generations/' + generation.str() + '/state.json')!)!
+		for installed in state.packages {
+			for file in installed.package.files { keep[file.sha256] = true }
+		}
+	}
+	for name in os.ls(directory + '/objects')! {
+		if digest_valid(name) && name !in keep { os.rm(directory + '/objects/' + name)! }
+		if name.ends_with('.part') && digest_valid(name.all_before_last('.part')) {
+			os.rm(directory + '/objects/' + name)!
+		}
+	}
+	sync_directory(directory + '/generations')!
+	sync_directory(directory + '/objects')!
+}

@@ -1,0 +1,13 @@
+{
+  "id": "org.vinix.package-hello",
+  "version": "1.0.0",
+  "architecture": "aarch64",
+  "name": "Package Hello",
+  "description": "A static V example of the signed package launch contract",
+  "license": "MIT",
+  "kind": "native",
+  "entrypoint": "bin/package-hello",
+  "permissions": ["files"],
+  "associations": ["text/plain"],
+  "sdk": 1
+}

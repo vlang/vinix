@@ -89,6 +89,9 @@ What it does:
   text/leading-level filtering and matching-row export
 - **System Information**, current hardware, storage and installed-package
   reports with localized search, refresh and export
+- **Software**, signed application catalog search, publisher/license/permission
+  review, transactional install/uninstall, updates, rollback and failure output;
+  see [application distribution and remaining release qualification](../docs/application-distribution.md)
 - **Archive Utility**, TAR browsing, creation and safe whole/selected extraction
   with progress/cancel
 - **Disk Utility**, read-only block-device and mounted-volume inspection

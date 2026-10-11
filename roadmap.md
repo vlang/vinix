@@ -544,6 +544,16 @@ files and accounts; local data remains usable when accounts or networking are of
 
 ### 14. Packages and application distribution
 
+The [native V application store and Software manager](docs/application-distribution.md)
+implement signed repositories, dependency planning, staged generations, rollback,
+download recovery, offline mirrors, organization policy and
+[package/launch SDK 1](tools/packages/SDK.md). The original Alpine frontend still
+manages system ports. Release publisher enrollment, catalog migration,
+ordinary-session/dynamic-launcher integration and guest/runtime qualification
+remain required before this acceptance gate is complete. Host lifecycle/UI
+fixtures and both target builds are available in
+[the V qualification driver](tests/packages/distribution-check.v).
+
 - [ ] Harden the existing package frontend with trusted repositories, dependency
   resolution, reproducible metadata and consistent architecture support.
 - [ ] Add transactional install/remove/upgrade, rollback, disk-space checks,

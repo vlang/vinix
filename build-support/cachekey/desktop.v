@@ -55,7 +55,7 @@ pub fn desktop_prepare(root_path string, compiler_path string, env map[string]st
 	// Native helper changes must invalidate an existing image just as edits to
 	// the former Python producers did. This is an explicit cache format upgrade.
 	for item in ['build-support/cachekey', 'build-support/cache_query.v',
-		'build-support/_cache_native.py'] {
+		'build-support/_cache_native.py', 'tools/packages'] {
 		sources << join_path(root, item)
 	}
 	wifi := env['VINIX_WIFI_BUNDLE'] or { '' }

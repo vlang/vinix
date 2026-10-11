@@ -1,0 +1,311 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import json2
+import os
+import tools.packages.pkgcore
+
+const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [ARGS]\n' +
+	'  update | search [QUERY] | info ID | list | status | updates | view\n' +
+	'  install ID... | remove ID... | upgrade | rollback | gc | verify\n' +
+	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
+	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
+	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
+	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n'
+
+struct SoftwareRow {
+	id                string
+	name              string
+	description       string
+	version           string
+	installed_version string
+	architecture      string
+	kind              string
+	repository        string
+	public_key        string
+	license           string
+	proprietary       bool
+	firmware          bool
+	permissions       []string
+	requested         bool
+	updatable         bool
+	diagnostic        string
+}
+
+struct SoftwareView {
+	format        int = 1
+	generation    u64
+	architecture  string
+	offline       bool
+	catalog_error string
+	rows          []SoftwareRow
+}
+
+struct Deployment {
+	format       int = 1
+	architecture string
+	packages     []string
+}
+
+fn software_view(config pkgcore.Config, directory string) !SoftwareView {
+	state := pkgcore.read_state(directory, config.architecture)!
+	mut catalog_error := ''
+	if config.repositories.len == 0 {
+		catalog_error = 'No trusted repositories are configured. An administrator must enroll a publisher in /etc/vinix-packages/config.json.'
+	}
+	catalog := pkgcore.load_catalog(config, directory) or {
+		catalog_error = err.msg()
+		pkgcore.Catalog{}
+	}
+	mut choices := map[string]pkgcore.Installed{}
+	for installed in state.packages { choices[installed.package.id] = installed }
+	for candidate in catalog.packages {
+		p := candidate.package
+		if p.architecture !in [config.architecture, 'all'] || p.kind in ['runtime', 'data'] {
+			continue
+		}
+		old := choices[p.id] or { pkgcore.Installed{} }
+		if old.package.id == '' || pkgcore.compare_versions(p.version, old.package.version) >= 0 {
+			choices[p.id] = candidate
+		}
+	}
+	mut rows := []SoftwareRow{}
+	mut ids := choices.keys()
+	ids.sort()
+	for id in ids {
+		candidate := choices[id]
+		p := candidate.package
+		mut installed_version := ''
+		for installed in state.packages {
+			if installed.package.id == id { installed_version = installed.package.version }
+		}
+		mut diagnostic := ''
+		pkgcore.check_policy(p, config.policy) or { diagnostic = err.msg() }
+		rows << SoftwareRow{
+			id:                id
+			name:              p.name
+			description:       p.description
+			version:           p.version
+			installed_version: installed_version
+			architecture:      p.architecture
+			kind:              p.kind
+			repository:        candidate.repository
+			public_key:        candidate.public_key
+			license:           p.license
+			proprietary:       p.proprietary
+			firmware:          p.firmware
+			permissions:       p.permissions
+			requested:         id in state.requested
+			updatable:         installed_version != '' && pkgcore.compare_versions(p.version, installed_version) > 0
+			diagnostic:        diagnostic
+		}
+	}
+	return SoftwareView{
+		generation:    state.generation
+		architecture:  config.architecture
+		offline:       config.policy.offline
+		catalog_error: catalog_error
+		rows:          rows
+	}
+}
+
+fn checked(arguments []string) !int {
+	mut args := arguments.clone()
+	mut root := ''
+	mut offline := false
+	mut as_json := false
+	for args.len > 0 && args[0].starts_with('--') {
+		match args[0] {
+			'--root' {
+				if args.len < 2 || !args[1].starts_with('/') || args[1].contains('\x00') {
+					return error('--root requires an absolute directory')
+				}
+				root = args[1].trim_right('/')
+				args = args[2..].clone()
+			}
+			'--offline' {
+				offline = true
+				args = args[1..].clone()
+			}
+			'--json' {
+				as_json = true
+				args = args[1..].clone()
+			}
+			'--help' {
+				print(usage)
+				return 0
+			}
+			else { return error('unknown option: ${args[0]}') }
+		}
+	}
+	if args.len == 0 {
+		print(usage)
+		return 2
+	}
+	command := args[0]
+	names := args[1..].clone()
+	match command {
+		'keygen' {
+			if names.len != 1 { return error('keygen requires a new signing seed filename') }
+			println(pkgcore.keygen(names[0])!)
+			return 0
+		}
+		'pack' {
+			if names.len != 3 {
+				return error('pack requires a manifest, payload directory and repository directory')
+			}
+			println(json2.encode(pkgcore.pack(names[0], names[1], names[2])!))
+			return 0
+		}
+		'publish' {
+			if names.len != 5 || !names[3].bytes().all(it >= `0` && it <= `9`) || !names[4].bytes().all(it >= `0` && it <= `9`) {
+				return error('publish requires repository directory, ID, signing seed, sequence and expiry')
+			}
+			pkgcore.publish(names[0], names[1], names[2], names[3].u64(), names[4].i64())!
+			return 0
+		}
+		else {}
+	}
+	initial := pkgcore.load_config(root)!
+	if root == '' {
+		$if arm64 {
+			if initial.architecture != 'aarch64' {
+				return error('package configuration targets another architecture')
+			}
+		}
+		$if amd64 {
+			if initial.architecture != 'x86_64' {
+				return error('package configuration targets another architecture')
+			}
+		}
+	}
+	config := pkgcore.Config{ ...initial, policy: pkgcore.Policy{ ...initial.policy, offline: offline || initial.policy.offline } }
+	directory := pkgcore.state_directory(root)
+	match command {
+		'update' {
+			if names.len != 0 { return error('update takes no package IDs') }
+			pkgcore.refresh(config, directory)!
+		}
+		'view', 'search', 'info', 'updates' {
+			view := software_view(config, directory)!
+			if command == 'view' {
+				println(json2.encode(view))
+				return 0
+			}
+			if command == 'info' && names.len != 1 { return error('info requires one package ID') }
+			query := names.join(' ').to_lower()
+			mut found := false
+			for row in view.rows {
+				if command == 'updates' && !row.updatable { continue }
+				if command == 'info' && row.id != query { continue }
+				if command == 'search' && query != '' && !('${row.id} ${row.name} ${row.description}'.to_lower().contains(query)) {
+					continue
+				}
+				found = true
+				if as_json {
+					println(json2.encode(row))
+				} else {
+					println('${row.id} ${row.version} (${row.architecture}) — ${row.description}')
+					if command == 'info' {
+						println('Repository: ${row.repository}\nPublisher key: ${row.public_key}\nLicense: ${row.license}\nPermissions: ${row.permissions.join(', ')}\nInstalled: ${row.installed_version}\n${row.diagnostic}')
+					}
+				}
+			}
+			if command == 'info' && !found { return error('package not found: ${query}') }
+			if view.catalog_error != '' { return error(view.catalog_error) }
+		}
+		'status', 'list', 'verify' {
+			state := pkgcore.read_state(directory, config.architecture)!
+			if as_json || command == 'status' {
+				println(json2.encode(state))
+				return 0
+			}
+			for installed in state.packages {
+				p := installed.package
+				if command == 'verify' {
+					for file in p.files {
+						if !pkgcore.verified_file(directory + '/generations/' + state.generation.str() + '/apps/' + p.id + '/' + file.path, file) {
+							return error('${p.id}: installed payload verification failed: ${file.path}')
+						}
+					}
+				}
+				println('${p.id} ${p.version} ${p.architecture} ${installed.repository}')
+			}
+		}
+		'install', 'remove', 'upgrade' {
+			pkgcore.transact(config, directory, command, names, pkgcore.TransactionOptions{})!
+		}
+		'plan' {
+			if names.len < 1 { return error('plan requires an operation') }
+			state := pkgcore.read_state(directory, config.architecture)!
+			roots := pkgcore.desired_roots(state, names[0], names[1..])!
+			catalog := if names[0] == 'remove' {
+				pkgcore.Catalog{ packages: state.packages }
+			} else {
+				pkgcore.load_catalog(config, directory)!
+			}
+			resolution_config := if names[0] == 'remove' {
+				pkgcore.Config{ ...config, policy: pkgcore.Policy{ allow_firmware: true, licenses: state.packages.map(it.package.license) } }
+			} else { config }
+			plan := pkgcore.resolve(catalog, resolution_config, state, roots, names[0] in [
+				'upgrade',
+				'deploy',
+			])!
+			if names[0] == 'remove' && plan.packages.any(it.package.id in names[1..]) {
+				return error('cannot remove a package still required by another installed application')
+			}
+			println(json2.encode(plan))
+		}
+		'deploy' {
+			if names.len != 1 { return error('deploy requires a deployment manifest') }
+			deployment := json2.decode[Deployment](pkgcore.read_metadata(names[0])!)!
+			if deployment.format != 1 || deployment.architecture != config.architecture {
+				return error('deployment format or architecture mismatch')
+			}
+			pkgcore.transact(config, directory, 'deploy', deployment.packages, pkgcore.TransactionOptions{})!
+		}
+		'rollback' {
+			if names.len != 0 { return error('rollback takes no arguments') }
+			pkgcore.rollback(config, directory)!
+		}
+		'gc' {
+			if names.len != 0 { return error('gc takes no arguments') }
+			pkgcore.collect(config, directory)!
+		}
+		'mirror' {
+			if names.len < 2 {
+				return error('mirror requires a new destination directory and package IDs')
+			}
+			pkgcore.mirror(config, directory, names[0], names[1..])!
+		}
+		'run' {
+			if root != '' {
+				return error('application launch cannot use an alternate installation root')
+			}
+			if names.len < 1 { return error('run requires an application ID') }
+			return pkgcore.run_application(config, directory, names[0], names[1..])
+		}
+		'purge-data' {
+			if root != '' || names.len != 1 || !pkgcore.identifier(names[0]) || os.geteuid() == 0 {
+				return error('purge-data requires an application ID and an ordinary user session')
+			}
+			state := pkgcore.read_state(directory, config.architecture)!
+			if state.packages.any(it.package.id == names[0]) {
+				return error('remove the application before purging its data')
+			}
+			path := os.home_dir().trim_right('/') + '/.local/share/vinix-apps/' + names[0]
+			if os.is_link(path) { return error('application data directory is a symlink') }
+			os.rmdir_all(path)!
+		}
+		else { return error('unknown command: ${command}\n${usage}') }
+	}
+	return 0
+}
+
+fn main() {
+	code := checked(os.args[1..]) or {
+		eprintln('vinix-package: ${err}')
+		exit(1)
+	}
+	exit(code)
+}

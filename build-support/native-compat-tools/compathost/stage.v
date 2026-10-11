@@ -2,6 +2,7 @@
 module compathost
 
 import hosttest
+import json2
 import os
 
 #include <unistd.h>
@@ -117,6 +118,10 @@ fn stage_command(args []string, security bool) !int {
 		})!
 	}
 	if security {
+		// Both desktop builders already stage these utilities. Keep package
+		// distribution in the same native V build path on both architectures.
+		run(['sh', root() + '/build-support/run-v-tool.sh', root() + '/tools/packages/stage.v',
+			'--arch', arch, '--staging', staging, '--cc-argv', json2.encode(cc)])!
 		install(root() + '/build-support/security-audit/run-collector', staging + '/usr/libexec/vinix-security-audit-supervise', 0o755, '.security-tool-')!
 		log := staging + '/var/log/vinix-audit'
 		if os.is_link(log) { return error('Audit log staging directory cannot be a symlink') }
