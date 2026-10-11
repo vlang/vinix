@@ -2310,14 +2310,52 @@ preserve x20/x21 and return canonical 0/1 for valid input values. The retained
 ARM64 Mac SDK interface defines frozen `ObjCBool` with Swift `Bool` storage,
 and both measured native exports mask bit 0. The Mac Catalyst interface instead
 uses `Int8` storage and a nonzero comparison. These target differences are
-retained; the iOS conversion ABI still needs verification. A failed initial probe
+retained; the iOS conversion ABI still needed verification at that checkpoint. A failed initial probe
 assumed any nonzero byte meant true; its source, output and status are retained.
 Additional raw-bit observations are not a contract for malformed Boolean
-values. These conversions remain unimplemented. Evidence is retained under
+values. Those conversions were still unimplemented. Evidence is retained under
 `swift-once-checks`; full regression remains unpassed, the five published
 runners retain their last passing hashes, and gameplay remains unverified.
 EOS resilient witness instantiation, `Optional<TaskPriority>` and `CVarArg`
 existential metadata also remain unsupported.
+
+V now implements both Swift Objective-C Boolean conversion imports,
+`_$s10ObjectiveC22_convertBoolToObjCBoolyAA0eF0VSbF` and
+`_$s10ObjectiveC22_convertObjCBoolToBoolySbAA0cD0VF`, through
+`/usr/lib/swift/libswiftObjectiveC.dylib`. They receive the scalar Boolean in
+`x0` and return canonical 0/1 in `x0`, preserving Swift context/error registers.
+The [Swift 5.0 overlay source](https://github.com/swiftlang/swift/blob/swift-5.0-RELEASE/stdlib/public/SDK/ObjectiveC/ObjectiveC.swift)
+explicitly gives ARM64 iOS `ObjCBool` Boolean storage; the current Apple Clang
+iOS 17 target macros and SDK Objective-C header agree on real `BOOL`.
+Installed ARM64 Mac exports and their Swift interface use the same Boolean
+representation. The Catalyst Swift interface uses signed-byte storage and is
+retained separately; the adapter does not implement its nonzero-byte semantics.
+This combines source, compiler and real caller evidence, without claiming an
+iOS device runtime comparison. EOS has four conversion calls and Marketplace
+one; retained assembly shows bit-0 masking around Boolean callers.
+
+Native Mac and V conversion fixtures pass ASAN/UBSAN in both hash modes,
+alongside the existing static witness and dispatch suites. Each conversion
+sweeps 256 upper-register patterns for valid 0/1 values, checks canonical results
+and round trips, and makes guarded raw calls preserving `x20`/`x21`. V resolves
+only the two exact overlay symbols, rejects wrong libraries and unsupported
+metadata/conformances, and passes before startup and before/during/after two
+runtime cycles. These entries allocate no owner, cache or metadata arena;
+generated C verifies scalar signatures, masking and absence of allocation or
+ARC operations. Invalid Boolean byte patterns are not additional supported
+values. `ObjCBool` metadata and `NSObject: Hashable` remain unsupported.
+
+All forty-two programs rebuild and all twenty-four focused Swift ABI guest
+checks pass. The supplied Fortnite probe passes the conversions and next exits
+while linking EOS at `_$sScA15unownedExecutorScevgTj`, the Swift concurrency
+`Actor.unownedExecutor` getter dispatch thunk. Native export disassembly,
+demangled names, the installed concurrency interface, official Actor/Executor
+sources and actual EOS call sites are retained for further measurement. Actor
+dispatch, executor identity/ownership and scheduling remain unimplemented.
+Evidence is retained under `build/ios/fortnite/swift-objc-bool-checks`, including
+verified lossless generated C archives and original byte hashes. Full regression
+remains unpassed, all five published runners retain their last passing hashes,
+and Fortnite still exits before entry; gameplay remains unverified.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -2325,11 +2363,11 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,403 | 755 | 81 |
-| EOSSDK | 609 | 53 | 18 |
-| MarketplaceKitWrapper | 101 | 75 | 23 |
-| All images | 2,113 | 883 | 122 |
+| EOSSDK | 611 | 51 | 18 |
+| MarketplaceKitWrapper | 102 | 74 | 23 |
+| All images | 2,116 | 880 | 122 |
 
-The C++/GLES/Text variant reports 2,126 resolved imports, 870 unresolved strong
+The C++/GLES/Text variant reports 2,129 resolved imports, 867 unresolved strong
 imports and 122 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -2381,7 +2419,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all seventeen Swift ABI checks in a small, independent guest and
+`swift` runs all twenty-four Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.

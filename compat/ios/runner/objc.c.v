@@ -428,6 +428,10 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	if library == '/usr/lib/swift/libswiftObjectiveC.dylib' {
+		if address := swift_objc_bool_symbol(symbol) { return address }
+		return error('iOS: Swift Objective-C symbol is not implemented: ${symbol}')
+	}
 	if library == '/usr/lib/swift/libswiftCore.dylib' {
 		if address := swift_core_symbol(symbol) { return address }
 		return error('iOS: Swift core symbol is not implemented: ${symbol}')

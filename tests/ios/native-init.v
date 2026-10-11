@@ -81,10 +81,11 @@ fn main() {
 		require_child('/opt/ios/swift-mangled-checks')
 		require_child('/opt/ios/swift-witness-checks')
 		require_child('/opt/ios/swift-once-checks')
+		require_child('/opt/ios/swift-objc-bool-checks')
 		require_child('/opt/ios/regression')
 	} else if mode == 'swift' {
 		for name in ['string', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
-			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once'] {
+			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
 		println('VINIX iOS SWIFT: PASS')
