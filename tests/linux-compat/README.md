@@ -12,7 +12,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -101,6 +101,12 @@ waiters, including a negative comparison operand. SET/ADD/OR/ANDN/XOR must
 change the target word correctly. Shift operands follow Linux's masking, and
 unsupported atomic operations/comparisons return ENOSYS with the appropriate
 word side effects and without waking a queue.
+
+The `futexerror` case checks 38 exact results for alignment, unknown command
+bits, unsupported clock flags, private versus shared unmapped addresses,
+timeout copy/validation precedence and expired deadlines. A mismatching word
+returns EAGAIN before expiration; a matching word returns ETIMEDOUT. WAKE_OP
+validates both keys before decoding or modifying its target.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "a9ace23977027c28124787b270a0707ba56aaff59c885ed10653aab82e11a272",
+    "results": [
+        {
+            "name": "futexerror",
+            "source_sha256": "23ae970412d591bebeb69133d9370591e17bbc9cb56d2f500871b8360dd6a451",
+            "init_sha256": "8460b10c8225b26326c7de058dd3321efbeabccd223e47f706e7e5a0fe4ae470",
+            "iso_sha256": "b01281cbc4668dc57917532a91befff4dd7a6d78538d90fa19c27506bc21a822",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

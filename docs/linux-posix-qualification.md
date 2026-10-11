@@ -570,5 +570,28 @@ No allocation or ownership change is introduced.
 and incorrectly waking on -2 compared with -1. `futex-op-after-*` retains the
 same fixture and all twelve passing native ABI cases in the
 [dated results](../tests/linux-compat/results/2026-10-11/).
-Address validation precedence, requeue and PI interaction remain separate
-qualification requirements.
+Requeue and PI interaction remain separate qualification requirements.
+
+## Futex address and timeout errors
+
+Both architectures pass 38 checks of exact errors and precedence. Unaligned
+words return EINVAL. Unknown command bits and unsupported clock modifiers
+return ENOSYS. The operation is narrowed to Linux's C int. Private wakes on
+canonical unmapped addresses can return zero; shared wakes must resolve their
+word and return EFAULT on missing mappings. WAKE_OP validates both keys before
+decoding its operation or changing the target.
+
+A supplied timeout is copied and validated before command-specific bitset
+and address checks, including recognized unsupported wait commands. Invalid
+pointers return EFAULT; negative seconds or invalid nanoseconds return EINVAL.
+An expired absolute deadline still compares the word: a mismatch returns
+EAGAIN, an inaccessible word returns EFAULT and a matching word returns
+ETIMEDOUT. See [Linux's syscall validation order](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/syscalls.c#L150)
+and [key validation](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/core.c#L185).
+
+`futex-errors-before-*` retains both prior kernels returning EAGAIN for an
+unaligned WAIT. `futex-errors-after-*` retains the matching fixture and all
+thirteen passing native ABI cases in the
+[dated results](../tests/linux-compat/results/2026-10-11/).
+These changes introduce no allocation or ownership change. Read-only WAKE_OP
+targets, page eviction, requeue and PI interactions remain unqualified.

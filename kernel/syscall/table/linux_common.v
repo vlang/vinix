@@ -14,6 +14,7 @@ import file
 import fs
 import futex
 import krandom
+import memory
 import net
 import proc
 import sched
@@ -22,18 +23,37 @@ import time
 import usercopy
 
 
+// Linux's private key only checks the canonical user range; the word need
+// not be mapped for a wake on an empty queue. Shared keys resolve the word.
+fn linux_futex_address_error(address u64, private bool) u64 {
+	if address & 3 != 0 { return errno.einval }
+	if address > memory.user_address_limit() - 4 { return errno.efault }
+	if !private { usercopy.read_u32(address) or { return errno.efault } }
+	return 0
+}
+
 // Linux futex(uaddr, futex_op, val, timeout/val2, uaddr2, val3).
 fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64, uaddr2 u64, val3 u64) (u64, u64) {
 	// PRIVATE selects the address-space/virtual key even on shared mappings.
 	// CLOCK_REALTIME selects the clock for absolute WAIT_BITSET deadlines.
 	private := futex_op & 0x80 != 0
-	op := futex_op & 0x7f
+	// Linux receives an int op. Strip only the two defined modifier bits;
+	// other bits identify an unsupported command instead of aliasing WAIT.
+	op := u32(futex_op) & ~u32(0x180)
+	mut duration := time.TimeSpec{}
+	if timeout != 0 && op in [u32(0), 6, 9, 11, 13]! {
+		if !usercopy.copy_from_user(voidptr(&duration), timeout, sizeof(time.TimeSpec)) {
+			return errno.err, errno.efault
+		}
+		if duration.tv_sec < 0 || duration.tv_nsec < 0 || duration.tv_nsec >= 1000000000 {
+			return errno.err, errno.einval
+		}
+	}
+	if futex_op & 0x100 != 0 && op !in [u32(9), 11, 13]! { return errno.err, errno.enosys }
 	match op {
 		6, 8, 13 { // FUTEX_LOCK_PI, TRYLOCK_PI, LOCK_PI2.
 			if op == 8 || timeout == 0 { return futex.lock_pi(uaddr, op == 8, unsafe { nil }, false) }
-			mut deadline := time.TimeSpec{}
-			if !usercopy.copy_from_user(voidptr(&deadline), timeout, sizeof(time.TimeSpec)) { return errno.err, errno.efault }
-			return futex.lock_pi(uaddr, false, &deadline, op == 6 || futex_op & 0x100 != 0)
+			return futex.lock_pi(uaddr, false, &duration, op == 6 || futex_op & 0x100 != 0)
 		}
 		7 { return futex.unlock_pi(uaddr) }
 		0, 9 { // FUTEX_WAIT, FUTEX_WAIT_BITSET
@@ -41,18 +61,11 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 				return errno.err, errno.einval
 			}
 			bitset := if op == 9 { u32(val3) } else { u32(0xffffffff) }
+			address_error := linux_futex_address_error(uaddr, private)
+			if address_error != 0 { return errno.err, address_error }
 			if timeout == 0 {
 				return futex.wait_mask_key(uaddr, int(val), private, bitset)
 			}
-
-			mut duration := time.TimeSpec{}
-			if !usercopy.copy_from_user(voidptr(&duration), timeout, sizeof(time.TimeSpec)) {
-				return errno.err, errno.efault
-			}
-			if duration.tv_sec < 0 || duration.tv_nsec < 0 || duration.tv_nsec >= 1000000000 {
-				return errno.err, errno.einval
-			}
-
 			// FUTEX_WAIT has a relative timeout. FUTEX_WAIT_BITSET names an
 			// absolute deadline, so turn it into the relative duration used by
 			// the Vinix timer queue.
@@ -64,7 +77,9 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 				}
 				now := time.clock_now(clock_id) or { return errno.err, errno.einval }
 				if duration.sub(now) {
-					return errno.err, errno.etimedout
+					// Compare the word before reporting expiration, just as
+					// a relative zero wait does in wait_timeout_mask_key.
+					duration = time.TimeSpec{}
 				}
 			}
 			return futex.wait_timeout_mask_key(uaddr, int(val), duration, private, bitset)
@@ -72,9 +87,15 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 		1, 10 { // FUTEX_WAKE, FUTEX_WAKE_BITSET
 			if op == 10 && u32(val3) == 0 { return errno.err, errno.einval }
 			bitset := if op == 10 { u32(val3) } else { u32(0xffffffff) }
+			address_error := linux_futex_address_error(uaddr, private)
+			if address_error != 0 { return errno.err, address_error }
 			return futex.wake_mask_key(uaddr, int(i32(val)), private, bitset), 0
 		}
 		5 { // FUTEX_WAKE_OP
+			for address in [uaddr, uaddr2]! {
+				address_error := linux_futex_address_error(address, private)
+				if address_error != 0 { return errno.err, address_error }
+			}
 			// Decode FUTEX_OP(op, oparg, cmp, cmparg). In particular Qt's
 			// QSemaphore uses OR 0 / NE 0 to wake paint worker completions.
 			code := u32(val3)
