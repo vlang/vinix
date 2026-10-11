@@ -1,0 +1,117 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "623190a0edf821cd0e34ee4e06b5efc6a49f44d52a76c300b9a01769b0754bd2",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "uid": 1000,
+    "gid": 1000,
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "firefox",
+            "status": "failed",
+            "detail": "command failed: ['/usr/lib/firefox-esr/firefox-esr', '--headless', '--no-remote', '--profile', '/tmp/linux-compat-evidence/firefox-profile', '--window-size', '800,600', '--screenshot', '/tmp/linux-compat-evidence/firefox.png', 'http://127.0.0.1:60516/'] exit=11 timeout=false output_limit=false"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--version"
+            ],
+            "executable_sha256": "143aeed9b12686c25130cac64524508ee9342533e5da76d059aef5e26524601f",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Mozilla Firefox 128.14.0esr\n",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1491452 kB\nMemFree:        1407016 kB\nMemAvailable:   1407016 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           13172 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 190905856\nOwnerLimit: 95452928\nCharged: 3210114\nAccounts: 3\nDenied: 0\nKind Objects Bytes\nfile 18 69704\ndescriptor 21 51456\nsocket 0 0\nipc 3 12288\nmapping 83 1285120\nprocess 6 82602\nthread 3 1692432\nscratch 1 16512\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--headless",
+                "--no-remote",
+                "--profile",
+                "/tmp/linux-compat-evidence/firefox-profile",
+                "--window-size",
+                "800,600",
+                "--screenshot",
+                "/tmp/linux-compat-evidence/firefox.png",
+                "http://127.0.0.1:60516/"
+            ],
+            "executable_sha256": "143aeed9b12686c25130cac64524508ee9342533e5da76d059aef5e26524601f",
+            "environment_overrides": {},
+            "environment_unset": [],
+            "exit_code": 11,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "[GFX1-]: glxtest: libpci missing\n[GFX1-]: glxtest: libGL.so.1 missing\n[GFX1-]: No GPUs detected via PCI\n\n",
+            "stderr": "*** You are running in headless mode.\n[Parent 15499, IPC Launch] WARNING: fork() failed: Out of memory: file /home/buildozer/aports/community/firefox-esr/src/firefox-128.14.0/ipc/chromium/src/base/process_util_linux.cc:298\n[Parent 15499, IPC I/O Parent] WARNING: Failed to launch tab subprocess @fork (Error:12): file /home/buildozer/aports/community/firefox-esr/src/firefox-128.14.0/ipc/glue/GeckoChildProcessHost.cpp:821\nExiting due to channel error.\n",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1491452 kB\nMemFree:        1397008 kB\nMemAvailable:   1397008 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           13304 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 190905856\nOwnerLimit: 95452928\nCharged: 4748002\nAccounts: 4\nDenied: 0\nKind Objects Bytes\nfile 35 169234\ndescriptor 23 51712\nsocket 1 131072\nipc 3 12288\nmapping 129 2000640\nprocess 8 109968\nthread 4 2256576\nscratch 1 16512\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                },
+                {
+                    "phase": "nonzero-exit",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1491452 kB\nMemFree:        1365480 kB\nMemAvailable:   1365480 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           14424 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 190905856\nOwnerLimit: 95452928\nCharged: 4797554\nAccounts: 6\nDenied: 3\nKind Objects Bytes\nfile 143 976380\ndescriptor 14 66816\nsocket 17 262144\nipc 3 274432\nmapping 90 1370560\nprocess 10 138278\nthread 3 1692432\nscratch 1 16512\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}

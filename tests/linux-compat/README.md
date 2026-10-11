@@ -149,6 +149,15 @@ unique response, recording its response and termination. Missing
 executables are `unsupported`, nonzero exits/timeouts are `failed`, and either
 causes a failing suite exit. There is no sandbox-disable fallback.
 
+Guest command receipts include a starting `/proc/meminfo` and
+`/proc/kernel-resources` snapshot. Before terminating a command for a timeout
+or output limit, the driver records those counters again, the child's
+`status`/`maps`, and `slabinfo`. Nonzero exits retain the final global counters.
+Each snapshot retains at most 64 KiB; truncation and read errors are explicit
+and cannot turn a failing command into a pass. Host-only runs collect no proc
+diagnostics. These counters help distinguish allocation limits from physical
+memory pressure; they do not establish the cause of a failure by themselves.
+
 The `serviceunits` case requires the cross-compiled native `vinix-desktop` broker
 and BusyBox Extras. It imports a supported Linux HTTP service unit disabled,
 starts it explicitly, checks its response and failure restart, restores its

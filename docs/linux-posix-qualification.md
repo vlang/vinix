@@ -641,3 +641,27 @@ process. The failed report, controller receipt, prepared-root manifest,
 package hashes and raw log remain visible alongside the passes. This result
 does not identify the cause of that allocation failure or qualify browsers,
 portals or the complete application lifecycle.
+
+## Browser allocation and timeout diagnostics
+
+The workload driver now retains bounded guest proc snapshots in each command
+receipt. Starting counters and failure counters expose physical memory and
+kernel resource reservations. Timeout/output-limit snapshots also record the
+child's status, up to 32 KiB of maps and slab counts before process-group
+cleanup. Read errors and truncation remain explicit. Host-only runs do not
+collect these snapshots. Three reader/failure tests and the three existing
+runner tests pass, and the static driver builds for both architectures.
+
+The [2048 MiB report](../tests/linux-compat/results/2026-10-12/pressure-firefox-2g-x86_64.json)
+and [4096 MiB report](../tests/linux-compat/results/2026-10-12/pressure-firefox-4g-x86_64.json)
+use the same native x86-64 kernel and Firefox 128.14.0esr executable as
+UID/GID 1000, with normal sandbox policy and 120-second command deadlines.
+The smaller run reports a failed fork, exits 11, and retains three kernel
+resource denials with 1,365,480 KiB of physical memory free after exit.
+The larger run times out without a fork warning, with zero resource denials,
+3,037,984 KiB free and 53 threads in the sleeping browser parent.
+This supports investigating resource accounting separately from the remaining
+browser startup issue; it does not prove either failure's complete cause.
+Neither run executes the nonce-bearing page or renders its PNG. Reports,
+controller receipts, source/build hashes, prepared-root manifests and logs
+remain alongside the other qualification artifacts.

@@ -21,6 +21,7 @@ struct CommandResult {
 	output_limited    bool
 	stdout            string
 	stderr            string
+	diagnostics       []DiagnosticSnapshot
 }
 
 struct Verdict {
@@ -65,6 +66,8 @@ struct Suite {
 	runtime string
 	runtime_libc string = 'musl'
 	data_device string
+	// Only guest main enables this. Host evidence must not read host /proc.
+	diagnostics_root string
 mut:
 	environment map[string]string
 	commands []CommandResult
@@ -158,23 +161,30 @@ fn (mut suite Suite) execute(program string, arguments []string) !string {
 	watch := time.new_stopwatch()
 	mut timed_out := false
 	mut output_limited := false
+	mut diagnostics := []DiagnosticSnapshot{}
+	if suite.diagnostics_root != '' { diagnostics << suite.diagnostic_snapshot('started', 0) }
 	for {
 		if child.is_pending(.stdout) { out += child.stdout_read() }
 		if child.is_pending(.stderr) { err += child.stderr_read() }
 		if out.len + err.len > 4 * 1024 * 1024 {
 			output_limited = true
+			if suite.diagnostics_root != '' { diagnostics << suite.diagnostic_snapshot('output-limit', child.pid) }
 			child.signal_pgkill()
 			break
 		}
 		if !child.is_alive() { break }
 		if watch.elapsed() > suite.timeout * time.second {
 			timed_out = true
+			if suite.diagnostics_root != '' { diagnostics << suite.diagnostic_snapshot('timeout', child.pid) }
 			child.signal_pgkill()
 			break
 		}
 		time.sleep(10 * time.millisecond)
 	}
 	child.wait()
+	if child.code != 0 && !timed_out && !output_limited && suite.diagnostics_root != '' {
+		diagnostics << suite.diagnostic_snapshot('nonzero-exit', 0)
+	}
 	// Retire descendants before collecting the final output; a lingering
 	// helper must not keep a pipe or service alive after this workload.
 	child.signal_pgkill()
@@ -206,6 +216,7 @@ fn (mut suite Suite) execute(program string, arguments []string) !string {
 		output_limited: output_limited
 		stdout: out
 		stderr: err
+		diagnostics: diagnostics
 	}
 	suite.commands << result
 	os.write_file('${suite.work}/command-${suite.commands.len}.json', json2.encode(result,
@@ -465,7 +476,7 @@ fn main() {
 		eprintln(err.msg())
 		exit(1)
 	}
-	mut suite := Suite{ work: os.real_path(work), path: path, timeout: timeout, install: '--install' in values, runtime: values['--runtime-probe'] or { '' }, runtime_libc: runtime_libc, data_device: values['--data-device'] or { '' } }
+	mut suite := Suite{ work: os.real_path(work), path: path, timeout: timeout, install: '--install' in values, runtime: values['--runtime-probe'] or { '' }, runtime_libc: runtime_libc, data_device: values['--data-device'] or { '' }, diagnostics_root: if host { '' } else { '/proc' } }
 	mut verdicts := []Verdict{}
 	for name in cases {
 		suite.run(name) or {

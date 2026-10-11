@@ -10,6 +10,7 @@ fn test_nonzero_and_timeout_are_retained_as_failures() {
 	mut suite := Suite{ work: work, path: 'native-aarch64', timeout: 1 }
 	suite.execute('false', []) or {
 		assert suite.commands.len == 1 && suite.commands[0].exit_code != 0
+		assert suite.commands[0].diagnostics.len == 0
 		assert os.is_file(work + '/command-1.json')
 		suite.execute('sleep', ['5']) or {
 			assert suite.commands.len == 2 && suite.commands[1].timed_out

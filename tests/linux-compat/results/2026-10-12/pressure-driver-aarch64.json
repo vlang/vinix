@@ -1,0 +1,47 @@
+{
+    "architecture": "aarch64",
+    "libc": "musl",
+    "commands": [
+        [
+            "/Users/alex/.local/bin/v",
+            "-os",
+            "linux",
+            "-arch",
+            "arm64",
+            "-gc",
+            "none",
+            "-prod",
+            "-o",
+            "/Volumes/VinixLinuxCompatNext1011/diagnostic-driver3-arm/workloads.c",
+            "/Users/alex/code/vinix/tools/linux-compat/workloads"
+        ],
+        [
+            "clang",
+            "--target=aarch64-linux-musl",
+            "--sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot",
+            "-fuse-ld=lld",
+            "-L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib",
+            "-static",
+            "-pthread",
+            "-w",
+            "/Volumes/VinixLinuxCompatNext1011/diagnostic-driver3-arm/workloads.c",
+            "-lm",
+            "-o",
+            "/Volumes/VinixLinuxCompatNext1011/diagnostic-driver3-arm/linux-compat-workloads"
+        ]
+    ],
+    "inputs": {
+        "tools/linux-compat/workloads/main.v": "69d98ee88afe481fa4e3d921559a2eee3f1b61944f5034d1007df8216c146fcc",
+        "tools/linux-compat/workloads/diagnostics.v": "41103024626e99b1f613a69f6f88657e994a1912e7499443d95a5032fdcd7d1f",
+        "tools/linux-compat/workloads/debugger.v": "95d39a019412164d190af4142bc849f91de77b472791f12098a914fac4eace36",
+        "tools/linux-compat/workloads/packages.v": "a56fa2d3026ea950df165c000ee2acd4f91652a0cea7e14f48458d91f9fdc2c7",
+        "tools/linux-compat/workloads/games.v": "bc1f4b3e5a40cd2dc557fa6f2243a0ef774d4192604b617f9a3c721d40626b12",
+        "tools/linux-compat/workloads/service_units.v": "8691a1d480c24d2a41d8012240f3365e0c8203861ea5393e7e61be67266c33d8",
+        "tools/linux-compat/workloads/browsers.v": "3ff72f4439c952ac99f0896f81d17e25dee4a58173289c449ae59f8daa8a7e8e",
+        "tools/linux-compat/workloads/runtime_sources.v": "61abe8c1bda3e05e930ea472015c5635233754c9397210d3ec20fb3dbad88482",
+        "tests/go/smoke.go": "f58f7865f0d668a13f2fe0a81f56b45cbe1cda463da4aa57cd17c6b9c0711fb5",
+        "tests/java/VinixJavaSmoke.java": "3db7a5dbb4eb3e6e1387680b5570a211417bc1adc25686d04c5b0da0cb77a92d",
+        "generated_c": "67646adfcf6fff4e0f05cd3803cefc6d755c88b73c78a4e21b7d8156c52c83c8"
+    },
+    "executable_sha256": "d1b135ce6715482a0cd919544049da17851d397d2c995374fbf0c0bd011a51c2"
+}
