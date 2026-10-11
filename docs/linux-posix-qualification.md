@@ -814,3 +814,27 @@ all VM metadata: existing PagedPage nodes remain uncharged, and heap allocation
 can still fail after budget admission. A fixed shared remap can remove its
 destination before a later reservation fails. The flat paging measurement
 does not replace the broader kernel operations/churn leak audit.
+
+## Production task diagnostics
+
+An explicit root request through `/proc/sysrq-trigger` now sends the x86-64
+task dump to serial as well as the graphical console. AArch64 already sent
+these dumps to serial; its path is retained without a duplicate report.
+The thread-list lock is attempted before reading process state. A busy list
+reports an unknown state instead of waiting for that lock. The process-table
+and console locks still apply, so this does not qualify general deadlock
+recovery.
+
+The same native fixture receives EACCES as UID/GID 1000 and then issues two
+root requests. The controller requires actual serial task rows in addition to
+the fixture's verdict. The prior production x86-64 kernel passes the writes
+but times out with no serial rows; the prior AArch64 kernel passes. Both final
+kernels pass the diagnostic, namespace-discovery and seccomp-query cases.
+The existing process-inspection fixture also passes all six groups on each
+kernel, including concurrent exec/exit and mapping changes. All seven
+compatibility host test files and the generated inventory check pass.
+
+The [dated receipts, raw logs and assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/sysrq-audit.v)
+record the before/after controls and inspection results. The auditor verifies
+49 inventory inputs against both isolated build trees, the generated lock
+ordering and architecture-specific serial calls, and the frozen test artifacts.

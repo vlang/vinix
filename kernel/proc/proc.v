@@ -11,6 +11,10 @@ import event.eventstruct
 import time
 import errno
 
+#include <stdio.h>
+
+fn C.printf_benchmark(charptr, ...voidptr) i32
+
 // The most descriptors a process may have: Linux's nr_open, and the hard
 // RLIMIT_NOFILE a process starts with. Its table starts with initial_fds
 // slots and grows as descriptors past them are made (file.grow_fd_table), so
@@ -1408,7 +1412,6 @@ fn dump_threads() {
 		if process == unsafe { nil } {
 			continue
 		}
-		state := match process_state(process) { `Z` { c'Z' } `T` { c'T' } `S` { c'S' } else { c'R' } }
 		start, end := command_name_bounds(process.name)
 		command := unsafe { process.name.str + start }
 		// The list is only safe to walk under its lock: a thread leaving takes
@@ -1417,15 +1420,27 @@ fn dump_threads() {
 		mut owner := unsafe { process }
 		if !owner.threads_lock.test_and_acquire() {
 			C.kprintf(c'sysrq: pid=%lld ppid=%lld %s %.*s (thread list busy)\n', i64(pid),
-				i64(process.ppid), state, i32(end - start), command)
+				i64(process.ppid), c'?', i32(end - start), command)
+			$if prod && amd64 {
+				C.printf_benchmark(c'sysrq: pid=%lld ppid=%lld %s %.*s (thread list busy)\n', i64(pid),
+					i64(process.ppid), c'?', i32(end - start), command)
+			}
 			continue
 		}
+		state := match process_state_unlocked(process) { `Z` { c'Z' } `T` { c'T' } `S` { c'S' } else { c'R' } }
 		for t in process.threads {
 			nr, arg0 := t.current_syscall()
 			args := t.syscall_args_text()
 			C.kprintf(c'sysrq: pid=%lld ppid=%lld tid=%lld %s %.*s syscall=%lld arg0=0x%llx %.*s\n',
 				i64(pid), i64(process.ppid), i64(t.tid), state, i32(end - start), command,
 				i64(nr), u64(arg0), i32(args.len), args.str)
+			// On x86-64, ordinary kernel output is console-only in production. Explicit
+			// task diagnostics must also reach serial-only guests and machines.
+			$if prod && amd64 {
+				C.printf_benchmark(c'sysrq: pid=%lld ppid=%lld tid=%lld %s %.*s syscall=%lld arg0=0x%llx %.*s\n',
+					i64(pid), i64(process.ppid), i64(t.tid), state, i32(end - start), command,
+					i64(nr), u64(arg0), i32(args.len), args.str)
+			}
 			unsafe { args.free() }
 		}
 		owner.threads_lock.release()

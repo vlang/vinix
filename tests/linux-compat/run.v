@@ -35,7 +35,7 @@ fn main() {
 		hosttest.Option{ name: '--state-dir', value: true },
 		hosttest.Option{ name: '--cases', value: true },
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: tests/linux-compat/run --arch aarch64|x86_64 --kernel-dir DIR --state-dir FRESH-DIR [--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage] [--timeout SECONDS]') or {
+	], [], 'Usage: tests/linux-compat/run --arch aarch64|x86_64 --kernel-dir DIR --state-dir FRESH-DIR [--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq] [--timeout SECONDS]') or {
 		eprintln(err.msg())
 		exit(2)
 	}
@@ -50,10 +50,10 @@ fn main() {
 		eprintln(err.msg())
 		exit(2)
 	}
-	cases := options.value('--cases', 'bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage').split(',')
+	cases := options.value('--cases', 'bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq').split(',')
 	mut seen := map[string]bool{}
 	for name in cases {
-		if name !in ['bpf', 'access', 'open', 'mmap', 'runtime', 'namespace', 'sharedmem', 'seccomp', 'futex', 'futexkeys', 'futexbits', 'futexop', 'futexerror', 'futexqueue', 'sparsefork', 'seccompquery', 'budget', 'mapstorage'] || name in seen {
+		if name !in ['bpf', 'access', 'open', 'mmap', 'runtime', 'namespace', 'sharedmem', 'seccomp', 'futex', 'futexkeys', 'futexbits', 'futexop', 'futexerror', 'futexqueue', 'sparsefork', 'seccompquery', 'budget', 'mapstorage', 'sysrq'] || name in seen {
 			eprintln('unknown or repeated case: ' + name)
 			exit(2)
 		}
@@ -114,6 +114,8 @@ fn main() {
 		code := guesthost.guest(frozen_source + '/core.v', '', work + '/' + name, work + '/kernel', arch,
 			if name == 'runtime' {
 				[marker, 'LINUX RUNTIME PASS: atomics SIMD TLS', 'LINUX RUNTIME PASS: JIT page sizes']
+			} else if name == 'sysrq' {
+				[marker, 'sysrq: pid=1 ppid=0 tid=1']
 			} else {
 				[marker]
 			},

@@ -11,6 +11,15 @@ pub fn process_state(process &Process) u8 {
 	mut owner := unsafe { process }
 	owner.threads_lock.acquire()
 	defer { owner.threads_lock.release() }
+	return process_state_unlocked(process)
+}
+
+// Caller holds both the process table and this process's thread-list lock.
+// SysRq acquires the latter without waiting, so a busy list cannot block the
+// diagnostic before it reaches the explicit busy-list report.
+fn process_state_unlocked(process &Process) u8 {
+	if process.exiting { return `Z` }
+	if katomic.load(&process.job_stop_complete) { return `T` }
 	for task in process.threads {
 		if !katomic.load(&task.is_dead) && (katomic.load(&task.is_in_queue)
 			|| katomic.load(&task.running_on) != u64(-1)) { return `R` }

@@ -31,7 +31,7 @@ charging during target exec/exit.
 After building the kernel for the selected architecture, run:
 
 ```sh
-python3 tests/kernel-gaps/run.py \
+tests/kernel-gaps/run-native \
   --source tests/process-inspection/test.c --kernel-dir kernel \
   --arch aarch64 --expect 'VINIX PROCESS INSPECTION: PASS'
 ```

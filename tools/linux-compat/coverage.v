@@ -63,6 +63,8 @@ fn coverage(root string) !Coverage {
 		'kernel/file/file.v', 'kernel/fs/vfs.v', 'kernel/fs/mount_policy.v',
 		'kernel/fs/mount.v', 'kernel/fs/tmpfs.v', 'kernel/fs/procfs.v',
 		'kernel/proc/proc.v', 'kernel/proc/proc_arm64.v', 'kernel/proc/proc_amd64.v',
+		'kernel/proc/state.v', 'kernel/kprint/printf_policy.v',
+		'kernel/kprint/kprint_amd64.v', 'kernel/kprint/kprint_arm64.v',
 		'kernel/proc/container.v', 'kernel/proc/seccomp.v',
 		'kernel/kbudget/budget.v', 'kernel/proc/kernel_budget.v',
 		'kernel/vmstorage/storage.v',

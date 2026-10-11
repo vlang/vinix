@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -152,6 +152,13 @@ unmapping it repeats the cycle to check bounded retained capacity. Prior
 fixed 8 KiB alias reservations fail the metadata bound on both architectures.
 The [host helper checks](../mmap-budget/README.md) separately cover allocator
 geometry, refused growth, retry and surviving creator accounts.
+
+The `sysrq` case checks that an ordinary user receives EACCES when opening
+`/proc/sysrq-trigger` for writing, then issues two root task-dump requests.
+The controller requires both the fixture verdict and an actual serial task
+row. Production kernels retain the graphical console report and also send
+these explicit requests to serial. A busy thread list is reported without
+waiting for its lock; broader deadlock recovery remains a separate concern.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,
