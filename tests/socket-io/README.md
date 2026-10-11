@@ -34,7 +34,7 @@ tests/socket-io/check-generated kernel/obj/blob.c
 VINIX_VM_RUNNER_ROOT=/path/to/prepared/vinix \
 VINIX_AARCH64_SYSROOT=/path/to/vinix/build-aarch64-userland/sysroot \
 VINIX_KERNEL_DIR=/path/to/saved-arm-kernel VINIX_QEMU_RT_NO_BUILD=1 \
-python3 tests/socket-io/run.py --arch=aarch64
+tests/socket-io/run --arch=aarch64
 
 make -C kernel clean
 make -C kernel ARCH=x86_64 ALLOC_TRACK=1 V=/path/to/v CC=clang \
@@ -42,7 +42,7 @@ make -C kernel ARCH=x86_64 ALLOC_TRACK=1 V=/path/to/v CC=clang \
 tests/socket-io/check-generated kernel/obj/blob.c
 VINIX_VM_RUNNER_ROOT=/path/to/prepared/vinix \
 VINIX_AMD64_KERNEL=/path/to/saved-amd64-kernel/bin/vinix \
-python3 tests/socket-io/run.py --arch=amd64
+tests/socket-io/run --arch=amd64
 ```
 
 `--baseline` permits measured heap growth and reports lost shared flag updates;
@@ -116,3 +116,7 @@ The independent guest now lives in `socketfixture/core.v`, with native libc
 and socket declarations in its narrow ABI header. The runner compiles the V
 module for the selected architecture. All 79 original check sites, allocation
 limits, exchange counts and the 300-second budget are retained.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

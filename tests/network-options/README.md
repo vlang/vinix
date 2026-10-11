@@ -11,11 +11,11 @@ and retry, send backpressure/output failures, and abort-close callback cleanup.
 Build the kernel for the desired architecture, then run:
 
 ```sh
-VINIX_QEMU_RT_NO_BUILD=1 python3 tests/network-options/run.py
-python3 tests/network-options/run.py --arch amd64
+VINIX_QEMU_RT_NO_BUILD=1 tests/network-options/run
+tests/network-options/run --arch amd64
 ```
 
-The ARM64 runner uses the same build/VM support as `tests/realtime`. Its optional
+The ARM64 runner uses the native V ABI controller. Its optional
 `VINIX_VM_RUNNER_ROOT`, `VINIX_KERNEL_DIR` and `VINIX_AARCH64_SYSROOT` settings
 support isolated worktree builds. The AMD64 runner uses
 `x86_64-linux-musl-gcc`, the existing ISO builder and QEMU TCG; set
@@ -42,3 +42,7 @@ setting without an ICMP error queue; PMTU feedback, ECN, raw userspace IPv4
 sockets, IPv6, multicast membership, packet filtering/NAT and VPNs also remain
 unfinished. SACK/timestamp negotiation is enabled and tested; this suite does
 not establish performance gains or exhaustive loss/reordering behavior.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

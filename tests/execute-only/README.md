@@ -49,15 +49,15 @@ export VINIX_VM_RUNNER_ROOT=/path/to/main
 export VINIX_KERNEL_DIR=/path/to/worktree/kernel
 export VINIX_AARCH64_SYSROOT=/path/to/main/build-aarch64-userland/sysroot
 export VINIX_QEMU_RT_NO_BUILD=1 VINIX_QEMU_AUDIO=off
-USE_TCG=1 python3 tests/execute-only/run.py
+USE_TCG=1 tests/execute-only/run
 
 # The same CPU with PAN explicitly disabled must keep readable text.
 VINIX_CMDLINE=vinix.user_access=off USE_TCG=1 \
-  python3 tests/execute-only/run.py --expect-readable
+  tests/execute-only/run --expect-readable
 
 VINIX_VM_RUNNER_ROOT=/path/to/main \
 VINIX_AMD64_KERNEL=/path/to/worktree/build-amd64-kernel/bin/vinix \
-  python3 tests/execute-only/run.py --arch=amd64
+  tests/execute-only/run --arch=amd64
 ```
 
 Use `--expect-readable` for an ARM CPU lacking enhanced PAN. The runner treats
@@ -136,3 +136,7 @@ logs, helpers and hashes are saved under
 
 SEC7 remains partial. AMD64 PKU, automatic loader/toolchain use and protected
 copy registration for otherwise readable ELF/libc text remain separate work.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

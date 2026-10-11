@@ -59,7 +59,7 @@ Run the remaining matrix on both kernels:
 | Task/kernel-memory quotas, concurrent admission, pressure notifications, swap, OOM/fault/exit races and recovery | `tests/resource-groups/run.py --arch ARCH --kernel-dir KERNEL --smp 4 --state-dir STATE` | `CGROUP PASS` |
 | Anonymous pageout/refault, COW and shared aliases under physical pressure | `tests/paging/run.py --arch ARCH --kernel-dir KERNEL --memory 256 --pressure --state-dir STATE` | `PAGING encrypted-disk-swapoff PASS` and `PAGING PASS` |
 
-Also run `tests/posix-timer/run.py` on AArch64 and amd64, and the AArch64 desktop
+Also run `tests/posix-timer/run` on AArch64 and amd64, and the AArch64 desktop
 performance scenarios `ops,churn,cache` and `idle,apps,drag` with
 `VINIX_KERNEL_DIR=KERNEL`. Run `tests/kernel-allocs/run.sh`, compare failures to
 the same-compiler baseline and do not expand the allocation allowance file.

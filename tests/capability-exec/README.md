@@ -35,9 +35,9 @@ export VINIX_VM_RUNNER_ROOT=/path/to/main-checkout
 export VINIX_KERNEL_DIR=/path/to/worktree/kernel
 export VINIX_AARCH64_SYSROOT=/path/to/main-checkout/build-aarch64-userland/sysroot
 export VINIX_QEMU_RT_NO_BUILD=1 VINIX_QEMU_AUDIO=off
-python3 tests/capability-exec/run.py
+tests/capability-exec/run
 VINIX_AMD64_KERNEL=/path/to/worktree/build-amd64-kernel/bin/vinix \
-  python3 tests/capability-exec/run.py --arch=amd64
+  tests/capability-exec/run --arch=amd64
 ```
 
 The guest is compiled with warnings treated as errors. The runner requires
@@ -56,3 +56,7 @@ Local evidence: `/tmp/vinix-capability-exec-{arm,amd64}-guest.log`,
 `/tmp/vinix-capability-exec-{arm,amd64}-build.log`.
 This closes the capability-ceiling bug. SEC4 still needs executable set-ID
 and file-capability transitions, nosuid integration and descriptor hygiene.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

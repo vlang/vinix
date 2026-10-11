@@ -43,9 +43,9 @@ include the separate procfs, stat/poll scratch, and unpublished-thread fixes.
 The generic VFS borrowed-node lifetime and retained mknod backing pointer
 remain separate work; this result covers the controlling-terminal handoff.
 
-Run `python3 tests/terminal-jobs/run.py`, or add `--arch=amd64`. Isolated
+Run `tests/terminal-jobs/run`, or add `--arch=amd64`. Isolated
 kernels and cached VM tooling use the same environment variables as
-`tests/stack-policy/run.py`. The test requires four virtual CPUs.
+`tests/stack-policy/run`. The test requires four virtual CPUs.
 
 The independent fixture is maintained in `guestfixture/core.v`; its native
 header contains libc declarations and layout assertions. Generated C is a
@@ -57,3 +57,7 @@ The original 568-line C control remains available in Git revision `13c5160a`.
 Its separate readiness fix in `66513801` waits for both orphan-signal handlers
 within the original bounded poll before the unchanged assertions. The V
 fixture includes the same fix; the C and V controls pass on both architectures.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

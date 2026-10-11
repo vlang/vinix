@@ -41,7 +41,7 @@ tests/posix-timer/check-generated kernel/obj/blob.c
 VINIX_VM_RUNNER_ROOT=/path/to/prepared/vinix \
 VINIX_AARCH64_SYSROOT=/path/to/vinix/build-aarch64-userland/sysroot \
 VINIX_KERNEL_DIR=/path/to/saved-arm-kernel VINIX_QEMU_RT_NO_BUILD=1 \
-python3 tests/posix-timer/run.py --arch=aarch64
+tests/posix-timer/run --arch=aarch64
 
 make -C kernel clean
 make -C kernel ARCH=x86_64 LIMINE_MP=1 ALLOC_TRACK=1 V=/path/to/v CC=clang \
@@ -49,7 +49,7 @@ make -C kernel ARCH=x86_64 LIMINE_MP=1 ALLOC_TRACK=1 V=/path/to/v CC=clang \
 tests/posix-timer/check-generated kernel/obj/blob.c
 VINIX_VM_RUNNER_ROOT=/path/to/prepared/vinix \
 VINIX_AMD64_KERNEL=/path/to/saved-amd64-kernel/bin/vinix \
-python3 tests/posix-timer/run.py --arch=amd64
+tests/posix-timer/run --arch=amd64
 ```
 
 The pointer slot and array header stay on the caller's stack throughout the
@@ -72,3 +72,7 @@ checks, then passes persistence verification after reboot. No assertions or timi
 This change does not alter POSIX timer metadata locking, notification queue
 semantics, timer owner lifetime, or clock discipline. Those broader mechanisms
 are outside this wait-wakeup fix.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

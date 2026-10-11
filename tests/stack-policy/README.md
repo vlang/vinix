@@ -19,7 +19,7 @@ mode with a fresh counter; exec clears both. A runtime opting into enforcement
 must tag every thread stack and alternate signal stack before using it. Policy
 is disabled by default to retain ordinary Linux syscall behavior.
 
-Run `python3 tests/stack-policy/run.py` or add `--arch=amd64`, with the same
+Run `tests/stack-policy/run` or add `--arch=amd64`, with the same
 worktree/sysroot environment overrides as the dumpability runner. Guests issue
 actual syscalls on tagged and untagged alternate stacks, exercise split/fork,
 protection changes and exec, and check audit counts and enforced signal status.
@@ -28,3 +28,7 @@ This supplies the opt-in tagging/checking portion of SEC6. It does not enable
 these rules for existing Linux binaries without cooperation from their runtimes,
 add syscall-instruction pinning, or guard kernel stacks. The check inspects VMA
 metadata under the pagemap lock and allocates no memory or faults pages in.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

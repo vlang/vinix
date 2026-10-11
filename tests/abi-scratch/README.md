@@ -7,10 +7,8 @@ value, and the signal path applies a scalar mask; neither retains these slots.
 Explicit `vinix_stack_alloc` storage prevents V escape analysis from promoting
 these synchronous locals to unfreed heap objects.
 
-Run `python3 tests/abi-scratch/run.py` or add `--arch=amd64`, using the prebuilt
+Run `tests/abi-scratch/run` or add `--arch=amd64`, using the prebuilt
 isolated-kernel overrides documented in `tests/terminal-jobs/README.md`.
-Set `VINIX_QEMU_RT_NO_BUILD=1` when measuring a prebuilt ARM kernel so the
-real-time runner does not rebuild it with its default compiler/configuration.
 The guest checks native stat layouts, symlink and AT_EMPTY_PATH/statx results,
 invalid pointers and lookup failures. Poll tests cover immediate readiness,
 invalid timeout/mask pointers, temporary-mask restoration, and a blocking
@@ -39,3 +37,7 @@ the expanded ABI guest passes all `SYS_poll` cases and stays exactly flat
 at 1,020 KiB; the ARM stat/`ppoll` loop stays flat at 1,536 KiB. Both production
 architecture builds pass, and the x86 generated `syscall_poll` has one
 conditional `vinix_stack_alloc` with no `memdup`.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

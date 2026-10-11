@@ -10,7 +10,7 @@ cleared. Private UTS namespaces may configure their independent names. Raising
 the level uses an atomic compare/exchange loop so concurrent raises cannot
 accidentally lower a newer policy. Only init may lower a positive level.
 
-Run `python3 tests/securelevel/run.py` for ARM64 or add `--arch=amd64` for x86.
+Run `tests/securelevel/run` for ARM64 or add `--arch=amd64` for x86.
 The runner follows the existing dumpability VM setup and environment overrides.
 The disk fixture is a block-mode inode used to exercise userspace dispatch;
 the ARM runner also mounts a real persistent EXT2 /root and checks ordinary
@@ -25,7 +25,7 @@ to run that original Git blob as an independent control.
 `--state-dir=/absolute/new-state` retains the native inputs, guest ELF and VM
 artifacts; the directory must be new. `--kernel-dir=/absolute/worktree/kernel`
 copies an already-built matching kernel immutably and disables rebuilding it.
-Without that option, the existing environment and build behavior apply.
+Without that option, the existing kernel-selection environment variables apply.
 
 The V port preserves the saved native errno across `close`, the initial UTS
 domain checks, levels 0/1/2/0, all original verdicts and the 300-second guest
@@ -58,3 +58,7 @@ This extends SEC3 but does not close it. Mounted-disk protection at level 1 is
 covered by the [mounted-disk policy tests](../mounted-disk-policy/README.md).
 Physical-memory devices and controls for future packet filters remain to be
 implemented. Clock backward-step protection at level 2 is tested separately.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

@@ -4,12 +4,12 @@
 including read-cadence independence, negative slews, frequency limits, and
 securelevel wall-step checks. It also runs the capability policy tests.
 
-`python3 tests/clock-control/run.py` builds the independent V fixture as a
-static AArch64 guest and uses the
-existing isolated real-time VM driver. Set `VINIX_AARCH64_SYSROOT` for its musl
+`tests/clock-control/run` builds the independent V fixture as a
+static AArch64 guest and uses the native V ABI controller.
+Set `VINIX_AARCH64_SYSROOT` for its musl
 sysroot; `VINIX_VM_RUNNER_ROOT` can select the original checkout's cached boot
 tools while `VINIX_KERNEL_DIR` selects a separately built worktree kernel.
-`VINIX_QEMU_RT_NO_BUILD=1` uses that existing kernel binary.
+The native controller always uses that existing kernel binary.
 
 The guest checks Linux `clock_settime`, `settimeofday`, `adjtimex`, and
 `clock_adjtime` layouts, privilege and pointer failures, uptime independence,
@@ -29,3 +29,7 @@ TAI, hardware RTC persistence, and RTC timezone warping remain unimplemented.
 Unsupported adjustment modes return `EOPNOTSUPP`; the supported modes report
 `STA_UNSYNC` and `TIME_ERROR` rather than claiming NTP synchronization. Queries
 are unprivileged; changes require effective root and `CAP_SYS_TIME`.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

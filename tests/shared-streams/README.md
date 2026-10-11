@@ -7,11 +7,15 @@ guest also fills a pipe using eight writers and checks that regular files
 still serialize their shared offset. It tests dup/fork descriptions, stream
 short reads, and ESPIPE for positioned stream I/O.
 
-Run `python3 tests/shared-streams/run.py` for ARM or add `--arch=amd64`.
+Run `tests/shared-streams/run` for ARM or add `--arch=amd64`.
 The runner accepts the same isolated-kernel and cached-runner environment
-variables as `tests/stack-policy/run.py`.
+variables as `tests/stack-policy/run`.
 
 The independent workload lives in `streamfixture/core.v`; its narrow ABI header
 imports the actual native libc and Linux terminal layouts. The runner generates
 and compiles V for the selected architecture. Original reader/writer counts,
 transfer sizes, shared-offset checks and the 300-second deadline are retained.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

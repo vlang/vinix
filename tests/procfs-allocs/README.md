@@ -5,9 +5,9 @@ Build an isolated kernel with `ALLOC_TRACK=1`, then run:
 ```sh
 VINIX_KERNEL_DIR=/path/to/worktree/kernel VINIX_QEMU_RT_NO_BUILD=1 \
   VINIX_AARCH64_SYSROOT=/path/to/aarch64/sysroot \
-  python3 tests/procfs-allocs/run.py
+  tests/procfs-allocs/run
 VINIX_AMD64_KERNEL=/path/to/worktree/kernel/bin/vinix \
-  python3 tests/procfs-allocs/run.py --arch amd64
+  tests/procfs-allocs/run --arch amd64
 tests/procfs-allocs/check-generated kernel/obj/blob.c
 ```
 
@@ -65,3 +65,7 @@ Both architecture builds and production generated-C checks are required.
 Existing shared-directory position synchronization, rollback of a directory
 position after failed user copying, global 255-byte namespace admission, and
 other proc formatting paths are outside this focused change.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

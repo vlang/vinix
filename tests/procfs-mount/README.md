@@ -33,11 +33,11 @@ tests/procfs-mount/check-generated build-amd64-kernel/obj/blob.c
 
 VINIX_VM_RUNNER_ROOT=/path/to/main-checkout VINIX_QEMU_RT_NO_BUILD=1 \
   VINIX_KERNEL_DIR="$PWD/kernel" VINIX_QEMU_TIMEOUT=600 \
-  python3 tests/procfs-mount/run.py
+  tests/procfs-mount/run
 VINIX_VM_RUNNER_ROOT=/path/to/main-checkout \
   VINIX_AMD64_KERNEL="$PWD/build-amd64-kernel/bin/vinix" \
   VINIX_LIMINE_CACHE=/tmp/vinix-procfs-mount-limine VINIX_QEMU_TIMEOUT=600 \
-  python3 tests/procfs-mount/run.py --arch amd64
+  tests/procfs-mount/run --arch amd64
 ```
 
 The optional Limine cache holds only the small pinned bootloader files; the ISO
@@ -57,7 +57,7 @@ control, recover `tests/procfs-mount/guest.c` from Git revision
 `99162a3924e8fc12d6e2298ee46bfde6c2627269`, compile it with the same SDK
 (adding `-DPROC_MOUNT_REUSE_ONLY` for the reuse case), and supply
 `--prebuilt-init /path/to/original-init`. These options retain the original
-VM controllers, markers and default 300-second budget.
+marker rules and default 300-second budget through the native V controller.
 
 The original-C and V full/reuse controls passed on both architectures. Their
 full-run denial measurements were:
@@ -144,3 +144,7 @@ Final logs are `/tmp/vinix-procfs-mount-{arm,amd64}-fixed.log`, the matching
 `-fixed-build.log` files and `/tmp/vinix-procfs-mount-generated-checks.log`.
 `/tmp/vinix-procfs-mount-artifacts/final/` records the final exact kernel patch,
 ELFs/C, guest sources and hashes, including baseline graph and bind coverage.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.

@@ -124,6 +124,10 @@ pub fn image(init string, state string) !string {
 }
 
 pub fn launch(init string, archive string, state string, kernel_dir string, arch string, no_network bool) !Launch {
+	return launch_at(init, archive, state, kernel_dir, arch, no_network, root())!
+}
+
+fn launch_at(_init string, archive string, state string, kernel_dir string, arch string, no_network bool, repo string) !Launch {
 	mut env := policyhost.environment()
 	kernel := kernel_dir + '/bin/vinix'
 	if arch == 'aarch64' {
@@ -131,7 +135,7 @@ pub fn launch(init string, archive string, state string, kernel_dir string, arch
 		// test init. Build this disposable ISO and own QEMU directly instead.
 		iso := state + '/test.iso'
 		build := state + '/iso-build'
-		cache := root() + '/build-aarch64-iso/limine'
+		cache := repo + '/build-aarch64-iso/limine'
 		if os.is_dir(cache) && !os.exists(build + '/limine') {
 			os.mkdir_all(build)!
 			os.cp_all(cache, build + '/limine', false)!
@@ -140,7 +144,7 @@ pub fn launch(init string, archive string, state string, kernel_dir string, arch
 		env['VINIX_AARCH64_INITRAMFS'] = archive
 		env['VINIX_AARCH64_ISO'] = iso
 		env['VINIX_AARCH64_ISO_BUILD_DIR'] = build
-		fixturehost.inherited_command_environment_preferred([root() + '/build-support/build-aarch64-iso.sh'],
+		fixturehost.inherited_command_environment_preferred([repo + '/build-support/build-aarch64-iso.sh'],
 			env, policyhost.caller_arch())!
 		qemu := os.find_abs_path_of_executable(os.getenv_opt('VINIX_QEMU_BIN') or { 'qemu-system-aarch64' })!
 		share := os.dir(os.dir(qemu)) + '/share/qemu'
@@ -165,7 +169,7 @@ pub fn launch(init string, archive string, state string, kernel_dir string, arch
 	}
 	iso := state + '/test.iso'
 	iso_build := state + '/iso-build'
-	cache := root() + '/build-amd64-iso/limine'
+	cache := repo + '/build-amd64-iso/limine'
 	if os.is_dir(cache) && !os.exists(iso_build + '/limine') {
 		os.mkdir_all(iso_build)!
 		os.cp_all(cache, iso_build + '/limine', false)!
@@ -174,7 +178,7 @@ pub fn launch(init string, archive string, state string, kernel_dir string, arch
 	env['VINIX_AMD64_INITRAMFS'] = archive
 	env['VINIX_AMD64_ISO'] = iso
 	env['VINIX_AMD64_ISO_BUILD_DIR'] = iso_build
-	fixturehost.inherited_command_environment_preferred([root() + '/build-support/build-amd64-iso.sh'],
+	fixturehost.inherited_command_environment_preferred([repo + '/build-support/build-amd64-iso.sh'],
 		env, policyhost.caller_arch())!
 	qemu := os.find_abs_path_of_executable(os.getenv_opt('VINIX_QEMU_X86_64') or { 'qemu-system-x86_64' })!
 	firmware := os.getenv_opt('VINIX_OVMF_CODE') or { os.dir(os.dir(qemu)) + '/share/qemu/edk2-x86_64-code.fd' }

@@ -19,13 +19,13 @@ VINIX_VM_RUNNER_ROOT=/Users/alex/code/vinix \
 VINIX_KERNEL_DIR="$PWD/kernel" \
 VINIX_AARCH64_SYSROOT=/Users/alex/code/vinix/build-aarch64-userland/sysroot \
 VINIX_QEMU_RT_NO_BUILD=1 VINIX_QEMU_AUDIO=off \
-python3 tests/syscall-policy/run.py
+tests/syscall-policy/run
 
 VINIX_VM_RUNNER_ROOT=/Users/alex/code/vinix \
 VINIX_KERNEL_DIR="$PWD/kernel" \
 VINIX_AMD64_KERNEL="$PWD/build-amd64-kernel/bin/vinix" \
 VINIX_QEMU_RT_NO_BUILD=1 VINIX_QEMU_AUDIO=off \
-python3 tests/syscall-policy/run.py --arch=amd64
+tests/syscall-policy/run --arch=amd64
 ```
 
 The guest redirects output to `/dev/com1` with `O_NOCTTY` before markers. It
@@ -58,3 +58,7 @@ audit still fails on preexisting categories: ARM reports 354 sites with V exit
 
 This exercises an opt-in runtime contract. It does not demonstrate pin-table
 loading from ELF or enforcement for unmodified libc, Go, or translated binaries.
+
+The [native V controller](../native-guest-tools/abi-guests.md) accepts
+`--state-dir FRESH-DIR` to retain artifacts and `--build-only` to qualify the
+fixture separately. Every run snapshots an already-built matching kernel.
