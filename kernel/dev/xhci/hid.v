@@ -10,8 +10,6 @@
 // input codes through virtio_input.
 module xhci
 
-import aarch64.timer
-import aarch64.virtio_input
 
 const kind_keyboard = 1
 const kind_pointer = 2
@@ -54,6 +52,9 @@ __global (
 	// Software key repeat: the boot protocol reports a held key once.
 	xhci_repeat_code u16
 	xhci_repeat_next u64
+	// Reports taken from keyboards and from pointers, for /sys.
+	xhci_keyboard_reports u64
+	xhci_pointer_reports  u64
 )
 
 const repeat_delay_ns = u64(500000000)
@@ -173,7 +174,7 @@ fn take_hid_functions(mut dev Device, total u64) {
 			}
 			f.kind = kind_pointer
 			absolute := !f.x.relative
-			virtio_input.declare_pointer(absolute, int(f.x.max - f.x.min), int(f.y.max - f.y.min))
+			sink_declare_pointer(absolute, int(f.x.max - f.x.min), int(f.y.max - f.y.min))
 		}
 		xhci_functions[xhci_function_cnt] = f
 		xhci_function_cnt++
@@ -443,6 +444,7 @@ fn (mut f HidFunction) report(length u32) {
 }
 
 fn (mut f HidFunction) pointer_report(length u32) {
+	xhci_pointer_reports++
 	mut base := u32(0)
 	if f.uses_ids {
 		if length == 0 || unsafe { *&u8(f.buf_virt) } != f.report_id {
@@ -453,12 +455,12 @@ fn (mut f HidFunction) pointer_report(length u32) {
 	x := field_value(f.x, f.buf_virt, length, base)
 	y := field_value(f.y, f.buf_virt, length, base)
 	if f.x.relative {
-		virtio_input.report_relative(int(x), int(y))
+		sink_relative(int(x), int(y))
 	} else {
-		virtio_input.report_absolute(int(x - f.x.min), int(y - f.y.min))
+		sink_absolute(int(x - f.x.min), int(y - f.y.min))
 	}
 	if f.wheel.present {
-		virtio_input.report_scroll(int(field_value(f.wheel, f.buf_virt, length, base)))
+		sink_scroll(int(field_value(f.wheel, f.buf_virt, length, base)))
 	}
 	mut buttons := u32(0)
 	for i := u32(0); i < f.buttons_count; i++ {
@@ -466,7 +468,7 @@ fn (mut f HidFunction) pointer_report(length u32) {
 			buttons |= u32(1) << i
 		}
 	}
-	virtio_input.report_buttons(buttons)
+	sink_buttons(buttons)
 }
 
 fn keycode(usage u8) u16 {
@@ -477,6 +479,7 @@ fn keycode(usage u8) u16 {
 }
 
 fn (mut f HidFunction) keyboard_report(length u32) {
+	xhci_keyboard_reports++
 	if length < 3 {
 		return
 	}
@@ -495,7 +498,7 @@ fn (mut f HidFunction) keyboard_report(length u32) {
 	for bit := 0; bit < 8; bit++ {
 		mask := u8(1) << bit
 		if (modifiers ^ f.modifiers) & mask != 0 {
-			virtio_input.report_key(modifier_codes[bit], if modifiers & mask != 0 { u32(1) } else { u32(0) })
+			sink_key(modifier_codes[bit], if modifiers & mask != 0 { u32(1) } else { u32(0) })
 		}
 	}
 	for old in f.keys {
@@ -504,7 +507,7 @@ fn (mut f HidFunction) keyboard_report(length u32) {
 		}
 		code := keycode(old)
 		if code != 0 {
-			virtio_input.report_key(code, 0)
+			sink_key(code, 0)
 			if code == xhci_repeat_code {
 				xhci_repeat_code = 0
 			}
@@ -516,9 +519,9 @@ fn (mut f HidFunction) keyboard_report(length u32) {
 		}
 		code := keycode(key)
 		if code != 0 {
-			virtio_input.report_key(code, 1)
+			sink_key(code, 1)
 			xhci_repeat_code = code
-			xhci_repeat_next = timer.get_ns() + repeat_delay_ns
+			xhci_repeat_next = now_ns() + repeat_delay_ns
 		}
 	}
 	f.keys = keys
@@ -538,10 +541,36 @@ fn repeat_keys() {
 	if xhci_repeat_code == 0 {
 		return
 	}
-	now := timer.get_ns()
+	now := now_ns()
 	if now < xhci_repeat_next {
 		return
 	}
-	virtio_input.report_key(xhci_repeat_code, 2)
+	sink_key(xhci_repeat_code, 2)
 	xhci_repeat_next = now + repeat_interval_ns
+}
+
+// The devices are about to be forgotten: every key a keyboard last said was
+// down is let go, so that nobody goes on thinking Shift is held by a
+// keyboard that will be asked again from nothing.
+fn forget_keys() {
+	for i := 0; i < xhci_function_cnt; i++ {
+		mut f := &xhci_functions[i]
+		if f.kind != kind_keyboard {
+			continue
+		}
+		for bit := 0; bit < 8; bit++ {
+			if f.modifiers & (u8(1) << bit) != 0 {
+				sink_key(modifier_codes[bit], 0)
+			}
+		}
+		for key in f.keys {
+			code := keycode(key)
+			if key > 3 && code != 0 {
+				sink_key(code, 0)
+			}
+		}
+		f.modifiers = 0
+		f.keys = [6]u8{}
+	}
+	xhci_repeat_code = 0
 }

@@ -43,6 +43,7 @@ import dev.e1000
 import dev.hda
 import dev.random
 import dev.mouse
+import dev.xhci
 import dev.procdev
 import dev.pty
 import dev.tty
@@ -190,6 +191,9 @@ fn kmain_thread() {
 	tty.initialise()
 	serial.initialise()
 	mouse.initialise()
+	// USB keyboards and pointers, where there is an xHCI controller: a PC
+	// need not have a PS/2 port. After the two above, which it reports into.
+	xhci.initialise()
 	hda.initialize()
 
 	$if !prod {

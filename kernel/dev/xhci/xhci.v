@@ -4,12 +4,21 @@
 // A polled xHCI driver for USB keyboards and pointers.
 //
 // VirtualBox's arm64 machine has neither PS/2 nor virtio input: its keyboard
-// and tablet are USB devices behind an xHCI controller on PCIe. This is as much
-// of xHCI as driving them takes -- one interrupter, polled from the idle loop
-// the way virtio-input is, no hubs, no hotplug -- and it hands what they report
-// to virtio_input, whose state the console and /dev/pointer already read. QEMU's
-// qemu-xhci with usb-kbd and usb-tablet is the same arrangement, and is how
-// this is tested.
+// and tablet are USB devices behind an xHCI controller on PCIe. A PC without
+// a PS/2 port is in the same position. This is as much of xHCI as driving
+// them takes -- one controller, one interrupter, polled, no hubs, no hotplug:
+// what is plugged into a root port when the controller is started is what
+// there is. QEMU's qemu-xhci with usb-kbd and usb-tablet or usb-mouse is the
+// same arrangement, and is how this is tested.
+//
+// What a keyboard or a pointer reports goes where the architecture keeps its
+// input (xhci_arm64.v, xhci_amd64.v): virtio_input on AArch64, which also
+// polls this driver from the idle loop; the PS/2 drivers' own state on
+// x86-64, with a thread here to do the polling.
+//
+// A sleep stops nothing: through a suspend to idle the controller goes on
+// being asked for keys, which is how one wakes the machine. After a sleep
+// that cut its power it is found halted and set up again from nothing.
 //
 // Every register is accessed 32 bits at a time through the out-of-line helpers
 // below. A 64-bit register is two such writes, low half first, which the
@@ -22,9 +31,9 @@ import pci
 import devcore
 import dma
 import memory
-import aarch64.cpu
-import aarch64.timer
-import aarch64.virtio_input
+import katomic
+import fs
+import lib
 
 // TRB types.
 const trb_normal = u32(1)
@@ -78,6 +87,8 @@ const ring_trbs = u32(256)
 
 const max_slots = u32(16)
 const max_functions = 8
+// Pages a controller with sixteen devices and a generous scratchpad needs.
+const max_pages = 768
 
 pub struct Ring {
 mut:
@@ -126,25 +137,22 @@ __global (
 	xhci_event_cycle  u32
 	xhci_functions    [8]HidFunction
 	xhci_function_cnt int
+	// What was allocated, for release_pages().
+	xhci_pages      [max_pages]u64
+	xhci_page_count int
+	// The controller, for setting it up again; whether something polls; and
+	// whether a poll is in progress, for whoever must wait one out.
+	xhci_controller &pci.PCIDevice
+	xhci_polled     bool
+	xhci_polling    u32
+	xhci_stopped    u32
+	// AArch64: the devices are suspended, and a thread does the asking.
+	xhci_sleep_polling u32
+	xhci_resumes    u64
 )
 
 fn hhdm() u64 {
 	return memory.get_hhdm_offset()
-}
-
-@[noinline]
-fn rd(addr u64) u32 {
-	value := unsafe { *&u32(addr) }
-	cpu.dmb_ish()
-	return value
-}
-
-@[noinline]
-fn wr(addr u64, value u32) {
-	cpu.dmb_ish()
-	unsafe {
-		*&u32(addr) = value
-	}
 }
 
 fn wr64(addr u64, value u64) {
@@ -171,9 +179,24 @@ fn mem_wr64(addr u64, value u64) {
 	mem_wr(addr + 4, u32(value >> 32))
 }
 
+// Every page the driver hands the controller is written down, so that all of
+// them can be given back when the controller is set up again from nothing
+// after a sleep that cut its power: by then nothing it was told is true any
+// more, and none of it is its to use.
 fn alloc_page() (u64, u64) {
 	phys := u64(memory.pmm_alloc(1))
+	if phys != 0 && xhci_page_count < max_pages {
+		xhci_pages[xhci_page_count] = phys
+		xhci_page_count++
+	}
 	return phys, phys + hhdm()
+}
+
+fn release_pages() {
+	for i in 0 .. xhci_page_count {
+		memory.pmm_free(voidptr(xhci_pages[i]), 1)
+	}
+	xhci_page_count = 0
 }
 
 fn halted() bool {
@@ -191,9 +214,9 @@ fn reset_done() bool {
 
 // Spin until `cond` holds or `timeout_ms` passes.
 fn wait_for(timeout_ms u64, cond fn () bool) bool {
-	deadline := timer.get_ns() + timeout_ms * 1000000
+	deadline := now_ns() + timeout_ms * 1000000
 	for !cond() {
-		if timer.get_ns() > deadline {
+		if now_ns() > deadline {
 			return false
 		}
 	}
@@ -222,13 +245,13 @@ fn (mut r Ring) push(d0 u32, d1 u32, d2 u32, d3 u32) u64 {
 	mem_wr(addr, d0)
 	mem_wr(addr + 4, d1)
 	mem_wr(addr + 8, d2)
-	cpu.dmb_ish()
+	barrier()
 	mem_wr(addr + 12, (d3 & ~trb_cycle) | r.cycle)
 	r.index++
 	if r.index == ring_trbs - 1 {
 		link := r.virt + u64(ring_trbs - 1) * 16
 		control := mem_rd(link + 12)
-		cpu.dmb_ish()
+		barrier()
 		mem_wr(link + 12, (control & ~trb_cycle) | r.cycle)
 		r.index = 0
 		r.cycle ^= 1
@@ -237,7 +260,7 @@ fn (mut r Ring) push(d0 u32, d1 u32, d2 u32, d3 u32) u64 {
 }
 
 fn ring_doorbell(slot u32, target u32) {
-	cpu.dsb_sy()
+	barrier_full()
 	wr(xhci_db + u64(slot) * 4, target)
 }
 
@@ -264,7 +287,7 @@ fn next_event() ?Event {
 	if control & trb_cycle != xhci_event_cycle {
 		return none
 	}
-	cpu.dmb_ish()
+	barrier()
 	ev := Event{
 		param:   u64(mem_rd(addr)) | (u64(mem_rd(addr + 4)) << 32)
 		status:  mem_rd(addr + 8)
@@ -285,8 +308,8 @@ fn next_event() ?Event {
 fn command(d0 u32, d1 u32, d2 u32, d3 u32) ?Event {
 	trb := xhci_cmd.push(d0, d1, d2, d3)
 	ring_doorbell(0, 0)
-	deadline := timer.get_ns() + 1000000000
-	for timer.get_ns() < deadline {
+	deadline := now_ns() + 1000000000
+	for now_ns() < deadline {
 		ev := next_event() or { continue }
 		if event_type(ev) == trb_command_completion && ev.param == trb {
 			if event_code(ev) != cc_success {
@@ -306,8 +329,8 @@ fn command(d0 u32, d1 u32, d2 u32, d3 u32) ?Event {
 // error is reported against whichever TRB hit it, so any failure on the
 // endpoint ends the wait too.
 fn await_transfer(slot u32, dci u32, trb u64) ?Event {
-	deadline := timer.get_ns() + 1000000000
-	for timer.get_ns() < deadline {
+	deadline := now_ns() + 1000000000
+	for now_ns() < deadline {
 		ev := next_event() or { continue }
 		if event_type(ev) == trb_transfer_event && event_slot(ev) == slot
 			&& event_endpoint(ev) == dci {
@@ -421,15 +444,15 @@ fn reset_port(port u32) bool {
 		return true
 	}
 	wr(reg, (sc & portsc_write_mask) | portsc_reset)
-	deadline := timer.get_ns() + 500000000
-	for timer.get_ns() < deadline {
+	deadline := now_ns() + 500000000
+	for now_ns() < deadline {
 		sc = rd(reg)
 		if sc & portsc_reset_change != 0 {
 			break
 		}
 	}
 	wr(reg, (rd(reg) & portsc_write_mask) | portsc_reset_change)
-	timer.busywait_us(20000)
+	busywait_us(20000)
 	return rd(reg) & portsc_enabled != 0
 }
 
@@ -491,21 +514,77 @@ fn controller_matches(dev &devcore.Device) bool {
 }
 
 fn controller_probe(mut core devcore.Device) bool {
+	if xhci_controller != unsafe { nil } {
+		// One controller: the state above is not kept per device.
+		return false
+	}
 	// The controller is told physical addresses of this driver's choosing;
 	// behind an IOMMU it has to be allowed all of memory to follow them.
 	dma.allow_all(mut core)
-	return start(core.pci)
+	if !start(core.pci) {
+		release_pages()
+		return false
+	}
+	xhci_controller = core.pci
+	// A key on a USB keyboard is what ends a suspend to idle, and it comes
+	// through here: the controller is not one to be powered down for a sleep.
+	core.wakeup_capable = true
+	core.wakeup_enabled = true
+	return true
+}
+
+// Nothing is stopped for a sleep. Through a suspend to idle the controller
+// goes on being asked for keys, which is how one wakes the machine; a
+// suspend to RAM takes its power in whatever state it is.
+fn controller_suspend(mut core devcore.Device) bool {
+	sleeping(true)
+	return true
+}
+
+// Still running, with its table of devices where it was put: nothing was
+// lost. Halted, blank or not answering: it was without power, and is set up
+// again from nothing -- every page given back, the controller reset, the
+// ports looked at and their devices taken into use as at boot.
+fn controller_resume(mut core devcore.Device) bool {
+	sleeping(false)
+	if xhci_controller == unsafe { nil } {
+		return true
+	}
+	if running() && rd(xhci_op + op_dcbaap) != 0 && rd(xhci_op + op_dcbaap) != 0xffffffff {
+		return true
+	}
+	katomic.store(mut &xhci_stopped, u32(1))
+	deadline := now_ns() + 1000000000
+	for katomic.load(&xhci_polling) != 0 && now_ns() < deadline {
+	}
+	xhci_ready = false
+	forget_keys()
+	xhci_function_cnt = 0
+	release_pages()
+	started := start(xhci_controller)
+	xhci_resumes++
+	katomic.store(mut &xhci_stopped, u32(0))
+	return started
 }
 
 // Register with the device core, which hands over an xHCI controller if the
 // machine has one. Returns whether the driver ended up with one working.
 pub fn initialise() bool {
+	// vinix.usb=off leaves the controller to firmware.
+	if !devcore.boot_flag('vinix.usb=', true) {
+		return false
+	}
 	driver := devcore.register_driver(devcore.Driver{
 		name:    'xhci'
 		bus:     .pci
 		matches: controller_matches
 		probe:   controller_probe
+		suspend: controller_suspend
+		resume:  controller_resume
 	}) or { return false }
+	if driver.bound > 0 {
+		fs.sysfs_attribute('bus/usb/xhci', 0o444, show_stats, unsafe { nil }, unsafe { nil })
+	}
 	return driver.bound > 0
 }
 
@@ -523,7 +602,7 @@ fn start(dev &pci.PCIDevice) bool {
 	}
 
 	size := if bar.size >= 0x10000 { bar.size } else { u64(0x10000) }
-	xhci_cap = memory.map_mmio(bar.base, size)
+	xhci_cap = map_registers(bar.base, size)
 	cap_length := u64(rd(xhci_cap) & 0xff)
 	hcs1 := rd(xhci_cap + 4)
 	hcs2 := rd(xhci_cap + 8)
@@ -592,7 +671,7 @@ fn start(dev &pci.PCIDevice) bool {
 	}
 
 	// Give the ports a moment to report what is plugged into them.
-	timer.busywait_us(100000)
+	busywait_us(100000)
 	for port := u32(1); port <= xhci_ports; port++ {
 		if rd(port_register(port)) & portsc_connected != 0 {
 			attach(port)
@@ -601,9 +680,9 @@ fn start(dev &pci.PCIDevice) bool {
 	for i := 0; i < xhci_function_cnt; i++ {
 		queue_report(mut xhci_functions[i])
 	}
-	cpu.dmb_ish()
+	barrier()
 	xhci_ready = true
-	virtio_input.set_extra_poller(voidptr(poll))
+	start_polling()
 	C.kprintf(c'xhci: %lld input device(s)\n', i64(xhci_function_cnt))
 	return true
 }
@@ -617,8 +696,8 @@ fn take_ownership(first u64) {
 		value := rd(reg)
 		if value & 0xff == 1 {
 			wr(reg, value | (u32(1) << 24))
-			deadline := timer.get_ns() + 1000000000
-			for rd(reg) & (u32(1) << 16) != 0 && timer.get_ns() < deadline {
+			deadline := now_ns() + 1000000000
+			for rd(reg) & (u32(1) << 16) != 0 && now_ns() < deadline {
 			}
 			// SMI enables off; their status bits are write-1-to-clear.
 			wr(reg + 4, (rd(reg + 4) & 0xffff1fee) | 0xe0000000)
@@ -654,14 +733,45 @@ fn handle_event(ev Event) {
 	}
 }
 
-// Called from virtio_input.poll(), under its lock.
+// One round: what the controller has to report, and a held key repeating.
+// On AArch64 this is called from virtio_input.poll(), under its lock; on
+// x86-64 by this driver's own thread. A round reads memory, and touches the
+// controller only to acknowledge an event it found there.
 fn poll() {
-	if !xhci_ready {
-		return
+	katomic.store(mut &xhci_polling, u32(1))
+	if katomic.load(&xhci_stopped) == 0 && xhci_ready {
+		for {
+			ev := next_event() or { break }
+			handle_event(ev)
+		}
+		repeat_keys()
 	}
-	for {
-		ev := next_event() or { break }
-		handle_event(ev)
+	katomic.store(mut &xhci_polling, u32(0))
+}
+
+// /sys/bus/usb/xhci: what the controller was found to have and how much it
+// has said, so that a key can be told from one a PS/2 keyboard sent.
+fn show_stats(_ voidptr, mut text lib.Text) {
+	mut keyboards := u64(0)
+	mut pointers := u64(0)
+	for i := 0; i < xhci_function_cnt; i++ {
+		if xhci_functions[i].kind == kind_keyboard {
+			keyboards++
+		} else {
+			pointers++
+		}
 	}
-	repeat_keys()
+	text.add('keyboards: ')
+	text.add_unsigned(keyboards)
+	text.add('\npointers: ')
+	text.add_unsigned(pointers)
+	text.add('\nkeyboard reports: ')
+	text.add_unsigned(xhci_keyboard_reports)
+	text.add('\npointer reports: ')
+	text.add_unsigned(xhci_pointer_reports)
+	text.add('\nset up again: ')
+	text.add_unsigned(xhci_resumes)
+	text.add('\npages: ')
+	text.add_unsigned(u64(xhci_page_count))
+	text.add_byte(`\n`)
 }
