@@ -117,6 +117,7 @@ fn (mut d Desktop) toggle_start_menu() {
 	}
 	d.close_taskbar_preview()
 	d.close_tray_flyout()
+	d.refresh_package_apps()
 	d.start_menu_open = true
 	d.start_menu_all_apps = false
 	d.start_menu_page = 0
@@ -375,10 +376,10 @@ fn start_menu_page_layout(top int, bottom int, count int, requested int) StartMe
 }
 
 fn (d &Desktop) start_menu_result_count() int {
-	if d.start_menu_query.len == 0 { return available_apps.len }
+	if d.start_menu_query.len == 0 { return desktop_menu_count() }
 	mut count := 0
-	for factory in available_apps {
-		if app_matches(factory.title, d.start_menu_query_text()) { count++ }
+	for index in 0 .. desktop_menu_count() {
+		if desktop_menu_matches(index, d.start_menu_query_text()) { count++ }
 	}
 	return count
 }
@@ -420,7 +421,7 @@ fn (d &Desktop) start_menu_page_controls(mut children []ui2.Element, page StartM
 }
 
 fn (mut d Desktop) start_menu_all_programs(mut children []ui2.Element, top int, bottom int, width int) {
-	page := start_menu_page_layout(top, bottom, available_apps.len, d.start_menu_page)
+	page := start_menu_page_layout(top, bottom, desktop_menu_count(), d.start_menu_page)
 	d.start_menu_page = page.page
 	mut row_y := top
 	for index in page.first .. page.end {
@@ -447,8 +448,8 @@ fn (mut d Desktop) start_menu_filtered_programs(mut children []ui2.Element, top 
 	}
 	mut slot := 0
 	mut row_y := top
-	for index, factory in available_apps {
-		if !app_matches(factory.title, d.start_menu_query_text()) { continue }
+	for index in 0 .. desktop_menu_count() {
+		if !desktop_menu_matches(index, d.start_menu_query_text()) { continue }
 		if slot >= page.end || row_y + start_menu_row_height > page.rows_bottom { break }
 		if slot >= page.first {
 			children << d.start_menu_app_button(index, 7, row_y, width - 14, start_menu_row_height)
@@ -460,6 +461,7 @@ fn (mut d Desktop) start_menu_filtered_programs(mut children []ui2.Element, top 
 }
 
 fn (d &Desktop) start_menu_app_button(index int, x int, y int, width int, height int) ui2.Element {
+	if index >= available_apps.len { return d.package_menu_button(index, x, y, width, height) }
 	factory := &available_apps[index]
 	id := app_start_actions[index]
 	return ui2.button_with_image(id, app_title_text(factory.title), factory.icon, ui2.rect(f64(x), f64(y), f64(width), f64(height)), ui2.BoxStyle{
@@ -477,7 +479,7 @@ fn (d &Desktop) start_menu_app_button(index int, x int, y int, width int, height
 fn (d &Desktop) start_menu_app_row(mut children []ui2.Element, index int, x int, y int, width int,
 	height int) {
 	children << d.start_menu_app_button(index, x, y, width, height)
-	if !jump_list_has_recent(available_apps[index].process_name) {
+	if index >= app_start_jump_actions.len || !jump_list_has_recent(available_apps[index].process_name) {
 		return
 	}
 	id := app_start_jump_actions[index]
@@ -759,11 +761,11 @@ fn (mut d Desktop) start_menu_key_input(keys string) {
 				page := d.start_menu_current_page()
 				d.start_menu_page = page.page
 				mut slot := 0
-				for index, factory in available_apps {
-					if !app_matches(factory.title, d.start_menu_query_text()) { continue }
+				for index in 0 .. desktop_menu_count() {
+					if !desktop_menu_matches(index, d.start_menu_query_text()) { continue }
 					if slot == page.first {
 						d.close_start_menu()
-						d.launch_index(index)
+						d.launch_menu_app(index)
 						return
 					}
 					slot++
@@ -855,7 +857,12 @@ fn (mut d Desktop) handle_start_action(action string) {
 			d.request_sleep()
 		}
 		else {
-			if action.starts_with(action_start_launch_prefix) {
+			if action.starts_with('start.package.') {
+				id := unsafe { tos(action.str + 'start.package.'.len, action.len - 'start.package.'.len).clone() }
+				defer { unsafe { id.free() } }
+				d.close_start_menu()
+				d.launch_package(id, '')
+			} else if action.starts_with(action_start_launch_prefix) {
 				index := action[action_start_launch_prefix.len..].int()
 				d.close_start_menu()
 				d.launch_index(index)

@@ -1172,6 +1172,7 @@ fn (mut d Desktop) take_power_signal() {
 // slots are intentionally stable while windows are open, so walk the slots
 // themselves: a closed window has already closed its process and is harmless.
 fn (mut d Desktop) close_apps() {
+	packaged_apps.close()
 	d.preview_cache.clear()
 	for index in 0 .. d.apps.len {
 		mut app := d.apps[index]

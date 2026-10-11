@@ -40,7 +40,7 @@ fn (mut d Desktop) open_workflow_document(path string) {
 	ext := os.file_ext(path).to_lower()
 	defer { unsafe { ext.free() } }
 	name := d.session_document_app(path, associations[ext] or { workflow_default_app(path) })
-	for i, factory in available_apps { if factory.process_name == name { d.open_path_in_app(i, path); return } }
+	d.open_document_in_handler(name, path)
 }
 
 fn native_app_document_request(mut app NativeApp) []u8 {
@@ -75,11 +75,12 @@ fn (mut app RemoteApp) handle_document_open(data string) bool {
 	request := json2.decode[DocumentOpenRequest](text) or { return false }
 	defer { unsafe { request.path.free(); request.app.free() } }
 	if !workflowcore.valid_path(request.path) || C.access(&char(request.path.str), C.R_OK) != 0 { return false }
+	if request.app == 'vinix-open-with' { app.desktop.open_with(request.path); return true }
 	if request.use_default && app.desktop.session_sender_has_gesture(app.pid) {
 		app.desktop.session_associate_document(request.path, request.app)
 	}
 	if request.app.len == 0 { app.desktop.open_workflow_document(request.path) }
-	else { for i, factory in available_apps { if factory.process_name == request.app { app.desktop.open_path_in_app(i, request.path); break } } }
+	else { app.desktop.open_document_in_handler(request.app, request.path) }
 	return true
 }
 
@@ -89,7 +90,7 @@ fn (mut a FilesContextApp) document_open_action(action string) bool {
 		a.queue_document_open(path, '')
 		return true
 	}
-	if action == 'files.document.choose' { a.document_choose = true; return true }
+	if action == 'files.document.choose' { a.queue_document_open(a.context_path, 'vinix-open-with'); return true }
 	if action == 'files.document.back' { a.document_choose = false; return true }
 	if action == 'files.document.default' { a.document_default = !a.document_default; return true }
 	if !action.starts_with('files.document.app.') { return false }

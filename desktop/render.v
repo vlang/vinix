@@ -479,11 +479,14 @@ fn (mut d Desktop) record_target(el &ui2.Element, x int, y int, w int, h int) {
 	if action.len == 0 {
 		return
 	}
-	owns_action := el.key == remote_owned_element_key
+	remote := el.key == remote_owned_element_key
+	// Registration can be replaced between rendering and the next pointer
+	// packet. Retain package selectors independently of that registry's rows.
+	owns_action := remote || action.starts_with('start.package.') || action.starts_with('session.open.package.')
 	d.targets << HitTarget{
 		action_id:   if owns_action { action.clone() } else { action }
 		owns_action: owns_action
-		world:       if owns_action { .application } else { .desktop }
+		world:       if remote { .application } else { .desktop }
 		x:           x
 		y:           y
 		width:       w

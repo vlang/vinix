@@ -23,7 +23,7 @@ fn C.execv(&char, &&char) int
 fn C.chown(&char, i32, i32) int
 fn C.rename(&char, &char) int
 fn C.fchmod(int, u32) int
-fn C.write(int, voidptr, usize) int
+fn C.write(int, voidptr, usize) isize
 
 pub fn replace_path(source string, destination string) ! {
 	// os.rename treats a directory symlink as a destination directory. POSIX

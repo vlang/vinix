@@ -108,7 +108,7 @@ compatibility across rollback remains the developer's responsibility.
 
 **Software** offers catalog, installed and updates filters, description search,
 publisher/permission/license review, install/uninstall confirmation, repository
-refresh, update-all, rollback, progress and recent failure output. A running
+refresh, update-all, rollback, launch, progress and recent failure output. A running
 mutation prevents normal window close. Mutations require administrator access;
 there is no setuid service or automatic privilege escalation.
 
@@ -121,12 +121,33 @@ supplied documents. Display/audio paths are granted only when declared. Today's
 root desktop cannot launch through this command. See
 [the sandbox's enforcement boundaries](../tools/sandbox/README.md).
 
-Non-data/non-runtime packages get `.desktop` launchers with MIME types, package
-ID and runtime provenance. `/usr/share/applications/vinix-packages` points through
-activation, so registration removal/rollback follows package state. Installation
-preserves user defaults. Native Start/Open With still uses built-in factories;
-consuming these dynamic XDG records remains release work. Ordinary sessions can
-execute packages using the CLI or an XDG-aware launcher.
+Installed applications appear in Start's All Programs/search and Quick Launch.
+Search includes package IDs and descriptions. Both use one bounded registry read
+from an administrator-owned immutable generation; arbitrary XDG `Exec` commands
+are not imported. Opening a launcher refreshes registration, so install/remove,
+upgrade and rollback become visible without restarting the desktop. Runtime/data
+packages are omitted. Package actions use stable IDs, independent of row order.
+
+Files' application chooser opens the shared, paged **Open With** dialog. Packages
+are offered only for their declared MIME types when they declare `files` access.
+Installation never takes over user defaults. An explicit choice is saved as
+`package.ID` in the session association store and used by Files, document search
+and session document requests. Removal or loss of the MIME/file grant uses the
+built-in fallback while retaining that preference for rollback or reinstall.
+
+Each package launch opens a Software window and passes literal arguments to
+`vinix-package run`; the service rechecks the current package/dependency closure,
+publisher policy and payloads before sandbox execution. The window shows output
+and launch failures, including the requirement for an ordinary user identity.
+Closing it while the application runs is prevented to retain the generation
+lease. This monitor is suitable for noninteractive programs and apps using their
+declared display runtime; interactive terminal input still requires the CLI.
+It does not turn the internal native compositor protocol into a public GUI SDK.
+
+Non-data/non-runtime packages also get `.desktop` launchers with MIME types,
+package ID and runtime provenance. `/usr/share/applications/vinix-packages` points
+through activation, so XDG registration removal/rollback follows package state.
+Ordinary sessions can execute packages using the CLI or an XDG-aware launcher.
 
 ## Offline and organization deployment
 
@@ -163,10 +184,14 @@ in the reviewed upgrade/deployment closure; no background updater is introduced.
 publishing, format and launch interfaces. The
 [V fixtures](../tests/packages/distribution-check.v) exercise real filesystem
 transactions, signatures, resolution, recovery, rollback, publisher tooling and
-Software controls, plus both package target builds and desktop configurations.
+Software controls, registry trust/retirement, shared launchers and document
+associations, plus both package target builds and desktop configurations.
+Allocator fixtures check menu redraws and cached reads for zero retained storage,
+and registration retirement against the standard JSON decoder's measured
+one-byte EOF-marker allocation per decode under `-manualfree`.
 
 The release gate remains open: enroll a release publisher, migrate/qualify the
-advertised native/Linux/Wine/Apple catalog, integrate ordinary-session and dynamic
-launchers/associations, qualify guest power-cut/reboot behavior and measure wider
+advertised native/Linux/Wine/Apple catalog, integrate ordinary-user graphical
+sessions, qualify guest power-cut/reboot behavior and measure wider
 runtime sandbox profiles. Apple packaging does not provide general macOS/AppKit
 compatibility; Windows/Linux packaging does not expand runtime API coverage.

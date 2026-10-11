@@ -59,6 +59,7 @@ mut:
 	gesture_pid         int
 	open_path           sessioncore.Text
 	open_default        bool
+	open_page           int
 	open_actions        [64]string
 	drop_path           sessioncore.Text
 	drop_pid            int
@@ -619,10 +620,9 @@ fn (mut d Desktop) open_associated_path(path string, selected_app string) {
 	name := if selected_app.len > 0 {
 		selected_app
 	} else {
-		d.hub.associations.resolve(sessioncore.mime_for_path(path), false) or { 'vinix-files' }
+		d.session_document_app(path, d.hub.associations.resolve(sessioncore.mime_for_path(path), false) or { 'vinix-files' })
 	}
-	index := shortcut_app_index_named(name)
-	if index >= 0 { d.open_path_in_app(index, path) }
+	d.open_document_in_handler(name, path)
 }
 
 fn (mut d Desktop) open_session_uri(uri string) {
@@ -671,6 +671,18 @@ fn (mut d Desktop) handle_session_hub_action(action string) bool {
 	}
 	if action.starts_with('session.open.app.') {
 		d.select_open_with(int(sessioncore.number(action['session.open.app.'.len..], 0, available_apps.len - 1) or { return true }))
+		return true
+	}
+	if action.starts_with('session.open.package.') {
+		d.select_package_open_with(unsafe { tos(action.str + 'session.open.package.'.len, action.len - 'session.open.package.'.len) })
+		return true
+	}
+	if action == 'session.open.previous' || action == 'session.open.next' {
+		count := d.open_with_count()
+		pages := (count + 4) / 5
+		if action == 'session.open.previous' && d.hub.open_page > 0 { d.hub.open_page-- }
+		if action == 'session.open.next' && d.hub.open_page + 1 < pages { d.hub.open_page++ }
+		d.dirty = true
 		return true
 	}
 	if action == 'session.center' {

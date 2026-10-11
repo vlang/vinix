@@ -5,6 +5,8 @@ module main
 import json2
 import os
 import ui2
+import time
+import desktop.packagecore
 
 struct Desktop {
 	tz_offset_seconds i64
@@ -47,6 +49,21 @@ fn console_field(id string, text string, x int, y int, width int, _ bool) ui2.El
 fn frame_elements(capacity int) []ui2.Element { return []ui2.Element{cap: capacity} }
 
 fn main() {
+	// This same executable is a literal-argv service fixture for asynchronous
+	// view/run transitions. It deliberately returns useful launch diagnostics.
+	if os.args.len > 1 {
+		if os.args[1] == 'view' {
+			println(json2.encode(SoftwareView{ format: 1, architecture: 'aarch64' }))
+			return
+		}
+		if os.args[1] == 'run' {
+			assert os.args[2..] == ['editor', '/private/tmp/document with spaces; \$literal.txt']
+			eprintln('fixture: ordinary user session required')
+			exit(19)
+		}
+		if os.args[1] == 'lease-hold' { time.sleep(200 * time.millisecond); return }
+		panic('unexpected fixture service command')
+	}
 	mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192} }
 	view := SoftwareView{
 		format:       1
@@ -98,6 +115,7 @@ fn main() {
 	assert tree.children.any(it.id == 'software.search')
 	assert tree.children.any(it.id == 'software.remove')
 	assert tree.children.any(it.id == 'software.refresh')
+	assert tree.children.any(it.id == 'software.run')
 	compact := app.build(ui2.rect(0, 0, 480, 300)) or { panic(err) }
 	assert compact.children.len == 2
 	assert !compact.children.any(it.id == 'software.install')
@@ -106,8 +124,39 @@ fn main() {
 	app.worker.wait()
 	assert app.worker.code == 1
 	assert !app.prepare_close()
+	app.handle('software.run') or { panic(err) }
+	assert app.launch_request == ''
 	app.retire_worker()
 	assert app.prepare_close()
 	app.close_app()
+	mut launched := SoftwareApp{ service_path: os.executable(), query: []u8{cap: 256}, output: []u8{cap: 8192} }
+	launched.start(['view'], true)
+	encoded_request := json2.encode(packagecore.Request{ id: 'editor', document: '/private/tmp/document with spaces; \$literal.txt' })
+	launched.handle(packagecore.request_prefix + encoded_request) or { panic(err) }
+	assert launched.launch_request.len > 0
+	for _ in 0 .. 500 {
+		launched.poll()
+		if launched.worker == unsafe { nil } { break }
+		time.sleep(time.millisecond)
+	}
+	assert launched.worker == unsafe { nil }
+	assert launched.launch_request == ''
+	assert launched.status.contains('ordinary user session required')
+	assert launched.prepare_close()
+	launched.launch_request = '{"id":"bad;command"}'.clone()
+	launched.run_requested()
+	assert launched.worker == unsafe { nil }
+	assert launched.launch_request == ''
+	assert launched.status.contains('invalid package launch request')
+	launched.close_app()
+	mut detached := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192} }
+	detached.start(['lease-hold'], false)
+	detached.worker_run = true
+	pid := detached.worker.pid
+	assert !detached.prepare_close()
+	detached.close_app()
+	assert C.kill(pid, 0) == 0, 'forced monitor retirement must retain the service lease holder'
+	mut child_status := 0
+	assert C.waitpid(pid, &child_status, 0) == pid
 	println('Software UI: search, installed/updates filters, provenance, permission review, removal diagnostics and close guard passed')
 }

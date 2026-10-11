@@ -50,14 +50,13 @@ fn (mut d Desktop) toggle_quick_launch() {
 	if d.start_menu_open {
 		d.close_start_menu()
 	}
+	d.refresh_package_apps()
 	d.quick_launch_reset_query()
 	launcher_documents.close()
 	launcher_documents = workflowcore.load_index(d.home) or { workflowcore.SearchIndex{} }
 	d.start_workflow_search()
-	for d.switcher.ids.len < available_apps.len {
-		d.switcher.ids << '${action_switch_prefix}${d.switcher.ids.len}'
-	}
-	for d.switcher.ids.len < available_apps.len + quick_launch_max_results { d.switcher.ids << '${action_switch_prefix}${d.switcher.ids.len}' }
+	// Action IDs describe the seven visible slots, including document results.
+	for d.switcher.ids.len < quick_launch_max_results { d.switcher.ids << '${action_switch_prefix}${d.switcher.ids.len}' }
 	d.switcher.quick_launch = true
 	d.switcher.active = true
 	d.switcher.shown = true
@@ -146,8 +145,8 @@ fn (d &Desktop) quick_launch_query_text() string {
 fn (d &Desktop) quick_launch_match_count() int {
 	query := d.quick_launch_query_text()
 	mut count := 0
-	for factory in available_apps {
-		if app_matches(factory.title, query) {
+	for index in 0 .. desktop_menu_count() {
+		if desktop_menu_matches(index, query) {
 			count++
 		}
 	}
@@ -175,16 +174,15 @@ fn (d &Desktop) quick_launch_visible_count() int {
 	return if count < limit { count } else { limit }
 }
 
-// quick_launch_app_index maps a visible result number back to the one canonical
-// application registry. Quick Launch deliberately has no second app database.
+// Built-ins and package entries share the same ordering in every launcher.
 fn (d &Desktop) quick_launch_app_index(result_index int) ?int {
 	if result_index < 0 {
 		return none
 	}
 	query := d.quick_launch_query_text()
 	mut result := 0
-	for app_index, factory in available_apps {
-		if !app_matches(factory.title, query) {
+	for app_index in 0 .. desktop_menu_count() {
+		if !desktop_menu_matches(app_index, query) {
 			continue
 		}
 		if result == result_index {
@@ -213,12 +211,12 @@ fn (mut d Desktop) quick_launch_launch_selected() {
 	}
 	if app_index := d.quick_launch_app_index(d.switcher.index) {
 		d.switcher_close()
-		d.launch_index(app_index)
+		d.launch_menu_app(app_index)
 		return
 	}
 	query := d.quick_launch_query_text()
 	mut app_count := 0
-	for factory in available_apps { if app_matches(factory.title, query) { app_count++ } }
+	for index in 0 .. desktop_menu_count() { if desktop_menu_matches(index, query) { app_count++ } }
 	paths := launcher_documents.query(query, quick_launch_max_results)
 	defer { unsafe { paths.free() } }
 	i := d.switcher.index - app_count
@@ -355,9 +353,8 @@ fn (mut d Desktop) quick_launch_take_sequence(input string, at int) int {
 }
 
 // quick_launch_element is a centered search field with a short result stack,
-// intentionally closer to Spotlight than to a menu. Every result is one entry
-// from available_apps and therefore launches through the desktop's normal app
-// path.
+// intentionally closer to Spotlight than to a menu. Application entries use
+// the shared built-in/package registry, followed by matching documents.
 fn (d &Desktop) quick_launch_element() ui2.Element {
 	mut width := quick_launch_panel_width
 	if width > d.canvas.width - 32 {
@@ -403,8 +400,8 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 		})
 	} else {
 		mut result := 0
-		for factory in available_apps {
-			if !app_matches(factory.title, query) {
+		for app_index in 0 .. desktop_menu_count() {
+			if !desktop_menu_matches(app_index, query) {
 				continue
 			}
 			if result >= result_count {
@@ -413,7 +410,11 @@ fn (d &Desktop) quick_launch_element() ui2.Element {
 			id := d.switcher.ids[result]
 			selected := result == d.switcher.index
 			hovered := d.hover == id
-			panel_children << ui2.button_with_image(id, app_title_text(factory.title), factory.icon, ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{
+			name := desktop_menu_name(app_index)
+			panel_children << ui2.button_with_image(id,
+				if app_index < available_apps.len { app_title_text(name) } else { name },
+				if app_index < available_apps.len { available_apps[app_index].icon } else { 'builtin:window' },
+				ui2.rect(f64(quick_launch_panel_padding), f64(row_y + result * quick_launch_row_height), f64(width - 2 * quick_launch_panel_padding), f64(quick_launch_row_height)), ui2.BoxStyle{
 				bg: if selected { d.theme().accent } else if hovered { quick_launch_hover } else { quick_launch_bg }
 				radius: 7
 			}, ui2.TextStyle{

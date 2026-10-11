@@ -5,6 +5,8 @@ import json2
 import os
 import time
 import tools.packages.pkgcore
+import desktop.packagecore
+import desktop.sessioncore
 
 struct Reply {
 	code int
@@ -39,11 +41,13 @@ fn package_template(id string, version string) pkgcore.Package {
 		license:      'MIT'
 		kind:         'native'
 		entrypoint:   'bin/app'
+		permissions: ['files']
+		associations: ['text/plain']
 	}
 }
 
 fn qualify(binary string) ! {
-	work := os.temp_dir() + '/vinix-package-cli-' + os.getpid().str()
+	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
 	os.mkdir_all(work + '/payload/bin')!
 	defer { os.rmdir_all(work) or {} }
@@ -70,6 +74,18 @@ fn qualify(binary string) ! {
 	installed := json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!
 	assert installed.generation == 1
 	assert installed.packages[0].package.id == 'app'
+	mut launchers := packagecore.Registry{}
+	defer { launchers.close() }
+	store := pkgcore.state_directory(work + '/root')
+	assert launchers.refresh(store, u32(os.geteuid()), 'aarch64')!
+	assert launchers.apps.len == 1
+	assert launchers.apps[0].start_action == 'start.package.app'
+	assert (launchers.handler('package.app', 'text/plain') or { panic('missing handler') }) == 'app'
+	assert launchers.handler('package.app', 'image/png') == none
+	assert !launchers.refresh(store, u32(os.geteuid()), 'aarch64')!
+	mut associations := sessioncore.Associations{}
+	associations.set('text/plain', 'package.' + 'a'.repeat(128), false)!
+	assert sessioncore.decode_associations(associations.encode())!.count == 1
 	assert success(binary, [...root_args, 'view'])!.contains('installed_version')
 	success(binary, [...root_args, 'verify'])!
 	// A mirror is used by another completely clean installation, offline.
@@ -85,14 +101,22 @@ fn qualify(binary string) ! {
 	// Deployment reconciles roots and rollback restores the previous set.
 	os.write_file(work + '/deployment.json', '{"format":1,"architecture":"aarch64","packages":["other"]}')!
 	success(binary, [...root_args, 'deploy', work + '/deployment.json'])!
+	assert launchers.refresh(store, u32(os.geteuid()), 'aarch64')!
+	assert launchers.find('app') == none
+	assert (launchers.find('other') or { panic('missing application') }) == 0
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.requested == ['other']
 	success(binary, [...root_args, 'rollback'])!
+	assert launchers.refresh(store, u32(os.geteuid()), 'aarch64')!
+	assert (launchers.handler('package.app', 'text/plain') or { panic('missing handler') }) == 'app'
+	assert launchers.find('other') == none
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.requested == ['app']
 	// Acquisition fails after trust revocation, but uninstall remains usable.
 	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: 'aarch64' }))!
 	assert command(binary, [...root_args, 'install', 'other'])!.code != 0
 	assert success(binary, [...root_args, 'plan', 'remove', 'app'])!.contains('"requested":[]')
 	success(binary, [...root_args, 'remove', 'app'])!
+	assert launchers.refresh(store, u32(os.geteuid()), 'aarch64')!
+	assert launchers.apps.len == 0
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.packages.len == 0
 	success(binary, [...root_args, 'gc'])!
 	println('Package CLI: publisher round-trip, clean offline install, missing payload diagnostics, deployment, rollback and revoked-publisher uninstall passed')

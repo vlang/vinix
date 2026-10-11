@@ -385,7 +385,7 @@ fn (mut d Desktop) switcher_select(index int) {
 		app_index := d.quick_launch_app_index(index) or { d.switcher.index = index; d.quick_launch_launch_selected(); return }
 		d.switcher.index = index
 		d.switcher_close()
-		d.launch_index(app_index)
+		d.launch_menu_app(app_index)
 		return
 	}
 	if index < 0 || index >= d.switcher.order.len {

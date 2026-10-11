@@ -151,7 +151,9 @@ pub mut:
 }
 
 pub fn (mut a Associations) set(kind string, app string, uri bool) ! {
-	if !identifier(app) || kind.len == 0 || kind.len > 128 || kind.contains('\x00') || kind.contains(' ')
+	// Package IDs have the same 128-byte bound, plus an explicit namespace.
+	valid_app := identifier(app) || (app.starts_with('package.') && identifier(unsafe { tos(app.str + 'package.'.len, app.len - 'package.'.len) }))
+	if !valid_app || kind.len == 0 || kind.len > 128 || kind.contains('\x00') || kind.contains(' ')
 		|| (uri && !uri_scheme(kind)) || (!uri && (!kind.contains('/') || kind.starts_with('/') || kind.ends_with('/'))) {
 		return error('invalid association')
 	}
@@ -182,31 +184,34 @@ pub fn uri_scheme(value string) bool {
 	return true
 }
 
+fn extension_matches(path string, start int, expected string) bool {
+	if path.len - start != expected.len { return false }
+	for i in 0 .. expected.len {
+		byte := path[start + i]
+		folded := if byte >= `A` && byte <= `Z` { byte + 32 } else { byte }
+		if folded != expected[i] { return false }
+	}
+	return true
+}
+
 pub fn mime_for_path(path string) string {
-	// Case-insensitive ASCII extension lookup needs no string allocation.
+	// Compare against the caller's path; taking a pointer to a local normalized
+	// extension made V move its fixed buffer to the heap on every lookup.
 	mut start := path.len
 	for start > 0 && path[start - 1] != `.` && path[start - 1] != `/` { start-- }
 	if start == 0 || path[start - 1] != `.` { return 'application/octet-stream' }
-	mut extension := [16]u8{}
-	length := path.len - start
-	if length > extension.len { return 'application/octet-stream' }
-	for i in 0 .. length {
-		byte := path[start + i]
-		extension[i] = if byte >= `A` && byte <= `Z` { byte + 32 } else { byte }
+	for ext in ['txt', 'md', 'v', 'c', 'h', 'log', 'csv', 'json', 'xml', 'yaml', 'sh']! {
+		if extension_matches(path, start, ext) { return 'text/plain' }
 	}
-	ext := unsafe { tos(&extension[0], length) }
-	return match ext {
-		'txt', 'md', 'v', 'c', 'h', 'log', 'csv', 'json', 'xml', 'yaml', 'sh' { 'text/plain' }
-		'html', 'htm' { 'text/html' }
-		'png' { 'image/png' }
-		'jpg', 'jpeg' { 'image/jpeg' }
-		'pdf' { 'application/pdf' }
-		'ics' { 'text/calendar' }
-		'zip' { 'application/zip' }
-		'tar' { 'application/x-tar' }
-		'mp3' { 'audio/mpeg' }
-		'wav' { 'audio/wav' }
-		'mp4' { 'video/mp4' }
-		else { 'application/octet-stream' }
-	}
+	if extension_matches(path, start, 'html') || extension_matches(path, start, 'htm') { return 'text/html' }
+	if extension_matches(path, start, 'png') { return 'image/png' }
+	if extension_matches(path, start, 'jpg') || extension_matches(path, start, 'jpeg') { return 'image/jpeg' }
+	if extension_matches(path, start, 'pdf') { return 'application/pdf' }
+	if extension_matches(path, start, 'ics') { return 'text/calendar' }
+	if extension_matches(path, start, 'zip') { return 'application/zip' }
+	if extension_matches(path, start, 'tar') { return 'application/x-tar' }
+	if extension_matches(path, start, 'mp3') { return 'audio/mpeg' }
+	if extension_matches(path, start, 'wav') { return 'audio/wav' }
+	if extension_matches(path, start, 'mp4') { return 'video/mp4' }
+	return 'application/octet-stream'
 }

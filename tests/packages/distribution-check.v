@@ -15,13 +15,15 @@ fn run(program string, arguments []string) ! {
 fn check() ! {
 	repository := os.dir(os.dir(os.dir(@FILE)))
 	v := os.find_abs_path_of_executable(os.getenv_opt('V') or { 'v' })!
-	work := os.temp_dir() + '/vinix-distribution-check-' + os.getpid().str()
+	temporary := os.getenv_opt('VINIX_PACKAGE_TEST_WORK') or { os.temp_dir() }
+	work := temporary + '/vinix-distribution-check-' + os.getpid().str()
 	os.mkdir_all(work + '/software')!
 	defer { os.rmdir_all(work) or {} }
 	run(v, ['test', repository + '/tools/packages/pkgcore'])!
+	run(v, ['-gc', 'none', '-manualfree', 'test', repository + '/desktop/packagecore'])!
 	run(v, ['-gc', 'none', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
 	run(work + '/vinix-package', ['--help'])!
-	run(v, ['-o', work + '/cli-check', repository + '/tests/packages/distribution-cli.v'])!
+	run(v, ['-gc', 'none', '-manualfree', '-o', work + '/cli-check', repository + '/tests/packages/distribution-cli.v'])!
 	run(work + '/cli-check', [work + '/vinix-package'])!
 	os.cp(repository + '/desktop/software_app.v', work + '/software/software_app.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
@@ -66,6 +68,9 @@ fn check() ! {
 				'@vlib|' + modules + '|@vmodules|' + repository + '|' + repository + '/third_party',
 				overlay])!
 		}
+		run(v, ['-path', '@vlib|@vmodules|' + repository + '/tests/linuxkpi|' + repository,
+			'-o', work + '/launcher-check', repository + '/tests/packages/launcher-check.v'])!
+		run(work + '/launcher-check', [work])!
 	}
 	println('Package distribution checks passed')
 }

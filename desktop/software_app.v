@@ -4,6 +4,7 @@ module main
 import json2
 import os
 import ui2
+import desktop.packagecore
 
 const software_row_actions = ['software.row.0', 'software.row.1', 'software.row.2', 'software.row.3',
 	'software.row.4', 'software.row.5', 'software.row.6', 'software.row.7', 'software.row.8',
@@ -41,23 +42,26 @@ struct SoftwareView {
 
 struct SoftwareApp {
 mut:
-	rows          []SoftwareRow
-	matching      []int
-	query         []u8
-	output        []u8
-	status        string
-	catalog_error string
-	selected      int = -1
-	scroll        int
-	page_rows     int = 10
-	filter        int // 0 catalog, 1 installed, 2 updates
-	focus         bool
-	select_all    bool
-	review        string
-	worker        &os.Process = unsafe { nil }
-	worker_view   bool
-	worker_failed bool
-	offline       bool
+	rows           []SoftwareRow
+	matching       []int
+	query          []u8
+	output         []u8
+	status         string
+	catalog_error  string
+	selected       int = -1
+	scroll         int
+	page_rows      int = 10
+	filter         int // 0 catalog, 1 installed, 2 updates
+	focus          bool
+	select_all     bool
+	review         string
+	worker         &os.Process = unsafe { nil }
+	worker_view    bool
+	worker_run     bool
+	worker_failed  bool
+	launch_request string
+	service_path   string = '/usr/bin/vinix-package'
+	offline        bool
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
@@ -86,14 +90,15 @@ fn (mut a SoftwareApp) set_status(text string) {
 
 fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	if a.worker != unsafe { nil } { return }
-	if C.access(c'/usr/bin/vinix-package', C.X_OK) != 0 {
+	if C.access(&char(a.service_path.str), C.X_OK) != 0 {
 		a.set_status('The package service is missing. Install the V package tools in this image.')
 		return
 	}
 	a.output.clear()
 	a.worker_failed = false
 	a.worker_view = view
-	a.worker = os.new_process('/usr/bin/vinix-package')
+	a.worker_run = false
+	a.worker = os.new_process(a.service_path.clone())
 	mut owned := []string{cap: arguments.len}
 	for argument in arguments { owned << argument.clone() }
 	a.worker.set_args(owned)
@@ -256,6 +261,7 @@ fn (mut a SoftwareApp) poll() bool {
 	}
 	code := a.worker.code
 	view := a.worker_view
+	running := a.worker_run
 	a.retire_worker()
 	if code != 0 {
 		diagnostic := software_output_tail(a.output)
@@ -267,15 +273,63 @@ fn (mut a SoftwareApp) poll() bool {
 		unsafe { diagnostic.free() }
 	} else if view {
 		if !a.worker_failed { a.load_view() }
+	} else if running {
+		tail := software_output_tail(a.output)
+		a.set_status(if tail.len > 0 { tail } else { 'Application finished successfully.' })
+		unsafe { tail.free() }
 	} else {
 		a.start(['view'], true)
 	}
+	if view && a.launch_request.len > 0 { a.run_requested() }
 	return true
+}
+
+fn (mut a SoftwareApp) run_requested() {
+	if a.worker != unsafe { nil } || a.launch_request.len == 0 { return }
+	request := json2.decode[packagecore.Request](a.launch_request) or {
+		a.set_status('Invalid application launch request.')
+		unsafe { a.launch_request.free() }
+		a.launch_request = ''
+		return
+	}
+	defer {
+		unsafe {
+			request.id.free()
+			request.document.free()
+			a.launch_request.free()
+		}
+		a.launch_request = ''
+	}
+	request.validate() or {
+		a.set_status(err.msg())
+		return
+	}
+	a.start(if request.document.len > 0 {
+		['run', request.id, request.document]
+	} else {
+		['run', request.id]
+	}, false)
+	if a.worker != unsafe { nil } {
+		a.worker_run = true
+		a.set_status('Starting application through its isolated runtime…')
+	}
 }
 
 fn (a &SoftwareApp) next_poll_ms() u64 { return 100 }
 
 fn (mut a SoftwareApp) handle(event_id string) ! {
+	if event_id.starts_with(packagecore.request_prefix) {
+		if a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
+			a.set_status('An operation is already running in this window.')
+			return
+		}
+		if event_id.len > 8192 { return }
+		a.launch_request = unsafe { tos(event_id.str + packagecore.request_prefix.len, event_id.len - packagecore.request_prefix.len).clone() }
+		// Initial catalog reading is asynchronous. Deliver the launch after it
+		// finishes, including when the catalog is expired or unavailable.
+		a.run_requested()
+		return
+	}
 	if event_id == 'software.search' {
 		a.focus = true
 		return
@@ -289,6 +343,17 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 	}
 	match event_id {
+		'software.run' {
+			if a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
+				a.set_status('An operation is already running in this window.')
+				return
+			}
+			if a.selected < 0 || a.selected >= a.rows.len || a.rows[a.selected].installed_version == '' {
+				return
+			}
+			a.launch_request = json2.encode(packagecore.Request{ id: a.rows[a.selected].id })
+			a.run_requested()
+		}
 		'software.catalog' {
 			a.filter = 0
 			a.filter_rows()
@@ -437,6 +502,9 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		}, 274, height - 176, 160)
 		if row.installed_version != '' {
 			children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
+			if row.kind !in ['runtime', 'data'] {
+				children << software_button('software.run', 'Launch', width - 110, 46, 96)
+			}
 		}
 	}
 	if a.review.len > 0 {
@@ -452,7 +520,11 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 
 fn (mut a SoftwareApp) prepare_close() bool {
 	if a.worker != unsafe { nil } && !a.worker_view {
-		a.set_status('Wait for the package transaction to finish before closing Software.')
+		a.set_status(if a.worker_run {
+			'Close the application first, then close Software.'
+		} else {
+			'Wait for the package transaction to finish before closing Software.'
+		})
 		return false
 	}
 	return true
@@ -460,7 +532,9 @@ fn (mut a SoftwareApp) prepare_close() bool {
 
 fn (mut a SoftwareApp) close_app() {
 	if a.worker != unsafe { nil } {
-		if a.worker.is_alive() {
+		// Forced desktop retirement must not kill the lease holder while its
+		// sandbox child can still use runtime files. Detach it for PID 1 to reap.
+		if !a.worker_run && a.worker.is_alive() {
 			a.worker.signal_kill()
 			a.worker.wait()
 		}
@@ -468,6 +542,8 @@ fn (mut a SoftwareApp) close_app() {
 	}
 	for row in a.rows { software_free_row(row) }
 	unsafe {
+		a.launch_request.free()
+		a.service_path.free()
 		a.rows.free()
 		a.matching.free()
 		a.query.free()

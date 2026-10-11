@@ -3,19 +3,34 @@ module main
 
 import desktop.sessioncore
 import ui2
+import desktop.packagecore
 
 fn (mut d Desktop) open_with(path string) {
 	if !path.starts_with('/') || path.contains('\x00') { return }
 	d.initialize_shell_hub()
+	d.refresh_package_apps()
 	d.hub.open_path.set(path) or { return }
 	d.hub.open_default = false
+	d.hub.open_page = 0
 	for w in d.windows {
 		if w.page == .open_with {
 			d.activate(w.id)
 			return
 		}
 	}
-	d.spawn('Open With', .open_with, 150, 100, 520, 360)
+	d.spawn('Open With', .open_with, 150, 100, 520, 440)
+}
+
+fn open_with_builtin(name string) bool {
+	return name in ['vinix-files', 'vinix-editor', 'vinix-preview', 'vinix-firefox', 'vinix-calendar']
+}
+
+fn (d &Desktop) open_with_count() int {
+	mut count := 0
+	for factory in available_apps { if open_with_builtin(factory.process_name) { count++ } }
+	mime := sessioncore.mime_for_path(d.hub.open_path.str())
+	for app in packaged_apps.apps { if app.accepts(mime) { count++ } }
+	return count
 }
 
 fn (d &Desktop) open_with_contents(width int) []ui2.Element {
@@ -23,20 +38,36 @@ fn (d &Desktop) open_with_contents(width int) []ui2.Element {
 	out << body_line(d.hub.open_path.str(), 16, 14, width - 32)
 	out << muted_line(sessioncore.mime_for_path(d.hub.open_path.str()), 16, 38, width - 32)
 	mut y := 76
+	mut slot := 0
+	first := d.hub.open_page * 5
 	for i, factory in available_apps {
-		if factory.process_name !in ['vinix-files', 'vinix-editor', 'vinix-preview', 'vinix-firefox',
-			'vinix-calendar'] {
-			continue
+		if !open_with_builtin(factory.process_name) { continue }
+		if slot >= first && slot < first + 5 {
+			out << settings_choice(d.hub.open_actions[i], factory.title, 16, y, width - 32, false)
+			y += 38
 		}
-		out << settings_choice(d.hub.open_actions[i], factory.title, 16, y, width - 32, false)
-		y += 38
+		slot++
 	}
-	out << settings_toggle('session.open.default', 'Use this application by default', 16, y + 8, width - 32, d.hub.open_default)
+	mime := sessioncore.mime_for_path(d.hub.open_path.str())
+	for app in packaged_apps.apps {
+		if !app.accepts(mime) { continue }
+		if slot >= first && slot < first + 5 {
+			out << settings_choice(app.open_action, app.name, 16, y, width - 32, false)
+			y += 38
+		}
+		slot++
+	}
+	out << settings_toggle('session.open.default', 'Use this application by default', 16, 280, width - 32, d.hub.open_default)
+	if slot > 5 {
+		out << settings_choice('session.open.previous', 'Previous applications', 16, 324, (width - 40) / 2, false)
+		out << settings_choice('session.open.next', 'Next applications', width / 2 + 4, 324, (width - 40) / 2, false)
+	}
 	return out
 }
 
 fn (mut d Desktop) select_open_with(index int) {
 	if index < 0 || index >= available_apps.len || d.hub.open_path.len == 0 { return }
+	if !open_with_builtin(available_apps[index].process_name) { return }
 	path := d.hub.open_path.str().clone()
 	defer { unsafe { path.free() } }
 	if d.hub.open_default {
@@ -53,6 +84,34 @@ fn (mut d Desktop) select_open_with(index int) {
 	d.open_path_in_app(index, path)
 }
 
+fn (mut d Desktop) select_package_open_with(id string) {
+	index := packaged_apps.find(id) or { return }
+	path := d.hub.open_path.str().clone()
+	defer { unsafe { path.free() } }
+	app := &packaged_apps.apps[index]
+	if !app.accepts(sessioncore.mime_for_path(path)) { return }
+	if d.hub.open_default { d.session_associate_document(path, app.association) }
+	for window in d.windows {
+		if window.page == .open_with {
+			d.close_window(window.id)
+			break
+		}
+	}
+	d.launch_package(id, path)
+}
+
+fn (mut d Desktop) open_document_in_handler(name string, path string) {
+	if name.starts_with(packagecore.association_prefix) {
+		d.refresh_package_apps()
+		if id := packaged_apps.handler(name, sessioncore.mime_for_path(path)) {
+			d.launch_package(id, path)
+		}
+		return
+	}
+	index := shortcut_app_index_named(name)
+	if index >= 0 { d.open_path_in_app(index, path) }
+}
+
 fn (mut d Desktop) load_associations() {
 	path := '${d.home}/.vinix-associations'
 	defer { unsafe { path.free() } }
@@ -61,7 +120,8 @@ fn (mut d Desktop) load_associations() {
 	associations := sessioncore.decode_associations(record) or { return }
 	for i in 0 .. associations.count {
 		a := associations.items[i]
-		if shortcut_app_index_named(a.app.str()) >= 0 {
+		name := a.app.str()
+		if shortcut_app_index_named(name) >= 0 || (name.starts_with(packagecore.association_prefix) && packagecore.identifier(unsafe { tos(name.str + packagecore.association_prefix.len, name.len - packagecore.association_prefix.len) })) {
 			d.hub.associations.set(a.type.str(), a.app.str(), a.uri) or {}
 			d.hub.association_overrides.set(a.type.str(), a.app.str(), a.uri) or {}
 		}
@@ -83,13 +143,34 @@ fn (d &Desktop) save_associations() {
 // Files and launcher retain their format-specific fallbacks; a user's MIME
 // choice is shared by every entry point that opens that document type.
 fn (mut d Desktop) session_document_app(path string, fallback string) string {
-	if info := desktop_stat(path) { if info.is_dir { return 'vinix-files' } }
+	if info := desktop_stat(path) {
+		if info.is_dir { return 'vinix-files' }
+	}
 	d.initialize_shell_hub()
-	return d.hub.association_overrides.resolve(sessioncore.mime_for_path(path), false) or { fallback }
+	d.refresh_package_apps()
+	return d.registered_document_app(path, fallback)
+}
+
+fn (d &Desktop) registered_document_app(path string, fallback string) string {
+	mime := sessioncore.mime_for_path(path)
+	if name := d.hub.association_overrides.resolve(mime, false) {
+		if !name.starts_with(packagecore.association_prefix) || packaged_apps.handler(name, mime) != none {
+			return name
+		}
+	}
+	// Retain the user's choice on disk for rollback/reinstall, but use the
+	// built-in fallback while its package or MIME permission is unavailable.
+	if fallback.starts_with(packagecore.association_prefix) {
+		if packaged_apps.handler(fallback, mime) != none { return fallback }
+		return workflow_default_app(path)
+	}
+	return fallback
 }
 
 fn (mut d Desktop) session_associate_document(path string, app string) {
-	if shortcut_app_index_named(app) < 0 { return }
+	if shortcut_app_index_named(app) < 0 {
+		if packaged_apps.handler(app, sessioncore.mime_for_path(path)) == none { return }
+	}
 	d.initialize_shell_hub()
 	kind := sessioncore.mime_for_path(path)
 	d.hub.associations.set(kind, app, false) or { return }

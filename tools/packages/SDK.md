@@ -105,6 +105,14 @@ supplied document. Keep on-disk data compatible with version rollback. A service
 lease preserves the generation until the launched process exits; runners must
 remain alive while children use runtime files.
 
+Installed apps register automatically in Start and Quick Launch. A declared
+`associations` MIME type plus the `files` permission makes an app available in
+the shared Open With chooser. Documents are appended as literal arguments;
+install/upgrade never changes user defaults. Uninstall removes active handlers,
+with user preferences retained for rollback/reinstall. Desktop launches use a
+Software output/diagnostic window and the same `run` contract; terminal input
+requires CLI execution. Execution requires an ordinary user session.
+
 The built-in `NativeApp` V interface and VAPP version 11 remain internal desktop
 contracts. Third-party ui2 clients need compositor adapter qualification. Importing
 `desktop/app_process.v` is not a supported standalone UI SDK protocol.
