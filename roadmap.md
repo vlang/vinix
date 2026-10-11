@@ -163,6 +163,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Atomic checksummed multi-disk plan bundles, complete-set publication and preflighted boot replay](docs/storage-volumes.md#atomic-multi-disk-bundles).
   - [x] [Offline capacity planning and explicit preflighted growth replay with stable generations and open descriptors](docs/storage-volumes.md#planned-capacity-growth).
   - [x] [Offline bundle inspection and read-only complete-set preflight with create/keep/grow action previews](docs/storage-volumes.md#bundle-inspection-and-preflight).
+  - [x] [Offline mapping additions/removal with complete-set validation, atomic publication and separate live application](docs/storage-volumes.md#offline-mapping-configuration).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

@@ -33,6 +33,12 @@ production preflight/application code with only open/close/status/identity-I/O
 boundaries replaced. It checks explicit growth opt-in, unlisted extension and
 later-slot conflicts before mutation, generation/old-size races, kernel growth
 refusal, later create failure, descriptor cleanup and successful resumed replay.
+Offline mapping configuration tests cover additions to empty disks, middle/last
+removal, preserved identities/order/modes, freed slot reuse across disks, full
+64-slot/disk bounds, complete rollback of invalid additions and unchanged files
+on corrupt/symlink inputs. Both command paths run publisher fault injection.
+See [offline edit qualification](edit-bundle.md) and
+[read-only bundle inspection/preflight](check-bundle.md).
 Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init
@@ -50,9 +56,10 @@ AMD64 uses the cached Alpine BusyBox and musl loader from
 On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
-output into retained logs, limits each boot to 600 seconds and terminates only
-its own process. The longer allowance includes 800 utility processes and disk
-discovery on x86 TCG; the strict retention checks are unchanged.
+output into retained logs, limits each boot to 1800 seconds and terminates only
+its own process. The allowance includes 2800 utility processes across 200 warmup
+and 200 measured seven-command cycles, including offline add/remove and live
+preflight on x86 TCG; the strict retention checks are unchanged.
 Serial output is streamed to disk, with a fixed marker window for read boundaries;
 pipe buffers are freed after writing, and the completed transcript is read once.
 This bounds capture memory during verbose development-kernel NVMe qualification.

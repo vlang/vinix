@@ -31,7 +31,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -280,7 +280,7 @@ fn boot(args []string, log string) !string {
 	}
 	mut markers := bootcapture.Capture{}
 	started := time.sys_mono_now()
-	for process.is_alive() && time.sys_mono_now() - started < u64(600 * time.second) {
+	for process.is_alive() && time.sys_mono_now() - started < u64(1800 * time.second) {
 		stdout := process.stdout_read()
 		if stdout != '' { capture.write_string(stdout)!; markers.observe(stdout) }
 		unsafe { stdout.free() }
@@ -330,6 +330,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN BUNDLE PASSED:') { return error('Missing atomic multi-disk bundle qualification') }
 	if !first.contains('PLAN GROWTH PASSED:') { return error('Missing planned capacity growth qualification') }
 	if !first.contains('PLAN CHECK PASSED:') { return error('Missing read-only bundle check qualification') }
+	if !first.contains('PLAN EDIT PASSED:') { return error('Missing offline mapping edit qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }

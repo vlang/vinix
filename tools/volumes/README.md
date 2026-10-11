@@ -52,6 +52,12 @@ offline. `check-bundle BUNDLE [grow]` opens devices read-only and uses restorati
 complete-set preflight to preview create/keep/grow actions and captured generations.
 See [inspection and check limits](../../docs/storage-volumes.md#bundle-inspection-and-preflight).
 
+`plan-add BUNDLE DISK_INDEX SLOT OFFSET_BYTES LENGTH_BYTES [ro]` adds a mapping
+offline using the disk's saved index. `plan-remove BUNDLE SLOT` removes its
+desired entry. Both atomically publish a validated complete set; live mappings
+are changed only by separate runtime commands. See
+[offline configuration editing](../../docs/storage-volumes.md#offline-mapping-configuration).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

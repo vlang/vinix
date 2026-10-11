@@ -113,12 +113,16 @@ fn missing(path &char) {
 fn tool(command &char, device &char, a &char, b &char, c &char, expected i32) {
 	unsafe {
 		arguments := [&char(c'/usr/sbin/vinix-volume'), command, device, a, b, c, &char(nil)]!
-		child := C.fork()
-		check(child >= 0, c'fork utility')
-		if child == 0 { C.execv(arguments[0], &arguments[0]); C._exit(127) }
-		mut code := i32(0)
-		check(C.waitpid(child, &code, 0) == child && code == expected << 8, c'utility exit')
+		run_utility(&arguments[0], expected)
 	}
+}
+
+fn run_utility(arguments &&char, expected i32) {
+	child := C.fork()
+	check(child >= 0, c'fork utility')
+	if child == 0 { unsafe { C.execv(arguments[0], arguments) }; C._exit(127) }
+	mut code := i32(0)
+	check(C.waitpid(child, &code, 0) == child && code == expected << 8, c'utility exit')
 }
 
 fn simple(command &char, device &char, file &char, expected i32) {
@@ -159,11 +163,14 @@ fn cycles(parent &char, count int) {
 	for _ in 0 .. count {
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, other, unsafe { &char(nil) }, 0)
 		tool(c'plan-grow', c'/etc/vinix/volumes.vset', c'2', c'8192', unsafe { &char(nil) }, 0)
+		planning_add(c'/etc/vinix/volumes.vset', c'0', c'14', c'6291456', c'4096', true, 0)
 		tool(c'check-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
+		simple(c'plan-remove', c'/etc/vinix/volumes.vset', c'14', 0)
 		tool(c'restore-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 	}
 	C.sleep(13)
+	missing(c'/dev/mapper/vinix14')
 }
 
 @[direct_array_access]
@@ -412,6 +419,7 @@ fn first_boot(parent &char) {
 		multiple_plans(parent, wrong)
 		bundle_plans(parent, wrong)
 		planned_growth(parent, wrong)
+		planned_mappings(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -471,6 +479,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		view_data(); second_view_data()
 		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 		grown_view_data()
+		edited_view_data()
 		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
 		check(C.getppid() == 1 && status(c'/dev/mapper/vinix2').disk_id == status(actual).disk_id
 			&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id, c'init restored reordered physical disks')

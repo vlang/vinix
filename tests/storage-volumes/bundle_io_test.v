@@ -114,3 +114,38 @@ fn test_bundle_publication_handles_interruption_short_writes_and_every_durabilit
 		 }
 	}
 }
+
+fn test_add_and_remove_commands_use_atomic_publication_and_cleanup_on_every_io_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-edit-io-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	for remove in [false, true] {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}
+			mut plan := Plan{count: if remove { u32(2) } else { u32(1) },
+				key: DiskKey{bytes: 4096, sector: 512, kind: 1}}
+			plan.key.id[0] = 1
+			plan.rows[0] = Request{slot: 2, length: 512}
+			plan.rows[1] = Request{slot: 5, offset: 1024, length: 512, flags: 1}
+			assert append_plan(mut set, &plan)
+			bundle_io = BundleIO{}
+			assert publish_bundle(path.str, &set)
+			original := os.read_bytes(path)!
+			row := if remove { plan.rows[0] } else { plan.rows[1] }
+			bundle_io = BundleIO{mode: mode}
+			assert edit_bundle_plan(path.str, 0, &row, remove) == if mode == 1 { 0 } else { 1 }
+			assert bundle_io.closes == 2 && os.ls(work)!.len == 1
+			current := os.read_bytes(path)!
+			mut decoded := PlanSet{}
+			assert decode_bundle(current.data, current.len, mut decoded)
+			if mode == 1 || mode == 4 {
+				assert current != original && decoded.plans[0].count == if remove { u32(1) } else { u32(2) }
+				assert decoded.plans[0].rows[if remove { 0 } else { 1 }].slot == 5
+				assert bundle_io.renames == 1 && bundle_io.flushes == 2
+			} else {
+				assert current == original
+			}
+		}
+	}
+}

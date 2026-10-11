@@ -324,6 +324,57 @@ Read access suffices for a check even when the bundle describes writable views.
 
 See [inspection and preflight qualification](../tests/storage-volumes/check-bundle.md).
 
+## Offline mapping configuration
+
+```sh
+# Save identities first; disks with no managed views are valid participants.
+vinix-volume save-set /root/layout.vset /dev/sd0 /dev/sd1
+vinix-volume show-bundle /root/layout.vset
+# Add slot 12 on saved disk index 1, at an absolute physical byte offset:
+vinix-volume plan-add /root/layout.vset 1 12 4194304 1048576 ro
+vinix-volume check-bundle /root/layout.vset
+vinix-volume restore-bundle /root/layout.vset
+# Stop replaying slot 12 without changing a live mapping:
+vinix-volume plan-remove /root/layout.vset 12
+```
+
+`plan-add BUNDLE DISK_INDEX SLOT OFFSET_BYTES LENGTH_BYTES [ro]` adds one desired
+mapping to an enrolled disk without opening a device or changing a live view.
+The disk index is its zero-based saved order, as printed by `show-bundle`;
+it is independent of runtime device names. The offset is absolute within the
+saved physical disk. Length must be nonzero. Offset and length must align to
+the saved sector size, fit its saved capacity without overflow and avoid all
+other planned extents on that disk. Slots 0 through 63 are globally unique
+across the bundle. An already planned slot is an error even if its geometry
+matches. The optional literal `ro` sets read-only mode; omission allows writes.
+
+`plan-remove BUNDLE SLOT` removes an existing desired entry, preserving the
+remaining order, disk identities, geometry and modes. A missing slot is an
+error. A disk remains enrolled after removing its last entry, and subsequent
+checking/replay still requires that disk's identity. A removed slot can be
+assigned to a different enrolled disk in the saved configuration.
+
+Both commands decode and validate the complete bounded checksummed bundle
+before editing. They publish the entire new set through the shared atomic
+publisher with mode 0600, retaining the existing file on validation or
+pre-publication I/O failure. As with capacity planning, directory-flush failure
+after rename returns an error with the new file visible and its durability
+unconfirmed. Reporting failure also returns an error after publication; inspect
+the file before retrying. Final symlinks and corrupt/nonregular files are
+rejected. Administration remains serialized to avoid concurrent edit overwrite.
+
+Removing a desired entry does not remove a live view, invalidate its open
+descriptors, erase data or release its physical extent. Replay preserves
+unlisted views. Use the separate live `remove` command when removal is intended;
+the kernel applies its ordinary mounted/swap/lifetime protections. Reassigning
+an omitted slot or extent can therefore fail live preflight until the old view
+is explicitly removed. Use `check-bundle` before application: offline validation
+checks saved extents, while live preflight also detects unlisted mappings.
+
+This completes add/remove editing of saved linear mappings; pools, RAID,
+filesystem resize and encryption remain separate work. See
+[offline edit qualification](../tests/storage-volumes/edit-bundle.md).
+
 ## Status ABI
 
 `tools/volumes/volumecli/volume.h` defines the native little-endian ABI shared by
