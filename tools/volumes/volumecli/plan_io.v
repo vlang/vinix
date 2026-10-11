@@ -247,6 +247,17 @@ struct RestoreState {
 mut:
 	parent Status
 	present [64]bool
+	grow [64]bool
+	generation [64]u64
+	previous_bytes [64]u64
+}
+
+fn mapping_growable(status &Status, parent &Status, row &Request) bool {
+	return status.flags & 8 != 0 && status.slot == row.slot && status.disk_id == parent.disk_id
+		&& status.start == row.offset && status.sector == parent.sector
+		&& status.flags & 1 == row.flags && status.generation != 0
+		&& status.bytes > 0 && status.bytes < row.length && parent.sector != 0
+		&& status.bytes % parent.sector == 0
 }
 
 fn verify_restore_disk(fd i32, plan &Plan, parent &Status) bool {
@@ -263,6 +274,11 @@ fn verify_restore_disk(fd i32, plan &Plan, parent &Status) bool {
 // occupied slot before creating the first mapping on any disk.
 @[direct_array_access]
 fn prepare_restore(fd i32, plan &Plan, mut state RestoreState) bool {
+	return prepare_restore_mode(fd, plan, mut state, false)
+}
+
+@[direct_array_access]
+fn prepare_restore_mode(fd i32, plan &Plan, mut state RestoreState, grow bool) bool {
 	mut key := unsafe { &DiskKey(C.alloca(sizeof(DiskKey))) }
 	unsafe { *key = DiskKey{} }
 	state = RestoreState{}
@@ -286,7 +302,12 @@ fn prepare_restore(fd i32, plan &Plan, mut state RestoreState) bool {
 			row := plan.rows[i]
 			if row.slot == slot {
 				if !mapping_matches(unsafe { &status }, unsafe { &state.parent }, unsafe { &plan.rows[i] }) {
-					plan_error(c'plan conflicts with an existing mapping'); return false
+					if !grow || !mapping_growable(unsafe { &status }, unsafe { &state.parent }, unsafe { &plan.rows[i] }) {
+						plan_error(c'plan conflicts with an existing mapping'); return false
+					}
+					state.grow[i] = true
+					state.generation[i] = status.generation
+					state.previous_bytes[i] = status.bytes
 				}
 				state.present[i] = true
 			} else if status.flags & 8 != 0 && status.disk_id == state.parent.disk_id {
@@ -305,6 +326,10 @@ fn prepare_restore(fd i32, plan &Plan, mut state RestoreState) bool {
 @[direct_array_access]
 fn apply_restore(fd i32, plan &Plan, state &RestoreState) i32 {
 	for i := u32(0); i < plan.count; i++ {
+		if state.grow[i] {
+			if !apply_mapping_growth(unsafe { &plan.rows[i] }, unsafe { &state.parent }, state.generation[i], state.previous_bytes[i]) { return 1 }
+			continue
+		}
 		if state.present[i] { continue }
 		if C.ioctl(fd, u64(0x56560001), &plan.rows[i]) != 0 {
 			C.perror(c'vinix-volume: restore stopped; previously created mappings remain'); return 1
@@ -312,4 +337,28 @@ fn apply_restore(fd i32, plan &Plan, state &RestoreState) i32 {
 	}
 	C.printf(c'restored %u volume mappings\n', plan.count)
 	return 0
+}
+
+// Open the target object, then recheck its captured generation and geometry
+// before growing through that same descriptor. Never resize a reused slot.
+fn apply_mapping_growth(row &Request, parent &Status, generation u64, previous_bytes u64) bool {
+	mut name := [64]char{}
+	volume_path(row.slot, &name[0])
+	fd := C.open(&name[0], C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if fd < 0 { C.perror(c'vinix-volume: open mapping for growth'); return false }
+	defer { C.close(fd) }
+	mut status := Status{}
+	if !query_status(fd, mut status) || status.generation != generation || status.bytes != previous_bytes
+		|| !mapping_growable(unsafe { &status }, parent, row) {
+		plan_error(c'mapping changed after growth preflight; earlier changes remain'); return false
+	}
+	mut request := Request{length: row.length}
+	if C.ioctl(fd, u64(0x56560002), &request) != 0 {
+		C.perror(c'vinix-volume: growth stopped; earlier changes remain'); return false
+	}
+	if !query_status(fd, mut status) || status.generation != generation || !mapping_matches(unsafe { &status }, parent, row) {
+		plan_error(c'mapping changed after growth; earlier changes remain'); return false
+	}
+	C.printf(c'grown slot=%u previous_bytes=%lu bytes=%lu generation=%lu\n', row.slot, previous_bytes, row.length, generation)
+	return true
 }

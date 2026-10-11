@@ -26,6 +26,13 @@ the old file, and directory-fsync failure retaining the new published file with
 unconfirmed durability. A destination matching a temporary candidate must survive
 publication and cleanup. Both architectures' complete generated utilities are
 audited for implicit heap/runtime dependencies.
+Capacity tests cover offline bundle edits, unchanged identity/mode/offset,
+idempotent desired lengths and failed publication on shrink, alignment,
+overflow, overlap or absent slots. A restore syscall model compiles the
+production preflight/application code with only open/close/status/identity-I/O
+boundaries replaced. It checks explicit growth opt-in, unlisted extension and
+later-slot conflicts before mutation, generation/old-size races, kernel growth
+refusal, later create failure, descriptor cleanup and successful resumed replay.
 Plan-set checks cover duplicate disks/slots, 64 plans and all global
 slots, directory ordering, ignored names, selected nonregular files, descriptor
 ownership and the 4096-entry limit. The same controller runs both native init
@@ -81,15 +88,21 @@ preserve the previous file; invalid arguments do not replace it. Corruption,
 missing disks, untrusted bundle mode/owner, final symlinks, legacy enrollment
 conflicts and later occupied/unlisted slots fail without creating a prefix.
 Explicit and boot bundle replay preserve data and existing generations.
-The fixture measures slab/large retention over 200 bundle-save/boot-restore
-cycles after 200 warmup cycles, with both disks enabled. A flushed phase marker
+The capacity fixture then plans larger views without changing live geometry,
+rejects invalid edits and default replay, and checks later-disk/extension
+conflicts before growth. Writable and read-only views grow in place, keeping
+their generations. An already open raw descriptor writes and flushes the new
+extent, which remains readable after reboot at the saved larger capacity.
+The fixture measures slab/large retention over 200 cycles after 200 warmup
+cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
+capacity, explicitly replays growth and runs boot restoration. A flushed phase marker
 and the atomically published bundle stay on ext2 across an
 abrupt VM stop. The physical disks are reordered for the second boot. Production ARM
 native init or AMD64 desktop init restores both disks from the bundle before the
 test application starts, and the application checks persisted data, read-only
 mode, the correct physical disks after reordering and idempotence. The host does
 not inject the bundle or phase marker between boots. The controller requires
-the bundle preflight marker before accepting the first boot.
+the bundle and capacity preflight markers before accepting the first boot.
 
 The fixture touches its readable ELF load pages before sampling. This keeps
 cold faults in the long-lived test program's diagnostic code from appearing as

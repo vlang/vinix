@@ -31,7 +31,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -40,6 +40,7 @@ fn host(root string, work string) ! {
 		println('PASS ' + entry + ': ASan/UBSan')
 	}
 	bundle_publication_tests(root, work, v)!
+	growth_io_tests(root, work, v)!
 	for arch in ['aarch64', 'x86_64'] {
 		path := work + '/volume-' + arch + '.c'
 		generate(root, root + '/tools/volumes/volumecli', path, arch)!
@@ -47,6 +48,29 @@ fn host(root string, work string) ! {
 	}
 	init_policy(root, work)!
 	println('PASS host: plan format, identity, corruption, bounded plan sets, atomic publication and sanitizers')
+}
+
+fn growth_io_tests(root string, work string, v string) ! {
+	fixture := work + '/growthio'
+	os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
+		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file == 'plan_io.v' {
+			for name in ['open', 'close', 'ioctl', 'pread'] {
+				source = source.replace('C.' + name + '(', 'growth_mock_' + name + '(')
+					.replace('fn growth_mock_' + name + '(', 'fn C.' + name + '(')
+			}
+		}
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/growth_io_test.v', fixture + '/growth_io_test.v')!
+	binary := work + '/growth-io-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, fixture + '/growth_io_test.v'])!
+	print(command([binary])!)
+	println('PASS growth replay: preflight, generation/geometry recheck, failures, cleanup and resumable application under ASan/UBSan')
 }
 
 // Replace only the shared publisher's synchronous syscall boundary. The
@@ -300,6 +324,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('init: volume restore failed; continuing') { return error('Production init did not report its invalid boot plan and continue') }
 	if !first.contains('PLAN SET PREFLIGHT PASSED') { return error('Missing multi-disk plan-set qualification') }
 	if !first.contains('PLAN BUNDLE PASSED:') { return error('Missing atomic multi-disk bundle qualification') }
+	if !first.contains('PLAN GROWTH PASSED:') { return error('Missing planned capacity growth qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
@@ -313,7 +338,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, nvme)! }
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
-	println('PASS ${arch}: atomic bundle save, multi-disk preflight, discovery and trust rejection, production init restore after device reorder, 200-cycle retention and reboot data')
+	println('PASS ${arch}: planned in-place capacity growth, atomic bundle save, multi-disk preflight, production init restore after device reorder, 200-cycle retention and reboot data')
 }
 
 fn main() {

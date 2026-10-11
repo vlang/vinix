@@ -239,6 +239,50 @@ creates; a quota, I/O or concurrent-reconfiguration failure during application
 can leave an already created prefix. Replaying the same bundle resumes from
 matching entries. Filesystem mounting, pools and RAID remain separate work.
 
+## Planned capacity growth
+
+```sh
+# Slot 2 already exists and has unused physical space immediately after it.
+vinix-volume save-set /root/capacity.vset /dev/vda /dev/vdb
+vinix-volume plan-grow /root/capacity.vset 2 16777216
+vinix-volume restore-bundle /root/capacity.vset grow
+# Enroll the resulting live geometry for ordinary boot replay.
+vinix-volume save-set /etc/vinix/volumes.vset /dev/vda /dev/vdb
+```
+
+`plan-grow BUNDLE SLOT LENGTH_BYTES` edits one existing mapping's desired length
+and atomically publishes the complete bundle. It reads the saved configuration
+without opening a physical device or changing a live mapping. The disk identity,
+start offset, slot and read-only mode stay fixed. The new length must be at least
+the saved length, sector-aligned, inside the saved disk geometry and disjoint
+from every other mapping on that disk. A missing slot, shrink, overflow,
+misalignment or overlap preserves the previous file; repeating the same desired
+length is valid. The existing checksummed format and publication guarantees apply.
+
+`restore-bundle BUNDLE grow` explicitly permits existing smaller views to grow
+in place when their physical identity, start, sector size, slot and read-only
+mode match. It discovers every disk and checks all requested slots and extents,
+including unlisted views in the extension, before the first grow or create.
+Ordinary restoration and boot replay continue to require exact lengths for
+existing views. Missing views are created at the saved desired length in either
+mode. Boot replay can therefore recreate the grown geometry after reboot.
+
+Before each grow, the utility opens that mapping and checks the generation and
+old length captured by preflight. It uses that same descriptor for the grow
+ioctl and verifies the resulting length and generation afterward. A replaced
+slot or changed geometry fails without resizing the replacement. Successful
+growth retains the volume's generation and open descriptors, and read-only
+volumes keep their read-only mode. Replaying an already applied growth is a
+no-op for those views. This extends raw block capacity within existing physical
+disk geometry; filesystem resizing remains separate work.
+
+Administration must remain serialized. The kernel rechecks privilege,
+mounted/swap protection, parent bounds, overlaps and policy-resource limits when
+each change is applied. A later failure can leave completed grows and creates
+in place; replay resumes from matching entries. The saved desired lengths remain
+published even if runtime application fails. An explicit growth replay is needed
+to resume a live view that is still smaller than its saved plan.
+
 ## Status ABI
 
 `tools/volumes/volumecli/volume.h` defines the native little-endian ABI shared by

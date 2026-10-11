@@ -123,6 +123,11 @@ fn load_boot_plans(directory i32, mut set PlanSet) bool {
 
 @[direct_array_access]
 fn restore_plan_set(set &PlanSet) i32 {
+	return restore_plan_set_mode(set, false)
+}
+
+@[direct_array_access]
+fn restore_plan_set_mode(set &PlanSet, grow bool) i32 {
 	if set.count == 0 { return 0 }
 	mut state := unsafe { &SetRestore(C.alloca(sizeof(SetRestore))) }
 	unsafe { *state = SetRestore{} }
@@ -136,7 +141,7 @@ fn restore_plan_set(set &PlanSet) i32 {
 		state.fds[i] = fd
 		opened++
 		C.printf(c'vinix-volume: matched /dev/%s\n', &name[0])
-		if !prepare_restore(fd, plan, mut state.states[i]) { return 1 }
+		if !prepare_restore_mode(fd, plan, mut state.states[i], grow) { return 1 }
 		for j := 0; j < i; j++ {
 			if state.states[i].parent.disk_id == state.states[j].parent.disk_id {
 				return plan_error(c'multiple plans resolved to the same physical disk')

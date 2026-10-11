@@ -41,6 +41,12 @@ single checksummed file, publishing the complete set with one atomic rename.
 `restore-bundle BUNDLE` discovers every disk and preflights the whole set before
 creating mappings. See [bundle format and durability limits](../../docs/storage-volumes.md#atomic-multi-disk-bundles).
 
+`plan-grow BUNDLE SLOT LENGTH_BYTES` atomically updates desired capacity without
+changing a live mapping. `restore-bundle BUNDLE grow` explicitly applies in-place
+growth after complete-set preflight, retaining generations and open descriptors.
+Ordinary and boot replay retain exact-size matching for existing views. See
+[capacity planning and replay](../../docs/storage-volumes.md#planned-capacity-growth).
+
 Init runs `vinix-volume boot-restore` before applications. It replays the
 optional root-owned `/etc/vinix/volumes.vmap`, `/etc/vinix/volumes.vset` bundle and visible `.vmap` files in
 `/etc/vinix/volumes.d` as one set. Absence is a no-op, and failure is reported

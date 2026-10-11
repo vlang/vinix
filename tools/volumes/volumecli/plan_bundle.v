@@ -210,7 +210,7 @@ fn save_bundle(path &char, count int, devices &&char) i32 {
 	return 0
 }
 
-fn restore_bundle(path &char) i32 {
+fn restore_bundle(path &char, grow bool) i32 {
 	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
 	if fd < 0 {
 		C.perror(c'vinix-volume: open bundle')
@@ -222,5 +222,40 @@ fn restore_bundle(path &char) i32 {
 		*set = PlanSet{}
 	}
 	if !read_bundle(fd, mut set, false) { return 1 }
-	return restore_plan_set(set)
+	return restore_plan_set_mode(set, grow)
+}
+
+// Edit desired capacity only. Validate the complete set before replacing its
+// saved file; no device is opened and no live mapping is changed here.
+@[direct_array_access]
+fn grow_bundle_plan(path &char, slot u32, length u64) i32 {
+	fd := C.open(path, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
+	if fd < 0 { C.perror(c'vinix-volume: open bundle'); return 1 }
+	defer { C.close(fd) }
+	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
+	unsafe { *set = PlanSet{} }
+	if !read_bundle(fd, mut set, false) { return 1 }
+	if !bundle_grow_row(mut set, slot, length) || !publish_bundle(path, set) { return 1 }
+	C.printf(c'planned slot=%u bytes=%lu\n', slot, length)
+	return 0
+}
+
+@[direct_array_access]
+fn bundle_grow_row(mut set PlanSet, slot u32, length u64) bool {
+	if slot >= 64 || !bundle_set_valid(unsafe { &set }) { return false }
+	for disk in 0 .. set.count {
+		for row := u32(0); row < set.plans[disk].count; row++ {
+			if set.plans[disk].rows[row].slot != slot { continue }
+			previous := set.plans[disk].rows[row].length
+			if length < previous { plan_error(c'planned capacity cannot shrink'); return false }
+			set.plans[disk].rows[row].length = length
+			if !bundle_set_valid(unsafe { &set }) {
+				set.plans[disk].rows[row].length = previous
+				plan_error(c'planned capacity is unaligned, out of bounds or overlaps another mapping')
+				return false
+			}
+			return true
+		}
+	}
+	plan_error(c'planned mapping slot is absent'); return false
 }

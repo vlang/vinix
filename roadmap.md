@@ -161,6 +161,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Periodic storage health/error monitoring with counter deltas and persistent session exit status](docs/storage-volumes.md#periodic-storage-monitoring).
   - [x] [Periodic NVMe/ANS thermal and wear telemetry, full 128-bit hardware counter deltas and new media-error detection](docs/storage-volumes.md#nvme-and-ans-telemetry).
   - [x] [Atomic checksummed multi-disk plan bundles, complete-set publication and preflighted boot replay](docs/storage-volumes.md#atomic-multi-disk-bundles).
+  - [x] [Offline capacity planning and explicit preflighted growth replay with stable generations and open descriptors](docs/storage-volumes.md#planned-capacity-growth).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

@@ -57,7 +57,7 @@ fn decimal(text &char) ?u64 {
 
 fn usage() i32 {
 	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume health DEVICE\n       vinix-volume monitor DEVICE INTERVAL_SECONDS [SAMPLES]\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n       vinix-volume save DEVICE PLAN\n       vinix-volume restore DEVICE PLAN\n       vinix-volume discover PLAN\n       vinix-volume restore-auto PLAN\n       vinix-volume restore-set DIRECTORY\n       vinix-volume boot-restore\n')
-	C.printf(c'       vinix-volume save-set BUNDLE DEVICE [DEVICE ...]\n       vinix-volume restore-bundle BUNDLE\n')
+	C.printf(c'       vinix-volume save-set BUNDLE DEVICE [DEVICE ...]\n       vinix-volume plan-grow BUNDLE SLOT LENGTH_BYTES\n       vinix-volume restore-bundle BUNDLE [grow]\n')
 	return 2
 }
 
@@ -67,7 +67,18 @@ pub fn run(argc i32, argv &&char) i32 {
 			if argc < 4 || argc > 67 { return usage() }
 			return save_bundle(argv[2], int(argc - 3), argv + 3)
 		}
-		if argc == 3 && C.strcmp(argv[1], c'restore-bundle') == 0 { return restore_bundle(argv[2]) }
+		if argc >= 2 && C.strcmp(argv[1], c'plan-grow') == 0 {
+			if argc != 5 { return usage() }
+			slot := decimal(argv[3]) or { return usage() }
+			length := decimal(argv[4]) or { return usage() }
+			if slot >= 64 || length == 0 { return usage() }
+			return grow_bundle_plan(argv[2], u32(slot), length)
+		}
+		if argc >= 2 && C.strcmp(argv[1], c'restore-bundle') == 0 {
+			if argc != 3 && argc != 4 { return usage() }
+			if argc == 4 && C.strcmp(argv[3], c'grow') != 0 { return usage() }
+			return restore_bundle(argv[2], argc == 4)
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'monitor') == 0 {
 			if argc != 4 && argc != 5 { return usage() }
 			interval := decimal(argv[3]) or { return usage() }
