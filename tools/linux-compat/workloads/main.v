@@ -294,7 +294,7 @@ fn (mut suite Suite) run(name string) ! {
 				return error('unsupported: supply --runtime-probe with the matching ELF fixture')
 			}
 			output := suite.execute(suite.runtime, ['--once'])!
-			expect(output.contains('LINUX RUNTIME PASS: atomics SIMD TLS') && output.contains('LINUX RUNTIME PASS: JIT page sizes') && output.contains('LINUX RUNTIME: PASS'), 'runtime predicates did not all pass')!
+			expect(output.contains('LINUX RUNTIME PASS: atomics SIMD TLS') && output.contains('LINUX RUNTIME PASS: JIT page sizes') && output.contains('LINUX RUNTIME PASS: wide offsets time64') && output.contains('LINUX RUNTIME: PASS'), 'runtime predicates did not all pass')!
 		}
 		'portal' {
 			suite.execute('gdbus', ['call', '--session', '--dest', 'org.freedesktop.portal.Desktop',

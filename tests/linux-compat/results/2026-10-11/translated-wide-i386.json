@@ -1,0 +1,43 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "translated-i386",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "e43c661b2f914fbe44b2fff75f2ca18d436c2af376e3bf87796736e48f89f0cd",
+    "runtime_probe_sha256": "ce6f9825fdf8b1764630e6b6291b05b629899c8b6c4a7cd3608ea6becc57b5a6",
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "runtime",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/bin/qemu-i386",
+                "-L",
+                "/usr/libexec/vinix-i386/root",
+                "-0",
+                "/usr/share/linux-compat/runtime",
+                "/usr/share/linux-compat/runtime",
+                "--once"
+            ],
+            "executable_sha256": "4d073123424b764c657526f5ac76544e368cd65a1295b68803a46e9abe21d6c3",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [
+                "LD_LIBRARY_PATH",
+                "QEMU_LD_PREFIX",
+                "QEMU_SET_ENV"
+            ],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "LINUX RUNTIME page_size=4096 pointer_bits=32\nLINUX RUNTIME PASS: atomics SIMD TLS\nLINUX RUNTIME PASS: JIT page sizes\nLINUX RUNTIME PASS: wide offsets time64\nLINUX RUNTIME: PASS\n",
+            "stderr": ""
+        }
+    ],
+    "services": []
+}

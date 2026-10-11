@@ -27,6 +27,9 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 - `runtime` checks four concurrent pthreads, isolated libc errno/TLS and keys,
   64-bit atomic increments, SSE2/NEON across scheduling, auxv/sysconf page sizes
   and an actual RW-to-RX JIT function. It prints pointer width and page size.
+  It also verifies file offsets past 8 GiB, normalized CLOCK_REALTIME and a
+  nonblocking timerfd deadline 2^32 seconds into the future, including through
+  the i386 libc's time64 wrappers.
   `--once` makes a staged runtime fixture exit after testing instead of waiting
   as PID 1. It is a native musl test until run through a foreign runtime.
 
@@ -113,7 +116,8 @@ static ELF cannot be passed to the wrapper's dynamic musl loader. That environme
 is confined to the child; ordinary i386 applications still use `run-x86-32`.
 The dated [qualification report](../../docs/linux-posix-qualification.md) contains
 passing native ELF64 and translated 32-bit runtime receipts. Native ELF32/x32 entry,
-glibc, 32-bit large-file/time APIs and debugger operations remain separate checks.
+glibc, the complete large-file/time ABI and debugger operations remain separate
+checks beyond the qualified lseek/clock/timerfd predicates.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

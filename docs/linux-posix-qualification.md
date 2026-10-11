@@ -19,6 +19,7 @@ reproduce tests against another kernel; a new hash needs a new qualification.
 | faccessat2 permissions, exact errors, empty/deleted/O_PATH paths and credentials | passed | passed | not tested | not tested |
 | openat2 ordinary opens and exact validation/rejection of unsupported resolution | passed | passed | not tested | not tested |
 | Concurrent pthread TLS/errno/keys, 64-bit atomics, SIMD and RW-to-RX JIT | passed | passed | passed | passed |
+| File offsets past 8 GiB, normalized clock and time64 timerfd deadline roundtrip | passed | passed | passed | passed |
 | auxv/sysconf page size, pointer width | 16 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 64 bits | 4 KiB, 32 bits |
 
 BPF is unavailable: passing its error regression means callers can discover
@@ -36,8 +37,19 @@ the existing ARM-native QEMU-i386 translator. Separate native runtime receipts
 record the revision. The i386 SDK's musl 1.2.5-r11, compiler-rt 19.1.4-r1, CRT
 and builtins hashes are recorded with the build and package inputs. The static
 probe bypasses the wrapper's dynamic musl loader and confines its W^X opt-in to
-the translator child. Native ELF32 entry, x32, unmodified glibc, 32-bit large-file
-and time APIs, loader interoperability and debugger operations remain unqualified.
+the translator child. Native ELF32 entry, x32, unmodified glibc, complete
+large-file/time ABI coverage, loader interoperability and debugger operations
+remain unqualified.
+
+The additional wide-offset/time64 fixture passes on both native architectures
+and both translated x86 paths. It seeks past 8 GiB, verifies current and negative
+relative offsets and EOF, reads a normalized realtime clock, then arms a
+nonblocking timerfd 2^32 seconds in the future. Getting the remaining duration
+must retain more than a signed time32 can hold, and reading must return EAGAIN.
+The `runtime-wide-*.json`, `translated-wide-*.json`, input and i386 build receipts
+record these binaries. This checks the musl lseek/clock/timerfd wrappers and
+translation; it does not qualify legacy time32 interfaces, large disk writes,
+every stat/truncate/mmap layout, or wall-clock synchronization.
 
 The application suite also attempts all categories and preserves missing
 dependencies as unsupported, with a nonzero complete-suite exit. Test roots

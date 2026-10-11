@@ -3,12 +3,15 @@
 module runtimefixture
 
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/auxv.h>
 #include <sys/mman.h>
+#include <sys/timerfd.h>
+#include <time.h>
 #include <unistd.h>
 
 @[typedef]
@@ -50,6 +53,28 @@ fn C.puts(&char) i32
 fn C.fflush(voidptr) i32
 fn C.pause() i32
 fn C.strcmp(&char, &char) i32
+fn C.open(&char, i32, ...) i32
+fn C.close(i32) i32
+fn C.unlink(&char) i32
+fn C.read(i32, voidptr, usize) isize
+fn C.lseek(i32, i64, i32) i64
+
+struct C.timespec {
+mut:
+	tv_sec i64
+	tv_nsec isize
+}
+
+struct C.itimerspec {
+mut:
+	it_interval C.timespec
+	it_value C.timespec
+}
+
+fn C.clock_gettime(i32, &C.timespec) i32
+fn C.timerfd_create(i32, i32) i32
+fn C.timerfd_settime(i32, i32, &C.itimerspec, &C.itimerspec) i32
+fn C.timerfd_gettime(i32, &C.itimerspec) i32
 
 $if !arm64 {
 	#include <emmintrin.h>
@@ -151,6 +176,39 @@ fn jit(page usize) bool {
 	}
 }
 
+fn wide_offsets_and_time() bool {
+	unsafe {
+		file := C.open(c'/tmp/linux-compat-wide-file', C.O_CREAT | C.O_EXCL | C.O_RDWR, 0o600)
+		if file < 0 { return false }
+		defer { C.close(file); C.unlink(c'/tmp/linux-compat-wide-file') }
+		// Moving past 8 GiB exercises off_t without allocating a giant file.
+		offset := (i64(1) << 33) + 17
+		mut byte := u8(0)
+		if C.lseek(file, offset, C.SEEK_SET) != offset || C.lseek(file, 0, C.SEEK_CUR) != offset
+			|| C.read(file, &byte, 1) != 0 || C.lseek(file, -17, C.SEEK_CUR) != offset - 17 {
+			return false
+		}
+		mut now := C.timespec{}
+		if C.clock_gettime(C.CLOCK_REALTIME, &now) != 0 || now.tv_sec < 0
+			|| now.tv_nsec < 0 || now.tv_nsec >= 1_000_000_000 {
+			return false
+		}
+		timer := C.timerfd_create(C.CLOCK_REALTIME, C.TFD_NONBLOCK | C.TFD_CLOEXEC)
+		if timer < 0 { return false }
+		defer { C.close(timer) }
+		// A deadline more than 2^32 seconds away cannot fit a signed time32.
+		deadline := C.itimerspec{ it_value: C.timespec{tv_sec: now.tv_sec + (i64(1) << 32)} }
+		mut remaining := C.itimerspec{}
+		mut expirations := u64(0)
+		if C.timerfd_settime(timer, C.TFD_TIMER_ABSTIME, &deadline, nil) != 0
+			|| C.timerfd_gettime(timer, &remaining) != 0 || remaining.it_value.tv_sec <= (i64(1) << 31)
+			|| C.read(timer, &expirations, sizeof(expirations)) != -1 || *C.__errno_location() != C.EAGAIN {
+			return false
+		}
+		return true
+	}
+}
+
 @[export: 'main']
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
@@ -191,6 +249,11 @@ pub fn run(argc i32, argv &&char) i32 {
 			return 1
 		}
 		C.puts(c'LINUX RUNTIME PASS: JIT page sizes')
+		if !wide_offsets_and_time() {
+			C.printf(c'LINUX RUNTIME FAIL: wide offsets/time64 errno=%d\n', *C.__errno_location())
+			return 1
+		}
+		C.puts(c'LINUX RUNTIME PASS: wide offsets time64')
 		C.puts(c'LINUX RUNTIME: PASS')
 		C.fflush(nil)
 		if argc == 2 && C.strcmp(argv[1], c'--once') == 0 { return 0 }
