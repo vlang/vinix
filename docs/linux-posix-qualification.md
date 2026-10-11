@@ -550,3 +550,25 @@ is checked separately against the built init. These inputs were extracted for
 runtime diagnosis; no APK install scripts or signature validation were run.
 The earlier unsupported catalog receipts remain available, and the application
 index now selects these completed native runtime workloads.
+
+## Futex WAKE_OP comparisons and errors
+
+Both architectures pass all six signed comparison encodings with 24 timed
+waiters, comparing negative, equal, zero and positive word values against -1.
+False comparisons leave the second queue blocked until a separate wake;
+true comparisons release its waiter. SET, ADD, OR, ANDN and XOR produce the
+expected target values. Shift operands are masked to five bits, including
+negative and out-of-range values, as in Linux's original ABI.
+
+Unsupported atomic operations return ENOSYS without changing the word. An
+unsupported comparison returns ENOSYS after its supported atomic operation
+takes effect and before either queue wakes. See
+[Linux's operation decoder](https://github.com/torvalds/linux/blob/v6.12/kernel/futex/waitwake.c#L194).
+No allocation or ownership change is introduced.
+
+`futex-op-before-*` retains both prior kernels using LE for the GE encoding
+and incorrectly waking on -2 compared with -1. `futex-op-after-*` retains the
+same fixture and all twelve passing native ABI cases in the
+[dated results](../tests/linux-compat/results/2026-10-11/).
+Address validation precedence, requeue and PI interaction remain separate
+qualification requirements.

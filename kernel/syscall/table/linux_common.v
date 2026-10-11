@@ -82,26 +82,28 @@ fn syscall_linux_futex(_ voidptr, uaddr u64, futex_op u64, val u64, timeout u64,
 			comparison := (code >> 24) & 0xf
 			mut operand := i32(code << 8) >> 20
 			compare_arg := i32(code << 20) >> 20
-			if operation & 7 > 4 || comparison > 5 {
-				return errno.err, errno.einval
+			if operation & 7 > 4 {
+				return errno.err, errno.enosys
 			}
 			if operation & 8 != 0 {
-				if operand < 0 || operand >= 32 {
-					return errno.err, errno.einval
-				}
-				operand = i32(u32(1) << u32(operand))
+				// Linux's original WAKE_OP masks even out-of-range signed
+				// shift arguments to five bits for this 32-bit operation.
+				operand = i32(u32(1) << (u32(operand) & 31))
 			}
 			old := usercopy.futex_atomic_op_u32(uaddr2, operation & 7, u32(operand)) or {
 				return errno.err, errno.efault
 			}
+			// A supported atomic operation happens before an unsupported
+			// comparison is refused; no queues are woken on that error.
+			if comparison > 5 { return errno.err, errno.enosys }
 			woken := futex.wake_n_key(uaddr, int(i32(val)), private)
 			matched := match comparison {
 				0 { i32(old) == compare_arg }
 				1 { i32(old) != compare_arg }
 				2 { i32(old) < compare_arg }
-				3 { i32(old) <= compare_arg }
-				4 { i32(old) > compare_arg }
-				else { i32(old) >= compare_arg }
+				3 { i32(old) >= compare_arg }
+				4 { i32(old) <= compare_arg }
+				else { i32(old) > compare_arg }
 			}
 			if matched {
 				return woken + futex.wake_n_key(uaddr2, int(i32(timeout)), private), 0

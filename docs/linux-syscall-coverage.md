@@ -714,7 +714,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/proc/proc_arm64.v` | `acc488a38d106815e1260a3690f619dc54ddc005a7aa2ab15bc3c463396d83a0` |
 | `kernel/proc/seccomp.v` | `0adf7fcb8d8b4f3a2af5bc5e7ba570ec09ae92ba0670b6f30e4f6514d34d5b7b` |
 | `kernel/syscall/table/container.v` | `e4c8fc7823b9194ef7937e864f1869f97223163952d2e4a6b1e6b000ebe37e11` |
-| `kernel/syscall/table/linux_common.v` | `05c48ac94c840749e9f7340076385dfba19d8372fae08c7597fb118b775f5705` |
+| `kernel/syscall/table/linux_common.v` | `98a9e780242a57673190103da8bcf6268fc490bc468037a3eac59d9b9c9237ee` |
 | `kernel/syscall/table/linux_compat.v` | `6270dd9bd29a6750f206a1c31422ee9b30c27c7b08d711e484ed643f72b78672` |
 | `kernel/syscall/table/linux_table_amd64.v` | `864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `cf70c23cb544cef0eedfb300f8410640ac7fc644feb7bbc3d467aaf08606c704` |

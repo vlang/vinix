@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "40f7ddf7a1c09769ac334ccbe38fb319201a139c90e3fa7d8fdf2edea03be125",
+    "results": [
+        {
+            "name": "futexop",
+            "source_sha256": "b106beee9e10b1e75c9417d4294421011e05cb06d4a8172c26844b5b3432c483",
+            "init_sha256": "b5b430d4aed643e63a506b82afc91b43e6a3f2a1ec7d43b638bda54953317e00",
+            "iso_sha256": "9576bcd0953100bafd3325d9ec6440344490487a8f383d682bbd8969d96bf4d9",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
