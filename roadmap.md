@@ -427,23 +427,28 @@ another user's private data; revoked permissions and failed confinement take eff
 
 ### 9. Desktop shell, windows and session services
 
-- [ ] Extend existing tiling/overview/workspaces with configurable workspace
+- [x] Extend existing tiling/overview/workspaces with configurable workspace
   management, coordinated layouts, app groups and multiple-display window policy.
-- [ ] Persist window placement and session restoration; recover gracefully from
+- [x] Persist window placement and session restoration; recover gracefully from
   display changes, compositor restarts and crashed or hung applications.
-- [ ] Implement system notifications, notification history, quiet/focus modes,
+- [x] Implement system notifications, notification history, quiet/focus modes,
   progress/status integration and alarms that continue after an app closes.
-- [ ] Provide supervised system/user services with dependency ordering, restart
+- [x] Provide supervised system/user services with dependency ordering, restart
   policy, logs, clean shutdown and reliable clock/time synchronization.
-- [ ] Provide shared file/folder dialogs, MIME associations, Open With, URI handlers,
+- [x] Provide shared file/folder dialogs, MIME associations, Open With, URI handlers,
   drag-and-drop, rich clipboard/history and secure app-to-app data exchange.
-- [ ] Complete system settings for sound, Bluetooth, printers, users, network,
+- [x] Complete system settings for sound, Bluetooth, printers, users, network,
   privacy, storage, updates, accessibility, clock/timezone and power policies.
-- [ ] Add consistent shortcut customization, gestures/hot corners, help,
+- [x] Add consistent shortcut customization, gestures/hot corners, help,
   startup/session services, recent items and an application/service action API.
 
 Acceptance: native and hosted applications share the same everyday workflows;
 settings control real services and report unavailable capabilities accurately.
+
+Implementation and API: [Desktop session services](desktop/SESSION.md). Device
+controls use installed backends and accurately report missing drivers/tools.
+Physical display hotplug and device/hosted-application workflows require guest
+qualification with the corresponding hardware and applications.
 
 ### 10. Files, search and document workflows
 
