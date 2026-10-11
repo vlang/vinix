@@ -9,12 +9,17 @@ module openfixture
 #include <unistd.h>
 
 struct How { mut: flags u64 mode u64 resolve u64 extra u64 }
+struct C.stat { st_mode u32 }
 fn C.__errno_location() &i32
 fn C.syscall(isize, ...) isize
 fn C.close(i32) i32
 fn C.open(&char, i32, ...) i32
 fn C.mkdir(&char, u32) i32
 fn C.symlink(&char, &char) i32
+fn C.fstat(i32, &C.stat) i32
+fn C.read(i32, voidptr, usize) isize
+fn C.pipe(&i32) i32
+fn C.snprintf(&char, usize, &char, ...) i32
 fn C.printf(&char, ...) i32
 fn C.puts(&char) i32
 fn C.fflush(voidptr) i32
@@ -32,6 +37,23 @@ fn open_result(path &char, how voidptr, size usize, expected i32) bool {
 	}
 }
 
+fn link_descriptor(path &char, via_openat2 bool, resolve u64) bool {
+	unsafe {
+		how := How{flags: u64(C.O_PATH | C.O_NOFOLLOW), resolve: resolve}
+		fd := if via_openat2 {
+			i32(C.syscall(isize(C.SYS_openat2), isize(C.AT_FDCWD), path, &how, isize(24)))
+		} else { C.open(path, C.O_PATH | C.O_NOFOLLOW) }
+		if fd < 0 { C.puts(c'LINUX OPEN FAIL: link descriptor'); return false }
+		mut info := C.stat{}
+		mut byte := u8(0)
+		ok := C.fstat(fd, &info) == 0 && info.st_mode & u32(C.S_IFMT) == u32(C.S_IFLNK)
+			&& C.read(fd, &byte, 1) == -1 && *C.__errno_location() == C.EBADF
+		C.close(fd)
+		if !ok { C.puts(c'LINUX OPEN FAIL: link inode or descriptor access') }
+		return ok
+	}
+}
+
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
@@ -39,7 +61,20 @@ pub fn run() i32 {
 		if fd < 0 { C.puts(c'LINUX OPEN FAIL: create'); return 1 }
 		C.close(fd)
 		if C.mkdir(c'/tmp/linux-open-dir', u32(0o700)) != 0
-			|| C.symlink(c'/tmp', c'/tmp/linux-open-dir/link') != 0 { return 1 }
+			|| C.symlink(c'/tmp', c'/tmp/linux-open-dir/link') != 0
+			|| C.symlink(c'/tmp/linux-open-missing', c'/tmp/linux-open-dangling') != 0 { return 1 }
+		for via_openat2 in [false, true]! {
+			if !link_descriptor(c'/tmp/linux-open-dir/link', via_openat2, 0)
+				|| !link_descriptor(c'/tmp/linux-open-dangling', via_openat2, 0)
+				|| !link_descriptor(c'/proc/self/exe', via_openat2, 0) { return 1 }
+		}
+		mut pipes := [2]i32{}
+		if C.pipe(&pipes[0]) != 0 { return 1 }
+		mut pipe_path := [64]u8{}
+		C.snprintf(&char(&pipe_path[0]), usize(pipe_path.len), c'/proc/self/fd/%d', pipes[0])
+		if !link_descriptor(&char(&pipe_path[0]), false, 0)
+			|| !link_descriptor(&char(&pipe_path[0]), true, 0) { return 1 }
+		C.close(pipes[0]); C.close(pipes[1])
 		mut how := How{}
 		if !open_result(c'/tmp/linux-open-target', &how, 24, 0)
 			|| !open_result(c'/tmp/linux-open-target', &how, sizeof(how), 0)

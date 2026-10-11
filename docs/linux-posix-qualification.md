@@ -5,13 +5,20 @@ disposable QEMU guests, plus explicitly separate host checks. They do not
 qualify every wired syscall, unmodified glibc, persistent package installation,
 desktop integration or physical hardware.
 
-The kernels were built in isolated worktrees from `ea6c4189` with the three
+The initial kernels were built in isolated worktrees from `ea6c4189` with the three
 Linux ABI fixes (`df484021`, `87611ce2`, `d9aee93e`). Concurrent changes in the
 shared checkout were excluded from those builds. Kernel, fixture source,
 init and image hashes are in the checked-in receipts under
 [`tests/linux-compat/results/2026-10-11`](../tests/linux-compat/results/2026-10-11).
 Use the [V qualification controllers](../tests/linux-compat/README.md) to
 reproduce tests against another kernel; a new hash needs a new qualification.
+
+Later `opath-*.json` receipts qualify an additional O_PATH|O_NOFOLLOW fix on
+both native architectures, built on that isolated kernel baseline. The raw
+fixture checks that regular, dangling, executable and pipe procfs links produce
+descriptors for the symlink inode and reject reads with EBADF. Plain openat
+and openat2 exercise the same behavior, following the
+[Linux open contract](https://man7.org/linux/man-pages/man2/open.2.html).
 
 | Check | Native AArch64 | Native x86-64 | x86-64 translated on AArch64 | i386 translated on AArch64 |
 | --- | --- | --- | --- | --- |

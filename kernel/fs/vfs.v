@@ -1022,11 +1022,13 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	// This used to return ELOOP for every symlink, before the reduce_node()
 	// below ever got the chance to resolve it, so open() on a symlink could
 	// not work at all.
-	if stat.islnk(node.resource.stat.mode) && !follow_links {
+	if stat.islnk(node.resource.stat.mode) && !follow_links && flags & resource.o_path == 0 {
 		return errno.err, errno.eloop
 	}
 
-	node = reduce_node_on_mount(node, true, 0, true, open_mount)
+	// O_PATH|O_NOFOLLOW holds the link itself, including dangling and procfs
+	// magic links. Following it here would replace the requested inode.
+	node = reduce_node_on_mount(node, follow_links, 0, true, open_mount)
 	if unsafe { node == 0 } {
 		return errno.err, errno.get()
 	}
@@ -1034,8 +1036,10 @@ pub fn syscall_openat(_ voidptr, dirfd int, _path charptr, flags int, mode u32) 
 	if !created && !policy_check(node, policy_open_access(flags)) {
 		return errno.err, errno.get()
 	}
-	if descriptor := procfs_anonymous_descriptor(node) {
-		return open_anonymous_descriptor(descriptor, flags)
+	if flags & resource.o_path == 0 {
+		if descriptor := procfs_anonymous_descriptor(node) {
+			return open_anonymous_descriptor(descriptor, flags)
+		}
 	}
 
 	// O_PATH names a device without opening it; other opens must respect nodev.
