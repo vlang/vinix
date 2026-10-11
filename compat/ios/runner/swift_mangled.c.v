@@ -41,6 +41,8 @@ fn swift_mangled_parse(name u64, length u64) !SwiftMangledType {
 		kind = 1; offset += if second == 0 { u64(1) } else { u64(2) }
 	} else if first == `S` && second == `i` {
 		kind = 2; offset += 2
+	} else if first == `S` && second == `c` && swift_mangled_byte(name, length, offset + 2) == `P` {
+		kind = 7; offset += 3
 	} else if first == `y` && second == `t` {
 		kind = 3; offset += 2
 	} else if first == `x` {
@@ -144,6 +146,7 @@ fn swift_mangled_lookup_checked(name u64, length u64, context u64, generic_args 
 			if cls == 0 { return 0 }
 			metadata = swift_objc_metadata_checked(cls)!
 		}
+		7 { metadata = swift_task_priority_metadata() }
 		else { return error('iOS: invalid Swift type expression') }
 	}
 	for _ in u64(0) .. parsed.arrays { metadata = swift_array_access(0, metadata).metadata }

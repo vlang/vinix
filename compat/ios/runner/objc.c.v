@@ -143,6 +143,7 @@ mut:
 	swift_objc_metadata map[u64]u64 // Class -> canonical sealed Swift wrapper, under the runtime lock.
 	swift_concurrency_code u64 // Sealed actor witness dispatcher and indirect priority getter.
 	swift_concurrency_retired bool // Reject new resolution after quiescent teardown.
+	swift_task_priority_arena u64 // Sealed TaskPriority accessor and read-only metadata/value witnesses.
 	swift_hash_code u64 // Sealed generic Hashable forwarding entries, retired after callbacks drain.
 	swift_fatal_code u64 // Assertion argument capture and BRK, retired at quiescent teardown.
 	names        map[string]u64

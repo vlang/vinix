@@ -2398,18 +2398,57 @@ build artifacts are retained as verified lossless gzip with original hashes and
 manifests. Full regression remains unpassed, the five published runners retain
 their last passing bytes, and gameplay remains unverified.
 
+V now also resolves `_$sScPMa`, `_$sScPMn` and `_$sScPN`: the canonical
+`TaskPriority` accessor, nominal descriptor and direct metadata exports. The
+installed Mac Swift runtime reports struct kind `0x200`, field offset zero,
+size/stride one, POD flags `0x02000000`, no extra inhabitants and the module
+name `Swift`. One runtime arena supplies an RX accessor page and a read-only
+metadata/value-witness page. The accessor returns complete metadata for all
+measured request modes, preserving `x20`/`x21`. Copy, take and assignment read
+and write exactly one byte; destruction touches no storage. Single-payload
+enum witnesses reproduce the measured tag-width boundaries and UInt32 wrap.
+The bounded type parser recognizes `ScP` and nested Arrays of TaskPriority.
+
+The installed native runtime and V fixtures pass ASAN/UBSAN in both hash modes,
+alongside the existing static witness and hashing suites. Guard pages cover
+byte values, unaligned enum tails and an exact non-NUL `ScP` span. Tests check
+all 256 payload bytes, accessor requests through both exports and descriptor
+references, nested Array ownership, eight concurrent resolvers/workers, and two
+drained runtime lifetimes. Unsupported Optional, conformance and malformed type
+expressions reject before allocating metadata. Generated C audits verify both
+page protections before publication, failed-seal cleanup, retirement and no
+hidden successful allocation or ARC in the new witnesses. Reflection field
+records, TaskPriority conformances, Optional metadata, actor creation, executor
+ownership and task scheduling remain unsupported. This compares installed Mac
+Swift and actual IPA callers; it does not claim an iOS device runtime comparison.
+
+All forty-four programs rebuild and all twenty-six focused Swift guest checks
+pass. The new exports resolve three strong imports and one weak import across
+the supplied images. Fortnite passes them and next exits with status 1
+before entry at EOS's `_swift_task_alloc`. Native export disassembly and actual
+framework call sites (21 in EOS and 31 in Marketplace) are retained for
+task-allocation ABI work. Evidence is
+under `build/ios/fortnite/swift-task-priority-checks`. The initial host ENOSPC
+build and compression failures are preserved; the retry joins every compiler,
+linker and generated-C audit before lossless compression. Completed parent
+artifacts and proof ancestry are also verified after recompression. Temporary
+VM payloads use the mounted test volume and are retired after joined runs;
+logs, configuration and hashes remain accessible from the evidence directory.
+Full regression remains unpassed and the five published runners keep their
+last passing bytes. Fortnite still has not entered gameplay.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,405 | 753 | 81 |
-| EOSSDK | 613 | 49 | 18 |
-| MarketplaceKitWrapper | 104 | 72 | 23 |
-| All images | 2,122 | 874 | 122 |
+| Fortnite executable | 1,407 | 752 | 80 |
+| EOSSDK | 614 | 48 | 18 |
+| MarketplaceKitWrapper | 105 | 71 | 23 |
+| All images | 2,126 | 871 | 121 |
 
-The C++/GLES/Text variant reports 2,135 resolved imports, 861 unresolved strong
-imports and 122 unresolved weak imports, including its native zlib/text backends.
+The C++/GLES/Text variant reports 2,139 resolved imports, 858 unresolved strong
+imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on
@@ -2460,7 +2499,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all twenty-five Swift ABI checks in a small, independent guest and
+`swift` runs all twenty-six Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.

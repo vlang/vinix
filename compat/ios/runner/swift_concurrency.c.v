@@ -36,6 +36,11 @@ fn swift_concurrency_entry(offset u64) !u64 {
 }
 
 fn swift_concurrency_symbol(symbol string) !u64 {
+	if symbol in ['_$sScPMa', '_$sScPMn', '_$sScPN'] {
+		base := swift_task_priority_arena()!
+		if symbol == '_$sScPMa' { return base }
+		return base + u64(C.getpagesize()) + if symbol == '_$sScPMn' { u64(160) } else { u64(16) }
+	}
 	offset := match symbol {
 		'_$sScA15unownedExecutorScevgTj' { u64(0) }
 		'_$sScP8rawValues5UInt8Vvg' { u64(32) }
@@ -46,6 +51,7 @@ fn swift_concurrency_symbol(symbol string) !u64 {
 
 fn swift_concurrency_stop() {
 	// Called under the runtime lock after workers and callbacks have drained.
+	swift_task_priority_stop()
 	if ios_runtime.swift_concurrency_code != 0 {
 		if C.munmap(unsafe { voidptr(ios_runtime.swift_concurrency_code) }, usize(C.getpagesize())) != 0 {
 			panic('iOS: cannot retire Swift concurrency entries')
