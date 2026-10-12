@@ -1,0 +1,74 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 32  248k   32 81911    0     0  62632      0  0:00:04  0:00:01  0:00:03 62623100  248k  100  248k    0     0   145k      0  0:00:01  0:00:01 --:--:--  145k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 2880k    0 28102    0     0  44601      0  0:01:06 --:--:--  0:01:06 44535 13 2880k   13  384k    0     0   235k      0  0:00:12  0:00:01  0:00:11  235k 25 2880k   25  735k    0     0   282k      0  0:00:10  0:00:02  0:00:08  282k 45 2880k   45 1311k    0     0   359k      0  0:00:08  0:00:03  0:00:05  359k 75 2880k   75 2176k    0     0   473k      0  0:00:06  0:00:04  0:00:02  473k100 2880k  100 2880k    0     0   553k      0  0:00:05  0:00:05 --:--:--  624k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 47 22528   47 10680    0     0  19937      0  0:00:01 --:--:--  0:00:01 19925100 22528  100 22528    0     0  41987      0 --:--:-- --:--:-- --:--:-- 41951
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   313k      0 --:--:-- --:--:-- --:--:--  314k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  90626      0 --:--:-- --:--:-- --:--:-- 90575
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   209k      0 --:--:-- --:--:-- --:--:--  209k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-capabi-1012/before-x86/capabi/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-capabi-1012/before-x86/capabi/.vinix-amd64.iso.pney95'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 51.6g free
+Added to ISO image: directory '/'='/private/tmp/vinix-capabi-1012/before-x86/capabi/iso-build/.iso-staging.yUY4wA/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13244 sectors
+Written to medium : 13244 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-capabi-1012/before-x86/capabi/.vinix-amd64.iso.pney95' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xceef.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-capabi-1012/before-x86/capabi/test.iso (27123712 bytes)
+Guest artifacts: /private/tmp/vinix-capabi-1012/before-x86/capabi
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=47144
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX CAPABI FAIL: set=0 actual=-1/22 expected=0/0
+QEMU: Terminated
+Missing verdicts: ['LINUX CAPABI: PASS']; failures: ['FAIL:', 'LINUX CAPABI FAIL']
+Linux compatibility qualification failed; see /private/tmp/vinix-capabi-1012/before-x86/receipt.json

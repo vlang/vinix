@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "370ec9030bb5d5bcadf4ed372464fdb6c84cc80bea3eab9bf9cc47f7556d2dd5",
+    "results": [
+        {
+            "name": "capabi",
+            "source_sha256": "dc2d0d444577ddd95ef0b46510fc643d210f78729853a944cdb9ef861defd5da",
+            "init_sha256": "286e0374b464f58fbd99116ae11de26beba7d2095dd5a6f7162fc97d3f2d43f6",
+            "iso_sha256": "86e80019c6300931f9c30ad9531881b998f29a65d19aba092acf4e5420d93cec",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

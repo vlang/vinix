@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -495,6 +495,13 @@ are checked with readable, null and bad data pointers. Valid self IDs with bad
 data and unreadable headers return EFAULT. Root and UID 1000 leader/sibling
 rounds verify 236 exact errors and unchanged sets. This qualifies PID/error
 validation; capability sets still belong to the process.
+
+The `capabi` case checks null-data version discovery, preferred-version
+writeback, unchanged PID words, readonly write faults and headers with only
+their version word accessible. All three versions use exact data sizes at
+protected page boundaries; version 1 clears the unrepresented high word in
+isolated children. Reserved high bits are ignored for root and UID 1000 while
+valid bits and capability state remain intact. Native page sizes are recorded.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

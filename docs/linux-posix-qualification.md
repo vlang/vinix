@@ -1214,3 +1214,46 @@ These receipts qualify argument validation in the initial PID namespace.
 Nested PID-namespace workflows and per-thread credential isolation remain
 unqualified. Capability sets still belong to the process; the broad roadmap
 acceptance gates remain open.
+
+## Capability ABI discovery and data format
+
+capget/capset validate the four-byte version word before reading PID or
+capability data. An unknown version writes back version 3 without changing
+the PID word. A null-data capget discovery probe then succeeds, including
+when PID is negative or inaccessible; other unknown-version requests return
+EINVAL. Failed preferred-version writes return EFAULT. This follows
+[Linux 6.12's version negotiation and syscall order](https://github.com/torvalds/linux/blob/v6.12/kernel/capability.c#L70).
+
+Version 1 transfers one 12-byte entry and clears the unrepresented high word
+on capset. Versions 2/3 transfer two entries. Reserved bits above CAP_LAST_CAP
+are masked before permission checks, matching
+[Linux's capability conversion](https://github.com/torvalds/linux/blob/v6.12/kernel/capability.c#L184).
+The previous implementation read an entire header before discovery, returned
+EINVAL for successful discovery, ignored preferred-version write faults,
+omitted capset writeback, and rejected reserved bits instead of masking them.
+
+The unchanged V fixture detects the old discovery error on both earlier
+kernels:
+[AArch64 control](../tests/linux-compat/results/2026-10-12/capabi-before-aarch64.json),
+[x86-64 control](../tests/linux-compat/results/2026-10-12/capabi-before-x86_64.json).
+Both fixed kernels pass root and UID 1000 discovery/writeback checks, unchanged
+PID words, readonly faults, four-byte headers before PROT_NONE, partial version
+words, exact data sizes and reserved-bit masks. Six isolated children check
+data/state behavior for each version, including legacy truncation. Native
+page sizes are 16 KiB on AArch64 and 4 KiB on x86-64.
+The same builds pass the seven earlier capability/thread cases:
+[AArch64 results](../tests/linux-compat/results/2026-10-12/capabi-after-aarch64.json),
+[x86-64 results](../tests/linux-compat/results/2026-10-12/capabi-after-x86_64.json).
+Capability-exec also passes:
+[AArch64](../tests/linux-compat/results/2026-10-12/capabi-cap-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/capabi-cap-x86_64.json).
+All eight host test files pass. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/capabi-audit.v)
+checks the controls, 55 source fingerprints, isolated sources, frozen guest
+artifacts, generated four-byte version handling and masks, and fixture helpers
+without V allocation/indexing runtime calls. The new kernel helper keeps its
+version word on the stack and allocates/frees nothing on either architecture.
+
+These are native ELF64 tests of the three capability data formats. They do
+not qualify a 32-bit application runtime, per-thread capability storage or
+file capabilities. The broad roadmap acceptance gates remain open.

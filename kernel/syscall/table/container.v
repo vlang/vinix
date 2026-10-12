@@ -31,6 +31,27 @@ mut:
 	inheritable u32
 }
 
+// Validate only the version word. Null-data capget probes do not read pid;
+// an unsupported version writes back the preferred word before any pid/data
+// access, and a failed write must return EFAULT instead of EINVAL.
+fn cap_words(header_ptr u64) (int, u64) {
+	mut version := u32(0)
+	if !usercopy.copy_from_user(voidptr(unsafe { &version }), header_ptr, sizeof(u32)) {
+		return 0, errno.efault
+	}
+	match version {
+		linux_capability_version_1 { return 1, 0 }
+		linux_capability_version_2, linux_capability_version_3 { return 2, 0 }
+		else {
+			version = linux_capability_version_3
+			if !usercopy.copy_to_user(header_ptr, voidptr(unsafe { &version }), sizeof(u32)) {
+				return 0, errno.efault
+			}
+			return 0, errno.einval
+		}
+	}
+}
+
 fn cap_target(local_pid int) &proc.Process {
 	if local_pid == 0 {
 		return proc.current_thread().process
@@ -54,25 +75,18 @@ fn cap_target(local_pid int) &proc.Process {
 }
 
 fn syscall_linux_capget(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
-	mut header := CapUserHeader{}
-	if !usercopy.copy_from_user(voidptr(&header), header_ptr, sizeof(CapUserHeader)) {
+	entries, format_error := cap_words(header_ptr)
+	if data_ptr == 0 {
+		if format_error == 0 || format_error == errno.einval { return 0, 0 }
+		return errno.err, format_error
+	}
+	if format_error != 0 { return errno.err, format_error }
+	mut pid := i32(0)
+	if !usercopy.copy_from_user(voidptr(unsafe { &pid }), header_ptr + sizeof(u32), sizeof(i32)) {
 		return errno.err, errno.efault
 	}
-	entries := if header.version == linux_capability_version_1 { 1 } else { 2 }
-	// A probe with a zero pid and null data asks which version we speak.
-	if header.version != linux_capability_version_1 && header.version != linux_capability_version_2
-		&& header.version != linux_capability_version_3 {
-		header.version = linux_capability_version_3
-		usercopy.copy_to_user(header_ptr, voidptr(&header), sizeof(CapUserHeader))
-		return errno.err, errno.einval
-	}
-	if header.pid < 0 {
-		return errno.err, errno.einval
-	}
-	if data_ptr == 0 {
-		return 0, 0
-	}
-	target := cap_target(int(header.pid))
+	if pid < 0 { return errno.err, errno.einval }
+	target := cap_target(int(pid))
 	if target == unsafe { nil } {
 		return errno.err, errno.esrch
 	}
@@ -95,20 +109,17 @@ fn syscall_linux_capget(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 }
 
 fn syscall_linux_capset(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
-	mut header := CapUserHeader{}
-	if !usercopy.copy_from_user(voidptr(&header), header_ptr, sizeof(CapUserHeader)) {
+	entries, format_error := cap_words(header_ptr)
+	if format_error != 0 { return errno.err, format_error }
+	mut pid := i32(0)
+	if !usercopy.copy_from_user(voidptr(unsafe { &pid }), header_ptr + sizeof(u32), sizeof(i32)) {
 		return errno.err, errno.efault
-	}
-	entries := if header.version == linux_capability_version_1 { 1 } else { 2 }
-	if header.version != linux_capability_version_1 && header.version != linux_capability_version_2
-		&& header.version != linux_capability_version_3 {
-		return errno.err, errno.einval
 	}
 	// capset only names the caller: zero or its namespace-visible tid.
 	// Reject every other pid before reading data, without a target lookup.
 	caller := proc.current_thread()
 	mut process := caller.process
-	if header.pid != 0 && int(header.pid) != proc.own_tid(caller) {
+	if pid != 0 && int(pid) != proc.own_tid(caller) {
 		return errno.err, errno.eperm
 	}
 	mut data := [2]CapUserData{}
@@ -123,6 +134,10 @@ fn syscall_linux_capset(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 		permitted |= u64(data[1].permitted) << 32
 		inheritable |= u64(data[1].inheritable) << 32
 	}
+	// Linux ignores reserved capability bits outside its advertised set.
+	effective &= proc.cap_all
+	permitted &= proc.cap_all
+	inheritable &= proc.cap_all
 	mut caps := process.caps
 	// New inheritable bits must be bounded unless already inherited. Without
 	// effective CAP_SETPCAP they must also come from the old permitted set.
