@@ -2,28 +2,29 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `6937b43c2a1da31a411fdf4167e93f07e20fe0f1`,
-Linguist 7.27.0 reports **Python 2.02%** (181 files, 786,825 bytes) and
-**V 80.41%** (3,273 files, 31,386,397 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `e8fa673a87420c51c98f09c72a61847b4b5dc2db`,
+Linguist 7.27.0 reports **Python 1.83%** (159 files, 714,392 bytes) and
+**V 80.61%** (3,296 files, 31,521,195 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **4,419,460 Python bytes**. All remaining
-786,825 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **4,491,893 Python bytes**. All remaining
+714,392 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
 source text, raising Python's share despite a reduction in Python bytes.
 
 No Linguist attributes changed. First-party code and fixtures remain counted;
-V code is not padded to alter the graph. Historical benchmark scripts retain
-their captured bytes and Git provenance. Moving an immutable snapshot to an
-archive would receive zero translation credit.
+V code is not padded to alter the graph. Immutable benchmark captures and
+original script Git provenance are preserved. Historical commands included
+in the table receive functional V replacements. Moving an immutable snapshot
+to an archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 67 stages below remove **348 Python files / 1,574,208 original bytes** and
+The 68 stages below remove **370 Python files / 1,646,641 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -98,6 +99,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Apple image pack/build, IORegistry/FDT/ABI checks, iBoot runner and host fixtures | `boottools`, eight native commands and Unix-socket qualification fixture | 42,568 / 1,006 | `4f93ffc9` |
 | Memory runtime and large-I/O differential controllers | `memorytools`, native fronts and compiler/guest owner fixtures | 13,403 / 246 | `d6492152` |
 | Fixture/module, security/X11, LinuxKPI, benchmark and static kmod generators | `generators`, native fronts and independent ABI/compiler owner fixtures | 25,780 / 531 | `6937b43c` |
+| Allocation C/V fixtures, VM/SSH/kext controllers and saved drivers/serial observers | `allocationhost`, twenty native fronts and process/socket owners | 72,433 / 1,562 | `e8fa673a` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -730,9 +732,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 67 stages.
+or hidden in these 68 stages.
 
-The next twenty-nine stages remove 196 Python files / 1,075,865 original bytes.
+The next thirty stages remove 218 Python files / 1,148,298 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -745,7 +747,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **226 Python files / 1,210,142 original bytes**. Earlier qualification
+translates **248 Python files / 1,282,575 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -2997,3 +2999,19 @@ pass. Public workflows include all security cores, Wine fixture mode, XInput and
 default compatibility architecture. No Python, new kernel, guest boot, Darwin
 GCC campaign or kext execution is used. See
 [native generator qualification](../tests/native-generators/README.md).
+
+The allocation stage retires 22 Python files and their obsolete object bridges.
+Thirty qualified cold V builds pass on ARM, Rosetta x86 and ARM ASan/UBSan;
+twenty public help builds and ten complete public workflows also pass. Each
+profile preserves the full 136-case immutable C/V benchmark comparison, both
+sampler fixtures, 30 controlled VM/SSH/kext workflows and twelve compiler/VM/SSH/
+kext signal cases. Real serial/QMP exchanges verify byte offsets, live log
+visibility, persistent command cursors and final stop after either signal.
+Saved drivers preserve cwd, literal paths, UTC timestamps and success/failure
+logs and exit records. Log owners preserve ordered large output and retire
+all private descendants with flat descriptors. Existing source-tool and guest
+regressions pass; eight static C/V AArch64/x86 target executables have the
+correct ELF machine and no interpreter. The excluded preboot runner preserves
+its old artifact failure. Python is not run, and no fresh kernel, guest boot,
+Darwin GCC timing campaign or kext execution is claimed. See
+[native allocation qualification](../tests/native-allocation-tools/README.md).
