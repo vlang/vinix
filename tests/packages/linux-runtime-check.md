@@ -71,6 +71,10 @@ host PT_INTERP path is bypassed. Guest assertions cover:
   read under ordinary credentials and installed/verified in a clean offline
   store; exporting over the same destination is refused. `PACKAGE OFFLINE`
   covers these assertions.
+- Complete `publish-release` output matching the canonical workspace index and
+  signature, excluding private publisher state/manifests, refusing changed
+  metadata at the same sequence, and installing/verifying its Linux/runtime
+  closure in a clean offline store. `PACKAGE RELEASE` covers this flow.
 
 A passing retained run writes `qualification.json` with architecture, SDK,
 scenario and hashes/lengths for kernel, sandbox, dynamic payload, shared library,
@@ -189,3 +193,30 @@ destination is absent, removes upstream objects, and completes a cache-only retr
 It checks corruption and a directory created immediately before the exclusive
 rename. These offline export runs use an initramfs; persistent-device power-cut
 durability of removable media still needs separate qualification.
+
+Complete publisher release export and clean offline installation passed on both
+targets on 2026-10-12 with those cached kernels:
+[AArch64 release receipt](results/2026-10-12/release-aarch64.json),
+[AArch64 serial](results/2026-10-12/release-aarch64.serial.txt),
+[x86_64 release receipt](results/2026-10-12/release-x86_64.json),
+[x86_64 serial](results/2026-10-12/release-x86_64.serial.txt).
+`PACKAGE RELEASE` checks reproducible canonical metadata, complete runtime objects,
+exclusion of private publisher files, sequence-equivocation refusal and consumer
+installation/verification. Host fixtures additionally check every advertised
+version/architecture, copied-object corruption, space preflight, existing/raced
+destinations, writer locks and abrupt exporter exit after durable sequence
+reservation followed by exact retry. Signing metadata remains private until that
+reservation. These runs do not qualify publisher-disk power-cut durability.
+
+Qualification used an isolated V/library snapshot at `826e96f56c`; the
+[compiler identity record](results/2026-10-12/release-toolchain.json) retains its
+binary length/hash and complete source revision. The full host/UI/target check
+used `--direct-tests --cross --desktop`, compiling and running every existing
+assertion runner directly with declaration pruning disabled. The separately
+linked launcher C fixture disables the compiler crash handler; assertions and
+nonzero process exits still fail qualification. The newer shared compiler failed
+before guest boot with omitted Ed25519 type declarations and process-launch C
+headers. Cached test-tool/run modes also failed. Those attempts produced no
+passing guest receipts. The
+isolated snapshot avoids changing another session's toolchain and does not claim
+that the newer compiler regressions are fixed.

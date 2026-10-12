@@ -17,6 +17,16 @@ v run tests/packages/distribution-check.v --cross --desktop
 Desktop checks need generated examples under `build/app-src` and a headless ui2
 overlay under `build/vmodules`; `VINIX_PACKAGE_TEST_UI2` selects another overlay
 parent. Package implementation, publishing, staging and qualification use V.
+The driver also accepts `--direct-tests` to compile/run each existing assertion
+runner directly when the compiler's cached `vtest` tool cannot run. These runners
+retain declarations to avoid pruning required crypto types. The launcher heap
+fixture disables the compiler's crash handler in its separately linked C unit;
+assertions and process exit failures still fail the check.
+
+Use `publish-release REPOSITORY_DIR ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY`
+to emit a complete signed consumer repository with atomic publication, dependency
+closure validation on each declared architecture and retained publisher sequence
+history. The legacy `publish` command remains available for workspace metadata.
 
 Read [administration/recovery](../../docs/application-distribution.md) and
 [SDK 1](SDK.md) for enrollment, policy, packaging and limits. Release publisher

@@ -101,6 +101,30 @@ fn qualify_package_linux(mut t Test) ! {
 	pkgcore.publish(repository, 'fixture', '/tmp/linux-signing-seed', 1, time.now().unix() + 3600)!
 	first_index := os.read_file(repository + '/index.json')!
 	first_signature := os.read_file(repository + '/index.sig')!
+	expires := json2.decode[pkgcore.Index](first_index)!.expires
+	release_path := '/tmp/linux-published-release'
+	release := json2.decode[pkgcore.ReleaseInfo](package_success(['publish-release', repository,
+		'fixture', '/tmp/linux-signing-seed', '1', expires.str(), release_path])!)!
+	assert release.package_count == 2 && release.public_key == key && release.sequence == 1
+	assert os.read_file(release_path + '/index.json')! == first_index
+	assert os.read_file(release_path + '/index.sig')! == first_signature
+	assert os.ls(release_path)!.len == 3 && !os.exists(release_path + '/manifests') && !os.exists(release_path + '/.publisher')
+	forked_release := run(['/usr/bin/vinix-package', 'publish-release', repository, 'fixture',
+		'/tmp/linux-signing-seed', '1', (expires + 1).str(), '/tmp/linux-forked-release'], '', none, none)
+	assert forked_release.status != 0 && forked_release.output.contains('sequence equivocation'), forked_release.output
+	assert !os.exists('/tmp/linux-forked-release') && os.ls('/tmp')!.all(!it.starts_with('.vinix-release-'))
+	release_root := '/tmp/release-client'
+	os.mkdir_all(release_root + '/etc/vinix-packages')!
+	os.write_file(release_root + '/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{
+		architecture: architecture, policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 }
+	}))!
+	package_success(['--root', release_root, 'repo-enroll', 'fixture', 'file://' + release_path, key])!
+	package_success(['--root', release_root, 'update'])!
+	package_success(['--root', release_root, 'install', application.id])!
+	release_state := pkgcore.read_state(pkgcore.state_directory(release_root), architecture)!
+	assert release_state.packages.len == 2 && release_state.requested == [application.id]
+	package_success(['--root', release_root, '--json', 'verify'])!
+	t.say('PACKAGE RELEASE reproducible-index complete-runtime-closure private-state-exclusion sequence-fork-refusal offline-install PASS')
 	config := pkgcore.Config{
 		architecture: architecture
 		launch_user:  'alex'

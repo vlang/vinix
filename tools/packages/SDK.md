@@ -12,7 +12,7 @@ Apple or internal compositor interfaces.
 v -o /tmp/vinix-package tools/packages/main.v
 /tmp/vinix-package keygen /secure/publisher.seed
 /tmp/vinix-package pack manifest.json /build/payload /build/new-repository
-/tmp/vinix-package publish /build/new-repository company /secure/publisher.seed 1 2000000000
+/tmp/vinix-package publish-release /build/new-repository company /secure/publisher.seed 1 2000000000 /srv/releases/company-1
 ```
 
 `keygen` prints the lowercase-hex public key and creates a mode-0600, 32-byte
@@ -22,6 +22,52 @@ then switch the web server to the complete new repository directory. Never chang
 content at an existing hash. Increase sequence for every index change, including
 expiry. Administrators explicitly enroll, replace or revoke publisher keys using
 the repository commands below; publishers cannot authorize their own keys.
+
+`publish-release REPOSITORY_DIR ID SEED SEQUENCE EXPIRES NEW_DIRECTORY` builds a
+complete consumer release without changing workspace indexes. It returns one
+format-1 JSON object with `repository`, `public_key`, `sequence`, `expires`,
+`index_sha256`, absolute `directory`, `package_count` and unique `object_count`.
+The output contains only `index.json`, `index.sig` and `objects/`; publisher
+manifests, state, locks and seeds are excluded. The seed must be an ordinary
+private file owned by the publisher. Workspaces and destination ancestors must
+be controlled by that administrator; sticky shared directories are supported.
+Do not modify the workspace or seed while publishing.
+An object whose digest matches the signing seed file is refused, catching an
+accidentally packed seed; keep all credentials out of payload sources as well.
+
+Every advertised version must have a complete dependency closure within this
+workspace for its declared host architecture. An `all` data package must resolve
+on both hosts. Runtime entrypoints and version bounds use the consumer solver;
+a newer working version cannot hide an older broken version. The complete check
+has the resolver's 100,000-step budget. This checks structural installability;
+it does not execute apps, qualify foreign APIs, accept consumer licenses or
+authorize firmware use. Proprietary/firmware declarations stay in signed metadata.
+
+The command verifies and deduplicates objects, checks destination space with a
+64 MiB reserve, creates a private `.vinix-release-*` sibling tree, verifies copied
+bytes and flushes the tree. Exclusive atomic rename publishes the complete new
+directory and refuses every existing destination, including one created during
+the export. Output objects/metadata are 0644 and directories 0755. Filesystems
+without exclusive atomic rename support fail closed. A post-publication flush
+failure reports that the complete directory exists but its durability is uncertain.
+Upload this complete release to a new remote directory, then switch the server's
+release route. Serving a mutable workspace can expose a torn metadata pair.
+
+Keep `.publisher/history.json` with the workspace and back it up. A private
+publisher lock serializes release commands. Before publication, durable history
+reserves the index sequence/digest for the repository ID and public key. Lower
+sequences or changed metadata at the same sequence are refused. After a failure
+or abrupt termination, retry the same seed, metadata, sequence and expiry into
+the same absent destination or another new directory, or choose a higher sequence.
+Never restore an older history to reuse a signed sequence. Normal failures remove
+staging; an abrupt stop can leave a hidden tree that the administrator may remove
+after the publisher process has stopped. Retry builds from the workspace, never
+from abandoned staging. Keep client enrollment/replay checks in place as well.
+
+`publish REPOSITORY_DIR ID SEED SEQUENCE EXPIRES` remains the workspace metadata
+command for development and existing callers. It replaces the signature and
+index separately and does not maintain publisher release history or check a
+self-contained dependency closure. Use `publish-release` for distribution.
 
 `pack` inventories ordinary payload files with paths, lengths, SHA-256 and
 executable bits, and copies verified content into the repository. It replaces the

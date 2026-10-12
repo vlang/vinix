@@ -426,6 +426,13 @@ same-size copy corruption, existing files/directories/dangling links, a destinat
 created immediately before publication, and abrupt process exit followed by a
 cache-only retry. CLI and both Linux guests consume signed offline closures on
 clean stores; guest checks include readable objects under ordinary credentials.
+Publisher release fixtures cover reproducible all-architecture metadata,
+per-version dependency closure, explicit consumer license/firmware restrictions,
+private seed/state exclusion, space preflight, changed copies, writer exclusion,
+existing/raced destinations and interrupted publication with retained sequence
+history. CLI and both Linux guests install complete signed release output into
+clean offline stores. `publish-release` is the supported complete-release command;
+the legacy `publish` command still writes workspace metadata separately.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute

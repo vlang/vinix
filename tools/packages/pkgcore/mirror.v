@@ -11,34 +11,6 @@ struct MirrorOptions {
 
 fn mirror_no_checkpoint(_ string, _ string) ! {}
 
-fn check_mirror_parent(parent string) ! {
-	mut path := parent
-	for {
-		info := os.lstat(path)!
-		// A sticky shared directory such as /tmp protects our exclusive child.
-		// Other users must not be able to rename its ancestors or replace it with
-		// a symlink while this administrator writes authenticated objects.
-		if os.is_link(path) || !os.is_dir(path)
-			|| (info.uid != 0 && info.uid != u32(os.geteuid()))
-			|| (info.mode & 0o022 != 0 && info.mode & 0o1000 == 0) {
-			return error('offline mirror parent must be controlled by this administrator; writable shared directories require the sticky bit: ${path}')
-		}
-		if path == '/' { return }
-		path = os.dir(path)
-	}
-}
-
-fn prepare_mirror_parent(path string) !string {
-	mut existing := os.abs_path(path)
-	for !os.exists(existing) && !os.is_link(existing) { existing = os.dir(existing) }
-	if !os.is_dir(existing) { return error('offline mirror parent must be a directory') }
-	check_mirror_parent(os.real_path(existing))!
-	os.mkdir_all(path)!
-	parent := os.real_path(path)
-	check_mirror_parent(parent)!
-	return parent
-}
-
 pub fn mirror(config Config, directory string, destination string, names []string) ! {
 	config.validate()!
 	guard := acquire(directory)!
@@ -86,20 +58,10 @@ fn mirror_space(plan Plan, snapshots []Snapshot, directory string) !(u64, u64) {
 }
 
 fn mirror_export(config Config, directory string, destination string, names []string, options MirrorOptions) ! {
-	if destination == '' || !printable(destination, 4096) || destination.contains('\\') {
-		return error('offline mirror requires a valid destination path')
-	}
-	trimmed := destination.trim_right('/')
-	name := os.file_name(trimmed)
-	if name in ['', '.', '..'] { return error('offline mirror destination must be a new directory') }
-	if os.exists(destination) || os.is_link(destination) {
-		return error('offline mirror destination must be new')
-	}
 	// Create missing parent directories, then place the private tree on the
 	// destination filesystem. No signed index is exposed at the final name yet.
-	parent := prepare_mirror_parent(os.dir(trimmed))!
-	target := parent + '/' + name
-	if os.exists(target) || os.is_link(target) { return error('offline mirror destination must be new') }
+	target := export_target(destination, 'offline mirror')!
+	parent := os.dir(target)
 	catalog := load_catalog(config, directory)!
 	plan := resolve(catalog, config, State{}, names, true)!
 	mut snapshots := []Snapshot{}
@@ -114,13 +76,7 @@ fn mirror_export(config Config, directory string, destination string, names []st
 		disk_check(options.available_space(parent)!, exported, config.policy.reserve_bytes)!
 		if acquired > 0 { disk_check(options.available_space(directory)!, acquired, config.policy.reserve_bytes)! }
 	}
-	mut template := (parent + '/.vinix-mirror-XXXXXX').bytes()
-	template << u8(0)
-	defer { unsafe { template.free() } }
-	if C.mkdtemp(unsafe { &char(template.data) }) == unsafe { nil } {
-		return error('cannot create private offline mirror staging directory')
-	}
-	stage := unsafe { cstring_to_vstring(&char(template.data)).clone() }
+	stage := export_stage(parent, '.vinix-mirror')!
 	mut published := false
 	defer {
 		if !published { os.rmdir_all(stage) or {} }
@@ -152,7 +108,7 @@ fn mirror_export(config Config, directory string, destination string, names []st
 	}
 	flush_tree(stage)!
 	options.checkpoint('ready', stage)!
-	publish_new_directory(stage, target)!
+	publish_new_directory(stage, target, 'offline mirror')!
 	published = true
 	// Publication already happened. A flush error must leave the complete tree
 	// intact and explain the uncertain durability instead of claiming a retry.

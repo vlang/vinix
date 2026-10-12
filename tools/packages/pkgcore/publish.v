@@ -69,7 +69,7 @@ pub fn keygen(path string) !string {
 	return public_key.hex()
 }
 
-pub fn publish(repository string, id string, seed_path string, sequence u64, expires i64) ! {
+fn publication(repository string, id string, seed_path string, sequence u64, expires i64) !(Index, string, string, string) {
 	if !identifier(id) || sequence == 0 || expires <= time.now().unix() {
 		return error('publishing requires a repository ID, positive sequence and future expiry')
 	}
@@ -92,7 +92,13 @@ pub fn publish(repository string, id string, seed_path string, sequence u64, exp
 	text := canonical_index(index)!
 	sig := ed25519.sign(private_key, text.bytes())!.hex()
 	// Run the consumer validation before emitting a signed publication.
-	verify_index(Repository{ id: id, public_key: private_key.public_key().hex() }, text, sig, time.now().unix())!
+	public_key := private_key.public_key().hex()
+	verified := verify_index(Repository{ id: id, public_key: public_key }, text, sig, time.now().unix())!
+	return verified, text, sig, public_key
+}
+
+pub fn publish(repository string, id string, seed_path string, sequence u64, expires i64) ! {
+	_, text, sig, _ := publication(repository, id, seed_path, sequence, expires)!
 	// Publish in a new repository directory, then switch the server's release
 	// directory. Clients reject a torn index/signature pair without changing state.
 	atomic_write(repository + '/index.sig', sig + '\n')!

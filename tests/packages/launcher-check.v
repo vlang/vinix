@@ -22,6 +22,7 @@ fn check() ! {
 	os.cp(repository + '/desktop/tools/tests/package_launcher_test.v', work + '/package_launcher_test.v')!
 	os.cp(repository + '/desktop/tools/tests/heap_tracker.h', work + '/heap_tracker.h')!
 	workflowbuild.test(v, ['-gc', 'none', '-manualfree', '-enable-globals', '-d', 'ui2_headless',
+		'-d', 'no_segfault_handler',
 		'-d', 'track_heap', '-path',
 		'@vlib|' + work + '/modules|@vmodules|' + repository + '|' + repository + '/third_party',
 		work + '/package_launcher_test.v'], work, 'package launchers')!

@@ -105,6 +105,30 @@ fn qualify(binary string) ! {
 		(time.now().unix() + 3600).str()])!
 	first_index := os.read_file(repository + '/index.json')!
 	first_signature := os.read_file(repository + '/index.sig')!
+	expires := json2.decode[pkgcore.Index](first_index)!.expires
+	release_path := work + '/published-release'
+	release := json2.decode[pkgcore.ReleaseInfo](success(binary, ['publish-release', repository,
+		'fixture', work + '/seed', '1', expires.str(), release_path])!)!
+	assert release.format == 1 && release.public_key == key && release.sequence == 1
+	assert release.directory == release_path && release.package_count == 2 && release.object_count == 2
+	assert os.read_file(release_path + '/index.json')! == first_index
+	assert os.read_file(release_path + '/index.sig')! == first_signature
+	assert os.ls(release_path)!.len == 3 && !os.exists(release_path + '/manifests') && !os.exists(release_path + '/.publisher')
+	for numbers in [['18446744073709551616', expires.str()], ['1', '9223372036854775808']] {
+		assert command(binary, ['publish-release', repository, 'fixture', work + '/seed', ...numbers, work + '/overflow'])!.code != 0
+		assert !os.exists(work + '/overflow')
+	}
+	forked_release := command(binary, ['publish-release', repository, 'fixture', work + '/seed', '1', (expires + 1).str(), work + '/fork'])!
+	assert forked_release.code != 0 && forked_release.text.contains('sequence equivocation') && !os.exists(work + '/fork')
+	release_root := work + '/release-client'
+	os.mkdir_all(release_root + '/etc/vinix-packages')!
+	os.write_file(release_root + '/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{
+		architecture: 'aarch64', policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 }
+	}))!
+	success(binary, ['--root', release_root, 'repo-enroll', 'fixture', 'file://' + release_path, key])!
+	success(binary, ['--root', release_root, 'update'])!
+	success(binary, ['--root', release_root, 'install', 'app', 'other'])!
+	assert json2.decode[pkgcore.State](success(binary, ['--root', release_root, '--json', 'verify'])!)!.packages.len == 2
 	mut trust := pkgprotocol.decode_repository_review(success(binary, [...root_args, '--offline', 'repo-review', 'enroll', 'fixture', 'file://' + repository, key])!)!
 	defer { trust.close() }
 	assert trust.sequence == 1 && trust.package_count == 2 && pkgcore.load_config(work + '/root')!.repositories.len == 0

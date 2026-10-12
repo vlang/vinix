@@ -3,6 +3,7 @@ module main
 
 import json2
 import os
+import strconv
 import tools.packages.pkgcore
 
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [ARGS]\n' +
@@ -18,7 +19,8 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
-	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n'
+	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
+	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n'
 
 fn checked(arguments []string) !int {
 	mut args := arguments.clone()
@@ -73,11 +75,19 @@ fn checked(arguments []string) !int {
 			println(json2.encode(pkgcore.pack_root(names[0], names[1], names[2])!))
 			return 0
 		}
-		'publish' {
-			if names.len != 5 || !names[3].bytes().all(it >= `0` && it <= `9`) || !names[4].bytes().all(it >= `0` && it <= `9`) {
-				return error('publish requires repository directory, ID, signing seed, sequence and expiry')
+		'publish', 'publish-release' {
+			count := if command == 'publish' { 5 } else { 6 }
+			if names.len != count || names[3] == '' || names[4] == ''
+				|| !names[3].bytes().all(it >= `0` && it <= `9`) || !names[4].bytes().all(it >= `0` && it <= `9`) {
+				return error('${command} requires repository directory, ID, signing seed, sequence and expiry' + if count == 6 { ' and a new output directory' } else { '' })
 			}
-			pkgcore.publish(names[0], names[1], names[2], names[3].u64(), names[4].i64())!
+			sequence := strconv.parse_uint(names[3], 10, 64)!
+			expires := strconv.parse_int(names[4], 10, 64)!
+			if command == 'publish' {
+				pkgcore.publish(names[0], names[1], names[2], sequence, expires)!
+			} else {
+				println(json2.encode(pkgcore.publish_release(names[0], names[1], names[2], sequence, expires, names[5])!))
+			}
 			return 0
 		}
 		else {}

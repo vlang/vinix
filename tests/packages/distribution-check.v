@@ -12,6 +12,24 @@ fn run(program string, arguments []string) ! {
 	if code != 0 { return error('${program} failed with status ${code}') }
 }
 
+fn check_tests(v string, flags []string, directory string, work string) ! {
+	if '--direct-tests' !in os.args {
+		run(v, [...flags, 'test', directory])!
+		return
+	}
+	// Compile the same assertion runners directly without the cached vtest tool.
+	// Retain declarations to avoid compiler pruning of required crypto SDK types.
+	mut files := os.ls(directory)!.filter(it.ends_with('_test.v'))
+	files.sort()
+	if files.len == 0 { return error('no qualification tests in ${directory}') }
+	for file in files {
+		output := work + '/' + os.file_name(directory) + '-' + file.all_before_last('.v')
+		run(v, [...flags, '-no-skip-unused', '-o', output, directory + '/' + file])!
+		run(output, [])!
+		println('Passed ' + directory + '/' + file)
+	}
+}
+
 fn check() ! {
 	repository := os.dir(os.dir(os.dir(@FILE)))
 	v := os.find_abs_path_of_executable(os.getenv_opt('V') or { 'v' })!
@@ -19,9 +37,9 @@ fn check() ! {
 	work := temporary + '/vinix-distribution-check-' + os.getpid().str()
 	os.mkdir_all(work + '/software')!
 	defer { os.rmdir_all(work) or {} }
-	run(v, ['test', repository + '/tools/packages/pkgcore'])!
-	run(v, ['-gc', 'none', '-manualfree', 'test', repository + '/tools/packages/pkgprotocol'])!
-	run(v, ['-gc', 'none', '-manualfree', 'test', repository + '/desktop/packagecore'])!
+	check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
+	check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
+	check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/desktop/packagecore', work)!
 	run(v, ['-gc', 'none', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
 	run(work + '/vinix-package', ['--help'])!
 	run(v, ['-gc', 'none', '-manualfree', '-o', work + '/cli-check', repository + '/tests/packages/distribution-cli.v'])!
