@@ -46,6 +46,7 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	}
 	if symbol == '___CFConstantStringClassReference' { return ios_runtime.names['NSString'] }
 	if symbol == '_NSLog' { return u64(unsafe { voidptr(C.ios_nslog) }) }
+	if symbol == '_NSGetSizeAndAlignment' { return u64(unsafe { voidptr(ns_get_size_alignment) }) }
 	if symbol == '_NSClassFromString' { return u64(unsafe { voidptr(ns_class_from_string) }) }
 	if symbol == '_NSSelectorFromString' { return u64(unsafe { voidptr(ns_selector_from_string) }) }
 	if symbol == '_NSStringFromSelector' { return u64(unsafe { voidptr(ns_string_from_selector) }) }

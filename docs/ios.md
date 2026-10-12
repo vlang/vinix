@@ -78,7 +78,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases, 144-byte stat records and native `utime` timestamps; version-4 UUIDs from native entropy; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread, `dispatch_once`, main/global/serial dispatch queues, delayed work and synchronous callbacks |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, caller-supplied instance construction and destruction, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
-| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
+| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, immutable NSValue byte/type, pointer, range and geometry boxes, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, dictionary add-if-absent and raw null entries, exported immutable empty dictionary, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
 | Bitmap graphics | Owned RGB/gray colors with full-precision components and equality, RGB/RGBA/BGRA storage, bitmap/image dimensions and data providers, premultiplied source-over fills, clear/clip, saved state and fill color space, axis-aligned translation/scale, nearest/bilinear image drawing; independent image storage and real PNG/JPEG codecs from the V installation's existing stb library |
@@ -3180,17 +3180,66 @@ application objects. Evidence is under `build/ios/fortnite/request-checks`.
 Full regression remains unpassed, the five published runners are unchanged,
 and game entry, rendering and gameplay remain unverified.
 
+`NSValue` now implements immutable public byte/type boxes in V, including
+generic factories and designated initialization, pointer and nonretained-object
+boxes, ranges, points, sizes, CGRect, edge insets and affine transforms. EOS
+imports this class strongly and references `valueWithCGRect:`, `CGRectValue`
+and `objCType`. Typed Catalyst calls verify those CGRect methods and the
+indirect argument/result ABI for six-double affine transforms. Generic boxes
+copy both bytes and their type encoding; immutable copies retain the same
+object. Equality compares the complete encoding and bytes, including structure
+names and padding. Equal boxes have equal hashes; numeric hash reproduction
+from native Foundation is outside this profile.
+
+Installed Foundation reports an 8-byte NSValue base and 24-byte concrete box;
+NSNumber now inherits NSValue while preserving its existing numeric behavior.
+Its raw value getters use the stored boolean, integer or double representation.
+These layouts are measured on macOS/Catalyst, not device iOS private records.
+A designated initializer replaces and consumes the base-class placeholder.
+Pointer and nonretained-object values use `^v` and never own the address.
+`getValue:size:` requires exactly the encoded size: native short and oversized
+destinations both raise NSInvalidArgumentException with recorded status 134.
+
+The bounded encoding parser handles scalar and qualified pointer types,
+arrays, structures, unions and quoted fields; legacy `l`/`L` encodings are
+32-bit even on this 64-bit host, matching the native layout API. It also
+exports `NSGetSizeAndAlignment`. Limits are 512 encoding bytes, nesting depth
+16, 1024 array elements, 128 aggregate fields and a 1 MiB payload. Bitfields,
+opaque aggregate encodings, mutable copies, coding and private bridges remain
+unimplemented. Byte and encoding buffers retire through the existing storage
+destructor even after a class change or caller-storage destruction.
+
+All 61 programs build and 74 original generated C streams restore to their
+recorded hashes. Thirteen host suites pass ASAN/UBSAN in both hashing modes.
+Vinix passes fifteen Objective-C programs and 33 Swift/loader programs.
+Value fixtures cover native layout/copy/equality behavior, both aggregate
+calling conventions, copy associations, 100 class-change release cycles,
+caller storage, two runtime cycles and seven explicit rejection children.
+Generated-code checks confirm one sized byte array and copied encoding per
+initialized box, no parser/equality/size-query scratch allocation, and cleanup
+of both buffers. Failed native, fixture, allocation-audit and production-build
+trials retain their sources, artifacts and actual statuses. The V compiler
+lowers direct one-character C-string integer casts incorrectly; typed pointer
+parameters preserve the address in native probes and fixtures.
+
+Fortnite passes the NSValue binding and exits with status 1 before entry at
+EOS's required `_OBJC_CLASS_$_NSHTTPURLResponse` import. The next-import probe
+verifies the required dependency and reads installed runtime metadata without executing
+application code. Evidence is under `build/ios/fortnite/value-checks`. Full
+regression remains unpassed, the five published runners are unchanged, and
+game entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,425 | 734 | 80 |
-| EOSSDK | 642 | 20 | 18 |
+| Fortnite executable | 1,426 | 733 | 80 |
+| EOSSDK | 643 | 19 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,182 | 815 | 121 |
+| All images | 2,184 | 813 | 121 |
 
-The C++/GLES/Text variant reports 2,195 resolved imports, 802 unresolved strong
+The C++/GLES/Text variant reports 2,197 resolved imports, 800 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

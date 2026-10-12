@@ -57,6 +57,7 @@ fn cf_equal_depth(left u64, right u64, depth int) bool {
 		}
 		return true
 	}
+	if objc_is_kind(left, ios_runtime.names['NSValue']) { return value_equal(left, right) }
 	if read64(left) != read64(right) { return false }
 	info := ios_runtime.classes[read64(left)] or { return false }
 	name := info.name

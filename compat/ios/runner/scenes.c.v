@@ -27,6 +27,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if ns_condition_selector(object, name) { return true }
 	if cookie_selector(object, name) { return true }
 	if request_selector(object, name) { return true }
+	if value_selector(object, name) { return true }
 	webkit := webkit_object_name(object)
 	if native_method(read64(object), name) != 0 { return true }
 	if webkit != '' && object !in ios_runtime.classes && name in ['copy', 'copyWithZone:', 'init'] {
