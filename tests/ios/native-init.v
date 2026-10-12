@@ -86,10 +86,11 @@ fn main() {
 		require_child('/opt/ios/swift-task-priority-checks')
 		require_child('/opt/ios/swift-task-alloc-checks')
 		require_child('/opt/ios/swift-task-create-checks')
+		require_child('/opt/ios/swift-task-switch-checks')
 		require_child('/opt/ios/regression')
 	} else if mode == 'swift' {
 		for name in ['string', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
-			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create'] {
+			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}
 		println('VINIX iOS SWIFT: PASS')

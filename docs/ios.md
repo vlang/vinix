@@ -2544,17 +2544,59 @@ five published runners keep their last passing bytes. Host disk pressure was
 handled with a private RAM volume; final compressed evidence is verified back
 to persistent repository storage before that volume is detached.
 
+V now implements `_swift_task_switch` for a running task switching to the same
+generic executor (`0/0`). The native Swift async ABI passes the opaque frame
+in `x22`, continuation in `x0`, and executor words in `x1/x2`. Native
+disassembly and the official Swift
+[executor implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/Concurrency/Actor.cpp)
+show immediate tail resumption for this case. Vinix validates the current
+registered task and its running phase, releases the runtime lock, restores the
+bridge's stack frame, and tail-branches to the continuation. It keeps current
+task TLS, execution ownership and saved resume slots unchanged; it neither
+reads the opaque context nor allocates on the successful switch path.
+
+Expanded inspection of all twenty framework calls found nineteen generic
+switches and one dynamic Marketplace switch at `a500`. That call obtains its
+executor from `Actor.unownedExecutor`; actor/custom executor switching and
+actual suspension remain unsupported. Continuation bounds, foreign current
+tasks, nonrunning phases and unsupported executor pairs reject before resuming.
+This implementation covers the measured generic path, with further executor
+work still required by the IPA.
+
+Native and V fixtures complete 100,000 consecutive switches with constant C
+stack usage, alternate between task-private frames, and resume an opaque
+context in a protected page. They cover manual and queued jobs, discarded and
+Int futures, completion that frees the final task reference, eight concurrent
+workers, fallback allocator isolation and two drained V lifetimes. All eight
+host sanitizer processes pass in both hash modes. All forty-seven programs
+build. Generated C audits cover every runner/test module; all fifty-one original
+C streams are retained with verified lossless compression.
+
+All twenty-nine Swift checks pass in the Vinix guest. The first guest run
+passed the preceding twenty-eight checks but could not execute the new test
+because the Swift VM packaging list omitted it. The corrected harness passes;
+the failed driver's exact source, statuses, guest payload and serial/config
+are retained. The IPA now passes `_swift_task_switch` and exits with status 1
+before entry at Swift Foundation's
+`_$s10Foundation5NSLogyySS_s7CVarArg_pdtF`, demangled as
+`NSLog(String, CVarArg...)`. Its native export and two EOS call sites are
+captured without invoking that ABI. Both audits resolve three additional
+strong imports. Evidence is under
+`build/ios/fortnite/swift-task-switch-checks`; full regression remains unpassed,
+the candidates stay there, and the five published runners retain their last
+passing bytes. Gameplay remains unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,410 | 749 | 80 |
-| EOSSDK | 617 | 45 | 18 |
-| MarketplaceKitWrapper | 108 | 68 | 23 |
-| All images | 2,135 | 862 | 121 |
+| Fortnite executable | 1,411 | 748 | 80 |
+| EOSSDK | 618 | 44 | 18 |
+| MarketplaceKitWrapper | 109 | 67 | 23 |
+| All images | 2,138 | 859 | 121 |
 
-The C++/GLES/Text variant reports 2,148 resolved imports, 849 unresolved strong
+The C++/GLES/Text variant reports 2,151 resolved imports, 846 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -80,6 +80,14 @@ fn swift_task_emit(code u64, metadata u64) {
 	// A meaningful heap destroyer; swift_release normally takes our registry path.
 	write32(code + 160, 0xaa1403e0); write32(code + 164, 0x58000070); write32(code + 168, 0xd61f0200)
 	unsafe { *(&u64(code + 176)) = u64(voidptr(swift_task_destroy)) }
+	// Async switch (context x22, continuation x0, executor x1/x2) -> ordinary
+	// validation -> tail continuation. Pop the frame before resuming; completion
+	// may free the task and nested switches must not grow the C stack.
+	for i, instruction in [u32(0xa9bf7bfd), 0xaa0203e3, 0xaa0103e2, 0xaa0003e1,
+		0xaa1603e0, 0x580000b0, 0xd63f0200, 0xa8c17bfd, 0xd61f0000]! {
+		write32(code + 192 + u64(i * 4), instruction)
+	}
+	unsafe { *(&u64(code + 232)) = u64(voidptr(swift_task_switch_prepare)) }
 	unsafe {
 		*(&u64(metadata - 24)) = 0
 		*(&u64(metadata - 16)) = code + 160
@@ -97,7 +105,7 @@ fn swift_task_arena() !u64 {
 	if code == unsafe { voidptr(-1) } { return error('iOS: cannot allocate Swift task entries') }
 	base := u64(code)
 	swift_task_emit(base, base + u64(page) + 32)
-	C.__builtin___clear_cache(code, unsafe { voidptr(base + 184) })
+	C.__builtin___clear_cache(code, unsafe { voidptr(base + 240) })
 	if C.mprotect(code, page, C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(base + u64(page)) }, page, C.PROT_READ) != 0 {
 		C.munmap(code, page * 2)
@@ -393,6 +401,7 @@ fn swift_task_create_symbol(symbol string) !u64 {
 		'_swift_task_create' { u64(voidptr(swift_task_create)) }
 		'_swift_task_getCurrent' { u64(voidptr(swift_task_current)) }
 		'_swift_job_run' { u64(voidptr(swift_task_run)) }
+		'_swift_task_switch' { swift_task_arena()! + 192 }
 		else { return error('iOS: Swift task creation symbol is not implemented') }
 	}
 }

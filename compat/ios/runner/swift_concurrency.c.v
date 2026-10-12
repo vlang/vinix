@@ -36,7 +36,7 @@ fn swift_concurrency_entry(offset u64) !u64 {
 }
 
 fn swift_concurrency_symbol(symbol string) !u64 {
-	if symbol in ['_swift_task_create', '_swift_task_getCurrent', '_swift_job_run'] {
+	if symbol in ['_swift_task_create', '_swift_task_getCurrent', '_swift_job_run', '_swift_task_switch'] {
 		return swift_task_create_symbol(symbol)
 	}
 	if symbol in ['_swift_task_alloc', '_swift_task_dealloc'] {
