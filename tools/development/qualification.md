@@ -1,0 +1,53 @@
+# Developer workload qualification
+
+`vinix-qualify` builds and executes small real projects using installed tools.
+It records OS/architecture, UID, the runner hash and each invoked executable's
+hash, argv, exit status and log. The output distinguishes `passed`, `failed` and
+`unsupported`; any selected profile that does not pass makes the command exit 1.
+It never reports a startup/version check as a completed project.
+
+```
+v -gc none -cc gcc -o vinix-qualify tools/development/qualify.v
+./vinix-qualify --require-vinix /home/developer/new-results
+./vinix-qualify --require-vinix /home/developer/cpp-results c,cpp,v,make,cmake,ninja
+```
+
+Each output directory must be new. The runner gives each project a private
+HOME, temporary directory and package-manager cache, with a fixed build epoch.
+Cargo and npm use offline operation, and Go disables proxy and checksum-service
+downloads. No system package is installed. Compiler invocations and test
+executables use bounded owned child processes. Logs remain private under the
+result directory; inherited environment credentials are omitted.
+
+| Profile | Workflow |
+| --- | --- |
+| C / C++ | Compile with symbols, create/join a thread, use collections (C++), write and read back a file, execute the resulting binary. |
+| V | Compile the project with the installed native C compiler, use an array, write/read a file and execute the exact binary. |
+| Rust / Cargo | Compile or build offline, run a thread, use a vector, write/read a file and execute the exact binary. |
+| Go | Build, communicate with a goroutine through a channel, write/read a file and execute the exact binary. |
+| Java | Compile, create an executable JAR, run it, join a thread and write/read a file. |
+| JavaScript / TypeScript | Run Node file/crypto checks; compile strict typed code with tsc and execute its JavaScript. |
+| GNU make / CMake / Ninja | Build and execute the same C thread/file project through each build system. |
+| npm | Pack a local dependency, install its archive offline with scripts disabled, and resolve it from the real Node project. |
+| GDB | Compile a child with symbols, break at main, run, obtain a source-level backtrace and continue to the success marker. No attach to another user's process or permission override. |
+| SQLite | Commit and roll back transactions, reopen the database, check integrity and validate the retained row. |
+
+`--require-vinix` rejects a host OS before creating output. Without it, host
+checks are labelled `host-only`. An unsupported tool remains an open gate; a
+failing native debugger does too. This suite adds repeatable compiler/project
+coverage, not complete IDE, package ecosystem, profiler or production-server
+qualification. Existing [Go](../../tests/go/README.md), [Java](../../tests/java/README.md),
+[developer-tool](../../tests/developer-tools/README.md) and
+[Linux application](../../docs/linux-posix-qualification.md) suites provide
+additional coverage at their recorded revisions.
+
+Python and Python-based build tooling, including Meson, are not executed by this
+runner because the repository requires V tooling and forbids running Python.
+Their roadmap qualification remains open. Native ptrace/core dumping, kernel
+stack sampling, rootless user/network namespace semantics and hardware-backed
+Vinix VM hosting also remain open; this runner never changes authorization or
+uses a sandbox-disable flag to turn one of those into a pass.
+
+Run host integration checks with `v -cc cc test tools/development/qualcore`.
+The host receipt is separate from a guest receipt and cannot satisfy an installed
+Vinix acceptance gate.
