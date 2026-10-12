@@ -37,6 +37,7 @@ fn dispatch(family string, args []string) !int {
 		'mapped' { mapped(args)! }
 		'journal' { journal(args)! }
 		'mounted' { mounted(args)! }
+		'external' { external(args)! }
 		'reboot' { reboot(args)! }
 		else { return error('Unknown disk runner') }
 	}

@@ -15,7 +15,22 @@ __global (
  block_filesystems [256]BlockFilesystemRegistration
  block_filesystems_count int
  block_filesystems_lock klock.Lock
+ block_probe fn (string, &VFSNode) ?&FileSystem = unsafe { nil }
+ block_probe_lock klock.Lock
 )
+
+// The driver lives above fs and installs its probe once during V initialization.
+// Serialize cache creation so two first mounts cannot create competing caches.
+pub fn register_block_probe(probe fn (string, &VFSNode) ?&FileSystem) {
+ block_probe = probe
+}
+
+fn probe_block_filesystem(kind string, source &VFSNode) ?&FileSystem {
+ block_probe_lock.acquire()
+ defer { block_probe_lock.release() }
+ if block_probe == unsafe { nil } { return none }
+ return block_probe(kind, source)
+}
 
 // Boot-detected volumes retain their own cache and backing resource. Select
 // by the actual resource and its exact physical extent, rather than a global

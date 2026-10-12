@@ -186,10 +186,12 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 				&& partition_entry.partition_type_guid[1] == 0 {
 				continue
 			}
+			sectors := gpt_sector_count(partition_entry.starting_lba, partition_entry.last_lba,
+				u64(parent_device.stat.size) / u64(parent_device.stat.blksize)) or { continue }
 
 			mut partition := &Partition{
 				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
-				sector_cnt:    partition_entry.last_lba - partition_entry.starting_lba
+				sector_cnt:    sectors
 				parent_device: unsafe { parent_device }
 			}
 

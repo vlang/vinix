@@ -3,6 +3,9 @@
 Run the production block-tree and inode read/write/resize algorithms against
 fault-injected backing storage:
 
+The native V host runner also checks Linux-created ext2/ext4 images and GPT
+geometry; e2fsprogs is required. See [external mount tests](../ext-mount/README.md).
+
 ```sh
 V=/path/to/v sh tests/ext2-sparse/run-host.sh
 V=/path/to/v VINIX_HOST_SANITIZE=1 ASAN_OPTIONS=detect_leaks=0 \

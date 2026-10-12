@@ -537,6 +537,7 @@ pub mut:
 	block_size u64
 	frag_size  u64
 	bgd_cnt    u64
+	descriptor_size u64 = 32
 
 	backing_device &vfs.VFSNode
 	cache          &pagecache.Cache = unsafe { nil }
@@ -720,11 +721,12 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 		l: bro.l
 		journal: bro.journal
 		read_only: bro.read_only
+		descriptor_size: bro.descriptor_size
 	}
 
-	this.block_size = 1024 << this.superblock.block_size
-	this.frag_size = 1024 << this.superblock.frag_size
-	this.bgd_cnt = lib.div_roundup(this.superblock.block_cnt, this.superblock.blocks_per_group)
+	this.block_size = bro.block_size
+	this.frag_size = bro.frag_size
+	this.bgd_cnt = bro.bgd_cnt
 
 	device := vfs.pathname(this.backing_device)
 	C.kprintf(c'ext2: filesystem detected on device %.*s\n', i32(device.len), device.str)
@@ -740,9 +742,15 @@ fn (mut bro EXT2Filesystem) instantiate() &vfs.FileSystem {
 	this.root_inode.read_entry(mut this, 2) or {
 		this.l.release()
 		print('ext2: unable to read root inode\n')
-		return this
+		memory.free(this)
+		return unsafe { nil }
 	}
 	this.l.release()
+	if !stat.isdir(u32(this.root_inode.permissions)) {
+		errno.set(errno.eio)
+		memory.free(this)
+		return unsafe { nil }
+	}
 
 	return this
 }
@@ -1141,6 +1149,7 @@ fn (mut filesystem EXT2Filesystem) free_inode(inode u32) ?int {
 }
 
 fn (mut bgd EXT2BlockGroupDescriptor) read_entry(mut filesystem EXT2Filesystem, bgd_index u32) int {
+	if u64(bgd_index) >= filesystem.bgd_cnt { errno.set(errno.eio); return -1 }
 	mut bgd_offset := u64(0)
 
 	if filesystem.block_size >= 2048 {
@@ -1149,9 +1158,17 @@ fn (mut bgd EXT2BlockGroupDescriptor) read_entry(mut filesystem EXT2Filesystem, 
 		bgd_offset = filesystem.block_size * 2
 	}
 
-	filesystem.raw_device_read(voidptr(unsafe { &bgd }), bgd_offset + sizeof(EXT2BlockGroupDescriptor) * bgd_index, sizeof(EXT2BlockGroupDescriptor)) or {
+	position := bgd_offset + filesystem.descriptor_size * u64(bgd_index)
+	filesystem.raw_device_read(voidptr(unsafe { &bgd }), position, sizeof(EXT2BlockGroupDescriptor)) or {
 		print('ext2: unable to read bgd entry\n')
 		return -1
+	}
+	if filesystem.descriptor_size >= 64 {
+		high := unsafe { &u8(C.vinix_stack_alloc(12)) }
+		filesystem.raw_device_read(high, position + 32, 12) or { return -1 }
+		if disk_u32(high, 0) != 0 || disk_u32(high, 4) != 0 || disk_u32(high, 8) != 0 {
+			errno.set(errno.eio); return -1
+		}
 	}
 
 	return 0
@@ -1263,6 +1280,9 @@ fn (mut filesystem EXT2Filesystem) write_superblock() ? {
 }
 
 fn (mut inode EXT2Inode) read_entry(mut filesystem EXT2Filesystem, inode_index u32) ?int {
+	if inode_index == 0 || inode_index > filesystem.superblock.inode_cnt {
+		errno.set(errno.eio); return none
+	}
 	inode_table_index := (inode_index - 1) % filesystem.superblock.inodes_per_group
 	bgd_index := (inode_index - 1) / filesystem.superblock.inodes_per_group
 
@@ -1273,7 +1293,12 @@ fn (mut inode EXT2Inode) read_entry(mut filesystem EXT2Filesystem, inode_index u
 		return none
 	}
 
-	filesystem.raw_device_read(unsafe { voidptr(&inode) }, bgd.inode_table_block * filesystem.block_size + filesystem.superblock.inode_size * inode_table_index, sizeof(EXT2Inode)) or {
+	position := u64(bgd.inode_table_block) * filesystem.block_size + u64(filesystem.superblock.inode_size) * inode_table_index
+	if bgd.inode_table_block == 0 || bgd.inode_table_block >= filesystem.superblock.block_cnt
+		|| position + sizeof(EXT2Inode) > u64(filesystem.superblock.block_cnt) * filesystem.block_size {
+		errno.set(errno.eio); return none
+	}
+	filesystem.raw_device_read(unsafe { voidptr(&inode) }, position, sizeof(EXT2Inode)) or {
 		print('ext2: unable to read inode entry\n')
 		return none
 	}
@@ -1305,6 +1330,7 @@ fn (mut inode EXT2Inode) write_entry(mut filesystem EXT2Filesystem, inode_index 
 // inspect what is on it first, and publish it only if it is a system.
 pub fn ext2_root(mut filesystem EXT2Filesystem) ?&vfs.VFSNode {
 	mut instance := filesystem.instantiate()
+	if instance == unsafe { nil } { return none }
 	mut root := instance.mount(unsafe { nil }, '', unsafe { nil })?
 	// A root's parent is itself, so `..` at the top of the tree stays inside it.
 	root.create_dotentries(root)
@@ -1312,14 +1338,34 @@ pub fn ext2_root(mut filesystem EXT2Filesystem) ?&vfs.VFSNode {
 }
 
 pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
-	mut cached := vfs.block_filesystem('ext2', backing_device)
+	return init_volume(backing_device, false)
+}
+
+fn init() {
+	vfs.register_block_probe(probe_volume)
+}
+
+fn probe_volume(kind string, backing_device &vfs.VFSNode) ?&vfs.FileSystem {
+	mut filesystem, ok := init_volume(backing_device, kind == 'ext4')
+	if !ok { return none }
+	return filesystem.as_filesystem()
+}
+
+fn init_volume(backing_device &vfs.VFSNode, ext4 bool) (&EXT2Filesystem, bool) {
+	kind := if ext4 { 'ext4' } else { 'ext2' }
+	mut cached := vfs.block_filesystem(kind, backing_device)
 	if cached != unsafe { nil } {
 		if mut cached is EXT2Filesystem { return cached, true }
+	}
+	other := vfs.block_filesystem(if ext4 { 'ext2' } else { 'ext4' }, backing_device)
+	if other != unsafe { nil } {
+		errno.set(errno.ebusy); return 0, false
 	}
 	sector_size := u64(backing_device.resource.stat.blksize)
 	if sector_size == 0 || sector_size > pagecache.page_bytes
 		|| pagecache.page_bytes % sector_size != 0 || backing_device.resource.stat.size < 2048
 		|| u64(backing_device.resource.stat.size) % sector_size != 0 {
+		errno.set(errno.einval)
 		return 0, false
 	}
 	reserve_bounce()
@@ -1329,7 +1375,7 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 		superblock: &EXT2Superblock{}
 		root_inode: &EXT2Inode{}
 		cache: pagecache.new_cache(u64(backing_device.resource.stat.size))
-		read_only: resource_mod.backend_is_read_only(mut backend)
+		read_only: ext4 || resource_mod.backend_is_read_only(mut backend)
 	}
 	mut ready := false
 	defer {
@@ -1348,37 +1394,34 @@ pub fn ext2_init(backing_device &vfs.VFSNode) (&EXT2Filesystem, bool) {
 	volume_lock := memory.calloc(sizeof(klock.Lock), 1) @[freed]
 	if volume_lock == unsafe { nil } { return 0, false }
 	new_filesystem.l = unsafe { &klock.Lock(volume_lock) }
-	new_filesystem.journal = journal.open(voidptr(new_filesystem), journal_load,
-		journal_store, journal_barrier, journal_publish,
-		u64(backing_device.resource.stat.size), !new_filesystem.read_only) or { return 0, false }
-	new_filesystem.raw_device_read(new_filesystem.superblock, 1024, sizeof(EXT2Superblock)) or { return 0, false }
+	if !ext4 {
+		new_filesystem.journal = journal.open(voidptr(new_filesystem), journal_load,
+			journal_store, journal_barrier, journal_publish,
+			u64(backing_device.resource.stat.size), !new_filesystem.read_only) or { return 0, false }
+	}
+	superblock_data := unsafe { &u8(C.vinix_stack_alloc(1024)) }
+	new_filesystem.raw_device_read(superblock_data, 1024, 1024) or { return 0, false }
+	unsafe { C.memcpy(new_filesystem.superblock, superblock_data, sizeof(EXT2Superblock)) }
 	signature := new_filesystem.superblock.signature
 	if (signature != 0xef53 && signature != journaled_signature)
 		|| (signature == journaled_signature) != (new_filesystem.journal != unsafe { nil })
-		|| new_filesystem.superblock.req_features & ~u32(2) != 0
-		|| new_filesystem.superblock.opt_features & u32(4) != 0 { return 0, false }
-	if new_filesystem.superblock.block_size > 2 { return 0, false }
-	block_bytes := u64(1024) << new_filesystem.superblock.block_size
-	if new_filesystem.superblock.version_maj == 0 { new_filesystem.superblock.inode_size = 128 }
-	inode_bytes := u64(new_filesystem.superblock.inode_size)
-	if inode_bytes < sizeof(EXT2Inode) || inode_bytes > block_bytes
-		|| inode_bytes & (inode_bytes - 1) != 0
-		|| new_filesystem.superblock.blocks_per_group == 0
-		|| new_filesystem.superblock.blocks_per_group > block_bytes * 8
-		|| new_filesystem.superblock.inodes_per_group == 0
-		|| new_filesystem.superblock.inodes_per_group > block_bytes * 8
-		|| u64(new_filesystem.superblock.block_cnt) * block_bytes > u64(backing_device.resource.stat.size) { return 0, false }
-	new_filesystem.block_size = block_bytes
-	new_filesystem.frag_size = block_bytes
-	new_filesystem.bgd_cnt = lib.div_roundup(new_filesystem.superblock.block_cnt, new_filesystem.superblock.blocks_per_group)
+		|| (ext4 && signature != 0xef53) { errno.set(errno.einval); return 0, false }
+	layout := volume_layout(mut new_filesystem.superblock, superblock_data,
+		u64(backing_device.resource.stat.size), ext4) or { return 0, false }
+	new_filesystem.read_only = new_filesystem.read_only || layout.read_only
+	new_filesystem.block_size = layout.block_bytes
+	new_filesystem.frag_size = layout.block_bytes
+	new_filesystem.descriptor_size = layout.descriptor_bytes
+	new_filesystem.bgd_cnt = lib.div_roundup(new_filesystem.superblock.block_cnt - new_filesystem.superblock.sb_block,
+		new_filesystem.superblock.blocks_per_group)
 	if new_filesystem.journal != unsafe { nil } {
-		if new_filesystem.journal.volume_bytes != u64(new_filesystem.superblock.block_cnt) * block_bytes
+		if new_filesystem.journal.volume_bytes != u64(new_filesystem.superblock.block_cnt) * layout.block_bytes
 			|| new_filesystem.journal.uuid != new_filesystem.superblock.uuid { return 0, false }
 		new_filesystem.recover_orphans() or { return 0, false }
 	}
 	if !register_mapped_writeback()
 		|| !new_filesystem.register_volume_cache() { return 0, false }
-	vfs.register_block_filesystem('ext2', backing_device, new_filesystem.as_filesystem(),
+	vfs.register_block_filesystem(kind, backing_device, new_filesystem.as_filesystem(),
 		new_filesystem.block_identity())
 	ready = true
 	return new_filesystem, true

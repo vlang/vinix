@@ -45,6 +45,9 @@ fn (filesystem &EXT2Filesystem) block_path(logical u32) ?(int, int, [3]u32) {
 }
 
 fn (mut inode EXT2Inode) get_block(mut filesystem EXT2Filesystem, logical u32) ?u32 {
+	if inode.flags & ext4_inode_extents != 0 {
+		return inode.extent_block(mut filesystem, logical)
+	}
 	root, depth, indices := filesystem.block_path(logical)?
 	mut block := inode.blocks[root]
 	value := unsafe { &u32(C.vinix_stack_alloc(sizeof(u32))) }

@@ -476,7 +476,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	mut block_token := -1
 	mut block_committed := false
 	defer { security.finish_block_mount(block_token, block_committed) }
-	if kind !in filesystems && kind !in ['overlay', 'ext2'] {
+	if kind !in filesystems && kind !in ['overlay', 'ext2', 'ext4'] {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -499,7 +499,7 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 			return none
 		}
 	}
-	if kind == 'ext2' && (source_node == unsafe { nil }
+	if kind in ['ext2', 'ext4'] && (source_node == unsafe { nil }
 		|| !stat.isblk(source_node.resource.stat.mode)) {
 		errno.set(errno.enotblk)
 		return none
@@ -565,17 +565,41 @@ fn new_mount(parent &VFSNode, source string, target string, fstype string, flags
 	} else {
 		// Reserve on the actual template before instantiate reads backing
 		// metadata or allocates an instance. EXT2 clones this exact device.
-		mut template := if kind == 'ext2' { block_filesystem(kind, source_node) } else { unsafe { filesystems[kind] } }
+		mut template := if kind in ['ext2', 'ext4'] { block_filesystem(kind, source_node) } else { unsafe { filesystems[kind] } }
+		if kind in ['ext2', 'ext4'] {
+			block_token = begin_block_device_mount(source_node) or {
+				unsafe { basename.free() }
+				return none
+			}
+			if template == unsafe { nil } {
+				template = probe_block_filesystem(kind, source_node) or {
+					unsafe { basename.free() }
+					return none
+				}
+			}
+		}
 		if template == unsafe { nil } {
 			errno.set(errno.einval)
 			unsafe { basename.free() }
 			return none
 		}
-		block_token = begin_filesystem_block_mount(mut template) or {
+		if kind in ['ext2', 'ext4'] {
+			// The registered template retains its cache even if constructing
+			// the root below fails. Keep its backing extent protected too:
+			// raw writes or reconfiguration would otherwise stale that cache.
+			block_committed = true
+		}
+		if kind !in ['ext2', 'ext4'] {
+			block_token = begin_filesystem_block_mount(mut template) or {
+				unsafe { basename.free() }
+				return none
+			}
+		}
+		mut f_sys := unsafe { template.instantiate() }
+		if f_sys == unsafe { nil } {
 			unsafe { basename.free() }
 			return none
 		}
-		mut f_sys := unsafe { template.instantiate() }
 		mount_node = f_sys.mount(parent_of_tgt_node, basename, source_node) or {
 			unsafe { basename.free() }
 			return none

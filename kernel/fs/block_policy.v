@@ -16,6 +16,23 @@ mut:
 	backend BlockBackedFilesystem
 }
 
+// First mounts must reserve the source before the probe can replay a native
+// journal or create a cache. The device may also be an aliased partition.
+fn begin_block_device_mount(source &VFSNode) ?int {
+	mut backend := source.resource
+	for {
+		identity := resource.block_identity(mut backend)
+		if identity.disk_id == 0 && identity.start == 0 && identity.length == 0 { return -1 }
+		token := security.begin_block_mount(identity) or {
+			if identity != resource.block_identity(mut backend) { continue }
+			return none
+		}
+		if identity == resource.block_identity(mut backend) { return token }
+		security.finish_block_mount(token, false)
+	}
+	return none
+}
+
 fn begin_filesystem_block_mount(mut filesystem FileSystem) ?int {
 	if filesystem is BlockBackedFilesystem {
 		mut call := unsafe { &BlockFilesystemCall(C.vinix_stack_alloc(sizeof(BlockFilesystemCall))) }
