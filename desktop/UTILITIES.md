@@ -239,13 +239,14 @@ not proposed as general Vinix utility ports.
   Copy is limited to 64 KiB and shows success only after the compositor
   acknowledges it; unavailable, invalid or failed copies preserve the guest
   clipboard. It does not write the host clipboard.
-- **Terminal:** click Find, type an exact query, use the arrows or Enter to
-  advance, and Escape to return keyboard input to the shell. Matches are
-  physical output rows, including scrollback; Clear scrollback keeps the
+- **Terminal:** right-click output and choose Find, type an exact query, use
+  the arrows or Enter to advance, and Escape to return keyboard input to the
+  shell. Matches are physical output rows, including scrollback;
+  Clear scrollback keeps the
   current terminal screen. Drag over output to select UTF-8 cells, then choose
-  Copy or Cmd-C. Selection covers physical rows, including the alternate
-  screen; copied rows are separated by newlines rather than joined into
-  logical wrapped lines. Copies are bounded to 64 KiB and acknowledged by the
+  Copy from the context menu or Cmd-C. Selection covers physical rows,
+  including the alternate screen; copied rows are separated by newlines rather
+  than joined into logical wrapped lines. Copies are bounded to 64 KiB and acknowledged by the
   guest clipboard service; oversized copies are refused without truncation.
   When keyboard input is directed to the shell, Ctrl-C reaches the PTY for
   the shell/program to handle as an interrupt.
@@ -254,9 +255,9 @@ not proposed as general Vinix utility ports.
   including backwards. Words use Unicode letters/numbers, underscore and common
   combining marks; whitespace forms runs, punctuation/symbols select one cell.
   Recognition uses successive clicks within 500 ms and five pixels. Wrapped
-  output remains separate physical rows. Choose Block in the toolbar for a
-  rectangle across physical rows; short or blank rows are padded with spaces
-  to the selected width. Copies preserve internal spaces and UTF-8 cells,
+  output remains separate physical rows. Choose Text/Block in the context menu
+  for a rectangle across physical rows; short or blank rows are padded with
+  spaces to the selected width. Copies preserve internal spaces and UTF-8 cells,
   insert newlines between rows and omit a
   final newline. Block mode uses single-click dragging; Text restores word/row
   gestures. Switching modes clears selection and copy feedback. Modifier-key

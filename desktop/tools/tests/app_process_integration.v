@@ -68,6 +68,14 @@ fn main() {
 		run_app_process(options)
 		return
 	}
+	if arguments().contains('--terminal-integration') {
+		desktop_ignore_broken_pipe()
+		mut desktop := Desktop{}
+		check_terminal_word_line_client(mut desktop)
+		check_terminal_block_client(mut desktop)
+		desktop.clipboard.close_request()
+		return
+	}
 	if arguments().contains('--prepare-precision-gui') {
 		image := integration_resize_source()
 		defer { unsafe { image.free() } }
@@ -1082,11 +1090,13 @@ fn check_terminal_block_client(mut desktop Desktop) {
 	app.handle(terminal_action_copy) or { panic(err) }
 	integration_assert_clipboard(&desktop, 'caf\xc3\xa9\n    \nZ   ')
 	app.handle(terminal_action_selection_mode) or { panic(err) }
+	if mut app is RemoteApp { app.pointer_event(.down, .right, 0, 550, 310, 560, 316) }
 	text := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
 	mode := integration_element_named(text, terminal_action_selection_mode) or { panic('missing selection mode') }
 	assert !mode.checked && mode.text == tr('terminal.selection.text')
 	assert !integration_tree_enabled(text, terminal_action_copy)
 	free_tree(text)
+	app.handle(terminal_action_context_dismiss) or { panic(err) }
 	if mut app is RemoteApp {
 		for _ in 0 .. 2 {
 			app.pointer_event(.down, .left, 0, terminal_padding + 8 * terminal_column_width, first_y, 560, 316)
@@ -1300,8 +1310,8 @@ fn integration_wait_terminal_prompt(mut app NativeApp) {
 		tree := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
 		mut matched := false
 		for child in tree.children {
-			if child.kind != .label || int(child.frame.y) < terminal_toolbar_height + terminal_padding
-				|| int(child.frame.y) >= 316 - terminal_selection_status_height
+			if child.kind != .label || int(child.frame.y) < terminal_padding
+				|| int(child.frame.y) >= 316
 				|| child.text.len <= 1 || !child.text.ends_with('_') { continue }
 			next_y := int(child.frame.y)
 			prompt_stable = if next_y == prompt_y && child.text == prompt { prompt_stable + 1 } else { 1 }
@@ -1364,7 +1374,7 @@ fn check_terminal_word_line_client(mut desktop Desktop) {
 			if line.len > 0 { unsafe { line.free() } }
 			line = next_line
 			y = next_y
-			assert y + terminal_row_height < 316 - terminal_selection_status_height
+			assert y + terminal_row_height < 316
 			matched = true
 			found = stable >= 3
 			break
@@ -1389,12 +1399,21 @@ fn check_terminal_word_line_client(mut desktop Desktop) {
 			app.pointer_event(.down, .left, 0, x, y, 560, 316)
 			app.pointer_event(.up, .left, 0, x, y, 560, 316)
 		}
+		app.pointer_event(.down, .right, 0, x, y, 560, 316)
+		app.pointer_event(.up, .right, 0, x, y, 560, 316)
 	}
+	menu := app.build(ui2.rect(0, 0, 560, 316)) or { panic(err) }
+	assert tree_has_id(menu, terminal_action_context_panel)
+	for action in [terminal_action_find, terminal_action_copy, terminal_action_selection_mode,
+		terminal_action_clear_history]! { assert tree_has_id(menu, action) }
+	assert integration_tree_enabled(menu, terminal_action_copy)
+	assert !tree_has_id(menu, 'term.selection.status')
+	free_tree(menu)
 	app.handle(terminal_action_copy) or { panic(err) }
 	integration_assert_clipboard(&desktop, word)
 	if mut app is RemoteApp {
 		// A different button resets the click sequence before three new clicks.
-		app.pointer_event(.down, .right, 0, x, y, 560, 316)
+		app.pointer_event(.down, .middle, 0, x, y, 560, 316)
 		for _ in 0 .. 3 {
 			app.pointer_event(.down, .left, 0, x, y, 560, 316)
 			app.pointer_event(.up, .left, 0, x, y, 560, 316)
@@ -1405,7 +1424,7 @@ fn check_terminal_word_line_client(mut desktop Desktop) {
 	assert desktop.clipboard.set_local_text('Cmd-C must replace this text')
 	if mut app is RemoteApp { app.key_input(terminal_key_cmd_copy) }
 	integration_assert_clipboard(&desktop, line)
-	println('IPC Terminal double-click Unicode word, triple-click physical line and Cmd-C clipboard passed')
+	println('IPC Terminal context menu Copy, double-click Unicode word, triple-click physical line and Cmd-C clipboard passed')
 }
 
 fn integration_element_named(element ui2.Element, id string) ?ui2.Element {

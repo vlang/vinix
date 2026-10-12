@@ -139,6 +139,10 @@ mut:
 	scroll int
 	search_query []u8
 	search_open bool
+	search_focused bool = true
+	context_open bool
+	context_x int
+	context_y int
 	search_match int = -1
 	search_pending [4]u8
 	search_pending_len int
@@ -1283,12 +1287,17 @@ fn replaced_terminal_text(old string, next string) string {
 // Feed keystrokes directly to the PTY master. DEL is the slave's default
 // VERASE, so normalize the desktop keyboard's Backspace byte to it.
 fn (mut a TerminalApp) key_input(text string) {
-	if a.search_open { a.search_input(text); return }
+	if a.context_open {
+		a.context_open = false
+		if text == '\x1b' { return }
+	}
+	if a.search_open && a.search_focused { a.search_input(text); return }
 	a.selection_key_input(text)
 }
 
 fn (mut a TerminalApp) paste_input(text string) {
-	if a.search_open { a.paste_search(text); return }
+	a.context_open = false
+	if a.search_open && a.search_focused { a.paste_search(text); return }
 	// Paste is literal shell input. A pending shortcut fragment precedes it;
 	// pasted CSI-u text is never interpreted as Copy.
 	a.flush_copy_key()
@@ -1338,11 +1347,15 @@ fn (mut a TerminalApp) close_app() {
 fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
-	if a.view_width != width || a.view_height != height { a.clear_selection() }
+	if a.view_width != width || a.view_height != height {
+		a.clear_selection()
+		a.context_open = false
+	}
 	a.view_width = width
 	a.view_height = height
-	a.visible_rows = if height > terminal_toolbar_height + terminal_selection_status_height + 2 * terminal_padding + terminal_row_height {
-		(height - terminal_toolbar_height - terminal_selection_status_height - 2 * terminal_padding) / terminal_row_height
+	top := a.content_top()
+	a.visible_rows = if height > top + 2 * terminal_padding + terminal_row_height {
+		(height - top - 2 * terminal_padding) / terminal_row_height
 	} else {
 		1
 	}
@@ -1373,7 +1386,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 	first := a.lines.len - a.scroll
 
 	mut children := frame_elements(a.visible_rows * 2 + 10)
-	a.build_search_toolbar(mut children, width)
+	a.build_search_bar(mut children, width)
 	for row in 0 .. a.visible_rows {
 		index := first + row
 		text := if !a.alternate_screen && index < a.lines.len {
@@ -1382,7 +1395,7 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 			screen_row := if a.alternate_screen { row } else { index - a.lines.len }
 			a.rendered_row(screen_row)
 		}
-		row_y := terminal_toolbar_height + terminal_padding + row * terminal_row_height
+		row_y := top + terminal_padding + row * terminal_row_height
 		if a.search_open && a.search_match == (if a.alternate_screen { row } else { index }) {
 			children << ui2.view('', ui2.rect(f64(terminal_padding), f64(row_y), f64(width - 2 * terminal_padding), f64(terminal_row_height)),
 				ui2.BoxStyle{ bg: terminal_button }, [])
@@ -1396,32 +1409,15 @@ fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {
 		})
 	}
 
-	if max_scroll > 0 {
-		button := 18
-		right := width - terminal_padding - button
-		children << ui2.button(terminal_action_scroll_up, '-', ui2.rect(f64(right - button - 4), f64(terminal_toolbar_height + terminal_padding), f64(button), 18), ui2.BoxStyle{
-			bg:     terminal_button
-			radius: 4
-		}, ui2.TextStyle{
-			color: terminal_text
-			size:  12
-			align: .center
-		})
-		children << ui2.button(terminal_action_scroll_down, '+', ui2.rect(f64(right), f64(terminal_toolbar_height + terminal_padding), f64(button), 18), ui2.BoxStyle{
-			bg:     terminal_button
-			radius: 4
-		}, ui2.TextStyle{
-			color: terminal_text
-			size:  12
-			align: .center
-		})
-	}
-	a.build_selection_status(mut children, width, height)
+	a.build_context_menu(mut children, width, height)
 
 	return ui2.screen(terminal_bg, children)
 }
 
 fn (mut a TerminalApp) handle(event_id string) ! {
+	if event_id == terminal_action_context_panel { return }
+	a.context_open = false
+	if event_id == terminal_action_context_dismiss { return }
 	if event_id == terminal_action_copy { a.copy_selection(); return }
 	if event_id == terminal_action_selection_mode { a.toggle_selection_mode(); return }
 	if a.handle_search(event_id) { return }

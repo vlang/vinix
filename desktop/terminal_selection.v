@@ -7,7 +7,6 @@ import encoding.utf8
 
 const terminal_action_copy = 'term.selection.copy'
 const terminal_action_selection_mode = 'term.selection.mode'
-const terminal_selection_status_height = 22
 const terminal_key_cmd_copy = '\x1b[99;9u'
 const terminal_key_cmd_copy_caps = '\x1b[67;9u'
 const terminal_selection_click_interval_ms = u64(500)
@@ -77,10 +76,6 @@ fn (mut a TerminalApp) toggle_selection_mode() {
 	// The next mode starts with fresh copy feedback. Transferred snapshots are
 	// owned by IPC; close releases only packets still owned by this client.
 	a.copy_client.close()
-}
-
-fn (a &TerminalApp) selection_hint_key() string {
-	return if a.selection_block { 'terminal.selection.block.hint' } else { 'terminal.selection.hint' }
 }
 
 fn terminal_selection_click_near(previous TerminalSelectionClick, x int, y int) bool {
@@ -181,7 +176,7 @@ fn (a &TerminalApp) selection_row_cells(row int) int {
 }
 
 fn (a &TerminalApp) pointer_selection_point(x int, y int) TerminalSelectionPoint {
-	visible := terminal_clamp((y - terminal_toolbar_height - terminal_padding) / terminal_row_height, 0, a.visible_rows - 1)
+	visible := terminal_clamp((y - a.content_top() - terminal_padding) / terminal_row_height, 0, a.visible_rows - 1)
 	row := if a.alternate_screen { visible } else { a.lines.len - a.scroll + visible }
 	column := if x > terminal_padding { (x - terminal_padding + terminal_column_width / 2) / terminal_column_width } else { 0 }
 	return TerminalSelectionPoint{row: row, column: terminal_clamp(column, 0, if a.selection_block { a.columns } else { a.selection_row_cells(row) })}
@@ -213,21 +208,31 @@ fn (a &TerminalApp) pointer_input_enabled() bool { return true }
 fn (a &TerminalApp) pointer_moves_matter() bool { return a.selection_dragging }
 
 fn (mut a TerminalApp) pointer_event(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int) {
+	if phase == .down && button == .right {
+		a.selection_dragging = false
+		a.selection_click = TerminalSelectionClick{}
+		a.context_x = x
+		a.context_y = y
+		a.context_open = true
+		return
+	}
+	if a.context_open { return }
 	a.selection_pointer_event_at(phase, button, scroll, x, y, width, height, desktop_monotonic_ms())
 }
 
 fn (mut a TerminalApp) selection_pointer_event_at(phase AppPointerPhase, button AppPointerButton, scroll int, x int, y int, width int, height int, now u64) {
 	if width <= 0 || height <= 0 || a.rows <= 0 || a.columns <= 0 { return }
-	bottom := height - terminal_selection_status_height
+	top := a.content_top()
+	bottom := height
 	max_scroll := if a.alternate_screen { 0 } else { a.lines.len }
-	if phase == .scroll && y >= terminal_toolbar_height && y < bottom {
+	if phase == .scroll && y >= top && y < bottom {
 		a.selection_click = TerminalSelectionClick{}
 		a.scroll = terminal_clamp(a.scroll - scroll * 3, 0, max_scroll)
 		return
 	}
-	if phase == .down && button == .left && y >= terminal_toolbar_height && y < bottom {
+	if phase == .down && button == .left && y >= top && y < bottom {
 		a.copy_client.clear_status()
-		a.search_open = false
+		a.search_focused = false
 		a.search_pending_len = 0
 		a.search_escape_state = 0
 		point := a.pointer_selection_point(x, y)
@@ -243,7 +248,7 @@ fn (mut a TerminalApp) selection_pointer_event_at(phase AppPointerPhase, button 
 		a.selection_dragging = true
 	} else if a.selection_dragging && (phase == .move || phase == .up) {
 		if !terminal_selection_click_near(a.selection_click, x, y) { a.selection_click = TerminalSelectionClick{} }
-		if y < terminal_toolbar_height + terminal_padding { a.scroll = terminal_clamp(a.scroll + 1, 0, max_scroll) }
+		if y < top + terminal_padding { a.scroll = terminal_clamp(a.scroll + 1, 0, max_scroll) }
 		else if y >= bottom - terminal_padding { a.scroll = terminal_clamp(a.scroll - 1, 0, max_scroll) }
 		a.expand_selection_to(x, y)
 		if phase == .up { a.selection_dragging = false }
@@ -355,13 +360,6 @@ fn (a &TerminalApp) build_selection_highlight(mut children []ui2.Element, row in
 	if w > 0 {
 		children << ui2.view('term.selection.highlight', ui2.rect(f64(x), f64(y), f64(w), terminal_row_height), ui2.BoxStyle{bg: u32(0x465a7c)}, [])
 	}
-}
-
-fn (a &TerminalApp) build_selection_status(mut children []ui2.Element, width int, height int) {
-	key := a.copy_client.status_key()
-	children << ui2.label('term.selection.status', tr(if key.len > 0 { key } else { a.selection_hint_key() }),
-		ui2.rect(8, f64(height - terminal_selection_status_height), f64(if width > 16 { width - 16 } else { 1 }), terminal_selection_status_height),
-		ui2.TextStyle{color: terminal_text, size: 10})
 }
 
 fn (mut a TerminalApp) flush_copy_key() {

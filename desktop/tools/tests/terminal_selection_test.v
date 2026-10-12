@@ -43,14 +43,14 @@ fn test_terminal_selection_drag_uses_unicode_cells_and_copies_under_cursor_text(
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'aй😀\r\nnext é', 3, 12)
-	terminal_selection_drag(mut app, 16, 42, 32, 42, 112, 118)
+	terminal_selection_drag(mut app, 16, 12, 32, 12, 112, 66)
 	assert app.has_selection() && !app.selection_dragging
 	terminal_selection_expect(unsafe { &app }, 'й😀')
-	terminal_selection_drag(mut app, 24, 58, 16, 42, 112, 118)
+	terminal_selection_drag(mut app, 24, 28, 16, 12, 112, 66)
 	terminal_selection_expect(unsafe { &app }, 'й😀\nne')
 	app.move_cursor(0, 1)
 	assert !app.has_selection()
-	terminal_selection_drag(mut app, 16, 42, 24, 42, 112, 118)
+	terminal_selection_drag(mut app, 16, 12, 24, 12, 112, 66)
 	assert app.rendered_row(0) == 'a_😀'
 	terminal_selection_expect(unsafe { &app }, 'й')
 }
@@ -60,16 +60,16 @@ fn test_terminal_selection_scroll_drag_reaches_history_and_respects_empty_row_ne
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'old й\r\n\r\nthird\r\nlast', 2, 12)
 	assert app.lines.len == 2
-	app.pointer_event(.scroll, .no_button, -1, 8, 42, 112, 102)
+	app.pointer_event(.scroll, .no_button, -1, 8, 12, 112, 50)
 	assert app.scroll == 2
-	terminal_selection_drag(mut app, 40, 42, 8, 58, 112, 102)
+	terminal_selection_drag(mut app, 40, 12, 8, 28, 112, 50)
 	terminal_selection_expect(unsafe { &app }, 'й\n')
-	app.pointer_event(.down, .left, 0, 8, 42, 112, 102)
-	app.pointer_event(.move, .no_button, 0, 40, 79, 112, 102)
+	app.pointer_event(.down, .left, 0, 8, 12, 112, 50)
+	app.pointer_event(.move, .no_button, 0, 40, 49, 112, 50)
 	assert app.scroll == 1 && app.selection_dragging
-	app.pointer_event(.move, .no_button, 0, 40, 79, 112, 102)
+	app.pointer_event(.move, .no_button, 0, 40, 49, 112, 50)
 	assert app.scroll == 0
-	app.pointer_event(.up, .left, 0, 40, 79, 112, 102)
+	app.pointer_event(.up, .left, 0, 40, 49, 112, 50)
 	terminal_selection_expect(unsafe { &app }, 'old й\n\nthird\nlast')
 }
 
@@ -77,26 +77,26 @@ fn test_terminal_selection_resets_for_output_geometry_alternate_and_history_chan
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'old\r\nnew', 2, 12)
-	terminal_selection_drag(mut app, 8, 42, 24, 42, 112, 102)
+	terminal_selection_drag(mut app, 8, 12, 24, 12, 112, 50)
 	terminal_selection_output(mut app, '\x07')
 	assert app.has_selection() // a bell does not mutate displayed cells
 	terminal_selection_output(mut app, '!')
 	assert !app.has_selection()
-	terminal_selection_drag(mut app, 8, 42, 24, 42, 112, 102)
+	terminal_selection_drag(mut app, 8, 12, 24, 12, 112, 50)
 	app.set_geometry(2, 12)
 	assert app.has_selection()
 	app.set_geometry(3, 12)
 	assert !app.has_selection()
 	app.visible_rows = 3
-	terminal_selection_drag(mut app, 8, 42, 24, 42, 112, 118)
+	terminal_selection_drag(mut app, 8, 12, 24, 12, 112, 66)
 	app.enter_alternate_screen()
 	assert !app.has_selection() && app.scroll == 0
 	terminal_selection_output(mut app, 'vim')
-	terminal_selection_drag(mut app, 8, 42, 32, 42, 112, 118)
+	terminal_selection_drag(mut app, 8, 12, 32, 12, 112, 66)
 	terminal_selection_expect(unsafe { &app }, 'vim')
 	app.leave_alternate_screen()
 	assert !app.has_selection()
-	terminal_selection_drag(mut app, 8, 42, 24, 42, 112, 118)
+	terminal_selection_drag(mut app, 8, 12, 24, 12, 112, 66)
 	app.clear_scrollback()
 	assert !app.has_selection()
 }
@@ -104,32 +104,39 @@ fn test_terminal_selection_resets_for_output_geometry_alternate_and_history_chan
 fn test_terminal_selection_build_draws_blank_rows_and_resets_on_pixel_resize() {
 	mut app := TerminalApp{exited: true}
 	defer { app.close_app() }
-	size := ui2.rect(0, 0, 176, 116)
+	size := ui2.rect(0, 0, 176, 64)
 	begin_frame_elements()
 	free_tree(app.build(size)!)
 	terminal_selection_output(mut app, 'one\r\n\r\nthree')
-	terminal_selection_drag(mut app, 8, 42, 32, 74, 176, 116)
+	terminal_selection_drag(mut app, 8, 12, 32, 44, 176, 64)
 	begin_frame_elements()
 	tree := app.build(size)!
 	assert terminal_selection_tree_count(unsafe { &tree }, 'term.selection.highlight') == 3
-	assert terminal_selection_tree_count(unsafe { &tree }, terminal_action_copy) == 1
-	assert terminal_selection_tree_count(unsafe { &tree }, 'term.selection.status') == 1
+	assert terminal_selection_tree_count(unsafe { &tree }, terminal_action_copy) == 0
+	assert terminal_selection_tree_count(unsafe { &tree }, terminal_action_find) == 0
+	assert terminal_selection_tree_count(unsafe { &tree }, terminal_action_selection_mode) == 0
+	assert terminal_selection_tree_count(unsafe { &tree }, terminal_action_clear_history) == 0
+	assert terminal_selection_tree_count(unsafe { &tree }, 'term.selection.status') == 0
 	assert app.has_selection()
 	free_tree(tree)
 	begin_frame_elements()
-	free_tree(app.build(ui2.rect(0, 0, 177, 116))!)
+	free_tree(app.build(ui2.rect(0, 0, 177, 64))!)
 	assert !app.has_selection() // grid remains the same, pixel geometry changed
 }
 
-fn test_terminal_selection_toolbar_copy_is_acknowledged_and_snapshot_survives_output() {
+fn test_terminal_selection_context_copy_is_acknowledged_and_snapshot_survives_output() {
 	features := app_compositor_features
 	defer { app_compositor_features = features }
 	app_compositor_features |= app_feature_text_copy
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'aй😀', 2, 12)
-	terminal_selection_drag(mut app, 8, 42, 32, 42, 112, 102)
+	terminal_selection_drag(mut app, 8, 12, 32, 12, 112, 50)
+	app.pointer_event(.down, .right, 0, 32, 12, 112, 50)
+	assert app.context_open && app.has_selection()
+	app.pointer_event(.up, .right, 0, 32, 12, 112, 50)
 	app.handle(terminal_action_copy)!
+	assert !app.context_open
 	assert app.copy_client.status_key() == 'clipboard.copy.pending'
 	terminal_selection_output(mut app, 'new')
 	assert !app.has_selection()
@@ -193,7 +200,7 @@ fn test_terminal_selection_cmd_copy_fragments_preserve_ctrl_c_and_unknown_shell_
 	app.set_geometry(2, 12)
 	app.visible_rows = 2
 	terminal_selection_output(mut app, 'copy')
-	terminal_selection_drag(mut app, 8, 42, 40, 42, 112, 102)
+	terminal_selection_drag(mut app, 8, 12, 40, 12, 112, 50)
 	for split in 1 .. terminal_key_cmd_copy.len {
 		app.key_input(unsafe { tos(terminal_key_cmd_copy.str, split) })
 		assert app.next_poll_ms() == 100
@@ -250,25 +257,25 @@ fn test_terminal_selection_double_click_uses_cell_under_pointer_and_unicode_word
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'café_42-й😀  fin', 3, 24)
-	terminal_selection_click_at(mut app, 22, 42, 1000, 208, 118)
+	terminal_selection_click_at(mut app, 22, 12, 1000, 208, 66)
 	assert !app.has_selection()
-	terminal_selection_click_at(mut app, 23, 42, 1200, 208, 118)
+	terminal_selection_click_at(mut app, 23, 12, 1200, 208, 66)
 	assert app.selection_unit == .word && !app.selection_dragging
 	terminal_selection_expect(unsafe { &app }, 'café_42')
-	terminal_selection_click_at(mut app, 66, 42, 2000, 208, 118)
-	terminal_selection_click_at(mut app, 66, 42, 2100, 208, 118)
+	terminal_selection_click_at(mut app, 66, 12, 2000, 208, 66)
+	terminal_selection_click_at(mut app, 66, 12, 2100, 208, 66)
 	terminal_selection_expect(unsafe { &app }, '-')
-	terminal_selection_click_at(mut app, 74, 42, 3000, 208, 118)
-	terminal_selection_click_at(mut app, 74, 42, 3100, 208, 118)
+	terminal_selection_click_at(mut app, 74, 12, 3000, 208, 66)
+	terminal_selection_click_at(mut app, 74, 12, 3100, 208, 66)
 	terminal_selection_expect(unsafe { &app }, 'й')
-	terminal_selection_click_at(mut app, 82, 42, 4000, 208, 118)
-	terminal_selection_click_at(mut app, 82, 42, 4100, 208, 118)
+	terminal_selection_click_at(mut app, 82, 12, 4000, 208, 66)
+	terminal_selection_click_at(mut app, 82, 12, 4100, 208, 66)
 	terminal_selection_expect(unsafe { &app }, '😀')
-	terminal_selection_click_at(mut app, 94, 42, 5000, 208, 118)
-	terminal_selection_click_at(mut app, 94, 42, 5100, 208, 118)
+	terminal_selection_click_at(mut app, 94, 12, 5000, 208, 66)
+	terminal_selection_click_at(mut app, 94, 12, 5100, 208, 66)
 	terminal_selection_expect(unsafe { &app }, '  ')
-	terminal_selection_click_at(mut app, 160, 42, 6000, 208, 118)
-	terminal_selection_click_at(mut app, 160, 42, 6100, 208, 118)
+	terminal_selection_click_at(mut app, 160, 12, 6000, 208, 66)
+	terminal_selection_click_at(mut app, 160, 12, 6100, 208, 66)
 	assert !app.has_selection() // trailing grid padding is not text
 }
 
@@ -276,16 +283,16 @@ fn test_terminal_selection_word_drag_expands_and_reverses_whole_unicode_words() 
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'one café_42 last\r\nй next', 3, 24)
-	terminal_selection_click_at(mut app, 50, 42, 1000, 208, 118)
-	app.selection_pointer_event_at(.down, .left, 0, 50, 42, 208, 118, 1200)
+	terminal_selection_click_at(mut app, 50, 12, 1000, 208, 66)
+	app.selection_pointer_event_at(.down, .left, 0, 50, 12, 208, 66, 1200)
 	terminal_selection_expect(unsafe { &app }, 'café_42')
-	app.selection_pointer_event_at(.move, .no_button, 0, 114, 42, 208, 118, 1300)
+	app.selection_pointer_event_at(.move, .no_button, 0, 114, 12, 208, 66, 1300)
 	terminal_selection_expect(unsafe { &app }, 'café_42 last')
-	app.selection_pointer_event_at(.move, .no_button, 0, 10, 42, 208, 118, 1400)
+	app.selection_pointer_event_at(.move, .no_button, 0, 10, 12, 208, 66, 1400)
 	terminal_selection_expect(unsafe { &app }, 'one café_42')
-	app.selection_pointer_event_at(.move, .no_button, 0, 58, 42, 208, 118, 1500)
+	app.selection_pointer_event_at(.move, .no_button, 0, 58, 12, 208, 66, 1500)
 	terminal_selection_expect(unsafe { &app }, 'café_42')
-	app.selection_pointer_event_at(.up, .left, 0, 26, 58, 208, 118, 1600)
+	app.selection_pointer_event_at(.up, .left, 0, 26, 28, 208, 66, 1600)
 	terminal_selection_expect(unsafe { &app }, 'café_42 last\nй next')
 	assert !app.selection_dragging && app.selection_click.count == 0
 }
@@ -294,18 +301,18 @@ fn test_terminal_selection_triple_click_includes_physical_line_newline_and_blank
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'first\r\n\r\nlast', 3, 16)
-	for time in [u64(1000), 1100, 1200]! { terminal_selection_click_at(mut app, 18, 42, time, 144, 118) }
+	for time in [u64(1000), 1100, 1200]! { terminal_selection_click_at(mut app, 18, 12, time, 144, 66) }
 	assert app.selection_unit == .line
 	terminal_selection_expect(unsafe { &app }, 'first\n')
-	terminal_selection_click_at(mut app, 18, 42, 1300, 144, 118)
+	terminal_selection_click_at(mut app, 18, 12, 1300, 144, 66)
 	assert app.selection_unit == .character && !app.has_selection() // fourth starts a new sequence
-	for time in [u64(2000), 2100, 2200]! { terminal_selection_click_at(mut app, 18, 58, time, 144, 118) }
+	for time in [u64(2000), 2100, 2200]! { terminal_selection_click_at(mut app, 18, 28, time, 144, 66) }
 	terminal_selection_expect(unsafe { &app }, '\n')
-	for time in [u64(3000), 3100, 3200]! { terminal_selection_click_at(mut app, 18, 74, time, 144, 118) }
+	for time in [u64(3000), 3100, 3200]! { terminal_selection_click_at(mut app, 18, 44, time, 144, 66) }
 	terminal_selection_expect(unsafe { &app }, 'last')
 	app.move_cursor(2, 0)
 	terminal_selection_output(mut app, '\x1b[2K')
-	for time in [u64(4000), 4100, 4200]! { terminal_selection_click_at(mut app, 18, 74, time, 144, 118) }
+	for time in [u64(4000), 4100, 4200]! { terminal_selection_click_at(mut app, 18, 44, time, 144, 66) }
 	assert !app.has_selection() // final empty row has no trailing newline
 }
 
@@ -313,15 +320,15 @@ fn test_terminal_selection_line_drag_expands_whole_rows_in_both_directions() {
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'first\r\nmiddle\r\nlast', 3, 16)
-	terminal_selection_click_at(mut app, 26, 58, 1000, 144, 118)
-	terminal_selection_click_at(mut app, 26, 58, 1100, 144, 118)
-	app.selection_pointer_event_at(.down, .left, 0, 26, 58, 144, 118, 1200)
+	terminal_selection_click_at(mut app, 26, 28, 1000, 144, 66)
+	terminal_selection_click_at(mut app, 26, 28, 1100, 144, 66)
+	app.selection_pointer_event_at(.down, .left, 0, 26, 28, 144, 66, 1200)
 	terminal_selection_expect(unsafe { &app }, 'middle\n')
-	app.selection_pointer_event_at(.move, .no_button, 0, 10, 42, 144, 118, 1300)
+	app.selection_pointer_event_at(.move, .no_button, 0, 10, 12, 144, 66, 1300)
 	terminal_selection_expect(unsafe { &app }, 'first\nmiddle\n')
-	app.selection_pointer_event_at(.move, .no_button, 0, 106, 74, 144, 118, 1400)
+	app.selection_pointer_event_at(.move, .no_button, 0, 106, 44, 144, 66, 1400)
 	terminal_selection_expect(unsafe { &app }, 'middle\nlast')
-	app.selection_pointer_event_at(.up, .left, 0, 18, 58, 144, 118, 1500)
+	app.selection_pointer_event_at(.up, .left, 0, 18, 28, 144, 66, 1500)
 	terminal_selection_expect(unsafe { &app }, 'middle\n')
 }
 
@@ -329,31 +336,31 @@ fn test_terminal_selection_multiclick_time_slop_other_buttons_scroll_and_drag_li
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'words\r\nnext', 2, 16)
-	terminal_selection_click_at(mut app, 18, 42, 1000, 144, 102)
-	terminal_selection_click_at(mut app, 23, 42, 1500, 144, 102)
+	terminal_selection_click_at(mut app, 18, 12, 1000, 144, 50)
+	terminal_selection_click_at(mut app, 23, 12, 1500, 144, 50)
 	assert app.selection_unit == .word
 	terminal_selection_expect(unsafe { &app }, 'words')
-	terminal_selection_click_at(mut app, 23, 42, 2001, 144, 102)
+	terminal_selection_click_at(mut app, 23, 12, 2001, 144, 50)
 	assert app.selection_unit == .character
-	terminal_selection_click_at(mut app, 29, 42, 2100, 144, 102)
+	terminal_selection_click_at(mut app, 29, 12, 2100, 144, 50)
 	assert app.selection_unit == .character // six-pixel jump
-	terminal_selection_click_at(mut app, 29, 42, 2000, 144, 102)
+	terminal_selection_click_at(mut app, 29, 12, 2000, 144, 50)
 	assert app.selection_unit == .character // clock moved backwards
-	terminal_selection_click_at(mut app, 29, 42, ~u64(0), 144, 102)
+	terminal_selection_click_at(mut app, 29, 12, ~u64(0), 144, 50)
 	assert app.selection_unit == .character
-	app.selection_pointer_event_at(.down, .right, 0, 29, 42, 144, 102, 2200)
-	terminal_selection_click_at(mut app, 29, 42, 2300, 144, 102)
+	app.selection_pointer_event_at(.down, .right, 0, 29, 12, 144, 50, 2200)
+	terminal_selection_click_at(mut app, 29, 12, 2300, 144, 50)
 	assert app.selection_unit == .character
-	app.selection_pointer_event_at(.scroll, .no_button, 1, 29, 42, 144, 102, 2400)
-	terminal_selection_click_at(mut app, 29, 42, 2500, 144, 102)
+	app.selection_pointer_event_at(.scroll, .no_button, 1, 29, 12, 144, 50, 2400)
+	terminal_selection_click_at(mut app, 29, 12, 2500, 144, 50)
 	assert app.selection_unit == .character
-	app.selection_pointer_event_at(.down, .left, 0, 29, 42, 144, 102, 2600)
-	app.selection_pointer_event_at(.move, .no_button, 0, 45, 42, 144, 102, 2700)
-	app.selection_pointer_event_at(.up, .left, 0, 29, 42, 144, 102, 2800)
-	terminal_selection_click_at(mut app, 29, 42, 2900, 144, 102)
+	app.selection_pointer_event_at(.down, .left, 0, 29, 12, 144, 50, 2600)
+	app.selection_pointer_event_at(.move, .no_button, 0, 45, 12, 144, 50, 2700)
+	app.selection_pointer_event_at(.up, .left, 0, 29, 12, 144, 50, 2800)
+	terminal_selection_click_at(mut app, 29, 12, 2900, 144, 50)
 	assert app.selection_unit == .character // returning after a drag does not count as another click
-	app.selection_pointer_event_at(.down, .left, 0, 29, 8, 144, 102, 3000)
-	terminal_selection_click_at(mut app, 29, 42, 3100, 144, 102)
+	app.selection_pointer_event_at(.down, .left, 0, 29, -22, 144, 50, 3000)
+	terminal_selection_click_at(mut app, 29, 12, 3100, 144, 50)
 	assert app.selection_unit == .character
 }
 
@@ -362,23 +369,23 @@ fn test_terminal_selection_multiclick_history_utf8_autoscroll_and_alternate_scre
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'old café\r\n\r\nthird\r\nlast', 2, 16)
 	assert app.lines.len == 2
-	app.pointer_event(.scroll, .no_button, -1, 8, 42, 144, 102)
-	terminal_selection_click_at(mut app, 50, 42, 1000, 144, 102)
-	app.selection_pointer_event_at(.down, .left, 0, 50, 42, 144, 102, 1100)
+	app.pointer_event(.scroll, .no_button, -1, 8, 12, 144, 50)
+	terminal_selection_click_at(mut app, 50, 12, 1000, 144, 50)
+	app.selection_pointer_event_at(.down, .left, 0, 50, 12, 144, 50, 1100)
 	terminal_selection_expect(unsafe { &app }, 'café')
-	app.selection_pointer_event_at(.move, .no_button, 0, 26, 79, 144, 102, 1200)
+	app.selection_pointer_event_at(.move, .no_button, 0, 26, 49, 144, 50, 1200)
 	assert app.scroll == 1
-	app.selection_pointer_event_at(.up, .left, 0, 26, 79, 144, 102, 1300)
+	app.selection_pointer_event_at(.up, .left, 0, 26, 49, 144, 50, 1300)
 	assert app.scroll == 0
 	terminal_selection_expect(unsafe { &app }, 'café\n\nthird\nlast')
 	app.enter_alternate_screen()
 	assert app.selection_click.count == 0 && !app.has_selection()
 	terminal_selection_output(mut app, 'alt й\r\nrow')
-	for time in [u64(2000), 2100, 2200]! { terminal_selection_click_at(mut app, 18, 42, time, 144, 102) }
+	for time in [u64(2000), 2100, 2200]! { terminal_selection_click_at(mut app, 18, 12, time, 144, 50) }
 	terminal_selection_expect(unsafe { &app }, 'alt й\n')
 	app.leave_alternate_screen()
 	assert app.selection_click.count == 0 && !app.has_selection()
-	terminal_selection_click_at(mut app, 18, 42, 2300, 144, 102)
+	terminal_selection_click_at(mut app, 18, 12, 2300, 144, 50)
 	assert app.selection_unit == .character
 }
 
@@ -386,12 +393,12 @@ fn test_terminal_selection_word_click_combining_marks_and_unicode_space_in_histo
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'cafe\u0301\u00a0\u00a0й\r\nnext\r\nlast', 2, 16)
-	app.pointer_event(.scroll, .no_button, -1, 8, 42, 144, 102)
-	terminal_selection_click_at(mut app, 42, 42, 1000, 144, 102)
-	terminal_selection_click_at(mut app, 42, 42, 1100, 144, 102)
+	app.pointer_event(.scroll, .no_button, -1, 8, 12, 144, 50)
+	terminal_selection_click_at(mut app, 42, 12, 1000, 144, 50)
+	terminal_selection_click_at(mut app, 42, 12, 1100, 144, 50)
 	terminal_selection_expect(unsafe { &app }, 'cafe\u0301')
-	terminal_selection_click_at(mut app, 54, 42, 2000, 144, 102)
-	terminal_selection_click_at(mut app, 54, 42, 2100, 144, 102)
+	terminal_selection_click_at(mut app, 54, 12, 2000, 144, 50)
+	terminal_selection_click_at(mut app, 54, 12, 2100, 144, 50)
 	terminal_selection_expect(unsafe { &app }, '\u00a0\u00a0')
 }
 
@@ -405,21 +412,21 @@ fn test_terminal_selection_multiclick_copy_still_refuses_large_words_and_physica
 	app.visible_rows = 2
 	app.lines << 'é'.repeat(clipboard_max_bytes / 2)
 	app.scroll = 1
-	terminal_selection_click_at(mut app, 18, 42, 1000, 144, 102)
-	terminal_selection_click_at(mut app, 18, 42, 1100, 144, 102)
+	terminal_selection_click_at(mut app, 18, 12, 1000, 144, 50)
+	terminal_selection_click_at(mut app, 18, 12, 1100, 144, 50)
 	app.copy_selection()
 	request := app.take_clipboard_copy_request()
 	assert request.len == text_copy_header_size + clipboard_max_bytes
 	unsafe { request.free() }
-	terminal_selection_click_at(mut app, 18, 42, 1200, 144, 102)
+	terminal_selection_click_at(mut app, 18, 12, 1200, 144, 50)
 	app.copy_selection()
 	assert app.copy_client.status_key() == 'clipboard.copy.too_large'
 	assert app.take_clipboard_copy_request().len == 0
 	app.lines << 'é'.repeat(clipboard_max_bytes / 2 + 1)
 	app.clear_selection()
 	app.scroll = 1
-	terminal_selection_click_at(mut app, 18, 42, 2000, 144, 102)
-	terminal_selection_click_at(mut app, 18, 42, 2100, 144, 102)
+	terminal_selection_click_at(mut app, 18, 12, 2000, 144, 50)
+	terminal_selection_click_at(mut app, 18, 12, 2100, 144, 50)
 	app.copy_selection()
 	assert app.copy_client.status_key() == 'clipboard.copy.too_large'
 	assert app.take_clipboard_copy_request().len == 0
@@ -429,13 +436,13 @@ fn test_terminal_selection_words_and_lines_stop_at_physical_autowrap_rows() {
 	mut app := TerminalApp{}
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'abcdefghi', 3, 6)
-	terminal_selection_click_at(mut app, 26, 42, 1000, 64, 118)
-	terminal_selection_click_at(mut app, 26, 42, 1100, 64, 118)
+	terminal_selection_click_at(mut app, 26, 12, 1000, 64, 66)
+	terminal_selection_click_at(mut app, 26, 12, 1100, 64, 66)
 	terminal_selection_expect(unsafe { &app }, 'abcdef')
-	terminal_selection_click_at(mut app, 26, 42, 1200, 64, 118)
+	terminal_selection_click_at(mut app, 26, 12, 1200, 64, 66)
 	terminal_selection_expect(unsafe { &app }, 'abcdef\n')
-	terminal_selection_click_at(mut app, 18, 58, 2000, 64, 118)
-	terminal_selection_click_at(mut app, 18, 58, 2100, 64, 118)
+	terminal_selection_click_at(mut app, 18, 28, 2000, 64, 66)
+	terminal_selection_click_at(mut app, 18, 28, 2100, 64, 66)
 	terminal_selection_expect(unsafe { &app }, 'ghi')
 }
 
@@ -445,8 +452,8 @@ fn test_terminal_block_selection_normalizes_rows_and_columns_independently_and_p
 	terminal_selection_fixture(mut app, 'aй😀 d\r\nxy\r\n', 3, 12)
 	app.handle(terminal_action_selection_mode)!
 	assert app.selection_block
-	for coordinates in [[16, 42, 48, 74]!, [48, 74, 16, 42]!, [48, 42, 16, 74]!, [16, 74, 48, 42]!]! {
-		terminal_selection_drag(mut app, coordinates[0], coordinates[1], coordinates[2], coordinates[3], 112, 118)
+	for coordinates in [[16, 12, 48, 44]!, [48, 44, 16, 12]!, [48, 12, 16, 44]!, [16, 44, 48, 12]!]! {
+		terminal_selection_drag(mut app, coordinates[0], coordinates[1], coordinates[2], coordinates[3], 112, 66)
 		assert app.has_selection() && !app.selection_dragging
 		first, last := app.selection_bounds()
 		assert first.row == 0 && first.column == 1 && last.row == 2 && last.column == 5
@@ -459,13 +466,13 @@ fn test_terminal_block_selection_uses_viewport_edges_instead_of_short_rows_and_z
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'a\r\n\r\nb', 3, 12)
 	app.toggle_selection_mode()
-	terminal_selection_drag(mut app, 80, 42, 1000, 74, 112, 118)
+	terminal_selection_drag(mut app, 80, 12, 1000, 44, 112, 66)
 	first, last := app.selection_bounds()
 	assert first.column == 9 && last.column == 12
 	terminal_selection_expect(unsafe { &app }, '   \n   \n   ')
-	terminal_selection_drag(mut app, -100, 42, 24, 74, 112, 118)
+	terminal_selection_drag(mut app, -100, 12, 24, 44, 112, 66)
 	terminal_selection_expect(unsafe { &app }, 'a \n  \nb ')
-	terminal_selection_drag(mut app, 40, 42, 40, 74, 112, 118)
+	terminal_selection_drag(mut app, 40, 12, 40, 44, 112, 66)
 	assert !app.has_selection()
 	assert app.selected_bytes().len == 0
 	app.copy_selection()
@@ -478,16 +485,16 @@ fn test_terminal_block_selection_disables_multiclick_expansion_and_text_toggle_r
 	terminal_selection_fixture(mut app, 'alpha beta_gamma end', 2, 24)
 	app.toggle_selection_mode()
 	for count in 0 .. 3 {
-		terminal_selection_click_at(mut app, 74, 42, u64(1000 + 100 * count), 208, 102)
+		terminal_selection_click_at(mut app, 74, 12, u64(1000 + 100 * count), 208, 50)
 		assert app.selection_click.count == 0 && app.selection_unit == .character
 		assert !app.has_selection()
 	}
-	terminal_selection_drag(mut app, 72, 42, 88, 42, 208, 102)
+	terminal_selection_drag(mut app, 72, 12, 88, 12, 208, 50)
 	terminal_selection_expect(unsafe { &app }, 'ta')
 	app.toggle_selection_mode()
 	assert !app.selection_block && !app.has_selection() && app.selection_click.count == 0
-	terminal_selection_click_at(mut app, 74, 42, 2000, 208, 102)
-	terminal_selection_click_at(mut app, 74, 42, 2100, 208, 102)
+	terminal_selection_click_at(mut app, 74, 12, 2000, 208, 50)
+	terminal_selection_click_at(mut app, 74, 12, 2100, 208, 50)
 	assert app.selection_unit == .word
 	terminal_selection_expect(unsafe { &app }, 'beta_gamma')
 }
@@ -498,18 +505,18 @@ fn test_terminal_block_selection_copies_utf8_history_blank_rows_live_screen_and_
 	terminal_selection_fixture(mut app, 'old й😀 x\r\n\r\nthird é\r\nlast', 2, 12)
 	app.toggle_selection_mode()
 	app.scroll = app.lines.len
-	terminal_selection_drag(mut app, 40, 42, 72, 58, 112, 102)
+	terminal_selection_drag(mut app, 40, 12, 72, 28, 112, 50)
 	terminal_selection_expect(unsafe { &app }, 'й😀 x\n    ')
-	app.pointer_event(.down, .left, 0, 40, 42, 112, 102)
-	app.pointer_event(.move, .no_button, 0, 72, 79, 112, 102)
-	app.pointer_event(.move, .no_button, 0, 72, 79, 112, 102)
-	app.pointer_event(.up, .left, 0, 72, 79, 112, 102)
+	app.pointer_event(.down, .left, 0, 40, 12, 112, 50)
+	app.pointer_event(.move, .no_button, 0, 72, 49, 112, 50)
+	app.pointer_event(.move, .no_button, 0, 72, 49, 112, 50)
+	app.pointer_event(.up, .left, 0, 72, 49, 112, 50)
 	assert app.scroll == 0
 	terminal_selection_expect(unsafe { &app }, 'й😀 x\n    \nd é \n    ')
 	app.enter_alternate_screen()
 	assert app.selection_block && !app.has_selection()
 	terminal_selection_output(mut app, 'aé\r\nz')
-	terminal_selection_drag(mut app, 16, 42, 32, 58, 112, 102)
+	terminal_selection_drag(mut app, 16, 12, 32, 28, 112, 50)
 	terminal_selection_expect(unsafe { &app }, 'é \n  ')
 	app.leave_alternate_screen()
 	assert app.selection_block && !app.has_selection()
@@ -523,9 +530,9 @@ fn test_terminal_block_selection_clips_long_history_to_viewport_and_keeps_combin
 	app.lines << 'aé\u0301😀long'.clone()
 	app.scroll = 1
 	app.toggle_selection_mode()
-	terminal_selection_drag(mut app, 8, 42, 1000, 42, 48, 102)
+	terminal_selection_drag(mut app, 8, 12, 1000, 12, 48, 50)
 	terminal_selection_expect(unsafe { &app }, 'aé\u0301😀')
-	terminal_selection_drag(mut app, 24, 42, 40, 42, 48, 102)
+	terminal_selection_drag(mut app, 24, 12, 40, 12, 48, 50)
 	terminal_selection_expect(unsafe { &app }, '\u0301😀')
 }
 
@@ -537,7 +544,7 @@ fn test_terminal_block_selection_invalidation_preserves_mode_and_toggle_clears_c
 	defer { app.close_app() }
 	terminal_selection_fixture(mut app, 'one\r\ntwo', 2, 12)
 	app.toggle_selection_mode()
-	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 102)
+	terminal_selection_drag(mut app, 8, 12, 24, 28, 112, 50)
 	terminal_selection_output(mut app, '\x07')
 	assert app.has_selection()
 	app.copy_selection()
@@ -550,24 +557,24 @@ fn test_terminal_block_selection_invalidation_preserves_mode_and_toggle_clears_c
 	app.receive_clipboard_copy_reply(editor_bytes_text(ack))
 	assert app.copy_client.status_key() == ''
 	app.toggle_selection_mode()
-	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 102)
+	terminal_selection_drag(mut app, 8, 12, 24, 28, 112, 50)
 	app.copy_selection() // This packet is still owned by the client.
 	app.toggle_selection_mode()
 	assert app.take_clipboard_copy_request().len == 0 && app.copy_client.status_key() == ''
 	app.toggle_selection_mode()
-	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 102)
+	terminal_selection_drag(mut app, 8, 12, 24, 28, 112, 50)
 	terminal_selection_output(mut app, '!')
 	assert app.selection_block && !app.has_selection()
-	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 102)
+	terminal_selection_drag(mut app, 8, 12, 24, 28, 112, 50)
 	app.set_geometry(3, 12)
 	assert app.selection_block && !app.has_selection()
 	app.visible_rows = 3
-	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 118)
+	terminal_selection_drag(mut app, 8, 12, 24, 28, 112, 66)
 	app.clear_scrollback()
 	assert app.selection_block && !app.has_selection()
 	for _ in 0 .. terminal_scrollback + 2 { terminal_selection_output(mut app, 'history\r\n') }
 	app.scroll = app.lines.len
-	terminal_selection_drag(mut app, 8, 42, 24, 58, 112, 118)
+	terminal_selection_drag(mut app, 8, 12, 24, 28, 112, 66)
 	terminal_selection_output(mut app, 'evict\r\n')
 	assert app.selection_block && !app.has_selection()
 }
@@ -575,30 +582,77 @@ fn test_terminal_block_selection_invalidation_preserves_mode_and_toggle_clears_c
 fn test_terminal_block_selection_highlights_full_rectangle_in_blank_cells_and_copy_is_enabled() {
 	mut app := TerminalApp{exited: true}
 	defer { app.close_app() }
-	size := ui2.rect(0, 0, 176, 116)
+	size := ui2.rect(0, 0, 176, 64)
 	begin_frame_elements()
 	free_tree(app.build(size)!)
 	terminal_selection_output(mut app, 'aй😀\r\n\r\nb')
 	app.toggle_selection_mode()
-	terminal_selection_drag(mut app, 64, 42, 104, 74, 176, 116)
+	terminal_selection_drag(mut app, 64, 12, 104, 44, 176, 64)
+	app.pointer_event(.down, .right, 0, 104, 44, 176, 64)
 	begin_frame_elements()
 	tree := app.build(size)!
 	defer { free_tree(tree) }
 	assert terminal_selection_tree_count(unsafe { &tree }, 'term.selection.highlight') == 3
+	assert terminal_selection_tree_count(unsafe { &tree }, terminal_action_copy) == 1
 	mut highlights := 0
 	for child in tree.children {
 		if child.id == 'term.selection.highlight' {
 			assert child.frame.x == 64 && child.frame.width == 40 && child.frame.height == 16
 			highlights++
 		}
-		if child.id == terminal_action_copy { assert child.enabled }
-		if child.id == terminal_action_selection_mode { assert child.enabled && child.checked }
+		if child.id == terminal_action_context_panel {
+			for item in child.children {
+				if item.id == terminal_action_copy { assert item.enabled }
+				if item.id == terminal_action_selection_mode { assert item.enabled && item.checked }
+			}
+		}
 	}
 	assert highlights == 3
 	terminal_selection_expect(unsafe { &app }, '     \n     \n     ')
 }
 
-fn test_terminal_block_toolbar_keeps_mode_copy_and_search_bounded_in_all_languages() {
+fn test_terminal_context_dismissal_preserves_selection_and_find_returns_input_to_shell() {
+	mut pipe := [2]i32{}
+	assert C.pipe(&pipe[0]) == 0
+	mut app := TerminalApp{terminal: int(pipe[1]), started: true}
+	defer { app.close_app(); desktop_close(pipe[0]) }
+	size := ui2.rect(0, 0, 560, 316)
+	begin_frame_elements()
+	free_tree(app.build(size)!)
+	assert app.visible_rows == 18
+	terminal_selection_output(mut app, 'one café')
+	terminal_selection_drag(mut app, 8, 12, 32, 12, 560, 316)
+	app.pointer_event(.down, .right, 0, 550, 310, 560, 316)
+	assert app.context_open && app.has_selection()
+	app.pointer_event(.down, .left, 0, 16, 12, 560, 316)
+	assert !app.selection_dragging
+	app.handle(terminal_action_context_dismiss)!
+	terminal_selection_expect(unsafe { &app }, 'one')
+	app.pointer_event(.down, .right, 0, 550, 310, 560, 316)
+	app.key_input('\x1b')
+	assert !app.context_open && app.has_selection()
+	app.pointer_event(.down, .right, 0, 550, 310, 560, 316)
+	app.handle(terminal_action_find)!
+	assert !app.context_open && app.search_open && app.search_focused
+	begin_frame_elements()
+	free_tree(app.build(size)!)
+	app.key_input('café')
+	assert app.search_match == 0
+	terminal_selection_drag(mut app, 8, 42, 32, 42, 560, 316)
+	assert app.search_open && !app.search_focused
+	app.key_input('\x03')
+	mut buffer := [8]u8{}
+	assert desktop_read(pipe[0], &buffer[0], u64(buffer.len)) == 1
+	assert buffer[0] == 3 // Escape dismissed only the menu; Ctrl-C still reaches the PTY.
+	app.handle('term.find.field')!
+	app.key_input('\x1b')
+	assert !app.search_open
+	begin_frame_elements()
+	free_tree(app.build(size)!)
+	assert app.visible_rows == 18
+}
+
+fn test_terminal_context_menu_and_find_stay_bounded_in_all_languages() {
 	language := desktop_language
 	defer { desktop_language = language }
 	mut app := TerminalApp{exited: true}
@@ -611,24 +665,35 @@ fn test_terminal_block_toolbar_keeps_mode_copy_and_search_bounded_in_all_languag
 					app.search_open = search
 					app.selection_block = block
 					begin_frame_elements()
-					tree := app.build(ui2.rect(0, 0, f64(width), 118))!
+					free_tree(app.build(ui2.rect(0, 0, f64(width), 196))!)
+					app.pointer_event(.down, .right, 0, width - 1, 195, width, 196)
+					begin_frame_elements()
+					tree := app.build(ui2.rect(0, 0, f64(width), 196))!
 					mut last_edge := f64(0)
 					mut mode_found := false
 					mut copy_found := false
 					for child in tree.children {
+						if child.id == terminal_action_context_panel {
+							assert child.frame.x >= 0 && child.frame.x + child.frame.width <= width
+							assert child.frame.y >= 0 && child.frame.y + child.frame.height <= 196
+							for item in child.children {
+								assert item.frame.x >= 0 && item.frame.x + item.frame.width <= child.frame.width
+								if item.id == terminal_action_selection_mode {
+									assert item.checked == block && item.enabled
+									assert item.text == tr(if block { 'terminal.selection.block' } else { 'terminal.selection.text' })
+									mode_found = true
+								}
+								if item.id == terminal_action_copy { assert !item.enabled; copy_found = true }
+							}
+						}
 						if child.frame.y != 3 { continue }
 						assert child.frame.x >= last_edge && child.frame.width > 0
 						assert child.frame.x + child.frame.width <= width
 						last_edge = child.frame.x + child.frame.width
-						if child.id == terminal_action_selection_mode {
-							assert child.checked == block && child.enabled
-							assert child.text == tr(if block { 'terminal.selection.block' } else { 'terminal.selection.text' })
-							mode_found = true
-						}
-						if child.id == terminal_action_copy { copy_found = true }
 					}
 					assert mode_found
-					if width >= 32 { assert copy_found }
+					assert copy_found
+					assert terminal_selection_tree_count(unsafe { &tree }, 'term.find.field') == if search { 1 } else { 0 }
 					free_tree(tree)
 				}
 			}

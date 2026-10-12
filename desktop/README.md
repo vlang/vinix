@@ -497,16 +497,18 @@ The bit editor comparison is [Apple's programmer Calculator guide](https://suppo
 
 Terminal supports mouse selection of UTF-8 cells across physical output rows,
 including scrollback and the alternate screen. Drag to select, then choose
-Copy or Cmd-C. When input is directed to the shell, Ctrl-C continues to the
-PTY for shell/program interrupt handling.
+Copy from the context menu or Cmd-C. Right-click output for Find, Copy,
+Text/Block selection and Clear scrollback. The search bar appears only while
+Find is open. When input is directed to the shell, Ctrl-C continues to the PTY
+for shell/program interrupt handling.
 Copy inserts a newline between physical rows and does not reassemble wrapped
 logical lines. Changed output or window geometry clears selection. Copies
 larger than 64 KiB are refused without truncating or replacing the clipboard.
 Double-click selects a word; triple-click selects a physical row and its
 newline when another row follows. Dragging extends whole words or rows in
-either direction. Choose Block in the toolbar to drag a rectangular selection;
-short/blank rows receive space padding, internal spaces and UTF-8 cells remain
-intact, and no final newline is added. Text restores ordinary and multi-click
+either direction. Choose Text/Block in the context menu to drag a rectangular
+selection; short/blank rows receive space padding, internal spaces and UTF-8
+cells remain intact, and no final newline is added. Text restores ordinary and multi-click
 gestures; switching modes clears selection/copy feedback. Wide and combining
 character cell widths, modifier-key block gestures and logical-line reflow
 remain future work.

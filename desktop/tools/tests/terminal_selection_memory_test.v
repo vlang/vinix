@@ -16,14 +16,18 @@ fn terminal_selection_memory_output(mut app TerminalApp, text string) {
 fn terminal_selection_memory_frames(mut app TerminalApp) {
 	for language in desktop_languages {
 		desktop_language = language
-		for size in [ui2.rect(0, 0, 272, 118), ui2.rect(0, 0, 560, 340), ui2.rect(0, 0, 640, 380)]! {
+		for size in [ui2.rect(0, 0, 272, 66), ui2.rect(0, 0, 560, 288), ui2.rect(0, 0, 640, 328)]! {
 			begin_frame_elements()
 			free_tree(app.build(size) or { panic(err) })
-			app.pointer_event(.down, .left, 0, 8, 42, int(size.width), int(size.height))
-			app.pointer_event(.move, .no_button, 0, 72, 58, int(size.width), int(size.height))
-			app.pointer_event(.up, .left, 0, 72, 58, int(size.width), int(size.height))
+			app.pointer_event(.down, .left, 0, 8, 12, int(size.width), int(size.height))
+			app.pointer_event(.move, .no_button, 0, 72, 28, int(size.width), int(size.height))
+			app.pointer_event(.up, .left, 0, 72, 28, int(size.width), int(size.height))
 			begin_frame_elements()
 			free_tree(app.build(size) or { panic(err) })
+			app.pointer_event(.down, .right, 0, 72, 28, int(size.width), int(size.height))
+			begin_frame_elements()
+			free_tree(app.build(size) or { panic(err) })
+			app.handle(terminal_action_context_dismiss) or { panic(err) }
 		}
 	}
 }
@@ -32,7 +36,11 @@ fn test_terminal_selection_repeated_models_history_eviction_resize_alternate_ren
 	language := desktop_language
 	defer { desktop_language = language }
 	mut warm := TerminalApp{exited: true}
+	warm.lines << 'history'.clone()
 	terminal_selection_memory_frames(mut warm)
+	warm.enter_alternate_screen()
+	terminal_selection_memory_frames(mut warm)
+	warm.leave_alternate_screen()
 	warm.close_app()
 	C.vinix_heap_begin()
 	for _ in 0 .. 50 {
@@ -52,6 +60,35 @@ fn test_terminal_selection_repeated_models_history_eviction_resize_alternate_ren
 	assert C.vinix_heap_end() == 0
 }
 
+fn test_terminal_context_menu_frames_and_dismissal_retain_zero_bytes() {
+	language := desktop_language
+	defer { desktop_language = language }
+	mut app := TerminalApp{exited: true}
+	app.lines << 'history'.clone()
+	size := ui2.rect(0, 0, 560, 316)
+	for lang in desktop_languages {
+		desktop_language = lang
+		begin_frame_elements()
+		free_tree(app.build(size) or { panic(err) })
+		app.pointer_event(.down, .right, 0, 550, 310, 560, 316)
+		begin_frame_elements()
+		free_tree(app.build(size) or { panic(err) })
+		app.handle(terminal_action_context_dismiss) or { panic(err) }
+	}
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for lang in desktop_languages {
+			desktop_language = lang
+			app.pointer_event(.down, .right, 0, 550, 310, 560, 316)
+			begin_frame_elements()
+			free_tree(app.build(size) or { panic(err) })
+			app.handle(terminal_action_context_dismiss) or { panic(err) }
+		}
+	}
+	app.close_app()
+	assert C.vinix_heap_end() == 0
+}
+
 fn test_terminal_selection_native_pointer_and_copy_dispatch_transfer_and_release_every_snapshot() {
 	features := app_compositor_features
 	defer { app_compositor_features = features }
@@ -67,8 +104,8 @@ fn test_terminal_selection_native_pointer_and_copy_dispatch_transfer_and_release
 		app.set_geometry(2, 20)
 		app.visible_rows = 2
 		terminal_selection_memory_output(mut app, 'copy й😀')
-		app.pointer_event(.down, .left, 0, 8, 42, 176, 102)
-		app.pointer_event(.up, .left, 0, 64, 42, 176, 102)
+		app.pointer_event(.down, .left, 0, 8, 12, 176, 50)
+		app.pointer_event(.up, .left, 0, 64, 12, 176, 50)
 		app.handle(terminal_action_copy) or { panic(err) }
 		request := native_app_text_copy_request(mut native)
 		sequence := text_copy_into_session(mut clipboard, editor_bytes_text(request)) or { panic('copy refused') }
@@ -130,8 +167,8 @@ fn test_terminal_selection_fragmented_copy_keys_literal_paste_and_escape_expiry_
 	app.set_geometry(2, 20)
 	app.visible_rows = 2
 	terminal_selection_memory_output(mut app, 'copy й😀')
-	app.pointer_event(.down, .left, 0, 8, 42, 176, 102)
-	app.pointer_event(.up, .left, 0, 64, 42, 176, 102)
+	app.pointer_event(.down, .left, 0, 8, 12, 176, 50)
+	app.pointer_event(.up, .left, 0, 64, 12, 176, 50)
 	C.vinix_heap_begin()
 	for _ in 0 .. 200 {
 		for byte in terminal_key_cmd_copy {
@@ -173,8 +210,8 @@ fn test_terminal_selection_word_line_click_drag_copy_history_mutation_and_render
 		terminal_selection_memory_output(mut app, 'old cafe\u0301 й😀\r\n\r\nthird\r\nlast')
 		app.scroll = app.lines.len
 		for count in 0 .. 3 {
-			app.selection_pointer_event_at(.down, .left, 0, 50, 42, 272, 118, u64(1000 + count * 100))
-			app.selection_pointer_event_at(.up, .left, 0, 50, 42, 272, 118, u64(1020 + count * 100))
+			app.selection_pointer_event_at(.down, .left, 0, 50, 12, 272, 66, u64(1000 + count * 100))
+			app.selection_pointer_event_at(.up, .left, 0, 50, 12, 272, 66, u64(1020 + count * 100))
 			if count > 0 {
 				app.copy_selection()
 				request := app.take_clipboard_copy_request()
@@ -182,12 +219,12 @@ fn test_terminal_selection_word_line_click_drag_copy_history_mutation_and_render
 				unsafe { request.free() }
 			}
 		}
-		app.selection_pointer_event_at(.down, .left, 0, 50, 58, 272, 118, 2000)
-		app.selection_pointer_event_at(.up, .left, 0, 50, 58, 272, 118, 2020)
-		app.selection_pointer_event_at(.down, .left, 0, 50, 58, 272, 118, 2100)
-		app.selection_pointer_event_at(.move, .no_button, 0, 10, 42, 272, 118, 2200)
-		app.selection_pointer_event_at(.move, .no_button, 0, 50, 95, 272, 118, 2300)
-		app.selection_pointer_event_at(.up, .left, 0, 50, 95, 272, 118, 2400)
+		app.selection_pointer_event_at(.down, .left, 0, 50, 28, 272, 66, 2000)
+		app.selection_pointer_event_at(.up, .left, 0, 50, 28, 272, 66, 2020)
+		app.selection_pointer_event_at(.down, .left, 0, 50, 28, 272, 66, 2100)
+		app.selection_pointer_event_at(.move, .no_button, 0, 10, 12, 272, 66, 2200)
+		app.selection_pointer_event_at(.move, .no_button, 0, 50, 65, 272, 66, 2300)
+		app.selection_pointer_event_at(.up, .left, 0, 50, 65, 272, 66, 2400)
 		app.copy_selection()
 		app.copy_selection()
 		request := app.take_clipboard_copy_request()
@@ -196,15 +233,15 @@ fn test_terminal_selection_word_line_click_drag_copy_history_mutation_and_render
 		for lang in desktop_languages {
 			desktop_language = lang
 			begin_frame_elements()
-			free_tree(app.build(ui2.rect(0, 0, 272, 118)) or { panic(err) })
+			free_tree(app.build(ui2.rect(0, 0, 272, 66)) or { panic(err) })
 		}
 		terminal_selection_memory_output(mut app, 'changed')
 		assert app.selection_click.count == 0 && !app.has_selection()
 		app.enter_alternate_screen()
 		terminal_selection_memory_output(mut app, 'alternate й\r\nrow')
 		for count in 0 .. 3 {
-			app.selection_pointer_event_at(.down, .left, 0, 18, 42, 272, 118, u64(3000 + count * 100))
-			app.selection_pointer_event_at(.up, .left, 0, 18, 42, 272, 118, u64(3020 + count * 100))
+			app.selection_pointer_event_at(.down, .left, 0, 18, 12, 272, 66, u64(3000 + count * 100))
+			app.selection_pointer_event_at(.up, .left, 0, 18, 12, 272, 66, u64(3020 + count * 100))
 		}
 		app.copy_selection()
 		alternate_request := app.take_clipboard_copy_request()
@@ -228,7 +265,7 @@ fn test_terminal_selection_word_line_click_drag_copy_history_mutation_and_render
 fn terminal_block_memory_frames(mut app TerminalApp) {
 	for language in desktop_languages {
 		desktop_language = language
-		for size in [ui2.rect(0, 0, 112, 118), ui2.rect(0, 0, 272, 118), ui2.rect(0, 0, 560, 340)]! {
+		for size in [ui2.rect(0, 0, 112, 66), ui2.rect(0, 0, 272, 66), ui2.rect(0, 0, 560, 288)]! {
 			for search in [false, true]! {
 				for block in [false, true]! {
 					app.search_open = search
@@ -261,9 +298,9 @@ fn test_terminal_block_selection_native_dispatch_padding_toggle_history_alternat
 		app.visible_rows = 3
 		terminal_selection_memory_output(mut app, 'aй😀 d\r\nxy\r\n')
 		app.handle(terminal_action_selection_mode) or { panic(err) }
-		app.pointer_event(.down, .left, 0, 16, 42, 112, 118)
-		app.pointer_event(.move, .no_button, 0, 48, 74, 112, 118)
-		app.pointer_event(.up, .left, 0, 48, 74, 112, 118)
+		app.pointer_event(.down, .left, 0, 16, 12, 112, 66)
+		app.pointer_event(.move, .no_button, 0, 48, 44, 112, 66)
+		app.pointer_event(.up, .left, 0, 48, 44, 112, 66)
 		app.key_input(terminal_key_cmd_copy)
 		request := native_app_text_copy_request(mut native)
 		sequence := text_copy_into_session(mut clipboard, editor_bytes_text(request)) or { panic('block copy refused') }
@@ -275,8 +312,8 @@ fn test_terminal_block_selection_native_dispatch_padding_toggle_history_alternat
 		assert app.copy_client.status_key() == '' && !app.selection_block
 		unsafe { request.free(); ack.free() }
 		app.handle(terminal_action_selection_mode) or { panic(err) }
-		app.pointer_event(.down, .left, 0, 16, 42, 112, 118)
-		app.pointer_event(.up, .left, 0, 48, 74, 112, 118)
+		app.pointer_event(.down, .left, 0, 16, 12, 112, 66)
+		app.pointer_event(.up, .left, 0, 48, 44, 112, 66)
 		app.copy_selection()
 		app.copy_selection()
 		app.handle(terminal_action_selection_mode) or { panic(err) }
