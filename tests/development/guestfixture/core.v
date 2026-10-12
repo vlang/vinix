@@ -223,6 +223,38 @@ fn build_checks() {
 	}
 }
 
+fn cpu_output_checks(path &char) {
+	unsafe {
+		mut text := [8192]char{}
+		log := C.open(path, C.O_RDONLY)
+		count := C.read(log, &text[0], text.len - 1)
+		check(log >= 0 && count > 0 && count < text.len - 1 && C.close(log) == 0, 270)
+		C.printf(c'DEVELOPMENT CPU OUTPUT %s\n%s\n', path, &text[0])
+		$if arm64 {
+			check(C.strstr(&text[0], c'Architecture:     aarch64\n') != nil
+				&& C.strstr(&text[0], c'Flags:            Unknown') == nil, 272)
+		} $else {
+			check(C.strstr(&text[0], c'Architecture:     x86_64\n') != nil, 273)
+		}
+		// Independently count processor records from the guest's procfs.
+		mut cpuinfo := [16384]char{}
+		fd := C.open(c'/proc/cpuinfo', C.O_RDONLY)
+		bytes := C.read(fd, &cpuinfo[0], cpuinfo.len - 1)
+		check(fd >= 0 && bytes > 0 && bytes < cpuinfo.len - 1 && C.close(fd) == 0, 274)
+		mut processors := 0
+		mut cursor := &cpuinfo[0]
+		for {
+			found := C.strstr(cursor, c'processor\t: ')
+			if found == nil { break }
+			processors++
+			cursor = found + 1
+		}
+		mut expected := [128]char{}
+		C.snprintf(&expected[0], expected.len, c'CPU Count:        %d\n', processors)
+		check(processors > 0 && C.strstr(&text[0], &expected[0]) != nil, 275)
+	}
+}
+
 fn native_userland_checks() {
 	unsafe {
 		private_receipt(c'/home/developer/native-build.json', c'/home/developer/native-source')
@@ -234,7 +266,7 @@ fn native_userland_checks() {
 				check(command(c'/bin/busybox', c'ls', c'-la', c'/opt/native/lib') == 0, 268)
 				check(command_output(c'/usr/bin/vinix-build', c'hash', c'/opt/native', nil, c'/home/developer/sdk-pin.sha') == 0, 269)
 				emit_command_log(c'/home/developer/sdk-pin.sha')
-				for step in [&char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh')]! {
+				for step in [&char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh'), &char(c'compile-lscpu'), &char(c'inspect-lscpu')]! {
 					C.snprintf(&path[0], path.len, c'%s/%s.log', output, step)
 					emit_command_log(&path[0])
 				}
@@ -247,7 +279,7 @@ fn native_userland_checks() {
 				mut st := C.stat{}
 				check(C.stat(&path[0], &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o777 == 0o700, 263)
 			}
-			for name in [&char(c'fetch'), &char(c'mount'), &char(c'chsh')]! {
+			for name in [&char(c'fetch'), &char(c'mount'), &char(c'chsh'), &char(c'lscpu')]! {
 				C.snprintf(&path[0], path.len, c'%s/work/%s-bin', output, name)
 				fd := C.open(&path[0], C.O_RDONLY)
 				mut elf := [20]u8{}
@@ -265,8 +297,10 @@ fn native_userland_checks() {
 				check(log >= 0 && count > 0 && count < text.len - 1 && C.close(log) == 0
 					&& C.strcmp(&text[0], &expected[0]) == 0, 266)
 			}
+			C.snprintf(&path[0], path.len, c'%s/inspect-lscpu.log', output)
+			cpu_output_checks(&path[0])
 		}
-		C.puts(c'DEVELOPMENT USERLAND PASS: UID 1000, pinned SDK/V/runtime, two fresh workspaces, fetch/mount/chsh compiled and executed')
+		C.puts(c'DEVELOPMENT USERLAND PASS: UID 1000, pinned SDK/V/runtime, two fresh workspaces, fetch/mount/chsh/lscpu compiled and executed, procfs CPU count matched')
 	}
 }
 
@@ -278,6 +312,13 @@ fn account_checks() {
 		for program in [&char(c'/usr/bin/vinix-build'), &char(c'/usr/bin/vinix-qualify'),
 			&char(c'/usr/bin/vinix-vm'), &char(c'/usr/bin/vinix-jobs')]! {
 			check(command(program, c'--help', nil, nil) == 0, 120)
+		}
+		cpu := C.open(c'/usr/bin/lscpu-smoke', C.O_RDONLY)
+		if cpu >= 0 {
+			check(C.close(cpu) == 0, 276)
+			check(command_output(c'/usr/bin/lscpu-smoke', nil, nil, nil, c'/home/developer/lscpu-smoke.log') == 0, 277)
+			cpu_output_checks(c'/home/developer/lscpu-smoke.log')
+			C.puts(c'DEVELOPMENT CPU PASS: UID 1000, prepared lscpu ELF, procfs CPU count matched')
 		}
 		check(command(c'/usr/bin/vinix-jobs', c'init', c'/home/developer/jobs.json', c'/home/developer/good') == 0, 123)
 		check(command(c'/usr/bin/vinix-jobs', c'run-due', c'/home/developer/good', nil) == 0, 124)

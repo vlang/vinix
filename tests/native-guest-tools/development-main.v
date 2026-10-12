@@ -210,6 +210,21 @@ fn run() !int {
 		os.chmod(root + '/usr/bin/' + tool, 0o755)!
 		hashes[tool] = hash
 	}
+	// Optional prepared ELF smoke coverage is kept distinct from native builds.
+	if cpu_binary := os.getenv_opt('VINIX_DEVELOPMENT_CPU_BINARY') {
+		binary := os.real_path(cpu_binary)
+		header := os.read_bytes(binary)!
+		if header.len < 20 || header[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
+			|| (u16(header[18]) | (u16(header[19]) << 8)) != if arch == 'aarch64' { u16(183) } else { u16(62) } {
+			return error('prepared lscpu has the wrong ELF architecture')
+		}
+		hashes['lscpu-smoke'] = digest(binary)!
+		os.cp(binary, root + '/usr/bin/lscpu-smoke')!
+		os.chmod(root + '/usr/bin/lscpu-smoke', 0o755)!
+		if digest(root + '/usr/bin/lscpu-smoke')! != hashes['lscpu-smoke'] || digest(binary)! != hashes['lscpu-smoke'] {
+			return error('prepared lscpu changed during copy')
+		}
+	}
 	os.cp(init, root + '/usr/bin/development-payload')!
 	os.chmod(root + '/usr/bin/development-payload', 0o755)!
 	for name in ['jobs', 'link-jobs'] {
@@ -300,9 +315,14 @@ fn run() !int {
 			userland := root + '/home/developer/native-source'
 			os.mkdir(userland)!
 			mut steps := []BuildStep{}
-			for name in ['fetch', 'mount', 'chsh'] {
+			for name in ['fetch', 'mount', 'chsh', 'lscpu'] {
 				os.mkdir(userland + '/' + name)!
-				for file in ['main.v', 'v.mod'] {
+				mut files := ['main.v', 'v.mod']
+				if name == 'lscpu' {
+					files << ['cpu/cpu_x64.v', 'cpu/cpu_arm64.v', 'armcpu/info.v']
+				}
+				for file in files {
+					os.mkdir_all(os.dir(userland + '/' + name + '/' + file))!
 					os.cp(guesthost.root() + '/util-vinix/' + name + '/' + file, userland + '/' + name + '/' + file)!
 					os.chmod(userland + '/' + name + '/' + file, 0o644)!
 				}
@@ -315,6 +335,7 @@ fn run() !int {
 				}
 				steps << BuildStep{ name: 'run-' + name, argv: ['{work}/' + name + '-bin', '--version'], artifacts: []string{} }
 			}
+			steps << BuildStep{ name: 'inspect-lscpu', argv: ['{work}/lscpu-bin'], artifacts: []string{} }
 			native_plan = BuildPlan{
 				source: Pin{'/home/developer/native-source', devcore.tree_hash(userland)!}
 				inputs: [Pin{'/opt/native', devcore.tree_hash(root + '/opt/native')!},
@@ -340,6 +361,9 @@ fn run() !int {
 	os.rmdir_all(root)!
 	os.rm(archive)!
 	mut command := launch.command.clone()
+	if arch == 'x86_64' {
+		if cpu := os.getenv_opt('VINIX_QEMU_CPU') { command[command.index('-cpu') + 1] = cpu }
+	}
 	if sdk_hash != '' {
 		for i, argument in command { if argument == '-m' { command[i + 1] = if v_root_hash == '' { '2048' } else { '3072' } } }
 	}
@@ -350,6 +374,7 @@ fn run() !int {
 	]
 	if sdk_hash != '' { expected << 'DEVELOPMENT TOOLCHAINS PASS:' }
 	if v_root_hash != '' { expected << 'DEVELOPMENT USERLAND PASS:' }
+	if 'lscpu-smoke' in hashes { expected << 'DEVELOPMENT CPU PASS:' }
 	result := guesthost.boot(command, launch.env, state, expected,
 		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], 900, true)!
 	mut receipts := map[string]string{}
@@ -413,15 +438,22 @@ fn run() !int {
 					return error('native userland build inputs or steps failed validation')
 				}
 				for i, step in receipt.steps {
-					if step.name != native_plan.steps[i].name { return error('native userland step order changed') }
-					if i % 2 == 0 {
+					planned := native_plan.steps[i]
+					mut expected_argv := planned.argv.map(it.replace('{work}', '/home/developer/' + output + '/work'))
+					for name, pin in native_plan.tools {
+						expected_argv = expected_argv.map(it.replace('{' + name + '}', pin.path))
+					}
+					if step.name != planned.name || step.argv != expected_argv {
+						return error('native userland step order or executed command changed')
+					}
+					if planned.artifacts.len != 0 {
 						name := native_plan.steps[i].artifacts[0]
 						hash := step.artifacts[name]
 						if step.artifacts.len != 1 || hash.len != 64 { return error('missing compiled userland artifact') }
 						if output == 'native-a' { artifacts[name] = hash }
 						else if artifacts[name] != hash { return error('userland artifacts differ between fresh workspaces') }
-					} else if step.argv != ['/home/developer/' + output + '/work/' + native_plan.steps[i - 1].artifacts[0], '--version'] {
-						return error('native userland execution does not match its recorded artifact')
+					} else if step.artifacts.len != 0 {
+						return error('unexpected native userland output artifact')
 					}
 				}
 			}

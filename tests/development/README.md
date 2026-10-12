@@ -76,16 +76,33 @@ must compile, write/read a file and execute its resulting binary. These runs
 receive 3 GiB of RAM. Failed qualification retains bounded command-log excerpts
 in the serial transcript as well as the native report.
 
-V runs also copy this repository's `fetch`, `mount` and `chsh` sources and
+V runs also copy this repository's `fetch`, `mount`, `chsh` and `lscpu` sources and
 generate a build plan pinning those sources, V, GCC, the shell and the complete
 SDK/V/runtime trees. UID/GID 1000 builds them in two fresh workspaces with
 private HOME/temporary directories, then executes each recorded artifact's
 `--version` entry point. The fixture checks ownership, executable ELF headers
-and expected utility output. The controller independently checks both build
-receipts, their input pins, step order, executed artifact paths and matching
+and expected utility output. `lscpu` also runs its CPU inspection path; the
+fixture independently counts `/proc/cpuinfo` processor records and checks the
+reported architecture. The controller independently checks both build
+receipts, their input pins, step order, complete executed argv and matching
 binary hashes. The native plan and both receipts are retained alongside the
 compiler report. Version entry points provide execution smoke coverage;
 filesystem mounting and account-changing workflows have their own gates.
+The ARM CPU backend reports the kernel's raw IDs and common feature names;
+it does not infer a model or independently qualify the kernel's hardware IDs.
+
+To run the CPU inspection check with a separately prepared `lscpu` ELF, set
+`VINIX_DEVELOPMENT_CPU_BINARY` to its host path. The controller checks the
+architecture, pins and copies the binary and records its hash as `lscpu-smoke`.
+The same UID/GID 1000 procfs check runs without requiring a native compiler SDK:
+
+```
+VINIX_DEVELOPMENT_CPU_BINARY=/path/to/x86_64-lscpu VINIX_QEMU_CPU=Nehalem tests/development/run-guest x86_64 /path/to/kernel /tmp/development-x86 /tmp/new-cpu-state
+```
+
+`VINIX_QEMU_CPU` also selects the x86 QEMU model; the default remains `max`.
+A prepared ELF check is execution coverage, separate from the native rebuild
+gate above. The receipt records the actual QEMU argv and prepared binary hash.
 
 `receipt.json` records the architecture, UID, kernel/fixture/tool hashes,
 QEMU argv, passing verdict and six native plan/state/build receipts. SDK runs
@@ -157,6 +174,29 @@ Both workspaces produced these artifact SHA-256s:
 Earlier diagnostics exposed Darwin/Vinix symlink-mode differences and retained
 64 KiB stream buffers under `-gc none`. Canonical link modes and explicit
 buffer release fix those runner failures; input pins are still verified.
+
+The extended four-utility native rebuild passed on AArch64 in
+`/tmp/vinix-development-lscpu-arm-20261013-a`, with the same staged commands
+and SDK/V/runtime pins. Its source pin is
+`1c2fead1fefb5b59f86f743202c719b4969865297feeb3ce400ef9a1e9e2c1c3`.
+Both workspaces produced `lscpu-bin` hash
+`82fbb5b623eabc581482befebc0dcb19f3b5b63ddd9a028e5f8c7b2d028fd9cf`
+and retained the three other artifact hashes listed above. CPU inspection
+matched the one online processor reported by this kernel's procfs; the boot
+has no usable device tree and therefore does not enable ARM SMP. This source
+snapshot precedes the separate `fetch` color and x86 CPU-count fixes.
+
+Prepared ELF CPU checks passed as UID/GID 1000 on AArch64 in
+`/tmp/vinix-development-lscpu-arm-smoke-20261013-a`, and on x86 with the AMD
+`max` and Intel `Nehalem` QEMU models in
+`/tmp/vinix-development-lscpu-x86-amd-20261013-a` and
+`/tmp/vinix-development-lscpu-x86-intel-20261013-a`. The x86 checks each match
+two online processor records and pin binary hash
+`44d43664cdc98a20d7c57141e59ed00534e422d72eed2eab2d85042bb5b137a9`.
+The old CPUID package-count implementation failed the same Intel CPU-count
+gate in `/tmp/vinix-development-lscpu-intel-before-20261013-a`; using the OS
+online CPU count fixes it. These x86 checks execute a cross-built ELF;
+native x86 compiler qualification still needs a prepared native SDK.
 
 This qualifies the tested per-account job workflows in Vinix guests. Watcher
 signal/deadline/interruption tests still have host coverage; installed service
