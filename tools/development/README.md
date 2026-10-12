@@ -47,9 +47,14 @@ The source must be a prepared closure, including dependencies. Export a committe
 revision with Git's archive command and materialize the pinned dependencies from
 `kernel/get-deps` inside it before hashing. Include the matching ui2 sources for
 the desktop. Internal relative symlinks are preserved; links escaping the closure
-and special files are rejected. The build runs on a copy and rechecks the source,
-tools and additional SDK inputs after completion. It performs no downloads or
-installation. Run it as the developer's account with the permissions that account
+and special files are rejected. Directory and regular-file permissions are part
+of each tree pin; symlink modes use canonical 0777 because Darwin's
+umask-dependent modes differ from Vinix's
+reported modes. Link targets remain pinned and escaping links remain errors.
+Recompute tree pins made by older tools on Darwin if they include symlinks.
+The build runs on a copy and rechecks the source, tools and additional SDK inputs
+after completion. It performs no downloads or installation. Run it as the
+developer's account with the permissions that account
 already has. A build plan is executable code supplied by that developer.
 
 A plan has this shape (replace paths and hashes with actual values):

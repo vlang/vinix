@@ -5,6 +5,9 @@ import json2
 import os
 import sourcecommand
 
+#include <sys/stat.h>
+fn C.lchmod(&char, u32) int
+
 fn test_build_compiles_and_runs_a_real_project_and_records_artifacts() {
 	root := sourcecommand.temporary('vinix-build-test')!
 	defer { os.rmdir_all(root) or {} }
@@ -77,10 +80,19 @@ fn test_tree_hash_preserves_internal_symlinks_modes_and_refuses_escape() {
 	os.write_file(root + '/source/file', 'content')!
 	os.chmod(root + '/source/file', 0o755)!
 	os.symlink('../file', root + '/source/sub/link')!
+	$if macos {
+		// The copy gets Darwin's default link mode; Vinix reports 0777.
+		// Neither changes permissions on the linked executable.
+		assert C.lchmod(unsafe { &char((root + '/source/sub/link').str) }, 0o777) == 0
+	}
 	original := tree_hash(root + '/source')!
 	copy_tree(root + '/source', root + '/copy')!
 	assert os.is_link(root + '/copy/sub/link')
 	assert tree_hash(root + '/copy')! == original
+	$if macos {
+		assert C.lchmod(unsafe { &char((root + '/source/sub/link').str) }, 0o755) == 0
+		assert tree_hash(root + '/source')! == original
+	}
 	os.chmod(root + '/copy/file', 0o644)!
 	assert tree_hash(root + '/copy')! != original
 	os.symlink('../../outside', root + '/source/escape')!
