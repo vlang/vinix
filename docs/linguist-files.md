@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `d64921522dabfac2ba482858ad9bc244fc98217b`,
+at source commit `6937b43c2a1da31a411fdf4167e93f07e20fe0f1`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -12,15 +12,15 @@ This is a snapshot; regenerate it when source files change.
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
 | C | 573 | 2,368,101 | 6.07% |
-| Python | 191 | 812,605 | 2.08% |
-| Shell | 638 | 1,369,289 | 3.51% |
+| Python | 181 | 786,825 | 2.02% |
+| Shell | 645 | 1,370,445 | 3.51% |
 
-All `.v` files are classified as V. The resulting V share is 80.34%, with no
+All `.v` files are classified as V. The resulting V share is 80.41%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 812,605 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 786,825 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev d64921522dabfac2ba482858ad9bc244fc98217b --breakdown --json
+github-linguist --rev 6937b43c2a1da31a411fdf4167e93f07e20fe0f1 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -644,7 +644,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/compile-v-atl-configuration.py` | 622 |
 | `build-support/android/compile-v-runtime.py` | 3,918 |
 | `build-support/android/musl-runtime.py` | 2,803 |
-| `build-support/compile-v-module.py` | 2,801 |
 | `build-support/cpython_host.py` | 1,007 |
 | `build-support/debian-root.py` | 4,231 |
 | `build-support/dhewm3/build.py` | 1,738 |
@@ -663,12 +662,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/roblox/_native.py` | 948 |
 | `build-support/roblox/build.py` | 5,502 |
-| `build-support/security-tools/compile-v-core.py` | 2,919 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
 | `build-support/venus/tests/run.py` | 6,197 |
-| `build-support/xorg-server/compile-v-host.py` | 1,972 |
 | `desktop/tools/_font_native.py` | 9,708 |
 | `desktop/tools/_input_native.py` | 792 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
@@ -690,9 +687,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/_kernel_vinix_native.py` | 1,002 |
 | `tests/alloc-bench/_vinix_native.py` | 982 |
 | `tests/alloc-bench/build-macos-kext.py` | 6,112 |
-| `tests/alloc-bench/compile-v-bench.py` | 2,110 |
-| `tests/alloc-bench/compile-v-kmod-info.py` | 3,828 |
-| `tests/alloc-bench/compile-v-sampler.py` | 2,480 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/control.py` | 1,058 |
 | `tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/measure-recorded.py` | 2,225 |
 | `tests/alloc-bench/results/2026-10-02-userspace/excluded/vinix-release-1-preboot/run-vinix-before-fix.py` | 8,908 |
@@ -756,7 +750,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/run-kernel-vinix.py` | 4,226 |
 | `tests/alloc-bench/run-macos.py` | 7,482 |
 | `tests/alloc-bench/run-vinix.py` | 6,015 |
-| `tests/alloc-bench/test_kmod_info.py` | 4,484 |
 | `tests/alloc-bench/test_v_bench.py` | 3,853 |
 | `tests/alloc-bench/test_v_sampler.py` | 2,841 |
 | `tests/android/_run_native.py` | 16,117 |
@@ -796,7 +789,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/run.py` | 20,826 |
 | `tests/ios/uikit.py` | 5,993 |
 | `tests/kernel-gaps/_native.py` | 13,350 |
-| `tests/kernel-gaps/compile-v-fixture.py` | 2,092 |
 | `tests/kernel-gaps/run.py` | 3,048 |
 | `tests/krandom/run_native.py` | 2,478 |
 | `tests/linuxkpi/_audit_native.py` | 7,668 |
@@ -804,9 +796,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/_host_native.py` | 4,257 |
 | `tests/linuxkpi/audit_generation_test.py` | 1,281 |
 | `tests/linuxkpi/compile-native-host.py` | 7,987 |
-| `tests/linuxkpi/compile-v-core.py` | 1,929 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,384 |
-| `tests/linuxkpi/compile-v-host.py` | 1,165 |
 | `tests/linuxkpi/exchange_test.py` | 3,182 |
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
 | `tests/linuxkpi/host_suite.py` | 1,162 |
@@ -1053,6 +1043,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-vm/run.sh` | 159 |
 | `tests/alloc-bench/compare` | 141 |
 | `tests/alloc-bench/compare-kernel` | 148 |
+| `tests/alloc-bench/compile-v-bench` | 165 |
+| `tests/alloc-bench/compile-v-kmod-info` | 168 |
+| `tests/alloc-bench/compile-v-sampler` | 167 |
 | `tests/alloc-bench/materialize-evidence` | 154 |
 | `tests/alloc-bench/results/2026-10-02-userspace/check-recompute` | 155 |
 | `tests/alloc-bench/results/2026-10-02-userspace/compare` | 147 |
@@ -1081,6 +1074,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run-driver` | 378 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/validate-completed` | 426 |
 | `tests/alloc-bench/test-evidence-owner` | 153 |
+| `tests/alloc-bench/test-kmod-info` | 165 |
 | `tests/alloc-bench/test-native-reports` | 153 |
 | `tests/alloc-bench/validate-kernel` | 161 |
 | `tests/alloc-track/run` | 170 |
@@ -1208,6 +1202,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-allocs/sites` | 180 |
 | `tests/kernel-cpu/logic` | 168 |
 | `tests/kernel-cpu/run` | 183 |
+| `tests/kernel-gaps/compile-v-fixture` | 167 |
 | `tests/kernel-gaps/run-native` | 168 |
 | `tests/kernel-gaps/test-runner` | 167 |
 | `tests/kernel-job-control/run` | 191 |
@@ -1224,6 +1219,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run.sh` | 1,734 |
 | `tests/limine-aarch64/test-patch` | 111 |
 | `tests/linux-compat/run` | 153 |
+| `tests/linuxkpi/compile-v-core` | 166 |
+| `tests/linuxkpi/compile-v-host` | 158 |
 | `tests/linuxkpi/run.sh` | 11,272 |
 | `tests/listen-backlog/run` | 187 |
 | `tests/m1-deploy/run.sh` | 2,686 |
