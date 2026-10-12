@@ -1803,3 +1803,71 @@ Positioned vectors still use their earlier import path. Linux MAX_RW_COUNT
 clamping and complete range/length precedence, shared-offset atomicity, stream
 message behavior, actual allocator exhaustion and translated/ELF32 qualification
 remain separate work. The broad section-15 gates remain open.
+
+## Native vector ranges and transfer counts
+
+readv/writev now reject malformed payload ranges before resource I/O. Each
+length must fit in signed ssize_t, and all such length checks precede range
+checks. Every original range, including a zero-length tail beyond userspace,
+must pass the canonical address check. The imported total is capped at
+`INT_MAX & PAGE_MASK`, with copied lengths truncated to the remaining count.
+Linux's single-segment path caps its length before checking its range; multiple
+segments check their original ranges, even after reaching the cap. See
+[Linux 6.12's importer](https://github.com/torvalds/linux/blob/v6.12/lib/iov_iter.c#L1284),
+[range predicate](https://github.com/torvalds/linux/blob/v6.12/include/asm-generic/access_ok.h#L29)
+and [count limit](https://github.com/torvalds/linux/blob/v6.12/include/linux/fs.h#L2511).
+Existing copied-header ownership and descriptor references cover these errors.
+
+The V `iovrange` fixture checks 215 cases in each root and UID/GID 1000 child,
+using 2/8/9/513/1024-entry arrays on regular files, pipes and UNIX stream/datagram
+sockets. Invalid later ranges require EFAULT before changing the first buffer,
+file offset/content, queued pipe bytes or socket messages. Cases include zero
+tails outside userspace, boundary-crossing and wrapping ranges, and a positive
+SSIZE_MAX length. Signed-invalid later lengths require EINVAL before an earlier
+invalid range. A PROT_NONE destination inside userspace remains a copy-time
+fault; a regular read retains its completed first-vector prefix.
+
+Fourteen EOF checks exercise the single/multiple-segment distinction, valid
+counts above the cap and invalid tails beyond it. No 2 GiB buffer or transfer
+is needed: EOF must succeed when the capped range fits, and an original range
+that fails validation must report EFAULT before EOF. The cap is 2,147,467,264
+bytes with ARM's 16 KiB pages and 2,147,479,552 with x86's 4 KiB pages.
+Fixed MAP_FIXED_NOREPLACE probes measure the active address limit, map/unmap
+its last page and require refusal of the next page before retention warmup.
+The qualified guests have 47-bit ARM and 56-bit x86 ranges. The first x86
+fixture incorrectly assumed 47 bits; its rejected run is preserved separately
+and contributes no passing qualification. A corrected x86 attempt passed this
+fixture but disk exhaustion interrupted receipt writing; its log is preserved
+separately. The fresh x86 run completed seven cases before disk exhaustion
+interrupted sharedmem staging. Its original receipt retains that failed row;
+four unfinished cases pass in a resumed run against the identical frozen
+kernel. The audit verifies both runs and uses only completed passing cases.
+
+Each unchanged kernel fails 121 checks per credential group. It can consume
+the first byte before rejecting a later malformed range, accept an invalid
+zero tail, and return EINVAL for a positive length whose range requires EFAULT.
+Both fixed kernels pass all 430 checks. Each credential group runs 32 warmup
+and 200 measured cycles through stack/heap range/length errors and EOF count
+boundaries, checking every live slab class and big-page count. Both stay flat.
+The earlier header and descriptor race/retention fixtures also pass.
+
+Both architectures pass eleven regression cases; all eight compatibility host
+tests and the mapping-storage geometry test pass. Allocation-site audits still
+fail the same existing allowances: 406 ARM and 295 x86 sites, with identical
+failure rows and no increased allowances. Independent review of the emitted
+kernels and fixtures approved cleanup, guarded subtraction and bounded stack
+storage, including the new address-probe mappings.
+
+The [dated results](../tests/linux-compat/results/2026-10-13/) publish
+`iovrange-before-*`, `iovrange-after-*`, the rejected x86 limit-oracle run,
+the interrupted receipt-writing log, `iovrange-resumed-x86_64`, host checks
+and both allocation-audit logs. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/iovrange-audit.v)
+verifies frozen inputs/artifacts, the native failures, passing regressions,
+retention and rejection of passing output as a negative control. The inventory
+retains 62 input fingerprints.
+
+Actual transfers at the 2 GiB cap, positioned vectors, tagged ARM pointers,
+four-level x86 runs, partial header-copy precedence, shared-offset atomicity,
+stream message conformance, allocator exhaustion and translated/ELF32 paths
+remain separate qualification work. The three broad section-15 gates stay open.

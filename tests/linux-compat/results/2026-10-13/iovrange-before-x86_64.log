@@ -1,0 +1,491 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   614k      0 --:--:-- --:--:-- --:--:--  613k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 39 2880k   39 1130k    0     0  1685k      0  0:00:01 --:--:--  0:00:01 1682k100 2880k  100 2880k    0     0  2587k      0  0:00:01  0:00:01 --:--:-- 2589k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  65333      0 --:--:-- --:--:-- --:--:-- 65488
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   570k      0 --:--:-- --:--:-- --:--:--  569k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   138k      0 --:--:-- --:--:-- --:--:--  138k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 95  117k   95  111k    0     0   297k      0 --:--:-- --:--:-- --:--:--  297k100  117k  100  117k    0     0   311k      0 --:--:-- --:--:-- --:--:--  310k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovrange-1013/before-final-x86/iovrange/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovrange-1013/before-final-x86/iovrange/.vinix-amd64.iso.UMLdXY'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  825m free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovrange-1013/before-final-x86/iovrange/iso-build/.iso-staging.HIYBaj/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  92.54% done
+ISO image produced: 13486 sectors
+Written to medium : 13486 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovrange-1013/before-final-x86/iovrange/.vinix-amd64.iso.UMLdXY' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2b7.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovrange-1013/before-final-x86/iovrange/test.iso (27619328 bytes)
+Guest artifacts: /private/tmp/vinix-iovrange-1013/before-final-x86/iovrange
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75472
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX IOVRANGE ADDRESS: user_limit=72057594037927936 last_page=mapped next_page=refused
+LINUX IOVRANGE DETAIL: label=0 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=2 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=2 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=2 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=2 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=2 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=2 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=2 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=2 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=2 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=2 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=2 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=2 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=2 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=2 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=2 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=2 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=8 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=8 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=8 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=8 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=8 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=8 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=8 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=8 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=8 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=8 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=8 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=8 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=8 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=8 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=8 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=8 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=9 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=9 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=9 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=9 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=9 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=9 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=9 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=9 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=9 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=9 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=9 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=9 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=9 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=9 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=9 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=9 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=513 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=513 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=513 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=513 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=513 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=513 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=513 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=513 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=513 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=513 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=513 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=513 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=513 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=513 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=513 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=513 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=1024 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=1024 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=1024 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=1024 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=1024 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=1024 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=1024 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=1024 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=1024 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=1024 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=1024 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=1024 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=1024 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=1024 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=1024 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=1024 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=101 write=0 count=1 result=-1/14 expected=0/0
+LINUX IOVRANGE DETAIL: label=103 write=0 count=1 result=-1/14 expected=0/0
+LINUX IOVRANGE DETAIL: label=105 write=0 count=1 result=0/0 expected=-1/14
+LINUX IOVRANGE DETAIL: label=105 write=0 count=2 result=0/0 expected=-1/14
+LINUX IOVRANGE DETAIL: label=110 write=0 count=2 result=0/0 expected=-1/14
+LINUX IOVRANGE LIMIT: page=4096 max_rw_count=2147479552 checks=14 FAIL
+LINUX IOVRANGE CASE: ordinary=1 checks=215 failures=121
+LINUX IOVRANGE ADDRESS: user_limit=72057594037927936 last_page=mapped next_page=refused
+LINUX IOVRANGE DETAIL: label=0 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=2 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=2 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=2 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=2 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=2 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=2 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=2 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=2 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=2 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=2 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=2 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=2 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=2 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=2 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=2 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=2 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=2 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=2 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=8 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=8 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=8 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=8 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=8 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=8 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=8 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=8 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=8 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=8 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=8 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=8 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=8 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=8 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=8 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=8 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=8 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=8 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=9 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=9 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=9 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=9 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=9 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=9 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=9 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=9 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=9 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=9 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=9 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=9 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=9 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=9 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=9 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=9 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=9 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=9 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=513 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=513 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=513 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=513 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=513 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=513 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=513 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=513 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=513 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=513 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=513 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=513 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=513 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=513 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=513 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=513 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=513 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=513 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=1024 variant=0 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=1 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=1024 variant=1 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=2 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=0 count=1024 variant=2 byte=41 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=0 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=0 write=1 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=0 write=1 count=1024 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=3 write=1 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=1024 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=11 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=1024 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=12 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=0 count=1024 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=13 write=0 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=10 write=1 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=1 write=1 count=1024 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=13 write=1 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=1024 variant=0 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=21 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=1024 variant=1 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=22 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=0 count=1024 variant=2 byte=41 offset_or_queued=3
+LINUX IOVRANGE DETAIL: label=23 write=0 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=20 write=1 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=2 write=1 count=1024 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=23 write=1 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=1024 variant=0 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=31 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=1024 variant=1 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=32 write=0 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=0 count=1024 variant=2 byte=41 offset_or_queued=0
+LINUX IOVRANGE DETAIL: label=33 write=0 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=30 write=1 count=1024 result=1/0 expected=-1/14
+LINUX IOVRANGE MUTATION: kind=3 write=1 count=1024 variant=0 byte=58 offset_or_queued=1
+LINUX IOVRANGE DETAIL: label=33 write=1 count=1024 result=-1/22 expected=-1/14
+LINUX IOVRANGE DETAIL: label=101 write=0 count=1 result=-1/14 expected=0/0
+LINUX IOVRANGE DETAIL: label=103 write=0 count=1 result=-1/14 expected=0/0
+LINUX IOVRANGE DETAIL: label=105 write=0 count=1 result=0/0 expected=-1/14
+LINUX IOVRANGE DETAIL: label=105 write=0 count=2 result=0/0 expected=-1/14
+LINUX IOVRANGE DETAIL: label=110 write=0 count=2 result=0/0 expected=-1/14
+LINUX IOVRANGE LIMIT: page=4096 max_rw_count=2147479552 checks=14 FAIL
+LINUX IOVRANGE CASE: ordinary=0 checks=215 failures=121
+LINUX IOVRANGE FAIL: native range/error/count semantics
+QEMU: Terminated
+Missing verdicts: ['LINUX IOVRANGE: PASS']; failures: ['FAIL:', 'LINUX IOVRANGE FAIL']
+Linux compatibility qualification failed; see /private/tmp/vinix-iovrange-1013/before-final-x86/receipt.json

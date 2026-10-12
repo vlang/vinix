@@ -199,12 +199,27 @@ fn import_linux_iov(iov_ptr u64, iovcnt int, fast voidptr) ?LinuxIOVector {
 	if !usercopy.copy_from_user(vector.data, iov_ptr, bytes) {
 		vector.release(); errno.set(errno.efault); return none
 	}
+	// Linux rejects any length that cannot be represented by ssize_t before
+	// testing payload ranges. The bounded transfer count avoids sum overflow.
 	for i := 0; i < iovcnt; i++ {
-		iov := unsafe { vector.data[i] }
-		if iov.len > u64(0x7fffffffffffffff) - vector.total {
+		if unsafe { vector.data[i].len } > u64(0x7fffffffffffffff) {
 			vector.release(); errno.set(errno.einval); return none
 		}
-		vector.total += iov.len
+	}
+	max_count := u64(0x7fffffff) & ~(memory.page_size - 1)
+	limit := memory.user_address_limit()
+	for i := 0; i < iovcnt; i++ {
+		iov := unsafe { vector.data[i] }
+		// Linux's one-segment ITER_UBUF path truncates before access_ok.
+		// Multiple segments check their original ranges, even after the
+		// transfer cap has been reached and their effective length is zero.
+		length := if iovcnt == 1 && iov.len > max_count { max_count } else { iov.len }
+		if iov.base > limit || length > limit - iov.base {
+			vector.release(); errno.set(errno.efault); return none
+		}
+		taken := if length > max_count - vector.total { max_count - vector.total } else { length }
+		unsafe { vector.data[i].len = taken }
+		vector.total += taken
 	}
 	return vector
 }

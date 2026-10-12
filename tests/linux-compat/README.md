@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -85,9 +85,25 @@ All I/O must use the original addresses and complete lengths. A preopened
 scratch-reservation observer establishes the read import checkpoint; queued
 pipe bytes establish the write checkpoint. Both checks work on the unchanged
 kernel too. Two 200-cycle cohorts check stack/heap import cleanup on valid,
-empty, bad-header, bad-payload and aggregate-length errors. This does not
+empty, bad-header, bad-payload and invalid-range errors. This does not
 qualify positioned vectors, Linux's MAX_RW_COUNT/range handling, shared-offset
 atomicity, stream message behavior, memory exhaustion or foreign ABIs.
+
+The `iovrange` case checks 215 native range/length/count cases in each root and
+UID/GID 1000 child. Later invalid ranges must return EFAULT before changing
+regular-file contents/offsets, pipe bytes or UNIX stream/datagram messages,
+including invalid bases on zero-length entries. Later signed-invalid lengths
+require EINVAL before earlier range errors. Fixed mmap probes measure the
+active user limit and verify its last and next pages; the qualified QEMU runs
+use 47-bit ARM and 56-bit x86 ranges. EOF boundary tests distinguish a single
+segment's page-size MAX_RW_COUNT clamp before range validation from multiple
+segments' original-range checks, including tails beyond the cap. In-range
+PROT_NONE destinations still fail at copy time and retain a regular read's
+completed prefix. Two 200-cycle error/count cohorts compare every live slab
+class and big-page count after warmup. No 2 GiB payload is allocated or
+transferred. Positioned vectors, tagged ARM pointers, four-level x86 runs,
+shared-offset atomicity, stream message conformance and foreign ABIs remain
+separate work. See the [qualification and receipts](../../docs/linux-posix-qualification.md#native-vector-ranges-and-transfer-counts).
 
 The `sharedmem` case drops to UID 1000/GID 2000 and checks memfd creator
 ownership, mode 0777 independent of umask, zero links, owner chmod and a

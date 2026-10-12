@@ -637,6 +637,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   through concurrent header mutation/protection; qualify stack/heap vector
   storage, error cleanup and flat retention on both native architectures.
   See [the immutable iovec receipts](docs/linux-posix-qualification.md#immutable-iovec-imports).
+- [x] Validate native readv/writev signed lengths and all canonical ranges
+  before I/O, including invalid zero tails; enforce page-size transfer-count
+  clamping and qualify EOF boundaries, unchanged file/pipe/socket data and
+  flat error-path retention on both architectures. See [the range/count receipts](docs/linux-posix-qualification.md#native-vector-ranges-and-transfer-counts).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "902f343b9ee3280f5c0ec88924d1bafa9f8bf19c8802c65aaabd5052318f79c3",
+    "results": [
+        {
+            "name": "iovrange",
+            "source_sha256": "a19883facc6f1fc864e6f5ba6998e2d8451ee752bd4dcce37614fff6a2c6e902",
+            "init_sha256": "b3d2a0cdd3ce63a18587e804bf6e69572ca7d66e00977ef864eeb5a43d1a9b92",
+            "iso_sha256": "a3574beafe74ddbdc42602d1ece9b984ddbc31815eea5321578a51d0981bd997",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

@@ -139,7 +139,9 @@ fn storage_cycle() bool {
 				if !vector_result(fd, write, vector, count, -1, C.EFAULT) { return false }
 				vector[0] = IOVec{base: u64(&data[0]), len: 1}
 				vector[1] = IOVec{base: u64(&data[1]), len: u64(0x7fffffffffffffff)}
-				if !vector_result(fd, write, vector, count, -1, C.EINVAL) { return false }
+				// This positive length exceeds the user address range. Linux
+				// rejects it with EFAULT; transfer truncation avoids sum overflow.
+				if !vector_result(fd, write, vector, count, -1, C.EFAULT) { return false }
 				vector[0].len = 0; vector[1].len = 0
 				if !vector_result(fd, write, vector, count, 0, 0) { return false }
 			}
