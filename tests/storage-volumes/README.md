@@ -134,6 +134,17 @@ changed and all-absent orders. Guests verify omitted replay, retained live
 descriptors, reused-slot preflight conflicts and persistent absence across boot.
 See [removal batch qualification](removal-batch.md).
 
+Disk enrollment batches compare 1024 existing/requested subset combinations
+against independent add/keep oracles across request order and MBR/GPT/sector
+layouts. They preserve desired rows and pool priority, reject later conflicts,
+and cover all 64 source descriptors/67 CLI arguments at the full V2 limit.
+Source fault tests check in-place changes, truncation, path replacement,
+interrupted/short reads, final stat/read failures, read-only/CLOEXEC flags and
+cleanup. Publisher and buffered output faults cover additions and all-keep
+retries. Guests verify unavailable participants, retained views, real physical
+reenrollment and exact persistent retries. See
+[enrollment batch qualification](enrollment-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -160,8 +171,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 8800 utility processes across 200 warmup
-and 200 measured twenty-two-command cycles, with pool membership, query, batch
+its own process. The allowance includes 9600 utility processes across 200 warmup
+and 200 measured twenty-four-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
@@ -212,8 +223,8 @@ mapping capacity, previews/verifies/republishes both unchanged physical capaciti
 previews/publishes admission of two pool members and unchanged allocation priority,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
 batch, previews/publishes a two-mapping growth batch, checks and previews/removes the scratch
-mappings, enrolls/forgets an empty offline
-participant, explicitly replays growth and runs boot restoration.
+mappings, previews/enrolls two empty offline participants and forgets both,
+explicitly replays growth and runs boot restoration.
 A flushed phase marker
 and the atomically published bundle stay on ext2 across an
 abrupt VM stop. The physical disks are reordered for the second boot. Production ARM

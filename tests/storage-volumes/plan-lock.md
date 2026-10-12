@@ -5,7 +5,7 @@ guest architectures. Production kernel code and saved formats are unchanged.
 
 The host suite holds an exclusive directory lock and requires every saved-state
 writer to fail without changing bytes or creating files: mapping add/remove (including removal batches) and
-growth, disk enrollment/removal, physical-capacity adoption, pool membership,
+growth, disk enrollment/removal (including enrollment batches), physical-capacity adoption, pool membership,
 allocation, expansion/growth, batches, bounded extent allocation, direct plan
 publication and live snapshots. Batch previews, pool queries and extent queries
 must succeed while that lock is held. Directory aliases share exclusion; a
@@ -40,7 +40,7 @@ a lock until killed; the next writer succeeds after reaping.
 `PLAN LOCK PASSED:` is required before the first boot is accepted.
 
 Each architecture also runs the existing 200 warmup and 200 measured cycles:
-**8800 utility processes**, with every saved mutation acquiring/releasing its
+**9600 utility processes**, with every saved mutation acquiring/releasing its
 lock. All slab classes and large-allocation page totals must stay flat or
 decrease. The unchanged four-boot fixture verifies reordered discovery,
 physical-capacity adoption and seven durable mappings with old/tail bytes,

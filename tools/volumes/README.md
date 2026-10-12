@@ -71,6 +71,13 @@ participant while retaining at least one disk. Both edit saved membership;
 live views survive omission. See
 [disk membership and index rules](../../docs/storage-volumes.md#offline-disk-membership).
 
+`plan-enroll-batch BUNDLE PLAN [...]` atomically imports 1–64 snapshots with
+complete read-only `plan-preview-enroll-batch` reports. New disks append;
+existing identities are durable keep retries only when their full saved
+geometry and ordered mappings match. Pinned read-only sources are rechecked
+before publication/reporting; later failures preserve the whole original set.
+See [enrollment batch rules](../../docs/storage-volumes.md#atomic-disk-enrollment-batches).
+
 `plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES` reports
 aligned gaps between saved mappings in an explicitly chosen region.
 `plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES

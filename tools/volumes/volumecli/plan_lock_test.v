@@ -58,6 +58,10 @@ fn test_directory_lock_excludes_all_saved_state_writers_but_preserves_readonly_i
 	assert edit_bundle_plan(path.str, 0, &row, false) == 1
 	assert grow_bundle_plan(path.str, 2, 8192) == 1
 	assert enroll_bundle_disk(path.str, c'/unused') == 1
+	unsafe {
+		inputs := [&char(c'/unused')]!
+		assert enroll_batch_bundle_plan(path.str, 1, &inputs[0], false) == 1
+	}
 	assert forget_bundle_disk(path.str, 0) == 1
 	assert capacity_bundle_plan(path.str, 0, c'/unused', 32768) == 1
 	assert edit_pool_plan(path.str, &region, false) == 1

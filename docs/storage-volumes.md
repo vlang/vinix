@@ -474,6 +474,56 @@ can be forgotten; remaining pool disk indices follow the compacted saved order. 
 and RAID are still separate work. See
 [disk membership qualification](../tests/storage-volumes/disk-bundle.md).
 
+## Atomic disk enrollment batches
+
+```sh
+vinix-volume plan-preview-enroll-batch /root/layout.vset /root/disk2.vmap /root/disk3.vmap
+vinix-volume plan-enroll-batch /root/layout.vset /root/disk2.vmap /root/disk3.vmap
+vinix-volume check-bundle /root/layout.vset
+```
+
+`plan-enroll-batch BUNDLE PLAN [...]` imports 1–64 complete single-disk snapshots
+as one saved-state edit. Every input must be a bounded regular `.vmap` file
+with valid version, checksum, identity, geometry and ordered mapping rows.
+Final symlinks are rejected. New disks append in request order, preserving
+all existing disk indices, pending desired edits and pool metadata/priority.
+Snapshots do not carry pool membership; configure eligibility separately.
+
+An already-enrolled identity is a `keep` retry only when capacity, sector size,
+identity kind/value and every active mapping row, mode and row order match.
+Matching retries retain the existing disk index and saved plan, including
+inactive storage. Conflicting snapshots never overwrite desired state.
+Identity means the MBR signature or GPT GUID independently of geometry;
+duplicate identities in the request or an ambiguous existing bundle fail.
+Duplicate global slots, invalid geometry and the 64-disk/64-mapping limits
+also fail without a partially enrolled prefix. Single-plan `plan-enroll`
+retains its existing duplicate-key error behavior.
+
+The command retains all read-only, close-on-exec source descriptors through
+publication and report flushing. After complete planning it rechecks each
+pinned inode against its original checksummed bytes, handling interrupted and
+short reads. Observed source changes or read/stat failures abort the whole
+operation. Replacing a source path cannot redirect an already-pinned import.
+Administration must serialize source edits; the final reads cannot prevent a
+write that happens afterward.
+
+`plan-preview-enroll-batch` uses the same validation, planning and source
+rechecks without physical-device probes, a writer lock, temporary or
+publication. Both commands report every request's disk index, add/keep action,
+identity, capacity, sector size and complete ordered mapping rows, after all
+inputs succeed. Preview does not reserve the configuration.
+
+Publication retains the pinned bundle directory writer lock from source read
+through cleanup. Every matching retry still writes, file-fsyncs, atomically
+renames and directory-fsyncs the entire bundle. Failure before rename keeps
+the old file; after rename the complete new set may be visible with durability
+unconfirmed. Buffered output failure returns an error too. Inspect saved state
+or repeat the same snapshots to confirm durability. Enrollment opens no live
+views and relocates no data; later complete live preflight/replay still checks
+all enrolled disks, including unavailable empty participants. Existing V1/V2
+formats and boot replay persist the imports. See
+[enrollment batch qualification](../tests/storage-volumes/enrollment-batch.md).
+
 ## Bounded extent allocation
 
 ```sh

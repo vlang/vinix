@@ -44,11 +44,11 @@ required before acceptance.
 
 Each repeated cycle saves, plans and verifies unchanged capacity, previews and
 publishes scratch allocation/growth batches, checks and previews/removes both scratch
-entries, enrolls/forgets an empty offline disk,
+entries, previews/enrolls two empty offline disks and forgets both,
 explicitly restores and runs boot replay.
 The scratch mappings must never become live. After 200 warmup and 200 measured cycles,
 all slab classes and large allocation pages must stay flat. The 1800-second
-boot allowance covers 8800 utility processes on x86 TCG, including physical
+boot allowance covers 9600 utility processes on x86 TCG, including physical
 capacity verification, pool membership/query and allocation/growth/expansion batch
 previews/publications. A reordered
 second boot uses production init and the actual disk-resident five-mapping bundle,

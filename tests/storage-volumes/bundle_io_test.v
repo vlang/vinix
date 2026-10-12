@@ -31,6 +31,70 @@ mut:
 
 __global bundle_io BundleIO
 
+struct EnrollmentReadIO {
+mut:
+	mode int
+	opens int
+	closes int
+	stats int
+	reads int
+	fds [64]i32
+	first &char = unsafe { nil }
+	replacement &char = unsafe { nil }
+	moved &char = unsafe { nil }
+}
+
+__global enrollment_read_io EnrollmentReadIO
+
+fn enrollment_mock_open(path &char, flags i32) i32 {
+	enrollment_read_io.opens++
+	if enrollment_read_io.mode == 9 && enrollment_read_io.opens == 2 { unsafe { C.errno = C.EIO }; return -1 }
+	fd := C.open(path, flags)
+	if fd >= 0 {
+		assert enrollment_read_io.opens <= 64
+		enrollment_read_io.fds[enrollment_read_io.opens - 1] = fd
+		assert C.fcntl(fd, C.F_GETFD) & C.FD_CLOEXEC != 0 && C.fcntl(fd, C.F_GETFL) & C.O_ACCMODE == C.O_RDONLY
+	}
+	if enrollment_read_io.opens == 2 && enrollment_read_io.mode in [1, 2, 3, 4] {
+		if enrollment_read_io.mode == 4 {
+			assert C.renameat(C.AT_FDCWD, enrollment_read_io.first, C.AT_FDCWD, enrollment_read_io.moved) == 0
+			assert C.renameat(C.AT_FDCWD, enrollment_read_io.replacement, C.AT_FDCWD, enrollment_read_io.first) == 0
+		} else {
+			changed := C.open(enrollment_read_io.first, C.O_WRONLY | if enrollment_read_io.mode == 3 { C.O_TRUNC } else { 0 })
+			assert changed >= 0
+			if enrollment_read_io.mode == 1 {
+				mut byte := u8(0x77); assert C.write(changed, &byte, 1) == 1
+			} else if enrollment_read_io.mode == 2 {
+				mut replacement := Plan{key: DiskKey{bytes: 65536, sector: 4096, kind: 2}}
+				replacement.key.id[0] = 2; mut bytes := [2112]u8{}
+				size := encode_plan(&replacement, &bytes[0]); assert size == 64 && C.write(changed, &bytes[0], usize(size)) == size
+			}
+			assert C.close(changed) == 0
+		}
+	}
+	return fd
+}
+
+fn enrollment_mock_close(fd i32) i32 {
+	enrollment_read_io.closes++
+	return C.close(fd)
+}
+
+fn enrollment_mock_fstat(fd i32, info &C.stat) i32 {
+	enrollment_read_io.stats++
+	if enrollment_read_io.mode == 8 && enrollment_read_io.stats == 2 { unsafe { C.errno = C.EIO }; return -1 }
+	result := C.fstat(fd, info)
+	if result == 0 && enrollment_read_io.mode == 7 { unsafe { info.st_size++ } }
+	return result
+}
+
+fn enrollment_mock_pread(fd i32, buffer voidptr, bytes usize, offset i64) i64 {
+	enrollment_read_io.reads++
+	if enrollment_read_io.mode == 5 && enrollment_read_io.reads == 1 { unsafe { C.errno = C.EINTR }; return -1 }
+	if enrollment_read_io.mode == 6 { return 0 }
+	return C.pread(fd, buffer, if enrollment_read_io.mode == 5 && bytes > 7 { usize(7) } else { bytes }, offset)
+}
+
 fn bundle_mock_write(fd i32, buffer voidptr, bytes usize) i64 {
 	bundle_io.writes++
 	if bundle_io.mode == 1 && bundle_io.writes == 1 {
@@ -837,6 +901,122 @@ fn test_mapping_removal_preview_and_publication_detect_buffered_stdout_failure()
 			expected.slots = 0
 			for disk in 0 .. 2 { expected.plans[disk].count = 0; expected.plans[disk].rows[0] = Request{} }
 		}
+		mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded) && decoded == expected
+	}
+}
+
+fn enrollment_io_fixture(mut set PlanSet, mut first Plan, mut second Plan) {
+	mut anchor := Plan{count: 1, key: DiskKey{bytes: 32768, sector: 512, kind: 1}}
+	anchor.key.id[0] = 1; anchor.rows[0] = Request{slot: 2, length: 4096, flags: 1}
+	assert append_plan(mut set, &anchor)
+	region := PoolRegion{pool: 3, disk: 0, window: SpaceWindow{start: 16384, end: 24576, alignment: 4096}}
+	assert bundle_pool_add(mut set, &region)
+	first = Plan{key: DiskKey{bytes: 32768, sector: 4096, kind: 2}}; first.key.id[0] = 2
+	second = Plan{count: 1, key: DiskKey{bytes: 65536, sector: 4096, kind: 1}}
+	second.key.id[0] = 3; second.rows[0] = Request{slot: 9, offset: 4096, length: 8192, flags: 1}
+}
+
+fn test_enrollment_pins_and_rechecks_every_source_and_closes_all_descriptors_on_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-enrollment-read-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'; first_path := work + '/first.vmap'; second_path := work + '/second.vmap'
+	replacement_path := work + '/replacement.vmap'; moved_path := work + '/moved.vmap'
+	for preview in [false, true] {
+		for mode in 0 .. 10 {
+			mut set := PlanSet{}; mut first := Plan{}; mut second := Plan{}
+			enrollment_io_fixture(mut set, mut first, mut second)
+			bundle_io = BundleIO{}; enrollment_read_io = EnrollmentReadIO{}
+			assert publish_bundle(path.str, &set) && publish_plan(first_path.str, &first) && publish_plan(second_path.str, &second)
+			mut replacement := first; replacement.key.id[0] = 99
+			assert publish_plan(replacement_path.str, &replacement)
+			original := os.read_bytes(path)!
+			enrollment_read_io = EnrollmentReadIO{mode: mode, first: first_path.str, replacement: replacement_path.str, moved: moved_path.str}
+			bundle_io = BundleIO{}
+			unsafe {
+				inputs := [first_path.str, second_path.str]!
+				success := mode in [0, 4, 5]
+				assert enroll_batch_bundle_plan(path.str, 2, &inputs[0], preview) == if success { 0 } else { 1 }
+				assert enrollment_read_io.closes == if mode == 9 { 1 } else { 2 }
+				for i in 0 .. enrollment_read_io.closes { assert C.fcntl(enrollment_read_io.fds[i], C.F_GETFD) == -1 }
+				if !success || preview { assert os.read_bytes(path)! == original && bundle_io == BundleIO{} }
+				else {
+					mut expected := set; expected.count = 3; expected.slots |= u64(1) << 9
+					expected.plans[1] = first; expected.plans[2] = second
+					current := os.read_bytes(path)!; mut decoded := PlanSet{}
+					assert decode_bundle(current.data, current.len, mut decoded) && decoded == expected
+					assert bundle_io.renames == 1 && bundle_io.flushes == 2
+				}
+				if success { assert enrollment_read_io.stats == 2 && enrollment_read_io.reads >= 4 }
+				if mode == 5 { assert enrollment_read_io.reads > 20 }
+			}
+			if mode == 4 { os.rm(moved_path)! }
+		}
+	}
+	enrollment_read_io = EnrollmentReadIO{}
+}
+
+fn test_enrollment_batches_and_all_keep_retries_use_atomic_publication_under_every_fault() {
+	work := os.join_path(os.temp_dir(), 'vinix-enrollment-publish-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'; first_path := work + '/first.vmap'; second_path := work + '/second.vmap'
+	for retry in [false, true] {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}; mut first := Plan{}; mut second := Plan{}
+			enrollment_io_fixture(mut set, mut first, mut second)
+			bundle_io = BundleIO{}; enrollment_read_io = EnrollmentReadIO{}
+			assert publish_bundle(path.str, &set) && publish_plan(first_path.str, &first) && publish_plan(second_path.str, &second)
+			mut expected := set; expected.count = 3; expected.slots |= u64(1) << 9
+			expected.plans[1] = first; expected.plans[2] = second
+			unsafe {
+				inputs := [first_path.str, second_path.str]!
+				if retry { assert enroll_batch_bundle_plan(path.str, 2, &inputs[0], false) == 0 }
+				original := os.read_bytes(path)!
+				bundle_io = BundleIO{mode: mode}; enrollment_read_io = EnrollmentReadIO{}
+				assert enroll_batch_bundle_plan(path.str, 2, &inputs[0], false) == if mode == 1 { 0 } else { 1 }
+				assert enrollment_read_io.closes == 2 && enrollment_read_io.stats == 2
+				assert bundle_io.closes == 2 && bundle_io.writes > 0 && os.ls(work)!.len == 3
+				current := os.read_bytes(path)!; mut decoded := PlanSet{}
+				assert decode_bundle(current.data, current.len, mut decoded)
+				if mode == 1 || mode == 4 {
+					assert decoded == expected && (current == original) == retry
+					assert bundle_io.renames == 1 && bundle_io.flushes == 2
+				} else { assert current == original }
+				bundle_io = BundleIO{}; enrollment_read_io = EnrollmentReadIO{}
+				assert enroll_batch_bundle_plan(path.str, 2, &inputs[0], false) == 0 && bundle_io.flushes == 2 && bundle_io.renames == 1
+				completed := os.read_bytes(path)!
+				bundle_io = BundleIO{mode: mode}; enrollment_read_io = EnrollmentReadIO{}
+				assert enroll_batch_bundle_plan(path.str, 2, &inputs[0], true) == 0 && os.read_bytes(path)! == completed
+				assert bundle_io == BundleIO{mode: mode} && enrollment_read_io.closes == 2 && enrollment_read_io.stats == 2
+			}
+		}
+	}
+}
+
+fn test_enrollment_preview_and_publication_detect_buffered_stdout_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-enrollment-output-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'; first_path := work + '/first.vmap'; second_path := work + '/second.vmap'
+	for preview in [false, true] {
+		mut set := PlanSet{}; mut first := Plan{}; mut second := Plan{}
+		enrollment_io_fixture(mut set, mut first, mut second)
+		bundle_io = BundleIO{}; enrollment_read_io = EnrollmentReadIO{}
+		assert publish_bundle(path.str, &set) && publish_plan(first_path.str, &first) && publish_plan(second_path.str, &second) && C.fflush(C.stdout) == 0
+		original := os.read_bytes(path)!
+		child := C.fork(); assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY)
+			if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }; C.close(fd)
+			mut buffer := [4096]char{}
+			if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+			unsafe {
+				inputs := [first_path.str, second_path.str]!
+				C._exit(if enroll_batch_bundle_plan(path.str, 2, &inputs[0], preview) == 1 && enrollment_read_io.closes == 2 { 0 } else { 4 })
+			}
+		}
+		mut code := i32(-1); assert C.waitpid(child, &code, 0) == child && code == 0
+		current := os.read_bytes(path)!; assert (current == original) == preview
+		mut expected := set
+		if !preview { expected.count = 3; expected.slots |= u64(1) << 9; expected.plans[1] = first; expected.plans[2] = second }
 		mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded) && decoded == expected
 	}
 }

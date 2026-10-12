@@ -42,11 +42,11 @@ Reenrollment restores the exact desired bytes offline while live checks fail
 until the physical identity returns; replay then keeps all generations.
 `PLAN DISKS PASSED:` is required by the controller.
 
-Each of 200 warmup and 200 measured cycles adds two successful membership
-commands to the existing workload: enroll an empty unavailable disk, then
-forget it before live restoration. Including physical capacity verification
+Each of 200 warmup and 200 measured cycles runs four successful membership
+commands: preview and enroll two empty unavailable disks, then forget each
+before live restoration. Including physical capacity verification
 and pool membership/query/allocation, growth and expansion batch previews/publications,
-there are twenty-two commands per cycle, or 8800 utility processes. Strict
+there are twenty-four commands per cycle, or 9600 utility processes. Strict
 acceptance requires flat slab classes and large
 allocation pages. The 1800-second allowance accommodates x86 TCG. A reordered
 reboot runs production init against the actual disk-resident two-disk bundle,
