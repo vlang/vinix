@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `8f4b4b4d6dc8789bab9c6a2a00753648596ff5e4`,
+at source commit `99cb5e31534066b7ca608ffa07b7258864564a49`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 593 | 2,394,789 | 5.80% |
-| Python | 43 | 275,389 | 0.67% |
-| Shell | 785 | 1,370,383 | 3.32% |
+| C | 595 | 2,395,229 | 5.78% |
+| Python | 40 | 264,500 | 0.64% |
+| Shell | 788 | 1,370,862 | 3.31% |
 
-All `.v` files are classified as V. The resulting V share is 82.66%, with no
+All `.v` files are classified as V. The resulting V share is 82.76%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 275,389 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 264,500 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 8f4b4b4d6dc8789bab9c6a2a00753648596ff5e4 --breakdown --json
+github-linguist --rev 99cb5e31534066b7ca608ffa07b7258864564a49 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -79,6 +79,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/dota2/qemubuild/stat_abi.h` | 387 |
 | `build-support/init-aarch64/syscall_abi.h` | 613 |
 | `build-support/ios/cxx-abi.h` | 456 |
+| `build-support/ios/iosbuild/copy_abi.h` | 294 |
+| `build-support/ios/test-abi.h` | 149 |
 | `build-support/minecraft/minecraftnative/spawn_abi.h` | 1,341 |
 | `build-support/n64-homebrew/paddlecore/freestanding/inttypes.h` | 124 |
 | `build-support/n64-homebrew/paddlecore/freestanding/stdio.h` | 298 |
@@ -100,7 +102,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/x86-translation/sppc-office-v-abi.h` | 514 |
 | `build-support/xorg-server/wine-host-v-abi.h` | 1,093 |
 | `build-support/xorg-server/xinput_abi.h` | 1,633 |
-| `compat/ios/runner/abi/cxx-symbols.h` | 50,070 |
+| `compat/ios/runner/abi/cxx-symbols.h` | 50,067 |
 | `compat/ios/runner/abi/dispatch.h` | 20,210 |
 | `compat/ios/runner/abi/gles-surface.h` | 387 |
 | `compat/ios/runner/abi/image_config.h` | 457 |
@@ -658,9 +660,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/_boot_native.py` | 20,549 |
 | `build-support/android/_native.py` | 5,749 |
 | `build-support/cpython_host.py` | 1,007 |
-| `build-support/ios/build-cxx.py` | 6,554 |
-| `build-support/ios/generate-cxx-symbols.py` | 1,647 |
-| `build-support/ios/stage-gles.py` | 2,688 |
 | `build-support/native_host.py` | 6,504 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/steam/lsof` | 2,979 |
@@ -761,6 +760,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/init-aarch64/compile-init` | 151 |
 | `build-support/init-amd64/alpine-init` | 519 |
 | `build-support/init-amd64/desktop-init` | 4,405 |
+| `build-support/ios/build-cxx` | 163 |
+| `build-support/ios/generate-cxx-symbols` | 174 |
+| `build-support/ios/stage-gles` | 164 |
 | `build-support/java-cacerts` | 123 |
 | `build-support/libreoffice/run-libreoffice` | 6,618 |
 | `build-support/link-duplicate-files` | 171 |
@@ -888,7 +890,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-firefox-amd64.sh` | 178 |
 | `scripts/build-go-aarch64.sh` | 3,038 |
 | `scripts/build-hyprland-aarch64.sh` | 10,888 |
-| `scripts/build-ios-aarch64.sh` | 5,125 |
+| `scripts/build-ios-aarch64.sh` | 5,103 |
 | `scripts/build-java-aarch64.sh` | 4,674 |
 | `scripts/build-libreoffice-aarch64.sh` | 6,556 |
 | `scripts/build-limine-aarch64.sh` | 4,779 |
