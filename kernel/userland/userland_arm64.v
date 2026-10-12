@@ -405,7 +405,8 @@ const linux_sa_restart = 0x10000000
 pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
 	mut ctx := unsafe { context }
 	mut t := proc.current_thread()
-	job_ipc := ctx.x0 == u64(-i64(errno.eintr)) && (ctx.x8 == 188 || ctx.x8 == 189)
+	nr := i32(ctx.x8)
+	job_ipc := ctx.x0 == u64(-i64(errno.eintr)) && (nr == 188 || nr == 189)
 		&& job_wake_restarts_syscall(t)
 	if ctx.x0 != u64(-i64(proc.interrupted_errno)) && !job_ipc { return }
 	ctx.x0 = t.syscall_x0

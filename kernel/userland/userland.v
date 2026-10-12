@@ -90,7 +90,8 @@ fn resume_sigreturn(context cpulocal.GPRState, old_mask u64) {
 pub fn prepare_syscall_restart(context &cpulocal.GPRState) {
 	mut ctx := unsafe { context }
 	mut t := proc.current_thread()
-	job_ipc := ctx.rax == u64(-i64(errno.eintr)) && (t.restart_nr == 69 || t.restart_nr == 70)
+	nr := i32(t.restart_nr)
+	job_ipc := ctx.rax == u64(-i64(errno.eintr)) && (nr == 69 || nr == 70)
 		&& job_wake_restarts_syscall(t)
 	if ctx.rax != u64(-i64(proc.interrupted_errno)) && !job_ipc { return }
 	ctx.rax = t.restart_nr

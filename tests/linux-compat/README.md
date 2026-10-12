@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -558,6 +558,18 @@ pages on AArch64 and nine on x86-64. It does not belong to a 32768-byte slab
 class. The separate `seccompthread` case measures published small-buffer
 retirement. Allow 300 seconds per case. Physical OOM recovery is a separate
 qualification; the injection is absent from production kernels.
+
+The `sysnr` case runs seven isolated UID/GID 1000 groups. Four full-register
+prefixes check the low-32-bit C-int selector: getpid/gettid/getuid/getgid retain
+their results; unknown, negative and x32-tagged numbers return ENOSYS. User
+number 511 cannot select the kernel's private verdict handler, including after
+an earlier errno verdict. Filters still see that number and may intentionally
+return ERRNO(0), EACCES or TRAP. Eight SIGSYS traps check signed syscall
+metadata, architecture, call address and the original return register; the
+handler changes the result. Strict read/write/exit calls with high bits pass
+using a primed pipe. A caught SA_RESTART signal restarts a blocked read while
+its signal frame preserves the full original selector. These are native ELF64
+checks; native ELF32/x32 and translated syscall entry remain separate.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

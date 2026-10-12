@@ -1488,3 +1488,50 @@ are retained. That existing startup failure remains an open qualification.
 Physical OOM recovery, exhaustive allocation/error precedence, notifications
 and foreign/ELF32 execution remain unqualified. The broad section-15 acceptance
 gates remain open.
+
+## Native syscall selectors and private verdict dispatch
+
+Native dispatch now uses the low 32 bits of the syscall-number register and
+records the signed C-int value for syscall metadata. This follows Linux's
+[x86-64 entry](https://github.com/torvalds/linux/blob/v6.12/arch/x86/entry/common.c#L38)
+and [AArch64 entry](https://github.com/torvalds/linux/blob/v6.12/arch/arm64/kernel/syscall.c#L68).
+The unsigned dispatch index also keeps negative selectors outside AArch64's
+assembly table bounds. Saved registers retain all 64 bits for signal frames
+and restart. On x86-64, seccomp TRAP restores the original number register,
+following Linux's [rollback before SIGSYS](https://github.com/torvalds/linux/blob/v6.12/kernel/seccomp.c#L1167).
+
+Number 511 is an internal verdict slot, rather than a Linux syscall. Ordinary
+requests now return ENOSYS instead of zero or a stale prior filter result.
+Seccomp still inspects unknown syscall numbers: an actual ERRNO(0), EACCES or
+TRAP verdict may select the internal handler. ALLOW/LOG on number 511 reaches
+ENOSYS. Only real verdicts may access the private slot.
+
+The native V `sysnr` fixture passes seven isolated UID/GID 1000 groups on each
+architecture. Four prefixes exercise raw 64-bit selector registers: zero,
+one high bit, a mixed high word and all high bits. Tests cover unknown,
+negative and x32-tagged numbers; getpid/gettid/getuid/getgid; filtered unknown
+calls; refusal after a stale errno result; eight caught SIGSYS traps; strict
+read/write/exit; and a blocked read interrupted by SA_RESTART. Trap checks
+include architecture, syscall metadata, call address, original register and
+handler-changed return value. The strict case uses a primed pipe; it does not
+qualify zero-length reads from an empty pipe.
+
+Both unchanged-fixture controls on the previous production kernel fail at
+number 511, returning `0/0` instead of `-1/ENOSYS(38)`. Both changed kernels
+pass eight regression cases, including filter ownership/TSYNC, fatal actions,
+NNP, runtime primitives and futex queues. The 3200-filter natural/forced
+retirement cohorts keep their four measured object classes flat. Separate
+four-CPU job-control suites pass group stops, blocked message restart, caught
+handler restart/EINTR, teardown and 400 stop/continue storage cycles. All eight
+host test files and the isolated generated inventory check pass.
+
+`sysnr-before-*`, `sysnr-after-*` and `sysnr-jobs-*` in the
+[dated results directory](../tests/linux-compat/results/2026-10-12/) retain
+controls, artifacts, verdicts and serial logs. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/sysnr-audit.v)
+checks 60 input fingerprints, frozen kernels/fixtures, the emitted integer
+casts, private dispatch guards and original-register preservation. The
+isolated ee6a8aae worktrees change four scalar/control-flow kernel files and
+introduce no allocation or reclamation. These native ELF64 checks do not
+qualify native ELF32/x32 or translated ABI entry. The three broad section-15
+acceptance gates remain open.

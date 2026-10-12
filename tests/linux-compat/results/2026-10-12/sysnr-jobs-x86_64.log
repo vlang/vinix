@@ -1,0 +1,241 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   469k      0 --:--:-- --:--:-- --:--:--  468k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 45 2880k   45 1317k    0     0  1620k      0  0:00:01 --:--:--  0:00:01 1619k100 2880k  100 2880k    0     0  2090k      0  0:00:01  0:00:01 --:--:-- 2091k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  72603      0 --:--:-- --:--:-- --:--:-- 72670
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   324k      0 --:--:-- --:--:-- --:--:--  324k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   118k      0 --:--:-- --:--:-- --:--:--  118k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   262k      0 --:--:-- --:--:-- --:--:--  262k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-sysnr-1012/jobs-x86/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-sysnr-1012/jobs-x86/.vinix-amd64.iso.SIfn8Z'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 27.6g free
+Added to ISO image: directory '/'='/private/tmp/vinix-sysnr-1012/jobs-x86/iso-build/.iso-staging.CWIXIU/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13485 sectors
+Written to medium : 13485 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-sysnr-1012/jobs-x86/.vinix-amd64.iso.SIfn8Z' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2b3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-sysnr-1012/jobs-x86/test.iso (27617280 bytes)
+Guest artifacts: /private/tmp/vinix-sysnr-1012/jobs-x86
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=89928
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000017ffff400
+initramfs: Done (9 entries)
+JOB-CHECK START pid=1 ppid=0 pgrp=1 sid=1
+JOB-CHECK PASS start four CPU-loop siblings
+JOB-CHECK PASS waitid reports group stop with WNOWAIT
+JOB-CHECK PASS WNOWAIT preserves stop event
+JOB-CHECK PASS faulted stop copy preserves wait event
+JOB-CHECK PASS waitpid WUNTRACED reports uncatchable SIGSTOP
+JOB-CHECK PASS stop status waits until every live thread parks
+JOB-CHECK PASS ordinary pending handler stays deferred while stopped
+JOB-CHECK PASS WEXITED does not consume stop state
+JOB-CHECK PASS blocked SIGCONT resumes group and reports continued status
+JOB-CHECK PASS resume keeps blocked CONT pending and delivers other handler
+JOB-CHECK PASS unblocking SIGCONT delivers caught handler once
+JOB-CHECK PASS group can stop again after continue
+JOB-CHECK PASS SIGKILL tears down every stopped sibling
+JOB-CHECK PASS ignored SIGTSTP never stops group
+JOB-CHECK PASS SIGSTOP bypasses catchable stop disposition
+JOB-CHECK PASS waitid CLD_CONTINUED ABI status
+JOB-CHECK PASS waitpid consumes preserved continue event
+JOB-CHECK PASS caught SIGTSTP invokes handler without stopping group
+JOB-CHECK PASS SIGSTOP bypasses catchable stop disposition
+JOB-CHECK PASS waitid CLD_CONTINUED ABI status
+JOB-CHECK PASS waitpid consumes preserved continue event
+JOB-CHECK PASS blocked message receiver reaches group-stop boundary
+JOB-CHECK PASS continued blocked message receiver restarts without losing message
+JOB-CHECK PASS orphaned group ignores default catchable stop signals
+JOB-CHECK PASS orphaned group still honors SIGSTOP
+JOB-CHECK PASS non-orphaned group honors default SIGTSTP
+JOB-CHECK PASS create sibling job process group
+JOB-CHECK PASS group-directed SIGSTOP and wait group selection cover every process
+JOB-CHECK PASS group-directed SIGCONT publishes distinct continuation events
+JOB-CHECK PASS parent exit resumes 40 newly orphaned stopped groups with HUP and CONT
+JOB-CHECK PASS same-session external subreaper keeps 40 adopted groups stopped
+JOB-CHECK TRACE creating 40 children
+JOB-CHECK TRACE all 40 children created
+JOB-CHECK PASS blocking wait wakes for child beyond first 32 events
+JOB-CHECK PASS more than 32 same-parent waiters safely compete for one exit event
+JOB-CHECK PASS clone and sibling exit races cannot publish an incomplete stop
+JOB-MEM snapshot free_kib=4034192 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-CHECK PASS physical page reclamation settles before retention measurement
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-SLAB teardown_control class=16 delta=0
+JOB-SLAB teardown_control class=32 delta=0
+JOB-SLAB teardown_control class=48 delta=0
+JOB-SLAB teardown_control class=64 delta=0
+JOB-SLAB teardown_control class=96 delta=0
+JOB-SLAB teardown_control class=128 delta=0
+JOB-SLAB teardown_control class=192 delta=0
+JOB-SLAB teardown_control class=256 delta=0
+JOB-SLAB teardown_control class=384 delta=0
+JOB-SLAB teardown_control class=512 delta=0
+JOB-SLAB teardown_control class=768 delta=0
+JOB-SLAB teardown_control class=1024 delta=0
+JOB-SLAB teardown_control class=1536 delta=0
+JOB-SLAB teardown_control class=2048 delta=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-CHECK PASS physical page reclamation settles before retention measurement
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM teardown_batch=1 free_kib_delta=0
+JOB-SLAB teardown_batch=1 class=16 delta=0
+JOB-SLAB teardown_batch=1 class=32 delta=0
+JOB-SLAB teardown_batch=1 class=48 delta=0
+JOB-SLAB teardown_batch=1 class=64 delta=0
+JOB-SLAB teardown_batch=1 class=96 delta=0
+JOB-SLAB teardown_batch=1 class=128 delta=0
+JOB-SLAB teardown_batch=1 class=192 delta=0
+JOB-SLAB teardown_batch=1 class=256 delta=0
+JOB-SLAB teardown_batch=1 class=384 delta=0
+JOB-SLAB teardown_batch=1 class=512 delta=0
+JOB-SLAB teardown_batch=1 class=768 delta=0
+JOB-SLAB teardown_batch=1 class=1024 delta=0
+JOB-SLAB teardown_batch=1 class=1536 delta=0
+JOB-SLAB teardown_batch=1 class=2048 delta=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-CHECK PASS physical page reclamation settles before retention measurement
+JOB-MEM snapshot free_kib=4034184 slab_kib=2308 cached_kib=0
+JOB-MEM teardown_batch=2 free_kib_delta=0
+JOB-SLAB teardown_batch=2 class=16 delta=0
+JOB-SLAB teardown_batch=2 class=32 delta=0
+JOB-SLAB teardown_batch=2 class=48 delta=0
+JOB-SLAB teardown_batch=2 class=64 delta=0
+JOB-SLAB teardown_batch=2 class=96 delta=0
+JOB-SLAB teardown_batch=2 class=128 delta=0
+JOB-SLAB teardown_batch=2 class=192 delta=0
+JOB-SLAB teardown_batch=2 class=256 delta=0
+JOB-SLAB teardown_batch=2 class=384 delta=0
+JOB-SLAB teardown_batch=2 class=512 delta=0
+JOB-SLAB teardown_batch=2 class=768 delta=0
+JOB-SLAB teardown_batch=2 class=1024 delta=0
+JOB-SLAB teardown_batch=2 class=1536 delta=0
+JOB-SLAB teardown_batch=2 class=2048 delta=0
+JOB-ADMISSION teardown retries=0
+JOB-CHECK PASS thread attachment racing teardown returns physical pages and slab objects
+JOB-CHECK PASS SA_NOCLDSTOP suppresses stop/continue signals while retaining wait events
+JOB-CHECK PASS continued stopped parent resumes its original child wait
+JOB-CHECK PASS caught SA_RESTART handler preserves blocking child wait
+JOB-CHECK PASS caught handler without SA_RESTART interrupts child wait
+JOB-CHECK PASS repeated multithread stop continue exit races
+JOB-CHECK TRACE warmup cycle=0
+JOB-CHECK TRACE warmup cycle=1
+JOB-CHECK TRACE warmup cycle=2
+JOB-CHECK TRACE warmup cycle=3
+JOB-CHECK TRACE warmup cycle=4
+JOB-CHECK TRACE warmup cycle=5
+JOB-CHECK TRACE warmup cycle=6
+JOB-CHECK TRACE warmup cycle=7
+JOB-CHECK TRACE warmup cycle=8
+JOB-CHECK TRACE warmup cycle=9
+JOB-CHECK TRACE allocation batch=0 cycle=0
+JOB-CHECK TRACE allocation batch=0 cycle=25
+JOB-CHECK TRACE allocation batch=0 cycle=50
+JOB-CHECK TRACE allocation batch=0 cycle=75
+JOB-CHECK TRACE allocation batch=0 cycle=100
+JOB-CHECK TRACE allocation batch=0 cycle=125
+JOB-CHECK TRACE allocation batch=0 cycle=150
+JOB-CHECK TRACE allocation batch=0 cycle=175
+JOB-SLAB batch=1 class=16 delta=-12
+JOB-SLAB batch=1 class=32 delta=-6
+JOB-SLAB batch=1 class=48 delta=0
+JOB-SLAB batch=1 class=64 delta=-6
+JOB-SLAB batch=1 class=96 delta=0
+JOB-SLAB batch=1 class=128 delta=0
+JOB-SLAB batch=1 class=192 delta=0
+JOB-SLAB batch=1 class=256 delta=0
+JOB-SLAB batch=1 class=384 delta=-6
+JOB-SLAB batch=1 class=512 delta=0
+JOB-SLAB batch=1 class=768 delta=0
+JOB-SLAB batch=1 class=1024 delta=0
+JOB-SLAB batch=1 class=1536 delta=0
+JOB-SLAB batch=1 class=2048 delta=0
+JOB-CHECK TRACE allocation batch=1 cycle=0
+JOB-CHECK TRACE allocation batch=1 cycle=25
+JOB-CHECK TRACE allocation batch=1 cycle=50
+JOB-CHECK TRACE allocation batch=1 cycle=75
+JOB-CHECK TRACE allocation batch=1 cycle=100
+JOB-CHECK TRACE allocation batch=1 cycle=125
+JOB-CHECK TRACE allocation batch=1 cycle=150
+JOB-CHECK TRACE allocation batch=1 cycle=175
+JOB-SLAB batch=2 class=16 delta=-8
+JOB-SLAB batch=2 class=32 delta=-4
+JOB-SLAB batch=2 class=48 delta=0
+JOB-SLAB batch=2 class=64 delta=-4
+JOB-SLAB batch=2 class=96 delta=0
+JOB-SLAB batch=2 class=128 delta=0
+JOB-SLAB batch=2 class=192 delta=0
+JOB-SLAB batch=2 class=256 delta=0
+JOB-SLAB batch=2 class=384 delta=-4
+JOB-SLAB batch=2 class=512 delta=0
+JOB-SLAB batch=2 class=768 delta=0
+JOB-SLAB batch=2 class=1024 delta=0
+JOB-SLAB batch=2 class=1536 delta=0
+JOB-SLAB batch=2 class=2048 delta=0
+JOB-CHECK PASS 400 stop/continue cycles preserve wait state and bounded storage
+JOB-CHECK DONE failures=0
+All requested guest verdicts passed.

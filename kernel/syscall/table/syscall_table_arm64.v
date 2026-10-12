@@ -101,7 +101,7 @@ fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 	}
 	match verdict & proc.seccomp_ret_action_full {
 		proc.seccomp_ret_allow, proc.seccomp_ret_log {
-			return nr
+			return if nr == seccomp_verdict_nr { u64(linux_syscall_max) } else { nr }
 		}
 		proc.seccomp_ret_errno {
 			mut e := u64(verdict & proc.seccomp_ret_data)
@@ -139,7 +139,10 @@ fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 pub fn syscall_trace(gpr_state voidptr) u64 {
 	proc.cpu_enter_kernel()
 	gpr := unsafe { &cpulocal.GPRState(gpr_state) }
-	nr := gpr.x8
+	// Linux checks the C-int selector as an unsigned table index. Zero
+	// extension also keeps it safe for the assembly's signed bounds branch.
+	// The saved x8 remains intact for signal frames and syscall restart.
+	nr := u64(u32(gpr.x8))
 	// A busy userspace workload can keep the HVF scheduler out of its normal
 	// idle polling loop. This throttled, input-only call keeps the desktop
 	// responsive while translated applications occupy every virtual CPU.
@@ -154,7 +157,7 @@ pub fn syscall_trace(gpr_state voidptr) u64 {
 		userland.exit_with_fatal_signal(u8(6))
 	}
 	current_thread.syscall_x0 = gpr.x0
-	current_thread.syscall_nr = i64(nr)
+	current_thread.syscall_nr = i64(i32(nr))
 	current_thread.syscall_x1 = gpr.x1
 	current_thread.syscall_x2 = gpr.x2
 	current_thread.syscall_x3 = gpr.x3
@@ -187,10 +190,12 @@ pub fn syscall_trace(gpr_state voidptr) u64 {
 	sc_trace_active = true
 	if proc.seccomp_mode(current_thread) != proc.seccomp_mode_disabled {
 		slot := seccomp_entry(mut current_thread, gpr, nr)
-		if slot != nr {
+		if slot == seccomp_verdict_nr || slot != nr {
 			return slot
 		}
 	}
+	// Only an actual filter/pledge verdict may select the private slot.
+	if nr == seccomp_verdict_nr { return u64(linux_syscall_max) }
 	if current_thread.process.pledge != 0 {
 		return pledge_entry(mut current_thread, gpr, nr)
 	}

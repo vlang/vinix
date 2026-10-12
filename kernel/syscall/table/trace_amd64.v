@@ -32,11 +32,13 @@ fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
 @[export: 'syscall_trace']
 pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
 	proc.cpu_enter_kernel()
-	nr := frame.rax
+	// Dispatch uses the C-int selector's unsigned 32-bit representation.
+	// Keep signed metadata and the original register for restart/rollback.
+	nr := u64(u32(frame.rax))
 	mut t := proc.current_thread()
 	t.audit_sequence = 0
-	t.syscall_nr = i64(nr)
-	t.restart_nr = nr
+	t.syscall_nr = i64(i32(nr))
+	t.restart_nr = frame.rax
 	t.syscall_x0 = frame.rdi
 	t.syscall_x1 = frame.rsi
 	t.syscall_x2 = frame.rdx
@@ -50,10 +52,13 @@ pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
 	}
 	if proc.seccomp_mode(t) != proc.seccomp_mode_disabled {
 		slot := seccomp_entry(mut t, frame, nr)
-		if slot != nr {
+		if slot == seccomp_verdict_nr || slot != nr {
 			return slot
 		}
 	}
+	// Slot 511 is private to seccomp/pledge verdicts. An ordinary request
+	// for that Linux number must reach the assembly ENOSYS bounds path.
+	if nr == seccomp_verdict_nr { return u64(512) }
 	if process.pledge != 0 {
 		return pledge_entry(mut t, frame, nr)
 	}
@@ -90,7 +95,7 @@ fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 	}
 	match verdict & proc.seccomp_ret_action_full {
 		proc.seccomp_ret_allow, proc.seccomp_ret_log {
-			return nr
+			return if nr == seccomp_verdict_nr { u64(512) } else { nr }
 		}
 		proc.seccomp_ret_errno {
 			mut e := u64(verdict & proc.seccomp_ret_data)
@@ -103,7 +108,7 @@ fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 		proc.seccomp_ret_trap {
 			userland.force_seccomp_signal(mut t, nr, frame.rip, verdict & proc.seccomp_ret_data)
 			// syscall_rollback leaves orig_rax in Linux's return register.
-			t.seccomp_return = nr
+			t.seccomp_return = frame.rax
 			t.seccomp_errno = 0
 			return seccomp_verdict_nr
 		}

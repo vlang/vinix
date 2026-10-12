@@ -1,0 +1,333 @@
+==> Assembling /private/tmp/vinix-sysnr-1012/jobs-arm/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-sysnr-1012/jobs-arm/.vinix-aarch64.iso.2ztgsB'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 27.7g free
+Added to ISO image: directory '/'='/private/tmp/vinix-sysnr-1012/jobs-arm/iso-build/.iso-staging.NnsEpv/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 17789 sectors
+Written to medium : 17789 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-sysnr-1012/jobs-arm/.vinix-aarch64.iso.2ztgsB' completed successfully.
+
+    /private/tmp/vinix-sysnr-1012/jobs-arm/test.iso (36431872 bytes)
+Guest artifacts: /private/tmp/vinix-sysnr-1012/jobs-arm
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0013FDB6000 start failed: 00000001
+Error: Image at 0013FCB2000 start failed: Unsupported
+Error: Image at 0013FC37000 start failed: Not Found
+Error: Image at 0013FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x137350000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x137350000 to 0xffffffff80000000, length: 0x2cc000
+vmm: Kernel: Mapping 0x13761c000 to 0xffffffff802cc000, length: 0x2c000
+vmm: Kernel: Mapping 0x137648000 to 0xffffffff802f8000, length: 0xf7d000
+vmm: HHDM 0-4GiB mapped (262144 device pages)
+vmm: high RAM mapped (262144 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0xc000 mapped
+vmm: framebuffer 0x13c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x137350000 +0x2f8000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff000137321000
+initramfs: Size:    118784
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=112168
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff00013733dc00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x212120
+JOB-CHECK START pid=1 ppid=0 pgrp=1 sid=1
+JOB-CHECK PASS start four CPU-loop siblings
+JOB-CHECK PASS waitid reports group stop with WNOWAIT
+JOB-CHECK PASS WNOWAIT preserves stop event
+JOB-CHECK PASS faulted stop copy preserves wait event
+JOB-CHECK PASS waitpid WUNTRACED reports uncatchable SIGSTOP
+JOB-CHECK PASS stop status waits until every live thread parks
+JOB-CHECK PASS ordinary pending handler stays deferred while stopped
+JOB-CHECK PASS WEXITED does not consume stop state
+JOB-CHECK PASS blocked SIGCONT resumes group and reports continued status
+JOB-CHECK PASS resume keeps blocked CONT pending and delivers other handler
+JOB-CHECK PASS unblocking SIGCONT delivers caught handler once
+JOB-CHECK PASS group can stop again after continue
+JOB-CHECK PASS SIGKILL tears down every stopped sibling
+JOB-CHECK PASS ignored SIGTSTP never stops group
+JOB-CHECK PASS SIGSTOP bypasses catchable stop disposition
+JOB-CHECK PASS waitid CLD_CONTINUED ABI status
+JOB-CHECK PASS waitpid consumes preserved continue event
+JOB-CHECK PASS caught SIGTSTP invokes handler without stopping group
+JOB-CHECK PASS SIGSTOP bypasses catchable stop disposition
+JOB-CHECK PASS waitid CLD_CONTINUED ABI status
+JOB-CHECK PASS waitpid consumes preserved continue event
+JOB-CHECK PASS blocked message receiver reaches group-stop boundary
+JOB-CHECK PASS continued blocked message receiver restarts without losing message
+JOB-CHECK PASS orphaned group ignores default catchable stop signals
+JOB-CHECK PASS orphaned group still honors SIGSTOP
+JOB-CHECK PASS non-orphaned group honors default SIGTSTP
+JOB-CHECK PASS create sibling job process group
+JOB-CHECK PASS group-directed SIGSTOP and wait group selection cover every process
+JOB-CHECK PASS group-directed SIGCONT publishes distinct continuation events
+JOB-CHECK PASS parent exit resumes 40 newly orphaned stopped groups with HUP and CONT
+JOB-CHECK PASS same-session external subreaper keeps 40 adopted groups stopped
+JOB-CHECK TRACE creating 40 children
+JOB-CHECK TRACE all 40 children created
+JOB-CHECK PASS blocking wait wakes for child beyond first 32 events
+JOB-CHECK PASS more than 32 same-parent waiters safely compete for one exit event
+JOB-CHECK PASS clone and sibling exit races cannot publish an incomplete stop
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-CHECK PASS physical page reclamation settles before retention measurement
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-SLAB teardown_control class=16 delta=0
+JOB-SLAB teardown_control class=32 delta=0
+JOB-SLAB teardown_control class=48 delta=0
+JOB-SLAB teardown_control class=64 delta=0
+JOB-SLAB teardown_control class=96 delta=0
+JOB-SLAB teardown_control class=128 delta=0
+JOB-SLAB teardown_control class=192 delta=0
+JOB-SLAB teardown_control class=256 delta=0
+JOB-SLAB teardown_control class=384 delta=0
+JOB-SLAB teardown_control class=512 delta=0
+JOB-SLAB teardown_control class=768 delta=0
+JOB-SLAB teardown_control class=1024 delta=0
+JOB-SLAB teardown_control class=1536 delta=0
+JOB-SLAB teardown_control class=2048 delta=0
+JOB-SLAB teardown_control class=2688 delta=0
+JOB-SLAB teardown_control class=4048 delta=0
+JOB-SLAB teardown_control class=5392 delta=0
+JOB-SLAB teardown_control class=8096 delta=0
+random: reseeded from 15117 events, 0 hardware words
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-CHECK PASS physical page reclamation settles before retention measurement
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM teardown_batch=1 free_kib_delta=0
+JOB-SLAB teardown_batch=1 class=16 delta=0
+JOB-SLAB teardown_batch=1 class=32 delta=0
+JOB-SLAB teardown_batch=1 class=48 delta=0
+JOB-SLAB teardown_batch=1 class=64 delta=0
+JOB-SLAB teardown_batch=1 class=96 delta=0
+JOB-SLAB teardown_batch=1 class=128 delta=0
+JOB-SLAB teardown_batch=1 class=192 delta=0
+JOB-SLAB teardown_batch=1 class=256 delta=0
+JOB-SLAB teardown_batch=1 class=384 delta=0
+JOB-SLAB teardown_batch=1 class=512 delta=0
+JOB-SLAB teardown_batch=1 class=768 delta=0
+JOB-SLAB teardown_batch=1 class=1024 delta=0
+JOB-SLAB teardown_batch=1 class=1536 delta=0
+JOB-SLAB teardown_batch=1 class=2048 delta=0
+JOB-SLAB teardown_batch=1 class=2688 delta=0
+JOB-SLAB teardown_batch=1 class=4048 delta=0
+JOB-SLAB teardown_batch=1 class=5392 delta=0
+JOB-SLAB teardown_batch=1 class=8096 delta=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-CHECK PASS physical page reclamation settles before retention measurement
+JOB-MEM snapshot free_kib=4048160 slab_kib=2288 cached_kib=0
+JOB-MEM teardown_batch=2 free_kib_delta=0
+JOB-SLAB teardown_batch=2 class=16 delta=0
+JOB-SLAB teardown_batch=2 class=32 delta=0
+JOB-SLAB teardown_batch=2 class=48 delta=0
+JOB-SLAB teardown_batch=2 class=64 delta=0
+JOB-SLAB teardown_batch=2 class=96 delta=0
+JOB-SLAB teardown_batch=2 class=128 delta=0
+JOB-SLAB teardown_batch=2 class=192 delta=0
+JOB-SLAB teardown_batch=2 class=256 delta=0
+JOB-SLAB teardown_batch=2 class=384 delta=0
+JOB-SLAB teardown_batch=2 class=512 delta=0
+JOB-SLAB teardown_batch=2 class=768 delta=0
+JOB-SLAB teardown_batch=2 class=1024 delta=0
+JOB-SLAB teardown_batch=2 class=1536 delta=0
+JOB-SLAB teardown_batch=2 class=2048 delta=0
+JOB-SLAB teardown_batch=2 class=2688 delta=0
+JOB-SLAB teardown_batch=2 class=4048 delta=0
+JOB-SLAB teardown_batch=2 class=5392 delta=0
+JOB-SLAB teardown_batch=2 class=8096 delta=0
+JOB-ADMISSION teardown retries=0
+JOB-CHECK PASS thread attachment racing teardown returns physical pages and slab objects
+JOB-CHECK PASS SA_NOCLDSTOP suppresses stop/continue signals while retaining wait events
+JOB-CHECK PASS continued stopped parent resumes its original child wait
+JOB-CHECK PASS caught SA_RESTART handler preserves blocking child wait
+JOB-CHECK PASS caught handler without SA_RESTART interrupts child wait
+JOB-CHECK PASS repeated multithread stop continue exit races
+JOB-CHECK TRACE warmup cycle=0
+JOB-CHECK TRACE warmup cycle=1
+JOB-CHECK TRACE warmup cycle=2
+JOB-CHECK TRACE warmup cycle=3
+JOB-CHECK TRACE warmup cycle=4
+JOB-CHECK TRACE warmup cycle=5
+JOB-CHECK TRACE warmup cycle=6
+JOB-CHECK TRACE warmup cycle=7
+JOB-CHECK TRACE warmup cycle=8
+JOB-CHECK TRACE warmup cycle=9
+JOB-CHECK TRACE allocation batch=0 cycle=0
+JOB-CHECK TRACE allocation batch=0 cycle=25
+JOB-CHECK TRACE allocation batch=0 cycle=50
+JOB-CHECK TRACE allocation batch=0 cycle=75
+JOB-CHECK TRACE allocation batch=0 cycle=100
+JOB-CHECK TRACE allocation batch=0 cycle=125
+JOB-CHECK TRACE allocation batch=0 cycle=150
+JOB-CHECK TRACE allocation batch=0 cycle=175
+JOB-SLAB batch=1 class=16 delta=-74
+JOB-SLAB batch=1 class=32 delta=-37
+JOB-SLAB batch=1 class=48 delta=-7
+JOB-SLAB batch=1 class=64 delta=-30
+JOB-SLAB batch=1 class=96 delta=0
+JOB-SLAB batch=1 class=128 delta=0
+JOB-SLAB batch=1 class=192 delta=0
+JOB-SLAB batch=1 class=256 delta=0
+JOB-SLAB batch=1 class=384 delta=-37
+JOB-SLAB batch=1 class=512 delta=0
+JOB-SLAB batch=1 class=768 delta=0
+JOB-SLAB batch=1 class=1024 delta=0
+JOB-SLAB batch=1 class=1536 delta=0
+JOB-SLAB batch=1 class=2048 delta=0
+JOB-SLAB batch=1 class=2688 delta=0
+JOB-SLAB batch=1 class=4048 delta=0
+JOB-SLAB batch=1 class=5392 delta=0
+JOB-SLAB batch=1 class=8096 delta=0
+JOB-CHECK TRACE allocation batch=1 cycle=0
+JOB-CHECK TRACE allocation batch=1 cycle=25
+JOB-CHECK TRACE allocation batch=1 cycle=50
+JOB-CHECK TRACE allocation batch=1 cycle=75
+JOB-CHECK TRACE allocation batch=1 cycle=100
+JOB-CHECK TRACE allocation batch=1 cycle=125
+JOB-CHECK TRACE allocation batch=1 cycle=150
+JOB-CHECK TRACE allocation batch=1 cycle=175
+JOB-SLAB batch=2 class=16 delta=0
+JOB-SLAB batch=2 class=32 delta=0
+JOB-SLAB batch=2 class=48 delta=0
+JOB-SLAB batch=2 class=64 delta=0
+JOB-SLAB batch=2 class=96 delta=0
+JOB-SLAB batch=2 class=128 delta=0
+JOB-SLAB batch=2 class=192 delta=0
+JOB-SLAB batch=2 class=256 delta=0
+JOB-SLAB batch=2 class=384 delta=0
+JOB-SLAB batch=2 class=512 delta=0
+JOB-SLAB batch=2 class=768 delta=0
+JOB-SLAB batch=2 class=1024 delta=0
+JOB-SLAB batch=2 class=1536 delta=0
+JOB-SLAB batch=2 class=2048 delta=0
+JOB-SLAB batch=2 class=2688 delta=0
+JOB-SLAB batch=2 class=4048 delta=0
+JOB-SLAB batch=2 class=5392 delta=0
+JOB-SLAB batch=2 class=8096 delta=0
+JOB-CHECK PASS 400 stop/continue cycles preserve wait state and bounded storage
+JOB-CHECK DONE failures=0
+syspower: power off: stopping devices
+All requested guest verdicts passed.
