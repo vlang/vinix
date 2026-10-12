@@ -202,8 +202,8 @@ fn run_profile(keep string) ! {
 	compiler := hosttest.shell_split(compiler_text)!
 	mut observed := ['linux/smp.h', 'asm/percpu.h', 'asm/smp.h', 'generated/autoconf.h'].map(os.join_path(here, 'include', it))
 	observed << [@FILE, os.join_path(root, 'tests/linuxkpi/smpfixture/core.v'),
-		os.join_path(here, 'audit.py'), os.join_path(here, 'generate-bounds.py'),
-		os.join_path(here, 'upstream.py'), os.join_path(here, 'upstream.json')]
+		os.join_path(here, 'audit'), os.join_path(here, 'generate-bounds'),
+		os.join_path(here, 'upstream'), os.join_path(here, 'upstream.json')]
 	mut guarded := observed.clone()
 	guarded << os.walk_ext(os.join_path(root, 'tests/linuxkpi/hosttest'), '.v')
 	guarded << os.walk_ext(os.join_path(root, 'tests/linuxkpi/upstreamsource'), '.v')

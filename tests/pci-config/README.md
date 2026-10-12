@@ -59,7 +59,7 @@ comparisons remain byte-exact.
 
 Build either architecture with `PCI_TOPOLOGY_TEST=1` for the read-only native
 boot fixture, then pass `--pci-topology-test` to `arm_vm` or
-`tests/linuxkpi/run_vm.py`. It reads actual root-zero configuration, compares the
+`tests/linuxkpi/run_vm`. It reads actual root-zero configuration, compares the
 private snapshot with permanent boot records, rejects every graph allocation
 index and measures physical pages plus all live heap classes after three
 warmups. The flag defaults to zero; harnesses reject an unexpected fixture.

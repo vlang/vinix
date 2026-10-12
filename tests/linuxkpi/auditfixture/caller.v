@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module auditfixture
 
+pub fn native_caller_source() string { return caller }
+
 const caller = '#include <linux/spinlock.h>
 #include <linux/atomic.h>
 #include <linux/overflow.h>

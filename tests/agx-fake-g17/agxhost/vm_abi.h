@@ -20,6 +20,7 @@ typedef struct sockaddr_in vinix_agx_inet_address;
 typedef struct sockaddr_un vinix_agx_unix_address;
 typedef struct in_addr vinix_agx_ip_address;
 typedef siginfo_t vinix_agx_child_info;
+#define vinix_agx_waitid waitid
 #define VINIX_AGX_UNIX_PATH_SIZE sizeof(((struct sockaddr_un *)0)->sun_path)
 _Static_assert(sizeof(pid_t) == sizeof(int32_t), "PTY pid width");
 _Static_assert(sizeof(socklen_t) == sizeof(uint32_t), "socket length width");

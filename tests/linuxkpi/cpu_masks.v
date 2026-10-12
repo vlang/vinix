@@ -185,26 +185,25 @@ fn run_profile(keep string) ! {
 		os.join_path(here, 'headercore/primitive.v'), os.join_path(here, 'headercore/wait.v'),
 		os.join_path(here, 'include/generated/autoconf.h'), os.join_path(root, 'kernel/GNUmakefile'),
 		os.join_path(root, 'kernel/c/linuxkpi_header_primitive_v_contract.h'),
-		os.join_path(root, 'kernel/c/linuxkpi_common_v_contract.h'), os.join_path(root, 'build-support/compile-v-module.py'),
+		os.join_path(root, 'kernel/c/linuxkpi_common_v_contract.h'), os.join_path(root, 'build-support/compile-v-module'),
 		os.join_path(linux, 'include/linux/cpumask.h'), os.join_path(linux, 'include/linux/smp.h'),
 		os.join_path(linux, 'lib/find_bit.c'), os.join_path(linux, 'lib/hweight.c')]
 	observed << owned_helpers()
 	initial := hosttest.hashes(observed)!
 	hosttest.write_json(os.join_path(work, 'initial-source-sha256.json'), hosttest.string_map(initial))!
-	python := hosttest.env_default('PYTHON', 'python3')
-	verify := run_command([python, os.join_path(here, 'upstream.py'), 'verify', '--base', os.dir(linux)],
+	verify := run_command([os.join_path(here, 'upstream'), 'verify', '--base', os.dir(linux)],
 		os.join_path(work, 'upstream-verification.log'))!
 	generated := os.join_path(work, 'include')
 	mut adapters := [['spinlock.json', 'spinlock_adapters.h'], ['atomic-exchange.json', 'atomic_exchange.h']]
 	if os.is_file(os.join_path(here, 'abi/overflow.json')) { adapters << ['overflow.json', 'integer_policy.h'] }
 	for adapter in adapters {
-		run_command([python, os.join_path(here, 'generate-abi.py'), os.join_path(here, 'abi', adapter[0]),
+		run_command([os.join_path(here, 'generate-abi'), os.join_path(here, 'abi', adapter[0]),
 			os.join_path(generated, 'vinix', adapter[1])], '')!
 	}
 	profile := flags(linux, generated, 'gnu11', 'x86_64-unknown-none')
 	bounds_path := os.join_path(generated, 'generated/bounds.h')
 	archive := os.join_path(os.dir(linux), 'linux-' + version + '.tar.xz')
-	mut bounds_command := [python, os.join_path(here, 'generate-bounds.py'), '--source-dir', linux,
+	mut bounds_command := [os.join_path(here, 'generate-bounds'), '--source-dir', linux,
 		'--archive', archive, '--output', bounds_path, '--depfile', bounds_path + '.d',
 		'--provenance', bounds_path + '.json', '--cc', hosttest.shell_join(compiler), '--']
 	bounds_command << profile

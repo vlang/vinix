@@ -27,12 +27,12 @@ fn run() ! {
 	}
 	parsed := hosttest.parse_arguments(os.args[1..], specifications, 0,
 		'Usage: run_vm --kernel ELF --state-dir FRESH [--cpu max] [--timeout 90] [--no-linuxkpi]',
-		'Four CPU q35/TCG native LinuxKPI guest; every maintained serial assertion is required.')!
+		'Four CPU q35/TCG native LinuxKPI guest; every maintained serial assertion is required.') or { return error_with_code(err.msg(), 2) }
 	for name in ['--kernel', '--state-dir'] {
-		if name !in parsed.options { return error('required argument: ' + name) }
+		if name !in parsed.options { return error_with_code('required argument: ' + name, 2) }
 	}
 	timeout := parsed.options['--timeout'] or { '90' }
-	strconv.parse_int(timeout, 10, 64)!
+	strconv.parse_int(timeout, 10, 64) or { return error_with_code(err.msg(), 2) }
 	mut environment := []string{}
 	for key, value in os.environ() { environment << key + '=' + value }
 	mut row := {

@@ -1,0 +1,97 @@
+{
+    "bytes": 54042,
+    "embedded_python_callers": [
+        {
+            "bytes": 5477,
+            "lines": 123,
+            "path": "tests/pci-config/run.sh",
+            "sha256": "c3b170485c4c785f2abb6e10c5154b61069867e303a1acad5ffc354322620abb",
+            "translation_credit": "V workflow replaces embedded Python; Shell-classified original receives no counted Python-file retirement credit"
+        }
+    ],
+    "evidence": "~/.cache/vinix-linuxkpi-tools-native-20261012",
+    "files": 13,
+    "lines": 1127,
+    "originals": [
+        {
+            "bytes": 7718,
+            "lines": 150,
+            "path": "kernel/linuxkpi/audit.py",
+            "sha256": "a89e94f9e8817b7f3a2e584a2c7a570a72ea4246d4fda98a119863d721d81300"
+        },
+        {
+            "bytes": 713,
+            "lines": 22,
+            "path": "kernel/linuxkpi/generate-abi.py",
+            "sha256": "b6733bdbb3d32e466f4cd0f1757e4025c494592607887ee9b99320a305978a8e"
+        },
+        {
+            "bytes": 2882,
+            "lines": 83,
+            "path": "kernel/linuxkpi/generate-bounds.py",
+            "sha256": "14bd5a10fc57c2c40daf30f33ac1afd8c8d3c43e878696e7defcf1e8565ddf89"
+        },
+        {
+            "bytes": 1586,
+            "lines": 49,
+            "path": "kernel/linuxkpi/upstream.py",
+            "sha256": "63d7871c475682106e27411d28ba7c28a0003665b6b1fd65247e916706454a2a"
+        },
+        {
+            "bytes": 7668,
+            "lines": 181,
+            "path": "tests/linuxkpi/_audit_native.py",
+            "sha256": "51fa03cc6fb7ecc5a105304dc006298a673b87247ae9327cc50cbde0b40821cd"
+        },
+        {
+            "bytes": 6611,
+            "lines": 154,
+            "path": "tests/linuxkpi/_guest_native.py",
+            "sha256": "fae9ec424da2e5516dbb5665c8df57d25e7974c08ae025a7dd498950444d145e"
+        },
+        {
+            "bytes": 4257,
+            "lines": 83,
+            "path": "tests/linuxkpi/_host_native.py",
+            "sha256": "aef88093cd87070302bd8df47f4fb8e9423d7a77eb3f881d686507671ea3c2ac"
+        },
+        {
+            "bytes": 1281,
+            "lines": 32,
+            "path": "tests/linuxkpi/audit_generation_test.py",
+            "sha256": "740abc0758ec49865b5879138cfdfe4d8dcaaf8ba94ee6cad9520ee2dfdec513"
+        },
+        {
+            "bytes": 7987,
+            "lines": 90,
+            "path": "tests/linuxkpi/compile-native-host.py",
+            "sha256": "af9543b5685fcc1ed0397b142361ce0fd06bb7fab7c33d3145755e7f12974af6"
+        },
+        {
+            "bytes": 3182,
+            "lines": 66,
+            "path": "tests/linuxkpi/exchange_test.py",
+            "sha256": "85757ef875305b06c062c97e43af1ec4ce6df811f0487f647212c25c7150250e"
+        },
+        {
+            "bytes": 7324,
+            "lines": 148,
+            "path": "tests/linuxkpi/fixture-goldens.py",
+            "sha256": "baf2f11c0d6cc73cdb10b9f55ec44ecd7e1f112ba7f486aa9a9b69dcb5cf1b84"
+        },
+        {
+            "bytes": 1162,
+            "lines": 30,
+            "path": "tests/linuxkpi/host_suite.py",
+            "sha256": "6eaca1ee0adf584d3953240c3cc57897a6d17eec4679f11a5149a7c1492bbf50"
+        },
+        {
+            "bytes": 1671,
+            "lines": 39,
+            "path": "tests/linuxkpi/run_vm.py",
+            "sha256": "7bbcb30e39956cc0edad0022de2e4683c3040bdb0c0e38c89090f0ee5bed4666"
+        }
+    ],
+    "qualification": "ARM/x86/ASanUBSan native tools, actual audit headers, actual C/V PCI models; real host ELF blocked; no Python or guest executed",
+    "source_commit": "3678edd591db0173eb139f44d671a54a4f736887"
+}

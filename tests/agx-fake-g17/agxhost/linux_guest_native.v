@@ -13,11 +13,28 @@ import time
 __global guest_native_owner = &NativeGuestOwner(unsafe { nil })
 
 struct NativeGuestOwner {
+	hooks LinuxGuestNativeHooks
 mut:
 	child    &os.Process = unsafe { nil }
 	log      os.File
 	log_open bool
 	retiring bool
+}
+
+// Native workflow tests replace preparation steps while the original marker,
+// deadline and process-retirement policy still observes real child processes.
+pub struct LinuxGuestNativeHooks {
+pub:
+	generate fn (string,string,string,[]string,voidptr) !bool = unsafe { nil }
+	run fn ([]string,map[string]string,bool,voidptr) !bool = unsafe { nil }
+	iso fn (string,map[string]string,voidptr) !bool = unsafe { nil }
+	context voidptr
+}
+
+fn guest_native_generate(source string, output string, arch string, defines []string) ! {
+	owner := unsafe { guest_native_owner }
+	if owner.hooks.generate != unsafe { nil } && owner.hooks.generate(source,output,arch,defines,owner.hooks.context)! { return }
+	hosttest.generate_module(source,output,arch,defines)!
 }
 
 fn guest_native_active() bool { return unsafe { guest_native_owner != nil } }
@@ -172,6 +189,10 @@ fn guest_native_dispatch(method string, row map[string]json2.Any) !json2.Any {
 }
 
 fn guest_native_run(argv []string, environment map[string]string, quiet bool) ! {
+	if guest_native_active() {
+		owner := unsafe { guest_native_owner }
+		if owner.hooks.run != unsafe { nil } && owner.hooks.run(argv,environment,quiet,owner.hooks.context)! { return }
+	}
 	result := hosttest.capture(argv, '', -1, environment)!
 	if !quiet { print(result.stdout) }
 	eprint(result.stderr)
@@ -196,6 +217,8 @@ fn guest_native_install(source string, destination string) ! {
 // The existing hybrid image contract is assembled by V with the original six
 // pinned bootloader inputs. Each invocation has a fresh caller-owned workspace.
 fn guest_native_iso(root string, environment map[string]string) ! {
+	owner := unsafe { guest_native_owner }
+	if owner.hooks.iso != unsafe { nil } && owner.hooks.iso(root,environment,owner.hooks.context)! { return }
 	build := environment['VINIX_AMD64_ISO_BUILD_DIR'] or { return error('missing ISO build directory') }
 	kernel := environment['VINIX_AMD64_KERNEL'] or { return error('missing kernel') }
 	archive := environment['VINIX_AMD64_INITRAMFS'] or { return error('missing initramfs') }
@@ -255,8 +278,12 @@ fn guest_native_iso(root string, environment map[string]string) ! {
 }
 
 pub fn linux_guest_native(row map[string]json2.Any) !int {
+	return linux_guest_native_with_hooks(row,LinuxGuestNativeHooks{})!
+}
+
+pub fn linux_guest_native_with_hooks(row map[string]json2.Any, hooks LinuxGuestNativeHooks) !int {
 	if guest_native_active() { return error('a native guest supervisor is already active') }
-	mut owner := NativeGuestOwner{}
+	mut owner := NativeGuestOwner{ hooks: hooks }
 	unsafe {
 		C.__atomic_store_n(&i32(C.VINIX_AGX_VM_INTERRUPTED), i32(0), C.__ATOMIC_RELAXED)
 		guest_native_owner = &owner

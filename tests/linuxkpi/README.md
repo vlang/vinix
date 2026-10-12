@@ -10,7 +10,7 @@ native type namespace. Generated C is a temporary build artifact.
 condition-variable lifecycle. `host_model_tls.S` supplies native per-thread
 storage because the frozen V compiler ignores `thread_local` for its Vinix
 target. The formatting and logging assembly captures the native variadic
-arguments; their fixture bodies are V. `compile-native-host.py` builds the
+arguments; their fixture bodies are V. `compile-native-host` builds the
 same assertions against the actual ARM or x86 musl SDK, with `hostguest/` as
 the child-process supervisor.
 
@@ -154,9 +154,9 @@ To generate an assertion-enabled native workload:
 
 ```sh
 V=/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/toolchain-v/v \
-  python3 tests/linuxkpi/compile-native-host.py /tmp/linuxkpi-host-arm --arch aarch64
+  tests/linuxkpi/compile-native-host /tmp/linuxkpi-host-arm --arch aarch64
 V=/Users/alex/.cache/vinix-c-to-v/firstparty-only-20261006-011023/toolchain-v/v \
-  python3 tests/linuxkpi/compile-native-host.py /tmp/linuxkpi-host-x86 --arch x86_64
+  tests/linuxkpi/compile-native-host /tmp/linuxkpi-host-x86 --arch x86_64
 ```
 
 Native compilation alone does not complete the required original-C/V guest
@@ -164,7 +164,7 @@ comparison. Keep the original failures, identical-image identities and equal
 comparison budgets when continuing that work.
 
 The separate native PID 1 is maintained in `initfixture/core_amd64.v`.
-`run_vm.py` generates its freestanding build artifact and links the
+`run_vm` generates its freestanding build artifact and links the
 instruction-only ELF entry in `initfixture/entry.S`, which supplies the native
 stack alignment. The immutable original is
 `2a5abc36175a5177828d86aad71667787eb68110:tests/linuxkpi/guest_init.c`

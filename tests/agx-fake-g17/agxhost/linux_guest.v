@@ -124,7 +124,7 @@ pub fn linux_guest(row map[string]json2.Any) !int {
  for name in ['dev', 'proc', 'sys', 'root'] { guest_mkdir(rootfs + '/' + name, false, false)! }
  generated := state + '/guest_init.c'
  if guest_native_active() {
-  hosttest.generate_module(root + '/tests/linuxkpi/initfixture', generated, 'amd64', ['nofloat'])!
+  guest_native_generate(root + '/tests/linuxkpi/initfixture', generated, 'amd64', ['nofloat'])!
  } else {
   python := guest_decode(row['python']!)!
   guest_run([python, root + '/tests/kernel-gaps/compile-v-fixture.py', generated, '--arch', 'x86_64', '--module', root + '/tests/linuxkpi/initfixture'], {}, false, false)!

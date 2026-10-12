@@ -71,10 +71,10 @@ fn argument_prefix(value string) string {
 pub fn build_suite(work string, arch string, sanitize bool, inherited_environment map[string]string, host_arch string) ! {
 	root := hosttest.root()
 	tests := root + '/tests/linuxkpi'
-	source := argument_path(hosttest.env_default('LINUXKPI_SOURCE_DIR', root + '/third_party/linux-i915/linux-6.6.157'))
+	source := argument_path(inherited_environment['LINUXKPI_SOURCE_DIR'] or { root + '/third_party/linux-i915/linux-6.6.157' })
 	source_prefix := argument_prefix(source)
 	work_prefix := argument_prefix(work)
-	compiler := hosttest.shell_split(hosttest.env_default('CC', 'clang'))!
+	compiler := hosttest.shell_split(inherited_environment['CC'] or { 'clang' })!
 	contracts := work_prefix + 'host-contracts'
 	os.mkdir(contracts) or {
 		if !os.is_dir(contracts) { return hosttest.ModuleFileError{contracts, err.code(), err.msg()} }
@@ -88,8 +88,8 @@ pub fn build_suite(work string, arch string, sanitize bool, inherited_environmen
 		if contract == '' { return HostFailure{'FileNotFoundError', header} }
 		hosttest.module_copy_file(contract, contracts + '/' + header)!
 	}
-	fixturehost.inherited_command_environment_preferred(['python3', root + '/kernel/linuxkpi/generate-abi.py',
-		tests + '/host_percpu_abi.json', contracts + '/host_percpu_abi.h'], inherited_environment, host_arch)!
+	hosttest.generate_abi(tests + '/host_percpu_abi.json', root + '/kernel/linuxkpi',
+		contracts + '/host_percpu_abi.h')!
 	mut flags := [...compiler, '-std=gnu11', '-fgnu89-inline', if sanitize { '-O1' } else { '-O2' }, '-g',
 		'-ffreestanding', '-fno-builtin', '-fwrapv', '-fno-strict-aliasing', '-ffunction-sections', '-fdata-sections',
 		'-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-Wno-unused-function', '-Wno-unused-label',
@@ -106,9 +106,10 @@ pub fn build_suite(work string, arch string, sanitize bool, inherited_environmen
 		generated := work_prefix + name + '.c'
 		object := work_prefix + name + '.o'
 		compiled := generate(directory(tests, name), generated, arch, name != 'hostmodel')!
+		if compiled.stdout.contains('retrying with') || compiled.stderr.contains('retrying with') { return error('V compiler fallback rejected: ' + compiled.stdout + compiled.stderr) }
 		print(compiled.stdout); eprint(compiled.stderr)
 		fixturehost.inherited_command_environment_preferred([...flags, '-D__sputc=vmh_' + name + '_sputc', '-c', generated, '-o', object], inherited_environment, host_arch)!
-		undefined := fixturehost.capture_preferred([hosttest.env_default('NM', 'nm'), '-u', object], '', inherited_environment, false, host_arch)!
+		undefined := fixturehost.capture_preferred([inherited_environment['NM'] or { 'nm' }, '-u', object], '', inherited_environment, false, host_arch)!
 		hosttest.module_write_text(work_prefix + name + '.undefined.txt', undefined)!
 		if suite_allocation(undefined) { return HostFailure{'RuntimeError', 'Implicit V allocation in ' + name + ': ' + undefined} }
 		objects << object

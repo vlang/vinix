@@ -33,7 +33,7 @@ struct C.vinix_agx_child_info {
 	si_code i32
 	si_status i32
 }
-fn C.waitid(i32, u32, &C.vinix_agx_child_info, i32) i32
+fn C.vinix_agx_waitid(i32, u32, &C.vinix_agx_child_info, i32) i32
 
 fn C.socket(i32, i32, i32) i32
 fn C.bind(i32, voidptr, u32) i32
@@ -73,7 +73,7 @@ fn vm_interrupt_check() ! {
 fn vm_native_observe(pid i32) !(bool, int) {
 	mut info := C.vinix_agx_child_info{}
 	for {
-		if C.waitid(C.P_PID, u32(pid), &info, C.WEXITED | C.WNOHANG | C.WNOWAIT) == 0 { break }
+		if C.vinix_agx_waitid(C.P_PID, u32(pid), &info, C.WEXITED | C.WNOHANG | C.WNOWAIT) == 0 { break }
 		if C.errno != C.EINTR { return vm_os_error() }
 		vm_interrupt_check()!
 	}

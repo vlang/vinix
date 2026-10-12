@@ -5,11 +5,11 @@ fallbacks and the shared native declarations. `host_suite.v` owns the ordered
 allocation guard, and response file. Original fixtures and warning policies
 remain unchanged.
 
-Python entry points retain argparse/import compatibility and exception transport.
-The counted `_host_native.py` also binds Python's replacement-template parser;
-V applies those tokens to its own first complete Unicode module-line match.
-Compilation preserves inherited standard streams, the original caller's ABI,
-its actual `env=None` environment, signal restoration and lack of a deadline.
+The maintained `host_suite` and `compile_host` commands invoke V directly.
+Module replacement templates are parsed and applied by V. Compilation preserves
+inherited standard streams, the caller's ABI, supplied compiler/source/nm
+environment, signal restoration and lack of a deadline. ABI headers are generated
+through the native API, and compiler fallback is rejected.
 
 Qualification compares frozen full original controllers with native controllers
 on ARM, x86 and ASan/UBSan profiles. Every group has exact actual generated

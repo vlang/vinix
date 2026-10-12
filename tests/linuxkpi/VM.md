@@ -2,18 +2,23 @@ The disposable LinuxKPI guest workflow is implemented in
 `tests/agx-fake-g17/agxhost/linux_guest.v`. V owns fixture compiler arguments,
 rootfs and ISO preparation, QEMU arguments, marker selection, panic grace time,
 deadlines, polling, final serial validation and guest retirement. The fixed
-public marker manifest lives in `linux_guest_data.v`. The Python entrypoint
-retains argparse and the original mutable `MARKERS` list; importing its public
-constants does not require a V compiler or a running native controller.
+public marker manifest lives in `linux_guest_data.v`. The `run_vm` command
+invokes `run_vm.v` directly, including required arguments and optional fixture
+flags. Metadata is available through `agxhost.guest_metadata()`.
 
-`_guest_native.py` provides synchronous stdlib filesystem, archive and process
-primitives. It retains the actual Python exceptions, QEMU process and log file
-until the native workflow finishes. Controller pipes retire before fallback
-guest recovery, and the log closes after the guest has been reaped. Further
+`linux_guest_native.v` provides filesystem, archive and process primitives.
+It retains the QEMU process and log file until the native workflow finishes,
+and the log closes after the guest has been reaped. Further
 SIGINT signals are ignored during retirement and the previous handler is
 restored afterward. This prevents repeated interruption from abandoning a
 guest during its original five-second terminate-to-kill allowance. Existing
 state directories are never overwritten or reused.
+
+The native tooling closure also checks thirteen real child-process cases with
+controlled preparation steps: normal/default/opt-in markers, unexpected fixture
+markers, failures, panics, early exit, timeout, more than a MiB of output,
+SIGINT and SIGTERM. Every case requires PID and descriptor retirement. Those
+tests build no kernel or boot image and make no new guest-runtime claim.
 
 Qualification compares twenty-four frozen-original workflows per ARM64,
 actual x86-64 caller/controller and ARM ASan/UBSan profile. The checks require

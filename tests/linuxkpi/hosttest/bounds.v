@@ -379,8 +379,8 @@ fn unique_paths(items []string) []string {
 }
 
 fn bounds_protected(archive string, compiler string) []string {
-	return unique_paths([archive, compiler, os.join_path(upstream_here(), 'generate-bounds.py'),
-		os.join_path(upstream_here(), 'upstream.py'), os.join_path(upstream_here(), 'upstream.json'),
+	return unique_paths([archive, compiler, os.join_path(upstream_here(), 'generate-bounds'),
+		os.join_path(upstream_here(), 'upstream'), os.join_path(upstream_here(), 'upstream.json'),
 		...bounds_sources()])
 }
 
@@ -542,8 +542,8 @@ pub fn generate_bounds(source_arg string, archive_arg string, output_arg string,
 		return error('compiler inputs changed during bounds generation')
 	}
 	dep := bounds_dependencies(dependency_text, source, output,
-		[archive, pin_path, os.join_path(upstream_here(), 'generate-bounds.py'),
-			os.join_path(upstream_here(), 'upstream.py'), compiler_path, ...bounds_sources()])!
+		[archive, pin_path, os.join_path(upstream_here(), 'generate-bounds'),
+			os.join_path(upstream_here(), 'upstream'), compiler_path, ...bounds_sources()])!
 	mut config := map[string]string{}
 	mut target := map[string]string{}
 	for name, value in macros {
