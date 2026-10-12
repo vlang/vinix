@@ -36,7 +36,7 @@ x86-64 only. Default x86-64 and arm64 kernels leave it disabled.
 
 **There is no working native i915 GPU driver yet.** The complete driver does
 not compile, link or bind; the firmware framebuffer remains the display
-backend. The latest full syntax audit passes **4/269** i915 translation units.
+backend. The latest full syntax audit passes **5/269** i915 translation units.
 The already-linked `i915_memcpy.c` is a CPU WC-copy helper, not GPU bringup.
 Unrelated OpenGothic/Venus/KekVM commits are not evidence of native i915 support.
 
@@ -83,6 +83,7 @@ global fault-lease rewrite was not applied.
 
 | Commit | Completed runtime change |
 | --- | --- |
+| `1d0f5b00` | Native ordinary RCU callback/cookie service, real IRQ-return grace periods, fixed CPU-domain guards and V-only validation tools |
 | `b718a737` | Original SMP/CSD/header integration, genuine CPU accessor bindings and compiler provenance; remote dispatch remains pending |
 | `4052200b` | Immutable actual boot-CPU MOVDIRI/MOVDIR64B capability intersection and measured caller-state-preserving queries |
 | `909f6a4b` | Original x86 instruction-helper include closure, unchanged MOVDIR operands/opcodes and genuine unresolved privileged references |
@@ -1534,3 +1535,38 @@ integer/error/resource include closure, configured CPU feature policy,
 devices/DMA/DRM and firmware. Never expose dummy `task->mm`, parent or vfork
 completion fields: the native task view is 64 bytes and carries no such owner.
 Physical Tiger Lake or suitable passthrough validation is still required.
+
+## Latest scalar/error/resource closure
+
+Exact original `umode_t`, `lower_32_bits`, `upper_32_bits`, pointer-only
+`ERR_CAST` and the UAPI Kbuild `asm/resource.h` wrapper are implemented.
+Ten strict GNU99/GNU11 sanitizer profiles and an independent V replay pass,
+including both type-header orders, constant expressions/single evaluation,
+error boundaries and a genuine UAPI-only compiler route. Actual native
+`ERR_CAST` object code returns the pointer without calls or allocation.
+
+Fresh helper worktrees are detached at **`1d0f5b00`**, with five production and
+six test paths overlaid. Enabled/default x86 and default ARM builds pass.
+Exact ELF `2c75b056fa5e9eb9da9f8e10598886b69e70cf28966d77e552b7772c6549059a`
+passes normal/SSE guests, all 46 markers and all 28 strict existing lifetime
+equalities. Independent ISO checks verify the kernel, PID 1 and image identity.
+Evidence: `smp-oct10/scalar-helper-*` and
+`scalar-helper-independent-review/review-result.json` under the cache root.
+
+The latest complete V audit passes **5/269**; its isolated report is
+`smp-oct10/scalar-audit-oct12/full/i915-audit.json`. The largest first-error
+groups are `vfork_done` (224 files) and `cpu_feature_enabled` (34). These are
+compiler diagnostics, not a complete dependency or runtime inventory.
+One additional first error is a missing `KBUILD_MODNAME` audit flag, which is
+an invocation defect rather than a missing kernel API. The maintained V audit
+replacement must derive that metadata from original Kbuild.
+CPU policy needs genuine configured masks and boot capability/active-mode queries.
+Keep hardware SHSTK separate from configured USER_SHSTK, and use actual
+CR4/page-table mode for LA57. Native task/MM/vfork ownership, resource-limit
+enforcement and complete device/DMA/DRM services remain unresolved.
+
+Run helper tests through V, with a new proof directory when keeping outputs:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/scalar_helpers.v --keep-dir /tmp/vinix-scalar-helpers-fresh
+```

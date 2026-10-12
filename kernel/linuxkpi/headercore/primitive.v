@@ -332,6 +332,11 @@ pub fn pointer_error(p C.vhp_const_voidp) isize {
 	return isize(usize(voidptr(p)))
 }
 
+@[export: 'ERR_CAST']
+pub fn error_cast(p C.vhp_const_voidp) voidptr {
+	return voidptr(p)
+}
+
 @[export: 'IS_ERR']
 pub fn is_error(p C.vhp_const_voidp) bool {
 	return usize(voidptr(p)) >= ~usize(0) - 4094

@@ -17,6 +17,7 @@
  * Native Stat fields have a separate u64 encoding and need an explicit bridge. */
 typedef u32 __kernel_dev_t;
 typedef __kernel_dev_t dev_t;
+typedef unsigned short umode_t;
 typedef unsigned int gfp_t;
 #define pgoff_t unsigned long
 typedef u64 phys_addr_t;

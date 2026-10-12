@@ -7,5 +7,6 @@ void *ERR_PTR(long);
 long PTR_ERR(const void *);
 bool IS_ERR(const void *);
 bool IS_ERR_OR_NULL(const void *);
+void * __must_check ERR_CAST(__force const void *);
 int PTR_ERR_OR_ZERO(const void *);
 #endif

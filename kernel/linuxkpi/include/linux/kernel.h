@@ -17,6 +17,9 @@
 #include <linux/panic.h>
 #include <linux/printk.h>
 #include <linux/sprintf.h>
+/* Original split shifts also accept a 32-bit operand without shifting by 32. */
+#define upper_32_bits(n) ((u32)(((n) >> 16) >> 16))
+#define lower_32_bits(n) ((u32)((n) & 0xffffffff))
 #define u64_to_user_ptr(x) (		\
 {					\
 	typecheck(u64, (x));		\
