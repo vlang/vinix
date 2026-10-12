@@ -1,0 +1,87 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "902f343b9ee3280f5c0ec88924d1bafa9f8bf19c8802c65aaabd5052318f79c3",
+    "results": [
+        {
+            "name": "iovimport",
+            "source_sha256": "0dce900bda900952ac325ae22e6f8cf9f96a5158c5999cf829d8764b4e5c0eca",
+            "init_sha256": "1d83b91b78ecf3782927470e2459d618686aca3acafb9ef41a5e7e3c804507ef",
+            "iso_sha256": "89b1449348b98c89b7b3c4c806f0337bcf43dc8c075ce83d890cdee5d5ea377e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovpin",
+            "source_sha256": "3a4e4decb1c124fcf4470a94e5fd3a7d4efb31767abef4bb2a71b9164be2df61",
+            "init_sha256": "fb4814af34504168bd5081eae7bcf9f4f0ece10fbab243ad96157cea01bb53ac",
+            "iso_sha256": "60dd4c1c0e17c9e5d6e29097d1f7a9ed3a57445f570fbed5ae6ad013ac2af8f1",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pathio",
+            "source_sha256": "28a7d58e04956b559c2024bcf6a3c081a770982a357724b7f52a54c536720d16",
+            "init_sha256": "48bf8c1b2a50662dfe0f1c976cb1b0884776ba756486cbf5ff95596890df79d0",
+            "iso_sha256": "81318e3ac865fe8fdde2e3cad03dbfb339593dc5f3880d567e1fa1154378a470",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "readerror",
+            "source_sha256": "f9d31a081f68f7de6f75651da8b10389202b2457e2bda232a45141ac1369ea64",
+            "init_sha256": "effe25b84eb5a0d81f390dd413f7271bd0b5eb088dffb361ce55b1899f221d11",
+            "iso_sha256": "c1e2e3c8d95e29d41cca46092a4355eeecbda61843abbfa8003f272fbe52a9d2",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pipezero",
+            "source_sha256": "45e03f2ebcc0806aba964d20b1e9ba0f89910264ad92f0c991687e1e41d34c96",
+            "init_sha256": "b28904aa9745a499fafc34d8b05c83500b13bac595c2385fe629a8c7dd65e675",
+            "iso_sha256": "7d9d5d5b5fb57e9ba73c8c8d52a7a210ec3a2fe463c86b2a7757a3309d0b409b",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "4192ba0538e93d8e85dad1ec36672bdfc005b06189f04358a9afa1d4e3aaeee6",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sharedmem",
+            "source_sha256": "99ee2c57a20feb6bcf30b333373985c214e4142769506e76374626e4ccc71f44",
+            "init_sha256": "f013d12f9f1faa2f7136eb171d1197102b306e780f6a89c18db77a05fd420676",
+            "iso_sha256": "c59bf8af9a6e9343fe957f43b0391e947b202760a461edbf46d5e8698729f675",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "aa2cc84209da7d1eeeabf00d54e2ed1e5004cd8dd2e2620b87484e0040951b46",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccomp",
+            "source_sha256": "fa786d3dbf56b7a0ad48273a8f2ac09984d6c22a9e9930bda91b8f7711d25dc3",
+            "init_sha256": "2ae611cb0aa90bdc3b55c8af460cbe3c588a31afc6bbf5af07db4904ef018c98",
+            "iso_sha256": "44ede08a574796f4c65d50fab07a02ace3e8503c6b78eb51faa118c886423d62",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexqueue",
+            "source_sha256": "9c881bb3bad609ab72d2161a39a994486e0b222b6c053709c16754c5d3c1d9cf",
+            "init_sha256": "5b32b91c590bc5f83285435a354e9f47a1aaa1be693ddb57a355ecd3ec7aab42",
+            "iso_sha256": "944c2ebb72cd64a53092490a8a142301e54f93ed4c7fdeeaffad9e9ed6330c4a",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

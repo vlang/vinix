@@ -14,6 +14,7 @@ import file
 import fs
 import futex
 import krandom
+import kbudget
 import memory
 import net
 import proc
@@ -22,6 +23,7 @@ import sched
 import stat
 import time
 import usercopy
+import vmstorage
 
 
 // Linux's private key only checks the canonical user range; the word need
@@ -155,6 +157,57 @@ mut:
 }
 
 const linux_iov_max = 1024
+const linux_iov_fast = 8
+
+struct LinuxIOVector {
+mut:
+	data &LinuxIOVec = unsafe { nil }
+	total u64
+	charge kbudget.Charge
+	owned bool
+}
+
+// Small vectors borrow the caller's stack; larger vectors own one bounded,
+// fallible allocation and its scratch reservation until the syscall returns.
+fn (vector LinuxIOVector) release() {
+	if vector.owned {
+		unsafe { free(vector.data) }
+		kbudget.release(vector.charge)
+	}
+}
+
+fn import_linux_iov(iov_ptr u64, iovcnt int, fast voidptr) ?LinuxIOVector {
+	if iovcnt < 0 || iovcnt > linux_iov_max {
+		errno.set(errno.einval); return none
+	}
+	if iovcnt == 0 { return LinuxIOVector{} }
+	if iov_ptr == 0 { errno.set(errno.efault); return none }
+	mut vector := LinuxIOVector{data: unsafe { &LinuxIOVec(fast) }}
+	bytes := u64(iovcnt) * sizeof(LinuxIOVec)
+	if iovcnt > linux_iov_fast {
+		reservation := vmstorage.allocation_bytes(bytes) or { errno.set(errno.enomem); return none }
+		vector.charge = proc.reserve_kernel(.scratch, reservation)?
+		vector.data = unsafe { &LinuxIOVec(memory.malloc_packed_fallible(bytes)) } @[freed]
+		if vector.data == unsafe { nil } {
+			kbudget.release(vector.charge)
+			errno.set(errno.enomem); return none
+		}
+		vector.owned = true
+	}
+	// Copy every header before any resource operation. Later user mutations
+	// or unmapping cannot change the lengths and addresses we have imported.
+	if !usercopy.copy_from_user(vector.data, iov_ptr, bytes) {
+		vector.release(); errno.set(errno.efault); return none
+	}
+	for i := 0; i < iovcnt; i++ {
+		iov := unsafe { vector.data[i] }
+		if iov.len > u64(0x7fffffffffffffff) - vector.total {
+			vector.release(); errno.set(errno.einval); return none
+		}
+		vector.total += iov.len
+	}
+	return vector
+}
 
 // The most writev(2) gathers into one kernel buffer: one byte more than the
 // longest message a socket takes, so that a datagram too long to send is
@@ -217,10 +270,10 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 	defer { fd.unref() }
 	access_error := linux_iov_access_error(fd, true)
 	if access_error != 0 { return errno.err, access_error }
-	total, validation_error := validate_linux_iov(iov_ptr, iovcnt)
-	if validation_error != 0 {
-		return errno.err, validation_error
-	}
+	fast := C.vinix_stack_alloc(linux_iov_fast * sizeof(LinuxIOVec))
+	vector := import_linux_iov(iov_ptr, iovcnt, fast) or { return errno.err, errno.get() }
+	defer { vector.release() }
+	total := vector.total
 	if total == 0 {
 		return 0, 0
 	}
@@ -241,12 +294,7 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 	mut filled := u64(0)
 	mut written := u64(0)
 	for i := 0; i < iovcnt; i++ {
-		iov := read_linux_iov(iov_ptr, i) or {
-			if written != 0 {
-				return written, 0
-			}
-			return errno.err, errno.efault
-		}
+		iov := unsafe { vector.data[i] }
 		mut taken := u64(0)
 		for taken < iov.len {
 			chunk := if iov.len - taken < size - filled { iov.len - taken } else { size - filled }
@@ -784,17 +832,16 @@ fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u
 	defer { fd.unref() }
 	access_error := linux_iov_access_error(fd, false)
 	if access_error != 0 { return errno.err, access_error }
-	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
-	if validation_error != 0 {
-		return errno.err, validation_error
-	}
+	fast := C.vinix_stack_alloc(linux_iov_fast * sizeof(LinuxIOVec))
+	vector := import_linux_iov(iov_ptr, iovcnt, fast) or { return errno.err, errno.get() }
+	defer { vector.release() }
 	if iovcnt == 0 {
 		return 0, 0
 	}
 
 	mut total := u64(0)
 	for i := 0; i < iovcnt; i++ {
-		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
+		iov := unsafe { vector.data[i] }
 		if iov.len == 0 {
 			continue
 		}

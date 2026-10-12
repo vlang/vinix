@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "6d5e7b2e631c189cb6c937d70d4c3720890adc856dc0a57ab4a37afa4ac20009",
+    "results": [
+        {
+            "name": "iovimport",
+            "source_sha256": "0dce900bda900952ac325ae22e6f8cf9f96a5158c5999cf829d8764b4e5c0eca",
+            "init_sha256": "ccf8e4561f194fba1e580ac5e89808aedcd7674d6856b933702ff747f5b54bc6",
+            "iso_sha256": "aba7e8a12103e28bc732c5ce4e34e3c47089dcc9345f9c4baf8cc6163f4b11b1",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

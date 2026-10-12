@@ -632,6 +632,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   qualify blocked pipe close/dup2 races, untouched replacement data and final
   reference release as root/UID 1000 on both native architectures, with flat
   storage measurements. See [the vector lifetime receipts](docs/linux-posix-qualification.md#vectored-io-descriptor-lifetime).
+- [x] Import readv/writev headers once, retaining the original addresses/lengths
+  through concurrent header mutation/protection; qualify stack/heap vector
+  storage, error cleanup and flat retention on both native architectures.
+  See [the immutable iovec receipts](docs/linux-posix-qualification.md#immutable-iovec-imports).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

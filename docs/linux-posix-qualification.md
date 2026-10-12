@@ -1736,6 +1736,70 @@ inventory check pass. An independent review of both generated kernels and
 fixtures verified paired FD/Handle ownership, all error/partial returns,
 borrowed notification paths, stack snapshots, worker join and failure exits.
 
-Shared file-offset atomicity across a whole vector, immutable iovec imports,
+Shared file-offset atomicity across a whole vector,
 Linux stream short-read/message behavior and translated/ELF32 variants remain
 unqualified. The three broad Linux/POSIX acceptance gates stay open.
+Immutable headers have later qualification below.
+
+## Immutable iovec imports
+
+readv/writev now copy all iovec headers once, before resource I/O, following
+Linux's [header import contract](https://github.com/torvalds/linux/blob/v6.12/lib/iov_iter.c#L1314).
+The earlier validation pass copied headers only to check them, then each I/O
+step copied its header again. A peer could change a later buffer address after
+validation, or protect/unmap the array while the first pipe operation waited.
+Reads could then consume data into another destination or return EFAULT after
+consuming their first byte; writes could send another source's bytes or return
+a short success after writing their first chunk.
+
+Up to eight headers borrow 128 bytes allocated in the syscall frame. Larger
+vectors own one raw allocation bounded to 16 KiB, with a scratch reservation
+through the existing allocator-geometry helper. In particular, ARM allocations
+can need a 16 KiB metadata page as well as rounded data pages; a simple twice-
+payload reservation undercovers some requests. Admission precedes allocation,
+allocator nil reports ENOMEM, copy/aggregate-length failures release storage,
+and every successful import releases its owner on all final I/O outcomes.
+Descriptor references continue to cover the whole call.
+
+The V `iovimport` fixture runs 40 readv and 40 multi-chunk writev cases per
+architecture, split between root and UID/GID 1000 children. It imports readonly
+2/8/9/513/1024-entry arrays, then changes a later address or applies PROT_NONE
+while I/O waits. Read tests observe the first read's scratch reservation after
+import through a preopened `/proc/kernel-resources`, and verify the original
+reader reference with the writer's readiness after closing the user descriptor.
+Write tests wait for queued bytes before mutation, then drain to EOF and verify
+all 1,052,673 original bytes. These checkpoints also work on the old kernel.
+Worker failure paths terminate the isolated child while its borrowed buffers
+remain live; successful paths join before releasing mappings or stack data.
+
+All 80 cases fail on each unchanged kernel: changed read addresses receive the
+second byte, protected headers cause `-1/EFAULT(14)` after the first byte,
+changed write sources produce the wrong final 4096 bytes, and protected write
+headers return only 1,048,577 bytes. Both changed kernels pass every case.
+Each credential group also runs 32 warmup and 200 measured cycles over all
+five vector counts, covering successful and empty vectors, header/payload
+faults, wrong modes and aggregate-length rejection. Every slab class remains
+flat, with big pages at 63/63 on ARM and 160/160 on x86. The earlier descriptor
+race and retention fixture also passes on the new kernels.
+
+Both architectures pass ten regression cases, and all eight Linux compatibility
+host tests pass. The maintained mapping-storage host test passes the geometry,
+admission, rollback and owner-lifetime checks. The allocation-site audit still
+fails its existing allowances: both controls and candidates report 406 ARM and
+295 x86 sites, with identical allowance-failure rows. No allowance is increased,
+and this audit is not reported as passing. Independent review of both emitted
+kernels and all four fixture C captures verified stack borrows, reservation
+coverage, raw ownership, partial/error returns, observer option paths and
+asynchronous mapping/stack lifetimes.
+
+The [dated results](../tests/linux-compat/results/2026-10-13/) retain
+`iovimport-before-*`, `iovimport-after-*`, both allocation-audit logs and host
+results. The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/iovimport-audit.v)
+checks frozen kernels, sources and artifacts, actual slab counts, all native
+control failures, geometry/reference order, and rejection of a passing run as
+a failing control. The inventory retains 62 input fingerprints.
+
+Positioned vectors still use their earlier import path. Linux MAX_RW_COUNT
+clamping and complete range/length precedence, shared-offset atomicity, stream
+message behavior, actual allocator exhaustion and translated/ELF32 qualification
+remain separate work. The broad section-15 gates remain open.
