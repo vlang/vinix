@@ -1,0 +1,25 @@
+{
+    "conclusion": "The sampled allocator state remained invariant while hot timings varied substantially across samples, fresh execs and boots. These data do not support class coarsening, lost retention, nested/sole group changes, missed free-fast-path eligibility or a malloc-lock transition as the source of the variation. Guest CPU time closely followed wall time, so substantial guest descheduling is not visible in this diagnostic.",
+    "fresh_execs": 12,
+    "full_warmup_pairs_per_phase": 200000,
+    "limits": [
+        "Outside-loop observations are sampled state, not instruction tracing inside every measured pair.",
+        "The private executable is cross GCC14.2 with different code layout and extra outside-loop dlsym/probes/CPU clock reads, whereas canonical captures were compiled by guest GCC14.2. This diagnostic cannot replace or revise either canonical timing.",
+        "Vinix CPU accounting and wall time use the virtual free-running hardware clock. A host pause while QEMU still considers the guest thread running can appear in both clocks. This report does not establish host noise, host CPU speed or a specific TCG/timing mechanism.",
+        "Dynamic setup resolves the actual next-DSO malloc definition before dladdr; immutable loader ELF offsets and all private copies are recorded. No secrets or full addresses are printed by the sampler.",
+        "A preflight setup error from executable-PLT dladdr was retained separately and excluded from measurements."
+    ],
+    "measured_pairs_per_sample": 200000,
+    "sampled_allocator_state": {
+        "after_metadata": "class4 group absent in all twelve execs",
+        "alignment": "All hot groups had memory page offset16 and metadata cache line offset24.",
+        "free_fast_path": "All 1536 outside-loop allocation probes met the v5 retained single-thread free conditions.",
+        "hot_group": "class4, eight slots, one sole nested group, stride80, full stride, usage8, active_idx7",
+        "locks": "need_locks0 and actual malloc lock0 in every state/probe; no negative transition",
+        "masks": "Available/freed masks were disjoint and together255; phase-dependent rotation masks retained.",
+        "rotation": "Each 32-pair probe visited all eight slots four times; no group change; reserved header5; offset0..35"
+    },
+    "samples": 168,
+    "status": "complete",
+    "validation": "Both hash-verified immutable-v5 kernels/loaders completed every fresh exec and checksum; all records retained."
+}

@@ -1,0 +1,19 @@
+#!/bin/sh
+exec >/dev/com1 2>&1
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+mount -t proc proc /proc
+echo DIAG-GUEST-BEGIN
+for invocation in 1 2 3; do
+    for mode in dynamic static; do
+        echo DIAG-EXEC-BEGIN invocation=$invocation linkage=$mode
+        /root/sampler-$mode
+        status=$?
+        echo DIAG-EXEC-END invocation=$invocation linkage=$mode exit_code=$status
+        if [ "$status" != 0 ]; then
+            echo DIAG-FAIL
+            while :; do sleep 60; done
+        fi
+    done
+done
+echo DIAG-GUEST-DONE
+while :; do sleep 60; done

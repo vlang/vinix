@@ -138,7 +138,7 @@ fn (child Child) settle(seconds f64) !bool {
 // Retirement never responds to pending interrupts. Every path kills the group
 // before the sole reap. The read loop has stopped before entry; close its master
 // after termination so Darwin slave teardown cannot block that reap.
-fn (child Child) close(amd64 bool) ! {
+fn (child Child) close(amd64 bool, terminate_grace f64) ! {
 	mut descriptor_closed := false
 	defer { if !descriptor_closed { C.close(child.master) } }
 	mut reaped := false
@@ -161,7 +161,7 @@ fn (child Child) close(amd64 bool) ! {
 	}
 	if !exited {
 		C.killpg(child.pid, C.SIGTERM)
-		exited = child.settle(2)!
+		exited = child.settle(terminate_grace)!
 	}
 	C.killpg(child.pid, C.SIGKILL)
 	C.kill(child.pid, C.SIGKILL)
@@ -183,21 +183,103 @@ pub:
 	status     int
 	forced     bool
 	finished   bool
+	actual_qemu_ps []string
+}
+
+pub struct CapturePolicy {
+pub:
+	pass string
+	failures []string
+	pass_lookback int = 131072
+	failure_lookback int = 131072
+	settle f64
+	quit_at_marker bool
+	log string
+	complete_lines bool
+	alternate_prefix string
+	pass_in_chunk bool = true
+	boot_disk string
+	drain_on_close f64
+	terminate_grace f64 = 2
+}
+
+fn write_capture(mut log os.File, chunk []u8) ! {
+	mut offset := 0
+	for offset < chunk.len {
+		written := log.write(chunk[offset..])!
+		if written == 0 { return error('Core serial log write stopped') }
+		offset += written
+	}
+	log.flush()
+}
+
+fn (child Child) retire_capture(amd64 bool, policy CapturePolicy, mut transcript []u8, mut log os.File) ! {
+	mut retired := false
+	defer { if !retired { child.close(amd64 || policy.drain_on_close > 0, policy.terminate_grace) or {} } }
+	if policy.drain_on_close > 0 {
+		exited, _ := child.observe()!
+		if !exited {
+			child.shutdown() or {}
+			until := now() + policy.drain_on_close
+			mut buffer := [65536]u8{}
+			mut descriptor := C.pollfd{fd: child.master, events: i16(C.POLLIN)}
+			for now() < until {
+				if C.poll(&descriptor, 1, 50) > 0 {
+					count := C.read(child.master, &buffer[0], buffer.len)
+					if count > 0 {
+						chunk := unsafe { buffer[..int(count)] }
+						transcript << chunk
+						if policy.log != '' { write_capture(mut log, chunk)! }
+					}
+				}
+				stopped, _ := child.observe()!
+				if stopped { break }
+			}
+		}
+	}
+	// A drained ARM console has already received its shutdown escape.
+	retired = true
+	child.close(amd64 || policy.drain_on_close > 0, policy.terminate_grace)!
+}
+
+fn capture_finished(recent string, policy CapturePolicy) bool {
+	if !policy.complete_lines { return recent.contains(policy.pass) }
+	parts := recent.split('\n')
+	for line in parts[..parts.len - 1] {
+		complete := line.trim_right('\r')
+		if complete == policy.pass || (policy.alternate_prefix != '' && complete.starts_with(policy.alternate_prefix)) { return true }
+	}
+	return false
 }
 
 pub fn capture(command []string, env map[string]string, cwd string, timeout f64,
 	verification bool, amd64 bool, echo bool) !Run {
+	return capture_policy(command, env, cwd, timeout, amd64, echo, CapturePolicy{
+		pass: if verification { core_persist_marker } else { core_pass_marker }
+		failures: core_fail_markers
+		settle: if amd64 { 2 } else { 10 }
+		quit_at_marker: !amd64
+	})!
+}
+
+pub fn capture_policy(command []string, env map[string]string, cwd string, timeout f64,
+	amd64 bool, echo bool, policy CapturePolicy) !Run {
+	mut log := os.File{}
+	if policy.log != '' { log = os.create(policy.log)! }
+	defer { if policy.log != '' { log.close() } }
 	child := start(command, env, cwd)!
 	mut closed := false
-	defer { if !closed { child.close(amd64) or {} } }
 	deadline := now() + timeout
 	mut transcript := []u8{}
+	defer { if !closed { child.retire_capture(amd64, policy, mut transcript, mut log) or {} } }
 	mut buffer := [65536]u8{}
 	mut descriptor := C.pollfd{ fd: child.master, events: i16(C.POLLIN) }
 	mut has_status := false
 	mut status := 0
 	mut finished_at := f64(-1)
+	mut actual_qemu_ps := []string{}
 	for now() < deadline {
+		mut pass_in_chunk := false
 		checkpoint()!
 		has_status, status = child.observe()!
 		if has_status { break }
@@ -214,7 +296,9 @@ pub fn capture(command []string, env map[string]string, cwd string, timeout f64,
 			}
 			if count > 0 {
 				chunk := unsafe { buffer[..int(count)] }
+				pass_in_chunk = policy.pass_in_chunk && !policy.complete_lines && chunk.bytestr().contains(policy.pass)
 				transcript << chunk
+				if policy.log != '' { write_capture(mut log, chunk)! }
 				if echo {
 					mut stdout := os.stdout()
 					stdout.write(chunk)!
@@ -222,18 +306,26 @@ pub fn capture(command []string, env map[string]string, cwd string, timeout f64,
 				}
 			}
 		}
-		recent := transcript[if transcript.len > 131072 { transcript.len - 131072 } else { 0 }..].bytestr()
-		expected := if verification { core_persist_marker } else { core_pass_marker }
-		if finished_at < 0 && (recent.contains(expected) || core_fail_markers.any(recent.contains(it))) {
-			finished_at = now()
-			if !amd64 { child.shutdown()! }
+		if policy.boot_disk != '' && actual_qemu_ps.len == 0 && transcript.bytestr().contains('Booting') {
+			processes := os.exec(['ps', '-axo', 'pid,command'])
+			if processes.exit_code != 0 { return error('cannot capture QEMU process evidence') }
+			for line in processes.output.split_into_lines() {
+				words := line.fields()
+				if words.len >= 2 && os.base(words[1]) == 'qemu-system-aarch64' && line.contains(policy.boot_disk) { actual_qemu_ps << line.trim_space() }
+			}
 		}
-		if finished_at >= 0 && ((amd64 && now() - finished_at > 2) || (!amd64 && now() - finished_at >= 10)) {
+		recent := transcript[if policy.pass_lookback > 0 && transcript.len > policy.pass_lookback { transcript.len - policy.pass_lookback } else { 0 }..].bytestr()
+		failed := transcript[if policy.failure_lookback > 0 && transcript.len > policy.failure_lookback { transcript.len - policy.failure_lookback } else { 0 }..].bytestr()
+		if finished_at < 0 && (pass_in_chunk || capture_finished(recent, policy) || policy.failures.any(failed.contains(it))) {
+			finished_at = now()
+			if policy.quit_at_marker { child.shutdown()! }
+		}
+		if finished_at >= 0 && ((amd64 && now() - finished_at > policy.settle) || (!amd64 && now() - finished_at >= policy.settle)) {
 			break
 		}
 	}
 	// Mark closed before cleanup: close owns its fallback even on an error.
 	closed = true
-	child.close(amd64)!
-	return Run{transcript.bytestr(), has_status, status, !has_status, finished_at >= 0}
+	child.retire_capture(amd64, policy, mut transcript, mut log)!
+	return Run{output: transcript.bytestr(), has_status: has_status, status: status, forced: !has_status, finished: finished_at >= 0, actual_qemu_ps: actual_qemu_ps}
 }

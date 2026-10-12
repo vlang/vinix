@@ -50,7 +50,7 @@ case "$BUILD_DIR" in
         ;;
 esac
 
-for tool in curl file python3 tar; do
+for tool in curl file tar; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1

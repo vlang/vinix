@@ -75,23 +75,30 @@ fn spawned(pid int, context voidptr) ! {
 }
 
 pub fn driver(root string, setup string, state_arg string, scenarios string, kernel_arg string) !int {
+	return driver_profile(root, setup, state_arg, scenarios, kernel_arg, 'v6')!
+}
+
+pub fn driver_profile(root string, setup string, state_arg string, scenarios string, kernel_arg string, profile string) !int {
+	if profile !in ['final', 'v4', 'v5', 'v6'] { return error('unknown saved driver profile') }
+	version := if profile == 'final' { 'v3' } else { profile }
+	suffix := if profile == 'final' { 'v3' } else { profile + '-final' }
 	state := hosttest.module_resolve(state_arg)!
 	os.mkdir_all(state)!
 	kernel := hosttest.module_resolve(kernel_arg)!
-	desktop := root + '/build/useralloc-pipe/static-desktop-v6/vinix-desktop'
+	desktop := if profile == 'final' { root + '/third_party/useralloc-pipe/build/vinix-desktop' } else { root + '/build/useralloc-pipe/static-desktop-' + version + '/vinix-desktop' }
 	directory := state + '/kernel/bin'
 	os.mkdir_all(directory)!
 	hosttest.module_copy_file_preserving_stat(kernel, directory + '/vinix')!
 	mut env := os.environ()
 	for key, value in {
 		'VINIX_KERNEL_DIR':      os.dir(directory)
-		'VINIX_AARCH64_SYSROOT': root + '/build/useralloc-pipe/static-desktop-v6/sysroot'
+		'VINIX_AARCH64_SYSROOT': root + '/build/useralloc-pipe/static-desktop-' + version + '/sysroot'
 		'VINIX_QEMU_SMP':        '2'
 		'USE_TCG':               '0'
 	} {
 		env[key] = value
 	}
-	argv := [root + '/tests/desktop-perf/run-saved', 'v6', setup, 'final=' + desktop,
+	argv := [root + '/tests/desktop-perf/run-saved', profile, setup, 'final=' + desktop,
 		'--scenarios=' + scenarios, '--rounds', '1', '--initramfs',
 		setup + '/initramfs-desktop-frozen.tar', '--settle', '5', '--seconds', '20', '--timeout',
 		'1800', '--json', state + '/results.json', '--shots', state + '/shots']
@@ -99,8 +106,8 @@ pub fn driver(root string, setup string, state_arg string, scenarios string, ker
 	mut manifest := {
 		'kernel_sha256':         json2.Any(sha(kernel)!)
 		'desktop_sha256':        json2.Any(sha(desktop)!)
-		'loader_sha256':         json2.Any(sha(root + '/third_party/useralloc-libc/build/useralloc/optimized-arm126-v6-final/lib/ld-musl-aarch64.so.1')!)
-		'static_libc_sha256':    json2.Any(sha(root + '/third_party/useralloc-libc/build/useralloc/optimized-arm126-v6-final/usr/lib/libc.a')!)
+		'loader_sha256':         json2.Any(sha(root + '/third_party/useralloc-libc/build/useralloc/optimized-arm126-' + suffix + '/lib/ld-musl-aarch64.so.1')!)
+		'static_libc_sha256':    json2.Any(sha(root + '/third_party/useralloc-libc/build/useralloc/optimized-arm126-' + suffix + '/usr/lib/libc.a')!)
 		'initramfs_sha256':      json2.Any(sha(setup + '/initramfs-desktop-frozen.tar')!)
 		'harness_sha256':        json2.Any(sha(harness)!)
 		'harness_path':          json2.Any(harness)
@@ -263,6 +270,9 @@ pub fn cli(argv []string, root string) int {
 }
 
 fn dispatch(argv []string, root string) !int {
+	if argv.len == 6 && argv[0] == 'run-driver-profile' {
+		return driver_profile(root, argv[2], argv[3], argv[4], argv[5], argv[1])!
+	}
 	if argv.len == 2 && argv[0] == 'pipeline' {
 		pipeline(root, argv[1])!
 		return 0

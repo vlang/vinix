@@ -55,8 +55,29 @@ pub struct Output { pub: status int stdout string stderr string }
 // until this observation and all callback work have finished.
 pub fn child_exited(pid int) !bool {
 	mut info := C.vinix_source_child_info{}
-	if C.waitid(C.P_PID, u32(pid), &info, C.WEXITED | C.WNOHANG | C.WNOWAIT) != 0 && C.errno != C.EINTR { return os.error_posix() }
+	for {
+		if C.waitid(C.P_PID, u32(pid), &info, C.WEXITED | C.WNOHANG | C.WNOWAIT) == 0 { break }
+		if C.errno != C.EINTR { return os.error_posix() }
+	}
 	return info.si_pid == pid
+}
+
+pub struct ChildExit {
+pub:
+	exited bool
+	return_code int
+}
+
+// Observe Python/Popen-style signed return codes without releasing the
+// leader identity. The command owner still performs the sole final reap.
+pub fn child_exit(pid int) !ChildExit {
+	mut info := C.vinix_source_child_info{}
+	for {
+		if C.waitid(C.P_PID, u32(pid), &info, C.WEXITED | C.WNOHANG | C.WNOWAIT) == 0 { break }
+		if C.errno != C.EINTR { return os.error_posix() }
+	}
+	if info.si_pid != pid { return ChildExit{} }
+	return ChildExit{true, if info.si_code == C.CLD_EXITED { int(info.si_status) } else { -int(info.si_status) }}
 }
 
 // Keep the child unreaped until its private group is retired. Drain both pipes

@@ -1,0 +1,359 @@
+{
+    "complete_production_desktop_or_userland_build": false,
+    "exact_original_and_diagnostic_flags_binary_identical": true,
+    "final_cold_v_builds": 63,
+    "fresh_guest_allocator_execution": false,
+    "fresh_kernel_build": false,
+    "global_zero_python_reached": false,
+    "host_profiles": [
+        "ARM",
+        "Rosetta x86",
+        "ARM ASan/UBSan"
+    ],
+    "hot_samples_retained": 168,
+    "immutable_core_captures_audited": 3,
+    "independently_extracted_completed_core_iso": true,
+    "original_python_bytes": 140552,
+    "original_python_files": 45,
+    "original_python_lines": 1829,
+    "originals": [
+        {
+            "blob": "cd9a04be1a579221c7e250592db1d2de42fecd67",
+            "bytes": 1678,
+            "lines": 11,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocation-audit-final/capture-x86-diagnostic.py",
+            "sha256": "e12cf3cc259939660fc7385e52e00a399665c818968e8142a412a7f2038595e4"
+        },
+        {
+            "blob": "0e5ee110b944ade3bf2e8ecb94d833a821b262f4",
+            "bytes": 2197,
+            "lines": 19,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocation-audit-final/run.py",
+            "sha256": "20fbf914ddfe030fbd41946276ba04287ed55a0e4cb74ca31d636a61888cd10d"
+        },
+        {
+            "blob": "a4ac8fa4679757ba93f9dd037c8ca92fce6735d8",
+            "bytes": 3446,
+            "lines": 50,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/run.py",
+            "sha256": "633b306869c42893ecfddc8dcca8e49897aa67d9d174dc027fec4ce6e6bc5239"
+        },
+        {
+            "blob": "0f3e9056ad3ef6823f0aac7f43321999e501e1ef",
+            "bytes": 6012,
+            "lines": 115,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/runner.py",
+            "sha256": "7ac28190fcaf495999360ee8d69acd9d90abffa490458b009b493e74bbe7dbf0"
+        },
+        {
+            "blob": "dc9c4b0efba0c1e2f70244e7ac4a5cb4a9e2fee8",
+            "bytes": 7164,
+            "lines": 133,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify-x86-v4-final.py",
+            "sha256": "00cd690a33f036ffef6753e6a6c024dbd1da51e80a34d09c6a6d70348ff88c14"
+        },
+        {
+            "blob": "4001991c2456329f8e2793125a5dcec312823ee4",
+            "bytes": 3689,
+            "lines": 44,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-coordinator-guard-stop/useralloc-v4-final-cohorts.py",
+            "sha256": "7e6043e39e6a4c14cf197cd9f438199097689c49797725712e3e9f7ab7d8723e"
+        },
+        {
+            "blob": "11a804dfbd9cfe24fd9f60eafda4e4de172b62f6",
+            "bytes": 4526,
+            "lines": 51,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-coordinator.py",
+            "sha256": "9ed7765e4fa5b5f58f2ef988f9b355515f30ec5d206c5f07ac8b6d270a858729"
+        },
+        {
+            "blob": "11a804dfbd9cfe24fd9f60eafda4e4de172b62f6",
+            "bytes": 4526,
+            "lines": 51,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-v4-final-cohorts.py",
+            "sha256": "9ed7765e4fa5b5f58f2ef988f9b355515f30ec5d206c5f07ac8b6d270a858729"
+        },
+        {
+            "blob": "7bf9e3b86b444cc5fa8e0b389f8d6fca3c3d3d1b",
+            "bytes": 1004,
+            "lines": 6,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/run.py",
+            "sha256": "8f52f55373d3c2a0e647dddb9435a8d62489e88045ce9f245ff97aee51b4bb10"
+        },
+        {
+            "blob": "33982c4fa2b6a1eb3d9b6d41d96c146719c0fb85",
+            "bytes": 602,
+            "lines": 5,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-v4/run.py",
+            "sha256": "6b8ff1334468b36898287172d2bda2ca7f9fe9eae0a662a2cc6da9fb9d7f11dc"
+        },
+        {
+            "blob": "33982c4fa2b6a1eb3d9b6d41d96c146719c0fb85",
+            "bytes": 602,
+            "lines": 5,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-v4/run.py",
+            "sha256": "6b8ff1334468b36898287172d2bda2ca7f9fe9eae0a662a2cc6da9fb9d7f11dc"
+        },
+        {
+            "blob": "7123c055cb7eac6b20ab5552556bfd03069d51ac",
+            "bytes": 2815,
+            "lines": 26,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run-driver.py",
+            "sha256": "9048c1d9137ed1b6487b8597228f919afb8da6ebb44fe0c824442e58235db43f"
+        },
+        {
+            "blob": "546a3b63371ca4f2a7663be583bd1a3c2072b59e",
+            "bytes": 2830,
+            "lines": 26,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run-driver.py",
+            "sha256": "09650c0bc4fc83cb175b388d32c99f0cc210355babed18364288cbe2604cc088"
+        },
+        {
+            "blob": "6a61c648e51630d5d6cf3be53cc0a6f575e276ad",
+            "bytes": 4795,
+            "lines": 83,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/runner.py",
+            "sha256": "20c0fb70be03999e6f20ea7d793c70bd00f2a5a78fe8253360caa2ca76d7c8a5"
+        },
+        {
+            "blob": "2684111f4aac169b9ac8dc2b19400e603c03808f",
+            "bytes": 3226,
+            "lines": 50,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/run.py",
+            "sha256": "4ba7b6e5a44e909c9fb6b96dcdb3bf5dd60f396912e228c188b2dc8438864733"
+        },
+        {
+            "blob": "e47714d296d5a22bf463a9927d407b310a585c83",
+            "bytes": 1032,
+            "lines": 15,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/run-settlement-after-core.py",
+            "sha256": "45ce64f24630b7d02ea6a6b9580b48befe7745937f603361a5de37e00cbe03ed"
+        },
+        {
+            "blob": "f84ae73672ee97378d3e09af09c649d2a35aaf10",
+            "bytes": 776,
+            "lines": 7,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/run.py",
+            "sha256": "cf7f771328751849629e403467da8853183a0d18f4df2fd05f9c062565536f4e"
+        },
+        {
+            "blob": "f84ae73672ee97378d3e09af09c649d2a35aaf10",
+            "bytes": 776,
+            "lines": 7,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/run.py",
+            "sha256": "cf7f771328751849629e403467da8853183a0d18f4df2fd05f9c062565536f4e"
+        },
+        {
+            "blob": "f84ae73672ee97378d3e09af09c649d2a35aaf10",
+            "bytes": 776,
+            "lines": 7,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run.py",
+            "sha256": "cf7f771328751849629e403467da8853183a0d18f4df2fd05f9c062565536f4e"
+        },
+        {
+            "blob": "f84ae73672ee97378d3e09af09c649d2a35aaf10",
+            "bytes": 776,
+            "lines": 7,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/run.py",
+            "sha256": "cf7f771328751849629e403467da8853183a0d18f4df2fd05f9c062565536f4e"
+        },
+        {
+            "blob": "add932949750a7a9644ecd564d47dd25851363a3",
+            "bytes": 944,
+            "lines": 7,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run-baseline.py",
+            "sha256": "de9971ea6c7cc429481714b682cc911601268f9ac2a88e2cb7babeccc22116f8"
+        },
+        {
+            "blob": "87b14363039d3cf737ebe6d65ef2f7d8913276dd",
+            "bytes": 1553,
+            "lines": 13,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run.py",
+            "sha256": "e02e21b8638885da4c2a49306a91aae5fceacd6cdd5a1be3133b0f5b5bf40140"
+        },
+        {
+            "blob": "58e0a4c825fcf2b216448d654eeb2b93bb7c5613",
+            "bytes": 2437,
+            "lines": 23,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/prepare.py",
+            "sha256": "5fbab0e9a3a2f388a6c1e94b1d7abe4e9d7f55134691ac35fc9077698bee5c5d"
+        },
+        {
+            "blob": "9a3f3370d1d0351ac890f094cd8f5e72d118512a",
+            "bytes": 3446,
+            "lines": 50,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/run.py",
+            "sha256": "c84a44c09dd9aa94fd2229de474ddc136b600a3c12ab0508b0a5f32371bf07d8"
+        },
+        {
+            "blob": "a52358ecb607f1c4d4fc290f916e7497c7200cd9",
+            "bytes": 7043,
+            "lines": 52,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-v5-final-cohorts.py",
+            "sha256": "9ef988102e69693648c42e562124d074472a4048d87a81f3f1d4f64cbc58db53"
+        },
+        {
+            "blob": "f84ae73672ee97378d3e09af09c649d2a35aaf10",
+            "bytes": 776,
+            "lines": 7,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/run.py",
+            "sha256": "cf7f771328751849629e403467da8853183a0d18f4df2fd05f9c062565536f4e"
+        },
+        {
+            "blob": "f84ae73672ee97378d3e09af09c649d2a35aaf10",
+            "bytes": 776,
+            "lines": 7,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run.py",
+            "sha256": "cf7f771328751849629e403467da8853183a0d18f4df2fd05f9c062565536f4e"
+        },
+        {
+            "blob": "f84ae73672ee97378d3e09af09c649d2a35aaf10",
+            "bytes": 776,
+            "lines": 7,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/run.py",
+            "sha256": "cf7f771328751849629e403467da8853183a0d18f4df2fd05f9c062565536f4e"
+        },
+        {
+            "blob": "79db0d954f8d7f36a0a3e5667ee8434e46c24869",
+            "bytes": 2088,
+            "lines": 28,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/static-desktop/run-build.py",
+            "sha256": "ae95d6d7d7d951e6ce412d7593db6d2c3ad38cd4e62ced6f5b3709bdd6f82de6"
+        },
+        {
+            "blob": "8b351e6fd0fa172b2e59d2a133d24ab9f47ca7ad",
+            "bytes": 1616,
+            "lines": 16,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/desktop-perf-controller/validate-completed.py",
+            "sha256": "a4ca325e3399fcb9e64c57443b3bf14a09e119153c331c5042352d7f543ce8e9"
+        },
+        {
+            "blob": "502952ac099c011477515fadcecd9a2e87cc11f2",
+            "bytes": 10670,
+            "lines": 81,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-final-cohorts.py",
+            "sha256": "568d515c6843cc20b5e5042de2e086798cccd41cafb8b13779177dacfb36a8bd"
+        },
+        {
+            "blob": "1aec26fce6eea6abf4ebdefed98cd6d9757c1b6b",
+            "bytes": 656,
+            "lines": 9,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-final-controller.py",
+            "sha256": "1cf252bdef2e20adadf302f4cda383da35324ee5bc9d50f2265adb1ec78f6a91"
+        },
+        {
+            "blob": "ed7fe2c9c43d4163d4867155eb8a630641652eaa",
+            "bytes": 2950,
+            "lines": 30,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-verify-readiness.py",
+            "sha256": "83c7e7ae12d9b09f390d9a79cbc5a3389710e981c87f0b142db7983c68018cee"
+        },
+        {
+            "blob": "8170b3b473df165edecfaea06131947b6fc7b6c3",
+            "bytes": 678,
+            "lines": 14,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/run.py",
+            "sha256": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14"
+        },
+        {
+            "blob": "8170b3b473df165edecfaea06131947b6fc7b6c3",
+            "bytes": 678,
+            "lines": 14,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64-four-level/run.py",
+            "sha256": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14"
+        },
+        {
+            "blob": "8170b3b473df165edecfaea06131947b6fc7b6c3",
+            "bytes": 678,
+            "lines": 14,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/run.py",
+            "sha256": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14"
+        },
+        {
+            "blob": "191ba2bd627a5405a69575efbe2f81ea28c93ef2",
+            "bytes": 15387,
+            "lines": 199,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/driver.py",
+            "sha256": "d9542c99bc2fbce40479776e9244ef92e72007effd8772dfa23e001c8711beba"
+        },
+        {
+            "blob": "be1d0fc6617fe1535ed0b078ea0a7064ea723e73",
+            "bytes": 4682,
+            "lines": 54,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/evidence-audit.py",
+            "sha256": "b8b20bd5f82eae7d65465d4d24dafcb96acc35eef178835bbe2fe514b443638d"
+        },
+        {
+            "blob": "8170b3b473df165edecfaea06131947b6fc7b6c3",
+            "bytes": 678,
+            "lines": 14,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/run.py",
+            "sha256": "05671dd8e267abb8ac7f30c94202c795f48551fa28924527acdf8b814bf40b14"
+        },
+        {
+            "blob": "ee240f251ed83712c9dbda6ca34c2b1116a7afd9",
+            "bytes": 6463,
+            "lines": 119,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/collect.py",
+            "sha256": "6d98b34918d246ce32a651f1818091e9d75b7db457d04e2eba0eb0a5d42fb2f9"
+        },
+        {
+            "blob": "0e3e8670cea004c7f49bdf1ce511697490728fe8",
+            "bytes": 5500,
+            "lines": 72,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/collect-v6-verification.py",
+            "sha256": "566538c067b7d255de97112a7b51208d8d18c091793df697b3ca71b8d906533f"
+        },
+        {
+            "blob": "c517fcf4e33d4cad2129723affcd71622b6f5e3a",
+            "bytes": 417,
+            "lines": 6,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-arm-driver.py",
+            "sha256": "1e610f4410fe09a3adb72690e3aac7cde22aa73e4bbf60b0d9530c155a3edb8a"
+        },
+        {
+            "blob": "5e4ceabfa70c4befafa64dc7b545f699d3afa7ed",
+            "bytes": 469,
+            "lines": 6,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-x86-driver.py",
+            "sha256": "b5e55d720dc344c2b93881393d5b7acc1b5f0c77208dd6862629b502b3153128"
+        },
+        {
+            "blob": "21d92ad37443d049db5354ab72505adab8dbac30",
+            "bytes": 8275,
+            "lines": 156,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/run.py",
+            "sha256": "72a32126185473e7424e87a6d9156331662d36b76fd99a2406250b844bfeefc6"
+        },
+        {
+            "blob": "55bc557b3165ca800e2b8d6cb48946bab4cc0d5f",
+            "bytes": 7668,
+            "lines": 113,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/summarize.py",
+            "sha256": "cf8a6aaba1c1ddf41325f862f1297fa5e9eed49aa84f2413d669df77473a9f4d"
+        }
+    ],
+    "public_fresh_v_builds": 3,
+    "public_saved_entrypoints": 45,
+    "python_executed": false,
+    "qualification_directory": "/Users/alex/.cache/vinix-campaign-tools-native-20261012",
+    "qualified_source_snapshot_sha256": "b5e20b6c1c700d140bd1c4cb203eaaa72bc177194705ce95fa080a2b28a73f41",
+    "readiness_gates": 16,
+    "real_libc_objects_reviewed": 24,
+    "real_prepared_arm_profiles": [
+        "v5",
+        "v6"
+    ],
+    "real_prepared_x86_profiles": [
+        "v3",
+        "v4",
+        "v6"
+    ],
+    "real_static_core_targets": [
+        "x86_64",
+        "aarch64"
+    ],
+    "saved_desktop_driver_profiles": 4,
+    "source_commit": "9b2d911e24522fc9aa7184691e5878ea13535b61",
+    "status": "PASS"
+}

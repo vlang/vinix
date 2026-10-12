@@ -13,12 +13,13 @@
 # are copied into a scratch tree first.
 set -eu
 
-repo=$(cd "$(dirname "$0")/../.." && pwd)
+tool_repo=$(cd "$(dirname "$0")/../.." && pwd)
+repo=${VINIX_KERNEL_ALLOCS_ROOT:-$tool_repo}
 kernel=$repo/kernel
 allowed=$repo/tests/kernel-allocs/allowed.txt
-copy_tool=${VINIX_KERNEL_ALLOCS_COPY_TOOL:-"$repo/tests/kernel-allocs/copy-sources"}
+copy_tool=${VINIX_KERNEL_ALLOCS_COPY_TOOL:-"$tool_repo/tests/kernel-allocs/copy-sources"}
 
-. "$repo/build-support/find-v.sh"
+. "$tool_repo/build-support/find-v.sh"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-kernel-allocs.XXXXXX")
 trap 'rm -rf "$work"' EXIT INT TERM

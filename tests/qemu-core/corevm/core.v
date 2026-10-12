@@ -11,6 +11,7 @@ pub struct Options {
 pub:
 	arch       string = 'aarch64'
 	root       string
+	arm_runner string
 	guest_init string
 	initramfs  string
 	state_dir  string
@@ -99,7 +100,7 @@ pub fn arm_environment(options Options, original map[string]string, system strin
 }
 
 pub fn arm_command(options Options, verification bool, no_build string) []string {
-	mut command := [options.root + '/scripts/run-aarch64.sh', '--serial', '--mem=2048',
+	mut command := [if options.arm_runner != '' { options.arm_runner } else { options.root + '/scripts/run-aarch64.sh' }, '--serial', '--mem=2048',
 		'--guest-init=' + options.guest_init]
 	if verification || no_build == '1' { command.insert(1, '--no-build') }
 	return command
