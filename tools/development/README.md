@@ -3,6 +3,8 @@
 The commands are `vinix-build`, [vinix-qualify](qualification.md),
 [vinix-vm](virtual-machines.md) and [vinix-jobs](scheduled-jobs.md).
 All implementations, staging and tests are V.
+See the [workstream status](../../docs/development-containers-virtualization.md)
+for the remaining section 17 implementation and guest acceptance work.
 
 Create a static development-tools overlay for either supported architecture:
 
