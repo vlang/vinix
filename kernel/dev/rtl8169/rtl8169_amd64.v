@@ -443,6 +443,9 @@ pub fn poll() {
 }
 
 fn diagnose_lease() {
+	// No DHCP exchange can begin until carrier appears. The startup and
+	// link-change messages already describe this condition.
+	if !rtl_link { return }
 	mut address := u32(0)
 	mut netmask := u32(0)
 	mut gateway := u32(0)

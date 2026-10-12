@@ -15,6 +15,15 @@ import ui2
 #include "network_status.h"
 
 fn C.vinix_interface_ipv4(name &char, address &u32) int
+fn C.socket(domain i32, typ i32, protocol i32) i32
+fn C.ioctl(fd i32, request u64, args ...voidptr) i32
+
+// C uses its native ifreq union and layout; only these members are accessed.
+pub struct C.ifreq {
+pub mut:
+	ifr_name  [16]char
+	ifr_flags i16
+}
 
 const tray_item_count = 4
 const tray_icon_actions = ['tray.icon.network', 'tray.icon.battery', 'tray.icon.display',
@@ -71,6 +80,7 @@ enum TrayFlyout {
 enum NetworkLink {
 	unknown
 	absent
+	disconnected
 	pending
 	connected
 }
@@ -252,15 +262,58 @@ fn (mut d Desktop) set_tray_item_hidden_in(home string, item TrayItem, hidden bo
 // ── Sampling ───────────────────────────────────────────────────────
 
 fn sample_ethernet() (NetworkLink, u32) {
+	return sample_ethernet_with(interface_flags, interface_ipv4)
+}
+
+fn interface_ipv4(name &char, address &u32) int {
+	return C.vinix_interface_ipv4(name, address)
+}
+
+fn interface_flags(name &char, flags &u16) int {
+	fd := C.socket(C.AF_INET, C.SOCK_DGRAM, 0)
+	if fd < 0 { return if C.errno != 0 { C.errno } else { C.EIO } }
+	defer { C.close(fd) }
+	mut request := C.ifreq{}
+	for i in 0 .. C.IFNAMSIZ - 1 {
+		ch := unsafe { name[i] }
+		if ch == 0 { break }
+		request.ifr_name[i] = ch
+	}
+	if C.ioctl(fd, C.SIOCGIFFLAGS, &request) != 0 {
+		return if C.errno != 0 { C.errno } else { C.EIO }
+	}
+	unsafe { *flags = u16(request.ifr_flags) }
+	return 0
+}
+
+fn sample_ethernet_with(read_flags fn (&char, &u16) int, read_ipv4 fn (&char, &u32) int) (NetworkLink, u32) {
+	mut flags := u16(0)
+	flags_result := read_flags(&char(tray_ethernet_name.str), &flags)
+	if flags_result != 0 {
+		return if flags_result == C.ENODEV || flags_result == C.ENXIO {
+			NetworkLink.absent
+		} else {
+			NetworkLink.unknown
+		}, u32(0)
+	}
+	// The short ioctl flags expose carrier as IFF_RUNNING. IFF_UP alone is
+	// only administrative state and does not mean the cable has a link.
+	if flags & u16(C.IFF_UP | C.IFF_RUNNING) != u16(C.IFF_UP | C.IFF_RUNNING) {
+		return .disconnected, u32(0)
+	}
 	mut address := u32(0)
-	result := C.vinix_interface_ipv4(&char(tray_ethernet_name.str), &address)
+	result := read_ipv4(&char(tray_ethernet_name.str), &address)
 	if result == 0 && address != 0 {
 		return .connected, address
 	}
 	if result == 0 || result == C.EADDRNOTAVAIL {
 		return .pending, u32(0)
 	}
-	return .absent, u32(0)
+	return if result == C.ENODEV || result == C.ENXIO {
+		NetworkLink.absent
+	} else {
+		NetworkLink.unknown
+	}, u32(0)
 }
 
 fn ipv4_text(address u32) string {
@@ -361,6 +414,7 @@ fn (mut d Desktop) format_tray_text() {
 	address := if sample.ethernet == .connected { ipv4_text(sample.address) } else { '' }
 	d.tray.ethernet_line = set_owned_text(d.tray.ethernet_line, match sample.ethernet {
 		.connected { tr('tray.ethernet.connected').clone() }
+		.disconnected { tr('tray.ethernet.disconnected').clone() }
 		.pending { tr('tray.ethernet.acquiring').clone() }
 		.absent { tr('tray.ethernet.no_adapter').clone() }
 		.unknown { tr('tray.ethernet.checking').clone() }

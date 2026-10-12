@@ -1417,6 +1417,9 @@ Ethernet: checking
 tray.ethernet.connected
 Ethernet: connected
 -----
+tray.ethernet.disconnected
+Ethernet: disconnected
+-----
 tray.ethernet.no_adapter
 Ethernet: no adapter
 -----

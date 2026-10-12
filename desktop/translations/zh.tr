@@ -1417,6 +1417,9 @@ tray.ethernet.checking
 tray.ethernet.connected
 以太网：已连接
 -----
+tray.ethernet.disconnected
+以太网：未连接
+-----
 tray.ethernet.no_adapter
 以太网：无适配器
 -----

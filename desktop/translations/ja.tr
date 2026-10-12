@@ -1417,6 +1417,9 @@ Ethernet: 確認中
 tray.ethernet.connected
 Ethernet: 接続済み
 -----
+tray.ethernet.disconnected
+Ethernet: 未接続
+-----
 tray.ethernet.no_adapter
 Ethernet: アダプタなし
 -----

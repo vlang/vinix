@@ -1417,6 +1417,9 @@ Ethernet: проверка
 tray.ethernet.connected
 Ethernet: подключено
 -----
+tray.ethernet.disconnected
+Ethernet: нет соединения
+-----
 tray.ethernet.no_adapter
 Ethernet: нет адаптера
 -----

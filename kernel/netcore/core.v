@@ -1368,7 +1368,8 @@ pub fn vinix_net_attach(mac &u8, driver i32) i32 {
 			vinix_net_detach()
 			return -12
 		}
-		C.printf(c'net: attached %c%c%u, DHCP started\n', i32(net_physical_netif.name[0]), i32(net_physical_netif.name[1]), i32(net_physical_netif.num))
+		C.printf(c'net: attached %c%c%u, %s\n', i32(net_physical_netif.name[0]), i32(net_physical_netif.name[1]), i32(net_physical_netif.num),
+			if net_physical_netif.flags & 4 != 0 { c'DHCP started' } else { c'waiting for carrier before DHCP' })
 		return 0
 	}
 }
