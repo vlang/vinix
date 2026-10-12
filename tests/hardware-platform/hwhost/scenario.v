@@ -40,6 +40,9 @@ pub struct Disk {
 pub:
 	name     string // file name inside the state directory
 	size_mib int
+	// A prepared image copied before the first boot, with this exact size.
+	// Header/pattern initialization cannot be combined with an image.
+	image string
 	// Written at offset 0. The kernel installs the system onto a disk that is
 	// blank, so a test disk that must be left alone starts with something.
 	header string
@@ -77,12 +80,15 @@ pub:
 
 // One more boot of the same machine. A scenario with any is run boot after
 // boot on one state directory: the same boot image, the same disks with
-// whatever the boot before left on them. Every boot but the last must end
-// with the guest switching the machine off, which QEMU reports; the last
+// whatever the boot before left on them. Intermediate boots switch off from
+// the guest, unless a power_cut_after marker requires a host SIGKILL; the last
 // ends the way the scenario says. The x86-64 machine has no firmware
 // variables to carry over: QEMU's firmware is given none to keep.
 pub struct Reboot {
 pub:
+	// Kill QEMU with SIGKILL at this marker in the preceding boot, without
+	// a guest sync/shutdown or QEMU's orderly block-backend teardown.
+	power_cut_after string
 	// Extra QEMU arguments for this boot alone, after the scenario's own: a
 	// second -m replaces the first.
 	qemu []string
@@ -2024,6 +2030,9 @@ pub fn validate_scenarios(all []Scenario) ! {
 		}
 		mut damages := []DiskDamage{}
 		for reboot in scenario.reboots {
+			if reboot.power_cut_after != '' && reboot.power_cut_after !in scenario.required {
+				return error('scenario ${scenario.name}: a power cut must name a required serial marker')
+			}
 			damages << reboot.damage
 		}
 		for damage in damages {

@@ -197,6 +197,16 @@ pub fn (mut c Child) stop() {
 	}
 }
 
+// A crash fixture deliberately skips orderly QEMU shutdown and cache flushing.
+pub fn (mut c Child) cut_power() ! {
+	if c.poll() { return error('machine ended before the requested power cut') }
+	if C.kill(c.pid, C.SIGKILL) != 0 { return error('cannot cut power to the test machine') }
+	if !c.wait_ended(5000) { return error('test machine did not end after SIGKILL') }
+	if c.outcome() != 'killed by signal 9' {
+		return error('unexpected power-cut outcome: ${c.outcome()}')
+	}
+}
+
 // The exit status, or -1 when a signal ended the child.
 pub fn (c &Child) exit_code() int {
 	status := c.status

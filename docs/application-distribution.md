@@ -234,8 +234,17 @@ runtime does not qualify Linux, Wine, Mach-O or graphical API compatibility.
 The guest root is an initramfs, so these runs do not qualify persistent-device
 power-cut durability.
 
+The [persistent-storage recovery check](../tests/packages/persistence-check.md)
+adds a real ext2 volume and abrupt QEMU SIGKILL/reboot cycles at the staged,
+published and activated transaction checkpoints. It verifies the old/new active
+set, partial-object/cache recovery, offline upgrade, rollback, removal,
+registration and personal-file metadata. The same volume survives both boots;
+the host neither restores package state nor repairs the filesystem. These
+completed checkpoints passed on both targets; interruptions inside filesystem or
+device operations and physical write-cache loss remain outside this fixture.
+
 The release gate remains open: enroll a release publisher, migrate/qualify the
 advertised native/Linux/Wine/Apple catalog, integrate ordinary-user graphical
-sessions, qualify guest power-cut/reboot behavior and measure wider
+sessions, qualify wider filesystem/device crash windows and measure wider
 runtime sandbox profiles. Apple packaging does not provide general macOS/AppKit
 compatibility; Windows/Linux packaging does not expand runtime API coverage.

@@ -160,3 +160,11 @@ dependencies, tamper refusal and generation leases through update/uninstall/GC;
 retained passing runs record hashes of the kernel, sandbox, payload, service,
 session runner and serial output. These fixtures qualify package mechanics,
 not the API coverage of a Linux, Windows, Apple or graphical runtime.
+
+[Persistent package recovery](../../tests/packages/persistence-check.md) tests
+abrupt QEMU termination and recovery on the same ext2 disk at the staged,
+published and activated checkpoints on both architectures. It checks cached
+partial-object recovery, offline upgrade, rollback, launcher removal and retained
+personal-file metadata. Its receipts cover those checkpoints; publishers must
+still qualify app data migrations, underlying filesystem/device crash behavior
+and their runtime's API coverage.

@@ -239,7 +239,11 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 			// A QEMU that would not start has said why, and nowhere else:
 			// its log has the commands, and its complaint after the last.
 			said := os.read_lines(qemu_log) or { []string{} }
-			complaint := if said.len > boot + 1 { '\n  ' + said[boot + 1..].join('\n  ') } else { '' }
+			complaint := if said.len > boot + 1 {
+				'\n  ' + said[boot + 1..].join('\n  ')
+			} else {
+				''
+			}
 			return error(err.msg() + complaint)
 		}
 		m.watch(scenario, state, deadline, run.timeout, mut session, boot, last)!
@@ -276,9 +280,12 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 
 // Follows one boot until the machine ends, or until nothing more is expected
 // of a machine that stays up. `last` says it is the scenario's final boot,
-// which is the one the scenario's ending is asked of; any other must end
-// with the guest switching the machine off.
+// which is the one the scenario's ending is asked of. Intermediate boots
+// switch off from the guest or reach their declared power-cut marker.
 fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout int, mut session Session, boot int, last bool) ! {
+	cut_marker := if last { '' } else { scenario.reboots[boot].power_cut_after }
+	mut cut_seen := false
+	mut cut_requested := false
 	mut end_deadline := i64(0) // set by an action with end_within
 	mut end_reason := ''
 	mut failed_at := i64(0)
@@ -298,6 +305,7 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 		for line in fresh {
 			session.markers.line(line)
 			session.actions.line(line, now)
+			if cut_marker != '' && line.contains(cut_marker) { cut_seen = true }
 			if line.contains('HWTEST INFO') {
 				m.notes << line.all_after('HWTEST INFO').trim_space()
 			}
@@ -314,6 +322,11 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 				break
 			}
 		} else {
+			if cut_seen && !cut_requested {
+				m.child.cut_power()!
+				cut_requested = true
+				continue // collect the final serial bytes before judging the boot
+			}
 			events := session.events_with(&m.qmp.events)
 			if action := session.actions.take_ready(now, &events) {
 				command := substitute(action.qmp, state)!
@@ -336,7 +349,11 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 			return error('the machine was still running ${end_reason}')
 		}
 		if now >= deadline {
-			where := if scenario.boots() > 1 { ' (in boot ${boot + 1} of ${scenario.boots()})' } else { '' }
+			where := if scenario.boots() > 1 {
+				' (in boot ${boot + 1} of ${scenario.boots()})'
+			} else {
+				''
+			}
 			event := session.actions.waiting_for_event()
 			if event != '' {
 				return error('timed out after ${timeout} s${where}: QEMU never reported the event ${event}')
@@ -359,6 +376,12 @@ fn (mut m Machine) watch(scenario Scenario, state string, deadline i64, timeout 
 	// From here on the machine has ended by itself.
 	how := if m.qmp.shutdown_reason != '' { m.qmp.shutdown_reason } else { m.child.outcome() }
 	if !last {
+		if cut_marker != '' {
+			if !cut_requested || m.child.outcome() != 'killed by signal 9' {
+				return error('boot ${boot + 1} ended by ${how} before its requested power cut')
+			}
+			return
+		}
 		problem := intermediate_end_problem(boot, m.qmp.shutdown_reason, m.child.exit_code(),
 			m.child.outcome())
 		if problem != '' {

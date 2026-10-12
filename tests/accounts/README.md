@@ -26,6 +26,12 @@ tamper refusal and maintenance of a running app's leased generation. The ordinar
 accounts controller keeps the `packages` sandbox substitute so the identity
 handoff can be diagnosed independently of the production enforcer.
 
+The [persistent package controller](../packages/persistence-check.md) reuses
+`packages-crash-staged`, `packages-crash-published` and `packages-crash-activated`.
+Each case SIGKILLs QEMU at its transaction checkpoint and reboots the same ext2
+volume, then verifies cached upgrade, rollback, uninstall, registration and
+personal-file retention through the real package CLI.
+
 | Scenario | What must hold |
 | --- | --- |
 | `packages` | Signed local installation through the real package CLI; a root launch re-executes it as the configured ordinary account with empty supplementary groups, empty capabilities, no new privileges and login attribution. A sandbox substitute checks the exec boundary and passes the literal document to the signed native payload, which writes private data as the user and exits with status 37. Missing launch identity fails, publisher revocation is rechecked by the ordinary child, and removal retains personal data. This checks the session handoff, not the real pledge/unveil enforcer or graphical runtime. |

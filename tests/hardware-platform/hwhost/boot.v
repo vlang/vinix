@@ -28,7 +28,8 @@ pub fn build_program(host Host, source string, directory string, name string, mo
 	// No collector and no backtraces: PID 1 of a test kernel should need as
 	// little of that kernel as it can, and what it allocates dies with it.
 	// Keep native C signal-handler glue out of these plain static fixtures too.
-	mut compile := [host.v, '-os', 'linux', '-arch', v_arch, '-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler']
+	mut compile := [host.v, '-os', 'linux', '-arch', v_arch, '-gc', 'none', '-d', 'no_backtrace',
+		'-d', 'no_segfault_handler']
 	if module_paths.len > 0 {
 		// Modules a suite's programs share with the tools they test.
 		mut lookup := ['@vlib', '@vmodules']
@@ -53,8 +54,8 @@ pub fn build_program(host Host, source string, directory string, name string, mo
 		// -fpermissive: V's own library passes an i64 where C wants an int
 		// pointer (os.Process and waitpid), which gcc 14 refuses outright and
 		// clang, above, only warns about.
-		run_tool([environment_or('CC_AMD64', 'x86_64-linux-musl-gcc'), '-static', '-O1', '-w', '-fpermissive', '-D_GNU_SOURCE',
-			'-o', binary, c_file, '-lm', '-lpthread'], map[string]string{}, log, tool_seconds)!
+		run_tool([environment_or('CC_AMD64', 'x86_64-linux-musl-gcc'), '-static', '-O1', '-w',
+			'-fpermissive', '-D_GNU_SOURCE', '-o', binary, c_file, '-lm', '-lpthread'], map[string]string{}, log, tool_seconds)!
 	}
 	return binary
 }
@@ -165,6 +166,14 @@ pub fn boot_media(host Host, kernel string, initramfs string, cmdline string, st
 // one kind the kernel's installer takes for its own.
 pub fn create_disk(disk Disk, state string) ! {
 	path := os.join_path(state, disk.name)
+	if disk.image != '' {
+		if disk.header != '' || disk.prefill.len != 0 || os.is_link(disk.image)
+			|| !os.is_file(disk.image) || os.file_size(disk.image) != u64(disk.size_mib) << 20 {
+			return error('prepared disk image must be a regular file of the declared size, without header/prefill: ${disk.image}')
+		}
+		os.cp(disk.image, path)!
+		return
+	}
 	os.write_file(path, '')!
 	os.truncate(path, u64(disk.size_mib) << 20)!
 	if disk.header == '' && disk.prefill.len == 0 {
@@ -205,6 +214,7 @@ pub fn check_disk_header(disk Disk, state string) ! {
 
 // What a disk's file holds when the controller has made it, byte for byte.
 pub fn disk_contents(disk Disk) []u8 {
+	if disk.image != '' { return os.read_bytes(disk.image) or { []u8{} } }
 	mut bytes := []u8{len: disk.size_mib << 20}
 	for fill in disk.prefill {
 		pattern := pattern_bytes(fill.seed, fill.length)
@@ -267,7 +277,11 @@ pub fn check_disk_bytes(wanted DiskBytes, state string) ! {
 	}
 	for i in 0 .. expected.len {
 		if found[i] != expected[i] {
-			what := if wanted.text != '' { '"${wanted.text}"' } else { '${wanted.zeros} zero bytes' }
+			what := if wanted.text != '' {
+				'"${wanted.text}"'
+			} else {
+				'${wanted.zeros} zero bytes'
+			}
 			return error('${place}: byte ${i} is 0x${found[i].hex()}; ${what} were to be there')
 		}
 	}

@@ -37,6 +37,9 @@ fn main() {
 		'accounts' { scenario_accounts(mut t) }
 		'packages' { scenario_packages(mut t) }
 		'packages-enforced' { scenario_packages_enforced(mut t) }
+		'packages-crash-staged', 'packages-crash-published', 'packages-crash-activated' {
+			scenario_package_recovery(mut t)
+		}
 		'elevation' { scenario_elevation(mut t) }
 		'unprivileged' { scenario_unprivileged(mut t) }
 		'seat' { scenario_seat(mut t) }

@@ -61,5 +61,6 @@ were retained in the corresponding host state directories during qualification.
 
 These are native package-mechanics checks. They do not qualify network traffic,
 graphical display/audio brokers or Linux/Wine/Apple API coverage. The guest uses
-an initramfs; power-cut/reboot durability on persistent storage needs separate
-qualification. The full roadmap release gate remains open.
+an initramfs; [the separate ext2 recovery suite](persistence-check.md) checks
+package checkpoints across abrupt termination/reboot. Wider filesystem/device
+durability and the full roadmap release gate remain open.

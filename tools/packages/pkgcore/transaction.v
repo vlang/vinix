@@ -156,7 +156,11 @@ pub struct TransactionOptions {
 pub:
 	// Used by the crash fixture. Production CLI never accepts this flag.
 	stop_before_activation bool
+	// In-process qualification hook; no CLI option/environment enables it.
+	checkpoint fn (string) = transaction_no_checkpoint
 }
+
+fn transaction_no_checkpoint(_ string) {}
 
 pub fn transact(config Config, directory string, operation string, names []string, options TransactionOptions) !State {
 	config.validate()!
@@ -237,6 +241,7 @@ pub fn transact(config Config, directory string, operation string, names []strin
 	os.chmod(stage + '/state.json', 0o644)!
 	sync_file(stage + '/state.json')!
 	flush_tree(stage)!
+	options.checkpoint('staged')
 	if options.stop_before_activation {
 		// Preserve the unfinished stage as a process killed here would.
 		completed = true
@@ -245,7 +250,9 @@ pub fn transact(config Config, directory string, operation string, names []strin
 	os.rename(stage, directory + '/generations/' + generation.str())!
 	completed = true
 	sync_directory(directory + '/generations')!
+	options.checkpoint('published')
 	activate(directory, generation)!
+	options.checkpoint('activated')
 	println('Activated package generation ${generation}')
 	return state
 }
