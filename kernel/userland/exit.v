@@ -35,6 +35,18 @@ pub fn syscall_exit_group(_ voidptr, status int) {
 
 @[noreturn]
 fn thread_exit(status int, group bool) {
+	thread_exit_status(encode_exit_status(status), group)
+}
+
+// Seccomp strict mode and KILL_THREAD terminate only the triggering task.
+// If it is the last task, wait(2) must still report a death by signal.
+@[noreturn]
+pub fn exit_thread_with_fatal_signal(signal u8) {
+	thread_exit_status(encode_fatal_signal(signal), false)
+}
+
+@[noreturn]
+fn thread_exit_status(outcome int, group bool) {
 	mut current_thread := proc.current_thread()
 	mut current_process := current_thread.process
 
@@ -49,7 +61,7 @@ fn thread_exit(status int, group bool) {
 	// and namespace-dependent tid release, then detach before giving it back.
 	proc.pin_process(current_process)
 	if group {
-		exit_process(mut current_process, mut current_thread, encode_exit_status(status), false)
+		exit_process(mut current_process, mut current_thread, outcome, false)
 	}
 
 	// Hand back whatever this thread still owns while its address space is
@@ -72,7 +84,7 @@ fn thread_exit(status int, group bool) {
 		sched.dequeue_and_die()
 	}
 
-	exit_process(mut current_process, mut current_thread, encode_exit_status(status), true)
+	exit_process(mut current_process, mut current_thread, outcome, true)
 }
 
 // OpenBSD kills a process that breaks a pledge(2) promise with SIGABRT,

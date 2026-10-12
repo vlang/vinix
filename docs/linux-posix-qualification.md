@@ -1321,7 +1321,53 @@ Desktop idle/apps/drag validation with the cached live desktop fails before
 readiness on both kernels with the same startup error. Those receipts remain
 failed; this change does not qualify desktop readiness.
 
-Strict-mode and KILL_THREAD signal scope, installation error ordering, user
-notifications, full sandbox isolation, nested PID-namespace TSYNC failures and
-procfs tree reclamation remain separate work. The three broad section-15
+At this snapshot, strict-mode and KILL_THREAD signal scope remained unqualified;
+the following qualification covers those paths. Installation error ordering,
+user notifications, full sandbox isolation, nested PID-namespace TSYNC failures
+and procfs tree reclamation remain separate work. The three broad section-15
 acceptance gates remain open.
+
+## Seccomp fatal action scope
+
+The native musl ELF64 `seccompkill` fixture passes eleven isolated UID/GID 1000
+cases on AArch64 and x86-64. KILL_THREAD, including nonzero action data, kills
+only the triggering task with SIGSYS. Strict-mode forbidden getpid and
+exit_group kill that task with SIGKILL. Its sibling remains able to make
+syscalls, catches no SIGSYS, observes CHILD_CLEARTID and gets ESRCH for the
+retired TID. KILL_PROCESS and unknown actions still kill the entire group.
+When the killed task is the last one, wait reports the original SIGSYS or
+SIGKILL instead of converting it into an ordinary exit code. This follows
+[Linux's strict-mode enforcement](https://github.com/torvalds/linux/blob/v6.12/kernel/seccomp.c#L962)
+and [fatal filter actions](https://github.com/torvalds/linux/blob/v6.12/kernel/seccomp.c#L1230).
+
+Additional cases execute strict-mode read, write and raw SYS_exit, deliver a
+caught SIGUSR1 and return through the architecture's actual signal trampoline.
+A strict sibling prevents TSYNC with a positive offending TID or ESRCH,
+without changing the caller's mode. The V fixture calls musl's unchanged
+`__clone` trampoline through an external declaration; its public clone wrapper
+refuses CLONE_THREAD/CLEARTID before reaching the kernel. No C implementation
+was added. A separate lifetime review checked the kernel's generated C and
+the fixture's borrowed Task frame: successful retirement precedes stack unmap,
+and a failure after cloning exits the group before returning from that frame.
+
+Both baseline kernels kill the entire group in the first KILL_THREAD case.
+The unchanged fixture records outcome 31 where the surviving sibling should
+exit normally. `seccompkill-before-*` and `seccompkill-after-*` in the
+[dated results directory](../tests/linux-compat/results/2026-10-12/) retain
+the controls, receipts and raw serial logs. Final production kernels pass
+seven regression cases: task/group termination, task ownership/TSYNC,
+trap/verifier, action discovery, no_new_privs, TLS/atomics/SIMD/JIT/page sizes
+and futex queues. Both 3200-filter storage cohorts retain flat
+32/64/96/128-byte slab classes. All eight host test files pass.
+
+The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/seccompkill-audit.v)
+checks the negative controls, frozen sources/artifacts, eleven verdicts,
+retirement markers, storage cohorts and allocation-free outcome wrappers in
+both generated kernels. The 60 source fingerprints describe isolated
+1c2e33ce worktrees with the three kernel changes; concurrent shared-checkout
+edits were excluded from the qualification builds.
+
+Core dumps, foreign/ELF32 execution, libc pthread cancellation/unwinding and
+complete application sandbox isolation remain unqualified. This closes the
+tested native fatal-action semantics; the three broad section-15 acceptance
+gates remain open.

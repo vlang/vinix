@@ -79,8 +79,8 @@ fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 		if nr == 0 || nr == 1 || nr == 60 || nr == 15 {
 			return nr
 		}
-		security.audit_seccomp(nr, frame.rip, proc.seccomp_ret_kill_process)
-		userland.exit_with_fatal_signal(u8(9))
+		security.audit_seccomp(nr, frame.rip, proc.seccomp_ret_kill_thread)
+		userland.exit_thread_with_fatal_signal(u8(9))
 	}
 	// The instruction after the syscall is what Linux reports as its address.
 	verdict := proc.seccomp_verdict(t, nr, frame.rip, [frame.rdi, frame.rsi,
@@ -111,6 +111,9 @@ fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 			// No tracer and no listener: Linux fails the call with ENOSYS.
 			t.seccomp_errno = errno.enosys
 			return seccomp_verdict_nr
+		}
+		proc.seccomp_ret_kill_thread {
+			userland.exit_thread_with_fatal_signal(u8(31))
 		}
 		else {
 			// SIGSYS kills the process.

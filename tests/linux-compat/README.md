@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -516,8 +516,21 @@ Concurrent clone/sync and two storage cohorts check thread publication and
 The 32/64/96/128-byte slab classes must remain flat after grace periods; this
 includes the actual filter-header and instruction-buffer classes. Storage
 cohorts use raw queries to keep the existing retained procfs trees out of the
-filter measurement. Signal kill scope, notifications and full sandbox support
-remain separate. Allow at least 300 seconds for each native guest.
+filter measurement. Notifications and full sandbox support remain separate.
+Allow at least 300 seconds for each native guest.
+
+The `seccompkill` case runs eleven isolated UID/GID 1000 groups. KILL_THREAD
+(with and without data bits) and strict-mode violations must terminate only
+the triggering task; KILL_PROCESS and unknown actions must terminate the
+group. Caught SIGSYS handlers must not intercept these actions, and the last
+task must retain its SIGSYS/SIGKILL wait status. Strict mode permits raw
+read/write/exit and actual signal return, forbids exit_group, and blocks TSYNC
+from a filtered sibling with the offending TID or ESRCH. CHILD_CLEARTID and
+ESRCH confirm task retirement. The V fixture uses musl's unchanged raw
+`__clone` architecture trampoline because its public clone wrapper refuses
+these CLONE_THREAD flags. Success waits for retirement before unmapping the
+child stack; failure after cloning exits the group while its borrowed Task
+frame remains live. Core dumps and foreign/ELF32 runtimes remain separate.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

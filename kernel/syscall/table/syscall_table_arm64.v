@@ -90,8 +90,8 @@ fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 		if nr == 63 || nr == 64 || nr == 93 || nr == 139 {
 			return nr
 		}
-		security.audit_seccomp(nr, gpr.pc, proc.seccomp_ret_kill_process)
-		userland.exit_with_fatal_signal(u8(9))
+		security.audit_seccomp(nr, gpr.pc, proc.seccomp_ret_kill_thread)
+		userland.exit_thread_with_fatal_signal(u8(9))
 		return seccomp_verdict_nr
 	}
 	verdict := proc.seccomp_verdict(t, nr, gpr.pc, [gpr.x0, gpr.x1, gpr.x2, gpr.x3,
@@ -121,6 +121,10 @@ fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 		proc.seccomp_ret_trace, proc.seccomp_ret_user_notif {
 			// No tracer and no listener: Linux fails the call with ENOSYS.
 			t.seccomp_errno = errno.enosys
+			return seccomp_verdict_nr
+		}
+		proc.seccomp_ret_kill_thread {
+			userland.exit_thread_with_fatal_signal(u8(31))
 			return seccomp_verdict_nr
 		}
 		else {
