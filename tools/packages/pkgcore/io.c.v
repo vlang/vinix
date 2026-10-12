@@ -199,6 +199,16 @@ pub struct Lock {
 	fd int
 }
 
+fn acquire_reader(directory string) !Lock {
+	fd := C.open((directory + '/lock').str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if fd < 0 { return error('package state is unavailable; refresh trusted repositories before reviewing changes') }
+	if C.flock(fd, C.LOCK_SH | C.LOCK_NB) != 0 {
+		C.close(fd)
+		return error('another package transaction is running; review again when it finishes')
+	}
+	return Lock{ fd: fd }
+}
+
 pub fn owned_directory(path string, mode int) ! {
 	if !os.exists(path) && !os.is_link(path) { os.mkdir_all(path, mode: mode)! }
 	if os.is_link(path) || !os.is_dir(path) {

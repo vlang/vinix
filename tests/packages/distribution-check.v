@@ -20,6 +20,7 @@ fn check() ! {
 	os.mkdir_all(work + '/software')!
 	defer { os.rmdir_all(work) or {} }
 	run(v, ['test', repository + '/tools/packages/pkgcore'])!
+	run(v, ['-gc', 'none', '-manualfree', 'test', repository + '/tools/packages/pkgprotocol'])!
 	run(v, ['-gc', 'none', '-manualfree', 'test', repository + '/desktop/packagecore'])!
 	run(v, ['-gc', 'none', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
 	run(work + '/vinix-package', ['--help'])!

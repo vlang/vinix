@@ -7,6 +7,7 @@ import os
 import ui2
 import time
 import desktop.packagecore
+import tools.packages.pkgprotocol
 
 struct Desktop {
 	tz_offset_seconds i64
@@ -48,6 +49,94 @@ fn console_field(id string, text string, x int, y int, width int, _ bool) ui2.El
 
 fn frame_elements(capacity int) []ui2.Element { return []ui2.Element{cap: capacity} }
 
+fn fixture_review(operation string, names []string) pkgprotocol.Review {
+	return pkgprotocol.Review{
+		format: 1, operation: operation, names: names, architecture: 'aarch64', generation: 3,
+		target_generation: if operation == 'rollback' { u64(2) } else { u64(0) },
+		fingerprint: 'c'.repeat(64), requested: ['editor'], disk_needed: 4096, disk_available: 65536, disk_reserve: 1024,
+		rows: [
+			pkgprotocol.ReviewPackage{ id: 'editor', name: 'Editor', description: 'Write documents', version: '2.0.0', installed_version: '1.0.0', architecture: 'aarch64', kind: 'linux', runtime: 'runtime', repository: 'trusted', public_key: 'a'.repeat(64), license: 'MIT', permissions: ['files'], requested: true, action: 'update' },
+			pkgprotocol.ReviewPackage{ id: 'runtime', name: 'Runtime', description: 'Required shared runtime', version: '2.0.0', installed_version: '1.0.0', architecture: 'aarch64', kind: 'runtime', repository: 'runtime-publisher', public_key: 'b'.repeat(64), license: 'Vendor-EULA', proprietary: true, firmware: true, permissions: ['network', 'process'], action: 'update' },
+		]
+	}
+}
+
+fn wait_for_software(mut app SoftwareApp) {
+	for _ in 0 .. 500 {
+		app.poll()
+		if app.worker == unsafe { nil } { return }
+		time.sleep(time.millisecond)
+	}
+	panic('Software fixture service did not finish')
+}
+
+fn check_package_review() {
+	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192},
+		rows: [SoftwareRow{ id: 'editor', requested: true, installed_version: '1.0.0' }] }
+	app.selected = 0
+	app.handle('software.install') or { panic(err) }
+	assert app.worker_review && !app.review_ready
+	assert app.prepare_close(), 'a read-only review is safe to close'
+	pending := app.build(ui2.rect(0, 0, 900, 660)) or { panic(err) }
+	assert !pending.children.any(it.id == 'software.confirm')
+	app.handle('software.confirm') or { panic(err) }
+	assert app.worker_review
+	wait_for_software(mut app)
+	assert app.review_ready && app.review_snapshot.rows.len == 2
+	app.handle('software.row.1') or { panic(err) }
+	assert app.review_selected == 1 && app.selected == 0
+	tree := app.build(ui2.rect(0, 0, 900, 660)) or { panic(err) }
+	assert tree.children.any(it.id == 'software.row.1' && it.text == 'update: Runtime')
+	assert tree.children.any(it.text.contains('runtime-publisher'))
+	assert tree.children.any(it.text.contains('Permissions: network, process'))
+	assert tree.children.any(it.text.contains('Vendor-EULA (proprietary)') && it.text.contains('firmware'))
+	assert tree.children.any(it.text.contains('4 KiB needed') && it.text.contains('1 KiB reserved'))
+	assert tree.children.any(it.id == 'software.confirm')
+	assert !tree.children.any(it.id == 'software.install' || it.id == 'software.run')
+	// Confirmation is tied to the returned intent, not the current list selection.
+	app.selected = -1
+	app.handle('software.confirm') or { panic(err) }
+	assert !app.review_ready && app.worker != unsafe { nil }
+	assert !app.prepare_close()
+	wait_for_software(mut app)
+	assert app.status.contains('stale') && app.review == ''
+	assert app.review_snapshot.rows.len == 0
+	// Each supported maintenance action goes through asynchronous plan review.
+	for action in ['software.upgrade', 'software.rollback'] {
+		app.handle(action) or { panic(err) }
+		wait_for_software(mut app)
+		assert app.review_ready
+		app.handle('software.cancel') or { panic(err) }
+		assert app.review_snapshot.rows.len == 0 && app.review_summary == ''
+	}
+	app.begin_review('install', ['broken'])
+	wait_for_software(mut app)
+	assert !app.review_ready && app.status.contains('dependency unavailable')
+	app.begin_review('install', ['wrong-format'])
+	wait_for_software(mut app)
+	assert !app.review_ready && app.status.contains('Unsupported')
+	app.begin_review('install', ['wrong-intent'])
+	wait_for_software(mut app)
+	assert !app.review_ready && app.status.contains('different package operation')
+	// The preview list pages independently of the underlying catalog selection.
+	a_snapshot := fixture_review('upgrade', [])
+	mut rows := a_snapshot.rows.clone()
+	for i in 0 .. 20 {
+		rows << pkgprotocol.ReviewPackage{ ...a_snapshot.rows[1], id: 'z-runtime-' + i.str(), name: 'Additional runtime' }
+	}
+	app.review = 'upgrade'.clone()
+	app.review_snapshot = json2.decode[pkgprotocol.Review](json2.encode(pkgprotocol.Review{ ...a_snapshot, rows: rows })) or { panic(err) }
+	app.review_ready = true
+	app.build(ui2.rect(0, 0, 900, 660)) or { panic(err) }
+	app.handle('software.down') or { panic(err) }
+	assert app.review_scroll > 0
+	app.handle('software.row.0') or { panic(err) }
+	assert app.review_selected == app.review_scroll
+	app.handle('software.up') or { panic(err) }
+	assert app.review_scroll == 0
+	app.close_app()
+}
+
 fn main() {
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
@@ -60,6 +149,21 @@ fn main() {
 			assert os.args[2..] == ['editor', '/private/tmp/document with spaces; \$literal.txt']
 			eprintln('fixture: ordinary user session required')
 			exit(19)
+		}
+		if os.args[1] == 'review' {
+			if os.args.len > 3 && os.args[3] == 'broken' { eprintln('fixture: dependency unavailable'); exit(17) }
+			review := fixture_review(os.args[2], os.args[3..])
+			println(json2.encode(if os.args.len > 3 && os.args[3] == 'wrong-format' {
+				pkgprotocol.Review{ ...review, format: 2 }
+			} else if os.args.len > 3 && os.args[3] == 'wrong-intent' {
+				pkgprotocol.Review{ ...review, names: ['other'] }
+			} else { review }))
+			return
+		}
+		if os.args[1] == 'apply' {
+			assert os.args[2..] == ['c'.repeat(64), 'install', 'editor']
+			eprintln('fixture: package review is stale; review again')
+			exit(23)
 		}
 		if os.args[1] == 'lease-hold' { time.sleep(200 * time.millisecond); return }
 		panic('unexpected fixture service command')
@@ -160,5 +264,6 @@ fn main() {
 	assert C.kill(pid, 0) == 0, 'forced monitor retirement must retain the service lease holder'
 	mut child_status := 0
 	assert C.waitpid(pid, &child_status, 0) == pid
-	println('Software UI: search, installed/updates filters, provenance, permission review, removal diagnostics and close guard passed')
+	check_package_review()
+	println('Software UI: catalog, complete dependency review, literal confirmation, stale-plan failure, paging, diagnostics and close guard passed')
 }

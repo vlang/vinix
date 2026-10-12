@@ -9,6 +9,8 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  update | search [QUERY] | info ID | list | status | updates | view\n' +
 	'  install ID... | remove ID... | upgrade | rollback | gc | verify\n' +
 	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
+	'  review install|remove|upgrade|deploy|rollback [ID...]\n' +
+	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
@@ -22,6 +24,7 @@ struct SoftwareRow {
 	installed_version string
 	architecture      string
 	kind              string
+	runtime           string
 	repository        string
 	public_key        string
 	license           string
@@ -91,6 +94,7 @@ fn software_view(config pkgcore.Config, directory string) !SoftwareView {
 			installed_version: installed_version
 			architecture:      p.architecture
 			kind:              p.kind
+			runtime:           p.runtime
 			repository:        candidate.repository
 			public_key:        candidate.public_key
 			license:           p.license
@@ -245,24 +249,24 @@ fn checked(arguments []string) !int {
 		}
 		'plan' {
 			if names.len < 1 { return error('plan requires an operation') }
-			state := pkgcore.read_state(directory, config.architecture)!
-			roots := pkgcore.desired_roots(state, names[0], names[1..])!
-			catalog := if names[0] == 'remove' {
-				pkgcore.Catalog{ packages: state.packages }
+			println(json2.encode(pkgcore.preview_plan(config, directory, names[0], names[1..])!))
+		}
+		'review' {
+			if names.len < 1 { return error('review requires an operation') }
+			text := json2.encode(pkgcore.review_operation(config, directory, names[0], names[1..])!)
+			if text.len > pkgcore.max_metadata { return error('package review exceeds metadata limit') }
+			println(text)
+		}
+		'apply' {
+			if names.len < 2 || !pkgcore.digest_valid(names[0]) || names[1] !in ['install', 'remove', 'upgrade', 'deploy', 'rollback'] {
+				return error('apply requires a review fingerprint and operation')
+			}
+			if names[1] == 'rollback' {
+				if names.len != 2 { return error('rollback takes no package IDs') }
+				pkgcore.rollback_reviewed(config, directory, names[0])!
 			} else {
-				pkgcore.load_catalog(config, directory)!
+				pkgcore.transact(config, directory, names[1], names[2..], pkgcore.TransactionOptions{ expected_review: names[0] })!
 			}
-			resolution_config := if names[0] == 'remove' {
-				pkgcore.Config{ ...config, policy: pkgcore.Policy{ allow_firmware: true, licenses: state.packages.map(it.package.license) } }
-			} else { config }
-			plan := pkgcore.resolve(catalog, resolution_config, state, roots, names[0] in [
-				'upgrade',
-				'deploy',
-			])!
-			if names[0] == 'remove' && plan.packages.any(it.package.id in names[1..]) {
-				return error('cannot remove a package still required by another installed application')
-			}
-			println(json2.encode(plan))
 		}
 		'deploy' {
 			if names.len != 1 { return error('deploy requires a deployment manifest') }

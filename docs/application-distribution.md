@@ -168,6 +168,23 @@ lease. This monitor is suitable for noninteractive programs and apps using their
 declared display runtime; interactive terminal input still requires the CLI.
 It does not turn the internal native compositor protocol into a public GUI SDK.
 
+Install, uninstall, Update all and Rollback first request a read-only review of
+the complete resolved package set. The paged review shows additions, version or
+payload changes, retained packages and removals, including implicit runtimes and
+data. Each row exposes its description, old/new version, architecture, runtime,
+publisher/key, license/proprietary/firmware flags and declared permissions. A
+summary shows estimated next-generation/cache space, available space and the
+configured reserve. Confirm appears only after a valid matching review arrives;
+Cancel releases the review without changing the installation.
+
+Confirmation passes the review fingerprint and original operation/IDs to the
+service. It recomputes the plan under the writer lock and rejects changed state,
+policy, provenance or payload metadata before cleanup, acquisition or activation.
+A stale review returns a diagnostic and requires a new review. Ordinary CLI
+maintenance remains compatible; fingerprints add a freshness check for graphical
+and SDK clients, and administrator access is still required. Failed dependency
+resolution and unsupported review responses leave Confirm unavailable.
+
 Non-data/non-runtime packages also get `.desktop` launchers with MIME types,
 package ID and runtime provenance. `/usr/share/applications/vinix-packages` points
 through activation, so XDG registration removal/rollback follows package state.
@@ -213,6 +230,10 @@ associations, plus both package target builds and desktop configurations.
 Allocator fixtures check menu redraws and cached reads for zero retained storage,
 and registration retirement against the standard JSON decoder's measured
 one-byte EOF-marker allocation per decode under `-manualfree`.
+The same allocator checks measure Software review redraws at zero retention,
+and review decode/cancellation/close against that independent decoder baseline.
+Service and CLI fixtures check complete dependency disclosure and rejection of
+changed catalogs, policy, active state or operation/IDs before acquisition.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute

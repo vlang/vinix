@@ -6,6 +6,7 @@ import desktop.sessioncore
 import ui2
 import os
 import json2
+import tools.packages.pkgprotocol
 
 #include "@VMODROOT/heap_tracker.h"
 
@@ -170,4 +171,48 @@ fn test_package_registry_reload_and_retirement_release_all_storage() {
 	}
 	registry.close()
 	package_assert_heap_flat('cached package registration')
+}
+
+const software_review_fixture = '{"format":1,"operation":"install","names":["editor"],"architecture":"aarch64","generation":1,"target_generation":0,"fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","requested":["editor"],"disk_needed":4096,"disk_available":65536,"disk_reserve":1024,"rows":[{"id":"editor","name":"Editor","description":"Write text","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"linux","runtime":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","permissions":["files"],"requested":true,"action":"update"},{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","repository":"vendor","public_key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","license":"Vendor-EULA","proprietary":true,"firmware":true,"permissions":["network","process"],"action":"update"}]}'
+
+fn test_software_review_redraw_cancel_and_decoded_storage_are_released() {
+	mut app := SoftwareApp{ output: software_review_fixture.bytes(), review: 'install'.clone(), review_names: ['editor'.clone()] }
+	app.load_review()
+	assert app.review_ready && app.review_snapshot.rows.len == 2
+	app.review_selected = 1
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+	}
+	package_assert_heap_flat('Software review redraw')
+	app.clear_review()
+	// Compare the JSON decoder's independent EOF allocation baseline.
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
+	baseline := C.vinix_heap_end()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut review := pkgprotocol.decode_review(software_review_fixture)!
+		review.validate()!
+		review.close()
+	}
+	assert C.vinix_heap_end() == baseline
+	// Warm the status buffer, then exercise the actual decode/cancel UI path.
+	app.review = 'install'.clone()
+	app.review_names = ['editor'.clone()]
+	app.load_review()
+	app.clear_review()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		app.review = 'install'.clone()
+		app.review_names = ['editor'.clone()]
+		app.load_review()
+		assert app.review_ready
+		app.clear_review()
+	}
+	app.close_app() // retire the final persistent status message before measuring
+	assert C.vinix_heap_end() == baseline
 }

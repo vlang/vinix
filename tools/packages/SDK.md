@@ -215,6 +215,35 @@ row per line. Consumers ignore additional fields and reject unknown formats.
 Success is exit 0; failures are nonzero with stderr diagnostics. Human progress
 text is not a machine protocol.
 
+`review install|remove|upgrade|deploy|rollback [ID...]` emits a format-1 review
+without downloading payloads or changing installed state. It includes the active
+generation, rollback target generation, operation/IDs, target requested roots,
+and every package in the target closure plus removed packages. Rows contain
+`action` (`install`, `update`, `keep`, `remove`), previous/target versions, runtime,
+publisher/key, license/proprietary/firmware flags and declared permissions.
+`disk_needed`, `disk_available` and `disk_reserve` are byte counts; estimates
+include the complete next generation, missing cached objects and metadata.
+Removal uses installed provenance and remains available after publisher expiry
+or revocation; rollback verifies retained payloads and current trust/policy.
+
+After review, call `apply FINGERPRINT OPERATION [ID...]` with the returned
+`fingerprint`, operation and IDs. The service resolves again under its writer
+lock and compares the complete manifests/payload hashes, provenance, requested
+roots, active state, configuration/policy and rollback target. Changed inputs
+fail with a stale-review diagnostic before cleanup, downloads or activation;
+obtain a fresh review. Free-space/cache changes are checked again at apply time.
+The fingerprint is an opaque freshness check, not an authorization credential;
+administrator access is still required. Ordinary install/remove/upgrade/deploy
+and rollback commands remain available for existing scripts.
+
+The lightweight [`pkgprotocol` V module](pkgprotocol/review.v) provides `Review`,
+`ReviewPackage`, bounded `decode_review`, validation and explicit `Review.close()`
+for consumers with manual memory management. Service-created and decoded reviews
+own their presentation fields. Renderers should retain the snapshot while it
+is on screen, pass literal arguments to `apply`, then close it on cancellation,
+replacement or handoff. Additional JSON fields are ignored; unknown formats,
+invalid provenance and incomplete requested-package records are refused.
+
 [The V example](../../examples/package-hello/main.v) and target manifests show a
 native payload. `v run examples/package-hello/build.v /build/new-example-repository`
 cross-compiles and packs both ELF targets using the matching musl compilers.

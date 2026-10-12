@@ -5,6 +5,7 @@ import json2
 import os
 import ui2
 import desktop.packagecore
+import tools.packages.pkgprotocol
 
 const software_row_actions = ['software.row.0', 'software.row.1', 'software.row.2', 'software.row.3',
 	'software.row.4', 'software.row.5', 'software.row.6', 'software.row.7', 'software.row.8',
@@ -20,6 +21,7 @@ struct SoftwareRow {
 	installed_version string
 	architecture      string
 	kind              string
+	runtime           string
 	repository        string
 	public_key        string
 	license           string
@@ -43,27 +45,34 @@ struct SoftwareView {
 
 struct SoftwareApp {
 mut:
-	rows           []SoftwareRow
-	matching       []int
-	query          []u8
-	output         []u8
-	status         string
-	catalog_error  string
-	selected       int = -1
-	scroll         int
-	page_rows      int = 10
-	filter         int // 0 catalog, 1 installed, 2 updates
-	focus          bool
-	select_all     bool
-	review         string
-	worker         &os.Process = unsafe { nil }
-	worker_view    bool
-	worker_run     bool
-	worker_failed  bool
-	launch_request string
-	launch_label   string = 'Launch'
-	service_path   string = '/usr/bin/vinix-package'
-	offline        bool
+	rows            []SoftwareRow
+	matching        []int
+	query           []u8
+	output          []u8
+	status          string
+	catalog_error   string
+	selected        int = -1
+	scroll          int
+	page_rows       int = 10
+	filter          int // 0 catalog, 1 installed, 2 updates
+	focus           bool
+	select_all      bool
+	review          string
+	review_names    []string
+	review_snapshot pkgprotocol.Review
+	review_ready    bool
+	review_selected int = -1
+	review_scroll   int
+	review_summary  string
+	worker          &os.Process = unsafe { nil }
+	worker_view     bool
+	worker_review   bool
+	worker_run      bool
+	worker_failed   bool
+	launch_request  string
+	launch_label    string = 'Launch'
+	service_path    string = '/usr/bin/vinix-package'
+	offline         bool
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
@@ -99,6 +108,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.output.clear()
 	a.worker_failed = false
 	a.worker_view = view
+	a.worker_review = false
 	a.worker_run = false
 	a.worker = os.new_process(a.service_path.clone())
 	mut owned := []string{cap: arguments.len}
@@ -122,6 +132,7 @@ fn software_free_row(row SoftwareRow) {
 		row.installed_version.free()
 		row.architecture.free()
 		row.kind.free()
+		row.runtime.free()
 		row.repository.free()
 		row.public_key.free()
 		row.license.free()
@@ -150,6 +161,7 @@ fn (mut a SoftwareApp) filter_rows() {
 }
 
 fn (mut a SoftwareApp) load_view() {
+	a.clear_review()
 	text := editor_bytes_text(a.output)
 	view := json2.decode[SoftwareView](text) or {
 		a.set_status('Invalid response from the package service. Reload the catalog or check its configuration.')
@@ -192,6 +204,76 @@ fn (mut a SoftwareApp) load_view() {
 	})
 }
 
+fn (mut a SoftwareApp) clear_review() {
+	a.review_snapshot.close()
+	unsafe {
+		a.review.free()
+		for name in a.review_names { name.free() }
+		(&array(&a.review_names)).free()
+		a.review_summary.free()
+	}
+	a.review = ''
+	a.review_names = []string{}
+	a.review_summary = ''
+	a.review_ready = false
+	a.review_selected = -1
+	a.review_scroll = 0
+}
+
+fn (mut a SoftwareApp) begin_review(operation string, names []string) {
+	a.clear_review()
+	a.review = operation.clone()
+	for name in names { a.review_names << name.clone() }
+	a.focus = false
+	a.start(['review', operation, ...names], false)
+	if a.worker != unsafe { nil } {
+		a.worker_review = true
+		a.set_status('Resolving the complete package set for review…')
+	}
+}
+
+fn (mut a SoftwareApp) load_review() {
+	mut review := pkgprotocol.decode_review(editor_bytes_text(a.output)) or {
+		a.clear_review()
+		a.set_status('Unsupported or invalid package review response. Review the operation again.')
+		return
+	}
+	review.validate() or {
+		review.close()
+		a.clear_review()
+		a.set_status('Unsupported or incomplete package review. Review the operation again.')
+		return
+	}
+	if review.operation != a.review || review.names != a.review_names {
+		review.close()
+		a.clear_review()
+		a.set_status('The service returned a different package operation. Review it again.')
+		return
+	}
+	a.review_snapshot.close()
+	a.review_snapshot = review
+	a.review_ready = true
+	a.review_selected = if review.rows.len > 0 { 0 } else { -1 }
+	// Cache numerical formatting once per review, outside the redraw path.
+	count := review.rows.len.str()
+	needed := (review.disk_needed / 1024 + if review.disk_needed % 1024 != 0 {
+		u64(1)
+	} else {
+		u64(0)
+	}).str()
+	available := (review.disk_available / 1024).str()
+	reserve := (review.disk_reserve / 1024).str()
+	unsafe { a.review_summary.free() }
+	a.review_summary = '${count} packages · ${needed} KiB needed · ${available} KiB free · ${reserve} KiB reserved'
+	unsafe {
+		count.free()
+		needed.free()
+		available.free()
+		reserve.free()
+	}
+	a.set_status('Review every application and dependency, including retained packages and removals. Personal data stays on disk. Confirm applies this exact package set.')
+}
+
 fn software_output_tail(bytes []u8) string {
 	clean := console_sanitize(editor_bytes_text(bytes))
 	mut end := clean.len
@@ -229,12 +311,12 @@ fn (mut a SoftwareApp) poll() bool {
 		chunk := a.worker.stdout_read()
 		if chunk.len == 0 { break }
 		changed = true
-		if a.worker_view {
+		if a.worker_view || a.worker_review {
 			if a.output.len + chunk.len <= software_output_limit {
 				for byte in chunk { a.output << byte }
 			} else {
 				a.worker_failed = true
-				a.set_status('Package catalog exceeds the supported size.')
+				a.set_status('Package response exceeds the supported size.')
 			}
 		} else {
 			// Keep recent progress and diagnostics, without growing indefinitely.
@@ -251,14 +333,14 @@ fn (mut a SoftwareApp) poll() bool {
 	if a.worker.is_pending(.stdout) {
 		if chunk := a.worker.pipe_read(.stdout) {
 			if chunk.len > 0 {
-				if a.worker_view && a.output.len + chunk.len <= software_output_limit {
+				if (a.worker_view || a.worker_review) && a.output.len + chunk.len <= software_output_limit {
 					for byte in chunk { a.output << byte }
-				} else if !a.worker_view {
+				} else if !a.worker_view && !a.worker_review {
 					if a.output.len + chunk.len > 8192 { a.output.clear() }
 					for byte in chunk { a.output << byte }
 				} else {
 					a.worker_failed = true
-					a.set_status('Package catalog exceeds the supported size.')
+					a.set_status('Package response exceeds the supported size.')
 				}
 				unsafe { chunk.free() }
 				return true
@@ -267,9 +349,11 @@ fn (mut a SoftwareApp) poll() bool {
 	}
 	code := a.worker.code
 	view := a.worker_view
+	reviewing := a.worker_review
 	running := a.worker_run
 	a.retire_worker()
 	if code != 0 {
+		if reviewing { a.clear_review() }
 		diagnostic := software_output_tail(a.output)
 		a.set_status(if diagnostic.len > 0 {
 			diagnostic
@@ -279,6 +363,8 @@ fn (mut a SoftwareApp) poll() bool {
 		unsafe { diagnostic.free() }
 	} else if view {
 		if !a.worker_failed { a.load_view() }
+	} else if reviewing {
+		if a.worker_failed { a.clear_review() } else { a.load_review() }
 	} else if running {
 		tail := software_output_tail(a.output)
 		a.set_status(if tail.len > 0 { tail } else { 'Application finished successfully.' })
@@ -310,6 +396,7 @@ fn (mut a SoftwareApp) run_requested() {
 		a.set_status(err.msg())
 		return
 	}
+	a.clear_review()
 	a.start(if request.document.len > 0 {
 		['run', request.id, request.document]
 	} else {
@@ -342,9 +429,12 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 	}
 	if a.worker != unsafe { nil } { return }
 	for row, action in software_row_actions {
-		if event_id == action && a.scroll + row < a.matching.len {
-			a.selected = a.matching[a.scroll + row]
-			a.review = ''
+		if event_id == action {
+			if a.review_ready && a.review_scroll + row < a.review_snapshot.rows.len {
+				a.review_selected = a.review_scroll + row
+			} else if a.review.len == 0 && a.scroll + row < a.matching.len {
+				a.selected = a.matching[a.scroll + row]
+			}
 			return
 		}
 	}
@@ -361,30 +451,53 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 			a.run_requested()
 		}
 		'software.catalog' {
+			a.clear_review()
 			a.filter = 0
 			a.filter_rows()
 		}
 		'software.installed' {
+			a.clear_review()
 			a.filter = 1
 			a.filter_rows()
 		}
 		'software.updates' {
+			a.clear_review()
 			a.filter = 2
 			a.filter_rows()
 		}
-		'software.refresh' { a.start(['update'], false) }
-		'software.reload' { a.start(['view'], true) }
-		'software.up' { a.scroll = if a.scroll > a.page_rows { a.scroll - a.page_rows } else { 0 } }
+		'software.refresh' {
+			a.clear_review()
+			a.start(['update'], false)
+		}
+		'software.reload' {
+			a.clear_review()
+			a.start(['view'], true)
+		}
+		'software.up' {
+			if a.review_ready {
+				a.review_scroll = if a.review_scroll > a.page_rows {
+					a.review_scroll - a.page_rows
+				} else {
+					0
+				}
+			} else {
+				a.scroll = if a.scroll > a.page_rows { a.scroll - a.page_rows } else { 0 }
+			}
+		}
 		'software.down' {
-			if a.scroll + a.page_rows < a.matching.len { a.scroll += a.page_rows }
+			if a.review_ready {
+				if a.review_scroll + a.page_rows < a.review_snapshot.rows.len {
+					a.review_scroll += a.page_rows
+				}
+			} else if a.scroll + a.page_rows < a.matching.len {
+				a.scroll += a.page_rows
+			}
 		}
 		'software.rollback' {
-			a.review = 'rollback'
-			a.set_status('Restore the previous package set. Your application data will be retained. Choose Confirm to continue.')
+			a.begin_review('rollback', [])
 		}
 		'software.upgrade' {
-			a.review = 'upgrade'
-			a.set_status('Update installed applications and their runtime dependencies from trusted repositories. Choose Confirm to continue.')
+			a.begin_review('upgrade', [])
 		}
 		'software.install', 'software.remove' {
 			if a.selected < 0 || a.selected >= a.rows.len { return }
@@ -397,23 +510,17 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 				a.set_status('This package is a dependency. Remove the applications that require it first.')
 				return
 			}
-			a.review = if event_id == 'software.install' { 'install' } else { 'remove' }
-			a.set_status(if a.review == 'install' {
-				'Review the publisher, permissions and license above. Confirm installs the complete dependency set.'
-			} else {
-				'Confirm removes this application and unused dependencies. Personal data and the rollback copy are retained.'
-			})
+			a.begin_review(if event_id == 'software.install' { 'install' } else { 'remove' }, [row.id])
 		}
 		'software.confirm' {
-			if a.review in ['install', 'remove'] && a.selected >= 0 {
-				a.start([a.review, a.rows[a.selected].id], false)
-			} else if a.review in ['upgrade', 'rollback'] {
-				a.start([a.review], false)
+			if a.review_ready {
+				a.start(['apply', a.review_snapshot.fingerprint, a.review_snapshot.operation,
+					...a.review_snapshot.names], false)
+				a.clear_review()
 			}
-			a.review = ''
 		}
 		'software.cancel' {
-			a.review = ''
+			a.clear_review()
 			a.set_status('Operation cancelled before making changes.')
 		}
 		else {}
@@ -453,6 +560,26 @@ fn software_button(id string, text string, x int, y int, width int) ui2.Element 
 		ui2.BoxStyle{ bg: body_panel, radius: 4 }, ui2.TextStyle{ color: body_text, size: 12, align: .center })
 }
 
+fn software_review_row(row pkgprotocol.ReviewPackage) SoftwareRow {
+	return SoftwareRow{
+		id:                row.id
+		name:              row.name
+		description:       row.description
+		version:           row.version
+		installed_version: row.installed_version
+		architecture:      row.architecture
+		kind:              row.kind
+		runtime:           row.runtime
+		repository:        row.repository
+		public_key:        row.public_key
+		license:           row.license
+		proprietary:       row.proprietary
+		firmware:          row.firmware
+		permissions:       row.permissions
+		requested:         row.requested
+	}
+}
+
 fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	width := int(size.width)
 	height := int(size.height)
@@ -466,55 +593,96 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	a.page_rows = if height > 400 { (height - 236) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	mut children := frame_elements(48)
+	reviewing := a.review.len > 0
 	children << software_label('Software', 14, 8, 150, 28, false)
-	children << console_field('software.search', editor_bytes_text(a.query), 170, 8, width - 370, a.focus)
-	children << software_button('software.refresh', 'Refresh repositories', width - 188, 8, 174)
-	children << software_button('software.catalog', 'Catalog', 14, 46, 90)
-	children << software_button('software.installed', 'Installed', 112, 46, 90)
-	children << software_button('software.updates', 'Updates', 210, 46, 90)
-	children << software_button('software.reload', 'Reload', 308, 46, 90)
+	if reviewing {
+		children << software_label('Review ${a.review}', 170, 8, width - 188, 28, true)
+		children << software_label(a.review_summary, 14, 40, width - 28, 44, false)
+	} else {
+		children << console_field('software.search', editor_bytes_text(a.query), 170, 8, width - 370, a.focus)
+		children << software_button('software.refresh', 'Refresh repositories', width - 188, 8, 174)
+		children << software_button('software.catalog', 'Catalog', 14, 46, 90)
+		children << software_button('software.installed', 'Installed', 112, 46, 90)
+		children << software_button('software.updates', 'Updates', 210, 46, 90)
+		children << software_button('software.reload', 'Reload', 308, 46, 90)
+	}
 	for slot in 0 .. a.page_rows {
-		index := a.scroll + slot
-		if index >= a.matching.len { break }
-		row_index := a.matching[index]
-		row := a.rows[row_index]
-		children << ui2.button(software_row_actions[slot], row.name,
-			ui2.rect(14, f64(90 + slot * 30), 236, 28),
-			ui2.BoxStyle{ bg: if row_index == a.selected { settings_choice_bg } else { body_panel }, radius: 3 },
-			ui2.TextStyle{ color: body_text, size: 12, align: .left })
+		if reviewing {
+			index := a.review_scroll + slot
+			if !a.review_ready || index >= a.review_snapshot.rows.len { break }
+			row := a.review_snapshot.rows[index]
+			children << ui2.Element{
+				...ui2.button(software_row_actions[slot], '${row.action}: ${row.name}',
+					ui2.rect(14, f64(90 + slot * 30), 236, 28),
+					ui2.BoxStyle{ bg: if index == a.review_selected {
+						settings_choice_bg
+					} else {
+						body_panel
+					}, radius: 3 },
+					ui2.TextStyle{ color: body_text, size: 12, align: .left })
+				key: workflow_owned_text_key
+			}
+		} else {
+			index := a.scroll + slot
+			if index >= a.matching.len { break }
+			row_index := a.matching[index]
+			row := a.rows[row_index]
+			children << ui2.button(software_row_actions[slot], row.name,
+				ui2.rect(14, f64(90 + slot * 30), 236, 28),
+				ui2.BoxStyle{ bg: if row_index == a.selected {
+					settings_choice_bg
+				} else {
+					body_panel
+				}, radius: 3 },
+				ui2.TextStyle{ color: body_text, size: 12, align: .left })
+		}
 	}
 	children << software_button('software.up', 'Previous', 14, height - 138, 110)
 	children << software_button('software.down', 'Next', 136, height - 138, 110)
-	if a.selected >= 0 && a.selected < a.rows.len {
-		row := a.rows[a.selected]
+	if (reviewing && a.review_ready && a.review_selected >= 0 && a.review_selected < a.review_snapshot.rows.len)
+		|| (!reviewing && a.selected >= 0 && a.selected < a.rows.len) {
+		row := if reviewing {
+			software_review_row(a.review_snapshot.rows[a.review_selected])
+		} else {
+			a.rows[a.selected]
+		}
 		children << software_label(row.name, 274, 90, width - 288, 28, false)
 		children << software_label(row.description, 274, 124, width - 288, 72, false)
 		children << software_label('Version: ${row.version}    Installed: ${row.installed_version}', 274, 204, width - 288, 28, true)
-		children << software_label('Architecture: ${row.architecture}    Runtime: ${row.kind}', 274, 236, width - 288, 28, true)
+		children << software_label('Architecture: ${row.architecture}    Kind: ${row.kind}    Runtime: ${row.runtime}', 274, 236, width - 288, 28, true)
 		children << software_label('Repository: ${row.repository}', 274, 268, width - 288, 28, true)
 		children << software_label('Publisher key: ${row.public_key}', 274, 300, width - 288, 48, true)
 		permissions := row.permissions.join(', ')
 		children << software_label('Permissions: ${permissions}', 274, 352, width - 288, 48, true)
 		unsafe { permissions.free() }
-		children << software_label('License: ${row.license}' + if row.proprietary {
-			' (proprietary)'
+		proprietary := if row.proprietary { ' (proprietary)' } else { '' }
+		firmware := if row.firmware { ' — firmware' } else { '' }
+		children << software_label('License: ${row.license}${proprietary}${firmware}', 274, 404, width - 288, 28, true)
+		if reviewing {
+			children << software_label(if row.requested {
+				'Requested application'
+			} else {
+				'Dependency or removed package'
+			},
+				274, height - 176, width - 288, 28, false)
 		} else {
-			''
-		} + if row.firmware { ' — firmware' } else { '' }, 274, 404, width - 288, 28, true)
-		children << software_button('software.install', if row.installed_version == '' {
-			'Install'
-		} else {
-			'Repair / install'
-		}, 274, height - 176, 160)
-		if row.installed_version != '' {
-			children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
-			if row.kind !in ['runtime', 'data'] {
-				children << software_button('software.run', a.launch_label, width - 174, 46, 160)
+			children << software_button('software.install', if row.installed_version == '' {
+				'Install'
+			} else {
+				'Repair / install'
+			}, 274, height - 176, 160)
+			if row.installed_version != '' {
+				children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
+				if row.kind !in ['runtime', 'data'] {
+					children << software_button('software.run', a.launch_label, width - 174, 46, 160)
+				}
 			}
 		}
 	}
 	if a.review.len > 0 {
-		children << software_button('software.confirm', 'Confirm', 274, height - 138, 130)
+		if a.review_ready {
+			children << software_button('software.confirm', 'Confirm', 274, height - 138, 130)
+		}
 		children << software_button('software.cancel', 'Cancel', 416, height - 138, 110)
 	} else {
 		children << software_button('software.upgrade', 'Update all', 274, height - 138, 130)
@@ -525,7 +693,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a SoftwareApp) prepare_close() bool {
-	if a.worker != unsafe { nil } && !a.worker_view {
+	if a.worker != unsafe { nil } && !a.worker_view && !a.worker_review {
 		a.set_status(if a.worker_run {
 			'Close the application first, then close Software.'
 		} else {
@@ -547,6 +715,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.retire_worker()
 	}
 	for row in a.rows { software_free_row(row) }
+	a.clear_review()
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()

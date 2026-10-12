@@ -7,6 +7,7 @@ import time
 import tools.packages.pkgcore
 import desktop.packagecore
 import desktop.sessioncore
+import tools.packages.pkgprotocol
 
 struct Reply {
 	code int
@@ -84,7 +85,13 @@ fn qualify(binary string) ! {
 	assert success(binary, [...root_args, 'search', 'distribution'])!.contains('app')
 	assert command(binary, [...root_args, 'info', 'absent'])!.code != 0
 	assert success(binary, [...root_args, 'plan', 'install', 'app'])!.contains('requested')
-	success(binary, [...root_args, 'install', 'app'])!
+	review := json2.decode[pkgprotocol.Review](success(binary, [...root_args, 'review', 'install', 'app'])!)!
+	review.validate()!
+	assert review.rows.len == 1 && review.rows[0].permissions == ['files']
+	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.generation == 0
+	success(binary, [...root_args, 'apply', review.fingerprint, 'install', 'app'])!
+	stale := command(binary, [...root_args, 'apply', review.fingerprint, 'install', 'app'])!
+	assert stale.code != 0 && stale.text.contains('stale')
 	installed := json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!
 	assert installed.generation == 1
 	assert installed.packages[0].package.id == 'app'
@@ -119,7 +126,10 @@ fn qualify(binary string) ! {
 	assert launchers.find('app') == none
 	assert (launchers.find('other') or { panic('missing application') }) == 0
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.requested == ['other']
-	success(binary, [...root_args, 'rollback'])!
+	rollback_review := json2.decode[pkgprotocol.Review](success(binary, [...root_args, 'review', 'rollback'])!)!
+	assert rollback_review.rows.any(it.id == 'other' && it.action == 'remove')
+	assert rollback_review.rows.any(it.id == 'app' && it.action == 'install')
+	success(binary, [...root_args, 'apply', rollback_review.fingerprint, 'rollback'])!
 	assert launchers.refresh(store, u32(os.geteuid()), 'aarch64')!
 	assert (launchers.handler('package.app', 'text/plain') or { panic('missing handler') }) == 'app'
 	assert launchers.find('other') == none
@@ -128,7 +138,9 @@ fn qualify(binary string) ! {
 	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: 'aarch64' }))!
 	assert command(binary, [...root_args, 'install', 'other'])!.code != 0
 	assert success(binary, [...root_args, 'plan', 'remove', 'app'])!.contains('"requested":[]')
-	success(binary, [...root_args, 'remove', 'app'])!
+	remove_review := json2.decode[pkgprotocol.Review](success(binary, [...root_args, 'review', 'remove', 'app'])!)!
+	assert remove_review.rows.all(it.action == 'remove')
+	success(binary, [...root_args, 'apply', remove_review.fingerprint, 'remove', 'app'])!
 	assert launchers.refresh(store, u32(os.geteuid()), 'aarch64')!
 	assert launchers.apps.len == 0
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.packages.len == 0

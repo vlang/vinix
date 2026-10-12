@@ -154,6 +154,8 @@ fn activate(directory string, generation u64) ! {
 
 pub struct TransactionOptions {
 pub:
+	// A reviewed operation must still resolve to these exact inputs under the lock.
+	expected_review string
 	// Used by the crash fixture. Production CLI never accepts this flag.
 	stop_before_activation bool
 	// In-process qualification hook; no CLI option/environment enables it.
@@ -166,29 +168,14 @@ pub fn transact(config Config, directory string, operation string, names []strin
 	config.validate()!
 	guard := acquire(directory)!
 	defer { guard.release() }
-	// No writer can still own a stage while this flock is held. Complete
-	// generations remain available for rollback; only abandoned stages retire.
+	current := read_state(directory, config.architecture)!
+	plan := operation_plan(config, directory, current, operation, names)!
+	if options.expected_review != '' {
+		check_review(options.expected_review, review_fingerprint(config, operation, names, current, plan, 0))!
+	}
+	// Retire abandoned work only after a supplied review has been accepted.
 	for name in os.ls(directory + '/generations')! {
 		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }
-	}
-	current := read_state(directory, config.architecture)!
-	roots := desired_roots(current, operation, names)!
-	// Removal must work even when a publisher is offline, expired or revoked.
-	// Resolve its retained closure entirely from installed versions, without
-	// applying new acquisition policy to applications it leaves in place.
-	catalog := if operation == 'remove' {
-		Catalog{ packages: current.packages }
-	} else {
-		load_catalog(config, directory)!
-	}
-	resolution_config := if operation == 'remove' {
-		Config{ ...config, policy: Policy{ allow_firmware: true, licenses: current.packages.map(it.package.license) } }
-	} else {
-		config
-	}
-	plan := resolve(catalog, resolution_config, current, roots, operation in ['upgrade', 'deploy'])!
-	if operation == 'remove' && plan.packages.any(it.package.id in names) {
-		return error('cannot remove a package still required by another installed application')
 	}
 	if current.requested == plan.requested && current.packages == plan.packages { return current }
 	disk_check(free_bytes(directory)!, estimate_space(plan, directory)!, config.policy.reserve_bytes)!
@@ -258,9 +245,10 @@ pub fn transact(config Config, directory string, operation string, names []strin
 }
 
 pub fn rollback(config Config, directory string) !State {
-	guard := acquire(directory)!
-	defer { guard.release() }
-	current := read_state(directory, config.architecture)!
+	return rollback_reviewed(config, directory, '')
+}
+
+fn rollback_target(config Config, directory string, current State) !State {
 	if current.previous == 0 { return error('no previous package generation is available') }
 	old := json2.decode[State](read_metadata(directory + '/generations/' + current.previous.str() + '/state.json')!)!
 	validate_state(old, config.architecture)!
@@ -275,6 +263,19 @@ pub fn rollback(config Config, directory string) !State {
 				return error('${installed.package.id}: rollback payload verification failed')
 			}
 		}
+	}
+	return old
+}
+
+pub fn rollback_reviewed(config Config, directory string, expected string) !State {
+	config.validate()!
+	guard := acquire(directory)!
+	defer { guard.release() }
+	current := read_state(directory, config.architecture)!
+	old := rollback_target(config, directory, current)!
+	if expected != '' {
+		check_review(expected, review_fingerprint(config, 'rollback', [], current,
+			Plan{ requested: old.requested, packages: old.packages }, old.generation))!
 	}
 	activate(directory, old.generation)!
 	println('Rolled back to generation ${old.generation}; application data was retained')

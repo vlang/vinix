@@ -33,15 +33,17 @@ host PT_INTERP path is bypassed. Guest assertions cover:
 
 - Absolute guest and relative library symlinks becoming regular signed files.
 - The runtime being installed as a dependency, with no extra requested root.
+- Read-only full-closure review exposing the runtime and publisher, followed by
+  fingerprint-bound install. Reusing the pre-install review fails as stale.
 - A shared-library call returning 23, UID/EUID 1000 and zero supplementary groups.
 - Literal arguments containing spaces, semicolons and a dollar sign.
 - Private-data writes as the user; host libraries, the package tool and unrelated
   same-user data hidden by the production sandbox.
 - Runtime library tampering being refused before execution; restoring the signed
   bytes permits launch again.
-- Upgrading to a signed runtime without the required shared library producing
-  the loader's library-name diagnostic and status 127; rollback restoring launch.
-- Uninstall removing both the app and unused runtime while preserving user data.
+- Reviewed upgrade to a signed runtime without the required shared library producing
+  the loader's library-name diagnostic and status 127; reviewed rollback restoring launch.
+- Reviewed uninstall removing both the app and unused runtime while preserving user data.
 
 A passing retained run writes `qualification.json` with architecture, SDK,
 scenario and hashes/lengths for kernel, sandbox, dynamic payload, shared library,
@@ -58,6 +60,15 @@ committed kernel revision `7ac619bd`. Retained receipts and complete serial logs
 Guest images were retained in the corresponding host state directories during
 qualification. The x86_64 build used the V sampler generator directly, bypassing
 the stale Python sampler recipe in that kernel revision.
+
+The fingerprint-bound review flow also passed on both targets on 2026-10-12
+with those same kernel artifacts:
+[AArch64 review receipt](results/2026-10-12/review-aarch64.json),
+[AArch64 serial](results/2026-10-12/review-aarch64.serial.txt),
+[x86_64 review receipt](results/2026-10-12/review-x86_64.json),
+[x86_64 serial](results/2026-10-12/review-x86_64.serial.txt).
+Their `PACKAGE REVIEW` marker covers full runtime/publisher disclosure and stale
+confirmation refusal; maintenance uses reviewed upgrade, rollback and uninstall.
 
 This qualifies this musl loader/package tuple and its stated assertions. It does
 not qualify arbitrary Linux libraries, upstream apps, glibc, graphics/audio

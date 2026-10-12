@@ -5,6 +5,13 @@ import json2
 import os
 import time
 import tools.packages.pkgcore
+import tools.packages.pkgprotocol
+
+fn reviewed_package_operation(operation string, names []string) !string {
+	mut review := pkgprotocol.decode_review(package_success(['review', operation, ...names])!)!
+	defer { review.close() }
+	return package_success(['apply', review.fingerprint, operation, ...names])
+}
 
 fn qualify_package_linux(mut t Test) ! {
 	t.make_accounts()
@@ -85,7 +92,16 @@ fn qualify_package_linux(mut t Test) ! {
 	os.write_file('/home/alex/outside.txt', 'not granted\n')!
 	os.chown('/home/alex/outside.txt', 1000, 1000)!
 	package_success(['update'])!
-	package_success(['install', application.id])!
+	mut installation := pkgprotocol.decode_review(package_success(['review', 'install', application.id])!)!
+	defer { installation.close() }
+	assert installation.rows.len == 2
+	assert installation.rows.any(it.id == runtime.id && it.kind == 'runtime' && it.license == runtime.license)
+	assert installation.rows.all(it.action == 'install' && it.repository == 'fixture' && it.public_key == key)
+	assert pkgcore.read_state('/var/lib/vinix-packages', architecture)!.generation == 0
+	package_success(['apply', installation.fingerprint, 'install', application.id])!
+	stale := run(['/usr/bin/vinix-package', 'apply', installation.fingerprint, 'install', application.id], '', none, none)
+	assert stale.status != 0 && stale.output.contains('review is stale'), stale.output
+	t.say('PACKAGE REVIEW full-runtime-closure provenance stale-confirmation PASS')
 	state := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
 	assert state.requested == [application.id]
 	assert state.packages.len == 2 && state.packages.any(it.package.id == runtime.id)
@@ -117,12 +133,12 @@ fn qualify_package_linux(mut t Test) ! {
 	package_success(['pack-root', '/tmp/linux-recipe.json', prepared, repository])!
 	pkgcore.publish(repository, 'fixture', '/tmp/linux-signing-seed', 2, time.now().unix() + 3600)!
 	package_success(['update'])!
-	package_success(['upgrade'])!
+	reviewed_package_operation('upgrade', [])!
 	missing := run(['/usr/bin/vinix-package', 'run', application.id], '', none, none)
 	assert missing.status == 127 && missing.output.contains('libfixture.so.1'), missing.output
-	package_success(['rollback'])!
+	reviewed_package_operation('rollback', [])!
 	assert package_success(['run', application.id])!.contains('PACKAGE LINUX')
-	package_success(['remove', application.id])!
+	reviewed_package_operation('remove', [application.id])!
 	removed := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
 	assert removed.packages.len == 0
 	assert os.is_file(data)
