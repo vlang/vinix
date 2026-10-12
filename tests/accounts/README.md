@@ -26,6 +26,11 @@ tamper refusal and maintenance of a running app's leased generation. The ordinar
 accounts controller keeps the `packages` sandbox substitute so the identity
 handoff can be diagnosed independently of the production enforcer.
 
+The [dynamic Linux package controller](../packages/linux-runtime-check.md) uses
+`packages-linux` with a target musl loader, shared V library and signed static
+runner. It checks prepared-root import, ordinary sandboxed execution,
+missing-library diagnostics, runtime rollback and clean uninstall.
+
 The [persistent package controller](../packages/persistence-check.md) reuses
 `packages-crash-staged`, `packages-crash-published` and `packages-crash-activated`.
 Each case SIGKILLs QEMU at its transaction checkpoint and reboots the same ext2

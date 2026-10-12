@@ -207,6 +207,7 @@ fn test_policy_runtime_and_literal_launch_arguments() {
 	assert launch.program == '/usr/bin/vinix-sandbox'
 	assert launch.arguments.last() == 'literal;$(do-not-run)'
 	assert '/var/lib/vinix-packages/generations/1/apps/wine/bin/app' in launch.arguments
+	assert 'LD_LIBRARY_PATH=/var/lib/vinix-packages/generations/1/apps/app/lib:/var/lib/vinix-packages/generations/1/apps/app/usr/lib:/var/lib/vinix-packages/generations/1/apps/wine/lib:/var/lib/vinix-packages/generations/1/apps/wine/usr/lib' in launch.arguments
 	if _ := launch_plan(config, '/var/lib/vinix-packages', state, 'app', '/home/user/data', 0, 0, []) {
 		assert false
 	}

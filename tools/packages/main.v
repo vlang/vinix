@@ -11,6 +11,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
+	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n'
 
 struct SoftwareRow {
@@ -157,6 +158,11 @@ fn checked(arguments []string) !int {
 				return error('pack requires a manifest, payload directory and repository directory')
 			}
 			println(json2.encode(pkgcore.pack(names[0], names[1], names[2])!))
+			return 0
+		}
+		'pack-root' {
+			if names.len != 3 { return error('pack-root requires a recipe, prepared guest root and repository directory') }
+			println(json2.encode(pkgcore.pack_root(names[0], names[1], names[2])!))
 			return 0
 		}
 		'publish' {

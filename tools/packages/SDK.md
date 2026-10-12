@@ -30,6 +30,49 @@ and MIME types are sorted, and JSON field order is fixed. Identical payload byte
 sequence, expiry and seed produce identical index bytes and Ed25519 signature.
 Binary build reproducibility remains the compiler/upstream build's responsibility.
 
+### Import a prepared guest root
+
+`pack-root recipe.json /build/guest-root /build/new-repository` imports an explicit
+selection from a prepared upstream root. Verify upstream signatures and obtain
+redistribution permission before preparing that root. This command does not
+authenticate upstream packages, solve their dependencies, run install scripts or
+infer licenses. Record the complete app/runtime dependency closure in the Vinix
+manifest and include the upstream copyright/license files among the selectors.
+
+```json
+{
+  "format": 1,
+  "manifest": {
+    "id": "org.example.musl-runtime",
+    "version": "1.0.0",
+    "architecture": "aarch64",
+    "name": "Example Linux runtime",
+    "license": "GPL-2.0-or-later AND MIT",
+    "kind": "runtime"
+  },
+  "entries": [
+    {"source": "bin/vinix-linux-runner", "path": "bin/vinix-linux-runner"},
+    {"source": "lib", "path": "lib"},
+    {"source": "usr/lib", "path": "usr/lib"},
+    {"source": "licenses", "path": "licenses"}
+  ]
+}
+```
+
+Both selector paths are relative; destinations cannot overlap. The input root
+must be an ordinary directory and remain unchanged during import. File and
+directory aliases are materialized into regular files in a private workspace;
+absolute links resolve inside the captured **guest** root, never the publisher's
+host filesystem. Relative parents are resolved after intermediate links and
+cannot traverse above that root. Broken links, cycles, more than 40 link hops,
+special files and oversized payloads fail. Input files/links are untouched.
+Executable modes become 0755 and other file modes become 0644, with no inherited
+setuid bits. The existing `pack` canonical inventory/signing rules then apply.
+Identical materialized bytes produce identical metadata, regardless of selector
+order or the upstream aliases. Do not select account databases, host settings,
+devices or unrelated applications. Proprietary and firmware flags stay explicit
+publisher declarations, subject to administrator policy.
+
 ## Manifest
 
 ```json
@@ -89,7 +132,34 @@ dependencies and external solver hooks are outside format 1.
 an executable **inside that runtime**. For example, a Windows app uses
 `"entrypoint":"bin/wine-runner"` and `"arguments":["@APP@/program.exe"]`.
 Runners must use packaged loaders/libraries rather than host-global installations.
-Materialize runtime symlinks into ordinary files before packing.
+Use `pack-root` to materialize a verified prepared runtime's symlinks, or supply
+ordinary files directly to `pack`.
+
+For a dynamically linked **musl** Linux application, package the target static
+[`vinix-linux-runner`](linux-runner.v) inside its runtime. Package staging builds
+the SDK artifact at `/usr/libexec/vinix/vinix-linux-runner`; the installed app
+must declare its signed runtime copy as the entrypoint. For an AArch64 example:
+
+```json
+{
+  "kind": "linux",
+  "runtime": "org.example.musl-runtime",
+  "entrypoint": "bin/vinix-linux-runner",
+  "arguments": ["@RUNTIME@/lib/ld-musl-aarch64.so.1", "@APP@/bin/application"],
+  "dependencies": [{"id":"org.example.musl-runtime","minimum":"1.0.0","before":"2.0.0"}]
+}
+```
+
+The runner execs that absolute loader with `--library-path`, the service's
+`LD_LIBRARY_PATH`, the application and literal arguments/documents. The ELF's
+host-global PT_INTERP path is not used. Library directories include `lib` and
+`usr/lib` in the app, runtime and transitive dependency payloads. The production
+sandbox hides host loader/library paths; missing packaged libraries fail with
+the loader's diagnostic and exit status. No shell or runtime download occurs.
+The process inherits the ordinary identity, permissions and service generation
+lease. This runner targets musl's loader protocol; other Linux loaders need an
+explicit qualified runner. Bundling libraries alone does not supply every Linux
+syscall, service, plugin/data search path or graphics API.
 
 The explicit environment includes `HOME`, `TMPDIR`, `WINEPREFIX`, `PATH`,
 `LD_LIBRARY_PATH`, `LANG`, and declared `DISPLAY`. Argument substitutions
@@ -160,6 +230,11 @@ dependencies, tamper refusal and generation leases through update/uninstall/GC;
 retained passing runs record hashes of the kernel, sandbox, payload, service,
 session runner and serial output. These fixtures qualify package mechanics,
 not the API coverage of a Linux, Windows, Apple or graphical runtime.
+
+The [dynamic Linux check](../../tests/packages/linux-runtime-check.md) exercises
+`pack-root`, this runner, a target musl loader and a shared V library under the
+production sandbox on both architectures. Its receipts qualify this narrow
+loader/package tuple; qualify actual upstream applications separately.
 
 [Persistent package recovery](../../tests/packages/persistence-check.md) tests
 abrupt QEMU termination and recovery on the same ext2 disk at the staged,

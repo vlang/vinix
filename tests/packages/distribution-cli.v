@@ -62,7 +62,21 @@ fn qualify(binary string) ! {
 		os.write_file(work + '/payload/bin/app', id + ' payload')!
 		os.chmod(work + '/payload/bin/app', 0o755)!
 		os.write_file(work + '/manifest.json', json2.encode(package_template(id, '1.0.0')))!
-		success(binary, ['pack', work + '/manifest.json', work + '/payload', repository])!
+		if id == 'other' {
+			os.mkdir_all(work + '/prepared/bin')!
+			os.mkdir_all(work + '/prepared/opt')!
+			os.cp(work + '/payload/bin/app', work + '/prepared/bin/app')!
+			os.chmod(work + '/prepared/bin/app', 0o755)!
+			os.symlink('/bin/app', work + '/prepared/opt/alias')!
+			recipe := pkgcore.RootRecipe{ manifest: package_template(id, '1.0.0'),
+				entries: [pkgcore.RootEntry{ source: 'opt/alias', path: 'bin/app' }] }
+			os.write_file(work + '/recipe.json', json2.encode(recipe))!
+			packed := json2.decode[pkgcore.Package](success(binary, ['pack-root', work + '/recipe.json', work + '/prepared', repository])!)!
+			assert packed.files.len == 1 && packed.files[0].executable
+			assert os.is_link(work + '/prepared/opt/alias')
+		} else {
+			success(binary, ['pack', work + '/manifest.json', work + '/payload', repository])!
+		}
 	}
 	success(binary, ['publish', repository, 'fixture', work + '/seed', '1',
 		(time.now().unix() + 3600).str()])!

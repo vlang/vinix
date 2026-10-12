@@ -234,6 +234,25 @@ runtime does not qualify Linux, Wine, Mach-O or graphical API compatibility.
 The guest root is an initramfs, so these runs do not qualify persistent-device
 power-cut durability.
 
+Publishers can now use `vinix-package pack-root` with explicit source/destination
+selectors to import a verified prepared guest root. It materializes library and
+directory symlinks within the captured guest namespace, rejects escapes/cycles
+and special files, and emits the same canonical regular-file package inventory.
+Upstream authentication, redistribution permission and the explicit runtime
+dependency closure remain publisher responsibilities. License documents,
+proprietary/firmware declarations and runtime updates remain visible in signed
+metadata and organization policy; no upstream install scripts run.
+
+The [dynamic Linux qualification](../tests/packages/linux-runtime-check.md)
+packages a target musl loader, the static SDK runner and a shared V library as an
+explicit runtime. A dynamically linked ELF application uses that loader and the
+signed closure's `lib`/`usr/lib` directories through the production sandbox.
+The fixture checks ordinary identity, literal arguments, private-data writes,
+hidden host paths, runtime tamper refusal, missing-library diagnostics, rollback
+and removal of the unused runtime with personal data preserved. It qualifies
+the loader/package contract; individual upstream applications and graphics
+services still require their own coverage.
+
 The [persistent-storage recovery check](../tests/packages/persistence-check.md)
 adds a real ext2 volume and abrupt QEMU SIGKILL/reboot cycles at the staged,
 published and activated transaction checkpoints. It verifies the old/new active

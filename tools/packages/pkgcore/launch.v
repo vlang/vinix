@@ -52,7 +52,7 @@ pub fn launch_plan(config Config, directory string, state State, id string, data
 	if 'display' in p.permissions { promises << 'unix' }
 	args << ['--promises', promises.join(' '), '--unveil', app, 'rx', '--unveil', data, 'rwc']
 	if runtime != app { args << ['--unveil', runtime, 'rx'] }
-	mut libraries := [app + '/lib', runtime + '/lib']
+	mut libraries := [app + '/lib', app + '/usr/lib', runtime + '/lib', runtime + '/usr/lib']
 	for dependency in application_closure(state, id) {
 		check_policy(dependency.package, config.policy)!
 		if !config.repositories.any(it.id == dependency.repository && it.public_key == dependency.public_key) {
@@ -62,6 +62,7 @@ pub fn launch_plan(config Config, directory string, state State, id string, data
 		path := generation + '/apps/' + dependency.package.id
 		args << ['--unveil', path, 'rx']
 		libraries << path + '/lib'
+		libraries << path + '/usr/lib'
 	}
 	args << ['--env', 'HOME=' + data, '--env', 'TMPDIR=' + data + '/tmp', '--env',
 		'PATH=' + runtime + '/bin', '--env', 'LD_LIBRARY_PATH=' + libraries.join(':'), '--env',

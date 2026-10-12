@@ -51,6 +51,7 @@ fn stage() ! {
 	for tool, input in {
 		'usr/bin/vinix-package':  'tools/packages/main.v'
 		'usr/sbin/vinix-session': 'tools/accounts/session.v'
+		'usr/libexec/vinix/vinix-linux-runner': 'tools/packages/linux-runner.v'
 	} {
 		source := work + '/' + os.file_name(tool) + '.c'
 		invoke(v, ['-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
