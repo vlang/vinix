@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `99cb5e31534066b7ca608ffa07b7258864564a49`,
+at source commit `eca3cb2ea8028caf02124f0e9e5b2d51460bde9a`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 595 | 2,395,229 | 5.78% |
-| Python | 40 | 264,500 | 0.64% |
-| Shell | 788 | 1,370,862 | 3.31% |
+| C | 597 | 2,395,782 | 5.76% |
+| Python | 33 | 241,463 | 0.58% |
+| Shell | 795 | 1,371,801 | 3.30% |
 
-All `.v` files are classified as V. The resulting V share is 82.76%, with no
+All `.v` files are classified as V. The resulting V share is 82.85%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 264,500 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 241,463 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 99cb5e31534066b7ca608ffa07b7258864564a49 --breakdown --json
+github-linguist --rev eca3cb2ea8028caf02124f0e9e5b2d51460bde9a --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -376,6 +376,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/cpu-mitigations/segments.c` | 613 |
 | `tests/desktop-perf/measure.c` | 27,246 |
 | `tests/desktop-perf/perfconsole/abi.h` | 302 |
+| `tests/development/guestfixture/native-abi.h` | 288 |
 | `tests/dhewm3/as-user.c` | 1,266 |
 | `tests/dhewm3/clock-probe.c` | 4,185 |
 | `tests/disk-no-sync/test.c` | 4,336 |
@@ -538,6 +539,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mounted-disk-policy/hosttemplates/host.h` | 749 |
 | `tests/n64/guestfixture/n64-guest-native-abi.h` | 1,072 |
 | `tests/n64/rspbudgetfixture/n64-rsp-native-abi.h` | 626 |
+| `tests/native-render-tools/test-abi.h` | 265 |
 | `tests/net-random/fixture/net-random-native-abi.h` | 351 |
 | `tests/network-ipv6/guestfixture/ipv6-guest-native-abi.h` | 558 |
 | `tests/network-ipv6/host.c` | 9,939 |
@@ -671,10 +673,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/tests/test_font_data.py` | 7,106 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `tests/activity-monitor/run.py` | 5,933 |
-| `tests/agx-fake-g17/_native.py` | 7,413 |
-| `tests/agx-fake-g17/run.py` | 1,075 |
-| `tests/agx-fake-g17/run_encode_native.py` | 1,278 |
-| `tests/agx-fake-g17/run_vm.py` | 4,186 |
 | `tests/android/_run_native.py` | 16,117 |
 | `tests/browsers/_native.py` | 5,357 |
 | `tests/browsers/run_vm.py` | 9,438 |
@@ -686,7 +684,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/uikit.py` | 5,993 |
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/run.py` | 3,048 |
-| `tests/krandom/run_native.py` | 2,478 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,384 |
 | `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/pointer-scroll/run.py` | 5,488 |
@@ -694,8 +691,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tests/roblox-windows/_native.py` | 5,099 |
 | `tests/roblox-windows/run.py` | 7,180 |
-| `tests/virtio-gpu-virgl/_native.py` | 957 |
-| `tests/virtio-gpu-virgl/run_vm.py` | 5,650 |
 | `tools/_package_store_native.py` | 4,314 |
 
 ## Shell files
@@ -937,7 +932,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/run-desktop-amd64.sh` | 2,920 |
 | `scripts/run-hyprland-aarch64.sh` | 840 |
 | `scripts/run-iso-virtualbox.sh` | 8,448 |
-| `scripts/test-gpu-kekvm.sh` | 274 |
+| `scripts/test-gpu-kekvm.sh` | 263 |
 | `scripts/test-iso.sh` | 18,878 |
 | `tests/aarch64-sigreturn/run` | 190 |
 | `tests/abi-scratch/run` | 182 |
@@ -945,7 +940,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/acpi-ec/run.sh` | 649 |
 | `tests/acpi-sync/compile-v-native` | 191 |
 | `tests/acpi-sync/run` | 182 |
-| `tests/agx-fake-g17/run.sh` | 942 |
+| `tests/agx-fake-g17/run` | 131 |
+| `tests/agx-fake-g17/run.sh` | 931 |
+| `tests/agx-fake-g17/run_encode_native` | 133 |
+| `tests/agx-fake-g17/run_vm` | 129 |
 | `tests/agx-g13-abi/run.sh` | 785 |
 | `tests/agx-g13-layouts/run.sh` | 796 |
 | `tests/agx-m1-image/run.sh` | 3,154 |
@@ -1128,6 +1126,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/desktop-perf/run-saved-driver` | 150 |
 | `tests/desktop/first-run-apps-init.sh` | 4,538 |
 | `tests/developer-tools/smoke.sh` | 4,577 |
+| `tests/development/run-guest` | 172 |
 | `tests/devicetree-string-list/run.sh` | 240 |
 | `tests/dhewm3/guest-init.sh` | 2,668 |
 | `tests/dhewm3/prepare-debian` | 129 |
@@ -1218,6 +1217,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/compile-hooks` | 175 |
 | `tests/krandom/run-hooks` | 172 |
 | `tests/krandom/run.sh` | 1,734 |
+| `tests/krandom/run_native` | 130 |
 | `tests/limine-aarch64/test-patch` | 111 |
 | `tests/linux-compat/run` | 153 |
 | `tests/linuxkpi/audit_generation_test` | 141 |
@@ -1281,6 +1281,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/native-campaign-tools/run` | 179 |
 | `tests/native-game-tools/run` | 135 |
 | `tests/native-linuxkpi-tools/run` | 135 |
+| `tests/native-render-tools/run` | 135 |
 | `tests/native-runtime-tools/run` | 135 |
 | `tests/native-validation-tools/run` | 135 |
 | `tests/net-random/run` | 183 |
@@ -1434,6 +1435,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/verified-root/test` | 202 |
 | `tests/virtio-gpu-virgl/desktop-guest-init.sh` | 1,941 |
 | `tests/virtio-gpu-virgl/guest-init.sh` | 1,464 |
+| `tests/virtio-gpu-virgl/run_vm` | 131 |
 | `tests/virtio-ro/run` | 218 |
 | `tests/vlang/desktop-runtime-guest-init.sh` | 1,766 |
 | `tests/vlang/gpu-desktop-reload-guest-init.sh` | 1,872 |

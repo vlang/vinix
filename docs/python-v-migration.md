@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `99cb5e31534066b7ca608ffa07b7258864564a49`,
-Linguist 7.27.0 reports **Python 0.64%** (40 files, 264,500 bytes) and
-**V 82.76%** (3,712 files, 34,321,072 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `eca3cb2ea8028caf02124f0e9e5b2d51460bde9a`,
+Linguist 7.27.0 reports **Python 0.58%** (33 files, 241,463 bytes) and
+**V 82.85%** (3,725 files, 34,434,175 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **4,941,785 Python bytes**. All remaining
-264,500 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **4,964,822 Python bytes**. All remaining
+241,463 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -24,7 +24,7 @@ to an archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 77 stages below remove **488 Python files / 2,096,364 original bytes** and
+The 78 stages below remove **495 Python files / 2,119,401 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -109,6 +109,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Launcher, GPU, DNS, CLI smoke and X11 checker closure | `validationhost`, `guestvalidation`, native event streams and process owners, guest ELF staging and checked cache | 36,139 / 972 | `af928324` |
 | LinuxKPI audit, fixtures, build recipes and VM closure | `kpihost`, native ABI/bounds/upstream APIs, literal golden reader and native guest supervisor | 54,042 / 1,127 | `8f4b4b4d` |
 | iOS C++ builder, symbol generator and graphics staging closure | `iosbuild`, pinned native archive reader, four-worker compiler/cache owner and ELF dependency staging | 10,889 / 213 | `99cb5e31` |
+| G17, VirtIO/VirGL and production random controller closure | `renderhost`, direct native G17 APIs, owned PTY/QMP paths and isolated native build runner | 23,037 / 586 | `eca3cb2e` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -741,9 +742,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 77 stages.
+or hidden in these 78 stages.
 
-The next thirty-nine stages remove 336 Python files / 1,598,021 original bytes.
+The next forty stages remove 343 Python files / 1,621,058 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -756,7 +757,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **366 Python files / 1,732,298 original bytes**. Earlier qualification
+translates **373 Python files / 1,755,335 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -3158,3 +3159,16 @@ commands also pass real warm and corrupt-object repair controls, and stage all
 The original symbol header and linker stub remain byte-identical except for
 the generator provenance comment. No Python or Vinix guest was executed. See
 [native iOS build tools](../build-support/ios/README.md).
+
+The GPU and random-controller stage retires seven unchanged Python files,
+totaling 23,037 bytes and 586 lines. Twelve cold host/unit builds plus six final
+CLI/recipe builds pass on ARM, x86 and ASan/UBSan. Each profile matches all
+71,944 saved original G17 policy results and passes 25 actual child-process
+cases, including QMP, PTY, large output, descendants, timeout, escalation,
+integer overflow, SIGINT/SIGTERM and exact PID/descriptor retirement. Four real
+static G17 executables per profile pass input and native boot-delegation
+checks using a controlled downstream endpoint. Public entrypoints and actual
+ARM/x86 frozen C and unchanged V host oracles also pass. The random CLI retains
+normal and signalled guest exit codes, exclusive state, isolation guards and
+merged compiler logs. No Python or Vinix guest was executed. See
+[native render test tools](../tests/native-render-tools/README.md).
