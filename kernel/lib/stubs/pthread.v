@@ -36,7 +36,7 @@ pub fn pthread_create(t &&C.__thread_data, attr &C.__threadattr, start_routine f
 }
 
 @[export: 'pthread_detach']
-pub fn pthread_detach(t &C.__thread_data) int {
+pub fn pthread_detach(t voidptr) int {
 	event.require_task_context()
 	mut thrd := unsafe { &proc.Thread(t) }
 	if !katomic.cas(mut &thrd.pthread_joinable, u32(1), u32(0)) {
@@ -91,6 +91,6 @@ pub fn pthread_attr_destroy(attr &C.__threadattr) int {
 }
 
 @[export: 'pthread_equal']
-pub fn pthread_equal(a &C.__thread_data, b &C.__thread_data) int {
+pub fn pthread_equal(a voidptr, b voidptr) int {
 	return if a == b { 1 } else { 0 }
 }
