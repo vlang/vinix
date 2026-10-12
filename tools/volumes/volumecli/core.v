@@ -60,6 +60,7 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume save-set BUNDLE DEVICE [DEVICE ...]\n       vinix-volume plan-grow BUNDLE SLOT LENGTH_BYTES\n       vinix-volume restore-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume show-bundle BUNDLE\n       vinix-volume check-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume plan-add BUNDLE DISK_INDEX SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume plan-remove BUNDLE SLOT\n')
+	C.printf(c'       vinix-volume plan-add-batch BUNDLE IDENTITY SLOT OFFSET_BYTES LENGTH_BYTES MODE [...]\n       vinix-volume plan-preview-add-batch BUNDLE IDENTITY SLOT OFFSET_BYTES LENGTH_BYTES MODE [...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
 	C.printf(c'       vinix-volume plan-remove-batch BUNDLE SLOT [...]\n       vinix-volume plan-preview-remove-batch BUNDLE SLOT [...]\n')
 	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
 	C.printf(c'       vinix-volume plan-enroll-batch BUNDLE PLAN [...]\n       vinix-volume plan-preview-enroll-batch BUNDLE PLAN [...]\n')
@@ -79,6 +80,22 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'plan-add-batch') == 0 || C.strcmp(argv[1], c'plan-preview-add-batch') == 0) {
+			if argc < 8 || argc > 323 || (argc - 3) % 5 != 0 { return usage() }
+			mut batch := &MappingAdditionBatch(C.alloca(sizeof(MappingAdditionBatch)))
+			*batch = MappingAdditionBatch{count: (argc - 3) / 5}
+			for i in 0 .. batch.count {
+				at := 3 + i * 5
+				if !parse_disk_identity(argv[at], mut batch.keys[i]) { return usage() }
+				slot := decimal(argv[at + 1]) or { return usage() }
+				offset := decimal(argv[at + 2]) or { return usage() }
+				length := decimal(argv[at + 3]) or { return usage() }
+				if slot >= 64 || length == 0 || (C.strcmp(argv[at + 4], c'rw') != 0 && C.strcmp(argv[at + 4], c'ro') != 0) { return usage() }
+				batch.rows[i] = Request{slot: u32(slot), offset: offset, length: length,
+					flags: if C.strcmp(argv[at + 4], c'ro') == 0 { u64(1) } else { u64(0) }}
+			}
+			return add_batch_bundle_plan(argv[2], batch, C.strcmp(argv[1], c'plan-preview-add-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'plan-forget-batch') == 0 || C.strcmp(argv[1], c'plan-preview-forget-batch') == 0) {
 			if argc < 4 || argc > 67 { return usage() }
 			mut batch := &DiskForgetBatch(C.alloca(sizeof(DiskForgetBatch)))

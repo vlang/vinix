@@ -46,16 +46,17 @@ report both saved placements as `keep`, preserve exact bytes, and retain both
 live generations and a readable held descriptor. A mode mismatch fails without
 changing the bundle. Cleanup restores exact baseline bytes.
 
-Each of 200 warmup and 200 measured cycles now executes 24 utility processes:
+Each of 200 warmup and 200 measured cycles now executes 26 utility processes:
 save-set, unchanged plan-grow, plan-preview-capacity-batch and plan-capacity-batch,
 pool-preview-add-batch and pool-add-batch,
 pool-preview-order and pool-order,
 pool-preview-expand-batch and pool-expand-batch,
 pool-space, two-request pool-preview-batch and pool-allocate-batch,
 pool-preview-grow-batch and pool-grow-batch,
+plan-preview-add-batch and plan-add-batch,
 check-bundle, plan-preview-remove-batch and plan-remove-batch,
-plan-preview-enroll-batch and plan-enroll-batch, two plan-forget commands, restore-bundle and
-boot-restore. This is **9600 processes**, 400 allocation previews/publications,
+plan-preview-enroll-batch and plan-enroll-batch, plan-preview-forget-batch and plan-forget-batch, restore-bundle and
+boot-restore. This is **10400 processes**, 400 allocation previews/publications,
 800 scratch placements, 400 growth previews/publications, 800 scratch growths,
 800 member additions, 400 expansion previews/publications, 400 capacity batch
 previews/publications and 400 pool queries. Neither scratch mapping becomes live.

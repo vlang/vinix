@@ -154,6 +154,16 @@ cover changed/all-absent batches. Guests verify writer exclusion, held views and
 actual physical disk/pool compaction across reboot. See
 [disk forgetting qualification](forget-batch.md).
 
+Explicit mapping addition batches check 1024 existing/requested subset
+combinations against independent append/keep oracles, preserving original rows,
+disk order and pool priority. Identity-based retries follow disk compaction.
+Maximum 64-request/323-argument CLIs reach the full V2 limit. Later identity,
+geometry, mode and slot conflicts preserve every field and publication bytes;
+publisher/output faults cover changed/all-keep batches. Guests verify mixed
+actions, later live conflicts, retained views and exact seven-row reconstitution
+before persistent boot replay. See
+[addition batch qualification](addition-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -180,8 +190,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 9600 utility processes across 200 warmup
-and 200 measured twenty-four-command cycles, with pool membership, query, batch
+its own process. The allowance includes 10400 utility processes across 200 warmup
+and 200 measured twenty-six-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
@@ -231,7 +241,7 @@ cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
 mapping capacity, previews/verifies/republishes both unchanged physical capacities,
 previews/publishes admission of two pool members and unchanged allocation priority,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
-batch, previews/publishes a two-mapping growth batch, checks and previews/removes the scratch
+batch, previews/publishes a two-mapping growth batch and explicit identity retries, checks and previews/removes the scratch
 mappings, previews/enrolls two empty offline participants and previews/forgets
 both by identity,
 explicitly replays growth and runs boot restoration.

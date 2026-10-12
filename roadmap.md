@@ -179,6 +179,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Atomic cross-disk desired mapping removal with complete action previews, stable row/pool order, rollback, durable absent-slot retries and boot persistence](docs/storage-volumes.md#atomic-desired-mapping-removal-batches).
   - [x] [Atomic multi-disk snapshot enrollment with complete previews, pinned source rechecks, exact matching retries, preserved desired state/indices/pool priority and boot persistence](docs/storage-volumes.md#atomic-disk-enrollment-batches).
   - [x] [Atomic identity-based empty-disk removal with complete previews, stable compaction, remapped pool references, whole-set rollback, durable absent retries and boot persistence](docs/storage-volumes.md#atomic-disk-forgetting).
+  - [x] [Atomic identity-based explicit mapping additions with complete previews, whole-set rollback, preserved row/pool order, durable exact retries across disk compaction and boot persistence](docs/storage-volumes.md#atomic-explicit-mapping-additions).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

@@ -379,6 +379,59 @@ This completes add/remove editing of saved linear mappings; RAID,
 filesystem resize and encryption remain separate work. See
 [offline edit qualification](../tests/storage-volumes/edit-bundle.md).
 
+## Atomic explicit mapping additions
+
+```sh
+vinix-volume plan-preview-add-batch /root/layout.vset \
+  mbr:12345678 19 8388608 4096 rw mbr:12345679 20 8388608 4096 ro
+vinix-volume plan-add-batch /root/layout.vset \
+  mbr:12345678 19 8388608 4096 rw mbr:12345679 20 8388608 4096 ro
+vinix-volume check-bundle /root/layout.vset
+vinix-volume restore-bundle /root/layout.vset
+```
+
+`plan-add-batch BUNDLE IDENTITY SLOT OFFSET_BYTES LENGTH_BYTES MODE [...]`
+adds 1–64 mappings at explicitly chosen offsets as one saved-state edit.
+Select an enrolled disk by its `mbr:` signature or `gpt:` GUID, in the format
+printed by `show-bundle`; hexadecimal letters may use either case. Identity
+selection is independent of saved geometry and shifting disk indices. The
+bundle's current capacity and sector size validate every requested extent.
+Offsets and lengths are decimal bytes; modes must be explicit `rw` or `ro`.
+
+Existing globally owned slots are `keep` retries only when the target identity,
+offset, length, mode and every saved row field match exactly. Different disks,
+geometry or modes never overwrite a desired row. New rows append in request
+order within each disk, retaining all existing row order, pending desired edits,
+disk order and pool bounds/alignment/priority. Several distinct slots may target
+the same identity. Duplicate requested slots, absent enrolled identities,
+ambiguous saved identities, invalid/overlapping/overflowing extents and the
+64-mapping bound fail with complete rollback and no partial action report.
+Matching retries remain safe after an unrelated empty disk is forgotten.
+
+This chooses explicit extents rather than searching a pool. Pool membership,
+eligibility and pool alignment do not constrain this editor; ordinary saved
+disk/sector/extent rules still apply, and future pool queries account for rows
+intersecting their regions. Allocation through a pool remains a separate command.
+Existing single indexed `plan-add` retains its duplicate-slot error behavior.
+
+`plan-preview-add-batch` uses the same complete planner and reports every
+request's current disk index, identity, slot, add/keep action, offset, length and
+mode without physical probes, a writer lock, temporary or publication. A preview
+does not reserve the configuration. Publication retains the pinned directory
+writer lock through source reads, atomic replacement, report flushing and
+cleanup. Every all-keep retry still writes, file-fsyncs, renames and directory-
+fsyncs the whole bundle. Before rename failures retain old bytes; afterward only
+the complete new set may be visible with durability unconfirmed. Buffered output
+failure also returns an error. Repeat the complete request list or inspect the
+saved state to confirm durability under serialized administration.
+
+Saved additions do not instantiate live views or write their physical extents.
+Later complete-set `check-bundle`/replay still detects unlisted live slot/extent
+conflicts before actions. Successful explicit replay creates missing views and
+keeps matching generations; desired omission does not remove them. Existing
+V1/V2 formats and boot replay persist the rows. See
+[explicit addition qualification](../tests/storage-volumes/addition-batch.md).
+
 ## Atomic desired mapping removal batches
 
 ```sh

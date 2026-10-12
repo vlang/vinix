@@ -176,6 +176,10 @@ fn cycles(parent &char, count int) {
 		pool_batch(c'/etc/vinix/volumes.vset', c'3', c'14', c'4096', c'ro', c'15', c'8192', c'rw', false, 0, unsafe { nil })
 		pool_grow_batch(c'/etc/vinix/volumes.vset', c'3', c'14', c'8192', c'15', c'12288', true, 0, unsafe { nil })
 		pool_grow_batch(c'/etc/vinix/volumes.vset', c'3', c'14', c'8192', c'15', c'12288', false, 0, unsafe { nil })
+		mapping_additions(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'15', c'6291456', c'12288', c'rw',
+			c'mbr:12345678', c'14', c'6291456', c'8192', c'ro', true, 0, unsafe { nil })
+		mapping_additions(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'15', c'6291456', c'12288', c'rw',
+			c'mbr:12345678', c'14', c'6291456', c'8192', c'ro', false, 0, unsafe { nil })
 		tool(c'check-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		mapping_removals(c'/etc/vinix/volumes.vset', c'15', c'14', unsafe { nil }, true, 0, unsafe { nil })
 		mapping_removals(c'/etc/vinix/volumes.vset', c'15', c'14', unsafe { nil }, false, 0, unsafe { nil })
@@ -451,6 +455,7 @@ fn first_boot(parent &char) {
 		planned_mapping_removals(parent, wrong)
 		planned_enrollment_batch(parent, wrong)
 		planned_forget_batch()
+		planned_addition_batch(parent, wrong)
 		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)

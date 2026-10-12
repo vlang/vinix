@@ -56,6 +56,9 @@ fn test_directory_lock_excludes_all_saved_state_writers_but_preserves_readonly_i
 	assert remove_batch_bundle_plan(path.str, &removals, false) == 1
 	assert remove_batch_bundle_plan(path.str, &removals, true) == 0
 	assert edit_bundle_plan(path.str, 0, &row, false) == 1
+	mut additions := MappingAdditionBatch{count: 1}; additions.keys[0] = set.plans[0].key; additions.rows[0] = row
+	assert add_batch_bundle_plan(path.str, &additions, false) == 1
+	assert add_batch_bundle_plan(path.str, &additions, true) == 0
 	assert grow_bundle_plan(path.str, 2, 8192) == 1
 	assert enroll_bundle_disk(path.str, c'/unused') == 1
 	unsafe {

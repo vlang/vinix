@@ -58,6 +58,15 @@ desired entry. Both atomically publish a validated complete set; live mappings
 are changed only by separate runtime commands. See
 [offline configuration editing](../../docs/storage-volumes.md#offline-mapping-configuration).
 
+`plan-add-batch BUNDLE IDENTITY SLOT OFFSET_BYTES LENGTH_BYTES MODE [...]`
+adds 1–64 explicit mappings across enrolled disks in one atomic publication.
+Select MBR/GPT identities from `show-bundle`; modes are `rw` or `ro`.
+Matching rows are durable keep retries, even after unrelated disk indices
+shift. A later conflict preserves the whole saved set and pool priority.
+`plan-preview-add-batch` reports every placement without device probes, writer
+locking or publication. Live preflight/replay remains separate. See
+[explicit addition batch rules](../../docs/storage-volumes.md#atomic-explicit-mapping-additions).
+
 `plan-remove-batch BUNDLE SLOT [...]` removes 1–64 distinct desired slots across
 disks in one atomic publication. Absent slots are durable `keep` retries;
 remaining mappings, enrolled disks and pool priority are preserved.
