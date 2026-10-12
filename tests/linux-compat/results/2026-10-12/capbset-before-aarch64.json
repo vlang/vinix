@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "3bd2f291e6c35ab38fe50eeb3f4677899dc7e1986cd747cc9ed8c66510357c3d",
+    "results": [
+        {
+            "name": "capbset",
+            "source_sha256": "c149e8ceb7938ace60e5d100500236d0a23aa10bd1e929fd1db2afc0cad30203",
+            "init_sha256": "740f9f33102fd683a8a0dfed8468e20ef104df6a40ee66dc2fc2ccc4f8ae641f",
+            "iso_sha256": "47916180e133453fc5548a11564b29e3fd69129dea6d8ca36933929836415440",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

@@ -1066,7 +1066,7 @@ larger roadmap gates stay open.
 PR_CAP_AMBIENT now rejects nonzero fourth/fifth arguments for every command
 and a nonzero third argument for CLEAR_ALL with EINVAL. The full native
 unsigned-long width is checked before mutation or a raise's permission test,
-following [Linux 6.12's capability implementation](https://github.com/torvalds/linux/blob/v6.12/security/commoncap.c#L1296).
+following [Linux 6.12's capability implementation](https://github.com/torvalds/linux/blob/v6.12/security/commoncap.c#L1267).
 Previously, queries, raises and lowers ignored reserved arguments; a malformed
 CLEAR_ALL could erase the ambient set and return success.
 
@@ -1096,3 +1096,40 @@ and library snapshot rather than the changing shared compiler checkout.
 The new validation allocates and frees nothing. Capability sets remain
 process-wide; these argument checks do not qualify per-thread credentials,
 file capabilities or complete application sandbox isolation.
+
+## Capability bounding-set permission precedence
+
+PR_CAPBSET_DROP now checks effective CAP_SETPCAP before validating the
+capability number, following [Linux 6.12's cap_prctl_drop](https://github.com/torvalds/linux/blob/v6.12/security/commoncap.c#L1160).
+A caller without that capability receives EPERM even for an invalid number.
+Privileged invalid drops and all invalid READ requests retain EINVAL.
+
+The V fixture checks six invalid numbers, including values above 2^32 whose
+low bits could name a valid capability, for privileged root, root with
+CAP_SETPCAP removed only from the effective set, and UID/GID 1000. It checks
+all 41 bounding bits after each pair of failures, and valid-number drops
+without permission must also return EPERM. All 42 errors leave state intact.
+Valid low/high drops succeed repeatedly and leave the current effective,
+permitted and inheritable sets intact. A forked child's additional drop stays
+private, and an exec retains the parent's low/high bounding drops.
+
+The unchanged fixture exposes the original EINVAL/EPERM mismatch on both
+earlier kernels:
+[AArch64 control](../tests/linux-compat/results/2026-10-12/capbset-before-aarch64.json),
+[x86-64 control](../tests/linux-compat/results/2026-10-12/capbset-before-x86_64.json).
+The fixed kernels pass the bounding-set case and the ambient, securebits,
+KEEPCAPS and task-local no_new_privs regressions:
+[AArch64 results](../tests/linux-compat/results/2026-10-12/capbset-after-aarch64.json),
+[x86-64 results](../tests/linux-compat/results/2026-10-12/capbset-after-x86_64.json).
+The same builds pass capability-exec:
+[AArch64](../tests/linux-compat/results/2026-10-12/capbset-cap-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/capbset-cap-x86_64.json).
+All eight host test files pass. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/capbset-audit.v)
+checks the failure control, 54 source fingerprints, isolated sources, frozen
+guest artifacts and the actual permission-before-validation order in each
+generated kernel. The reordered checks allocate and free nothing.
+
+Capability sets remain process-wide. These selected error/transition checks
+do not qualify per-thread credentials, file capabilities or full sandbox
+isolation; the broader roadmap acceptance gates remain open.

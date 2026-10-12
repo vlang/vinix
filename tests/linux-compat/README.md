@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -468,6 +468,15 @@ EINVAL and leave the ambient set unchanged. Valid raises, queries, lowers and
 clears retain their behavior; an ordinary user without the required permitted
 and inheritable capability gets EPERM for a valid raise. This case qualifies
 argument validation, not per-thread capability credential isolation.
+
+The `capbset` case checks PR_CAPBSET_READ/DROP with six invalid full-width
+capability numbers. DROP must check effective CAP_SETPCAP before returning
+EINVAL for a capability number; READ returns EINVAL independently of privilege.
+Privileged root, root with that effective capability removed, and UID/GID 1000
+must receive the exact 42 errors without changes to the bounding set. Valid,
+repeated low/high drops leave current capability sets unchanged; fork inherits
+the bounding set, a child's drop stays private, and exec retains the drops.
+Per-thread capability credentials remain outside this case's qualification.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

@@ -294,11 +294,11 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 			return if process.caps.bounding & (u64(1) << arg2) != 0 { u64(1) } else { u64(0) }, 0
 		}
 		pr_capbset_drop {
-			if arg2 > u64(proc.cap_last_cap) {
-				return errno.err, errno.einval
-			}
 			if !proc.has_capability(process, proc.cap_setpcap) {
 				return errno.err, errno.eperm
+			}
+			if arg2 > u64(proc.cap_last_cap) {
+				return errno.err, errno.einval
 			}
 			process.caps.bounding &= ~(u64(1) << arg2)
 			return 0, 0
