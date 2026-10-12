@@ -104,3 +104,14 @@ Linux KVM applications expect `/dev/kvm` and `KVM_*` ioctls, as specified in the
 `VINIX_HV_*` ioctls are a separate interface, so QEMU `-accel kvm` cannot use
 the native backend. For QEMU running inside arm64 Vinix, follow the
 [nested QEMU instructions](qemu-nested.md), which use `-accel tcg`.
+
+## Manage QEMU guests
+
+The V [VM manager](../tools/development/virtual-machines.md) imports raw images
+into separate qcow2 disks, keeps firmware variables per VM, controls guests over
+QMP, and pairs offline disk snapshots with firmware snapshots. It supports
+explicit QEMU accelerators, multiple virtual CPUs, user-mode networking,
+loopback SSH forwarding, read-only virtio-9p shares and a guest-agent channel.
+Its real QEMU host tests cover lifecycle, locking and snapshot restoration.
+Installed Vinix uses TCG with its existing authorized JIT policy; native
+Intel/AMD/ARM hardware-accelerated VM hosting remains incomplete.
