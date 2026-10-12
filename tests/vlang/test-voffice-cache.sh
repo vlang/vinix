@@ -96,7 +96,7 @@ build() {
 	VINIX_VOFFICE_V_COUNT=$work/v-count \
 	VINIX_VOFFICE_CC_COUNT=$work/cc-count \
 	VINIX_VOFFICE_RESOURCE_DIR=$resource \
-		python3 "$repo/desktop/tools/build_voffice.py" \
+		"$repo/desktop/tools/build_voffice" \
 		--repo "$repo" --office-source "$office" --ui2-source "$ui2" \
 		--output "$work/output" --work "$work/build" --v "$toolchain/v" \
 		--arch arm64 --clang "$work/bin/clang" --strip "$work/bin/strip" \

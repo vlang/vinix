@@ -100,7 +100,7 @@ path_generation() {
     fi
     if [ "$path" = "$X11_STAGING" ] || [ "$path" = "$GPU_SYSROOT" ] ||
        [ "$path" = "$DOOM_STAGING" ] || [ "$path" = "$OPENGOTHIC_STAGING" ] || [ "$path" = "$STEAM_STAGING" ] || [ "$path" = "$DOTA2_STAGING" ]; then
-        python3 "$SCRIPT_DIR/build-support/content-key.py" --metadata "$path"
+        "$SCRIPT_DIR/build-support/content-key" --metadata "$path"
         return 0
     fi
     if value="$(stat -f '%d:%i:%m:%z' "$path" 2>/dev/null)"; then
@@ -468,7 +468,7 @@ else
     DESKTOP_CACHE_ARGS+=(--value gpu-unavailable)
 fi
 DESKTOP_CACHE_HIT=0
-if python3 "$SCRIPT_DIR/build-support/staging-cache.py" check "${DESKTOP_CACHE_ARGS[@]}"; then
+if "$SCRIPT_DIR/build-support/staging-cache" check "${DESKTOP_CACHE_ARGS[@]}"; then
     DESKTOP_CACHE_HIT=1
     cp -a "$DESKTOP_CACHE_DIR/vinix-desktop" "$BUILD_DIR/vinix-desktop"
     if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
@@ -568,7 +568,7 @@ if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
         cp -a "$BUILD_DIR/vinix-desktop-gpu" "$DESKTOP_CACHE_DIR/vinix-desktop-gpu.tmp"
         mv -f "$DESKTOP_CACHE_DIR/vinix-desktop-gpu.tmp" "$DESKTOP_CACHE_DIR/vinix-desktop-gpu"
     fi
-    python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${DESKTOP_CACHE_ARGS[@]}"
+    "$SCRIPT_DIR/build-support/staging-cache" record "${DESKTOP_CACHE_ARGS[@]}"
 fi
 
 if [ "$MAKE_INITRAMFS" -eq 0 ]; then
@@ -1675,7 +1675,7 @@ if [ ! -f "$DESKTOP_DEV_ROOT/desktop/main.v" ] || \
     echo "ERROR: system desktop development tree is incomplete" >&2
     exit 1
 fi
-python3 "$SCRIPT_DIR/build-support/content-key.py" \
+"$SCRIPT_DIR/build-support/content-key" \
     "$DESKTOP_DEV_ROOT/desktop" "$DESKTOP_DEV_ROOT/vmodules" \
     > "$DESKTOP_DEV_ROOT/.source-version"
 rm -rf "$STAGING/root/desktop" "$STAGING/root/vmodules"
@@ -1814,7 +1814,7 @@ CONTENT_KEY_INPUTS=(
 if [ -n "$WIFI_BUNDLE" ]; then
     CONTENT_KEY_INPUTS+=("$WIFI_BUNDLE")
 fi
-python3 "$SCRIPT_DIR/build-support/content-key.py" \
+"$SCRIPT_DIR/build-support/content-key" \
     "${CONTENT_KEY_INPUTS[@]}" > "$CONTENT_KEY_EXPECTED"
 if [ "$WITH_STEAM" -eq 1 ]; then
     printf 'steam-layer=%s\n' "$(path_generation "$STEAM_STAGING")" \

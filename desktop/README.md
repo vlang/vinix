@@ -285,7 +285,7 @@ set, otherwise a sibling `../ui2` checkout when present, and finally
 `third_party/ui2`.
 
 VOffice is not built with the image. `../scripts/build-voffice-aarch64.sh` uses
-`tools/build_voffice.py` and `tools/ui2_vinix_backend.v` to cross-compile
+`tools/build_voffice` and `tools/ui2_vinix_backend.v` to cross-compile
 Writer and Calc as static musl applications from `VINIX_OFFICE_SOURCE`, a
 sibling `../office`, or `third_party/office`. It packages both executables with
 VOffice's translations and ribbon PNGs as `VOffice-vinix-aarch64.tar.gz` plus a `.sha256`,

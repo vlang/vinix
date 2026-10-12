@@ -33,7 +33,7 @@ CACHE_ARGS=(
     --value "$ALPINE_BRANCH" --value "$ALPINE_MIRROR" --value "$ALPINE_ARCH"
     --metadata "$DOWNLOADS"
     --source "$SCRIPT_DIR/scripts/build-chromium-aarch64.sh"
-    --source "$SCRIPT_DIR/build-support/staging-cache.py"
+    --source "$SCRIPT_DIR/build-support/staging-cache"
     --source "$SCRIPT_DIR/build-support/alpine-resolve.v"
     --source "$SCRIPT_DIR/build-support/alpinecore/main.v"
     --source "$SCRIPT_DIR/build-support/alpinecore/parse.v"
@@ -41,7 +41,7 @@ CACHE_ARGS=(
     --source "$SCRIPT_DIR/tests/browsers/chromium-smoke.html"
     --executable usr/lib/chromium/chrome --executable usr/bin/run-chromium
 )
-if python3 "$SCRIPT_DIR/build-support/staging-cache.py" check "${CACHE_ARGS[@]}"; then
+if "$SCRIPT_DIR/build-support/staging-cache" check "${CACHE_ARGS[@]}"; then
     echo "==> Reusing cached Chromium staging"
     exit 0
 fi
@@ -137,4 +137,4 @@ echo "staged packages: $(wc -l < "$BUILD_DIR/packages" | tr -d ' ')"
 echo "staged size: $(du -sh "$STAGING" | cut -f1)"
 echo "manifest: $BUILD_DIR/packages"
 echo "launcher: /usr/bin/run-chromium"
-python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${CACHE_ARGS[@]}"
+"$SCRIPT_DIR/build-support/staging-cache" record "${CACHE_ARGS[@]}"

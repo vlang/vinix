@@ -14,7 +14,7 @@ printf '#!/bin/sh\nexit 0\n' > "$work/staging/usr/bin/app"
 chmod 755 "$work/staging/usr/bin/app"
 
 cache() {
-    python3 "$repo/build-support/staging-cache.py" "$1" \
+    "$repo/build-support/staging-cache" "$1" \
         --state "$work/cache-key" --staging "$work/staging" \
         --value alpine-v3.22 --source "$work/linked-source" \
         --metadata "$work/downloads" --executable usr/bin/app

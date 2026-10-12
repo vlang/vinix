@@ -1,0 +1,68 @@
+{
+    "caller_syntax_checks": 8,
+    "cold_native_builds": 39,
+    "content_key_format_changed": false,
+    "fresh_guest_boot": false,
+    "fresh_kernel_build": false,
+    "obsolete_object_bridge_retired": true,
+    "original_python_bytes": 17638,
+    "original_python_lines": 473,
+    "originals": [
+        {
+            "blob": "77508044de1a3aa7d19a2d657f8f028432a71e48",
+            "bytes": 1440,
+            "lines": 48,
+            "path": "build-support/content-key.py",
+            "sha256": "c9c36b068511a810141d55916bd2188295267a8bc19189f4709ffd968c8001e2"
+        },
+        {
+            "blob": "3b87fe7b2a638c342ce6c3e45f84dc64fde71ca6",
+            "bytes": 2980,
+            "lines": 72,
+            "path": "build-support/staging-cache.py",
+            "sha256": "9f07a90de2a46b5619a6043a6763bd204ea1f78a7a0dbf52fba0d7e33cdd4b9a"
+        },
+        {
+            "blob": "32c66cc6049ab6b026069ca8fb380e52fa4a926a",
+            "bytes": 4588,
+            "lines": 106,
+            "path": "build-support/desktop-build-key.py",
+            "sha256": "016b2b70e32d3926ff047e8443d99e3f93a6977afec103ddd06ba42fcef151d8"
+        },
+        {
+            "blob": "bebae5799b0d3cc15c8c6d6254262423509dddb5",
+            "bytes": 2147,
+            "lines": 57,
+            "path": "build-support/_cache_native.py",
+            "sha256": "7b6187797ab4d657abf2a1ed05c9c15dc7de19d572fe2722df04ba38ed3aa68e"
+        },
+        {
+            "blob": "4a477b5a4d539a0e315d46cb64b30434596cec7f",
+            "bytes": 848,
+            "lines": 26,
+            "path": "desktop/tools/build_cache.py",
+            "sha256": "3c224fabe459d796382ec1d1e23185e962701174ecb0206f28fd18d5e328e7d9"
+        },
+        {
+            "blob": "da10d91ac927c1e259734f1fc8aeba44096901bd",
+            "bytes": 5635,
+            "lines": 164,
+            "path": "desktop/tools/build_voffice.py",
+            "sha256": "2dad5474440233378dbff3f0b133c181003ff89bd73b827f821ff1258462b5a7"
+        }
+    ],
+    "profiles": [
+        "ARM",
+        "Rosetta x86",
+        "ARM ASan/UBSan"
+    ],
+    "public_existing_workflows": 2,
+    "public_native_fronts": 4,
+    "python_executed": false,
+    "python_files_retired": 6,
+    "qualification": "native-cache-tools.md",
+    "real_office_cross_build": false,
+    "schema": 1,
+    "source_commit": "9101983a5da68f816bc15b35075e14c139606e69",
+    "staging_desktop_office_cache_version": "v3-native"
+}

@@ -61,9 +61,24 @@ fn desktop_temporary() !string {
 
 fn fixture_key(root string, v string, env map[string]string) !string {
 	input := desktop_prepare(root, v, env, os.executable())!
-	// Host interpreter/package metadata are fixed fixture inputs here. Frozen
-	// original tests separately exercise the Python platform/subprocess bindings.
-	return desktop_complete(input, env, 'fixture platform', 'fixture python', 'fixture pillow', '', 'missing')
+	return desktop_native_complete(input, env, 'fixture platform', '', 'missing')
+}
+
+fn test_cache_native_producer_dependencies_invalidate() {
+	root := desktop_temporary()!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	v, env := desktop_fixture(root)!
+	for name in ['build-support/cachecli/core.v', 'build-support/cachekey/shell_words.v',
+		'build-support/content-key', 'build-support/content-key.v',
+		'build-support/staging-cache', 'build-support/staging-cache.v',
+		'build-support/desktop-build-key', 'build-support/desktop-build-key.v',
+		'desktop/tools/officenative/core.v', 'desktop/tools/build_voffice.v'] {
+		path := root + '/' + name
+		fixture_write(path, 'original native producer\n')!
+		first := fixture_key(root, v, env)!
+		fixture_write(path, 'changed native producer\n')!
+		assert first != fixture_key(root, v, env)!, name
+	}
 }
 
 fn test_source_content_change_invalidates() {

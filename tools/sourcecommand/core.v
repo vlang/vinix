@@ -56,6 +56,12 @@ pub fn capture(argv []string, env map[string]string, timeout f64, limit int, can
 	return capture_observed(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, 0)
 }
 
+// Use one SDK pipe for both child streams when the caller's original command
+// used stderr=STDOUT. Preserve their write ordering and one output bound.
+pub fn capture_combined(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
+	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, true)
+}
+
 pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
 	observe fn (string, voidptr) !, context voidptr, shutdown_grace f64) !Output {
 	return capture_owned(argv, env, timeout, limit, cancel, observe, unsafe { nil }, context, shutdown_grace)
@@ -63,6 +69,11 @@ pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit
 
 pub fn capture_owned(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
 	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64) !Output {
+	return capture_policy(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, false)
+}
+
+fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
+	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool) !Output {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid command') }
 	mut pipes := [i32(-1), -1, -1, -1]!
 	defer { for fd in pipes { if fd >= 0 { C.close(fd) } } }
@@ -78,7 +89,7 @@ pub fn capture_owned(argv []string, env map[string]string, timeout f64, limit in
 	mut actions := C.posix_spawn_file_actions_t{}
 	if C.posix_spawn_file_actions_init(&actions) != 0 { return error('cannot initialize spawn actions') }
 	defer { C.posix_spawn_file_actions_destroy(&actions) }
-	for status in [C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1), C.posix_spawn_file_actions_adddup2(&actions, pipes[3], 2),
+	for status in [C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1), C.posix_spawn_file_actions_adddup2(&actions, if combined { pipes[1] } else { pipes[3] }, 2),
 		C.posix_spawn_file_actions_addclose(&actions, pipes[0]), C.posix_spawn_file_actions_addclose(&actions, pipes[1]),
 		C.posix_spawn_file_actions_addclose(&actions, pipes[2]), C.posix_spawn_file_actions_addclose(&actions, pipes[3])] {
 		if status != 0 { return error_with_code('cannot configure spawn actions', int(status)) }

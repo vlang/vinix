@@ -109,18 +109,18 @@ pub fn build_tree_key(namespace string, fields []string, inputs []BuildInput) !s
 }
 
 fn native_inputs(mut digest sha256.Digest, root string, mut active map[string]bool) ! {
-	for item in ['build-support/cachekey', 'build-support/cache_query.v',
-		'build-support/_cache_native.py'] {
+	for item in ['build-support/cachekey', 'build-support/cachecli',
+		'build-support/content-key', 'build-support/content-key.v', 'build-support/staging-cache', 'build-support/staging-cache.v', 'build-support/desktop-build-key', 'build-support/desktop-build-key.v', 'build-support/run-v-tool.sh', 'build-support/find-v.sh', 'tools/sourcecommand'] {
 		build_hash_path(mut digest, join_path(root, item), 'native-helper/' + item, false, '', mut active)!
 	}
 }
 
 pub fn staging_key(root string, values []string, sources []string, metadata []string, vlib []string) !string {
 	mut digest := sha256.new()
-	add_field(mut digest, 'vinix-staging-cache-v2')
+	add_field(mut digest, 'vinix-staging-cache-v3-native')
 	mut active := map[string]bool{}
-	build_hash_path(mut digest, join_path(root, 'build-support/staging-cache.py'), 'staging-helper', false, '', mut active)!
-	build_hash_path(mut digest, join_path(root, 'desktop/tools/build_cache.py'), 'hash-helper', false, '', mut active)!
+	build_hash_path(mut digest, join_path(root, 'build-support/staging-cache.v'), 'staging-helper', false, '', mut active)!
+	build_hash_path(mut digest, join_path(root, 'build-support/cachecli'), 'hash-helper', false, '', mut active)!
 	native_inputs(mut digest, root, mut active)!
 	for value in values { add_field(mut digest, value) }
 	for index, path in sources {
@@ -228,12 +228,12 @@ pub fn office_modules(office string, app string) ![]string {
 
 pub fn office_shared(input OfficeInputs) !string {
 	mut digest := sha256.new()
-	add_field(mut digest, 'vinix-voffice-cache-v2')
+	add_field(mut digest, 'vinix-voffice-cache-v3-native')
 	compiler := resolved_tool(input.v)!
 	for value in ['arch', input.arch, 'target', input.target] { add_field(mut digest, value) }
 	mut active := map[string]bool{}
 	for item in [BuildInput{input.builder, 'builder', false, ''},
-		BuildInput{join_path(parent_path(input.builder), 'build_cache.py'), 'cache-helper', false, ''},
+		BuildInput{join_path(input.repo, 'build-support/cachecli'), 'cache-helper', false, ''},
 		BuildInput{join_path(input.repo, 'desktop/tools/stage_ui2'), 'stager', false, ''},
 		BuildInput{join_path(input.repo, 'desktop/tools/ui2_vinix_backend.v'), 'backend', false, ''},
 		BuildInput{join_path(input.ui2, 'v.mod'), 'ui2-manifest', false, ''},
@@ -244,14 +244,12 @@ pub fn office_shared(input OfficeInputs) !string {
 	}
 	native_inputs(mut digest, input.repo, mut active)!
 	// The builder now executes these maintained native policies and bindings.
-	for path in ['desktop/tools/office_query.v', 'desktop/tools/officebuild', 'tools/packagestore',
-		'tools/_package_store_native.py', 'build-support/native_host.py',
-		'build-support/android/_boot_native.py', 'build-support/android/androidhost',
-		'build-support/android/boothost', 'build-support/run-v-tool.sh', 'build-support/find-v.sh',
-		'desktop/tools/stage_query.v', 'desktop/tools/stage_ui2.v', 'desktop/tools/stagehost',
+	for path in ['desktop/tools/build_voffice.v', 'desktop/tools/officenative',
+		'build-support/run-v-tool.sh', 'build-support/find-v.sh',
+		'desktop/tools/stage_ui2.v', 'desktop/tools/stagehost',
 		'desktop/tools/hosttest', 'desktop/tools/fixturehost', 'desktop/tools/policyhost',
 		'tests/linuxkpi/hosttest', 'tests/qemu-core/fixturehost', 'tests/host-policy/policyhost',
-		'desktop/tools/androidhost', 'desktop/tools/boothost', 'desktop/tools/packagestore'] {
+		'desktop/tools/sourcecommand', 'desktop/tools/cachekey', 'desktop/tools/cachecli'] {
 		build_hash_path(mut digest, join_path(input.repo, path), 'office-native/' + path, false, '', mut active)!
 	}
 	build_hash_path(mut digest, join_path(input.vroot, 'vlib'), 'vlib', true, 'vlib', mut active)!

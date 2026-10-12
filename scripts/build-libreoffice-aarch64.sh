@@ -38,7 +38,7 @@ CACHE_ARGS=(
     --value "$ALPINE_BRANCH" --value "$ALPINE_MIRROR" --value "$ALPINE_ARCH"
     --metadata "$DOWNLOADS"
     --source "$SCRIPT_DIR/scripts/build-libreoffice-aarch64.sh"
-    --source "$SCRIPT_DIR/build-support/staging-cache.py"
+    --source "$SCRIPT_DIR/build-support/staging-cache"
     --source "$SCRIPT_DIR/build-support/alpine-resolve.v"
     --source "$SCRIPT_DIR/build-support/alpinecore/main.v"
     --source "$SCRIPT_DIR/build-support/alpinecore/parse.v"
@@ -48,7 +48,7 @@ CACHE_ARGS=(
     --required usr/lib/libreoffice/program/libvclplug_gtk3lo.so
     --required usr/lib/libreoffice/program/libswlo.so
 )
-if python3 "$SCRIPT_DIR/build-support/staging-cache.py" check "${CACHE_ARGS[@]}"; then
+if "$SCRIPT_DIR/build-support/staging-cache" check "${CACHE_ARGS[@]}"; then
     echo "==> Reusing cached LibreOffice staging"
     exit 0
 fi
@@ -153,4 +153,4 @@ echo "staged packages: $(wc -l < "$BUILD_DIR/packages" | tr -d ' ')"
 echo "staged size: $(du -sh "$STAGING" | cut -f1)"
 echo "manifest: $BUILD_DIR/packages"
 echo "launcher: /usr/bin/run-libreoffice"
-python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${CACHE_ARGS[@]}"
+"$SCRIPT_DIR/build-support/staging-cache" record "${CACHE_ARGS[@]}"

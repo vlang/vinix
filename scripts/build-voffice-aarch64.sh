@@ -115,7 +115,7 @@ fi
 
 echo "==> Building VOffice Calc and Writer for aarch64 Vinix..."
 mkdir -p "$BUILD_DIR"
-python3 "$SCRIPT_DIR/desktop/tools/build_voffice.py" \
+"$SCRIPT_DIR/desktop/tools/build_voffice" \
     --repo "$SCRIPT_DIR" --office-source "$OFFICE_SOURCE" --ui2-source "$UI2_SOURCE" \
     --output "$BUILD_DIR/bin" --work "$BUILD_DIR/work" \
     --v "$V" --arch arm64 --clang "$LLVM_BIN/clang" --strip "$LLVM_BIN/llvm-strip" \

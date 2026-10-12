@@ -39,7 +39,7 @@ CACHE_ARGS=(
     --value "$ALPINE_ARCH" --value "$FIREFOX_PACKAGE"
     --metadata "$DOWNLOADS"
     --source "$SCRIPT_DIR/scripts/build-firefox-aarch64.sh"
-    --source "$SCRIPT_DIR/build-support/staging-cache.py"
+    --source "$SCRIPT_DIR/build-support/staging-cache"
     --source "$SCRIPT_DIR/build-support/alpine-resolve.v"
     --source "$SCRIPT_DIR/build-support/alpinecore/main.v"
     --source "$SCRIPT_DIR/build-support/alpinecore/parse.v"
@@ -48,7 +48,7 @@ CACHE_ARGS=(
     --executable usr/bin/run-firefox
     --executable-any usr/bin/firefox-esr --executable-any usr/bin/firefox
 )
-if python3 "$SCRIPT_DIR/build-support/staging-cache.py" check "${CACHE_ARGS[@]}"; then
+if "$SCRIPT_DIR/build-support/staging-cache" check "${CACHE_ARGS[@]}"; then
     echo "==> Reusing cached Firefox staging"
     exit 0
 fi
@@ -158,4 +158,4 @@ echo "staged packages: $(wc -l < "$RESOLVED" | tr -d ' ')"
 echo "staged size: $(du -sh "$STAGING" | cut -f1)"
 echo "manifest: $RESOLVED"
 echo "launcher: /usr/bin/run-firefox"
-python3 "$SCRIPT_DIR/build-support/staging-cache.py" record "${CACHE_ARGS[@]}"
+"$SCRIPT_DIR/build-support/staging-cache" record "${CACHE_ARGS[@]}"

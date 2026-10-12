@@ -2,7 +2,6 @@
 module cachekey
 
 import crypto.sha256
-import os
 
 pub struct DesktopTool {
 pub:
@@ -54,8 +53,8 @@ pub fn desktop_prepare(root_path string, compiler_path string, env map[string]st
 	}
 	// Native helper changes must invalidate an existing image just as edits to
 	// the former Python producers did. This is an explicit cache format upgrade.
-	for item in ['build-support/cachekey', 'build-support/cache_query.v',
-		'build-support/_cache_native.py', 'tools/packages'] {
+	for item in ['build-support/cachekey', 'build-support/cachecli',
+		'build-support/content-key', 'build-support/content-key.v', 'build-support/staging-cache', 'build-support/staging-cache.v', 'build-support/desktop-build-key', 'build-support/desktop-build-key.v', 'tools/packages'] {
 		sources << join_path(root, item)
 	}
 	wifi := env['VINIX_WIFI_BUNDLE'] or { '' }
@@ -85,11 +84,21 @@ fn add_text(mut digest sha256.Digest, name string, value string) {
 }
 
 pub fn desktop_complete(input DesktopInputs, env map[string]string, platform string, python_version string, pillow_version string, musl_path string, musl_version string) !string {
+	return desktop_finish(input, env, platform, python_version, pillow_version, musl_path, musl_version, false)
+}
+
+pub fn desktop_native_complete(input DesktopInputs, env map[string]string, platform string, musl_path string, musl_version string) !string {
+	return desktop_finish(input, env, platform, '', '', musl_path, musl_version, true)
+}
+
+fn desktop_finish(input DesktopInputs, env map[string]string, platform string, python_version string, pillow_version string, musl_path string, musl_version string, native bool) !string {
 	mut digest := sha256.new()
-	add_field(mut digest, 'vinix-desktop-run-build-key-v2')
+	add_field(mut digest, if native { 'vinix-desktop-run-build-key-v3-native' } else { 'vinix-desktop-run-build-key-v2' })
 	add_text(mut digest, 'platform', platform)
-	add_text(mut digest, 'python-version', python_version)
-	add_text(mut digest, 'pillow-version', pillow_version)
+	if !native {
+		add_text(mut digest, 'python-version', python_version)
+		add_text(mut digest, 'pillow-version', pillow_version)
+	}
 	for item in [DesktopEnv{'optimized-musl', 'VINIX_OPTIMIZED_MUSL', '1'},
 		DesktopEnv{'musl-retain', 'VINIX_MUSL_RETAIN', '1'},
 		DesktopEnv{'musl-compiler', 'VINIX_MUSL_CC_AARCH64', 'aarch64-linux-musl-gcc'}] {
@@ -102,6 +111,7 @@ pub fn desktop_complete(input DesktopInputs, env map[string]string, platform str
 	add_text(mut digest, 'inplace-layer-generation', tree_key(input.in_place, true, 'vinix-desktop-build-metadata-v1')!)
 	for path in input.layers { add_text(mut digest, 'layer:' + path, root_generation(path)!) }
 	mut tools := input.tools.clone()
+	if native { tools = tools.filter(it.name != 'python') }
 	if musl_path != '' { tools << DesktopTool{'musl-cc', musl_path} }
 	for tool in tools {
 		add_text(mut digest, 'tool:' + tool.name + ':' + if tool.path != '' {

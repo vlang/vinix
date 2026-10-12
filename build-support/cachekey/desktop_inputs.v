@@ -3,12 +3,12 @@ module cachekey
 
 const desktop_source_paths = [
 	'scripts/build-desktop-aarch64.sh',
-	'build-support/content-key.py',
+	'build-support/content-key.v',
 	'build-support/musl/stage.py',
 	'build-support/musl/malloc-retain.patch',
 	'build-support/musl/alpine',
 	'build-support/musl/alpine-1.2.6',
-	'build-support/desktop-build-key.py',
+	'build-support/desktop-build-key.v',
 	'desktop',
 	'ui2:v.mod',
 	'ui2:ui',

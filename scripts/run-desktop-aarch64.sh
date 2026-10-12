@@ -190,7 +190,7 @@ desktop_image_id() {
 }
 
 desktop_build_key() {
-    python3 "$SCRIPT_DIR/build-support/desktop-build-key.py" \
+    "$SCRIPT_DIR/build-support/desktop-build-key" \
         --root "$SCRIPT_DIR" --v "$V"
 }
 
@@ -257,7 +257,7 @@ if [ "$BUILD_DESKTOP" -eq 1 ]; then
     "$SCRIPT_DIR/build-support/prepare-desktop-aarch64.sh"
     DESKTOP_INPUT_KEY=""
     if [ "${VINIX_REFRESH_DESKTOP_STAGING:-0}" != 1 ] &&
-       [ -f "$SCRIPT_DIR/build-support/desktop-build-key.py" ]; then
+       [ -f "$SCRIPT_DIR/build-support/desktop-build-key" ]; then
         DESKTOP_INPUT_KEY="$(desktop_build_key 2>/dev/null || true)"
     fi
 
@@ -282,7 +282,7 @@ if [ "$BUILD_DESKTOP" -eq 1 ]; then
         "$SCRIPT_DIR/scripts/build-desktop-aarch64.sh"
         # Recompute after a successful build because the builder may refresh an
         # old base userland as part of satisfying its prerequisites.
-        if [ -f "$SCRIPT_DIR/build-support/desktop-build-key.py" ]; then
+        if [ -f "$SCRIPT_DIR/build-support/desktop-build-key" ]; then
             DESKTOP_INPUT_KEY="$(desktop_build_key 2>/dev/null || true)"
             write_desktop_build_key "$DESKTOP_INPUT_KEY"
         fi
