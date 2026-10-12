@@ -27,7 +27,7 @@ fn C.posix_spawn_file_actions_addinherit_np(voidptr, i32) i32
 @[typedef]
 struct C.posix_spawn_file_actions_t {}
 
-fn C.posix_spawn_file_actions_addchdir_np(&C.posix_spawn_file_actions_t, &char) i32
+fn C.posix_spawn_file_actions_addchdir_np(voidptr, &char) i32
 fn C.posix_spawnattr_init(voidptr) i32
 fn C.posix_spawnattr_destroy(voidptr) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
@@ -38,7 +38,7 @@ fn C.vinix_dota_sigaddset(voidptr, i32) i32
 fn C.posix_spawnattr_setbinpref_np(voidptr, usize, &i32, &usize) i32
 fn C.WIFEXITED(i32) i32
 fn C.WEXITSTATUS(i32) i32
-fn C.WIFSIGNALED(i32) bool
+fn C.WIFSIGNALED(i32) i32
 fn C.WTERMSIG(i32) i32
 
 pub struct ChildFailure {
@@ -212,7 +212,7 @@ pub fn command_preferred(argv []string, directory string, environment map[string
 		if C.close(i32(retiring)) != 0 { return io_error('') }
 	}
 	if C.WIFEXITED(status) != 0 { return int(C.WEXITSTATUS(status)) }
-	if C.WIFSIGNALED(status) { return -int(C.WTERMSIG(status)) }
+ if C.WIFSIGNALED(status) != 0 { return -int(C.WTERMSIG(status)) }
 	return error('Unexpected build command status')
 }
 

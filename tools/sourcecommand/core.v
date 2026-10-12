@@ -115,6 +115,16 @@ pub fn run_preferred(argv []string, env map[string]string, cancel fn () bool, ho
 	return capture_policy_arch(argv, env, -1, 0, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, true, '', '', false, '', host_arch, false)
 }
 
+// Native builders choose a working directory through SDK spawn actions while
+// retaining the same group owner, cancellation and sole reap as other calls.
+pub fn run_in(argv []string, env map[string]string, directory string, cancel fn () bool, host_arch string) !Output {
+	return capture_policy_arch(argv, env, -1, 0, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, true, '', '', false, directory, host_arch, false)
+}
+
+pub fn capture_in(argv []string, env map[string]string, directory string, merge bool, cancel fn () bool, host_arch string) !Output {
+ return capture_policy_arch(argv, env, -1, 64 * 1024 * 1024, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, merge, false, '', '', false, directory, host_arch, false)
+}
+
 // A synchronous owner may inspect a live child through WNOWAIT while the
 // child inherits stdout/stderr. Its callback finishes before the sole reap;
 // verbose emulators cannot block behind undrained capture pipes.

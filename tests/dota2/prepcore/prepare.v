@@ -24,7 +24,7 @@ fn prepare(work string, repo string) !json2.Any {
 	if !test('exists', root)! {
 		base := field('base_root')!
 		if !test('is_file', join(base, '.prepared')!)! {
-			return failed("Prepare tests/dota2/vulkan-run.py's root first: " + field('base_root')!)
+			return failed("Prepare tests/dota2/vulkan-run's root first: " + field('base_root')!)
 		}
 		clone(field('base_root')!, root)!
 	}
@@ -61,8 +61,7 @@ fn prepare(work string, repo string) !json2.Any {
 	verify_sdk_closure(root)!
 	runtime := join(root, 'usr/libexec/vinix-dota2/root')!
 	generated_probe := join(work, 'mmap32-probe-v.c')!
-	checked([decode(primitive('executable', [])!.str())!,
-		join(repo, 'build-support/dota2/compile-v-compat.py')!, 'mmap-probe', generated_probe,
+	checked([join(repo, 'build-support/dota2/compile-v-compat')!, 'mmap-probe', generated_probe,
 		'--bare'])!
 	checked(['clang', '--target=x86_64-linux-gnu', '-fPIE', '-pie', '-ffreestanding',
 		'-fno-stack-protector', '-nostdlib', '-fuse-ld=lld', '-Wall', '-Wextra', '-Werror',
@@ -131,7 +130,7 @@ fn prepare(work string, repo string) !json2.Any {
 	mut host_sources := [field('host_source')!]
 	if field('host_source')! == join(repo, 'build-support/xorg-server/winehost/core.v')! {
 		host_core := join(work, 'wine-host-core.c')!
-		checked(['python3', join(repo, 'build-support/xorg-server/compile-v-host.py')!, 'winehost',
+		checked([join(repo, 'build-support/xorg-server/compile-v-host')!, 'winehost',
 			host_core, '--arch', 'arm64'])!
 		host_sources = [host_core, '-I' + repo + '/build-support/xorg-server']
 	}

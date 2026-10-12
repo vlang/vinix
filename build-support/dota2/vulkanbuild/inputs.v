@@ -18,8 +18,9 @@ pub fn compatibility_inputs(repo string, module_name string, header string, extr
 	})!.as_array() {
 		files << path(value)!
 	}
-	files << [repo + '/build-support/dota2/compile-v-compat.py',
-		repo + '/build-support/compile-v-module.py', repo + '/build-support/find-v.sh']
+ files << [repo + '/build-support/dota2/compile-v-compat',
+  repo + '/build-support/dota2/compat.v',
+  repo + '/build-support/compile-v-module', repo + '/build-support/find-v.sh']
 	mut result := map[string]json2.Any{}
 	for filename in files {
 		relative := path(method(paths(filename), 'relative_to', [paths(repo)])!)!
@@ -33,10 +34,10 @@ pub fn compatibility_inputs(repo string, module_name string, header string, extr
 	return json2.Any(result)
 }
 
-pub fn build_compat(repo string, python string, destination string, artifacts string, early bool) ! {
+pub fn build_compat(repo string, _python string, destination string, artifacts string, early bool) ! {
 	qemubuild.mkdir(artifacts, true, true)!
 	generated := artifacts + '/' + if early { 'early-client-v.c' } else { 'mmap32-v.c' }
-	command('run', [python, repo + '/build-support/dota2/compile-v-compat.py',
+ command('run', [repo + '/build-support/dota2/compile-v-compat',
 		if early { 'early' } else { 'mmap32' }, generated, '--bare'], {
 		'check': json2.Any(true)
 	})!

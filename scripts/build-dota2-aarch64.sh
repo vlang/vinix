@@ -23,11 +23,11 @@ case "${1:-}" in
 esac
 [ "$#" -le 1 ] || { echo 'unexpected arguments' >&2; exit 2; }
 
-python3 "$repo/build-support/dota2/vulkan-stage.py" \
+"$repo/build-support/dota2/vulkan-stage" \
     --steam-build "$steam_build" --build "$build" \
     --mirror "${DEBIAN_MIRROR:-https://deb.debian.org/debian}" \
     --release "${VINIX_STEAM_DEBIAN_RELEASE:-bookworm}"
-python3 "$repo/build-support/dota2/qemu-stage.py" \
+"$repo/build-support/dota2/qemu-stage" \
     --work "$qemu_build" --staging "$build/staging"
 mkdir -p "$build/staging/usr/bin"
 install -m755 "$repo/build-support/dota2/run-dota2" "$build/staging/usr/bin/run-dota2"

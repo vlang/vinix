@@ -1,21 +1,8 @@
 #ifndef VINIX_DOTA_SPAWN_ABI_H
 #define VINIX_DOTA_SPAWN_ABI_H
 
-/* SDK storage and constants only. Imported V os declares these six functions
- * through ABI-compatible opaque pointers; rename the SDK declarations only. */
-#define posix_spawn vinix_dota_sdk_spawn
-#define posix_spawnp vinix_dota_sdk_spawnp
-#define posix_spawn_file_actions_init vinix_dota_sdk_actions_init
-#define posix_spawn_file_actions_destroy vinix_dota_sdk_actions_destroy
-#define posix_spawn_file_actions_adddup2 vinix_dota_sdk_actions_dup2
-#define posix_spawn_file_actions_addclose vinix_dota_sdk_actions_close
+/* SDK storage, constants and system function prototypes. */
 #include <spawn.h>
-#undef posix_spawn
-#undef posix_spawnp
-#undef posix_spawn_file_actions_init
-#undef posix_spawn_file_actions_destroy
-#undef posix_spawn_file_actions_adddup2
-#undef posix_spawn_file_actions_addclose
 #include <signal.h>
 #ifdef __APPLE__
 #include <mach/machine.h>

@@ -16,7 +16,7 @@ glibc/Mesa build or hardware GPU acceleration.
 
 ## Build and run
 
-Use an Apple Silicon host with QEMU, Python 3, curl, CMake, Ninja, cpio and
+Use an Apple Silicon host with QEMU, V, curl, CMake, Ninja and
 the `aarch64-linux-musl-gcc` / `aarch64-linux-musl-g++` cross compilers. Build
 the existing userland and X11 layers first if they are absent:
 
@@ -24,7 +24,7 @@ the existing userland and X11 layers first if they are absent:
 ./scripts/build-userland-aarch64.sh
 ./scripts/build-x11-aarch64.sh
 ./scripts/build-dhewm3-aarch64.sh
-python3 tests/dhewm3/prepare-debian.py
+tests/dhewm3/prepare-debian
 ```
 
 The builder pins dhewm3 commit
@@ -42,7 +42,7 @@ that worktree:
 
 ```sh
 make -C ../vinix-dhewm3/kernel ARCH=aarch64 LIMINE_MP=1 CC=clang V=/path/to/v
-python3 tests/dhewm3/run.py --os vinix --record --check-clock \
+tests/dhewm3/run --os vinix --record --check-clock \
   --kernel-dir ../vinix-dhewm3/kernel \
   --work build-aarch64-dhewm3/gameplay
 ```
@@ -53,14 +53,14 @@ the recording's rendered frame count can vary with host speed. Record once,
 and use that saved `vinix-demo.demo` for both guests.
 
 ```sh
-python3 tests/dhewm3/run.py --os both --rounds 7 --check-clock \
+tests/dhewm3/run --os both --rounds 7 --check-clock \
   --kernel-dir ../vinix-dhewm3/kernel \
   --work build-aarch64-dhewm3/gameplay \
   --debian-kernel build-aarch64-dhewm3/debian/root/boot/vmlinuz-6.12.107+deb13-cloud-arm64 \
   --debian-root build-aarch64-dhewm3/debian/userland
 ```
 
-Use the kernel path printed by `prepare-debian.py`; its package version and
+Use the kernel path printed by `prepare-debian`; its package version and
 SHA256 are written to `debian/kernel.json`. The Debian package index and
 downloads are cached. Each guest performs a discarded warmup and the requested
 number of measured runs. `results.json` contains every run and median FPS;

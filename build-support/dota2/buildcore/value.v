@@ -165,6 +165,9 @@ fn equal(left Value, right Value) bool {
 	}
 }
 
+// Native adapters share the manifest's numeric and container equality rules.
+pub fn values_equal(left Value, right Value) bool { return equal(left,right) }
+
 fn element_equal(left Value, right Value) bool {
 	// Python container comparison checks identity before scalar equality.
 	// Standard json.loads reuses its NaN object, though NaN == NaN is false.

@@ -1,5 +1,9 @@
 # Debian package preparation policy
 
+The maintained command is now [`build-support/debian-root`](../debian-root),
+implemented by [`runtimehost`](../../tests/native-runtime-tools/runtimehost/debian.v).
+The following describes the historical interpreter-bound policy qualification.
+
 `debian-root.py` retains its public dataclass, function signatures and CLI. This
 module owns index and relation parsing, dependency resolution, hash and download
 policy, lazy ar member traversal, extraction policy and the six-worker staging

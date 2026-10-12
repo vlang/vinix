@@ -20,13 +20,18 @@ otherwise reuse a native page and zero an occupied guest fragment despite
 guest pages and still allows a free sibling fragment. `PROT_NONE` reservations
 count as occupied too.
 
-Build with `python3 build-support/dota2/qemu-stage.py --work build/dota2-qemu
+Build with `build-support/dota2/qemu-stage --work build/dota2-qemu
 --staging build/dota2-runtime/staging`. The output is a static AArch64 ELF with
 no interpreter or native library dependencies; `usr/libexec/vinix-dota2/qemu-build.json`
 records its hash and build inputs. The helper preserves the staged private glibc
 runtime. The translated `tests/dota2/mmap32-probe.c` contract checks collisions,
 sentinel preservation, large reservations, a free sibling page and an interior
 hole on actual Vinix.
+
+The first-party frontend and process supervision are V. Upstream QEMU still needs
+its configure interpreter and Meson dependencies; provide an existing upstream
+toolchain and select its interpreter with `VINIX_DOTA2_QEMU_PYTHON` when needed.
+The native frontend does not create a Python environment or install packages.
 
 `wake-op.patch` validates and unprotects a writable guest secondary word before
 the native `FUTEX_WAKE_OP` atomic write. Translated code can make its containing

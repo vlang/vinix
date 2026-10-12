@@ -8,8 +8,8 @@ pub fn exported_constant(repo string, name string) !json2.Any {
 		'GLIBC_PIN':           'build-support/dota2/glibc-package.json'
 		'MMAP32_SOURCE':       'build-support/dota2/mmapcore/core.v'
 		'EARLY_CLIENT_SOURCE': 'build-support/dota2/earlycore/core.v'
-		'MESA_BUILDER':        'build-support/dota2/mesa-build.py'
-		'VENUS_BUILDER':       'build-support/dota2/venus-build.py'
+  'MESA_BUILDER':        'build-support/dota2/mesa-build'
+  'VENUS_BUILDER':       'build-support/dota2/venus-build'
 	}
 	if name in path_values { return json2.Any(repo + '/' + path_values[name]) }
 	strings := {

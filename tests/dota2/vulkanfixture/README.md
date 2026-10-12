@@ -1,5 +1,11 @@
 # Native private Vulkan staging fixtures
 
+The maintained [`vulkan-stage-test`](../vulkan-stage-test) is now a direct V
+command. Its [native fixtures](../../native-runtime-tools/runtimefixtures/vulkan.v)
+retain all 18 original named cases against the native production adapter and
+real compressed `.deb` archives. The remaining text records the historical
+interpreter-bound qualification.
+
 `vulkan-stage-test.py` retains the independent fixture's 18 unittest IDs and
 public helper signatures. V owns fixture setup, Debian/tar member construction,
 all fake compiler and driver effects, cache mutations and the original

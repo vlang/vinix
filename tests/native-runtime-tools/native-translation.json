@@ -1,0 +1,130 @@
+{
+    "bytes": 68010,
+    "files": 16,
+    "lines": 1694,
+    "originals": [
+        {
+            "bytes": 4231,
+            "lines": 119,
+            "path": "build-support/debian-root.py",
+            "sha256": "951eb1c88cfd177aced91731a64e5126e24b903db6ec1f0b73b8ee4403a50896"
+        },
+        {
+            "bytes": 1738,
+            "lines": 55,
+            "path": "build-support/dhewm3/build.py",
+            "sha256": "efeae5def6c66853fc442d217273bd5e9ef4bec8f151b4fa93078967e1eabc39"
+        },
+        {
+            "bytes": 1073,
+            "lines": 31,
+            "path": "tests/dhewm3/prepare-debian.py",
+            "sha256": "810fa2436ed412b0e55866ed2fe05fa9fd57af4c97312ee935670d935a5d5340"
+        },
+        {
+            "bytes": 3664,
+            "lines": 108,
+            "path": "tests/dhewm3/run.py",
+            "sha256": "57f5c3c933af762f01be534ce403bd71aa206698ca16a172726045d4c42f4fb3"
+        },
+        {
+            "bytes": 3724,
+            "lines": 114,
+            "path": "tests/dhewm3/_guest_native.py",
+            "sha256": "647484203ed1d6c2bdf35d11014cbacea85a5ca939ffaf97da7decac557bcab2"
+        },
+        {
+            "bytes": 12992,
+            "lines": 285,
+            "path": "build-support/dota2/_vulkan_native.py",
+            "sha256": "f3f3b7e11e5052a9d3ab5de909b69167ac7c4dc3d40085663d9af927634337fd"
+        },
+        {
+            "bytes": 393,
+            "lines": 9,
+            "path": "build-support/dota2/compile-v-compat.py",
+            "sha256": "66b9eef9f8c16134b4bcc432e97fe910804b1ac5a714005f58f59c040fa260e7"
+        },
+        {
+            "bytes": 6294,
+            "lines": 164,
+            "path": "build-support/dota2/mesa-build.py",
+            "sha256": "4c4f9524f176805427426925fbee77c2263bae2c96c32b01653e3caace1bb71f"
+        },
+        {
+            "bytes": 3871,
+            "lines": 80,
+            "path": "build-support/dota2/qemu-stage.py",
+            "sha256": "4ee61fb02af0ec047a507c3370fdee7a9f5344152ebf55a805752e2f91cef1f2"
+        },
+        {
+            "bytes": 4720,
+            "lines": 108,
+            "path": "build-support/dota2/venus-build.py",
+            "sha256": "60120699bab65fd8cadad32be5d7e9468a0236a464981e3abd11a90f60449a8b"
+        },
+        {
+            "bytes": 7797,
+            "lines": 211,
+            "path": "build-support/dota2/vulkan-stage.py",
+            "sha256": "0c543db29fee7d600fd2138b12371b9fc26672446823ce1181a12218c037dd0b"
+        },
+        {
+            "bytes": 3559,
+            "lines": 71,
+            "path": "tests/dota2/_native.py",
+            "sha256": "871cd36f26132fe1755eb709359e437d6303ce42ba938b5f670e6adf807a590b"
+        },
+        {
+            "bytes": 6287,
+            "lines": 155,
+            "path": "tests/dota2/_vulkan_fixture_native.py",
+            "sha256": "af1004881c5a817c5a5328a06f891469503e6f25732071e698c1332f084299cf"
+        },
+        {
+            "bytes": 830,
+            "lines": 16,
+            "path": "tests/dota2/_vulkan_vm_native.py",
+            "sha256": "d7cb8dbddaa2012ca3c2ac4f7859b98ffcd67b0e1bde7511b850ffb918cf9eab"
+        },
+        {
+            "bytes": 2115,
+            "lines": 69,
+            "path": "tests/dota2/vulkan-run.py",
+            "sha256": "de3cb574ba12da456e4963cc990f7e6f737f5879a51b020fef642c5725cdb181"
+        },
+        {
+            "bytes": 4722,
+            "lines": 99,
+            "path": "tests/dota2/vulkan-stage-test.py",
+            "sha256": "996813653e2a5e10abc5e8ec8ebdf91506b626b22447f7645b4eb0adab425bba"
+        }
+    ],
+    "qualification": {
+        "actual_gzip_initramfs_extraction": true,
+        "actual_x86_compatibility_generator_and_link": true,
+        "cold_program_profiles": 24,
+        "first_party_python_executed": false,
+        "full_staging_suite_after_retirement": 18,
+        "original_staging_cases_per_profile": 18,
+        "profiles": [
+            "arm",
+            "x86",
+            "san"
+        ],
+        "public_bootstraps_after_retirement": 8,
+        "public_bootstraps_before_retirement": 22,
+        "receipt_sha256": {
+            "arm": "31401d76fb7953c3f18c57150d7a63f974893d0cb3d3c8a9a05e66640fd83d1b",
+            "cross": "fd29608b499b4fc69c7a7509c95c613f6a772a6ec9add29ada1da669c63fd1a7",
+            "public-after-retirement": "d7c8a4341fb51be0f5535ab6a5f844b7d52515682beba2cb92e426f09aa99893",
+            "public-before-retirement": "ec4584948be7ce38196199c4125820da01e5421c747fb890250ee60dac8063e6",
+            "san": "f52b1616b11b30ba617fd75b650ecbe8aa40cc884fb423f4eaad5d3603613c3d",
+            "x86": "cef9aab213b19654c931a78e3466c3e979556434e67c45de8f6508d0b74458d9"
+        },
+        "upstream_build_or_real_guest_claimed": false,
+        "whole_pty_cases_per_profile": 17
+    },
+    "source_commit": "6fee67f91246120be4c83d80f4023ae2281e711e",
+    "status": "PASS"
+}

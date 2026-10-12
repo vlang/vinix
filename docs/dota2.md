@@ -56,7 +56,9 @@ The staged Lavapipe is rebuilt from Debian's own Mesa 22.3.6 source and
 patches, with one [local patch](../build-support/dota2/mesa/README.md) for null
 descriptor sets. Only `libvulkan_lvp.so` changes; it links against the runtime's
 Debian LLVM 15. `scripts/build-dota2-aarch64.sh` cross-builds it with clang, lld, ninja
-and pkg-config, and a private Meson. `vulkan-stage.py --debian-lavapipe` keeps
+and pkg-config, with an existing Meson installation. Set `VINIX_DOTA2_MESON`
+to its executable; the native driver builder does not bootstrap an environment.
+`vulkan-stage --debian-lavapipe` keeps
 Debian's unpatched driver for baseline comparisons.
 
 The default translated CPU is `Haswell`. In the actual Vinix probe, Mesa
@@ -74,7 +76,7 @@ glibc 2.36 and completed all 32 rounds under 2.41. Valve's real anonymous
 Steam API initialization, callbacks, shutdown and reinitialization also
 passed with the new runtime. This fixes that measured runtime failure;
 local-map loading still fails separately. The staging cache verifies the
-whole libc package and loader aliases. `vulkan-stage.py --keep-steam-libc`
+whole libc package and loader aliases. `vulkan-stage --keep-steam-libc`
 retains the original libc for baseline comparisons.
 
 The launcher passes Valve's `-noassert` option by default. The translated
@@ -147,7 +149,7 @@ stages an x86-64 build ([`build-support/dota2/venus`](../build-support/dota2/ven
 and the translator passes the virtio-gpu ioctls through
 ([`drm-passthrough.patch`](../build-support/dota2/qemu/README.md)). `run-dota2`
 selects it when the native `venus-available` probe finds a Venus GPU. Pass
-`--venus` to `tests/dota2/run` or `tests/dota2/vulkan-run.py` to test it.
+`--venus` to `tests/dota2/run` or `tests/dota2/vulkan-run` to test it.
 
 On Vinix in KekVM, translated `vulkaninfo` reports
 `Virtio-GPU Venus (Apple M5 Max)`, vkcube renders, and Dota draws its startup
@@ -204,8 +206,8 @@ return `EROFS`.
 ## Verify graphics before starting the game
 
 ```sh
-python3 tests/dota2/vulkan-run.py --staging build/dota2-runtime/staging
-python3 tests/dota2/launcher-test.py
+tests/dota2/vulkan-run --staging build/dota2-runtime/staging
+build-support/run-v-tool.sh tests/dota2/launcher.v
 tests/dota2/export-test
 ```
 

@@ -18,6 +18,13 @@ pub fn archive(root string, destination string) ! {
  writer.finish()!; writer.close_checked()!
 }
 
+pub fn archive_gzip(root string, destination string) ! {
+ mut writer := tarcore.create_gzip(destination)!; defer { writer.close() }
+ mut inodes := map[string]string{}
+ add_tree(mut writer,root,'.',mut inodes)!
+ writer.finish()!; writer.close_checked()!
+}
+
 fn add_tree(mut writer tarcore.Writer, source string, name string, mut inodes map[string]string) ! {
  state := os.lstat(source)!
  mut member := tarcore.Member{name:name,mode:i64(state.mode & 0o7777),uid:state.uid,gid:state.gid,mtime:state.mtime}

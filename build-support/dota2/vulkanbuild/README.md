@@ -1,5 +1,10 @@
 # Private Vulkan staging policy
 
+The maintained [`vulkan-stage`](../vulkan-stage) command installs the direct V
+[`runtimehost` adapter](../../../tests/native-runtime-tools/runtimehost/vulkan_binding.v).
+It retains this module's staging policy and uses native Debian/JSON/process APIs.
+The remaining text records the historical interpreter-bound qualification.
+
 `vulkan_query.v` runs the maintained V implementation. It owns the private
 root generation, package selection and reports, libc-family checks and aliases,
 Lavapipe/Venus installation and ICD paths, compatibility compiler arguments,

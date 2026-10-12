@@ -138,7 +138,7 @@ pub fn stage(metadata map[string]json2.Any, options map[string]json2.Any, repo s
 	mmap_source := path(global('MMAP32_SOURCE')!)!
 	early_source := path(global('EARLY_CLIENT_SOURCE')!)!
 	inputs := json2.Any({
-		'format':                json2.Any(6)
+  'format':                json2.Any(7)
 		'source':                json2.Any(source)
 		'guest_root':            options['guest_root']!
 		'release':               options['release']!

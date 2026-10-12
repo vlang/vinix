@@ -37,7 +37,7 @@ the AArch64 VM.
 `scripts/build-steam-aarch64.sh` fetches `steam.deb` from Valve's CDN and the packages
 from `deb.debian.org`; set `VINIX_STEAM_DEB_URL`, `DEBIAN_MIRROR` and
 `VINIX_STEAM_DEBIAN_RELEASE` to take them from elsewhere. It installs nothing
-with dpkg: `build-support/debian-root.py` resolves the closure from the
+with dpkg: `build-support/debian-root` resolves the closure from the
 Packages indices and unpacks the archives under
 `/usr/libexec/vinix-steam/root`, so no maintainer script runs and nothing in
 that root can replace a native file.

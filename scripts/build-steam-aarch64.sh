@@ -132,14 +132,14 @@ for name in "${ignored[@]}"; do
 done
 
 echo "=== staging the i386 glibc runtime ==="
-python3 "$SCRIPT_DIR/build-support/debian-root.py" \
+"$SCRIPT_DIR/build-support/debian-root" \
     --index "$(fetch_index i386)" --mirror "$DEBIAN_MIRROR" \
     --cache "$DOWNLOADS/i386" --root "$ROOT" \
     --manifest "$BUILD_DIR/i386-packages" "${ignore_flags[@]}" \
     "${guest_libraries[@]}" "${client_libraries_i386[@]}"
 
 echo "=== staging the x86-64 glibc runtime and tools ==="
-python3 "$SCRIPT_DIR/build-support/debian-root.py" \
+"$SCRIPT_DIR/build-support/debian-root" \
     --index "$(fetch_index amd64)" --mirror "$DEBIAN_MIRROR" \
     --cache "$DOWNLOADS/amd64" --root "$ROOT" \
     --manifest "$BUILD_DIR/amd64-packages" "${ignore_flags[@]}" \

@@ -8,6 +8,8 @@ import hosttest
 import json2
 import math.big
 import os
+import cachecli
+import sourcecommand
 import transcriptcore
 
 fn C.fflush(voidptr) i32
@@ -41,6 +43,10 @@ fn failed(message string) IError { return BuildError{'SystemExit', message} }
 
 pub struct Options {
 pub:
+ native bool
+ native_sources []string
+ command_hook fn ([]string, string, string, bool, bool, map[string]string, voidptr) !sourcecommand.Output = unsafe { nil }
+ command_context voidptr
 	repo                  string
 	support               string
 	builder               string
@@ -68,12 +74,25 @@ fn concat(a []string, b []string) []string {
 }
 
 fn capture(options Options, argv []string, cwd string, merge bool) !string {
+ if options.native {
+  result := if options.command_hook != unsafe { nil } { options.command_hook(argv,cwd,'',true,merge,options.inherited_environment,options.command_context)! } else { sourcecommand.capture_in(argv,options.inherited_environment,cwd,merge,cachecli.cancelled,options.host_arch)! }
+  if !merge && result.stderr != '' { eprint(result.stderr) }
+  if result.status != 0 { return ChildFailure{result.status,argv.clone()} }
+  return result.stdout
+ }
 	return fixturehost.capture_in_preferred(argv, '', options.inherited_environment, merge, cwd, false, options.host_arch)!
 }
 
 fn execute(options Options, argv []string, cwd string) ! {
-	status := command_preferred(argv, cwd, options.inherited_environment, '', false, options.host_arch)!
+ status := builder_command(options,argv,cwd,options.inherited_environment,'',false)!
 	if status != 0 { return ChildFailure{status, argv.clone()} }
+}
+
+fn builder_command(options Options, argv []string, directory string, environment map[string]string, log string, discard bool) !int {
+ if !options.native { return command_preferred(argv,directory,environment,log,discard,options.host_arch) }
+ if options.command_hook != unsafe { nil } { return options.command_hook(argv,directory,log,false,discard,environment,options.command_context)!.status }
+ if log != '' || discard { return sourcecommand.run_logged_owned(argv,environment,cachecli.cancelled,if discard { '/dev/null' } else { log },false,directory,unsafe { nil },unsafe { nil },0)!.status }
+ return sourcecommand.run_in(argv,environment,directory,cachecli.cancelled,options.host_arch)!.status
 }
 
 pub fn download(options Options, url string, destination string, expected string) ! {
@@ -95,7 +114,7 @@ pub fn download(options Options, url string, destination string, expected string
 
 pub fn apply_source_patch(options Options, source string, patch string) ! {
 	mut argv := [tool('git', options.environment)!, 'apply', '--unsafe-paths', '--directory=' + source]
-	check := command_preferred(concat(argv, ['--check', patch]), options.repo, options.inherited_environment, '', true, options.host_arch)!
+ check := builder_command(options,concat(argv, ['--check', patch]), options.repo, options.inherited_environment, '', true)!
 	if check == 0 {
 		argv << patch
 		execute(options, argv, options.repo)!
@@ -156,7 +175,7 @@ fn replacement_text(raw string) string {
 }
 
 pub fn logged(options Options, argv []string, directory string, log string, environment map[string]string) ! {
-	status := command_preferred(argv, directory, environment, log, false, options.host_arch)!
+ status := builder_command(options,argv, directory, environment, log, false)!
 	if status != 0 {
 		lines := split_lines(replacement_text(read(log)!))
 		eprintln(lines[if lines.len > 35 { lines.len - 35 } else { 0 }..].join('\n'))
@@ -336,7 +355,7 @@ pub fn build(options Options) ! {
 	mut patch_hashes := map[string]json2.Any{}
 	for path in patches { patch_hashes[path[options.support.len + 1..]] = digest(path)! }
 	mut policy := map[string]json2.Any{}
-	for path in policy_sources(options.repo)! {
+ for path in if options.native { options.native_sources } else { policy_sources(options.repo)! } {
 		policy[path[options.repo.len + 1..]] = digest(path)!
 	}
 	mut producer := map[string]json2.Any{}
@@ -350,6 +369,7 @@ pub fn build(options Options) ! {
 	inputs['configure'] = words(configure)
 	inputs['native_policy'] = policy
 	inputs['native_builder'] = producer
+ inputs['native_frontend'] = options.native
 	inputs['python_packages'] = words(python_packages)
 	inputs['python'] = options.python_version
 	inputs['clang'] = capture(options, [clang, '--version'], '', false)!
@@ -393,7 +413,7 @@ pub fn build(options Options) ! {
 			clone_tree(base, sysroot)!
 		}
 		for package in packages {
-			command_preferred([tool('tar', options.environment)!, 'xzf', package, '-C', sysroot], '', options.inherited_environment, '', true, options.host_arch)!
+   builder_command(options,[tool('tar', options.environment)!, 'xzf', package, '-C', sysroot], '', options.inherited_environment, '', true)!
 		}
 		for relative in ['usr/lib/libglib-2.0.a', 'usr/lib/libpcre2-8.a', 'usr/lib/libintl.a'] {
 			if !is_file(join(sysroot, relative))! {
@@ -423,10 +443,11 @@ pub fn build(options Options) ! {
 	wrapper(pkg, 'export PKG_CONFIG_SYSROOT_DIR=' + shell_quote(sysroot) + '\nexport PKG_CONFIG_LIBDIR=' +
 		shell_quote(join(sysroot, 'usr/lib/pkgconfig')) + '\nexec ' + shell_quote(tool('pkg-config', options.environment)!) + ' "$@"')!
 	venv := join(work, 'host-venv')
-	python := join(venv, 'bin/python3')
-	if !exists(python)! { execute(options, [options.python, '-m', 'venv', venv], '')! }
+ python := if options.native { options.python } else { join(venv, 'bin/python3') }
+ if options.native && !is_file(python)! { return failed('provide the upstream QEMU configure interpreter with VINIX_DOTA2_QEMU_PYTHON') }
+ if !options.native && !exists(python)! { execute(options, [options.python, '-m', 'venv', venv], '')! }
 	package_stamp := join(venv, '.dota2-packages')
-	if !is_file(package_stamp)! || split_lines(read_text(package_stamp)!) != python_packages {
+ if !options.native && (!is_file(package_stamp)! || split_lines(read_text(package_stamp)!) != python_packages) {
 		execute(options, concat([python, '-m', 'pip', 'install', '--quiet'], python_packages), '')!
 		write(package_stamp, python_packages.join('\n') + '\n')!
 	}

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+@[has_globals]
 module vulkanbuild
 
 import encoding.hex
@@ -6,6 +7,19 @@ import hosttest
 import json2
 import os
 import qemubuild
+
+__global (
+ native_request fn (map[string]json2.Any, voidptr) !json2.Any
+ native_context voidptr
+)
+
+// The native command installs its typed SDK adapter only for the synchronous
+// call. The existing library protocol remains available to historical callers.
+pub fn set_native_request(callback fn (map[string]json2.Any, voidptr) !json2.Any, context voidptr) (fn (map[string]json2.Any, voidptr) !json2.Any, voidptr) {
+ previous := native_request; pointer := native_context
+ native_request = callback; native_context = context
+ return previous,pointer
+}
 
 pub struct BindingFailure {
 pub:
@@ -45,6 +59,7 @@ fn path(value json2.Any) !string { return hex.decode(value.as_map()['path_hex']!
 fn words(values []string) json2.Any { return json2.Any(values.map(json2.Any(it))) }
 
 fn request(row map[string]json2.Any) !json2.Any {
+ if native_request != unsafe { nil } { return native_request(row,native_context) }
 	println(json2.encode({
 		'callback': json2.Any(row)
 	}, escape_unicode: true))
