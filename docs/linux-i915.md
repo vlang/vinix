@@ -66,6 +66,9 @@ after a filesystem failure. Mutable build inputs still require isolation.
   aligned types have one owner, avoiding duplicate GNU99 typedefs and include
   order conflicts. Linux page ownership, descriptor/PFN services and runtime
   page-table geometry bindings remain unresolved.
+  The original unconditional x86 `ARCH_HAS_MEM_ENCRYPT` selection exposes
+  the configured-disabled SME/SEV masks. AMD/X86 encryption services remain
+  disabled; their original mask values are zero.
 - Generated x86 `asm/early_ioremap.h` and `asm/kmap_size.h` wrappers forward
   to the original generic headers selected by the pinned Kbuild. Mapping
   references retain their genuine unresolved symbols; no early-MMIO, fixmap or
@@ -1911,3 +1914,30 @@ failures remain separate; fresh retries pass. Four completed owned build
 worktrees were removed after saving source patches and immutable proofs, and
 old supervisor-control ISOs were losslessly compressed with hash receipts.
 Other sessions' files and the verified import remain unchanged.
+
+## Original x86 encryption-header selection
+
+The exact pinned x86 Kconfig unconditionally selects `ARCH_HAS_MEM_ENCRYPT`.
+This profile now makes that selection, retaining the original zero SME/SEV
+masks with AMD/X86 encryption and confidential-computing services disabled.
+No encryption service or Linux page ownership is supplied.
+
+Twelve GNU99/GNU11 compiler controls pass across both include orders, disabled
+and configured profiles, and a missing-selection control. Independent original
+page-mask probes reproduce the undeclared-mask failure without a fixture guard.
+Configured encryption retains four genuine external owners and fails a strict
+link when they are absent. Disabled-profile objects import nothing.
+
+Fresh worktrees at `69a4d10f` with only the configuration overlay build
+enabled/default x86 and default ARM. Enabled ELF
+`25b5ea1fa5791569e2fa01474d911ef663d36fc17064f21b2d0afdfdf78e37ab`
+passes normal/SSE guests; existing lifetime measurements retain no pages or
+heap objects. Default Linux-ABI startup passes. The coherent isolated full
+audit remains **5/269**: all 33 former encryption-mask first errors now reach
+the genuine aggregate `pmd_t` exchange type-check blocker. Task/MM/vfork
+ownership remains the largest group, with 225 files.
+
+Run `build-support/run-v-tool.sh tests/linuxkpi/mem_encrypt_policy.v`.
+Evidence is under `smp-oct10/mem-encrypt-*`, `sme-*-native/`,
+`sme-guest-review/` and `sme-isolated-full-audit/`. The concurrent shared-tree
+audit rejected changed inputs and published no coherent report.

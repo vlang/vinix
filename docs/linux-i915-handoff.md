@@ -1631,3 +1631,33 @@ their original hashes in `archived-control-isos-oct12.json`.
 Remaining work includes actual task/MM/vfork rendezvous and retained owners,
 encryption/TSC include closure, Linux PCI/devres, DMA/pages/TTM/GEM, IRQs,
 DRM/firmware/display and real Tiger Lake validation. GPU support is incomplete.
+
+## Latest original encryption-header selection
+
+CPU policy is committed as `69a4d10f`. The next configuration change selects
+the original unconditional x86 `ARCH_HAS_MEM_ENCRYPT` header route, retaining
+configured-disabled zero SME/SEV masks. AMD/X86 encryption and confidential
+computing stay disabled. No native encryption or Linux page ownership is
+implemented by this selection.
+
+Twelve compiler controls and independent original page-mask probes pass.
+Configured-encryption controls keep real unresolved external owners; a strict
+link rejects their absence. Fresh native worktrees at `69a4d10f` with only
+this configuration overlay build enabled/default x86 and default ARM.
+Enabled ELF `25b5ea1fa5791569e2fa01474d911ef663d36fc17064f21b2d0afdfdf78e37ab`
+boots normal/SSE guests with the existing allocation equalities preserved;
+default Linux-ABI startup passes. The isolated full syntax audit remains
+**5/269**, with all 33 encryption-mask first errors reaching actual aggregate
+`pmd_t` atomic-exchange type checks. The largest group remains task/MM/vfork
+ownership, 225 files.
+
+Evidence: `smp-oct10/mem-encrypt-*`, `sme-*-native/`, `sme-guest-review/`
+and `sme-isolated-full-audit/`. A shared-tree audit overlapped newly written
+TSC files, rejected the changed source snapshot and published no coherent
+result; use the isolated report. The completed CPU worktrees were removed
+only after exact saved artifact/source checks; their runtime caches were
+copied into the fresh architecture worktrees. Immutable v2 proofs remain.
+
+Next compilation/runtime work includes aggregate exchange witnesses, raw TSC,
+actual vfork rendezvous and task/MM/GFP scopes, then PCI/DMA/DRM/firmware.
+Hardware validation remains required for driver completion.

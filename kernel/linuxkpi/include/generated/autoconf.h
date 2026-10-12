@@ -5,6 +5,10 @@
 #define CONFIG_64BIT 1
 #define CONFIG_X86 1
 #define CONFIG_X86_64 1
+/* Original x86 Kconfig always selects the architecture encryption headers.
+ * Native AMD/X86 encryption services remain disabled; their original absent
+ * configuration supplies the zero SME/SEV masks used by page-table types. */
+#define CONFIG_ARCH_HAS_MEM_ENCRYPT 1
 /* Exact x86 Kconfig selection avoids the generic duplicate frame helper.
  * FRAME_POINTER/HARDENED_USERCOPY remain disabled: this declares no native
  * Linux stack-bound validation service. */
