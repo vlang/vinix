@@ -44,7 +44,7 @@ a desired head permits releasing it while its unlisted live descriptor remains
 readable. Cleanup restores exact baseline bytes and original E7 data/generation.
 `PLAN POOL RESIZE BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured **37-command cycles / 14800
+Each architecture runs 200 warmup and 200 measured **39-command cycles / 15600
 utility processes**, including 400 complete resize previews/publications with
 800 ordered keep actions each. Every earlier storage assertion remains enabled.
 Slab classes and large pages must stay flat or decrease; the per-boot limit

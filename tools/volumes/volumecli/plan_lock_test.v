@@ -45,6 +45,9 @@ fn test_directory_lock_excludes_all_saved_state_writers_but_preserves_readonly_i
 	mut multi := MultiPoolBatch{count: 1}; multi.pools[0] = 3; multi.rows[0] = batch.rows[0]
 	assert multi_pool_batch_plan(path.str, &multi, false) == 1
 	assert multi_pool_batch_plan(path.str, &multi, true) == 0
+	mut multi_growth := MultiPoolGrowthBatch{count: 1}; multi_growth.pools[0] = 3; multi_growth.slots[0] = 2; multi_growth.lengths[0] = 4096
+	assert grow_multi_pool_batch_plan(path.str, &multi_growth, false) == 1
+	assert grow_multi_pool_batch_plan(path.str, &multi_growth, true) == 0
 	mut members := PoolMembersBatch{count: 1}
 	members.rows[0] = region
 	assert members_batch_pool_plan(path.str, 4, &members, false, false) == 1

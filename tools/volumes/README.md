@@ -210,6 +210,14 @@ Matching rows stay fixed; a later failure discards every earlier placement.
 lock or publication. All-keep retries still complete both publication flushes.
 See [multi-pool allocation rules](../../docs/storage-volumes.md#atomic-multi-pool-allocation-batches).
 
+`pool-grow-set-batch BUNDLE POOL SLOT LENGTH_BYTES [...]` grows 1–64 existing
+mappings across multiple pools in one atomic saved-state edit. Both old and
+requested extents must fit each row's own member; offsets/modes stay fixed.
+Later failure discards every earlier growth. `pool-preview-grow-set-batch`
+reports the complete candidate without a writer lock or publication. All-keep
+retries still complete both publication flushes. See
+[multi-pool growth rules](../../docs/storage-volumes.md#atomic-multi-pool-growth-batches).
+
 Saved-plan writers acquire a nonblocking exclusive lock on the destination
 directory before reading or snapshotting, holding it through atomic publication.
 A busy directory returns failure; retry reads the latest complete state. All

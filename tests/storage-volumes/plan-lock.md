@@ -40,7 +40,7 @@ a lock until killed; the next writer succeeds after reaping.
 `PLAN LOCK PASSED:` is required before the first boot is accepted.
 
 Each architecture also runs the existing 200 warmup and 200 measured cycles:
-**14800 utility processes**, with every saved mutation acquiring/releasing its
+**15600 utility processes**, with every saved mutation acquiring/releasing its
 lock. All slab classes and large-allocation page totals must stay flat or
 decrease. The unchanged four-boot fixture verifies reordered discovery,
 physical-capacity adoption and seven durable mappings with old/tail bytes,

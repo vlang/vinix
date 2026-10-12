@@ -44,7 +44,7 @@ readable held descriptor. Cleanup restores exact baseline bytes.
 
 The two previous single-member additions in each cycle become a complete
 membership preview and publication. Each architecture still runs 200 warmup
-and 200 measured thirty-seven-command cycles: **14800 utility processes**, including
+and 200 measured thirty-nine-command cycles: **15600 utility processes**, including
 400 complete membership previews/publications with 800 member actions each.
 Existing capacity, allocation, growth, expansion, replay and preflight work
 remain enabled. Scratch mappings stay offline. Every slab class and large-page

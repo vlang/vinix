@@ -1307,6 +1307,48 @@ checks. Existing views, descriptors and generations remain intact during
 planning. The V1/V2 formats and production boot restore are unchanged. See
 [multi-pool allocation qualification](../tests/storage-volumes/multi-pool-batch.md).
 
+## Atomic multi-pool growth batches
+
+```sh
+vinix-volume pool-preview-grow-set-batch /root/layout.vset \
+  8 19 8192 7 20 8192
+vinix-volume pool-grow-set-batch /root/layout.vset \
+  8 19 8192 7 20 8192
+vinix-volume check-bundle /root/layout.vset grow
+vinix-volume restore-bundle /root/layout.vset grow
+```
+
+`pool-grow-set-batch BUNDLE POOL SLOT LENGTH_BYTES [...]` plans 1–64
+existing mapping lengths across multiple pools in one saved-state transaction.
+Each request names its own pool; repeated pools are allowed, while mapping
+slots must be globally distinct. Complete argument counts and decimal tokens
+are checked before source I/O. Each length must be at least its saved length,
+aligned to the owning disk's sector size and fit the selected pool's member
+on that same disk. Both old and new extents must lie inside that member and
+avoid every other desired row. Free capacity or earlier priority on another
+member cannot move or extend this mapping.
+
+Every disk identity/geometry, mapping start/mode/slot/order, unrelated row and
+pool bound/order/priority remains exact. Earlier growths occupy their extensions
+for later interleaved requests. A later missing pool/slot, wrong member, shrink,
+unaligned length, overlap or overflow discards the entire private candidate and
+all caller action results. Equal-size requests may accompany real growth.
+
+`pool-preview-grow-set-batch` reports the same complete candidate without
+device probes, writer locking or publication. Reports contain request, pool,
+resolved disk, slot, `grow`/`keep`, offset, previous/requested lengths and mode
+in request order. Publication holds the pinned directory writer lock through
+source loading, atomic replacement, report flushing and cleanup. All-keep
+retries still write, file-fsync, rename and directory-fsync. Before rename
+failure preserves old bytes; afterward only the full candidate may be visible
+with durability unconfirmed. Buffered stdout failure returns an error. Retry
+the complete request under serialized administration to confirm durability.
+
+Planning remains offline. Explicit complete-set growth preflight/replay applies
+the desired lengths separately, preserving the ordinary kernel conflict checks
+and existing descriptors/generations. Saved formats and production boot restore
+are unchanged. See [multi-pool growth qualification](../tests/storage-volumes/multi-pool-grow-batch.md).
+
 ## Atomic pool growth batches
 
 ```sh

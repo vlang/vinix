@@ -39,11 +39,13 @@ Explicit replay verifies primary writable and secondary read-only data while
 original descriptors/generations survive. Cleanup restores exact baseline
 bytes. `PLAN MULTI POOL BATCH PASSED:` is required.
 
-Each target runs **200 warmup + 200 measured 37-command cycles / 14800 utility
+Each target runs **200 warmup + 200 measured 39-command cycles / 15600 utility
 processes**, retaining every earlier storage assertion. The new workload adds
 temporary pool eligibility for an existing mapping, 400 multi-pool previews
 and publications with 800 ordered keep actions each, then removes that
-temporary eligibility. Slab classes and large pages must stay flat or decrease;
+temporary eligibility. Two more commands preview/publish complete equal-size
+multi-pool growth within that temporary membership interval. Slab classes and
+large pages must stay flat or decrease;
 each boot retains the 1800-second limit.
 
 The previous six-boot growth/contraction fixture remains enabled. After all

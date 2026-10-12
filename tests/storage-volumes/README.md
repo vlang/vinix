@@ -209,6 +209,14 @@ remain covered. A seventh boot restores two additional placements across two
 pools with all original rows and data intact. See
 [multi-pool qualification](multi-pool-batch.md).
 
+Multi-pool growth checks 16384 independent extension-cell cases, own-member
+constraints despite preferred empty alternate disks, interleaved pools and
+whole-set rollback. Full 64-pool/195-argument batches reach the V2 limit.
+Changed/all-keep publication faults and complete live growth preflight remain
+covered. An eighth boot restores both grown lengths with held-descriptor and
+extension data intact. See
+[multi-pool growth qualification](multi-pool-grow-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -235,8 +243,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 14800 utility processes across 200 warmup
-and 200 measured thirty-seven-command cycles, with pool membership, query, batch
+its own process. The allowance includes 15600 utility processes across 200 warmup
+and 200 measured thirty-nine-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention

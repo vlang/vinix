@@ -40,7 +40,7 @@ fit only retained windows and remain offline. Cleanup restores exact baseline
 bytes and preserves original generations/data. `PLAN POOL CONTRACTION BATCH
 PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured **37-command cycles / 14800
+Each architecture runs 200 warmup and 200 measured **39-command cycles / 15600
 utility processes**, including 400 complete contraction previews/publications
 with 800 ordered keep actions each, against fully occupied window ends. All
 previous capacity, allocation, growth, expansion, membership, priority, removal,

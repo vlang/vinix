@@ -78,6 +78,7 @@ fn planned_multi_pool_batch(parent &char, other &char) {
 		multi_pool_allocations(c'/root/saved.vset', c'7', c'20', c'4096', c'rw', c'8', c'19', c'4096', c'ro', false, 0, &output[0])
 		check(contains(&output[0], c'action=keep') && !contains(&output[0], c'action=allocate'), c'exact reverse-order multi-pool retries')
 		check(status(c'/dev/mapper/vinix19').generation == secondary && status(c'/dev/mapper/vinix20').generation == primary, c'multi-pool metadata retains generations')
+		planned_multi_pool_growth(parent, other)
 		mapping_removals(c'/root/saved.vset', c'19', c'20', nil, false, 0, nil)
 		simple(c'remove', c'/dev/mapper/vinix19', nil, 0); simple(c'remove', c'/dev/mapper/vinix20', nil, 0)
 		tool(c'pool-remove', c'/root/saved.vset', c'7', c'0', nil, 0); tool(c'pool-remove', c'/root/saved.vset', c'8', c'1', nil, 0)
@@ -118,5 +119,6 @@ fn multi_pool_boot_phase(parent &char, other &char) {
 		bundle_unchanged(c'/etc/vinix/volumes.vset', &bytes[0], size); simple(c'boot-restore', nil, nil, 0)
 		check(status(c'/dev/mapper/vinix19').generation == first && status(c'/dev/mapper/vinix20').generation == second, c'boot multi-pool durable retries preserve live generations')
 		C.printf(c'PLAN MULTI POOL BATCH BOOT PRESERVED\n')
+		multi_pool_growth_boot_prepare()
 	}
 }
