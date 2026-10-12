@@ -965,7 +965,7 @@ implementation, where a clear nonleader incorrectly retains its set leader's
 flag after exec: [AArch64 control](../tests/linux-compat/results/2026-10-12/nnpthread-before-aarch64.json),
 [x86-64 control](../tests/linux-compat/results/2026-10-12/nnpthread-before-x86_64.json).
 Both isolated final builds pass sibling independence, clone/fork/exec,
-direct nonleader exec, exact seccomp EACCES/EFAULT authorization and
+direct nonleader exec, the then-current seccomp authorization probe and
 live/zombie procfs checks. They also pass the existing 34-error prctl test,
 seccomp queries/trap delivery, approved JIT permissions and TLS/atomic/SIMD
 runtime checks: [AArch64](../tests/linux-compat/results/2026-10-12/nnpthread-after-aarch64.json),
@@ -980,6 +980,12 @@ All eight host test files pass. The [assertion-enabled auditor](../tests/linux-c
 requires its deliberate failing assertion to exit nonzero, verifies the
 53-input inventory and isolated source changes, and rehashes frozen kernels,
 fixtures, generated C, binaries, ISOs, serial logs and receipts.
+
+The original authorization probe expected EACCES for an unreadable header
+when no_new_privs was clear. That error oracle was incorrect; the
+[installation qualification](#seccomp-installation-error-precedence) corrects
+the reusable fixture and verifies the caller's permission with a readable
+valid-length header. These historical receipts retain their original sources.
 
 These results qualify task-local flag behavior and the stated capability
 checks. Seccomp filters remain process-wide; TSYNC, setuid/file-capability
@@ -1322,8 +1328,8 @@ readiness on both kernels with the same startup error. Those receipts remain
 failed; this change does not qualify desktop readiness.
 
 At this snapshot, strict-mode and KILL_THREAD signal scope remained unqualified;
-the following qualification covers those paths. Installation error ordering,
-user notifications, full sandbox isolation, nested PID-namespace TSYNC failures
+the following qualifications cover those paths and installation error ordering.
+User notifications, full sandbox isolation, nested PID-namespace TSYNC failures
 and procfs tree reclamation remain separate work. The three broad section-15
 acceptance gates remain open.
 
@@ -1371,3 +1377,53 @@ Core dumps, foreign/ELF32 execution, libc pthread cancellation/unwinding and
 complete application sandbox isolation remain unqualified. This closes the
 tested native fatal-action semantics; the three broad section-15 acceptance
 gates remain open.
+
+## Seccomp installation error precedence
+
+Native musl ELF64 syscall/prctl installation follows the Linux validation
+order: copy the complete sock_fprog header, validate its instruction count,
+check the calling task's no_new_privs/CAP_SYS_ADMIN, then copy and verify the
+instruction program. An unreadable header returns EFAULT and a zero or
+over-4096 count returns EINVAL even for an unauthorized task. With a readable
+valid-length header, an unauthorized task gets EACCES before instructions are
+read; authorized tasks get EFAULT for unreadable instructions or EINVAL for
+invalid bytecode. This follows
+[Linux's user-header copy and filter preparation](https://github.com/torvalds/linux/blob/v6.12/kernel/seccomp.c#L618).
+Unknown syscall flags still return EINVAL before reading the header.
+
+The V `seccompinstall` fixture passes 446 checked calls in each of five
+isolated groups on both architectures: root with CAP_SYS_ADMIN, root without
+that capability, UID 1000 with a clear flag, UID 1000 with no_new_privs and
+root without CAP_SYS_ADMIN with no_new_privs. Its 2230 checks include null,
+bad and partial-page pointers, readonly headers, exact eight-byte instruction
+boundaries, unaligned headers and ignored sock_fprog padding. Rejections
+preserve mode and no_new_privs, including 400 repeated invalid-program calls
+per group. Valid ALLOW programs prove both capability and NNP authorization.
+The fixtures record AArch64's 16384-byte and x86-64's 4096-byte native pages.
+
+Both baseline kernels fail the same unchanged fixture: after the privileged
+group passes, a root task without CAP_SYS_ADMIN gets EACCES instead of EFAULT
+for an unreadable header. `seccompinstall-before-*` and `seccompinstall-after-*`
+in the [dated results directory](../tests/linux-compat/results/2026-10-12/)
+retain the exact diagnostics, receipts and serial logs. The reusable
+`nnpthread` probe now checks header EFAULT in both flag states, then checks
+EACCES/EFAULT using a readable valid-length header with unreadable instructions.
+Both syscall interfaces retain the caller's state across independent siblings,
+clone, fork, exec and direct nonleader exec. The previous malformed-header
+authorization oracle and its historical receipts are explicitly superseded.
+
+Both production kernels pass eight regression cases: installation errors,
+thread NNP/inheritance, NNP argument errors, task seccomp/TSYNC, fatal action
+scope, trap/verifier, action discovery and TLS/atomics/SIMD/JIT/page sizes.
+The 3200-filter natural/forced-retirement cohorts keep all four measured slab
+classes flat. All eight host test files and the isolated generated-inventory
+check pass. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/seccompinstall-audit.v)
+checks the controls, 60 fingerprints, frozen artifacts, emitted validation
+order, stack-local header, unchanged instruction cleanup and verdicts.
+These isolated 1d4080c8 worktrees change only the installation helper; no
+allocation or reclamation implementation was added.
+
+Allocation-pressure behavior, user notifications, foreign/ELF32 execution and
+complete sandbox isolation remain unqualified. The three broad section-15
+acceptance gates remain open.

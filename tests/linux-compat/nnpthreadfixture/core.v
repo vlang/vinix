@@ -37,6 +37,7 @@ mut:
 	stage i32
 	wanted i32
 }
+struct SeccompProgram { len u16 filter voidptr }
 
 fn C.syscall(isize, ...) isize
 fn C.prctl(i32, ...) i32
@@ -89,9 +90,19 @@ fn own_state(wanted i32) bool {
 fn authorization(wanted i32) bool {
 	unsafe {
 		errno_ptr := C.__errno_location()
-		*errno_ptr = 0
-		result := C.syscall(isize(C.SYS_seccomp), isize(1), isize(0), usize(1))
-		return result == -1 && *errno_ptr == if wanted == 0 { C.EACCES } else { C.EFAULT }
+		// Header faults precede authorization. A readable header with an
+		// unreadable instruction pointer distinguishes each caller's NNP.
+		program := SeccompProgram{len: 1, filter: voidptr(1)}
+		for method in [i32(0), 1]! {
+			for pointer in [voidptr(1), voidptr(&program)]! {
+				*errno_ptr = 0
+				result := if method == 0 {
+					C.syscall(isize(C.SYS_seccomp), isize(1), isize(0), pointer)
+				} else { isize(C.prctl(C.PR_SET_SECCOMP, usize(2), pointer, usize(0), usize(0))) }
+				if result != -1 || *errno_ptr != if pointer == voidptr(1) || wanted == 1 { C.EFAULT } else { C.EACCES } { return false }
+			}
+		}
+		return true
 	}
 }
 fn child_thread(argument voidptr) voidptr {

@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -179,13 +179,15 @@ changing its leader, then the leader sets it without changing an existing worker
 Each state must survive new pthreads, fork and exec. Two direct execs from a
 nonleader whose flag differs from its leader require the caller's state in the
 replacement leader. Seccomp authorization must use the calling thread:
-an inaccessible filter returns EACCES for state 0 and EFAULT for state 1.
+an unreadable header returns EFAULT in both states; a readable valid-length
+header with unreadable instructions returns EACCES for state 0 and EFAULT for
+state 1, through both the seccomp syscall and prctl.
 No filter is installed by that authorization probe. `/proc/self/status`,
 `/proc/thread-self/status` and another task's status must report the selected
 thread's flag. WNOWAIT permits checking status after child exit before reaping.
 The capability-exec suite separately checks retained privilege ceilings.
-Seccomp filter ownership, TSYNC, setuid/file-capability execution and complete
-sandbox isolation remain separate qualifications.
+The `seccompthread` case qualifies filter ownership and TSYNC separately.
+Setuid/file-capability execution and complete sandbox isolation remain separate.
 
 The `keepcaps` case checks PR_SET_KEEPCAPS values 0 and 1 as root and UID/GID
 1000. Six invalid unsigned-long values, including high bits and all bits set,
@@ -531,6 +533,16 @@ ESRCH confirm task retirement. The V fixture uses musl's unchanged raw
 these CLONE_THREAD flags. Success waits for retirement before unmapping the
 child stack; failure after cloning exits the group while its borrowed Task
 frame remains live. Core dumps and foreign/ELF32 runtimes remain separate.
+
+The `seccompinstall` case compares syscall/prctl installation errors in five
+isolated groups: root with CAP_SYS_ADMIN, root without it, UID 1000 without
+no_new_privs, UID 1000 with it, and root without CAP_SYS_ADMIN with no_new_privs.
+Unreadable headers must return EFAULT and invalid lengths EINVAL before the
+permission check. Valid lengths require permission before reading/verifying
+instructions. Null, bad and partial-page pointers, readonly headers, exact
+instruction boundaries, unaligned headers and ignored ABI padding are tested.
+Repeated rejection preserves mode and no_new_privs; valid ALLOW filters prove
+the capability/NNP authorization paths. Each group performs 446 checked calls.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

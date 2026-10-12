@@ -222,15 +222,9 @@ fn seccomp_set_strict() (u64, u64) {
 	return proc.seccomp_set_strict()
 }
 
-// Install the program struct sock_fprog at `prog` describes. Only a process
+// Install the program struct sock_fprog at `prog` describes. Only a task
 // that cannot gain privileges by exec, or one that holds CAP_SYS_ADMIN, may.
 fn seccomp_install(prog u64, flags u32) (u64, u64) {
-	if proc.seccomp_mode(proc.current_thread()) == proc.seccomp_mode_strict {
-		return errno.err, errno.einval
-	}
-	if proc.no_new_privs_state(proc.current_thread()) == 0 && !proc.current_has_capability(proc.cap_sys_admin) {
-		return errno.err, errno.eacces
-	}
 	// struct sock_fprog: an unsigned short length, then the pointer.
 	mut header := [2]u64{}
 	if !usercopy.copy_from_user(voidptr(&header[0]), prog, 16) {
@@ -239,6 +233,11 @@ fn seccomp_install(prog u64, flags u32) (u64, u64) {
 	length := int(header[0] & 0xffff)
 	if length == 0 || length > proc.bpf_max_instructions {
 		return errno.err, errno.einval
+	}
+	// Linux reads the header and validates its length before authorization;
+	// only authorized tasks may reach instruction copying and verification.
+	if proc.no_new_privs_state(proc.current_thread()) == 0 && !proc.current_has_capability(proc.cap_sys_admin) {
+		return errno.err, errno.eacces
 	}
 	mut instructions := []proc.SockFilter{len: length} @[freed]
 	if !usercopy.copy_from_user(unsafe { voidptr(&instructions[0]) }, header[1], u64(length) * sizeof(proc.SockFilter)) {
