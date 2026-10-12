@@ -94,7 +94,16 @@ fn (mut runner Runner) profile(name string) ! {
 		}
 		'v' {
 			runner.write('main.v', v_source)!
-			runner.command('v', ['-gc', 'none', '-cc', tool('cc')!, '-o', 'project', 'main.v'])!
+			mut v_args := ['-gc', 'none', '-cc', tool('cc')!, '-o', 'project', 'main.v']
+			kernel := os.uname()
+			if kernel.sysname.to_lower() == 'vinix' {
+				// Match the installed native compiler's defaults without requiring
+				// a shell wrapper. Keep V3 workers serial and make failures final.
+				v_args.prepend(['-new-compiler', '-no-retry-compilation', '-no-parallel',
+					'-no-memory-limit', '-os', 'vinix', '-arch',
+					if kernel.machine == 'aarch64' { 'arm64' } else { 'amd64' }, '-musl'])
+			}
+			runner.command('v', v_args)!
 			runner.verify_binary('project')!
 		}
 		'rust' {

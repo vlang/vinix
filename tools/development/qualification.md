@@ -41,6 +41,14 @@ qualification. Existing [Go](../../tests/go/README.md), [Java](../../tests/java/
 [Linux application](../../docs/linux-posix-qualification.md) suites provide
 additional coverage at their recorded revisions.
 
+Inside Vinix, the V profile explicitly selects the Vinix/musl target and the
+native architecture, uses V3 with serial workers, and disables compilation
+retry. These match the installed compiler's defaults even when `v` resolves
+directly to the compiler rather than its shell wrapper. The profile still
+invokes the selected native C compiler and executes the resulting binary;
+compiler startup alone cannot pass it. Host V invocations retain their host
+target settings.
+
 The [V guest controller](../../tests/development/README.md) can stage a prepared
 native musl GCC SDK and run the C/C++ projects as UID/GID 1000. It preserves
 the SDK closure hash, compiler versions and native report, and independently
