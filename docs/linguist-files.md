@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `f21c1a5e5166b1feb9165ce11e7afb3524c57c5e`,
+at source commit `c961bf9e551cf1bbbc910ebe96eb496eb0449be9`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 591 | 2,394,046 | 5.91% |
-| Python | 85 | 454,232 | 1.12% |
-| Shell | 747 | 1,380,937 | 3.41% |
+| C | 591 | 2,394,136 | 5.87% |
+| Python | 78 | 433,580 | 1.06% |
+| Shell | 752 | 1,381,585 | 3.39% |
 
-All `.v` files are classified as V. The resulting V share is 81.86%, with no
+All `.v` files are classified as V. The resulting V share is 82.02%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 454,232 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 433,580 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev f21c1a5e5166b1feb9165ce11e7afb3524c57c5e --breakdown --json
+github-linguist --rev c961bf9e551cf1bbbc910ebe96eb496eb0449be9 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -191,7 +191,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/locale.h` | 45 |
 | `kernel/c/lwipopts.h` | 3,213 |
 | `kernel/c/math.h` | 569 |
-| `kernel/c/net_driver_abi.h` | 1,223 |
+| `kernel/c/net_driver_abi.h` | 1,286 |
 | `kernel/c/net_random.h` | 1,782 |
 | `kernel/c/pci_config.h` | 2,255 |
 | `kernel/c/pci_config_arm_test.h` | 172 |
@@ -212,7 +212,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/verity.h` | 1,518 |
 | `kernel/c/vinix_endpoint.h` | 349 |
 | `kernel/c/vinix_inet6.h` | 1,534 |
-| `kernel/c/vinix_net.h` | 2,496 |
+| `kernel/c/vinix_net.h` | 2,523 |
 | `kernel/c/vmx.h` | 1,394 |
 | `kernel/c/x86_irq_v_contract.h` | 804 |
 | `kernel/c/x86_mitigations.h` | 1,098 |
@@ -668,17 +668,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ios/generate-cxx-symbols.py` | 1,647 |
 | `build-support/ios/stage-gles.py` | 2,688 |
 | `build-support/native_host.py` | 6,504 |
-| `build-support/opengothic/build.py` | 1,979 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
 | `build-support/venus/tests/run.py` | 6,197 |
 | `desktop/tools/_font_native.py` | 9,708 |
-| `desktop/tools/_input_native.py` | 792 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 4,935 |
-| `desktop/tools/input.py` | 6,196 |
 | `desktop/tools/test-gpu-present.py` | 8,956 |
 | `desktop/tools/tests/test_font_data.py` | 7,106 |
 | `installer/macos/vinix_auto.py` | 8,147 |
@@ -686,7 +683,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/generate-abi.py` | 713 |
 | `kernel/linuxkpi/generate-bounds.py` | 2,882 |
 | `kernel/linuxkpi/upstream.py` | 1,586 |
-| `scripts/build-opengothic-aarch64.sh` | 169 |
 | `tests/activity-monitor/run.py` | 5,933 |
 | `tests/agx-fake-g17/_native.py` | 7,413 |
 | `tests/agx-fake-g17/run.py` | 1,075 |
@@ -725,9 +721,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/host_suite.py` | 1,162 |
 | `tests/linuxkpi/run_vm.py` | 1,671 |
 | `tests/native-host/stdio-test.py` | 3,995 |
-| `tests/opengothic/_native.py` | 3,643 |
-| `tests/opengothic/kekvm-control.py` | 4,448 |
-| `tests/opengothic/run.py` | 3,425 |
 | `tests/packages/x-window-check.py` | 5,985 |
 | `tests/pointer-scroll/run.py` | 5,488 |
 | `tests/python3/smoke.py` | 9,112 |
@@ -808,6 +801,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/n64/build` | 209 |
 | `build-support/n64/test-bridge` | 161 |
 | `build-support/obs/run-obs` | 1,305 |
+| `build-support/opengothic/build` | 126 |
 | `build-support/opengothic/run-opengothic` | 1,674 |
 | `build-support/patch-elf-interpreter` | 176 |
 | `build-support/prepare-desktop-aarch64.sh` | 7,085 |
@@ -924,6 +918,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
 | `scripts/build-network-tools-aarch64.sh` | 8,755 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
+| `scripts/build-opengothic-aarch64.sh` | 158 |
 | `scripts/build-ps1-aarch64.sh` | 3,148 |
 | `scripts/build-ps2-aarch64.sh` | 2,879 |
 | `scripts/build-python-aarch64.sh` | 3,553 |
@@ -955,7 +950,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/push-to-m1.sh` | 6,967 |
 | `scripts/run-aarch64.sh` | 63,398 |
 | `scripts/run-amd64-alpine.sh` | 5,108 |
-| `scripts/run-desktop-aarch64.sh` | 16,558 |
+| `scripts/run-desktop-aarch64.sh` | 16,547 |
 | `scripts/run-desktop-amd64.sh` | 2,920 |
 | `scripts/run-hyprland-aarch64.sh` | 840 |
 | `scripts/run-iso-virtualbox.sh` | 8,448 |
@@ -1287,6 +1282,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/native-campaign-tools/campaignhost/verify-v3-init.txt` | 1,651 |
 | `tests/native-campaign-tools/campaignhost/verify-v4-init.txt` | 2,156 |
 | `tests/native-campaign-tools/run` | 179 |
+| `tests/native-game-tools/run` | 135 |
 | `tests/net-random/run` | 183 |
 | `tests/net-random/run.sh` | 283 |
 | `tests/network-ipv6/run-host.sh` | 124 |
@@ -1306,7 +1302,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/openbsd-security/run.sh` | 182 |
 | `tests/openbsd-security/run_vm` | 217 |
 | `tests/opengothic/guest-init.sh` | 1,880 |
+| `tests/opengothic/kekvm-control` | 125 |
 | `tests/opengothic/kekvm-guest.sh` | 2,747 |
+| `tests/opengothic/run` | 115 |
 | `tests/packages/blender-smoke.sh` | 1,269 |
 | `tests/packages/chromium-smoke.sh` | 2,694 |
 | `tests/packages/ffmpeg-smoke.sh` | 1,455 |
