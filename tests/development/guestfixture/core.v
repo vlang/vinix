@@ -266,7 +266,7 @@ fn native_userland_checks() {
 				check(command(c'/bin/busybox', c'ls', c'-la', c'/opt/native/lib') == 0, 268)
 				check(command_output(c'/usr/bin/vinix-build', c'hash', c'/opt/native', nil, c'/home/developer/sdk-pin.sha') == 0, 269)
 				emit_command_log(c'/home/developer/sdk-pin.sha')
-				for step in [&char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh'), &char(c'compile-lscpu'), &char(c'inspect-lscpu')]! {
+				for step in [&char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh'), &char(c'compile-lscpu'), &char(c'compile-init'), &char(c'inspect-lscpu')]! {
 					C.snprintf(&path[0], path.len, c'%s/%s.log', output, step)
 					emit_command_log(&path[0])
 				}
@@ -279,7 +279,7 @@ fn native_userland_checks() {
 				mut st := C.stat{}
 				check(C.stat(&path[0], &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o777 == 0o700, 263)
 			}
-			for name in [&char(c'fetch'), &char(c'mount'), &char(c'chsh'), &char(c'lscpu')]! {
+			for name in [&char(c'fetch'), &char(c'mount'), &char(c'chsh'), &char(c'lscpu'), &char(c'init')]! {
 				C.snprintf(&path[0], path.len, c'%s/work/%s-bin', output, name)
 				fd := C.open(&path[0], C.O_RDONLY)
 				mut elf := [20]u8{}
@@ -292,7 +292,11 @@ fn native_userland_checks() {
 				log := C.open(&path[0], C.O_RDONLY)
 				mut text := [128]char{}
 				mut expected := [128]char{}
-				C.snprintf(&expected[0], expected.len, c'%s from util-vinix\n', name)
+				if C.strcmp(name, c'init') == 0 {
+					C.snprintf(&expected[0], expected.len, c'init from Vinix\n')
+				} else {
+					C.snprintf(&expected[0], expected.len, c'%s from util-vinix\n', name)
+				}
 				count := C.read(log, &text[0], text.len - 1)
 				check(log >= 0 && count > 0 && count < text.len - 1 && C.close(log) == 0
 					&& C.strcmp(&text[0], &expected[0]) == 0, 266)
@@ -300,7 +304,7 @@ fn native_userland_checks() {
 			C.snprintf(&path[0], path.len, c'%s/inspect-lscpu.log', output)
 			cpu_output_checks(&path[0])
 		}
-		C.puts(c'DEVELOPMENT USERLAND PASS: UID 1000, pinned SDK/V/runtime, two fresh workspaces, fetch/mount/chsh/lscpu compiled and executed, procfs CPU count matched')
+		C.puts(c'DEVELOPMENT USERLAND PASS: UID 1000, pinned SDK/V/runtime, two fresh workspaces, fetch/mount/chsh/lscpu/init compiled and executed, procfs CPU count matched')
 	}
 }
 

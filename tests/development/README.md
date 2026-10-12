@@ -76,10 +76,10 @@ must compile, write/read a file and execute its resulting binary. These runs
 receive 3 GiB of RAM. Failed qualification retains bounded command-log excerpts
 in the serial transcript as well as the native report.
 
-V runs also copy this repository's `fetch`, `mount`, `chsh` and `lscpu` sources and
-generate a build plan pinning those sources, V, GCC, the shell and the complete
-SDK/V/runtime trees. UID/GID 1000 builds them in two fresh workspaces with
-private HOME/temporary directories, then executes each recorded artifact's
+V runs also copy this repository's `fetch`, `mount`, `chsh`, `lscpu` and `init`
+sources and generate a build plan pinning those sources, V, GCC, the shell and
+the complete SDK/V/runtime trees. UID/GID 1000 builds them in two fresh
+workspaces with private HOME/temporary directories, then executes each recorded artifact's
 `--version` entry point. The fixture checks ownership, executable ELF headers
 and expected utility output. `lscpu` also runs its CPU inspection path; the
 fixture independently counts `/proc/cpuinfo` processor records and checks the
@@ -88,6 +88,10 @@ receipts, their input pins, step order, complete executed argv and matching
 binary hashes. The native plan and both receipts are retained alongside the
 compiler report. Version entry points provide execution smoke coverage;
 filesystem mounting and account-changing workflows have their own gates.
+The rebuilt `init` runs its version entry point before setting environment
+variables, changing directory, setting the hostname or entering its login loop.
+This checks native compilation and safe execution; booting it as PID 1 and
+qualifying its login workflow remain separate acceptance work.
 The ARM CPU backend reports the kernel's raw IDs and common feature names;
 it does not infer a model or independently qualify the kernel's hardware IDs.
 
@@ -198,6 +202,24 @@ The old CPUID package-count implementation failed the same Intel CPU-count
 gate in `/tmp/vinix-development-lscpu-intel-before-20261013-a`; using the OS
 online CPU count fixes it. These x86 checks execute a cross-built ELF;
 native x86 compiler qualification still needs a prepared native SDK.
+
+The init-extended native rebuild passed in
+`/tmp/vinix-development-init-arm-20261013-a`, using the same staged commands
+and SDK/V/runtime pins. Both workspaces compiled and executed all four
+utilities and `init`, completed all 11 steps and reverified every input pin.
+The source pin is
+`658a5fc75c5cd5fa7a07afa63a776cd5a6881927a9ca3ea2250fbb5ac7e4da0b`.
+This includes the current `fetch` color and x86 CPU-count source changes.
+Both workspaces produced `init-bin` hash
+`f8b6c9a30c3cfcd5cc6e4eeda2facb00d77afb6fb15c935ee7601403ce02a05c`
+and updated `fetch-bin` hash
+`c4995938f7b4c73c9eb78540b760c944709fc1ad3e2cf84b509a7a5b51e87b46`;
+the `mount`, `chsh` and ARM `lscpu` artifact hashes remained unchanged.
+The x86 controller/fixture regression passed without a native compiler SDK in
+`/tmp/vinix-development-init-x86-base-20261013-a`.
+Both architectures also passed after moving duplicate staging-tree retirement
+before ISO assembly, in `/tmp/vinix-development-prune-arm-20261013-a` and
+`/tmp/vinix-development-prune-x86-20261013-a`.
 
 This qualifies the tested per-account job workflows in Vinix guests. Watcher
 signal/deadline/interruption tests still have host coverage; installed service

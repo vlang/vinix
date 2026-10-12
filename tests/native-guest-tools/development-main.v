@@ -315,15 +315,16 @@ fn run() !int {
 			userland := root + '/home/developer/native-source'
 			os.mkdir(userland)!
 			mut steps := []BuildStep{}
-			for name in ['fetch', 'mount', 'chsh', 'lscpu'] {
+			for name in ['fetch', 'mount', 'chsh', 'lscpu', 'init'] {
 				os.mkdir(userland + '/' + name)!
+				source := guesthost.root() + if name == 'init' { '/init' } else { '/util-vinix/' + name }
 				mut files := ['main.v', 'v.mod']
 				if name == 'lscpu' {
 					files << ['cpu/cpu_x64.v', 'cpu/cpu_arm64.v', 'armcpu/info.v']
 				}
 				for file in files {
 					os.mkdir_all(os.dir(userland + '/' + name + '/' + file))!
-					os.cp(guesthost.root() + '/util-vinix/' + name + '/' + file, userland + '/' + name + '/' + file)!
+					os.cp(source + '/' + file, userland + '/' + name + '/' + file)!
 					os.chmod(userland + '/' + name + '/' + file, 0o644)!
 				}
 				steps << BuildStep{
