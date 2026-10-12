@@ -6,6 +6,10 @@ import os
 import sourcecommand
 import time
 
+// os.filelock's emitted sidecar branch also needs the native flock constants
+// when linked directly by GCC against musl.
+#include <sys/file.h>
+
 pub struct Pin {
 pub:
 	path   string
@@ -98,11 +102,13 @@ pub fn relative_path(path string) ! {
 // Newly created state is private from its first instant, including before
 // receipt/log creation. Never reuse a caller's or another session's directory.
 pub fn fresh_directory(path string) ! {
+	check_account()!
 	if os.exists(path) || os.is_link(path) { return error('output already exists: ${path}') }
 	os.mkdir(path, mode: 0o700)!
 }
 
 pub fn private_directory(path string) ! {
+	check_account()!
 	st := os.lstat(path)!
 	if st.get_filetype() != .directory || st.uid != u32(os.getuid()) || st.mode & 0o077 != 0 {
 		return error('state must be a directory owned by this user with mode 0700: ${path}')
@@ -118,6 +124,12 @@ pub fn environment(epoch i64) map[string]string {
 	env['TZ'] = 'UTC'
 	env['SOURCE_DATE_EPOCH'] = epoch.str()
 	return env
+}
+
+pub fn check_account() ! {
+	if os.getuid() != os.geteuid() || os.getgid() != os.getegid() {
+		return error('development tools require matching real and effective account IDs')
+	}
 }
 
 struct Clock {

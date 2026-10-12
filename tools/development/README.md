@@ -1,5 +1,26 @@
 # Native development tools
 
+The commands are `vinix-build`, [vinix-qualify](qualification.md),
+[vinix-vm](virtual-machines.md) and [vinix-jobs](scheduled-jobs.md).
+All implementations, staging and tests are V.
+
+Create a static development-tools overlay for either supported architecture:
+
+```
+v -gc none -cc cc run tools/development/stage.v aarch64 /path/to/new-staging
+v -gc none -cc cc run tools/development/stage.v x86_64 /path/to/another-new-staging
+```
+
+The default compiler is `ARCH-linux-musl-gcc`. A third argument can provide
+a JSON compiler argv, for example `["/usr/bin/clang","--target=aarch64-linux-musl","--sysroot=/path/to/sysroot","-fuse-ld=lld"]`.
+The stager builds the four commands under `usr/bin`, checks the ELF architecture,
+and writes compiler pins, argv and binary hashes to `development-tools.json`.
+Only a receipt with `complete: true` is a finished overlay. Failed builds retain
+their generated sources and logs under `.build`. Stage into a new directory;
+publish or install the overlay through the existing package workflow. The stager
+does not modify the running system. Commands refuse mismatched real/effective
+account IDs and are installed mode 0755, without set-ID bits.
+
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links
 and permissions, sets `SOURCE_DATE_EPOCH`, and records command results and output
@@ -74,8 +95,8 @@ pinning a compiler executable alone is not a full toolchain closure. Plans can
 add native generators, desktop translation/link commands and package archive
 commands as further steps. `{work}`, `{output}`, and pinned tool names are the
 only substitutions. Artifacts are paths relative to the copied source root.
-Unknown JSON fields and substitutions, escaped paths and unpinned top-level
-executables are errors. A later step can execute `{work}/ARTIFACT` produced by
+JSON uses strict type conversion. Unknown substitutions, escaped paths and
+unpinned top-level executables are errors. A later step can execute `{work}/ARTIFACT` produced by
 an earlier step; its recorded hash is checked before execution. This supports
 building generators, running them and testing the exact resulting binaries.
 Output directories must be new.
