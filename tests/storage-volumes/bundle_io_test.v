@@ -717,3 +717,62 @@ fn test_pool_membership_batch_previews_and_publication_detect_buffered_stdout_fa
 		}
 	}
 }
+
+fn test_priority_changes_and_all_keep_retries_use_atomic_publication_under_every_fault() {
+	work := os.join_path(os.temp_dir(), 'vinix-priority-io-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	mut order := PoolOrder{count: 2}; order.disks[0] = 1; order.disks[1] = 0
+	for retry in [false, true] {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}; members_io_fixture(mut set, true)
+			bundle_io = BundleIO{}; assert publish_bundle(path.str, &set)
+			mut expected := set; expected.windows[1] = set.windows[3]; expected.windows[3] = set.windows[1]
+			if retry { assert order_pool_plan(path.str, 3, &order, false) == 0 }
+			original := os.read_bytes(path)!
+			bundle_io = BundleIO{mode: mode}
+			assert order_pool_plan(path.str, 3, &order, false) == if mode == 1 { 0 } else { 1 }
+			assert bundle_io.closes == 2 && bundle_io.writes > 0 && os.ls(work)!.len == 1
+			current := os.read_bytes(path)!
+			mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded)
+			if mode == 1 || mode == 4 {
+				assert decoded == expected && (current == original) == retry
+				assert bundle_io.renames == 1 && bundle_io.flushes == 2
+			} else { assert current == original }
+			bundle_io = BundleIO{}; assert order_pool_plan(path.str, 3, &order, false) == 0
+			assert bundle_io.renames == 1 && bundle_io.flushes == 2 && bundle_io.closes == 2 && bundle_io.writes > 0
+			completed := os.read_bytes(path)!
+			bundle_io = BundleIO{mode: mode}
+			assert order_pool_plan(path.str, 3, &order, true) == 0 && os.read_bytes(path)! == completed
+			assert bundle_io == BundleIO{mode: mode}
+			order.disks[1] = 2
+			assert order_pool_plan(path.str, 3, &order, false) == 1 && os.read_bytes(path)! == completed
+			assert bundle_io == BundleIO{mode: mode}; order.disks[1] = 0
+		}
+	}
+}
+
+fn test_priority_preview_and_publication_detect_buffered_stdout_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-priority-output-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	mut order := PoolOrder{count: 2}; order.disks[0] = 1; order.disks[1] = 0
+	for preview in [false, true] {
+		mut set := PlanSet{}; members_io_fixture(mut set, true)
+		bundle_io = BundleIO{}; assert publish_bundle(path.str, &set) && C.fflush(C.stdout) == 0
+		original := os.read_bytes(path)!
+		child := C.fork(); assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY)
+			if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }; C.close(fd)
+			mut buffer := [4096]char{}
+			if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+			C._exit(if order_pool_plan(path.str, 3, &order, preview) == 1 { 0 } else { 4 })
+		}
+		mut code := i32(-1); assert C.waitpid(child, &code, 0) == child && code == 0
+		current := os.read_bytes(path)!; assert (current == original) == preview
+		mut expected := set
+		if !preview { expected.windows[1] = set.windows[3]; expected.windows[3] = set.windows[1] }
+		mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded) && decoded == expected
+	}
+}

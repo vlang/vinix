@@ -115,6 +115,15 @@ corrupt/symlink sources, version transitions and buffered output failure. Guests
 check mixed edits, first fit, desired mappings and persistent reverse-order
 retries. See [membership batch qualification](pool-members-batch.md).
 
+Priority tests enumerate all six-member permutations across interleaved pools
+and mixed MBR/GPT/sector fixtures: 2880 independently constructed expected orders.
+They preserve every bound, desired row and unrelated position, retain aggregate
+free capacity and verify that first fit follows the new order. Both commands
+cover full 64-member CLIs, invalid lists/sources, publisher faults, all-keep
+retries and buffered stdout failure. Guests check actual physical first fit,
+held views and explicit reordered priority across reboot. See
+[priority qualification](pool-order.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -141,8 +150,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 8000 utility processes across 200 warmup
-and 200 measured twenty-command cycles, with pool membership, query, batch
+its own process. The allowance includes 8800 utility processes across 200 warmup
+and 200 measured twenty-two-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
@@ -190,7 +199,7 @@ extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
 mapping capacity, previews/verifies/republishes both unchanged physical capacities,
-previews/publishes admission of two pool members,
+previews/publishes admission of two pool members and unchanged allocation priority,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
 batch, previews/publishes a two-mapping growth batch, checks/removes the scratch
 mappings, enrolls/forgets an empty offline

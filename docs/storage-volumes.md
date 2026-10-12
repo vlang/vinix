@@ -713,6 +713,45 @@ Physical capacity adoption, mapping allocation/growth and live preflight/replay
 remain explicit separate operations. Single-member commands retain their
 existing behavior. See [membership batch qualification](../tests/storage-volumes/pool-members-batch.md).
 
+## Explicit pool allocation priority
+
+```sh
+vinix-volume pool-preview-order /root/layout.vset 3 1 0
+vinix-volume pool-order /root/layout.vset 3 1 0
+vinix-volume pool-space /root/layout.vset 3
+```
+
+`pool-order BUNDLE POOL_ID DISK_INDEX [...]` sets the first-fit allocation
+priority of an existing pool. List every current member exactly once, in the
+desired order, with 1–64 unsigned decimal disk indices. Pool and disk indices
+must be below 64; absent pools, incomplete lists, duplicates and disks outside
+the selected pool fail before publication or action reporting. Priority zero
+is considered first for subsequent allocations, then priority one and so on.
+
+The planner permutes only the table positions already occupied by that pool.
+Each member's disk, bounds and alignment move together. Unrelated pools retain
+their exact positions and relative order; disk identities/capacities, desired
+mapping rows/modes, unapplied growth, counts and aggregate free capacity remain
+unchanged. Existing placements stay on their current disks. Changing priority
+does not relocate data, reserve live space, or change live views or generations.
+The new priority is preserved by the existing checksummed V2 format and boot
+replay. Membership additions still append and matching membership retries keep
+this explicitly configured order.
+
+`pool-preview-order` accepts the same complete list and reports each requested
+priority, disk, previous priority and `action=move` or `action=keep`. It uses
+the same planner without device probes, a writer lock, temporary file or
+publication. Reports begin only after the entire list succeeds. A preview does
+not reserve the configuration; administration must serialize related edits.
+
+Publication holds the pinned directory writer lock from source read through
+report flushing. Every retry, including an unchanged order, writes, fsyncs,
+atomically renames and fsyncs the directory. Failure before rename keeps the
+original file; after rename the complete new priority may already be visible.
+Buffered output failure also returns an error. Inspect saved state or repeat
+the same complete order to confirm durability. Allocation and live preflight/
+replay remain separate. See [priority qualification](../tests/storage-volumes/pool-order.md).
+
 ## Pool expansion and mapping growth
 
 ```sh

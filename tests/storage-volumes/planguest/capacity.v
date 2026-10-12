@@ -40,6 +40,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 			pool_boot_check()
 			pool_growth_boot_check()
 			pool_members_batch_boot_check()
+			pool_order_boot_check()
 			check(status(c'/dev/mapper/vinix14').disk_id == status(parent).disk_id
 				&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id,
 				c'capacity boot maps the correct physical disks')
@@ -143,6 +144,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 		check(status(c'/dev/mapper/vinix14').generation == tail, c'mixed batch retains existing tail generation')
 		capacity_growth_batch(parent)
 		pool_batch_boot_check(parent)
+		pool_order(c'/root/saved.vset', c'3', c'1', c'0', false, 0, nil)
 		copy_plan(c'/root/saved.vset', c'/etc/vinix/volumes.vset')
 		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0,
 			c'capacity aliases cleanup')

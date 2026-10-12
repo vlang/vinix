@@ -49,6 +49,9 @@ fn test_directory_lock_excludes_all_saved_state_writers_but_preserves_readonly_i
 	members.rows[0] = PoolRegion{pool: 3, disk: 0}
 	assert members_batch_pool_plan(path.str, 3, &members, true, false) == 1
 	assert members_batch_pool_plan(path.str, 3, &members, true, true) == 0
+	mut order := PoolOrder{count: 1}; order.disks[0] = 0
+	assert order_pool_plan(path.str, 3, &order, false) == 1
+	assert order_pool_plan(path.str, 3, &order, true) == 0
 	assert edit_bundle_plan(path.str, 0, &row, false) == 1
 	assert grow_bundle_plan(path.str, 2, 8192) == 1
 	assert enroll_bundle_disk(path.str, c'/unused') == 1

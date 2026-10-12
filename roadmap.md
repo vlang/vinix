@@ -175,6 +175,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Atomic pool eligibility expansion batches with complete read-only previews, rollback on later failures, preserved allocation priority and durable equal-end retries](docs/storage-volumes.md#atomic-pool-expansion-batches).
   - [x] [Atomic multi-disk physical capacity adoption with complete previews, pinned read-only devices, final identity/geometry rechecks and durable equal-capacity retries](docs/storage-volumes.md#atomic-physical-capacity-adoption-batches).
   - [x] [Atomic pool membership additions/removals with complete previews, preserved allocation priority, whole-set rollback and durable matching/absent retries](docs/storage-volumes.md#atomic-pool-membership-batches).
+  - [x] [Explicit pool allocation priority with complete permutation previews, preserved bounds/mappings, atomic publication, durable retries and boot persistence](docs/storage-volumes.md#explicit-pool-allocation-priority).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

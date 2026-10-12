@@ -66,6 +66,7 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume plan-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [DISK_INDEX DEVICE EXPECTED_BYTES ...]\n       vinix-volume plan-preview-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [DISK_INDEX DEVICE EXPECTED_BYTES ...]\n')
 	C.printf(c'       vinix-volume pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume pool-remove BUNDLE POOL_ID DISK_INDEX\n       vinix-volume pool-space BUNDLE POOL_ID\n       vinix-volume pool-allocate BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]\n')
 	C.printf(c'       vinix-volume pool-add-batch BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES [...]\n       vinix-volume pool-preview-add-batch BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES [...]\n       vinix-volume pool-remove-batch BUNDLE POOL_ID DISK_INDEX [...]\n       vinix-volume pool-preview-remove-batch BUNDLE POOL_ID DISK_INDEX [...]\n')
+	C.printf(c'       vinix-volume pool-order BUNDLE POOL_ID DISK_INDEX [...]\n       vinix-volume pool-preview-order BUNDLE POOL_ID DISK_INDEX [...]\n')
 	C.printf(c'       vinix-volume pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES\n       vinix-volume pool-grow BUNDLE POOL_ID SLOT LENGTH_BYTES\n')
 	C.printf(c'       vinix-volume pool-allocate-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       vinix-volume pool-preview-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
 	C.printf(c'       vinix-volume pool-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [SLOT LENGTH_BYTES ...]\n       vinix-volume pool-preview-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [SLOT LENGTH_BYTES ...]\n')
@@ -75,6 +76,19 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'pool-order') == 0 || C.strcmp(argv[1], c'pool-preview-order') == 0) {
+			if argc < 5 || argc > 68 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			if pool >= 64 { return usage() }
+			mut order := &PoolOrder(C.alloca(sizeof(PoolOrder)))
+			*order = PoolOrder{count: argc - 4}
+			for i in 0 .. order.count {
+				disk := decimal(argv[4 + i]) or { return usage() }
+				if disk >= 64 { return usage() }
+				order.disks[i] = u32(disk)
+			}
+			return order_pool_plan(argv[2], u32(pool), order, C.strcmp(argv[1], c'pool-preview-order') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'pool-add-batch') == 0
 			|| C.strcmp(argv[1], c'pool-preview-add-batch') == 0
 			|| C.strcmp(argv[1], c'pool-remove-batch') == 0

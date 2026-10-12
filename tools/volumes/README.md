@@ -92,6 +92,13 @@ removals support durable retries. A later failure discards the entire edit.
 without a writer lock or publication. See
 [membership batch rules](../../docs/storage-volumes.md#atomic-pool-membership-batches).
 
+`pool-order BUNDLE POOL_ID DISK_INDEX [...]` sets an existing pool's allocation
+priority with a complete member permutation. Member bounds and desired mappings
+are preserved; unrelated pools keep their positions. `pool-preview-order`
+reports the complete move/keep list without publication or writer locking.
+Unchanged-order retries still complete both flushes. See
+[priority rules](../../docs/storage-volumes.md#explicit-pool-allocation-priority).
+
 `pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES`
 enrolls an eligible region in a persistent allocation pool. `pool-space BUNDLE
 POOL_ID` reports each member and full-width aggregate capacity. `pool-allocate
