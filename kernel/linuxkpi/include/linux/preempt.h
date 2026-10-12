@@ -13,6 +13,10 @@ bool in_nmi(void);
  * inlines. Native preempt_count does not encode IRQ/BH context in these bits. */
 #define SOFTIRQ_OFFSET (1UL << 8)
 #define HARDIRQ_OFFSET (1UL << 16)
+/* Parsing unchanged BH inlines supplies declarations, not a working BH
+ * service. Context-bit mutation remains unresolved at link time. */
+#define SOFTIRQ_DISABLE_OFFSET (2 * SOFTIRQ_OFFSET)
+void preempt_count_add(int value);
 #define preempt_disable() vinix_linuxkpi_preempt_disable()
 #define preempt_enable() vinix_linuxkpi_preempt_enable()
 #define preempt_enable_no_resched() vinix_linuxkpi_preempt_enable_no_resched()

@@ -25,7 +25,10 @@
 #define CONFIG_MESSAGE_LOGLEVEL_DEFAULT 4
 #define CONFIG_CONSOLE_LOGLEVEL_DEFAULT 7
 #define CONFIG_CONSOLE_LOGLEVEL_QUIET 4
-/* SMP SRCU has independent reader/grace-period state. Ordinary RCU is pending. */
+/* Select the genuine SMP, non-PREEMPT_RCU reader/declaration ABI. Native grace
+ * periods use immutable boot CPUs; no Linux tree/hotplug implementation is
+ * imported. SRCU retains its independent reader/grace-period state. */
+#define CONFIG_TREE_RCU 1
 #define CONFIG_TREE_SRCU 1
 /* Do not alias NMI entrypoints to readers using the native per-CPU registry. */
 #define CONFIG_NEED_SRCU_NMI_SAFE 1

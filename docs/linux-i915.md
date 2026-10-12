@@ -15,8 +15,8 @@ class matching Linux's own Tiger Lake table. Confirm the actual device with
 SHA256, and a separately pinned manifest of every imported file. Fetch with:
 
 ```sh
-python3 kernel/linuxkpi/upstream.py fetch
-python3 kernel/linuxkpi/upstream.py verify
+build-support/run-v-tool.sh tests/linuxkpi/upstream_source.v fetch
+build-support/run-v-tool.sh tests/linuxkpi/upstream_source.v verify
 ```
 
 The complete upstream `drivers/gpu/drm/i915` directory, Linux headers and
@@ -227,9 +227,33 @@ after a filesystem failure. Mutable build inputs still require isolation.
   barriers capture their submission boundary before serializing waiters and
   include callbacks still executing. Cleanup requires stopped readers,
   producers and API users, then joins GP/timer/callback activity before freeing
-  either allocation. There is no allocation per reader or callback. Ordinary
-  RCU, NMI-safe SRCU, down/up context-independent SRCU and CPU hotplug remain
+  either allocation. There is no allocation per reader or callback.
+  NMI-safe SRCU, down/up context-independent SRCU and CPU hotplug remain
   unresolved; SRCU does not provide ordinary RCU's implicit read regions.
+- Ordinary nonpreemptible RCU retains the original Linux reader and pointer
+  publication macros. Grace periods force real maskable interrupts on every
+  immutable boot CPU and wait for CPU-owned outer returns with interrupted
+  IF enabled, no scheduler pins and no remaining maskable IRQ depth. Arbitrary
+  IRQ-off and pinned regions are protected, including callbacks that never
+  explicitly call `rcu_read_lock`. Saved IF belongs to the original interrupt
+  frame; enabling IF inside a handler does not acknowledge its interrupted
+  reader. The IRQ hook uses permanent scalar storage and full memory ordering,
+  with no allocation, lock, task borrow or wakeup.
+  Two private boot-lifetime pthreads advance grace periods and serial callbacks
+  independently of workqueue capacity. Original intrusive heads allocate
+  nothing on enqueue; callbacks run with IRQs enabled and preemption disabled,
+  may self-requeue or free their detached object, and dispatch never reads a
+  head after invocation. `rcu_barrier` captures the submitted ordinal at its
+  call boundary and waits for callback return, excluding later submissions.
+  Synchronization and polling require a full grace period starting after their
+  snapshot; exact upstream cookie comparisons preserve wrap and old-cookie
+  behavior. Expedited synchronization uses the same forced native service,
+  without a separate latency guarantee. Constructor failures join and verify
+  actual off-stack retirement before releasing either worker owner.
+  PREEMPT_RCU, NMI/BH/task RCU, CPU hotplug/NOHZ, `kfree_rcu`/`kvfree_rcu`
+  ownership and the completed-cookie shortcut remain unresolved. Selecting
+  `CONFIG_TREE_RCU` supplies the original nonpreemptible ABI; it does not import
+  Linux's hierarchical implementation. Native validation is recorded below.
 - Unmodified Linux `wait.h`, `swait.h` and `completion.h` use native-backed
   queues and task wakeups. Ordinary wait queues preserve nonexclusive,
   exclusive and priority order, wake quotas, callback keys and automatic
@@ -437,7 +461,8 @@ after a filesystem failure. Mutable build inputs still require isolation.
   reject before consuming pending events or attaching listeners. Ordinary
   task wait behavior, including ARM's existing IRQ contract, is preserved.
   This does not implement Linux's context bit layout, NMI entry, BH dispatch,
-  IRQ registration or ordinary RCU grace periods. Scheduler IST1 still requires
+  IRQ registration. Ordinary RCU uses the saved outer-return state described
+  above. Scheduler IST1 still requires
   IRQ exclusion while it is active; nesting accounting cannot repair a frame
   overwritten by reentering that same stack.
 - A `current` task view embedded in the native x86 Thread, with
@@ -1381,7 +1406,7 @@ and `/tmp/vinix-linuxkpi-compiler-next-oct06-final-artifacts.json`.
 The complete i915 build still fails. Ordinary per-CPU storage and scheduler
 pins, current-task identity, ordinary blocking task states/wakeups and retained
 task references now have native implementations. Namespace-relative
-PID queries, SMP dispatch, full Linux interrupt-context encoding and runtime page-table
+PID queries, full Linux interrupt-context encoding and runtime page-table
 geometry/ownership still need a bridge. No `mm` field or dummy address space is exposed.
 Borrowed `current` must not be used after exit; callers retaining a view use
 `get_task_struct` before surrendering its running/owned lifetime and release
@@ -1394,7 +1419,7 @@ runtime subsystems:
    page/shmem management, GPU address spaces and TTM/GEM memory management.
 3. Remaining lock/wait variants,
    freezable/reclaim workqueues, remaining system queues, RCU work, remaining
-   timer modes, high-resolution timers and RCU lifetime rules.
+   timer modes, high-resolution timers and remaining RCU lifetime interfaces.
 4. Linux IRQ registration, interrupt synchronization and safe GPU reset paths.
 5. C DRM core integration, device nodes, file ownership, ioctl/mmap handling,
    DMA fences, sync objects and dma-buf lifetime handling. The existing V DRM
@@ -1729,3 +1754,69 @@ Final evidence is under
 `/Users/alex/.cache/vinix-linuxkpi/smp-oct10/worker-irq-final-validation.json`.
 Ordinary RCU remains the next implementation dependency; this worker fix does
 not establish GPU support.
+
+## Ordinary RCU and native V validation, 2026-10-12
+
+The ordinary callback, synchronization, barrier and polling-cookie service
+described above is now implemented. Native validation uses fresh detached
+x86 and ARM worktrees at **`ebefd710`**, with only this feature's explicit
+overlay. The final enabled ELF SHA256 is
+`7d0625d34d71b79d4e52664ed5df59a66dcacd118155e04bd572e1d0661763ee`.
+Both complete four-CPU normal and hypervisor-off SSE guests pass all **46**
+markers and **28** exact fourth-batch PMM/all-live-heap equalities. Ordinary
+RCU's measured fourth lifecycle recovers `381243392 -> 381243392` bytes in
+both normal and SSE guests. The actual
+ISOs contain that exact saved ELF; the SSE run executes the original copy
+helper and verifies FPU preservation. Neither run exercises GPU memory.
+
+The maintained V host runner passes strict GNU99/GNU11 ASan/UBSan profiles
+at CPU counts 1, 2, 4, 64, 65, 128 and 256, including both worker allocation
+and pthread construction failures, 20 overlapping barrier snapshots,
+self-free/requeue callbacks and 26 exact cookie boundary cases. Host CPU
+counts do not establish native operation on 256 CPUs. Independent source,
+actual generated-C, object and lifetime reviews cover the final native
+artifact, including the real IRQ frame offset and off-stack worker rollback.
+Enabled/default x86 and default ARM kernels compile and link. The final
+default x86 guest passes Linux-ABI startup without compatibility markers.
+
+The native heap observers now fill fixed caller-owned buffers without
+allocating. A diagnostic traced an observer's old 463-byte array request to
+one retained 512-byte-class slab page. A separate, allocation-free scalar
+diagnostic accounted for a later 12 KiB loss exactly: classes 48, 192 and
+768 each gained one page with unchanged live counts as the controller moved
+between CPUs. The scalar fixture now executes its real complete workload
+once on every boot CPU, with a bound neighbor writer, before its original
+three warmups and measured fourth lifecycle. It restores original affinity
+and NUMA state on all returning paths. No equality is relaxed, no allocator
+is trimmed between snapshots, and failed earlier artifacts remain recorded.
+
+The fixed online CPU domain rejects deep-suspend/hibernation plans before
+filesystem flush, userspace freeze, device suspension or CPU parking.
+The same captured plan is used after flushing, so a concurrent configuration
+change cannot enable parking after a safe preflight. Suspend-to-idle and
+device-only rehearsals remain available. Default profiles keep their original
+planning boundary. Both profiles pass 72 configuration/mutation controls;
+deleting the rejection makes its production-body control fail as expected.
+
+Boot-image restoration also preserves the CPU domain: the original named-device
+lookup and image/parent mode restrictions run, then restoration is declined
+before loader allocation or image reads, consumption, memory replacement or
+parking. Existing protection for valid and unreadable named images remains.
+Both profiles pass 24 metadata/protection cases; removing the guard, erasing
+the image or skipping device publication each fails a separate control. The
+first pre-open design failed unreadable-device protection review and was
+corrected. Removing only the saved-IF IRQ predicate in a private kernel fails
+the native held-reader fixture with its deadline; the log does not identify
+the precise reader mode or directly observe early acknowledgement.
+
+Import verification, fixture generation, ABI/bounds generation, native guest
+supervision and pinned ISO assembly use V tools without Python. The guest
+runner preserves the existing marker/failure policy and has separate process,
+signal and image-identity controls. The official default allocation gate
+still exits 1: baseline and feature have identical **394** sites, **199**
+groups and **166** existing failures. This is not a global allocation pass.
+Later shared-checkout Ethernet/boot-log commits are outside this frozen
+native evidence. The latest complete driver audit remains **4/269**; Linux
+task/MM, device, DMA and DRM dependencies and Tiger Lake validation remain.
+Durable evidence is under `/Users/alex/.cache/vinix-linuxkpi/smp-oct10/`,
+including the `rcu-oct12-*` artifacts and independent review receipts.

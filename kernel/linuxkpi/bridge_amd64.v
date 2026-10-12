@@ -489,6 +489,7 @@ pub fn initialise() {
 		if C.vinix_linuxkpi_workqueue_bootstrap() != 0 {
 			lib.kpanic(unsafe { nil }, c'Linux compatibility system queue initialization failed')
 		}
+		initialise_ordinary_rcu()
 		C.srcu_init()
 		C.wait_bit_init()
 		printk_bootstrap_result := C.vinix_linuxkpi_printk_bootstrap_native_selftest()
@@ -547,6 +548,10 @@ pub fn initialise() {
 			lib.kpanic(unsafe { nil }, c'Native worker IRQ rejection self-test failed')
 		}
 		C.kprintf(c'linuxkpi: native worker binding rejects IRQ-enabled handlers and preserves borrowed task state; no pages or heap objects retained\n')
+		if !rcu_native_selftest() {
+			lib.kpanic(unsafe { nil }, c'Native ordinary RCU self-test failed')
+		}
+		C.kprintf(c'linuxkpi: ordinary RCU implicit readers, native IRQ returns, callback barriers and cookies passed; no pages or heap objects retained\n')
 		if !work_irq_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Native workqueue IRQ identity self-test failed')
 		}

@@ -27,7 +27,7 @@ ifneq ($(ARCH),x86_64)
     $(error LINUXKPI currently supports ARCH=x86_64 only)
 endif
 ifeq ($(wildcard $(LINUXKPI_SOURCE_DIR)/.vinix-upstream.json),)
-    $(error Run python3 linuxkpi/upstream.py fetch before enabling LINUXKPI)
+    $(error Run ../build-support/run-v-tool.sh ../tests/linuxkpi/upstream_source.v fetch before enabling LINUXKPI)
 endif
 endif
 
@@ -315,7 +315,7 @@ ifeq ($(LINUXKPI),1)
     # Match the generator's resolved -MQ target, including macOS /tmp aliases.
     LINUXKPI_BOUNDS_HEADER := $(realpath $(CURDIR))/obj/linuxkpi/include/generated/bounds.h
     LINUXKPI_GENERATED_HEADERS := $(LINUXKPI_ABI_HEADERS) $(LINUXKPI_BOUNDS_HEADER)
-    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture smpfixture workirqfixture
+    LINUXKPI_FIXTURES := cachefixture i915policyfixture pciconfigfixture runtimefixture taskfixture timefixture timerfixture syncfixture wwfixture iofixture seqfixture srcufixture workerfixture workfixture usleepfixture waitbitfixture printkfixture smpfixture workirqfixture rcufixture
     LINUXKPI_FIXTURE_C := $(addprefix obj/linuxkpi/,$(addsuffix .c,$(LINUXKPI_FIXTURES)))
     LINUXKPI_FIXTURE_OBJ := $(LINUXKPI_FIXTURE_C:.c=.o)
     LINUXKPI_OBJ += $(LINUXKPI_FIXTURE_OBJ)
@@ -418,7 +418,7 @@ endif
 ifeq ($(LINUXKPI),1)
 .PHONY: linuxkpi-verify
 linuxkpi-verify:
-	python3 linuxkpi/upstream.py verify --base $(dir $(LINUXKPI_SOURCE_DIR))
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/upstream_source.v verify --base "$(dir $(LINUXKPI_SOURCE_DIR))"
 all: linuxkpi-verify
 
 $(LINUXKPI_OBJ) $(LINUXKPI_COBJ): | linuxkpi-verify
@@ -456,9 +456,9 @@ $(LINUXKPI_BOUNDS_HEADER): $(LINUXKPI_ABI_HEADERS) obj/linuxkpi/.bounds-command 
 
 -include $(LINUXKPI_BOUNDS_HEADER).d
 
-obj/linuxkpi/exchangecore.c obj/linuxkpi/exchange128core.c: obj/linuxkpi/%.c: linuxkpi/%/core.v ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
+obj/linuxkpi/exchangecore.c obj/linuxkpi/exchange128core.c: obj/linuxkpi/%.c: linuxkpi/%/core.v ../tests/linuxkpi/generate_module.v $(LINUXKPI_V_TOOL_HELPERS) $(V_CONFIG_STAMP)
 	mkdir -p "$(@D)"
-	python3 ../build-support/compile-v-module.py linuxkpi/$* $@ --arch amd64 -d nofloat
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/generate_module.v linuxkpi/$* $@ --arch amd64 -d nofloat
 
 obj/linuxkpi/exchangecore.o obj/linuxkpi/exchange128core.o: obj/linuxkpi/%.o: obj/linuxkpi/%.c GNUmakefile $(V_CONFIG_STAMP)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -Wno-unused-function -Wno-atomic-alignment -std=gnu11 -c $< -o $@
@@ -482,9 +482,9 @@ obj/linuxkpi/headercore.o: obj/linuxkpi/headercore.c GNUmakefile $(V_CONFIG_STAM
 
 # Independent diagnostic V fixtures call the actual upstream header ABI in
 # separate objects. The frozen original C goldens remain in Git history.
-$(LINUXKPI_FIXTURE_C): obj/linuxkpi/%.c: linuxkpi/%/core.v $(wildcard c/linuxkpi_*_v_contract.h) ../tests/linuxkpi/compile-v-fixture.py ../build-support/compile-v-module.py $(V_CONFIG_STAMP)
+$(LINUXKPI_FIXTURE_C): obj/linuxkpi/%.c: linuxkpi/%/core.v $(wildcard c/linuxkpi_*_v_contract.h) ../tests/linuxkpi/compile_v_fixture.v $(LINUXKPI_V_TOOL_HELPERS) $(V_CONFIG_STAMP)
 	mkdir -p "$$(dirname $@)"
-	python3 ../tests/linuxkpi/compile-v-fixture.py $* $@
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/linuxkpi/compile_v_fixture.v $* $@
 
 $(LINUXKPI_FIXTURE_OBJ): obj/linuxkpi/%.o: obj/linuxkpi/%.c GNUmakefile $(V_CONFIG_STAMP)
 	$(CC) $(CFLAGS) $(CPPFLAGS) $(LINUXKPI_CPPFLAGS) -Wno-unused-function -std=gnu11 -c $< -o $@
@@ -509,9 +509,9 @@ endif
 # Compile the maintained V sampler separately so benchmark callers can use
 # identical GCC flags for this object on Vinix and XNU.
 ifeq ($(ARCH),x86_64)
-obj/heap_benchmark.c: $(wildcard heapbench/*.v) ../tests/alloc-bench/compile-v-sampler.py c/heap_benchmark_v.h
+obj/heap_benchmark.c: $(wildcard heapbench/*.v) ../tests/native-generators/main.v $(wildcard ../tests/native-generators/generators/*.v) c/heap_benchmark_v.h
 	mkdir -p obj
-	python3 ../tests/alloc-bench/compile-v-sampler.py $@
+	V="$(V)" sh ../build-support/run-v-tool.sh ../tests/native-generators/main.v sampler $@
 
 obj/heap_benchmark.c.o: obj/heap_benchmark.c c/heap_benchmark_v.h GNUmakefile $(V_CONFIG_STAMP)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $< -o $@
@@ -557,6 +557,7 @@ obj/asm/x86_64/linuxkpi_varargs.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/aarch64/linuxkpi_storage.S.o obj/asm/x86_64/linuxkpi_storage.S.o: $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_fixture_abi.S.o: $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_irq_probe.S.o: $(V_CONFIG_STAMP)
+obj/asm/int_thunks_asm.S.o: $(V_CONFIG_STAMP)
 obj/asm/aarch64/linuxkpi_printk_fixture_abi.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/x86_64/linuxkpi_printk_fixture_abi.S.o: asm/x86_64/varargs.inc $(V_CONFIG_STAMP)
 obj/asm/aarch64/linuxkpi_workqueue_abi.S.o: asm/aarch64/varargs.inc $(V_CONFIG_STAMP)

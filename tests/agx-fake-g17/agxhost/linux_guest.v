@@ -15,6 +15,7 @@ pub fn (e GuestBindingFailure) msg() string { return 'guest library primitive fa
 pub fn (e GuestBindingFailure) code() int { return 0 }
 
 fn guest_call(method string, arguments map[string]json2.Any) !json2.Any {
+ if guest_native_active() { return guest_native_dispatch(method, arguments)! }
  println(json2.encode({'callback': json2.Any(method), 'arguments': json2.Any(arguments)}, escape_unicode: true))
  reply := hosttest.decode_json(os.get_raw_line())!.as_map()
  if 'error' in reply { return GuestBindingFailure{reply['error']!.as_map()} }
@@ -105,7 +106,7 @@ fn guest_drive(serial string, qemu_log string, timeout_text string, no_linuxkpi 
 }
 
 pub fn linux_guest(row map[string]json2.Any) !int {
- previous := unsafe { C.signal(C.SIGINT, C.SIG_IGN) }
+ previous := unsafe { C.signal(C.SIGINT, if guest_native_active() { voidptr(vm_native_signal) } else { C.SIG_IGN }) }
  defer { unsafe { C.signal(C.SIGINT, previous) } }
  root := guest_decode(row['root']!)!
  state := guest_resolve(guest_decode(row['state_dir']!)!)!
@@ -122,8 +123,12 @@ pub fn linux_guest(row map[string]json2.Any) !int {
  guest_mkdir(rootfs + '/sbin', true, false)!
  for name in ['dev', 'proc', 'sys', 'root'] { guest_mkdir(rootfs + '/' + name, false, false)! }
  generated := state + '/guest_init.c'
- python := guest_decode(row['python']!)!
- guest_run([python, root + '/tests/kernel-gaps/compile-v-fixture.py', generated, '--arch', 'x86_64', '--module', root + '/tests/linuxkpi/initfixture'], {}, false, false)!
+ if guest_native_active() {
+  hosttest.generate_module(root + '/tests/linuxkpi/initfixture', generated, 'amd64', ['nofloat'])!
+ } else {
+  python := guest_decode(row['python']!)!
+  guest_run([python, root + '/tests/kernel-gaps/compile-v-fixture.py', generated, '--arch', 'x86_64', '--module', root + '/tests/linuxkpi/initfixture'], {}, false, false)!
+ }
  guest_run([row['cc']!.str(), '--target=x86_64-linux-musl', '-std=gnu11', '-O2', '-nostdlib', '-ffreestanding', '-fno-stack-protector', '-fno-pie', '-Wno-unused-function', '-Wno-unused-parameter', '-I', root + '/kernel/c', '-isystem', root + '/kernel/freestnd-c-hdrs', '-static', '-fuse-ld=lld', '-Wl,-e,_start', '-Wl,--build-id=none', generated, root + '/tests/linuxkpi/initfixture/entry.S', '-o', rootfs + '/sbin/init'], {}, false, false)!
  initramfs := state + '/initramfs.tar'
  guest_call('archive', {'path': guest_path(initramfs), 'rootfs': guest_path(rootfs)})!
@@ -138,7 +143,9 @@ pub fn linux_guest(row map[string]json2.Any) !int {
  overrides['VINIX_AMD64_KERNEL'] = guest_resolve(guest_decode(row['kernel']!)!)!
  overrides['VINIX_AMD64_INITRAMFS'] = initramfs
  overrides['VINIX_AMD64_ISO'] = iso
- guest_run([root + '/build-support/build-amd64-iso.sh'], overrides, true, true)!
+ if guest_native_active() { guest_native_iso(root, overrides)! } else {
+  guest_run([root + '/build-support/build-amd64-iso.sh'], overrides, true, true)!
+ }
  serial := state + '/serial.log'
  qemu_log := state + '/qemu.log'
  command := [qemu, '-M', 'q35,smm=off', '-m', '512', '-smp', '4', '-accel', 'tcg', '-cpu', row['cpu']!.str(), '-display', 'none', '-monitor', 'none', '-drive', 'if=pflash,format=raw,unit=0,readonly=on,file=' + firmware, '-cdrom', iso, '-serial', 'file:' + serial, '-no-reboot']

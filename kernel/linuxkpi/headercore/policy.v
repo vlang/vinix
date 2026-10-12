@@ -7,11 +7,14 @@ module headercore
 #include "linuxkpi_header_primitive_v_contract.h"
 fn C.vinix_linuxkpi_preempt_count() u32
 fn C.irqs_disabled() bool
+fn C.vinix_linuxkpi_may_sleep() bool
 
 @[export: 'vinix_zero_or_null_ptr']
 pub fn zero_or_null(pointer usize) bool { return pointer <= 16 }
 
 @[export: 'vinix_preemptible']
 pub fn preemptible() bool {
-	return C.vinix_linuxkpi_preempt_count() == 0 && !C.irqs_disabled()
+	// Observe IF, pins and actual maskable IRQ depth together. An IRQ-enabled
+	// nested handler still borrows its interrupted task rather than task context.
+	return C.vinix_linuxkpi_may_sleep()
 }

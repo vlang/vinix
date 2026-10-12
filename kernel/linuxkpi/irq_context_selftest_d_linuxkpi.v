@@ -433,11 +433,17 @@ fn irq_test_lifecycle() bool {
 
 fn irq_test_snapshot(_snapshot &IrqTestSnapshot) bool {
 	mut snapshot := unsafe { _snapshot }
-	mut classes := memory.heap_classes() @[freed]
-	defer { unsafe { classes.free() } }
-	if classes.len > snapshot.live.len { return irq_test_require(false, c'heap snapshot capacity') }
-	snapshot.count = classes.len
-	for i, class in classes { snapshot.sizes[i] = class.size; snapshot.live[i] = class.live }
+	mut classes := [64]memory.HeapClass{}
+	count := memory.heap_classes_into(unsafe { &classes[0] }, classes.len)
+	if count < 0 || count > snapshot.live.len {
+		return irq_test_require(false, c'heap snapshot capacity')
+	}
+	snapshot.count = count
+	for i in 0 .. count {
+		class := classes[i]
+		snapshot.sizes[i] = class.size
+		snapshot.live[i] = class.live
+	}
 	return true
 }
 

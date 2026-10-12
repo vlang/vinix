@@ -16,6 +16,11 @@ import time
 
 fn C.vinix_linuxkpi_test_thread_reap_ready(voidptr) bool
 fn C.vinix_linuxkpi_test_reap_quiescent() bool
+fn C.vinix_linuxkpi_cpu_id() u32
+fn C.vinix_linuxkpi_percpu_count() u32
+fn C.vinix_linuxkpi_worker_bind(u32) int
+fn C.vinix_linuxkpi_irq_save() u64
+fn C.vinix_linuxkpi_irq_restore(u64)
 
 const scalar_test_base = u64(0x24000000)
 const scalar_test_lazy_base = u64(0x48000000)
@@ -46,6 +51,8 @@ mut:
 	writes    u64
 	address   voidptr
 	width     u64
+	warm_cpu  u32
+	bind_error int
 }
 
 fn scalar_test_require(ok bool, message &char) bool {
@@ -57,13 +64,14 @@ fn scalar_test_require(ok bool, message &char) bool {
 
 fn scalar_test_snapshot(_snapshot &ScalarSnapshot) bool {
 	mut snapshot := unsafe { _snapshot }
-	mut classes := memory.heap_classes() @[freed]
-	defer { unsafe { classes.free() } }
-	if classes.len > snapshot.live.len {
+	mut classes := [64]memory.HeapClass{}
+	count := memory.heap_classes_into(unsafe { &classes[0] }, classes.len)
+	if count < 0 || count > snapshot.live.len {
 		return scalar_test_require(false, c'heap snapshot capacity')
 	}
-	snapshot.count = classes.len
-	for i, class in classes {
+	snapshot.count = count
+	for i in 0 .. count {
+		class := classes[i]
 		snapshot.sizes[i] = class.size
 		snapshot.live[i] = class.live
 	}
@@ -274,8 +282,23 @@ fn scalar_test_store(address voidptr, width u64, value u64) {
 
 fn scalar_test_writer(argument voidptr) {
 	mut writer := unsafe { &ScalarWriter(argument) }
+	if writer.warm_cpu != ~u32(0) {
+		writer.bind_error = C.vinix_linuxkpi_worker_bind(writer.warm_cpu)
+		if writer.bind_error == 0 && C.vinix_linuxkpi_cpu_id() != writer.warm_cpu {
+			writer.bind_error = -1
+		}
+		if writer.bind_error != 0 {
+			// Publish failure before readiness, then release the borrowed
+			// controller only through the same real join/off-stack path.
+			katomic.store(mut &writer.ready, true)
+			event.pthread_exit(unsafe { nil })
+		}
+	}
 	katomic.store(mut &writer.ready, true)
 	for !katomic.load(&writer.quit) {
+		if writer.warm_cpu != ~u32(0) && C.vinix_linuxkpi_cpu_id() != writer.warm_cpu {
+			lib.kpanic(unsafe { nil }, c'usercopy: scalar warm writer migrated outside its CPU')
+		}
 		request := katomic.load(&writer.request)
 		if request == katomic.load(&writer.completed) {
 			event.await_one(mut writer.wake, true) or { sched.reschedule() }
@@ -427,9 +450,9 @@ fn scalar_test_join(_writer &ScalarWriter, actor &proc.Thread) bool {
 	return true
 }
 
-fn scalar_test_lifecycle() bool {
+fn scalar_test_lifecycle_on(warm_cpu u32) bool {
 	mut writer := unsafe { &ScalarWriter(C.vinix_stack_alloc(sizeof(ScalarWriter))) }
-	unsafe { *writer = ScalarWriter{} }
+	unsafe { *writer = ScalarWriter{warm_cpu: warm_cpu} }
 	mut actor := sched.try_new_kernel_thread(voidptr(scalar_test_writer), writer) or {
 		return scalar_test_require(false, c'writer creation')
 	}
@@ -448,6 +471,7 @@ fn scalar_test_lifecycle() bool {
 		if !joined { scalar_test_join(writer, actor) }
 	}
 	if !scalar_test_wait_ready(writer) { return false }
+	if !scalar_test_require(writer.bind_error == 0, c'warm writer CPU binding') { return false }
 	for _ in 0 .. 3 {
 		if !scalar_test_batch(writer) { return false }
 	}
@@ -466,7 +490,50 @@ fn scalar_test_lifecycle() bool {
 	return join_ok
 }
 
+fn scalar_test_lifecycle() bool {
+	return scalar_test_lifecycle_on(~u32(0))
+}
+
+fn scalar_test_restore_placement(owner &proc.Thread, mask u64, node int) {
+	flags := C.vinix_linuxkpi_irq_save()
+	katomic.store(mut unsafe { &owner.affinity_mask }, mask)
+	katomic.store(mut unsafe { &owner.numa_node }, node)
+	C.vinix_linuxkpi_irq_restore(flags)
+}
+
+fn scalar_test_warm_cpus() bool {
+	count := C.vinix_linuxkpi_percpu_count()
+	flags := C.vinix_linuxkpi_irq_save()
+	owner := proc.current_thread()
+	if flags & (u64(1) << 9) == 0 || owner == unsafe { nil } || count == 0 || count > 64 {
+		C.vinix_linuxkpi_irq_restore(flags)
+		return scalar_test_require(false, c'per-CPU warmup task and affinity domain')
+	}
+	mask := katomic.load(&owner.affinity_mask)
+	node := katomic.load(&owner.numa_node)
+	C.vinix_linuxkpi_irq_restore(flags)
+	// This is the executing controller's borrowed Thread. It cannot exit
+	// before this frame returns; all child lifetimes join before restoration.
+	defer { scalar_test_restore_placement(owner, mask, node) }
+	// A freed mapping can leave one spare per CPU/class. Three migrating
+	// batches do not enumerate those caches. Run the real full workload on
+	// each boot CPU exactly once, with a genuinely bound neighbor writer.
+	for target := u32(0); target < count; target++ {
+		if !scalar_test_require(C.vinix_linuxkpi_worker_bind(target) == 0
+			&& C.vinix_linuxkpi_cpu_id() == target, c'warm controller CPU binding') { return false }
+		before := memory.free_bytes()
+		neighbor := if target + 1 < count { target + 1 } else { u32(0) }
+		if !scalar_test_lifecycle_on(neighbor) { return false }
+		if !scalar_test_require(C.vinix_linuxkpi_cpu_id() == target,
+			c'warm controller placement after sleeping lifecycle') { return false }
+		C.kprintf(c'usercopy: scalar per-CPU complete-lifecycle warmup CPU=%u writer=%u free-byte baseline=%llu after=%llu\n',
+			target, neighbor, before, memory.free_bytes())
+	}
+	return true
+}
+
 pub fn scalar_selftest() bool {
+	if !scalar_test_warm_cpus() { return false }
 	// First use can populate permanent shared vmap page tables for the two
 	// guarded worker stacks. Warm the complete lifetime, including actual
 	// off-stack reclamation, before measuring another complete lifetime.

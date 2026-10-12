@@ -161,6 +161,29 @@ fn fail_sleep(step string, device string, reason string) {
 	syspower_stats.failed_device = if device.len == 0 { '' } else { device.clone() }
 }
 
+struct SleepPlan {
+	rehearsing_platform bool
+	rehearsing          bool
+	going_deep          bool
+	going_disk          bool
+}
+
+// Capture the requested transition once. Configuration can be changed by
+// another caller while writes are being flushed; the plan used by preflight
+// must also be the plan which decides whether any processor is parked.
+fn sleep_plan(kind SleepDepth) SleepPlan {
+	rehearsal := syspower_rehearsal
+	deep_wanted := kind == .deep && mem_is_deep()
+	rehearsing_platform := rehearsal == .platform && deep_wanted
+	rehearsing := rehearsal != .none && !rehearsing_platform
+	return SleepPlan{
+		rehearsing_platform: rehearsing_platform
+		rehearsing: rehearsing
+		going_deep: deep_wanted && !rehearsing
+		going_disk: kind == .disk && !rehearsing
+	}
+}
+
 // Sleep. Returns when the machine is awake again: true if it slept (or
 // rehearsed) and came back, false if the sleep was refused, with the reason
 // in the statistics. Called from a thread, never from an interrupt.
@@ -170,6 +193,18 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	}
 	defer {
 		katomic.store(mut &syspower_sleeping, u32(0))
+	}
+	mut plan := SleepPlan{}
+	$if linuxkpi ? {
+		// The compatibility SMP/RCU domain keeps its boot CPUs online.
+		// Capture before flushing, freezing or changing device/CPU state.
+		// A platform rehearsal of deep sleep also parks CPUs; suspend to
+		// idle and device-only rehearsals keep every CPU online.
+		plan = sleep_plan(kind)
+		if plan.going_deep || plan.going_disk {
+			fail_sleep('platform', '', 'LinuxKPI requires every boot CPU to remain online')
+			return false
+		}
 	}
 	started := devcore.now_ns()
 	if kind == .disk && !platform_hibernate_available() {
@@ -183,11 +218,15 @@ pub fn enter_sleep(kind SleepDepth) bool {
 	// A rehearsal of the platform's part is one of a suspend to RAM: where
 	// `mem` means suspend to idle the platform has no part, and the devices
 	// are what is rehearsed. So they are for a suspend to disk.
-	deep_wanted := kind == .deep && mem_is_deep()
-	rehearsing_platform := syspower_rehearsal == .platform && deep_wanted
-	rehearsing := syspower_rehearsal != .none && !rehearsing_platform
-	going_deep := deep_wanted && !rehearsing
-	going_disk := kind == .disk && !rehearsing
+	$if !linuxkpi ? {
+		// Default profiles select their transition at the original boundary,
+		// after the first filesystem flush.
+		plan = sleep_plan(kind)
+	}
+	rehearsing_platform := plan.rehearsing_platform
+	rehearsing := plan.rehearsing
+	going_deep := plan.going_deep
+	going_disk := plan.going_disk
 	// Either way the devices come back from having had no power.
 	powering_down := going_deep || going_disk
 	sched.freeze_userspace()

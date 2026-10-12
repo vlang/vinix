@@ -11,4 +11,10 @@ void vinix_x86_maskable_irq_enter(uint32_t vector, uint64_t saved_cs);
 void vinix_x86_maskable_irq_exit(uint32_t vector);
 uint32_t vinix_x86_maskable_irq_depth(void);
 
+#ifdef VINIX_LINUXKPI
+/* Actual normal maskable return, after depth exit but before frame restoration.
+ * Requires IF=0 and kernel GS; saved_flags belongs to this interrupted frame. */
+void vinix_linuxkpi_rcu_native_irq_exit(uint64_t saved_flags);
+#endif
+
 #endif

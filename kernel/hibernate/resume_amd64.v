@@ -559,6 +559,16 @@ pub fn resume_at_boot() {
 			i32(hib_device_problem.len), hib_device_problem.str)
 		return
 	}
+	$if linuxkpi ? {
+		// Preserve the metadata lookup, image/parent restrictions and device
+		// publication used by look_for_images(), including unreadable images.
+		// Image handoff would park CPUs and replace compatibility workers;
+		// reject before allocating a loader or reading/consuming the image.
+		hib_boot_verdict = 'LinuxKPI requires every boot CPU to remain online'
+		C.kprintf(c'hibernate: boot image restoration is not attempted: %.*s\n',
+			i32(hib_boot_verdict.len), hib_boot_verdict.str)
+		return
+	}
 	mut loader := &Loader(memory.calloc(1, sizeof(Loader)))
 	if loader == unsafe { nil } {
 		return

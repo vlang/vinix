@@ -1,7 +1,7 @@
 # Linux i915 next-session handoff
 
-Updated 2026-10-10 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
-Native SMP validation baseline: **`a0ae707a`**, with the final feature overlay described below. Recheck HEAD and the worktree before
+Updated 2026-10-12 for `/Users/alex/code/vinix`, on macOS ARM64 with zsh.
+Ordinary RCU validation baseline: **`ebefd710`**, with the final feature overlay described below. Recheck HEAD and the worktree before
 starting; other sessions use this checkout. The main status document is
 [linux-i915.md](linux-i915.md).
 
@@ -304,7 +304,7 @@ archive into another separate reference directory, never into the import.
 - Owners stop readers/producers/API users before cleanup. Finish a full GP and
   callback barrier, synchronously cancel delayed GP activity, then flush/cancel
   callback work before freeing per-CPU data or usage. Static cleanup is forbidden.
-- Ordinary RCU, NMI-safe and context-independent down/up SRCU remain unresolved.
+- NMI-safe and context-independent down/up SRCU remain unresolved.
   Do not treat explicit SRCU counters as ordinary RCU implicit read protection.
 
 ### Wound/wait lifetime contracts
@@ -380,18 +380,42 @@ archive into another separate reference directory, never into the import.
   records, observes all off-stack handoffs before any final put, and waits
   through actual deferred frees under one shared retirement bound.
 
-### Ordinary RCU prerequisites
+### Ordinary RCU contracts
 
 Explicit SRCU counters do not cover ordinary RCU's implicit IRQ-off, preemption
 or BH read regions. Native x86 maskable entry/exit and scheduler handoffs now
 have real CPU-owned accounting; the final validation below covers actual
-nested interrupts and task returns. Linux's full context encoding, softirq/BH
-exclusion/dispatch and ordinary RCU remain pending. Current x86 NMI entry also needs paranoid GS and stack
+nested interrupts and task returns. Ordinary nonpreemptible RCU now uses actual
+outer maskable returns. Linux's full context encoding and softirq/BH
+exclusion/dispatch remain pending. Current x86 NMI entry also needs paranoid GS and stack
 handling: an NMI can arrive during ring-0 windows with user GS or a released
 old Thread. A counter hook on the current ordinary thunk would be unsafe.
-Do not resolve in_nmi/local_bh/ordinary RCU with constant or explicit-reader-only
+Do not resolve in_nmi/local_bh with constant or explicit-reader-only
 stubs. Read-only next-step design is in
 `/tmp/vinix-linuxkpi-context-design.md`, with pinned entry reference paths.
+
+- Keep the IRQ hook behind the native active gate, which is published only
+  after the boot owner warms generated module initialization and both worker
+  owners are ready. AP interrupt entry must never run lazy V initialization.
+- The ordinary THUNK closes maskable depth while CLI/kernel GS and the original
+  frame remain installed. Its saved RFLAGS is at `160(%rsp)`. Acknowledge only
+  saved IF=1, zero pins and zero remaining depth. Never substitute handler IF,
+  another CPU's state, a CSD completion or an explicit SRCU counter.
+- GP request publication, CPU-owned acknowledgement and GP completion have
+  full ordering. Real IPIs include the calling CPU and are reissued while a
+  genuine implicit reader remains. The hook takes no locks and allocates nothing.
+- GP and callback pthread owners are permanent and independent of workqueue
+  active limits. Failed construction joins and waits for actual off-stack
+  retirement before final task release and owner free.
+- Capture original callback next/function before invocation and never read the
+  head afterward. Callbacks are serial, IRQ-enabled and pinned; they may free
+  or requeue their object. Complete the ordinal only after callback return.
+- Barriers snapshot the enqueue ordinal under the lock at their call boundary,
+  then wait without moving that boundary. Public cookie polling retains the
+  exact original signed/wrap comparison, including its old-cookie guard band.
+- `kfree_rcu`/`kvfree_rcu`, completed-cookie shortcuts, PREEMPT_RCU, task/NMI/BH
+  RCU, hotplug and NOHZ remain unresolved. Native operation has a fixed boot
+  CPU domain. Host 256-CPU coverage does not establish native 256-CPU operation.
 
 ## Shared PCI transport and next user-copy prerequisite
 
@@ -1333,7 +1357,7 @@ there; preserve known baselines and clearly scope feature-specific evidence.
 
 ## Remaining path to completion
 
-1. Remaining synchronization (ordinary RCU), SMP/context,
+1. Remaining synchronization/RCU interfaces and SMP/context,
    additional system workqueues and timer interfaces.
 2. Linux device/PCI registration/configuration/removal and devres ownership.
 3. MMIO cache attributes, DMA/SG, page/shmem, GPU address spaces and TTM/GEM.
@@ -1432,5 +1456,81 @@ generated-code and native lifetime review is separate from the failed initial
 fixture, which called a CLI-only CPU accessor with IF enabled. Keep the final
 capture-IF-then-CLI observation order and the post-IRET stack retirement rule.
 Durable evidence: `smp-oct10/worker-irq-final-validation.json` under the cache
-root above. Ordinary RCU development is still in progress; do not treat its
-compile-only artifacts as a completed grace-period service.
+root above. The subsequent ordinary-RCU results are recorded below; earlier
+compile-only artifacts remain insufficient runtime evidence.
+
+## Latest continuation: ordinary RCU and V-only tooling
+
+Validation now uses fresh worktrees at **`ebefd710`**, after refreshing 291
+committed kernel paths from the older baseline. The saved enabled ELF is
+`7d0625d34d71b79d4e52664ed5df59a66dcacd118155e04bd572e1d0661763ee`;
+both exact-image normal/SSE guests pass **46** markers and **28** strict PMM
+and live-heap equalities. The RCU fourth lifecycles recover all pages and
+classes; genuine implicit pinned/IRQ-off readers, nested IRQ-enabled handlers,
+actual saved-IF0 software interrupts, FIFO/self-free/requeue callbacks, callback
+barrier snapshots and polling cookies are exercised. Default x86 build/guest
+and ARM disabled build pass. Independent reviews cover final source, generated
+C, objects, stack storage, worker references and actual off-stack retirement.
+
+All implementation and validation tooling must now be V. Current commands:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/upstream_source.v verify
+build-support/run-v-tool.sh tests/linuxkpi/rcu_callbacks.v --keep-directory /tmp/vinix-rcu-host-fresh
+build-support/run-v-tool.sh tests/linuxkpi/run_vm.v --kernel /absolute/enabled.elf --state-dir /tmp/vinix-rcu-normal-fresh --timeout 3600
+build-support/run-v-tool.sh tests/linuxkpi/run_vm.v --kernel /absolute/enabled.elf --state-dir /tmp/vinix-rcu-sse-fresh --timeout 3600 --cpu max,hypervisor=off
+```
+
+Replace the ELF path and use new state/proof directories. The new V fixture
+entry is `tests/linuxkpi/compile_v_fixture.v`; Make invokes it directly through
+the V launcher. Upstream verification, module/ABI/bounds/sampler generation
+and the guest's initfixture/ISO/process supervision also use V. Historical
+Python commands in this handoff are superseded; do not run their wrappers.
+The broad host shell runner still contains Python dependencies, so invoke
+the maintained V feature tools until that runner is migrated.
+
+Native observers use fixed caller buffers. An actual private diagnostic traced
+the former snapshot array request, 463 bytes, to a retained class-512 spare.
+A separate scalar diagnostic accounted for its full 12 KiB PMM deficit with
+one added page each in classes 48/192/768 and flat live counts during CPU
+migration. Finite real scalar warmups now enumerate every boot CPU and use
+a bound neighbor writer; original unbound warmups and every exact fourth
+equality remain. Controller affinity/NUMA are restored after all child joins,
+including partial failures. Do not replace this calibration with allocator
+trimming, additional until-pass retries or relaxed equalities.
+
+Committed suspend support can park CPUs offline. The compatibility profile
+rejects actual deep/hibernation plans before side effects, including deep
+platform rehearsal, then reuses its captured plan to prevent a setter race.
+Idle sleep and device-only rehearsals remain available; default profiles
+select at their old post-sync boundary. Both profiles pass 72 plan/mutation
+cases and an independently replayed removed-guard control fails as expected.
+Hotplug, deep sleep and hibernation need genuine domain lifecycle integration
+before that restriction can be removed.
+
+Boot restoration is separately guarded after the original named-device lookup,
+0600 image/parent restrictions and `hib_device` publication, before loader
+allocation or any image I/O/consumption/CPU parking. Keep that metadata path:
+the initial pre-open guard lost unreadable named-image disk protection and was
+rejected by review. Never use `refuse()` here; it erases the image header.
+Both profiles pass 24 exact production metadata/protection cases, and private
+removed-guard, destructive-refuse and pre-open controls each fail. The final
+normal/SSE RCU fourth rows recover `381243392 -> 381243392` and every live
+class. A private kernel removing only the saved-IF predicate fails the native
+held-scope fixture with its deadline; mode/early-ACK attribution is a source
+inference, not a direct log observation.
+
+The unmodified official default allocation gate has identical baseline/feature
+**394** sites, **199** groups and **166** existing failures. No global pass is
+claimed. Later Ethernet/boot-log changes in the shared checkout are outside
+this exact baseline's native result. Evidence remains under
+`/Users/alex/.cache/vinix-linuxkpi/smp-oct10/rcu-oct12-*`, plus the feature-tool
+and independent lifetime review subdirectories. Earlier failed versions and
+private causal diagnostics remain separate from the final PASS artifacts.
+
+The latest full i915 audit remains **4/269**, and GPU support remains incomplete.
+Next dependencies include task/MM/vfork ownership and GFP scopes, the reviewed
+integer/error/resource include closure, configured CPU feature policy,
+devices/DMA/DRM and firmware. Never expose dummy `task->mm`, parent or vfork
+completion fields: the native task view is 64 bytes and carries no such owner.
+Physical Tiger Lake or suitable passthrough validation is still required.

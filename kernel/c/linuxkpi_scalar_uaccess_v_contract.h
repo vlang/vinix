@@ -13,4 +13,11 @@ int vinix_linuxkpi_read_user_scalar(void *source, size_t size, uint64_t *result)
 bool vinix_linuxkpi_test_thread_reap_ready(void *owner);
 bool vinix_linuxkpi_test_reap_quiescent(void);
 
+/* Actual native placement for the finite per-CPU scalar workload warmup. */
+uint32_t vinix_linuxkpi_cpu_id(void);
+uint32_t vinix_linuxkpi_percpu_count(void);
+int vinix_linuxkpi_worker_bind(uint32_t cpu);
+uint64_t vinix_linuxkpi_irq_save(void);
+void vinix_linuxkpi_irq_restore(uint64_t flags);
+
 #endif

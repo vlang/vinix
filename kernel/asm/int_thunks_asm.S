@@ -80,6 +80,12 @@ interrupt_thunk_\num:
     cli
     mov $\num, %edi
     call vinix_x86_maskable_irq_exit
+#ifdef VINIX_LINUXKPI
+    // Original RFLAGS, after DS/ES and fifteen saved GPRs plus error/RIP/CS.
+    // An IF-off interrupted task and an outer IRQ/pinned scope are readers.
+    mov 160(%rsp), %rdi
+    call vinix_linuxkpi_rcu_native_irq_exit
+#endif
 .endif
     jmp interrupt_thunk_exit
 .endm

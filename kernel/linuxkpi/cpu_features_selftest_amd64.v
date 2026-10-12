@@ -14,13 +14,17 @@ mut:
 }
 
 fn cpu_feature_test_heap(snapshot &CPUFeatureHeapSnapshot) bool {
-	mut output := unsafe { snapshot }
-	mut classes := memory.heap_classes() @[freed]
-	defer { unsafe { classes.free() } }
-	if classes.len > output.live.len { return false }
-	output.count = classes.len
-	for i, class in classes { output.sizes[i] = class.size; output.live[i] = class.live }
-	return true
+	$if linuxkpi ? {
+		mut output := unsafe { snapshot }
+		mut classes := [64]memory.HeapClass{}
+		count := memory.heap_classes_into(unsafe { &classes[0] }, classes.len)
+		if count < 0 || count > output.live.len { return false }
+		output.count = count
+		for i in 0 .. count { output.sizes[i] = classes[i].size; output.live[i] = classes[i].live }
+		return true
+	} $else {
+		return false
+	}
 }
 
 fn cpu_feature_test_queries(expected u32) bool {
