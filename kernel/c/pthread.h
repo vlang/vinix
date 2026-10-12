@@ -18,18 +18,16 @@ typedef struct __threadattr pthread_attr_t;
 // functions below. `-target-libc-headers` leaves the declaring to us.
 //
 // The implementations are V functions in lib/stubs exported under these names.
-// The parameter spellings follow what V emits for each: a single pointer to a
-// struct it knows stays typed, while a double pointer or an opaque attribute
-// lowers to `void *`. A prototype that disagreed would be a conflicting
-// declaration, and every caller passes a pointer either way.
+// V's builtin pthread declarations and opaque-handle exports use `void *`.
+// Match that spelling at the C boundary; every caller still passes a pointer.
 //
 // The attribute calls are accepted and ignored: a kernel thread's stack is chosen
 // by the scheduler, not by the caller.
 int pthread_create(void *thread, void *attr, void *start_routine, void *arg);
 int pthread_join(void *thread, void *retval);
-int pthread_detach(struct __thread_data *thread);
+int pthread_detach(void *thread);
 void pthread_exit(void *retval);
-int pthread_equal(struct __thread_data *a, struct __thread_data *b);
+int pthread_equal(void *a, void *b);
 
 int pthread_attr_init(void *attr);
 int pthread_attr_setstacksize(void *attr, size_t stacksize);

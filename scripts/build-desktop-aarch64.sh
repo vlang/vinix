@@ -424,6 +424,7 @@ rm -f "$APP_SRC/gpu_present.h"
 "$SCRIPT_DIR/build-support/compile-v-module" \
     "$SCRIPT_DIR/desktop/gpucore" "$BUILD_DIR/gpu-present-soft.c" --arch arm64 \
     --header "$APP_SRC/gpu_present.h"
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/stage-v-runtime.v" "$BUILD_DIR/v-runtime"
 
 # Keep the compositor executable outside build/, just like the standalone
 # applications. A direct desktop build can then reuse it even after build/
@@ -439,7 +440,8 @@ DESKTOP_CACHE_ARGS=(
     --source "$V_REAL" --vlib "$(dirname "$V_REAL")/vlib"
     --source "$CC_SHIM"
     --source "$SCRIPT_DIR/desktop/execinfocore" --source "$SCRIPT_DIR/desktop/gpucore"
-    --source "$SCRIPT_DIR/build-support/compile-v-module.py"
+    --source "$SCRIPT_DIR/build-support/stage-v-runtime.v" --source "$BUILD_DIR/v-runtime"
+    --source "$SCRIPT_DIR/build-support/compile-v-module"
     --metadata "$LLVM_BIN/clang" --metadata "$LLVM_BIN/llvm-strip"
     --metadata "$SYSROOT/usr/include" --metadata "$GCCLIB/include"
     --metadata "$SYSROOT/usr/lib/crt1.o" --metadata "$SYSROOT/usr/lib/crti.o"
@@ -500,6 +502,7 @@ if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
         -D_GNU_SOURCE -O2 -fno-stack-protector -w \
         "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
         "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
+        "$BUILD_DIR/v-runtime/segfault_handler_nix.c" \
         -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
         "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
         -fuse-ld=lld -B"$LLVM_BIN" \
@@ -536,6 +539,7 @@ if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
             -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
             -D_GNU_SOURCE -O2 -fno-pie -no-pie -fno-stack-protector -w \
             "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" \
+            "$BUILD_DIR/v-runtime/segfault_handler_nix.c" \
             "$BUILD_DIR/gpu-present.c" \
             -L"$ASAHI_STAGING/usr/lib" \
             -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
@@ -1737,7 +1741,7 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/build-support/xorg-server/compile-v-host"
     "$SCRIPT_DIR/build-support/xorg-server/xinputcore"
     "$SCRIPT_DIR/build-support/xorg-server/xinput_abi.h"
-    "$SCRIPT_DIR/build-support/compile-v-module.py"
+    "$SCRIPT_DIR/build-support/compile-v-module"
     "$SCRIPT_DIR/build-support/x86-translation/officecore"
     "$SCRIPT_DIR/build-support/x86-translation/compile-v-office"
     "$SCRIPT_DIR/build-support/native-compat-tools/main.v"

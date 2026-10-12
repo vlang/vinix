@@ -31,7 +31,7 @@ fn checked(args []string) ! {
 		source := work + '/' + tool + '.c'
 		bh.run([v, '-nocache', '-enable-globals', '-os', 'linux', '-arch',
 			if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-d', 'glibc', '-d',
-			'no_backtrace', '-path', bh.root() + '/build-support/minecraft|@vlib', '-o', source,
+			'no_backtrace', '-d', 'no_segfault_handler', '-path', bh.root() + '/build-support/minecraft|@vlib', '-o', source,
 			bh.root() + '/build-support/minecraft/' + tool + '.v'])!
 		binary := work + '/' + tool
 		bh.run([cc, '-static', '-O2', '-w', '-D_GNU_SOURCE', source, '-pthread', '-lm', '-o', binary])!
