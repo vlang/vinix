@@ -1,0 +1,8 @@
+---- Testing... ----------------------------------------------------------------
+FAIL   532.064 ms /Users/alex/code/vinix/tools/linux-compat/applications/audit_test.v
+/Users/alex/code/vinix/tools/linux-compat/applications/audit_test.v:51: fn test_passing_browser_must_prove_ordinary_user_javascript_and_rendering
+    assert false, 'resealed passing browser without its required proof was accepted'
+        Message: resealed passing browser without its required proof was accepted
+--------------------------------------------------------------------------------
+To reproduce just failure 1 run:    '/Users/alex/code/v/v' -nocache -cflags -O2 '/Users/alex/code/vinix/tools/linux-compat/applications/audit_test.v'
+Summary for all V _test.v files: 1 failed, 1 total. Elapsed time: 3192 ms, on 1 job. Comptime: 2659 ms. Runtime: 532 ms.

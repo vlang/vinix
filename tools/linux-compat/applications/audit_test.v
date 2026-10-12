@@ -34,6 +34,27 @@ fn test_host_architecture_duplicate_and_exit_contradictions_are_refused() {
 	assert false, 'contradictory controller exit was accepted'
 }
 
+fn test_passing_browser_must_prove_ordinary_user_javascript_and_rendering() {
+	root := os.real_path(os.dir(@FILE) + '/../../..')
+	base := root + '/tests/linux-compat/results/2026-10-12/jit-firefox-x86_64'
+	raw := os.read_file(base + '.json')!
+	receipt := os.read_file(base + '-inputs.json')!
+	assert audit_application(raw, receipt, 'x86_64', 'firefox')!.status == 'passed'
+	for changed in [raw.replace('/42 HTTP/1.1', '/41 HTTP/1.1'),
+		raw.replace('"screenshot_sha256": "', '"screenshot_sha256": "bad-'),
+		raw.replace('"uid": 1000', '"uid": 0'),
+		raw.replace('"timed_out": false', '"timed_out": true'),
+		raw.replace('"--headless"', '"--version"'),
+		raw.replace('"--no-remote"', '"--no-sandbox"'),
+		raw.replace('"VINIX_ALLOW_WX": "1"', '"MOZ_DISABLE_CONTENT_SANDBOX": "1"')] {
+		assert changed != raw
+		audit_application(changed, reseal(receipt, raw, changed), 'x86_64', 'firefox') or { continue }
+		assert false, 'resealed passing browser without its required proof was accepted'
+	}
+	audit_application(raw, receipt.replace('"uid": 1000', '"uid": 0'), 'x86_64', 'firefox') or { return }
+	assert false, 'passing browser identity was not bound to the controller receipt'
+}
+
 fn test_index_preserves_all_families_qualified_runtimes_and_remaining_failures() {
 	root := os.real_path(os.dir(@FILE) + '/../../..')
 	index := application_index(root)!

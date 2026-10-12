@@ -892,3 +892,13 @@ init/archive/ISO, driver build, literal command vectors and JavaScript proof.
 The builder generates without V's module cache so a cached host declaration
 cannot replace a target runtime definition. Installation signatures/scripts,
 updates and approval persistence remain separate from these extracted roots.
+
+The application index also verifies passing browser proof explicitly: an
+ordinary identity bound to the controller receipt, the exact nonce-bearing
+JavaScript result, page/render hashes, matching successful version and headless
+commands, and enabled sandbox settings. A [negative control](../tests/linux-compat/results/2026-10-12/browser-audit-before.log)
+reproduces the previous acceptance of a resealed report changed from 42 to 41.
+The [fixed audit tests](../tests/linux-compat/results/2026-10-12/browser-audit-after.log)
+reject that report, a bad PNG hash, root or mismatched identities, timeout,
+version-only invocation, and sandbox-disable flags or environment. These are
+host checks of guest receipts, with no additional guest qualification claim.

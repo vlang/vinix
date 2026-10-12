@@ -1,0 +1,17 @@
+{
+    "after_implementation": "1ef8a13c8c71539b6a24444e8c283e496fae9f29c306ccc1a2ce6bffa35e8db6",
+    "after_log": "355b19d7200d22793be65c3b6de3aea31c15daa449e11ec7fffdcce58ae9156f",
+    "after_test_exit": "0",
+    "after_test_source": "2869fa8e73af1111c59265fcf51f7b7e0569542e80ad7e6071dd5c17af6c0c9e",
+    "before_implementation": "1ada8475bd49b83f8de17efe86628d2defd31db1e34be4d016368cc2c8707162",
+    "before_implementation_commit": "14b7ccec",
+    "before_log": "fa6ea6c1d8793ddeb46c93143e598e139654aed7430c0629a8406b962322bd7c",
+    "before_test_exit": "1",
+    "compiler": "24c19beab399d14b40d9cff8d54bc3890b26f7f6e51c444b859d3c323157744a",
+    "complete_gate_exit": "1",
+    "context": "host assertion-enabled V audit of guest reports; before accepted the first corrupted JavaScript result, after rejects eight corrupted reports/identities",
+    "flags": "-nocache -cflags -O2",
+    "guest_inputs": "459ac59db9f7d3f66d1a8bd18473ced45bd6490bc3a29bea735470ab158ee055",
+    "guest_report": "e05e5421ce6d6104f82167fd1063bbe2a0c471eae4de4b78e926e66e32bdb791",
+    "index_check_exit": "0"
+}

@@ -80,6 +80,9 @@ fn audit_application(raw string, receipt_raw string, arch string, workload strin
 	if selected['status']!.str() == 'passed' && report['commands']!.as_array().len < 2 {
 		return error('a version-only run is not application qualification')
 	}
+	if selected['status']!.str() == 'passed' && workload in ['firefox', 'chromium'] {
+		audit_browser_proof(report, receipt, workload)!
+	}
 	return ApplicationEvidence{
 		workload: workload
 		architecture: arch
@@ -93,6 +96,66 @@ fn audit_application(raw string, receipt_raw string, arch string, workload strin
 		// Workload receipts explicitly separate this broader acceptance gate.
 		full_lifecycle_qualified: report['complete_lifecycle_qualified']!.bool()
 	}
+}
+
+// A passing verdict alone must not promote a browser's version banner or
+// unrelated HTTP request to JavaScript/render qualification.
+fn audit_browser_proof(report map[string]json2.Any, receipt map[string]json2.Any, name string) ! {
+	uid := report['uid']!.int()
+	if uid <= 0 || receipt['uid']!.int() != uid {
+		return error('passing browser evidence requires the recorded ordinary-user identity')
+	}
+	mut proofs := []map[string]json2.Any{}
+	for item in report['browsers']!.as_array() {
+		proof := item.as_map()
+		if proof['name']!.str() == name { proofs << proof }
+	}
+	if proofs.len != 1 { return error('passing browser evidence requires one matching render proof') }
+	proof := proofs[0]
+	callback := proof['javascript_callback']!.str()
+	if !callback.starts_with('GET /result/') || !callback.ends_with('/42 HTTP/1.1') {
+		return error('browser JavaScript callback does not contain the required result')
+	}
+	nonce := callback.all_after('GET /result/').all_before('/42 HTTP/1.1')
+	if !valid_hash(nonce) || !valid_hash(proof['page_sha256']!.str()) {
+		return error('browser page and nonce hashes are missing or invalid')
+	}
+	if name == 'firefox' && !valid_hash(proof['screenshot_sha256']!.str()) {
+		return error('Firefox render proof has no valid PNG hash')
+	}
+	if name == 'chromium' && !proof['dom_verified']!.bool() {
+		return error('Chromium render proof has no verified DOM')
+	}
+	program := proof['executable']!.str()
+	if !program.starts_with('/') { return error('browser proof does not identify an absolute executable') }
+	mut count := 0
+	mut rendered := false
+	mut version := false
+	for item in report['commands']!.as_array() {
+		command := item.as_map()
+		argv := command['argv']!.as_array().map(it.str())
+		if argv.len == 0 || argv[0] != program { continue }
+		count++
+		if command['exit_code']!.int() != 0 || command['timed_out']!.bool()
+			|| command['output_limited']!.bool() || !valid_hash(command['executable_sha256']!.str()) {
+			return error('passing browser proof contains a failed or incomplete command')
+		}
+		if argv.any(it == '--no-sandbox' || (it.starts_with('--disable-') && it.contains('sandbox'))) {
+			return error('passing browser proof disables its sandbox')
+		}
+		for key, value in command['environment_overrides']!.as_map_of_strings() {
+			if key.starts_with('MOZ_DISABLE_') && key.ends_with('_SANDBOX') && value != '' && value != '0' {
+				return error('passing browser proof disables its sandbox through the environment')
+			}
+		}
+		if '--version' in argv { version = true }
+		if argv.any(it == '--headless' || it.starts_with('--headless=')) {
+			if name == 'firefox' && '--screenshot' in argv { rendered = true }
+			if name == 'chromium' && '--dump-dom' in argv
+				&& command['stdout']!.str().contains('id="verdict">42</p>') { rendered = true }
+		}
+	}
+	if count < 2 || !version || !rendered { return error('browser proof lacks matching version and headless render commands') }
 }
 
 fn evidence(root string, category string, workload string, arch string, name string, limits string) !ApplicationEvidence {
