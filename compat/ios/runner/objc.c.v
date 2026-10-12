@@ -105,6 +105,8 @@ mut:
 	condition_owned bool
 	condition_initialized bool
 	thread &FoundationThread = unsafe { nil }
+	auth_owned bool
+	auth &WebAuthState = unsafe { nil }
 	cookie_owned bool
 	webkit &WebKitState = unsafe { nil }
 	webkit_array bool // Read-only script list; its contents change through its controller.
@@ -266,7 +268,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -318,6 +320,7 @@ fn objc_start() {
 			'NSError' { u32(sizeof(AbiNSError)) }
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
 			'NSThread' { u32(64) }
+			'ASWebAuthenticationSession' { u32(136) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
 			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
 			'NSURLResponse' { u32(24) }
@@ -466,6 +469,7 @@ fn objc_new(cls u64) u64 {
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	if obj_header(object).value_owned { objc_release(object); return 0 }
+	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	if obj_header(object).thread != unsafe { nil } { ns_thread_initialize(object, 0, 0, 0, 0) }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }

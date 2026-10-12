@@ -169,6 +169,7 @@ fn framework_constant(symbol string) ?u64 {
 		'_NSCocoaErrorDomain' { 'NSCocoaErrorDomain' }
 		'_NSMachErrorDomain' { 'NSMachErrorDomain' }
 		'_NSPOSIXErrorDomain' { 'NSPOSIXErrorDomain' }
+		'_ASWebAuthenticationSessionErrorDomain' { 'com.apple.AuthenticationServices.WebAuthenticationSession' }
 		'_NSLocalizedDescriptionKey' { 'NSLocalizedDescription' }
 		'_NSLocalizedFailureReasonErrorKey' { 'NSLocalizedFailureReason' }
 		'_NSLocalizedRecoverySuggestionErrorKey' { 'NSLocalizedRecoverySuggestion' }

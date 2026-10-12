@@ -28,6 +28,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	if objc_is_kind(object, ios_runtime.names['NSLayoutConstraint']) { layout_constraint_initialize(object) }
 	header.condition_owned = objc_is_kind(object, ios_runtime.names['NSCondition'])
 	ns_thread_install(object, mut header)
+	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.cookie_owned = objc_is_kind(object, ios_runtime.names['NSHTTPCookie'])
 	header.webview_owned = objc_is_kind(object, ios_runtime.names['WKWebView'])
 	header.request_owned = objc_is_kind(object, ios_runtime.names['NSURLRequest'])
@@ -88,6 +89,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_error_dispose(object)
 	ns_condition_dispose(object, mut header)
 	ns_thread_dispose(mut header)
+	web_auth_dispose(mut header)
 	cookie_dispose(object, mut header)
 	webkit_dispose(mut header)
 	webview_dispose(object, mut header)

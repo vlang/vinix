@@ -96,6 +96,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if json_dispatch(object, selector, mut frame) { return true }
 	if ns_condition_dispatch(object, selector, mut frame) { return true }
 	if ns_thread_dispatch(object, selector, mut frame) { return true }
+	if web_auth_dispatch(object, selector, mut frame) { return true }
 	if cookie_dispatch(object, selector, mut frame) { return true }
 	if webkit_dispatch(object, selector, mut frame) { return true }
 	if http_url_dispatch(object, selector, mut frame) { return true }

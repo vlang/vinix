@@ -3462,18 +3462,71 @@ Evidence is retained under
 published runners are unchanged, and game entry, rendering and gameplay
 remain unverified.
 
+`ASWebAuthenticationSession` now supports the measured configuration and
+missing-presentation path in V. EOS strongly imports the class and contains
+the old URL/scheme/completion constructor, presentation-provider and anchor
+selectors, start and cancel. Installed Mac and Catalyst AuthenticationServices
+supplied typed metadata and behavior probes; no application code or login
+request was executed during native RE.
+
+The native instance record is 136 bytes and remains opaque. An owned sidecar
+retains the URL, copies the callback scheme and promotes the completion block.
+The presentation provider uses the existing zeroing-weak storage, and the
+ephemeral flag defaults to false. Disposal releases all these references
+independently of isa and supports caller-provided storage. Constructor probes
+also accept nil configuration; native starts with nil handlers were not tested.
+
+With no provider or a nil anchor, canStart returns false without completing.
+start returns false and synchronously reports NSError code 2 in
+com.apple.AuthenticationServices.WebAuthenticationSession once. Inactive cancel
+does not call the handler or prevent a later start. Receiver and block pins
+allow completion to release its owning session. Presentation checks require
+the runtime main thread, and nonatomic configuration needs app synchronization.
+
+A native exploratory callback that called start recursively reached ASAN
+stack overflow with joined status 134; its source and logs are retained.
+A bounded follow-up confirms two callbacks for one nested native start.
+Shared native sanitizer cases avoid this recursion. Vinix publishes completion
+before calling user code and independently tests its reentrant start/cancel
+guard. This deliberate guard differs from the native recursive error path.
+
+Real authentication-browser presentation and login tokens remain unsupported.
+A nonzero anchor rejects explicitly. Modern callback matching, additional
+headers, copy, unavailable construction and reinitialization also reject.
+No private AuthenticationServices state or browser engine is emulated.
+
+All 66 programs build and 84 original generated C streams restore to recorded
+hashes. Eighteen host suites pass ASAN/UBSAN in both hashing modes. Vinix passes
+twenty Objective-C and 33 Swift/loader programs. Authentication fixtures cover
+block promotion/disposal, weak providers, nil-anchor checks, ephemeral flags,
+synchronous errors, inactive cancellation and repeat suppression. They also
+check URL retention after pool drainage, scheme copying after source mutation,
+owning release in completion, caller storage, 100 isa changes, eleven exact
+rejection reasons and two shutdown cycles with zero live objects and blocks.
+Generated C audits verify sidecar retirement and receiver/block pins. Earlier
+compatibility checks remain enabled; failed compiler trials are retained.
+
+Fortnite passes the authentication-session binding and exits with status 1
+before entry at EOS's required `_OBJC_CLASS_$_UIImageView` import. Follow-up
+metadata RE through installed Catalyst UIKit measures a 512-byte UIImageView
+subclass of UIView; its constructors and application code were not executed.
+Evidence is retained under `build/ios/fortnite/auth-checks`.
+Full regression remains unpassed, the five
+published runners are unchanged, and game entry, rendering and gameplay
+remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,432 | 727 | 80 |
-| EOSSDK | 647 | 15 | 18 |
+| Fortnite executable | 1,433 | 727 | 79 |
+| EOSSDK | 648 | 14 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,194 | 803 | 121 |
+| All images | 2,196 | 802 | 120 |
 
-The C++/GLES/Text variant reports 2,207 resolved imports, 790 unresolved strong
-imports and 121 unresolved weak imports, including its native zlib/text backends.
+The C++/GLES/Text variant reports 2,209 resolved imports, 789 unresolved strong
+imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
 their own unresolved dependencies still prevent execution. Results depend on
