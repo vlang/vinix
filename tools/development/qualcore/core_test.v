@@ -42,10 +42,10 @@ fn test_missing_tool_cannot_pass() {
 fn test_successful_command_with_wrong_output_cannot_pass() {
 	root := sourcecommand.temporary('vinix-qualification-output')!
 	defer { os.rmdir_all(root) or {} }
-	os.cp(tool('echo')!, root + '/project')!
+	os.symlink(tool('echo')!, root + '/project')!
 	mut runner := Runner{ work: root, env: devcore.environment(0) }
 	runner.verify_binary('project') or {
-		assert err.msg().contains('unexpected output')
+		assert err.msg().contains('unexpected output'), err.msg()
 		assert runner.commands.len == 1 && runner.commands[0].exit_code == 0
 		return
 	}
