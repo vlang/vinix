@@ -34,6 +34,7 @@ fn C.posix_spawnattr_destroy(voidptr) i32
 fn C.posix_spawnattr_setpgroup(voidptr, i32) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
 fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
+fn C.posix_spawnattr_setbinpref_np(voidptr, usize, &i32, &usize) i32
 fn C.poll(&C.pollfd, usize, i32) i32
 fn C.waitid(i32, u32, &C.vinix_source_child_info, i32) i32
 fn C.waitpid(i32, &i32, i32) i32
@@ -99,6 +100,21 @@ pub fn capture_as(executable string, argv []string, env map[string]string, timeo
 	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, false, executable, '', false, '')
 }
 
+// Prefer the original host architecture for universal Darwin compiler tools.
+// Spawn, cancellation, process-group retirement and the sole reap stay owned
+// by the same SDK path as ordinary commands.
+pub fn capture_preferred(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool, host_arch string) !Output {
+	return capture_policy_arch(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, false, '', '', false, '', host_arch, false)
+}
+
+pub fn capture_stdout_preferred(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool, host_arch string) !Output {
+	return capture_policy_arch(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, false, '', '', false, '', host_arch, true)
+}
+
+pub fn run_preferred(argv []string, env map[string]string, cancel fn () bool, host_arch string) !Output {
+	return capture_policy_arch(argv, env, -1, 0, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, true, '', '', false, '', host_arch, false)
+}
+
 // A synchronous owner may inspect a live child through WNOWAIT while the
 // child inherits stdout/stderr. Its callback finishes before the sole reap;
 // verbose emulators cannot block behind undrained capture pipes.
@@ -128,6 +144,11 @@ pub fn capture_owned(argv []string, env map[string]string, timeout f64, limit in
 
 fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
 	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string, log string, append bool, directory string) !Output {
+	return capture_policy_arch(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, combined, inherited, executable, log, append, directory, '', false)
+}
+
+fn capture_policy_arch(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
+	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string, log string, append bool, directory string, host_arch string, stderr_inherited bool) !Output {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid command') }
 	mut pipes := [i32(-1), -1, -1, -1]!
 	defer { for fd in pipes { if fd >= 0 { C.close(fd) } } }
@@ -161,8 +182,9 @@ fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, 
 		if status != 0 { return error_with_code('cannot configure command directory', int(status)) }
 	}
 	if !inherited || log_fd >= 0 {
-		for status in [C.posix_spawn_file_actions_adddup2(&actions, if log_fd >= 0 { log_fd } else { pipes[1] }, 1),
-			C.posix_spawn_file_actions_adddup2(&actions, if log_fd >= 0 { log_fd } else if combined { pipes[1] } else { pipes[3] }, 2)] {
+		mut statuses := [C.posix_spawn_file_actions_adddup2(&actions, if log_fd >= 0 { log_fd } else { pipes[1] }, 1)]
+		if !stderr_inherited || log_fd >= 0 { statuses << C.posix_spawn_file_actions_adddup2(&actions, if log_fd >= 0 { log_fd } else if combined { pipes[1] } else { pipes[3] }, 2) }
+		for status in statuses {
 			if status != 0 { return error_with_code('cannot configure spawn streams', int(status)) }
 		}
 	}
@@ -187,10 +209,25 @@ fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, 
 		flags |= i16(C.POSIX_SPAWN_CLOEXEC_DEFAULT)
 		if C.fcntl(0, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, 0) != 0 { return error('cannot preserve command stdin') }
 		if inherited && log_fd < 0 { for fd in [1,2] { if C.fcntl(fd, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, fd) != 0 { return error('cannot preserve command output') } } }
+		if !inherited && stderr_inherited && log_fd < 0 && C.fcntl(2, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, 2) != 0 { return error('cannot preserve command stderr') }
 	}
 	for status in [C.posix_spawnattr_setpgroup(&attributes, 0), C.posix_spawnattr_setsigdefault(&attributes, &signals),
 		C.posix_spawnattr_setflags(&attributes, flags)] {
 		if status != 0 { return error_with_code('cannot configure spawn attributes', int(status)) }
+	}
+	$if macos {
+		cpu := match host_arch.to_lower() {
+			'arm64', 'aarch64' { i32(C.CPU_TYPE_ARM64) }
+			'amd64', 'x86_64' { i32(C.CPU_TYPE_X86_64) }
+			else { i32(0) }
+		}
+		if cpu != 0 {
+			preferences := [cpu, i32(C.CPU_TYPE_ANY)]!
+			mut selected := usize(0)
+			status := C.posix_spawnattr_setbinpref_np(&attributes, 2, &preferences[0], &selected)
+			if status != 0 { return error_with_code('cannot configure host architecture preference', int(status)) }
+			if selected != 2 { return error('incomplete host architecture preference') }
+		}
 	}
 	mut args := []&char{}
 	for value in argv { args << unsafe { &char(value.str) } }

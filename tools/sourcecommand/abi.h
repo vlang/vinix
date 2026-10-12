@@ -15,5 +15,8 @@
 #undef posix_spawn_file_actions_adddup2
 #undef posix_spawn_file_actions_addclose
 #include <sys/wait.h>
+#if defined(__APPLE__)
+#include <mach/machine.h>
+#endif
 typedef siginfo_t vinix_source_child_info;
 #endif
