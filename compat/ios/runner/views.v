@@ -45,6 +45,7 @@ fn ui_load_controller(controller u64) {
 		root.frame = ObjRect{0, 0, window.width, window.height}
 	}
 	invoke_void(controller, c'viewDidLayoutSubviews')
+	alert_layout(controller)
 	// The window owns the root view just as it owns its root controller. The
 	// non-owning parent permits UIView.window to find the connected window scene.
 	view := header.fields[6]

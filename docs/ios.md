@@ -80,7 +80,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, caller-supplied instance construction and destruction, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
 | Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, immutable NSValue byte/type, pointer, range and geometry boxes, NSURLResponse/NSHTTPURLResponse metadata, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, dictionary add-if-absent and raw null entries, exported immutable empty dictionary, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
-| UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
+| UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers, UIAlertController/UIAlertAction and legacy simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
 | Bitmap graphics | Owned RGB/gray colors with full-precision components and equality, RGB/RGBA/BGRA storage, bitmap/image dimensions and data providers, premultiplied source-over fills, clear/clip, saved state and fill color space, axis-aligned translation/scale, nearest/bilinear image drawing; independent image storage and real PNG/JPEG codecs from the V installation's existing stb library |
 | AudioToolbox PCM | Same-rate, same-channel Int16/Int32/Float32/Float64 conversion between packed little-endian interleaved and planar buffers; complex input callbacks, partial output/error recovery, EOF/reset and converter ownership |
 | Offline AudioUnits | GenericOutput pull rendering and mono MultiChannelMixer, graph nodes/connections and native input callbacks, stream formats, mixer volume/enable, slice limits, initialize/start/stop/uninitialize and owned render buffers |
@@ -3285,17 +3285,77 @@ under `build/ios/fortnite/response-checks`. Full regression remains unpassed,
 the five published runners are unchanged, and game entry, rendering and
 gameplay remain unverified.
 
+`UIAlertController` and `UIAlertAction` now implement a bounded public alert
+model in V. EOS imports the controller strongly and names dismissal and the
+WKUIDelegate JavaScript alert callback. Its selector table has no alert factory
+or text-field selectors. Installed Catalyst UIKit supplied typed native
+measurements without native presentation or executing application code.
+
+Factories and setters copy title/message text. Controllers retain actions
+and return immutable action snapshots; existing snapshots keep their contents.
+Duplicate default/destructive actions are allowed. A second cancel action and
+a preferred action outside the list reject, matching native exceptions.
+Action copies are separate objects and preserve style/enabled state. Captured
+handlers promote from stack blocks once and share that capture lifetime through
+copies; disposal runs on the final owner. Fresh actions are disabled, factory
+actions enabled; fresh controllers use alert style and default severity.
+
+Vinix presents simple title/message panels and action buttons through its
+existing desktop protocol. Disabled buttons are marked disabled and ignored.
+Selection pins the controller, action and handler while removing presentation
+ownership, then invokes the handler with its selected action. A handler can
+present a replacement immediately. Presenting-controller links and button
+targets are weak, and dismissal uses the recorded presenter relationship.
+Resize rebuilds the panel with bounded children and releases old view ownership.
+
+The 1400/144-byte controller/action records come from Catalyst, not private
+device iOS ABI measurements; bytes after isa remain reserved zero-filled.
+One fixed sidecar owns three references, up to 32 actions and a copied block.
+Storage flags preserve retirement after isa changes and caller-owned destruction.
+The profile covers controller styles 0/1, action styles 0/1/2, severity 0/1
+and text up to 64 KiB. Native accepts controller style 99, which Vinix rejects.
+Text fields, keyboard interaction, popovers, private UIKit bridging, animations
+and controller copying remain unimplemented. The JavaScript alert delegate
+callback still requires a WebKit execution engine.
+
+All 63 programs build and 78 original generated C streams restore to their
+recorded hashes. Fifteen host suites pass ASAN/UBSAN in both hashing modes;
+the alert suite runs as Catalyst against native UIKit and the V runtime.
+Catalyst host compilation disables Apple LLVM ARC optimizations and its
+aarch64 objc retain/release register-call rewrite: the first trial redirected
+Vinix ownership calls into native libobjc. Native empty action arrays can
+reuse identity; populated snapshots are checked independently. Original trial
+sources, binaries, logs and actual exits remain retained. Two headless turn
+interruptions also retain unfinished C and driver sources. Completed checks
+were reused only after validating their joined statuses and original C hashes;
+detached V supervisors recorded the final driver exits.
+
+Vinix passes seventeen Objective-C and 33 Swift/loader programs. Alert checks
+cover native properties, calling conventions, copy associations, 100 isa-change
+release cycles, caller storage and two clean runtime cycles. Selection fixtures
+cover visible text/buttons, resize, disabled actions and 20 pool-drained callback
+lifetime cycles with weak zeroing and reentrant replacement. Nine rejection
+children cover invalid inputs, cancel/preferred restrictions, immutable arrays
+and unsupported APIs. Generated-code checks cover fixed-state retirement and
+layout constructor ownership; the prior allocation checks also pass.
+
+Fortnite passes the alert controller binding and exits with status 1 before
+entry at EOS's required `_OBJC_CLASS_$_NSMutableSet` import. Evidence is retained under
+`build/ios/fortnite/alert-checks`. Full regression remains unpassed, the five
+published runners are unchanged, and game entry, rendering and gameplay
+remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,427 | 732 | 80 |
-| EOSSDK | 644 | 18 | 18 |
+| Fortnite executable | 1,430 | 729 | 80 |
+| EOSSDK | 645 | 17 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,186 | 811 | 121 |
+| All images | 2,190 | 807 | 121 |
 
-The C++/GLES/Text variant reports 2,199 resolved imports, 798 unresolved strong
+The C++/GLES/Text variant reports 2,203 resolved imports, 794 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

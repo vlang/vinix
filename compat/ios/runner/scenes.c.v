@@ -28,6 +28,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if cookie_selector(object, name) { return true }
 	if request_selector(object, name) { return true }
 	if response_selector(object, name) { return true }
+	if alert_selector(object, name) { return true }
 	if value_selector(object, name) { return true }
 	webkit := webkit_object_name(object)
 	if native_method(read64(object), name) != 0 { return true }
@@ -72,7 +73,8 @@ fn objc_responds(object u64, selector &char) bool {
 	if objc_is_kind(object, ios_runtime.names['UIApplication']) { return name in ['delegate', 'setDelegate:', 'applicationState', 'isIdleTimerDisabled', 'setIdleTimerDisabled:'] }
 	if objc_is_kind(object, ios_runtime.names['UIViewController']) {
 		return name in ['preferredScreenEdgesDeferringSystemGestures', 'prefersHomeIndicatorAutoHidden',
-			'setNeedsUpdateOfScreenEdgesDeferringSystemGestures', 'setNeedsUpdateOfHomeIndicatorAutoHidden']
+			'setNeedsUpdateOfScreenEdgesDeferringSystemGestures', 'setNeedsUpdateOfHomeIndicatorAutoHidden',
+			'presentViewController:animated:completion:', 'dismissViewControllerAnimated:completion:', 'presentedViewController', 'presentingViewController']
 	}
 	if objc_is_kind(object, ios_runtime.names['UIView']) { return name in ['frame', 'bounds', 'setFrame:', 'layer', 'addSubview:', 'removeFromSuperview', 'backgroundColor', 'setBackgroundColor:', 'tag', 'setTag:'] }
 	return false

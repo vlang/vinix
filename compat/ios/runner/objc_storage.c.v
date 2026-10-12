@@ -31,6 +31,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.webview_owned = objc_is_kind(object, ios_runtime.names['WKWebView'])
 	header.request_owned = objc_is_kind(object, ios_runtime.names['NSURLRequest'])
 	header.response_owned = objc_is_kind(object, ios_runtime.names['NSURLResponse'])
+	header.alert_owned = objc_is_kind(object, ios_runtime.names['UIAlertController']) || objc_is_kind(object, ios_runtime.names['UIAlertAction'])
 	header.value_owned = objc_is_kind(object, ios_runtime.names['NSValue']) && !objc_is_kind(object, ios_runtime.names['NSNumber'])
 	C.ios_ref_change(unsafe { &ios_runtime.live }, 1)
 	C.ios_ref_change(unsafe { &info.instances }, 1)
@@ -88,6 +89,8 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	webview_dispose(object, mut header)
 	request_dispose(mut header)
 	response_dispose(mut header)
+	alert_dispose(mut header)
+	objc_destroy_weak(unsafe { &header.presenter })
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])

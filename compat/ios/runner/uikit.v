@@ -100,6 +100,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if http_url_dispatch(object, selector, mut frame) { return true }
 	if request_dispatch(object, selector, mut frame) { return true }
 	if response_dispatch(object, selector, mut frame) { return true }
+	if alert_dispatch(object, selector, mut frame) { return true }
 	if value_dispatch(object, selector, mut frame) { return true }
 	if image_dispatch(object, selector, mut frame) { return true }
 	if accessibility_dispatch(object, selector, mut frame) { return true }
@@ -237,15 +238,13 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 		'addGestureRecognizer:' { header.gestures << objc_retain(frame.x[2]) }
 		'setAffineTransform:' {} // Final animation states are rendered without interpolation.
 		'presentViewController:animated:completion:' {
-			store_field(object, 8, frame.x[2])
-			ui_load_controller(frame.x[2])
-			block_invoke_void(frame.x[4])
+			ui_present_controller(object, frame.x[2], frame.x[4])
 		}
 		'dismissViewControllerAnimated:completion:' {
-			root := obj_header(ios_runtime.window).fields[7]
-			store_field(root, 8, 0)
-			block_invoke_void(frame.x[3])
+			ui_dismiss_controller(object, frame.x[3])
 		}
+		'presentedViewController' { frame.x[0] = header.fields[8] }
+		'presentingViewController' { frame.x[0] = header.presenter }
 		'viewDidLoad', 'viewDidLayoutSubviews' {}
 		'view' {
 			if header.fields[6] == 0 {
@@ -392,9 +391,11 @@ fn ui_root_view() u64 {
 }
 
 fn ui_layout(width int, height int) {
+	if ios_runtime.window != 0 { mut window := obj_header(ios_runtime.window); window.frame.width = f64(width); window.frame.height = f64(height) }
 	mut view := obj_header(ui_root_view())
 	view.frame = ObjRect{0, 0, f64(width), f64(height)}
 	invoke_void(ui_current_controller(), c'viewDidLayoutSubviews')
+	alert_layout(ui_current_controller())
 }
 
 fn ui_action(button u64) ! {
@@ -403,5 +404,6 @@ fn ui_action(button u64) ! {
 	}
 	header := obj_header(button)
 	if header.target == 0 || header.action == 0 { return error('UIKit action has no target') }
+	if !alert_button_enabled(button) { return }
 	invoke_action(header.target, header.action, button)
 }

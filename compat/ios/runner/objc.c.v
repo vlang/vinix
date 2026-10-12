@@ -109,6 +109,10 @@ mut:
 	response &URLResponseState = unsafe { nil }
 	response_owned bool
 	response_headers bool
+	alert &AlertState = unsafe { nil }
+	alert_owned bool
+	alert_button bool
+	presenter u64 // Weak: a presenter owns its presented controller in fields[8].
 	value_owned bool
 	value_initialized bool
 	web_history bool
@@ -251,7 +255,7 @@ fn objc_start() {
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
-		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
+		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSUserDefaults',
@@ -269,7 +273,7 @@ fn objc_start() {
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
 			'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
 			'WKWebView' { ios_runtime.names['UIView'] }
-			'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController' { ios_runtime.names['UIViewController'] }
+			'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController', 'UIAlertController' { ios_runtime.names['UIViewController'] }
             'CAMetalLayer', 'AVCaptureVideoPreviewLayer' { ios_runtime.names['CALayer'] }
             'UIScreenEdgePanGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			'UIWindowScene' { ios_runtime.names['UIScene'] }
@@ -302,6 +306,8 @@ fn objc_start() {
 			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
 			'NSURLResponse' { u32(24) }
 			'NSHTTPURLResponse' { u32(32) }
+			'UIAlertController' { u32(1400) }
+			'UIAlertAction' { u32(144) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
 			'NSLayoutAnchor', 'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { u32(sizeof(AbiLayoutAnchor)) }
 			else { webkit_size(name) }
@@ -444,6 +450,7 @@ fn objc_new(cls u64) u64 {
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
 	if obj_header(object).response_owned { response_initialize(object) }
+	if obj_header(object).alert_owned { alert_initialize(object, 0, 0, if objc_is_kind(object, ios_runtime.names['UIAlertController']) { i64(1) } else { i64(0) }, 0, false) }
 	name := webkit_object_name(object)
 	if name == 'WKWebView' { webview_initialize(object, ObjRect{}, 0); return object }
 	if name == 'WKWebsiteDataStore' { panic('iOS: use WebKit data store factories') }

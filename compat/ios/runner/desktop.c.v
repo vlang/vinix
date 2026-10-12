@@ -74,7 +74,7 @@ fn encode_view(mut bytes []u8, object u64, root bool, depth int) ! {
 		u8(1)
 	}
 	bytes << kind
-	bytes << u8(64 | if button {
+	bytes << u8((if !button || alert_button_enabled(object) { 64 } else { 0 }) | if button {
 		8
 	} else if kind == 2 {
 		1
