@@ -79,7 +79,6 @@ const portsc_connected = u32(1)
 const portsc_enabled = u32(1) << 1
 const portsc_reset = u32(1) << 4
 const portsc_reset_change = u32(1) << 21
-const portsc_write_mask = ~(u32(0x80FE0012) | (u32(1) << 16))
 
 // One page of 16-byte TRBs per ring. A transfer or command ring gives its last
 // slot to a link back to the start.
@@ -603,6 +602,10 @@ fn start(dev &pci.PCIDevice) bool {
 
 	size := if bar.size >= 0x10000 { bar.size } else { u64(0x10000) }
 	xhci_cap = map_registers(bar.base, size)
+	if xhci_cap == 0 {
+		println('xhci: controller registers could not be mapped')
+		return false
+	}
 	cap_length := u64(rd(xhci_cap) & 0xff)
 	hcs1 := rd(xhci_cap + 4)
 	hcs2 := rd(xhci_cap + 8)
@@ -619,7 +622,9 @@ fn start(dev &pci.PCIDevice) bool {
 	C.kprintf(c'xhci: controller at 0x%llx, %llu ports, %llu slots\n', u64(bar.base),
 		u64(xhci_ports), u64(xhci_slots))
 
-	take_ownership((hcc1 >> 16) << 2)
+	if !take_ownership(u64(hcc1 >> 16) << 2, size) {
+		return false
+	}
 
 	// Stop it, then reset it.
 	wr(xhci_op + op_usbcmd, rd(xhci_op + op_usbcmd) & ~usbcmd_run)
@@ -670,13 +675,23 @@ fn start(dev &pci.PCIDevice) bool {
 		return false
 	}
 
-	// Give the ports a moment to report what is plugged into them.
-	busywait_us(100000)
+	// Firmware and a controller reset may leave switchable ports unpowered.
+	// Power them before looking for devices, then allow connection debounce.
+	power_ports(hcc1)
+	mut powered := u64(0)
+	mut connected := u64(0)
 	for port := u32(1); port <= xhci_ports; port++ {
-		if rd(port_register(port)) & portsc_connected != 0 {
+		sc := rd(port_register(port))
+		if sc & portsc_power != 0 {
+			powered++
+		}
+		if sc & portsc_connected != 0 {
+			connected++
 			attach(port)
 		}
 	}
+	C.kprintf(c'xhci: %llu of %llu ports powered, %llu connected\n', powered,
+		u64(xhci_ports), connected)
 	for i := 0; i < xhci_function_cnt; i++ {
 		queue_report(mut xhci_functions[i])
 	}
@@ -685,30 +700,6 @@ fn start(dev &pci.PCIDevice) bool {
 	start_polling()
 	C.kprintf(c'xhci: %lld input device(s)\n', i64(xhci_function_cnt))
 	return true
-}
-
-// Firmware that used the controller itself hands it over through the USB
-// Legacy Support capability.
-fn take_ownership(first u64) {
-	mut offset := first
-	for steps := 0; offset != 0 && steps < 64; steps++ {
-		reg := xhci_cap + offset
-		value := rd(reg)
-		if value & 0xff == 1 {
-			wr(reg, value | (u32(1) << 24))
-			deadline := now_ns() + 1000000000
-			for rd(reg) & (u32(1) << 16) != 0 && now_ns() < deadline {
-			}
-			// SMI enables off; their status bits are write-1-to-clear.
-			wr(reg + 4, (rd(reg + 4) & 0xffff1fee) | 0xe0000000)
-			return
-		}
-		next := u64((value >> 8) & 0xff)
-		if next == 0 {
-			return
-		}
-		offset += next << 2
-	}
 }
 
 fn handle_event(ev Event) {

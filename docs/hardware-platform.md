@@ -82,6 +82,15 @@ found halted and set up again from nothing, its pages given back.
 `/sys/bus/usb/xhci` counts what it has and what it has said.
 `vinix.usb=off` leaves the controller to firmware.
 
+Startup requests firmware ownership before resetting the controller, forces
+the BIOS semaphore clear after a one-second handoff timeout, and disables
+legacy SMIs. Controllers with per-port power switching have every root port
+powered before connection debounce and enumeration. The boot log reports
+powered and connected port counts, so an unpowered port can be distinguished
+from a device that failed enumeration. The register fixture in
+[`tests/xhci-startup`](../tests/xhci-startup/README.md) covers power-off startup
+and stuck firmware, which QEMU's USB input scenario does not reproduce.
+
 What it does not do, each of which a real machine will meet:
 
 - **Hubs.** A keyboard behind a hub -- a dock, a monitor, the front panel of
