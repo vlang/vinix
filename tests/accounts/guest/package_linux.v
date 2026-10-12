@@ -80,15 +80,21 @@ fn qualify_package_linux(mut t Test) ! {
 	}
 	key := pkgcore.keygen('/tmp/linux-signing-seed')!
 	pkgcore.publish(repository, 'fixture', '/tmp/linux-signing-seed', 1, time.now().unix() + 3600)!
+	first_index := os.read_file(repository + '/index.json')!
+	first_signature := os.read_file(repository + '/index.sig')!
 	config := pkgcore.Config{
 		architecture: architecture
 		launch_user:  'alex'
-		repositories: [pkgcore.Repository{ id: 'fixture', url: 'file://' + repository, public_key: key }]
 		policy:       pkgcore.Policy{ reserve_bytes: 0 }
 	}
 	os.mkdir_all('/etc/vinix-packages')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(config))!
 	os.chmod('/etc/vinix-packages/config.json', 0o644)!
+	package_success(['repo-enroll', 'fixture', 'file://' + repository, key])!
+	enrolled := json2.decode[pkgcore.RepositoryStatus](package_success(['--json', 'repo-list'])!)!
+	assert enrolled.repositories.len == 1 && enrolled.repositories[0].public_key == key
+	assert enrolled.history.len == 1 && enrolled.history[0].sequence == 1
+	assert pkgcore.load_config('')!.launch_user == 'alex'
 	os.write_file('/home/alex/outside.txt', 'not granted\n')!
 	os.chown('/home/alex/outside.txt', 1000, 1000)!
 	package_success(['update'])!
@@ -132,16 +138,37 @@ fn qualify_package_linux(mut t Test) ! {
 	os.write_file('/tmp/linux-recipe.json', json2.encode(broken_recipe))!
 	package_success(['pack-root', '/tmp/linux-recipe.json', prepared, repository])!
 	pkgcore.publish(repository, 'fixture', '/tmp/linux-signing-seed', 2, time.now().unix() + 3600)!
+	latest_index := os.read_file(repository + '/index.json')!
+	latest_signature := os.read_file(repository + '/index.sig')!
 	package_success(['update'])!
 	reviewed_package_operation('upgrade', [])!
 	missing := run(['/usr/bin/vinix-package', 'run', application.id], '', none, none)
 	assert missing.status == 127 && missing.output.contains('libfixture.so.1'), missing.output
 	reviewed_package_operation('rollback', [])!
 	assert package_success(['run', application.id])!.contains('PACKAGE LINUX')
+	package_success(['repo-revoke', 'fixture'])!
+	revoked_launch := run(['/usr/bin/vinix-package', 'run', application.id], '', none, none)
+	assert revoked_launch.status != 0, revoked_launch.output
+	revoked_rollback := run(['/usr/bin/vinix-package', 'rollback'], '', none, none)
+	assert revoked_rollback.status != 0, revoked_rollback.output
 	reviewed_package_operation('remove', [application.id])!
 	removed := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
 	assert removed.packages.len == 0
 	assert os.is_file(data)
+	package_success(['update'])!
+	assert pkgcore.read_snapshots('/var/lib/vinix-packages')!.len == 0
+	os.write_file(repository + '/index.json', first_index)!
+	os.write_file(repository + '/index.sig', first_signature)!
+	replay := run(['/usr/bin/vinix-package', 'repo-enroll', 'fixture', 'file://' + repository, key], '', none, none)
+	assert replay.status != 0 && replay.output.contains('retained trust history'), replay.output
+	assert pkgcore.load_config('')!.repositories.len == 0
+	os.write_file(repository + '/index.json', latest_index)!
+	os.write_file(repository + '/index.sig', latest_signature)!
+	package_success(['repo-enroll', 'fixture', 'file://' + repository, key])!
+	package_success(['update'])!
+	assert pkgcore.read_state('/var/lib/vinix-packages', architecture)!.generation == removed.generation
+	assert os.is_file(data)
+	t.say('PACKAGE REPOSITORY authenticated-enrollment revocation retained-replay-floor re-enrollment PASS')
 	t.say('PACKAGE LINUX IMPORT signed-source-aliases explicit-runtime tamper-refusal missing-library rollback clean-uninstall PASS')
 }
 

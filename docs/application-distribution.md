@@ -13,18 +13,16 @@ migration of that catalog remains part of roadmap acceptance.
 
 ## Trust and configuration
 
-An administrator creates `/etc/vinix-packages/config.json`:
+The image stage creates `/etc/vinix-packages/config.json` with an empty
+repository list and the target architecture. An administrator can configure
+organization policy and the launch account in that file:
 
 ```json
 {
   "format": 1,
   "architecture": "aarch64",
   "launch_user": "",
-  "repositories": [{
-    "id": "company",
-    "url": "https://software.example.org/vinix",
-    "public_key": "REPLACE_WITH_THE_PUBLISHER_64_CHARACTER_HEX_PUBLIC_KEY"
-  }],
+  "repositories": [],
   "policy": {
     "offline": false,
     "allowed": [],
@@ -37,17 +35,54 @@ An administrator creates `/etc/vinix-packages/config.json`:
 }
 ```
 
-Replace the intentionally invalid example key with a publisher key obtained
-through your organization's trusted channel. No key is learned from an index.
+Enroll a publisher using its public key obtained through your organization's
+authenticated channel:
+
+```sh
+vinix-package repo-list
+vinix-package repo-enroll company https://software.example.org/vinix PUBLISHER_PUBLIC_KEY_HEX
+vinix-package update
+vinix-package --json repo-list
+vinix-package repo-revoke company
+```
+
+`repo-enroll` verifies a current signed index against that exact ID/key and
+retained sequence history before atomically enabling trust. It downloads only
+metadata; `update` then publishes the combined catalog. Invalid signatures,
+expiry, identities, URLs and replayed metadata leave configuration unchanged.
+Enrollment preserves the target, launch account and organization policy. Using
+an existing ID explicitly replaces its URL/key; the old catalog is unavailable
+until refreshed. A URL change retains the same publisher's sequence floor. Key
+rotation permits the new key's own sequence while retaining the old key's floor.
+`--offline repo-enroll ID file:///media/repository KEY` uses a local repository
+without changing the persistent offline policy. No key is learned from an index.
+
 Keep configuration/state owned by the administrator and unwritable by ordinary
-users. Removing a repository/key revokes acquisition, rollback and subsequent
-launches from that publisher. A root administrator can still alter installed code
-or local sequence records; this is not hardware protected antirollback.
+users. The commands share the package writer lock, reject unsafe configuration
+files/directories and flush private temporary files before atomic replacement.
+`repo-revoke` requires no reachable repository or valid catalog/history. It
+revokes acquisition, rollback and subsequent launches from that publisher while
+retaining payloads, personal data and history for inspection and uninstall.
+A root administrator can still alter installed code or local sequence records;
+this is not hardware protected antirollback.
 
 Ed25519 authenticates the exact index bytes **before** decoding. The service
 checks repository identity, format, expiry, increasing sequence and same-sequence
-equivocation. Refresh commits all configured repositories together; failure keeps
-the previous catalog. SHA-256 and length authenticate every payload. Transport
+equivocation. `/var/lib/vinix-packages/trust-history.json` retains the highest
+authenticated sequence and exact index digest for each repository ID/key,
+including revoked and replaced keys. Empty refreshes, garbage collection and
+re-enrollment never reset it. Authenticated legacy cached indexes migrate into
+this history even after expiry or revocation.
+
+Refresh verifies all configured repositories before committing metadata. A fetch
+or validation failure keeps the previous catalog/history. History is flushed
+before the new catalog or enrollment configuration: an interrupted publication
+can leave a newer floor alongside an older catalog. Acquisition then fails
+closed; retry `update` against the same or a newer signed index, or retry
+`repo-enroll` if enrollment was interrupted. Do not delete history to retry.
+Installed launches use their retained signed payloads and current trust/policy.
+These guarantees require the filesystem/device to honor flush and rename.
+SHA-256 and length authenticate every payload. Transport
 accepts certificate-validated HTTPS or an absolute local `file://` repository.
 HTTP, unknown architectures, unsafe paths, special files, symlinks, conflicting
 file paths and ambiguous package ownership are rejected.
@@ -199,7 +234,7 @@ vinix-package deploy /etc/company/applications.json
 ```
 
 Mirror exports signed indexes and the resolved payload closure. On the offline
-machine enroll each `/media/new-mirror/REPOSITORY_ID` as a `file://` repository
+machine use `repo-enroll REPOSITORY_ID file:///media/new-mirror/REPOSITORY_ID KEY`
 with the same ID/key, then `update`. Expiry and sequence checks still apply;
 publishers must plan suitable expiry for offline use. Indexes may advertise apps
 outside the exported closure; those requests report missing payloads.
@@ -234,6 +269,11 @@ The same allocator checks measure Software review redraws at zero retention,
 and review decode/cancellation/close against that independent decoder baseline.
 Service and CLI fixtures check complete dependency disclosure and rejection of
 changed catalogs, policy, active state or operation/IDs before acquisition.
+Repository administration fixtures cover invalid enrollment, preserved policy,
+revocation with corrupt metadata, key rotation, mirror changes, legacy expiry
+migration, retained replay/equivocation floors after empty refresh, and recovery
+from history published ahead of the catalog. Unsafe configuration and predictable
+temporary-file symlinks are also covered.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute
@@ -270,8 +310,10 @@ explicit runtime. A dynamically linked ELF application uses that loader and the
 signed closure's `lib`/`usr/lib` directories through the production sandbox.
 The fixture checks ordinary identity, literal arguments, private-data writes,
 hidden host paths, runtime tamper refusal, missing-library diagnostics, rollback
-and removal of the unused runtime with personal data preserved. It qualifies
-the loader/package contract; individual upstream applications and graphics
+and removal of the unused runtime with personal data preserved. It also checks
+CLI enrollment/revocation, launch/rollback denial after revocation, replay refusal
+after an empty refresh, and re-enrollment without changing installed state. It
+qualifies the loader/package contract; individual upstream applications and graphics
 services still require their own coverage.
 
 The [persistent-storage recovery check](../tests/packages/persistence-check.md)

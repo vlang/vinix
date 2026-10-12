@@ -64,7 +64,14 @@ pub fn read_snapshots(directory string) ![]Snapshot {
 
 pub fn load_catalog(config Config, directory string) !Catalog {
 	config.validate()!
-	return snapshots_catalog(config, read_snapshots(directory)!, time.now().unix())
+	snapshots := read_snapshots(directory)!
+	history := read_history(directory)!
+	for snapshot in snapshots {
+		if !config.repositories.any(it == snapshot.repository) { continue }
+		index := verify_index(snapshot.repository, snapshot.text, snapshot.signature, time.now().unix())!
+		check_floor(history, snapshot.repository, index, index_digest(snapshot.text))!
+	}
+	return snapshots_catalog(config, snapshots, time.now().unix())
 }
 
 pub fn refresh(config Config, directory string) !Catalog {
@@ -72,6 +79,7 @@ pub fn refresh(config Config, directory string) !Catalog {
 	guard := acquire(directory)!
 	defer { guard.release() }
 	previous := read_snapshots(directory)!
+	mut history := history_with_snapshots(directory, previous)!
 	mut snapshots := []Snapshot{}
 	work := directory + '/refresh'
 	if os.exists(work) { os.rmdir_all(work)! }
@@ -86,15 +94,7 @@ pub fn refresh(config Config, directory string) !Catalog {
 		text := read_metadata(index_path)!
 		signature := read_metadata(sig_path)!.trim_space()
 		index := verify_index(repository, text, signature, time.now().unix())!
-		for cached in previous {
-			if cached.repository.id == repository.id && cached.repository.public_key == repository.public_key {
-				// Expiry does not erase the remembered sequence floor.
-				old := json2.decode[Index](cached.text)!
-				if index.sequence < old.sequence || (index.sequence == old.sequence && text != cached.text) {
-					return error('${repository.id}: repository rollback or sequence equivocation refused')
-				}
-			}
-		}
+		history = remember_index(history, repository, index, text)!
 		snapshots << Snapshot{ repository: repository, text: text, signature: signature }
 	}
 	catalog := snapshots_catalog(config, snapshots, time.now().unix())!
@@ -102,6 +102,9 @@ pub fn refresh(config Config, directory string) !Catalog {
 	if encoded.len > max_metadata {
 		return error('combined repository metadata exceeds cache limit')
 	}
+	// Record authenticated sequence/digest floors before exposing the new cache.
+	// Revocation and empty refreshes never discard identities from this history.
+	save_history(directory, history)!
 	atomic_write(directory + '/catalog.json', encoded)!
 	return catalog
 }

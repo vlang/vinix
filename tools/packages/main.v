@@ -10,6 +10,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  install ID... | remove ID... | upgrade | rollback | gc | verify\n' +
 	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
 	'  review install|remove|upgrade|deploy|rollback [ID...]\n' +
+	'  repo-list | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID\n' +
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
@@ -56,7 +57,7 @@ fn software_view(config pkgcore.Config, directory string) !SoftwareView {
 	state := pkgcore.read_state(directory, config.architecture)!
 	mut catalog_error := ''
 	if config.repositories.len == 0 {
-		catalog_error = 'No trusted repositories are configured. An administrator must enroll a publisher in /etc/vinix-packages/config.json.'
+		catalog_error = 'No trusted repositories are configured. An administrator must enroll a publisher with vinix-package repo-enroll.'
 	}
 	catalog := pkgcore.load_catalog(config, directory) or {
 		catalog_error = err.msg()
@@ -194,6 +195,33 @@ fn checked(arguments []string) !int {
 	config := pkgcore.Config{ ...initial, policy: pkgcore.Policy{ ...initial.policy, offline: offline || initial.policy.offline } }
 	directory := pkgcore.state_directory(root)
 	match command {
+		'repo-list' {
+			if names.len != 0 { return error('repo-list takes no arguments') }
+			status := pkgcore.repository_status(root)!
+			if as_json {
+				println(json2.encode(status))
+			} else {
+				for repository in status.repositories {
+					println('${repository.id} ${repository.url}\n  Publisher key: ${repository.public_key}')
+					for floor in status.history {
+						if floor.id == repository.id && floor.public_key == repository.public_key {
+							println('  Remembered sequence: ${floor.sequence}')
+						}
+					}
+				}
+				if status.repositories.len == 0 { println('No trusted repositories are enrolled.') }
+			}
+		}
+		'repo-enroll' {
+			if names.len != 3 { return error('repo-enroll requires ID, URL and an independently authenticated publisher key') }
+			pkgcore.enroll_repository(root, pkgcore.Repository{ id: names[0], url: names[1], public_key: names[2] }, offline)!
+			println('Enrolled repository ${names[0]}. Run update to load its verified catalog. A replaced key revokes launches and rollback of payloads signed with the old key.')
+		}
+		'repo-revoke' {
+			if names.len != 1 { return error('repo-revoke requires one repository ID') }
+			pkgcore.revoke_repository(root, names[0])!
+			println('Revoked repository ${names[0]}; installed payloads and personal data were retained for inspection/removal. Trust history was retained.')
+		}
 		'update' {
 			if names.len != 0 { return error('update takes no package IDs') }
 			pkgcore.refresh(config, directory)!

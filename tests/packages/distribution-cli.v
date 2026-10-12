@@ -57,8 +57,9 @@ fn qualify(binary string) ! {
 	assert os.stat(work + '/seed')!.mode & 0o777 == 0o600
 	root_args := ['--root', work + '/root']
 	repository := work + '/repository'
-	config := pkgcore.Config{ architecture: 'aarch64', repositories: [pkgcore.Repository{ id: 'fixture', url: 'file://' + repository, public_key: key }], policy: pkgcore.Policy{ reserve_bytes: 0 } }
+	config := pkgcore.Config{ architecture: 'aarch64', policy: pkgcore.Policy{ reserve_bytes: 0 } }
 	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(config))!
+	assert success(binary, [...root_args, 'repo-list'])!.contains('No trusted repositories')
 	for id in ['app', 'other'] {
 		os.write_file(work + '/payload/bin/app', id + ' payload')!
 		os.chmod(work + '/payload/bin/app', 0o755)!
@@ -81,6 +82,13 @@ fn qualify(binary string) ! {
 	}
 	success(binary, ['publish', repository, 'fixture', work + '/seed', '1',
 		(time.now().unix() + 3600).str()])!
+	first_index := os.read_file(repository + '/index.json')!
+	first_signature := os.read_file(repository + '/index.sig')!
+	success(binary, [...root_args, '--offline', 'repo-enroll', 'fixture', 'file://' + repository, key])!
+	enrolled := json2.decode[pkgcore.RepositoryStatus](success(binary, [...root_args, '--json', 'repo-list'])!)!
+	assert enrolled.repositories.len == 1 && enrolled.history.len == 1
+	assert enrolled.repositories[0].public_key == key && enrolled.history[0].sequence == 1
+	assert !pkgcore.load_config(work + '/root')!.policy.offline
 	success(binary, [...root_args, 'update'])!
 	assert success(binary, [...root_args, 'search', 'distribution'])!.contains('app')
 	assert command(binary, [...root_args, 'info', 'absent'])!.code != 0
@@ -113,8 +121,9 @@ fn qualify(binary string) ! {
 	success(binary, [...root_args, 'mirror', work + '/mirror', 'app'])!
 	offline_root := work + '/offline'
 	os.mkdir_all(offline_root + '/etc/vinix-packages')!
-	offline := pkgcore.Config{ ...config, repositories: [pkgcore.Repository{ ...config.repositories[0], url: 'file://' + work + '/mirror/fixture' }], policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }
+	offline := pkgcore.Config{ ...config, policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }
 	os.write_file(offline_root + '/etc/vinix-packages/config.json', json2.encode(offline))!
+	success(binary, ['--root', offline_root, 'repo-enroll', 'fixture', 'file://' + work + '/mirror/fixture', key])!
 	success(binary, ['--root', offline_root, 'update'])!
 	success(binary, ['--root', offline_root, 'install', 'app'])!
 	assert command(binary, ['--root', offline_root, 'install', 'other'])!.code != 0
@@ -134,8 +143,13 @@ fn qualify(binary string) ! {
 	assert (launchers.handler('package.app', 'text/plain') or { panic('missing handler') }) == 'app'
 	assert launchers.find('other') == none
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.requested == ['app']
+	success(binary, ['publish', repository, 'fixture', work + '/seed', '2',
+		(time.now().unix() + 3600).str()])!
+	success(binary, [...root_args, 'update'])!
+	latest_index := os.read_file(repository + '/index.json')!
+	latest_signature := os.read_file(repository + '/index.sig')!
 	// Acquisition fails after trust revocation, but uninstall remains usable.
-	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ architecture: 'aarch64' }))!
+	success(binary, [...root_args, 'repo-revoke', 'fixture'])!
 	assert command(binary, [...root_args, 'install', 'other'])!.code != 0
 	assert success(binary, [...root_args, 'plan', 'remove', 'app'])!.contains('"requested":[]')
 	remove_review := json2.decode[pkgprotocol.Review](success(binary, [...root_args, 'review', 'remove', 'app'])!)!
@@ -145,7 +159,18 @@ fn qualify(binary string) ! {
 	assert launchers.apps.len == 0
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.packages.len == 0
 	success(binary, [...root_args, 'gc'])!
-	println('Package CLI: publisher round-trip, clean offline install, missing payload diagnostics, deployment, rollback and revoked-publisher uninstall passed')
+	success(binary, [...root_args, 'update'])!
+	assert pkgcore.read_snapshots(store)!.len == 0
+	os.write_file(repository + '/index.json', first_index)!
+	os.write_file(repository + '/index.sig', first_signature)!
+	replay := command(binary, [...root_args, 'repo-enroll', 'fixture', 'file://' + repository, key])!
+	assert replay.code != 0 && replay.text.contains('retained trust history')
+	assert pkgcore.load_config(work + '/root')!.repositories.len == 0
+	os.write_file(repository + '/index.json', latest_index)!
+	os.write_file(repository + '/index.sig', latest_signature)!
+	success(binary, [...root_args, 'repo-enroll', 'fixture', 'file://' + repository, key])!
+	success(binary, [...root_args, 'update'])!
+	println('Package CLI: authenticated enrollment, offline mirror, retained replay floors, deployment, rollback and revoked-publisher uninstall passed')
 }
 
 fn main() {

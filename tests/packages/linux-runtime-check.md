@@ -4,7 +4,8 @@ The V controller builds a target musl dynamic executable and a shared V library,
 the static SDK Linux runner, and the production native sandbox. It checks that
 the executable has both PT_INTERP and PT_DYNAMIC before staging. The guest
 imports the prepared app/runtime roots with the actual `pack-root` CLI, creates
-a throwaway signing key, enrolls a local repository and installs the Linux app.
+a throwaway signing key, authenticates/enrolls a local repository through the CLI
+and installs the Linux app.
 The runtime includes upstream copyright and Vinix licensing documents.
 
 ```sh
@@ -44,6 +45,10 @@ host PT_INTERP path is bypassed. Guest assertions cover:
 - Reviewed upgrade to a signed runtime without the required shared library producing
   the loader's library-name diagnostic and status 127; reviewed rollback restoring launch.
 - Reviewed uninstall removing both the app and unused runtime while preserving user data.
+- Repository revocation denying launches/rollback while reviewed uninstall remains
+  usable, and an empty refresh retaining the sequence floor. Re-enrollment with
+  an older signed index fails; re-enrollment with the latest exact index succeeds
+  without changing installed state or personal data.
 
 A passing retained run writes `qualification.json` with architecture, SDK,
 scenario and hashes/lengths for kernel, sandbox, dynamic payload, shared library,
@@ -69,6 +74,17 @@ with those same kernel artifacts:
 [x86_64 serial](results/2026-10-12/review-x86_64.serial.txt).
 Their `PACKAGE REVIEW` marker covers full runtime/publisher disclosure and stale
 confirmation refusal; maintenance uses reviewed upgrade, rollback and uninstall.
+
+The repository administration flow passed on both targets on 2026-10-12 with
+those same kernel artifacts:
+[AArch64 repository receipt](results/2026-10-12/repositories-aarch64.json),
+[AArch64 serial](results/2026-10-12/repositories-aarch64.serial.txt),
+[x86_64 repository receipt](results/2026-10-12/repositories-x86_64.json),
+[x86_64 serial](results/2026-10-12/repositories-x86_64.serial.txt).
+Their `PACKAGE REPOSITORY` marker covers authenticated enrollment, revocation,
+retained replay floors after an empty refresh and successful re-enrollment.
+These guests use initramfs; metadata publication interruption is simulated by
+host fixtures, rather than tested as a physical power cut in these runs.
 
 This qualifies this musl loader/package tuple and its stated assertions. It does
 not qualify arbitrary Linux libraries, upstream apps, glibc, graphics/audio

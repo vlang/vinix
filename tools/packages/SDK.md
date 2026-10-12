@@ -20,7 +20,8 @@ signing seed encoded as hex. Keep it outside repositories/deployment images.
 Distribute the public key through an authenticated channel. Upload objects first,
 then switch the web server to the complete new repository directory. Never change
 content at an existing hash. Increase sequence for every index change, including
-expiry. Key rotation/revocation requires administrator configuration.
+expiry. Administrators explicitly enroll, replace or revoke publisher keys using
+the repository commands below; publishers cannot authorize their own keys.
 
 `pack` inventories ordinary payload files with paths, lengths, SHA-256 and
 executable bits, and copies verified content into the repository. It replaces the
@@ -204,6 +205,29 @@ manifests/ID-ARCH-VERSION.json    publisher input, not consumer trust input
 
 Expiry is UTC Unix seconds; sequence is a positive increasing integer. The signed
 index embeds full manifests/hashes; consumers never acquire unsigned side metadata.
+
+`repo-enroll ID URL PUBLIC_KEY_HEX` authenticates a current index with the supplied,
+independently authenticated Ed25519 key before enabling that repository. Run
+`update` to publish its catalog. Reusing an ID replaces the URL/key and preserves
+architecture, launch account and policy. Local `file://` repositories support
+offline enrollment. `repo-revoke ID` disables that publisher without fetching
+metadata or deleting installed payloads/personal data; uninstall remains available.
+Key replacement also revokes launch/rollback trust for old-key installations.
+
+`--json repo-list` emits `{format:1,architecture,repositories,history}`.
+Repositories contain `{id,url,public_key}`; history contains
+`{id,public_key,sequence,index_sha256}` for enrolled, revoked and replaced keys.
+Listing takes a shared lock once a package store exists; an active writer gives
+a busy diagnostic. A fresh image can be listed without initializing its store.
+
+History is keyed by ID/key, independent of mirror URL, and records exact signed
+index bytes. Reject lower sequences and changed bytes at an existing sequence;
+increase sequence for expiry renewals too. Revocation and empty refreshes retain
+floors. History is durable before configuration/catalog publication: retry an
+interrupted enrollment/refresh with the same or a newer signed index. An older
+cache is refused until refreshed. The administrator owns this local history;
+it is not a hardware trust anchor. See the
+[administration and recovery contract](../../docs/application-distribution.md#trust-and-configuration).
 
 `view` emits one `{format:1,generation,architecture,offline,catalog_error,rows}`
 JSON object. Rows include ID/name/description, available/installed version, target,
