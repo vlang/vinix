@@ -63,7 +63,7 @@ fn compile_c(root string, generated string, output string, gles bool) {
 }
 
 fn build(root string, out string, only string) {
-	for item in ['run-ios', 'run-ios-gles', 'select-checks', 'semaphore-checks', 'signal-checks',
+	for item in ['run-ios', 'run-ios-gles', 'objc-constant-dictionary-checks', 'select-checks', 'semaphore-checks', 'signal-checks',
 		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'swift-array-storage-checks', 'swift-vararg-checks', 'swift-void-checks', 'swift-version-checks', 'swift-initializer-checks', 'swift-heap-checks', 'swift-error-checks', 'swift-error-value-checks', 'swift-object-type-checks', 'swift-mangled-checks', 'swift-witness-checks', 'swift-once-checks', 'swift-objc-bool-checks', 'swift-actor-executor-checks', 'swift-task-priority-checks', 'swift-task-alloc-checks', 'swift-task-create-checks', 'swift-task-switch-checks', 'swift-nslog-checks', 'swift-string-unbridge-checks', 'swift-error-description-checks', 'module-lookup-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
@@ -77,7 +77,9 @@ fn build(root string, out string, only string) {
 			if item.ends_with('-checks') { args = args.filter(it != '-prod') }
 			if item == 'run-ios-gles' { args << ['-d', 'ios_gles', '-d', 'ios_text'] }
 			args << root + if item.ends_with('-checks') {
-				'/compat/ios/runner/' + if item == 'module-lookup-checks' {
+				'/compat/ios/runner/' + if item == 'objc-constant-dictionary-checks' {
+					'objc_constant_dictionary_test.v'
+				} else if item == 'module-lookup-checks' {
 					'module_lookup_test.v'
 				} else if item == 'select-checks' {
 					'select_test.v'
@@ -282,6 +284,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/uuid-checks', fs + '/opt/ios/uuid-checks')
 	copy_file(out + '/audio-session-checks', fs + '/opt/ios/audio-session-checks')
 	copy_file(out + '/cf-dictionary-checks', fs + '/opt/ios/cf-dictionary-checks')
+	copy_file(out + '/objc-constant-dictionary-checks', fs + '/opt/ios/objc-constant-dictionary-checks')
 	copy_file(out + '/objc-storage-checks', fs + '/opt/ios/objc-storage-checks')
 	copy_file(out + '/objc-associated-checks', fs + '/opt/ios/objc-associated-checks')
 	copy_file(out + '/objc-property-checks', fs + '/opt/ios/objc-property-checks')
@@ -372,7 +375,7 @@ fn verify_monitor(out string) {
 }
 
 fn vm(root string, out string, mode string) {
-	if mode !in ['regression', 'swift', 'probe', 'audit', 'static-audit'] {
+	if mode !in ['regression', 'swift', 'objc', 'probe', 'audit', 'static-audit'] {
 		panic('invalid check mode: ' + mode)
 	}
 	state := out + '/' + mode + '-' + time.sys_mono_now().str()
@@ -383,6 +386,12 @@ fn vm(root string, out string, mode string) {
 	if mode == 'regression' {
 		regression_root(root, out, fs)
 		copy_lookup_fixtures(out, fs)
+	} else if mode == 'objc' {
+		for directory in ['sbin', 'proc', 'sys', 'dev', 'tmp', 'opt/ios'] { os.mkdir_all(fs + '/' + directory) or { panic(err) } }
+		copy_file(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks/EOSSDK.framework/EOSSDK', fs + '/opt/ios/constant-dictionary-image')
+		for name in ['objc-constant-dictionary', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
+			copy_file(out + '/' + name + '-checks', fs + '/opt/ios/' + name + '-checks')
+		}
 	} else if mode == 'swift' {
 		copy_lookup_fixtures(out, fs)
 		copy_file(out + '/module-lookup-checks', fs + '/opt/ios/module-lookup-checks')
@@ -441,7 +450,7 @@ fn vm(root string, out string, mode string) {
 		'virtio-keyboard-device', '-device', 'virtio-tablet-device'])
 	p.set_redirect_stdio()
 	p.run()
-	marker := if mode == 'regression' { 'VINIX iOS GUEST: PASS' } else if mode == 'swift' { 'VINIX iOS SWIFT: PASS' } else { 'FORTNITE PROBE COMPLETE' }
+	marker := if mode == 'regression' { 'VINIX iOS GUEST: PASS' } else if mode == 'swift' { 'VINIX iOS SWIFT: PASS' } else if mode == 'objc' { 'VINIX iOS OBJC: PASS' } else { 'FORTNITE PROBE COMPLETE' }
 	mut failure := ''
 	await_checks(mut p, log, marker) or { failure = err.msg() }
 	// V panics do not unwind defers. Close our VM before reporting failure.
@@ -451,7 +460,7 @@ fn vm(root string, out string, mode string) {
 	}
 	p.close()
 	if failure != '' { panic(failure) }
-	println('${mode}: ${if mode in ['regression', 'swift'] {
+	println('${mode}: ${if mode in ['regression', 'swift', 'objc'] {
 		'PASS'
 	} else {
 		'COMPLETE (see guest process status)'
@@ -460,7 +469,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|build-swift-void|build-swift-version|build-swift-initializer|build-swift-heap|build-swift-error|build-swift-error-value|build-swift-object-type|build-swift-mangled|build-swift-witness|build-swift-once|build-swift-objc-bool|build-swift-actor-executor|build-swift-task-priority|build-swift-task-alloc|build-swift-task-create|build-swift-task-switch|build-swift-nslog|build-swift-string-unbridge|build-swift-error-description|build-module-lookup|verify-monitor|regression|swift|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-objc-constant-dictionary|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|build-swift-void|build-swift-version|build-swift-initializer|build-swift-heap|build-swift-error|build-swift-error-value|build-swift-object-type|build-swift-mangled|build-swift-witness|build-swift-once|build-swift-objc-bool|build-swift-actor-executor|build-swift-task-priority|build-swift-task-alloc|build-swift-task-create|build-swift-task-switch|build-swift-nslog|build-swift-string-unbridge|build-swift-error-description|build-module-lookup|verify-monitor|regression|swift|objc|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -510,6 +519,8 @@ fn main() {
 		build(root, out, 'objc-property-checks')
 	} else if mode == 'build-objc-sync' {
 		build(root, out, 'objc-sync-checks')
+	} else if mode == 'build-objc-constant-dictionary' {
+		build(root, out, 'objc-constant-dictionary-checks')
 	} else if mode == 'build-swift-string' {
 		build(root, out, 'swift-string-checks')
 	} else if mode == 'build-swift-metadata' {

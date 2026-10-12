@@ -2800,17 +2800,53 @@ unimplemented. Evidence is under `build/ios/fortnite/swift-builtin-checks`.
 Full regression remains unpassed, the five published runners retain their last
 passing bytes, and entry, rendering and gameplay remain unverified.
 
+The subsequent Objective-C increment implements the `NSConstantDictionary`
+class and its `__objc_dictobj` records. The native runtime and
+[Clang's literal ABI](https://github.com/llvm/llvm-project/blob/main/clang/lib/CodeGen/CGObjCMac.cpp)
+agree on the forty-byte layout and sorted string-key format. Vinix validates
+all records, member arrays and supported member lifetimes before publishing
+metadata. The mapped objects and arrays stay read-only. Each record owns one
+sidecar and two sized member arrays; shutdown frees them after collection and
+autorelease users drain, without releasing borrowed image members or freeing
+mapped object bytes. Ordinary owned objects and disposable classes are rejected
+as literal members.
+
+Native comparisons cover CF/Objective-C lookup, equal and missing keys,
+extraction, enumeration, arrays, immortal copies and independent mutable copies.
+The native extraction method fills every pair even when its count argument is
+zero; the tests provision complete output buffers and check their guards.
+Concurrent registration, malformed records, immutable mutation, explicit
+destruction and two drained runtime lifetimes also pass. A metadata-only fixture
+rebases and registers EOS's three actual dictionaries on both the host and
+Vinix, checks equal-key lookup and retires their metadata without executing app
+code. The native getter's initially incorrect count-limit expectation, a missing
+archived storage fixture, a test declaration conflict and the VM monitor's
+rejection of expected child panics retain their failed/partial evidence. Child
+panics are now captured and checked inside the test; the monitor still rejects
+unexpected failures.
+
+All 52 programs build, 56 final generated C streams restore to their recorded
+hashes, and four host suites pass ASAN/UBSAN in both hashing modes. Vinix passes
+33 Swift/loader programs and six Objective-C collection/storage programs. The
+IPA passes the dictionary class binding and exits with status 1 before entry at
+Foundation's `_OBJC_CLASS_$_NSLayoutConstraint`. Native runtime metadata for
+that eighty-byte NSObject subclass and its method signatures is captured;
+constraint construction and layout remain unimplemented. Evidence is under
+`build/ios/fortnite/constant-dictionary-checks`. Full regression remains
+unpassed, the five published runners retain their last passing bytes, and entry,
+rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,415 | 744 | 80 |
-| EOSSDK | 626 | 36 | 18 |
+| EOSSDK | 627 | 35 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,156 | 841 | 121 |
+| All images | 2,157 | 840 | 121 |
 
-The C++/GLES/Text variant reports 2,169 resolved imports, 828 unresolved strong
+The C++/GLES/Text variant reports 2,170 resolved imports, 827 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -2840,6 +2876,7 @@ fixtures and extracted IPA under `build/ios/fortnite`:
 v -nocache -cc clang run tests/ios/native-checks.v build
 v -nocache -cc clang run tests/ios/native-checks.v regression
 v -nocache -cc clang run tests/ios/native-checks.v swift
+v -nocache -cc clang run tests/ios/native-checks.v objc
 v -nocache -cc clang run tests/ios/native-checks.v probe
 v -nocache -cc clang run tests/ios/native-checks.v audit
 v -nocache -cc clang run tests/ios/native-checks.v static-audit

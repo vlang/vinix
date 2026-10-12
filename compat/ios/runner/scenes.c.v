@@ -19,6 +19,8 @@ fn objc_is_kind(object u64, cls u64) bool {
 fn objc_responds(object u64, selector &char) bool {
 	if object == 0 || selector == unsafe { nil } { return false }
 	name := ctext(u64(selector))
+	if object in ios_runtime.objects && obj_header(object).image_dictionary
+		&& name in ['copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:', 'allKeys', 'allValues', 'getObjects:andKeys:count:'] { return true }
 	if image_selector(object, name) { return true }
 	if accessibility_selector(object, name) { return true }
 	if native_method(read64(object), name) != 0 { return true }

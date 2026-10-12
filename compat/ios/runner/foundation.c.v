@@ -6,7 +6,7 @@ import encoding.utf8
 
 fn string_text(object u64) string {
 	if object == 0 { return '' }
-	if object in ios_runtime.constants {
+	if object in ios_runtime.constants && objc_is_kind(object, ios_runtime.names['NSString']) {
 		if text := ios_runtime.constant_utf8[object] { return text }
 		return unsafe { tos(&u8(read64(object + 16)), int(read64(object + 24))) }
 	}
@@ -209,6 +209,13 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		return true
 	}
 	mut header := obj_header(object)
+	if header.image_dictionary {
+		if constant_dictionary_dispatch(object, selector, mut frame) { return true }
+		if selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',
+			'removeAllObjects', 'addObject:', 'removeObjectAtIndex:', 'setObject:atIndexedSubscript:'] {
+			panic('iOS: mutation of an immutable image dictionary')
+		}
+	}
 	if selector == 'initWithBytes:length:encoding:' && objc_is_kind(object, ios_runtime.names['NSString']) {
 		if frame.x[3] > 16 * 1024 * 1024 { panic('iOS: NSString exceeds size limit') }
 		text := unsafe { tos(&u8(frame.x[2]), int(frame.x[3])) }

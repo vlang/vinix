@@ -53,6 +53,8 @@ mut:
 	refs        i64
 	cls u64
 	caller_storage bool
+	image_dictionary bool // Immortal image bytes; owned metadata borrows its members.
+	image_dictionary_next u64
 	releasing bool
 	destroying bool
 	destroyed bool
@@ -193,6 +195,7 @@ mut:
 	defaults u64
 	locale u64
 	empty_dictionary u64
+	image_dictionaries u64 // Intrusive list retired after all collection/pool users.
 	observers []&NotificationObserver
 	selectors    []string
 	selector_names map[string]u64
@@ -221,7 +224,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
+		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
@@ -246,7 +249,7 @@ fn objc_start() {
 			'UIButton' { ios_runtime.names['UIControl'] }
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray' { ios_runtime.names['NSArray'] }
-			'NSMutableDictionary' { ios_runtime.names['NSDictionary'] }
+			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSMutableData' { ios_runtime.names['NSData'] }
 			'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			else { ios_runtime.names['NSObject'] }
@@ -260,12 +263,16 @@ fn objc_start() {
 		mut metaclass := unsafe { &AbiClass(meta) }
 		metaclass.isa = if parent == 0 { meta } else { read64(parent) }
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
-		ios_runtime.classes[u64(cls)] = &ObjClass{ name: name, parent: parent, size: 8, owned: true }
+		ios_runtime.classes[u64(cls)] = &ObjClass{ name: name, parent: parent, size: if name == 'NSConstantDictionary' { u32(40) } else { u32(8) }, owned: true }
 		ios_runtime.classes[meta] = &ObjClass{ name: name, parent: metaclass.parent, size: 40, meta: true }
 		ios_runtime.names[name] = u64(cls)
 	}
 	mut root := ios_runtime.classes[ios_runtime.names['NSObject']] or { panic('iOS: missing NSObject') }
 	root.ivars['isa'] = &ObjIvar{name: 'isa'.clone(), types: '#'.clone(), offset: 0, size: 8}
+	mut dictionary := ios_runtime.classes[ios_runtime.names['NSConstantDictionary']] or { panic('iOS: missing constant dictionary class') }
+	for i, pair in [['_options', 'Q']!, ['_count', 'Q']!, ['_keys', 'r^@']!, ['_objects', 'r^@']!]! {
+		dictionary.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: i64((i + 1) * 8), size: 8}
+	}
 }
 
 fn read64(address u64) u64 { return unsafe { *(&u64(address)) } }
@@ -418,6 +425,7 @@ fn objc_stop() {
 		objc_release(ios_runtime.empty_dictionary)
 		ios_runtime.empty_dictionary = 0
 	}
+	objc_constant_dictionaries_stop()
 	if ios_runtime.live != 0 {
 		eprintln('iOS: ${ios_runtime.live} Objective-C objects still owned at shutdown')
 	}
@@ -721,6 +729,7 @@ fn objc_register_image(image macho.Image, layout macho.Layout, base u64) ! {
 	}
 	for cls in classes { m.register(cls, 0)! }
 	for cls in classes { m.register(read64(cls), 0)! }
+	m.constant_dictionaries()!
 	ios_runtime.load_classes << classes
 	unsafe { classes.free() }
 	mut attached := map[u64]bool{}
