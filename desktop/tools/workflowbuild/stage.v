@@ -97,9 +97,9 @@ pub fn stage(root string, ui string, dest string, cross bool) ! {
 		icons.write_string('static const unsigned char icon_${stem}[] = {')
 		for byte in data { icons.write_string('${byte},') }
 		icons.write_string('};\n')
-		entries << 'if (strcmp(name, "${stem}") == 0) { *size = sizeof(icon_${stem}); return (void*)icon_${stem}; }'
+		entries << 'if (strcmp(name, "${stem}") == 0) { if (size) *size = sizeof(icon_${stem}); return (void*)icon_${stem}; }'
 	}
-	icons.write_string('static void* vinix_app_icon_data(const char* name, size_t* size) {\n' + entries.join('\n') + '\n*size = 0; return NULL; }\n')
+	icons.write_string('static void* vinix_app_icon_data(const char* name, size_t* size) {\n' + entries.join('\n') + '\nif (size) *size = 0; return NULL; }\n')
 	icons.write_string('static size_t vinix_app_icon_size(const char* name) { size_t size = 0; vinix_app_icon_data(name, &size); return size; }\n')
 	os.write_file('${dest}/app_icon_data.h', icons.str())!
 	hosttest.generate_module('${root}/desktop/gpucore', '${dest}/presenter.c', 'arm64', [])!
