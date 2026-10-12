@@ -63,4 +63,9 @@ remain separate acceptance work.
 `v -enable-globals -cc cc test tools/development/jobcore` checks real job
 execution, credential handling, interval coalescing, interrupted-run refusal,
 executable pins and deadline retirement. These are host tests; Vinix guest
-qualification must be recorded separately.
+qualification is recorded separately by the
+[native workflow controller](../../tests/development/README.md). Its x86_64
+and AArch64 fixtures run the public scheduler as UID/GID 1000, check private
+credential/receipt ownership, selected environment and discarded child output,
+and refuse public/symlinked credentials. Native watcher, service/boot and
+production server/SSH/CI acceptance remain open.
