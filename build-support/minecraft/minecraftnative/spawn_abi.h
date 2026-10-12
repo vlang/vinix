@@ -16,4 +16,11 @@
 #undef posix_spawn_file_actions_destroy
 #undef posix_spawn_file_actions_adddup2
 #undef posix_spawn_file_actions_addclose
+/* Keep these opaque declarations local: the V runtime may provide them in a
+ * separate object instead of emitting them into the generated program. */
+int posix_spawnp(pid_t *, const char *, const void *, const void *, char *const [], char *const []);
+int posix_spawn_file_actions_init(void *);
+int posix_spawn_file_actions_destroy(void *);
+int posix_spawn_file_actions_adddup2(void *, int, int);
+int posix_spawn_file_actions_addclose(void *, int);
 #endif
