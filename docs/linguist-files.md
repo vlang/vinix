@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `88708dd9e9d476420ec77d19ec6ef3581a4fdc31`,
+at source commit `4f93ffc9e95fcce04aeb0936fb7ca503b71106ee`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 572 | 2,367,937 | 6.09% |
-| Python | 202 | 868,576 | 2.23% |
-| Shell | 626 | 1,367,210 | 3.52% |
+| C | 573 | 2,368,101 | 6.08% |
+| Python | 193 | 826,008 | 2.12% |
+| Shell | 635 | 1,368,878 | 3.51% |
 
-All `.v` files are classified as V. The resulting V share is 80.14%, with no
+All `.v` files are classified as V. The resulting V share is 80.28%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 868,576 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 826,008 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 88708dd9e9d476420ec77d19ec6ef3581a4fdc31 --breakdown --json
+github-linguist --rev 4f93ffc9e95fcce04aeb0936fb7ca503b71106ee --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -57,6 +57,7 @@ depend on its deployed Linguist version and the default-branch revision.
 
 | File | Bytes |
 | --- | ---: |
+| `apple-boot/boottools/sdk.h` | 164 |
 | `apple-boot/src/adt.h` | 3,097 |
 | `apple-boot/src/fdt.h` | 2,518 |
 | `apple-boot/src/lib.h` | 1,256 |
@@ -634,15 +635,6 @@ depend on its deployed Linguist version and the default-branch revision.
 
 | File | Bytes |
 | --- | ---: |
-| `apple-boot/build.py` | 4,340 |
-| `apple-boot/pack.py` | 4,497 |
-| `apple-boot/tests/check-v-abi.py` | 3,047 |
-| `apple-boot/tests/check_converter.py` | 3,283 |
-| `apple-boot/tests/fdt_check.py` | 5,286 |
-| `apple-boot/tests/fixture-parity.py` | 5,066 |
-| `apple-boot/tests/ioreg_adt.py` | 3,303 |
-| `apple-boot/tests/qemu_iboot.py` | 9,857 |
-| `apple-boot/tests/run-v-core.py` | 3,889 |
 | `build-support/android/_boot_native.py` | 20,549 |
 | `build-support/android/_native.py` | 5,749 |
 | `build-support/android/art-bootclasspath.py` | 4,172 |
@@ -842,8 +834,17 @@ depend on its deployed Linguist version and the default-branch revision.
 | File | Bytes |
 | --- | ---: |
 | `.githooks/post-commit` | 1,452 |
+| `apple-boot/build-image` | 183 |
 | `apple-boot/compile-v` | 181 |
+| `apple-boot/pack` | 176 |
+| `apple-boot/tests/check-v-abi` | 186 |
+| `apple-boot/tests/check_converter` | 190 |
 | `apple-boot/tests/compile-fixture` | 190 |
+| `apple-boot/tests/fixture-parity` | 189 |
+| `apple-boot/tests/ioreg_adt` | 184 |
+| `apple-boot/tests/qemu_iboot` | 185 |
+| `apple-boot/tests/run-v-core` | 185 |
+| `apple-boot/tests/test-boot-tools` | 190 |
 | `base-files/etc/profile` | 1,023 |
 | `build-support/alpine-resolve` | 169 |
 | `build-support/android/build-art.sh` | 9,004 |
