@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `cfe9489880d311becf0655b5620962a70c112bf7`,
+at source commit `2f9d995321ebfd317d83d8d726e3752657f80b8d`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 573 | 2,368,101 | 6.05% |
-| Python | 157 | 697,874 | 1.78% |
-| Shell | 667 | 1,378,989 | 3.53% |
+| C | 578 | 2,376,496 | 5.98% |
+| Python | 112 | 557,322 | 1.40% |
+| Shell | 717 | 1,391,362 | 3.50% |
 
-All `.v` files are classified as V. The resulting V share is 80.66%, with no
+All `.v` files are classified as V. The resulting V share is 81.26%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 697,874 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 557,322 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev cfe9489880d311becf0655b5620962a70c112bf7 --breakdown --json
+github-linguist --rev 2f9d995321ebfd317d83d8d726e3752657f80b8d --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -147,11 +147,15 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/linuxkpi_pagefault_v_contract.h` | 1,455 |
 | `kernel/c/linuxkpi_pci_fixture_v_contract.h` | 629 |
 | `kernel/c/linuxkpi_printk_fixture_v_contract.h` | 1,555 |
+| `kernel/c/linuxkpi_rcu_fixture_v_contract.h` | 699 |
+| `kernel/c/linuxkpi_rcu_fixture_v_primitives.h` | 967 |
+| `kernel/c/linuxkpi_rcu_v_contract.h` | 1,796 |
+| `kernel/c/linuxkpi_rcu_v_primitives.h` | 2,629 |
 | `kernel/c/linuxkpi_runtime_fixture_v_contract.h` | 1,375 |
 | `kernel/c/linuxkpi_runtime_v_contract.h` | 2,423 |
 | `kernel/c/linuxkpi_runtime_v_primitives.h` | 2,085 |
 | `kernel/c/linuxkpi_scalar_store_v_contract.h` | 431 |
-| `kernel/c/linuxkpi_scalar_uaccess_v_contract.h` | 565 |
+| `kernel/c/linuxkpi_scalar_uaccess_v_contract.h` | 860 |
 | `kernel/c/linuxkpi_seq_fixture_v_contract.h` | 311 |
 | `kernel/c/linuxkpi_smp_call_v_contract.h` | 2,480 |
 | `kernel/c/linuxkpi_smp_call_v_primitives.h` | 2,929 |
@@ -184,7 +188,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/locale.h` | 45 |
 | `kernel/c/lwipopts.h` | 3,213 |
 | `kernel/c/math.h` | 569 |
-| `kernel/c/net_driver_abi.h` | 1,159 |
+| `kernel/c/net_driver_abi.h` | 1,223 |
 | `kernel/c/net_random.h` | 1,782 |
 | `kernel/c/pci_config.h` | 2,255 |
 | `kernel/c/pci_config_arm_test.h` | 172 |
@@ -207,7 +211,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/vinix_inet6.h` | 1,534 |
 | `kernel/c/vinix_net.h` | 2,422 |
 | `kernel/c/vmx.h` | 1,394 |
-| `kernel/c/x86_irq_v_contract.h` | 548 |
+| `kernel/c/x86_irq_v_contract.h` | 804 |
 | `kernel/c/x86_mitigations.h` | 1,098 |
 | `kernel/linuxkpi/include/asm/atomic.h` | 3,241 |
 | `kernel/linuxkpi/include/asm/barrier.h` | 1,174 |
@@ -235,7 +239,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/asm/swab.h` | 181 |
 | `kernel/linuxkpi/include/asm/types.h` | 79 |
 | `kernel/linuxkpi/include/asm/unaligned.h` | 177 |
-| `kernel/linuxkpi/include/generated/autoconf.h` | 2,187 |
+| `kernel/linuxkpi/include/generated/autoconf.h` | 2,358 |
 | `kernel/linuxkpi/include/generated/timeconst.h` | 1,100 |
 | `kernel/linuxkpi/include/linux/bug.h` | 1,481 |
 | `kernel/linuxkpi/include/linux/compiler_attributes.h` | 869 |
@@ -251,8 +255,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/linux/percpu-defs.h` | 1,424 |
 | `kernel/linuxkpi/include/linux/percpu.h` | 532 |
 | `kernel/linuxkpi/include/linux/poison.h` | 236 |
-| `kernel/linuxkpi/include/linux/preempt.h` | 1,351 |
-| `kernel/linuxkpi/include/linux/rcupdate.h` | 933 |
+| `kernel/linuxkpi/include/linux/preempt.h` | 1,579 |
+| `kernel/linuxkpi/include/linux/rcupdate.h` | 383 |
 | `kernel/linuxkpi/include/linux/sched.h` | 2,337 |
 | `kernel/linuxkpi/include/linux/sched/signal.h` | 302 |
 | `kernel/linuxkpi/include/linux/sched/task.h` | 318 |
@@ -486,6 +490,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/kstrtoxhost_v_contract.h` | 413 |
 | `tests/linuxkpi/loghost_v_contract.h` | 1,557 |
 | `tests/linuxkpi/policyhost_v_contract.h` | 1,469 |
+| `tests/linuxkpi/rcucallfixture/rcucall_host_contract.h` | 1,840 |
 | `tests/linuxkpi/smpcallfixture/smpcall_host_contract.h` | 2,059 |
 | `tests/linuxkpi/standalone/headercompiler_v_contract.h` | 1,823 |
 | `tests/linuxkpi/standalone/headerpreempt_v_contract.h` | 1,005 |
@@ -683,51 +688,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/run.py` | 1,075 |
 | `tests/agx-fake-g17/run_encode_native.py` | 1,278 |
 | `tests/agx-fake-g17/run_vm.py` | 4,186 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocation-audit-final/capture-x86-diagnostic.py` | 1,678 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocation-audit-final/run.py` | 2,197 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/run.py` | 3,446 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/runner.py` | 6,012 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify-x86-v4-final.py` | 7,164 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-coordinator-guard-stop/useralloc-v4-final-cohorts.py` | 3,689 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-coordinator.py` | 4,526 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-v4-final-cohorts.py` | 4,526 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/run.py` | 1,004 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-v4/run.py` | 602 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-v4/run.py` | 602 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run-driver.py` | 2,815 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run-driver.py` | 2,830 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/runner.py` | 4,795 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/run.py` | 3,226 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/run-settlement-after-core.py` | 1,032 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run-baseline.py` | 944 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run.py` | 1,553 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/prepare.py` | 2,437 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/run.py` | 3,446 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-v5-final-cohorts.py` | 7,043 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/static-desktop/run-build.py` | 2,088 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/desktop-perf-controller/validate-completed.py` | 1,616 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-final-cohorts.py` | 10,670 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-final-controller.py` | 656 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-verify-readiness.py` | 2,950 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/run.py` | 678 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64-four-level/run.py` | 678 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/run.py` | 678 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/driver.py` | 15,387 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/evidence-audit.py` | 4,682 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/run.py` | 678 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/collect.py` | 6,463 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/collect-v6-verification.py` | 5,500 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-arm-driver.py` | 417 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-x86-driver.py` | 469 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/run.py` | 8,275 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/summarize.py` | 7,668 |
 | `tests/android/_run_native.py` | 16,117 |
 | `tests/android/activity-lifecycle-test.py` | 1,750 |
 | `tests/android/art-runtime-test.py` | 2,297 |
@@ -872,7 +832,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/security-tools/stage` | 165 |
 | `build-support/sparse-file` | 178 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
-| `build-support/stage-uname.sh` | 656 |
+| `build-support/stage-uname.sh` | 215 |
 | `build-support/staging-cache` | 127 |
 | `build-support/steam/bash` | 433 |
 | `build-support/steam/compile-v-robust` | 165 |
@@ -946,7 +906,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,588 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 93,962 |
+| `scripts/build-desktop-aarch64.sh` | 94,056 |
 | `scripts/build-desktop-amd64.sh` | 14,918 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
@@ -979,8 +939,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
 | `scripts/build-steam-aarch64.sh` | 13,694 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
-| `scripts/build-userland-aarch64.sh` | 24,954 |
-| `scripts/build-userland-amd64.sh` | 5,997 |
+| `scripts/build-userland-aarch64.sh` | 24,946 |
+| `scripts/build-userland-amd64.sh` | 5,989 |
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
 | `scripts/build-venus-aarch64.sh` | 5,339 |
@@ -1031,41 +991,86 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/compare` | 147 |
 | `tests/alloc-bench/results/2026-10-02-userspace/excluded/vinix-release-1-preboot/run-vinix-before-fix` | 381 |
 | `tests/alloc-bench/results/2026-10-02-userspace/recompute` | 149 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocation-audit-final/capture-x86-diagnostic` | 230 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocation-audit-final/run` | 211 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-arm-v4/run` | 211 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v3/runner` | 214 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/init.sh` | 2,156 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/verify-x86-v4-final` | 227 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/macos-driver` | 401 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/run-vinix` | 379 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/vinix-driver` | 401 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-coordinator` | 222 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-coordinator-guard-stop/useralloc-v4-final-cohorts` | 234 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-final-driver` | 411 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-macos-final-driver` | 417 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-v4-final-cohorts` | 234 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/run` | 211 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/run-vm` | 222 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-v4/run` | 211 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-final/run-vm` | 222 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-v4/run` | 211 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run` | 325 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run-driver` | 218 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run` | 322 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run-driver` | 218 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/runner` | 214 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/stage` | 358 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/run` | 211 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/run-settlement-after-core` | 233 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute` | 155 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/compare` | 147 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/run` | 211 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/run` | 211 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run` | 211 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run-vm` | 228 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/run` | 211 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/recompute` | 149 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run` | 211 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run-baseline` | 220 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/prepare` | 215 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocator-aarch64/run` | 211 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-final-driver` | 411 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-macos-final-driver` | 417 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-v5-final-cohorts` | 234 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/run` | 211 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run` | 211 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run-vm` | 228 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/run` | 211 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/run` | 322 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/static-desktop/run-build` | 217 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute` | 155 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/compare` | 147 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/desktop-perf-controller/validate-completed` | 226 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/recompute` | 149 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/catalina-measure` | 393 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/run-vinix` | 379 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-final-driver` | 411 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-macos-final-driver` | 417 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-final-cohorts` | 234 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-final-controller` | 237 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-verify-readiness` | 237 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/run` | 211 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64-four-level/run` | 211 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64-four-level/run-vm` | 228 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/run` | 211 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/driver` | 214 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/evidence-audit` | 222 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/run` | 211 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/pipeline` | 335 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run` | 322 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run-driver` | 378 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/validate-completed` | 426 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/independent-review/collect` | 215 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/collect-v6-verification` | 237 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-arm-driver` | 239 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/source-freeze/evidence/correctness-v6-x86-driver` | 239 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/run` | 211 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/v5-hot-diagnostic/summarize` | 217 |
 | `tests/alloc-bench/run-kernel-vinix` | 374 |
 | `tests/alloc-bench/run-macos` | 373 |
 | `tests/alloc-bench/run-vinix` | 373 |
@@ -1161,7 +1166,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/execute-only/check-generated` | 178 |
 | `tests/execute-only/run` | 183 |
 | `tests/ext2-sparse/run` | 184 |
-| `tests/ext2-sparse/run-host.sh` | 2,056 |
+| `tests/ext2-sparse/run-host.sh` | 158 |
 | `tests/fs-journal/run` | 214 |
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/fsync-scope/run` | 220 |
@@ -1196,7 +1201,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ipv6-multicast/run_vm` | 213 |
 | `tests/java/smoke.sh` | 652 |
 | `tests/kernel-allocs/copy-sources` | 187 |
-| `tests/kernel-allocs/run.sh` | 4,115 |
+| `tests/kernel-allocs/run.sh` | 4,175 |
 | `tests/kernel-allocs/sites` | 180 |
 | `tests/kernel-cpu/logic` | 168 |
 | `tests/kernel-cpu/run` | 183 |
@@ -1263,6 +1268,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/n64/rsp-budget` | 218 |
 | `tests/n64/run` | 213 |
 | `tests/native-boundaries/run` | 104 |
+| `tests/native-campaign-tools/campaignhost/hot-init.txt` | 552 |
+| `tests/native-campaign-tools/campaignhost/verify-v3-init.txt` | 1,651 |
+| `tests/native-campaign-tools/campaignhost/verify-v4-init.txt` | 2,156 |
+| `tests/native-campaign-tools/run` | 179 |
 | `tests/net-random/run` | 183 |
 | `tests/net-random/run.sh` | 283 |
 | `tests/network-ipv6/run-host.sh` | 124 |
@@ -1401,6 +1410,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/uname/run` | 178 |
 | `tests/user-access/sites` | 180 |
 | `tests/userland-demo/run` | 186 |
+| `tests/userland-identity/run` | 169 |
 | `tests/verified-boot/runtime` | 205 |
 | `tests/verified-boot/test` | 202 |
 | `tests/verified-root/run-host` | 206 |
