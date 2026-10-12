@@ -256,7 +256,7 @@ The same check can be run non-interactively from the host after building the
 AArch64 kernel:
 
 ```sh
-python3 tests/agx-fake-g17/run_vm.py
+tests/agx-fake-g17/run_vm
 ```
 
 The runner creates scratch disk/NVRAM files by default, waits for the guest

@@ -212,7 +212,7 @@ pub:
 
 fn (identity Identity) key() string { return json2.encode(identity) }
 
-fn quoted(text string) string {
+pub fn quoted(text string) string {
 	quote := if text.contains("'") && !text.contains('"') { '"' } else { "'" }
 	mut output := quote
 	for ch in text.runes() {
@@ -239,6 +239,11 @@ fn quoted(text string) string {
 		}
 	}
 	return output + quote
+}
+
+// Preserve the original host CLI's decimal digits, separators and integer width.
+pub fn integer_text(text string) !string {
+	return big.integer_from_string(normalize_number(text, true)!)!.str()
 }
 
 fn (identity Identity) repr() string {

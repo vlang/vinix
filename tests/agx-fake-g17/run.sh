@@ -5,7 +5,7 @@ repo=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
 
-python3 "$repo/tests/agx-fake-g17/run.py"
+"$repo/tests/agx-fake-g17/run"
 . "$repo/build-support/find-v.sh"
 
 # Check the V-side native descriptor bridge at its recovered member offsets.

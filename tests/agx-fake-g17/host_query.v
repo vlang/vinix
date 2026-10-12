@@ -43,7 +43,7 @@ fn request(row map[string]json2.Any, mut out agxhost.Transcript) !json2.Any {
 		return out.core_amd64((row['iso'] or { json2.Any('') }).str(), (row['qemu'] or { json2.Any('qemu-system-x86_64') }).str(),
 			(row['firmware'] or { json2.Any('None') }).str(), (row['timeout_text'] or { json2.Any('300') }).str(),
 			(row['timeout_kind'] or { json2.Any('number') }).str(), (row['cpus_text'] or { json2.Any('4') }).str(),
-			(row['python'] or { json2.Any('python3') }).str(), (row['child_binding'] or { json2.Any('') }).str())!
+			(row['python'] or { json2.Any('') }).str(), (row['child_binding'] or { json2.Any('') }).str())!
 	}
 	root := (row['root'] or { return error('Missing root') }).str()
 	if operation == 'host' {
@@ -56,21 +56,21 @@ fn request(row map[string]json2.Any, mut out agxhost.Transcript) !json2.Any {
 		environment := agxhost.native_environment(row['inherited_environment_hex'] or { json2.Any('') }.str())!
 		return out.native_fixture(root, row['arch'] or { json2.Any('') }.str(), row['kernel'] or { json2.Any('') }.str(),
 			row['state'] or { json2.Any('') }.str(), row['reference'] or { json2.Any('') }.str(), row['fixture'] or { json2.Any('encoder') }.str(),
-			row['timeout_text'] or { json2.Any('600') }.str(), row['python'] or { json2.Any('python3') }.str(), environment)!
+			row['timeout_text'] or { json2.Any('600') }.str(), row['python'] or { json2.Any('') }.str(), environment)!
 	} else if operation == 'vm_test' {
-		return out.vm_test(root, row['timeout_text'] or { json2.Any('180') }.str(), row['timeout_kind'] or { json2.Any('number') }.str(), row['python'] or { json2.Any('python3') }.str(),
-			(row['child_binding'] or { return error('Missing child binding') }).str())!
+		return out.vm_test(root, row['timeout_text'] or { json2.Any('180') }.str(), row['timeout_kind'] or { json2.Any('number') }.str(), row['python'] or { json2.Any('') }.str(),
+			(row['child_binding'] or { json2.Any('') }).str())!
 	} else if operation in ['core_phase', 'core_vm'] {
 		if operation == 'core_phase' {
 			return out.core_phase(root, (row['guest_init'] or { json2.Any('') }).str(), (row['initramfs'] or { json2.Any('') }).str(),
 				(row['state_dir'] or { json2.Any('') }).str(), (row['timeout_text'] or { json2.Any('300') }).str(),
 				(row['timeout_kind'] or { json2.Any('number') }).str(), (row['verification'] or { json2.Any(false) }).bool(),
-				(row['python'] or { json2.Any('python3') }).str(), (row['child_binding'] or { json2.Any('') }).str(),
+				(row['python'] or { json2.Any('') }).str(), (row['child_binding'] or { json2.Any('') }).str(),
 				(row['system'] or { json2.Any('Darwin') }).str())!
 		}
 		return out.core_vm(root, (row['guest_init'] or { json2.Any('') }).str(), (row['initramfs'] or { json2.Any('') }).str(),
 			(row['state_dir'] or { json2.Any('') }).str(), (row['timeout_text'] or { json2.Any('300') }).str(),
-			(row['timeout_kind'] or { json2.Any('number') }).str(), (row['python'] or { json2.Any('python3') }).str(),
+			(row['timeout_kind'] or { json2.Any('number') }).str(), (row['python'] or { json2.Any('') }).str(),
 			(row['child_binding'] or { json2.Any('') }).str(), (row['system'] or { json2.Any('Darwin') }).str())!
 	} else {
 		return error('Unknown AGX host operation ' + operation)

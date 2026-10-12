@@ -5,7 +5,6 @@ import os
 import time
 import json2
 import hosttest
-import encoding.hex
 import math
 
 #flag -I @DIR
@@ -322,23 +321,22 @@ fn (mut out Transcript) vm_drive(pid i32, master i32, monitor string, timeout_te
 		}
 	}
 	if !state.has_status {
-		waited, child_status := vm_wait(pid, C.WNOHANG)!
+		waited, child_status := if native { vm_native_observe(pid)! } else { vm_wait(pid, C.WNOHANG)! }
 		if waited { state.has_status = true; state.status = child_status }
 	}
 }
 
-// Native callers exec the frozen shell directly; compatibility callers retain
-// their borrowed Python child adapter while that separate family is translated.
+// Child setup and execution are native for CLI and compatibility requests.
 pub fn (mut out Transcript) vm_native_test(root string, timeout_text string) !int {
 	return out.vm_test(root, timeout_text, 'number', '', '')!
 }
 
-pub fn (mut out Transcript) vm_test(root string, timeout_text string, timeout_kind string, python string, child_binding string) !int {
+pub fn (mut out Transcript) vm_test(root string, timeout_text string, timeout_kind string, _python string, _child_binding string) !int {
 	if !os.is_file(root + '/kernel/bin/vinix') {
 		out.streams('', 'ERROR: kernel/bin/vinix is missing; build the AArch64 kernel first\n')
 		return 2
 	}
-	base := if python == '' { os.getenv_opt('TMPDIR') or { os.temp_dir() } } else { os.temp_dir() }
+	base := os.getenv_opt('TMPDIR') or { os.temp_dir() }
 	scratch := private_directory(base, 'vinix-fake-g17-vm.')!
 	defer { hosttest.remove_work_dir(scratch) or {} }
 	mut environment := os.environ()
@@ -349,8 +347,7 @@ pub fn (mut out Transcript) vm_test(root string, timeout_text string, timeout_ki
 	monitor := scratch + '/qmp.sock'
 	environment['VINIX_QEMU_EXTRA'] = (environment['VINIX_QEMU_EXTRA'] or { '' }) + ' -qmp unix:' + monitor + ',server=on,wait=off'
 	command := [root + '/scripts/run-aarch64.sh', '--no-build', '--serial', '--fake-g17', '--no-persist', '--mem=8192']
-	encoded_command := json2.encode(json2.Any(command.map(json2.Any(it))))
-	mut argv := if python == '' { command.clone() } else { [python, child_binding, '--vinix-pty-child', hex.encode(root.bytes()), encoded_command] }
+	mut argv := command.clone()
 	$if darwin {
 		if out.host_arch in ['arm64', 'aarch64', 'x86_64', 'amd64'] {
 			argv = ['/usr/bin/arch', if out.host_arch in ['arm64', 'aarch64'] { '-arm64' } else { '-x86_64' }, ...argv]
@@ -365,25 +362,23 @@ pub fn (mut out Transcript) vm_test(root string, timeout_text string, timeout_ki
 	for item in entries { c_environment << &char(item.str) }
 	c_environment << &char(unsafe { nil })
 	unsafe { C.__atomic_store_n(&i32(C.VINIX_AGX_VM_INTERRUPTED), i32(0), C.__ATOMIC_RELAXED) }
-	previous := unsafe { C.signal(C.SIGINT, if python == '' { voidptr(vm_native_signal) } else { voidptr(vm_signal) }) }
+	previous := unsafe { C.signal(C.SIGINT, voidptr(vm_native_signal)) }
 	defer { unsafe { C.signal(C.SIGINT, previous) } }
-	previous_term := if python == '' { unsafe { C.signal(C.SIGTERM, voidptr(vm_native_signal)) } } else { unsafe { nil } }
-	defer { if python == '' { unsafe { C.signal(C.SIGTERM, previous_term) } } }
+	previous_term := unsafe { C.signal(C.SIGTERM, voidptr(vm_native_signal)) }
+	defer { unsafe { C.signal(C.SIGTERM, previous_term) } }
 	previous_pipe := unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
 	defer { unsafe { C.signal(C.SIGPIPE, previous_pipe) } }
 	mut master := i32(-1)
 	pid := C.forkpty(&master, unsafe { nil }, unsafe { nil }, unsafe { nil })
 	if pid < 0 { return vm_os_error() }
 	if pid == 0 {
-		if python == '' {
-			unsafe { C.signal(C.SIGINT, C.SIG_DFL); C.signal(C.SIGTERM, C.SIG_DFL); C.signal(C.SIGPIPE, C.SIG_DFL) }
-			if C.chdir(root.str) != 0 { C._exit(127) }
-		}
+		unsafe { C.signal(C.SIGINT, C.SIG_DFL); C.signal(C.SIGTERM, C.SIG_DFL); C.signal(C.SIGPIPE, C.SIG_DFL) }
+		if C.chdir(root.str) != 0 { C._exit(127) }
 		unsafe { C.execve(argv[0].str, c_arguments.data, c_environment.data) }
 		C._exit(127)
 	}
 	mut state := VmState{}
-	if python == '' {
+	{
 		if C.fcntl(master, C.F_SETFL, C.O_NONBLOCK) < 0 || C.fcntl(master, C.F_SETFD, C.FD_CLOEXEC) < 0 {
 			cause := vm_os_error()
 			C.killpg(pid, C.SIGKILL); C.kill(pid, C.SIGKILL)
@@ -394,7 +389,7 @@ pub fn (mut out Transcript) vm_test(root string, timeout_text string, timeout_ki
 	}
 	mut loop_failed := false
 	mut loop_error := IError(none)
-	out.vm_drive(pid, master, monitor, timeout_text, timeout_kind, python == '', mut state) or {
+	out.vm_drive(pid, master, monitor, timeout_text, timeout_kind, true, mut state) or {
 		loop_failed = true
 		loop_error = err
 	}
@@ -402,19 +397,9 @@ pub fn (mut out Transcript) vm_test(root string, timeout_text string, timeout_ki
 	unsafe { C.__atomic_store_n(&i32(C.VINIX_AGX_VM_INTERRUPTED), i32(0), C.__ATOMIC_RELAXED) }
 	// Keep further interrupts from abandoning the PID while its owner reaps it.
 	unsafe { C.signal(C.SIGINT, C.SIG_IGN) }
-	if python == '' { unsafe { C.signal(C.SIGTERM, C.SIG_IGN) } }
+	unsafe { C.signal(C.SIGTERM, C.SIG_IGN) }
 	forced_stop := !state.has_status
-	if forced_stop || python == '' {
-		if python == '' {
-			vm_native_retire(pid, master, state.has_status) or { C.close(master); return err }
-		} else {
-			vm_stop_child(pid, master, false) or {
-				// Preserve finally's stop-error precedence while also retiring the FD.
-				C.close(master)
-				return err
-			}
-		}
-	}
+	vm_native_retire(pid, master, state.has_status) or { C.close(master); return err }
 	if C.close(master) < 0 { return vm_os_error() }
 	if loop_failed { return loop_error }
 	missing := vm_missing(state.transcript.bytestr(), state.command_sent, state.pass_seen, state.fail_seen, forced_stop, state.status, state.has_status)

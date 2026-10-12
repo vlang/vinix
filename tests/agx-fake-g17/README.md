@@ -9,26 +9,27 @@ Host ASan/UBSan builds reject hidden allocation imports.
 The independent V verifier retains all 41 original trace, size, resource and
 provenance checks. Its 314-record scale case retains the single explicit
 `calloc`/`free` pair, checked in generated output; every other buffer stays on
-the caller's stack. Use `run_encode_native.py --fixture verifier` to run it
+the caller's stack. Use `run_encode_native --fixture verifier` to run it
 on either native architecture.
 
-`python3 run_encode_native.py --arch aarch64 --kernel-dir /path/to/kernel
+`./run_encode_native --arch aarch64 --kernel-dir /path/to/kernel
 --state-dir /path/to/new/state` runs that same fixture and production policy in
 QEMU. Use `--arch x86_64` and `CC_AMD64` for the other architecture. Native
 fixtures model command bytes; they do not establish physical GPU operation.
 
 The original 289-line encoder oracle is recoverable from
 `15048510:tests/agx-fake-g17/test_encode.c`. A materialized immutable copy can be
-supplied with `run.py --c-encoder-reference` or
-`run_encode_native.py --c-reference`. `VINIX_G17_TEST_ARCH=x86_64` selects the
+supplied with `./run --c-encoder-reference` or
+`./run_encode_native --c-reference`. `VINIX_G17_TEST_ARCH=x86_64` selects the
 x86 host ABI when the host compiler targets x86 on an ARM machine.
 The original 420-line verifier is recoverable at
-`083cb12b:tests/agx-fake-g17/test.c`; use `run.py --c-verifier-reference` or
+`083cb12b:tests/agx-fake-g17/test.c`; use `./run --c-verifier-reference` or
 the native runner's `--c-reference` with `--fixture verifier` for comparison.
 
-The host controller lives in `agxhost/`. `run.py` keeps the original argument
-parser and architecture diagnostic, and `_native.py` transports CLI/import
-requests and typed exceptions. The native controller stages sources, builds the
+The host controller lives in `agxhost/`. The maintained `run`,
+`run_encode_native` and `run_vm` commands invoke native V through
+`../native-render-tools`. V owns argument parsing and architecture diagnostics.
+The native controller stages sources, builds the
 production core and both independent fixtures, enforces the original allocator
 import guards and exact scale allocation pair, and runs optional frozen C
 fixtures. `tools/agx-re/compile-v-trace` invokes `compile-trace.v` directly with
@@ -52,13 +53,12 @@ executables. Mixed ARM/x86 controller and caller combinations preserve original
 fixture output and command arguments. These are host controller and native ABI
 checks; the separate VM runner retains its own guest deadlines and markers.
 
-The native guest builder also lives in `agxhost/`. `run_encode_native.py` keeps
-its original CLI and transports the caller's interpreter and inherited child
-environment. V owns source staging, target/compiler flags, immutable C reference
+The native guest builder also lives in `agxhost/`. `run_encode_native` keeps
+the original CLI and inherits the native caller's child environment.
+V owns source staging, target/compiler flags, immutable C reference
 selection, allocator guards, static linking, input hashes and the exact receipt.
-The unchanged kernel-gap harness receives the original timeout and pass/fail
-markers. Python's implicit Darwin child environment is captured per invocation;
-explicit generator environments retain their separate original values.
+The native kernel-gap harness receives the original timeout and pass/fail
+markers directly. Explicit generator environments retain their separate values.
 
 All eight ARM/x86 encoder/verifier and native/frozen-C combinations produce
 byte-identical ELF inputs and receipts against the original Python builder on

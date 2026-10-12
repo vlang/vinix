@@ -76,7 +76,7 @@ fn native_input_paths(path string) ![]string {
 }
 
 pub fn (mut out Transcript) native_fixture(root string, arch string, kernel string, state_arg string,
-	reference string, fixture string, timeout_text string, python string, environment map[string]string) !int {
+	reference string, fixture string, timeout_text string, _python string, environment map[string]string) !int {
 	state := hosttest.module_resolve(state_arg) or {
 		if err.msg().starts_with('Symlink loop from ') { return NativeFailure{'NativeResolveError', state_arg} }
 		return err
@@ -156,7 +156,7 @@ pub fn (mut out Transcript) native_fixture(root string, arch string, kernel stri
 		'inputs': json2.Any(inputs)
 		'init_sha256': json2.Any(hosttest.sha(executable)!)
 	}))!
-	argv := [python, root + '/tests/kernel-gaps/run.py', '--arch', arch, '--kernel-dir', kernel,
+	argv := [root + '/tests/kernel-gaps/run-native', '--arch', arch, '--kernel-dir', kernel,
 		'--prebuilt-init', executable, '--state-dir', state + '/guest', '--timeout', timeout_text,
 		'--expect', 'INDEPENDENT FIXTURE PASS', '--expect', if fixture == 'encoder' {
 			'fake G17 recovered 3D encoder tests passed'

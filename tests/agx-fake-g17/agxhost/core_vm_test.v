@@ -7,9 +7,8 @@ import time
 fn test_core_spawn_retires_argv_environment_pid_and_master() {
  mut before := 0
  for fd in 0 .. 256 { if C.fcntl(fd, C.F_GETFD) >= 0 { before++ } }
- binding := os.real_path(@FILE).all_before_last('/') + '/../_native.py'
  for _ in 0 .. 100 {
-  pid, master := core_spawn(['/usr/bin/true'], os.environ(), '/', '/usr/bin/python3', binding, '', false) or { panic(err) }
+  pid, master := core_spawn(['/usr/bin/true'], os.environ(), '/', '', '', '', false) or { panic(err) }
   mut done := false
   deadline := vm_now() + 5
   for vm_now() < deadline {

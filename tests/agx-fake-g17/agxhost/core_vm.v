@@ -2,8 +2,6 @@
 module agxhost
 
 import os
-import json2
-import encoding.hex
 import math
 
 fn C.execvp(&char, &&char) i32
@@ -88,9 +86,9 @@ fn core_timeout(text string, kind string) !f64 {
  return value
 }
 
-fn core_spawn(command []string, environment map[string]string, root string, python string, binding string, architecture string, search bool) !(i32, i32) {
- encoded := json2.encode(json2.Any(command.map(json2.Any(it))))
- mut argv := [python, binding, if search { '--vinix-pty-child-path' } else { '--vinix-pty-child' }, hex.encode(root.bytes()), encoded]
+fn core_spawn(command []string, environment map[string]string, root string, _python string, _binding string, architecture string, search bool) !(i32, i32) {
+ // The legacy request signature stays callable; child setup now runs in V.
+ mut argv := command.clone()
  $if darwin {
   if architecture in ['arm64', 'aarch64', 'x86_64', 'amd64'] { argv = ['/usr/bin/arch', if architecture in ['arm64', 'aarch64'] { '-arm64' } else { '-x86_64' }, ...argv] }
  }
@@ -106,6 +104,7 @@ fn core_spawn(command []string, environment map[string]string, root string, pyth
  pid := C.forkpty(&master, unsafe { nil }, unsafe { nil }, unsafe { nil })
  if pid < 0 { return vm_os_error() }
  if pid == 0 {
+  if root != '' && C.chdir(root.str) != 0 { C._exit(127) }
   if search { unsafe { C.execvp(argv[0].str, argument_pointers.data) } } else { unsafe { C.execve(argv[0].str, argument_pointers.data, envp.data) } }
   C._exit(127)
  }

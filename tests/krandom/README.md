@@ -39,10 +39,10 @@ Use separate isolated worktrees for each architecture, with the kernel's
 untracked build dependencies installed, then run:
 
 ```sh
-python3 tests/krandom/run_native.py --arch aarch64 \
+tests/krandom/run_native --arch aarch64 \
   --kernel-dir /path/to/arm-worktree/kernel --v /path/to/v \
   --state-dir /tmp/krandom-arm-new
-python3 tests/krandom/run_native.py --arch x86_64 \
+tests/krandom/run_native --arch x86_64 \
   --kernel-dir /path/to/x86-worktree/kernel --v /path/to/v \
   --state-dir /tmp/krandom-x86-new
 ```

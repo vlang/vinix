@@ -1,19 +1,16 @@
 The Mesa guest controller owns PTY launch, byte transcripts, prompt and exact
 marker validation, QMP shutdown, deadlines, process-group escalation and child
 retirement in V. The header exposes SDK declarations and constants only. The
-Python frontend retains argparse and its public byte/regex constants; its child
-binding calls only `chdir` and `execve`, preserving Python exec errors and the
-caller's architecture preference.
+native frontend retains the original CLI, byte markers and regex boundaries.
+V performs `chdir` and `execve` directly, with no interpreter child adapter.
 
-The standalone `stop_child(pid, master)` import API borrows a child and descriptor
-owned by its Python caller. V drives the same retirement policy through a small
-request protocol; Python dispatches `write`, `waitpid` and `killpg` primitives in
-that owner process. The actual VM path calls those primitives directly from V.
+The historical borrowed-child protocol remains available to legacy native
+requests. The maintained VM command calls its process primitives directly from V.
 All argv strings, environment entries, transcripts and scratch paths remain
 owned until their last use. Socket descriptors close on every return, and PTY
 retirement preserves stop/close error precedence.
 
-A first SIGINT ends the test and retires its child. Further SIGINT is ignored
+A first SIGINT or SIGTERM ends the test and retires its child. Further signals are ignored
 only during that retirement, with the previous handlers restored afterward.
 An integer timeout outside floating-point range raises the original OverflowError
 and also retires the native child. These two bounded cleanup improvements prevent
