@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `e8fa673a87420c51c98f09c72a61847b4b5dc2db`,
+at source commit `cfe9489880d311becf0655b5620962a70c112bf7`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 573 | 2,368,101 | 6.06% |
-| Python | 159 | 714,392 | 1.83% |
-| Shell | 665 | 1,378,289 | 3.52% |
+| C | 573 | 2,368,101 | 6.05% |
+| Python | 157 | 697,874 | 1.78% |
+| Shell | 667 | 1,378,989 | 3.53% |
 
-All `.v` files are classified as V. The resulting V share is 80.61%, with no
+All `.v` files are classified as V. The resulting V share is 80.66%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 714,392 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 697,874 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev e8fa673a87420c51c98f09c72a61847b4b5dc2db --breakdown --json
+github-linguist --rev cfe9489880d311becf0655b5620962a70c112bf7 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -656,7 +656,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ios/build-cxx.py` | 6,554 |
 | `build-support/ios/generate-cxx-symbols.py` | 1,647 |
 | `build-support/ios/stage-gles.py` | 2,688 |
-| `build-support/musl/stage.py` | 4,754 |
 | `build-support/native_host.py` | 6,504 |
 | `build-support/opengothic/build.py` | 1,979 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
@@ -698,7 +697,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run-driver.py` | 2,815 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run-driver.py` | 2,830 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/runner.py` | 4,795 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/stage.py` | 11,764 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-arm-baseline/run.py` | 3,226 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/socket-operations-final/run-settlement-after-core.py` | 1,032 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/run.py` | 776 |
@@ -851,6 +849,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/minecraft/patch-lwjgl-aarch64` | 221 |
 | `build-support/minecraft/run-minecraft` | 10,431 |
 | `build-support/minecraft/stage` | 207 |
+| `build-support/musl/stage` | 119 |
 | `build-support/n64-homebrew/build` | 231 |
 | `build-support/n64/build` | 209 |
 | `build-support/n64/test-bridge` | 161 |
@@ -947,8 +946,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,588 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 93,695 |
-| `scripts/build-desktop-amd64.sh` | 14,940 |
+| `scripts/build-desktop-aarch64.sh` | 93,962 |
+| `scripts/build-desktop-amd64.sh` | 14,918 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |
@@ -980,8 +979,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
 | `scripts/build-steam-aarch64.sh` | 13,694 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
-| `scripts/build-userland-aarch64.sh` | 24,965 |
-| `scripts/build-userland-amd64.sh` | 6,008 |
+| `scripts/build-userland-aarch64.sh` | 24,954 |
+| `scripts/build-userland-amd64.sh` | 5,997 |
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
 | `scripts/build-venus-aarch64.sh` | 5,339 |
@@ -1044,6 +1043,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run` | 325 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run` | 322 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/stage` | 358 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute` | 155 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/compare` | 147 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run-vm` | 228 |
