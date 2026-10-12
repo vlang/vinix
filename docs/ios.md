@@ -3515,17 +3515,77 @@ Full regression remains unpassed, the five
 published runners are unchanged, and game entry, rendering and gameplay
 remain unverified.
 
+`UIImageView` now supports static bitmap images in V, including desktop
+publication. EOS strongly imports the class and contains initWithImage and
+setContentMode selectors. Installed Catalyst UIKit supplied its 512-byte
+instance size, UIView superclass and method encodings. V probes measured
+constructors, image sizing, flags, opacity and copied animation arrays;
+no native window or application code was executed.
+
+The opaque native record has an owned sidecar for normal/highlighted images,
+immutable animation snapshots and one cached PNG path. Frame and zero-origin
+bounds setters, sizeToFit, intrinsicContentSize, sizeThatFits and the measured
+configuration properties preserve their argument/return ABI. Intrinsic size
+uses the normal image, or the highlighted image when normal is absent;
+changing highlighted state does not change that size. Empty views report
+(-1,-1) intrinsic metrics and zero sizeThatFits. Initial image constructors
+size the frame; later image assignment preserves its geometry.
+
+Static rendering uses the existing CPU bitmap pipeline for thirteen content
+modes, including aspect fit/fill and directional alignment. PNGs retain
+premultiplied alpha through encoding and decoding. Highlighting selects the
+alternate bitmap. Desktop serialization emits an image widget with the
+configured interaction flag. Unchanged content reuses its PNG; updates get
+a new pathname and remove the previous publication. Nil images clear it.
+Raster contexts, wrappers and autorelease pools retire after encoding.
+
+Sidecar disposal releases images/arrays and removes the cached file even
+after isa changes or caller-owned storage destruction. Retained immutable
+snapshots can outlive their view. Apps using VINIX_IOS_EXIT_ON_CLOSE remove
+all image-view publications, including unattached views, before _Exit without
+destroying storage that native workers may still read. Publication requires
+the runtime main thread; nonatomic configuration needs app synchronization.
+
+Active animation playback, nonzero bounds origins and unrepresentable
+unclipped desktop overflow reject explicitly. Animation configuration copies
+at most 256 bitmap images, and empty start/stop remain idle. Finite frames
+accept nonnegative sizes through 8192 points per dimension; desktop rasters
+cap 4096 pixels per dimension. Private ivars, symbol images, transforms and
+broader inherited UIView behavior remain outside the profile.
+
+All 67 programs build and 86 original generated C streams restore to their
+recorded hashes. Nineteen host suites pass ASAN/UBSAN in both hashing modes.
+Vinix passes twenty-one Objective-C and 33 Swift/loader programs. Image-view
+fixtures compare five construction paths and public properties with native
+UIKit. Runtime checks cover alpha/coverage for thirteen modes, highlighted
+pixels, cache replacement and zero-size recovery, desktop serialization,
+retained snapshots, explicit-exit cleanup, caller storage, 100 isa changes,
+fourteen exact rejection reasons and two zero-live-object shutdown cycles.
+Generated C checks verify geometry/retirement/close cleanup allocate no
+scratch state and raster intermediates are released. Earlier checks remain.
+
+Failed native/header compiler trials and a controlled validation restart
+are retained. The restart source archive raced an edit; both snapshots are
+preserved and the pre-edit snapshot was restored against the prior validated
+source and generated C. Every final program was rebuilt with close cleanup.
+
+Fortnite passes the UIImageView binding and exits with status 1 before entry
+at EOS's required `_OBJC_CLASS_$_GCKeyboard` import. Evidence is retained under
+`build/ios/fortnite/imageview-checks`. Full regression remains unpassed, the
+five published runners are unchanged, and game entry, rendering and gameplay
+remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,433 | 727 | 79 |
-| EOSSDK | 648 | 14 | 18 |
+| Fortnite executable | 1,434 | 726 | 79 |
+| EOSSDK | 649 | 13 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,196 | 802 | 120 |
+| All images | 2,198 | 800 | 120 |
 
-The C++/GLES/Text variant reports 2,209 resolved imports, 789 unresolved strong
+The C++/GLES/Text variant reports 2,211 resolved imports, 787 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -22,6 +22,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if object in ios_runtime.objects && obj_header(object).image_dictionary
 		&& name in ['copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:', 'allKeys', 'allValues', 'getObjects:andKeys:count:'] { return true }
 	if image_selector(object, name) { return true }
+	if image_view_selector(object, name) { return true }
 	if layout_selector(object, name) { return true }
 	if json_selector(object, name) { return true }
 	if ns_condition_selector(object, name) { return true }

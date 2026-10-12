@@ -213,6 +213,7 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 	if header.response_headers && selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:', 'removeAllObjects'] { panic('iOS: mutation of immutable response headers') }
 	if header.web_history_array && selector in ['addObject:', 'removeObjectAtIndex:', 'removeAllObjects', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of a read-only WebKit history array') }
 	if header.webkit_array && selector in ['addObject:', 'removeObjectAtIndex:', 'removeAllObjects', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of a read-only WebKit script array') }
+	if header.image_view_array && selector in ['addObject:', 'removeObjectAtIndex:', 'removeAllObjects', 'setObject:atIndexedSubscript:'] { panic('iOS: image view animation snapshot is read-only') }
 	if header.json_immutable && selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',
 		'removeAllObjects', 'addObject:', 'removeObjectAtIndex:', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of an immutable JSON collection') }
 	if header.image_dictionary {

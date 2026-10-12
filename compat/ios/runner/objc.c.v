@@ -107,6 +107,9 @@ mut:
 	thread &FoundationThread = unsafe { nil }
 	auth_owned bool
 	auth &WebAuthState = unsafe { nil }
+	image_view_owned bool
+	image_view &ImageViewState = unsafe { nil }
+	image_view_array bool
 	cookie_owned bool
 	webkit &WebKitState = unsafe { nil }
 	webkit_array bool // Read-only script list; its contents change through its controller.
@@ -270,7 +273,7 @@ fn objc_start() {
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
-		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
+		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
@@ -287,7 +290,7 @@ fn objc_start() {
 			'NSObject' { u64(0) }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
-			'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
+			'UIImageView', 'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
 			'WKWebView' { ios_runtime.names['UIView'] }
 			'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController', 'UIAlertController' { ios_runtime.names['UIViewController'] }
             'CAMetalLayer', 'AVCaptureVideoPreviewLayer' { ios_runtime.names['CALayer'] }
@@ -321,6 +324,7 @@ fn objc_start() {
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
 			'NSThread' { u32(64) }
 			'ASWebAuthenticationSession' { u32(136) }
+			'UIImageView' { u32(512) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
 			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
 			'NSURLResponse' { u32(24) }
@@ -470,6 +474,7 @@ fn objc_new(cls u64) u64 {
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
+	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	if obj_header(object).thread != unsafe { nil } { ns_thread_initialize(object, 0, 0, 0, 0) }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
