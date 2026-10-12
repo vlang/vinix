@@ -69,12 +69,38 @@ struct NativeBuild {
 	steps    []NativeStep
 }
 
+struct NativeCommand {
+	argv              []string
+	executable_sha256 string
+	exit_code         int
+}
+
+struct Profile {
+	profile  string
+	status   string
+	commands []NativeCommand
+}
+
+struct NativeQualification {
+	schema              int
+	kernel              string
+	architecture        string
+	runner_sha256       string
+	complete            bool
+	all_selected_passed bool
+	uid                 int
+	context             string
+	requested           []string
+	results             []Profile
+}
+
 struct Receipt {
 	schema          int = 1
 	arch            string
 	uid             int = 1000
 	kernel_sha256   string
 	fixture_sha256  string
+	sdk_sha256      string
 	tools           map[string]string
 	command         []string
 	native_receipts map[string]string
@@ -83,9 +109,55 @@ struct Receipt {
 
 fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 
+// Materialize a prepared native SDK while preserving relative links and
+// recording precisely the copied closure. GDB's unused Python helpers are
+// excluded before copying; no Python source is written or executed.
+fn copy_sdk(source string, target string, base string, relative string, mut hash sha256.Digest) ! {
+	if source.ends_with('.py') || source.ends_with('.pyc') || source.ends_with('.pyo') { return }
+	st := os.lstat(source)!
+	mode := st.mode & 0o777
+	hash.write('${relative.len}:${relative}:${mode}:'.bytes())!
+	match st.get_filetype() {
+		.directory {
+			os.mkdir(target, mode: 0o700)!
+			hash.write('directory\n'.bytes())!
+			mut children := os.ls(source)!
+			children.sort()
+			for name in children {
+				copy_sdk(source + '/' + name, target + '/' + name, base, relative + '/' + name, mut hash)!
+			}
+			os.chmod(target, int(mode))!
+		}
+		.regular {
+			os.cp(source, target)!
+			os.chmod(target, int(mode))!
+			copied := digest(target)!
+			if digest(source)! != copied { return error('SDK input changed during copy') }
+			hash.write(('file:' + copied + '\n').bytes())!
+		}
+		.symbolic_link {
+			link := os.readlink(source)!
+			if link.starts_with('/') {
+				if link != '/lib/libc.so' {
+					return error('unsupported absolute SDK link: ' + source)
+				}
+			} else {
+				if !os.exists(source) { return error('dangling SDK link: ' + source) }
+				resolved := os.real_path(source)
+				if resolved != base && !resolved.starts_with(base + '/') {
+					return error('SDK link escapes input closure: ' + source)
+				}
+			}
+			os.symlink(link, target)!
+			hash.write(('link:' + link + '\n').bytes())!
+		}
+		else { return error('unsupported SDK file type') }
+	}
+}
+
 fn run() !int {
-	if os.args.len != 5 {
-		return error('usage: run-guest aarch64|x86_64 KERNEL-DIR STAGED-TOOLS NEW-STATE')
+	if os.args.len !in [5, 6] {
+		return error('usage: run-guest aarch64|x86_64 KERNEL-DIR STAGED-TOOLS NEW-STATE [PREPARED-NATIVE-GCC-SDK]')
 	}
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
@@ -148,14 +220,54 @@ fn run() !int {
 			'payload': Pin{'/usr/bin/development-payload', digest(init)!}
 		}
 	}))!
+	mut sdk_hash := ''
+	mut compiler_hashes := map[string]string{}
+	if os.args.len == 6 {
+		sdk := os.real_path(os.args[5])
+		os.mkdir_all(root + '/opt')!
+		mut hash := sha256.new()
+		copy_sdk(sdk, root + '/opt/native', sdk, '.', mut hash)!
+		// Dynamic project executables need the SDK's musl/C++ runtime in the
+		// guest loader's default search path, with the same recorded bytes.
+		copy_sdk(root + '/opt/native/lib', root + '/lib', os.real_path(root + '/opt/native'), './runtime-lib', mut hash)!
+		sdk_hash = hash.sum([]u8{}).hex()
+		for name in ['cc', 'c++'] {
+			driver := if os.exists(root + '/opt/native/bin/' + name) {
+				name
+			} else if name == 'cc' {
+				'gcc'
+			} else {
+				'g++'
+			}
+			binary := root + '/opt/native/bin/' + driver
+			header := os.read_bytes(binary)!
+			if header.len < 20 || header[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
+				|| (u16(header[18]) | (u16(header[19]) << 8)) != if arch == 'aarch64' {
+					u16(183)
+				} else {
+					u16(62)
+				} {
+				return error('native SDK compiler has the wrong ELF architecture')
+			}
+			compiler_hashes[if name == 'cc' { 'c' } else { 'cpp' }] = digest(binary)!
+			os.symlink('/opt/native/bin/' + driver, root + '/usr/bin/' + name)!
+		}
+		os.write_file(root + '/home/developer/qualify-sdk', 'c,cpp')!
+	}
 	archive := guesthost.image(init, state)!
 	launch := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
-	result := guesthost.boot(launch.command, launch.env, state, [
+	mut command := launch.command.clone()
+	if sdk_hash != '' {
+		for i, argument in command { if argument == '-m' { command[i + 1] = '2048' } }
+	}
+	mut expected := [
 		'DEVELOPMENT ACCOUNT PASS:',
 		'DEVELOPMENT BUILD PASS:',
 		'DEVELOPMENT GUEST PASS',
-	],
-		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], 180, true)!
+	]
+	if sdk_hash != '' { expected << 'DEVELOPMENT TOOLCHAINS PASS:' }
+	result := guesthost.boot(command, launch.env, state, expected,
+		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], 400, true)!
 	mut receipts := map[string]string{}
 	for line in os.read_lines(state + '/serial.log')! {
 		if !line.starts_with('DEVELOPMENT RECEIPT ') { continue }
@@ -164,23 +276,46 @@ fn run() !int {
 		body := entry.all_after(' ')
 		if path !in ['/home/developer/good/state.json', '/home/developer/good/plan.json',
 			'/home/developer/public-token/state.json', '/home/developer/link-token/state.json',
-			'/home/developer/build-a/receipt.json', '/home/developer/build-b/receipt.json'] {
+			'/home/developer/build-a/receipt.json', '/home/developer/build-b/receipt.json',
+			'/home/developer/qualification/report.json'] {
 			return error('unexpected guest receipt path')
 		}
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != 6 { return error('missing native workflow receipts') }
+	if result == 0 && receipts.len != if sdk_hash == '' { 6 } else { 7 } {
+		return error('missing native workflow receipts')
+	}
 	if result == 0 {
-		expected := sha256.sum('build-fixture-input\n'.bytes()).hex()
+		expected_artifact := sha256.sum('build-fixture-input\n'.bytes()).hex()
 		for name in ['build-a', 'build-b'] {
 			receipt := json2.decode[NativeBuild](receipts['/home/developer/' + name + '/receipt.json'],
 				strict: true
 			)!
 			if !receipt.complete || receipt.uid != 1000 || receipt.kernel != 'Vinix'
 				|| receipt.epoch != 1700000000 || receipt.steps.len != 1
-				|| receipt.steps[0].exit_code != 0 || receipt.steps[0].artifacts['artifact.txt'] != expected {
+				|| receipt.steps[0].exit_code != 0 || receipt.steps[0].artifacts['artifact.txt'] != expected_artifact {
 				return error('native build receipt failed independent artifact check')
+			}
+		}
+		if sdk_hash != '' {
+			report := json2.decode[NativeQualification](receipts['/home/developer/qualification/report.json'],
+				strict: true
+			)!
+			if report.schema != 1 || report.kernel != 'Vinix' || report.architecture != arch
+				|| report.runner_sha256 != hashes['vinix-qualify']
+				|| !report.complete || !report.all_selected_passed || report.uid != 1000 || report.context != 'vinix-native'
+				|| report.requested != ['c', 'cpp'] || report.results.len != 2
+				|| report.results.any(it.status != 'passed' || it.commands.len != 2) {
+				return error('native compiler project qualification failed')
+			}
+			for i, profile in report.results {
+				if profile.profile != report.requested[i]
+					|| profile.commands.any(it.exit_code != 0 || it.executable_sha256.len != 64)
+					|| profile.commands[0].executable_sha256 != compiler_hashes[profile.profile]
+					|| profile.commands[1].argv != ['/home/developer/qualification/' + profile.profile + '/project'] {
+					return error('native compiler or executed artifact receipt mismatch')
+				}
 			}
 		}
 	}
@@ -188,8 +323,9 @@ fn run() !int {
 		arch:            arch
 		kernel_sha256:   digest(state + '/kernel/bin/vinix')!
 		fixture_sha256:  digest(init)!
+		sdk_sha256:      sdk_hash
 		tools:           hashes
-		command:         launch.command
+		command:         command
 		native_receipts: receipts
 		passed:          result == 0
 	}, prettify: true))!

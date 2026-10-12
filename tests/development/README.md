@@ -33,8 +33,33 @@ the expected bytes. Altering the pinned source must stop the next build before
 execution. This tests runner behavior with a prebuilt payload; compiling all
 Vinix layers inside an installed system remains open.
 
+To compile and execute the C/C++ reference projects in the guest, supply a
+prepared native musl GCC SDK for the selected architecture:
+
+```
+tests/development/run-guest aarch64 /path/to/kernel /tmp/development-arm /tmp/new-sdk-state /path/to/aarch64-linux-musl-native
+```
+
+The controller copies the SDK to `/opt/native`, installs its runtime libraries
+in the guest's `/lib`, and supplies `cc`/`c++` aliases to its native drivers.
+It validates the drivers' ELF architecture and records a deterministic closure
+hash over copied paths, permission bits, file bytes and links, including the
+runtime copy. Relative links must stay inside the SDK; `/lib/libc.so` is the
+only accepted absolute link target. Unused `.py`, `.pyc` and `.pyo` helpers are
+excluded before copying. The SDK is prepared input, not downloaded or built by
+this controller. Compiler workloads receive 2 GiB of guest RAM.
+
+As UID/GID 1000, the fixture invokes `vinix-qualify --require-vinix` for `c,cpp`.
+Both projects must compile with symbols, create/join a thread, write/read a
+file and execute their exact resulting binary. The controller independently
+checks the native report's kernel, architecture, account, runner and compiler
+hashes, both successful command statuses and the executed artifact paths.
+Compiler versions remain in the serial transcript. A missing compiler or
+failed project fails the run.
+
 `receipt.json` records the architecture, UID, kernel/fixture/tool hashes,
-QEMU argv, passing verdict and six native plan/state/build receipts. `serial.log`,
+QEMU argv, passing verdict and six native plan/state/build receipts. SDK runs
+also retain the SDK hash and native compiler report. `serial.log`,
 the ISO and compiled fixture remain beside it. Credential values do not enter
 the receipts. The credential in this fixture is public synthetic test data.
 
@@ -46,6 +71,17 @@ The extended build-plan runs passed in
 `/tmp/vinix-development-build-x86-20261013-b` and
 `/tmp/vinix-development-build-arm-20261013-b`; both architectures produced
 artifact hash `8f62334d280332417efb4876a0690270b65488e01a24a4752f6e512653bb4cc9`.
+The optional SDK run passed on AArch64 with GCC/G++ 11.2.1 (20211120) as
+UID/GID 1000, including both reference project compile/run workflows. Its
+receipt and compiler-version transcript are retained in
+`/tmp/vinix-development-compilers-arm-20261013-c`.
+Comparison with the fresh guest in `...-20261013-b` found matching SDK,
+compiler and compiled-project hashes for the same project paths and build
+epoch. The copied SDK hash is
+`5286f56cfe9f709635fa20f38325376e541cc4283376887ed6abc67d3d3eb279`.
+The extended controller's x86 job/build regression passed in
+`/tmp/vinix-development-compilers-x86-base-20261013-a`.
+No native x86 GCC SDK was supplied for a compiler-project run.
 
 This qualifies the tested per-account job workflows in Vinix guests. Watcher
 signal/deadline/interruption tests still have host coverage; installed service

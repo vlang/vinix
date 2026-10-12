@@ -41,6 +41,13 @@ qualification. Existing [Go](../../tests/go/README.md), [Java](../../tests/java/
 [Linux application](../../docs/linux-posix-qualification.md) suites provide
 additional coverage at their recorded revisions.
 
+The [V guest controller](../../tests/development/README.md) can stage a prepared
+native musl GCC SDK and run the C/C++ projects as UID/GID 1000. It preserves
+the SDK closure hash, compiler versions and native report, and independently
+checks the runner/compiler hashes and the successful compile/run receipts.
+Other profiles retain their own acceptance gates; supplying this SDK does not
+qualify the complete catalog or IDE workflows.
+
 Python and Python-based build tooling, including Meson, are not executed by this
 runner because the repository requires V tooling and forbids running Python.
 Their roadmap qualification remains open. Native ptrace/core dumping, kernel

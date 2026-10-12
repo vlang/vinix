@@ -238,6 +238,17 @@ fn account_checks() {
 		check(C.open(c'/home/developer/payload.done', C.O_RDONLY) == -1, 143)
 		C.puts(c'DEVELOPMENT ACCOUNT PASS: UID 1000 jobs, credentials, environment, receipts, interval, unsafe-file refusal')
 		build_checks()
+		sdk := C.open(c'/home/developer/qualify-sdk', C.O_RDONLY)
+		if sdk >= 0 {
+			check(C.close(sdk) == 0 && C.setenv(c'PATH', c'/usr/bin:/opt/native/bin', 1) == 0, 251)
+			C.puts(c'DEVELOPMENT COMPILER VERSIONS:')
+			check(command(c'/usr/bin/cc', c'--version', nil, nil) == 0, 253)
+			check(command(c'/usr/bin/c++', c'--version', nil, nil) == 0, 254)
+			status := command(c'/usr/bin/vinix-qualify', c'--require-vinix', c'/home/developer/qualification', c'c,cpp')
+			emit_receipt(c'/home/developer/qualification/report.json', c'vinix-native', false)
+			check(status == 0, 252)
+			C.puts(c'DEVELOPMENT TOOLCHAINS PASS: UID 1000 C/C++ compilation, threads, files and executed artifacts')
+		}
 	}
 }
 
