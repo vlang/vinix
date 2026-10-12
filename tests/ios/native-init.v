@@ -70,6 +70,7 @@ fn main() {
 		require_child('/opt/ios/thread-checks')
 		require_child('/opt/ios/auth-session-checks')
 		require_child('/opt/ios/image-view-checks')
+		require_child('/opt/ios/keyboard-checks')
 		require_child('/opt/ios/objc-storage-checks')
 		require_child('/opt/ios/objc-associated-checks')
 		require_child('/opt/ios/objc-property-checks')
@@ -111,7 +112,7 @@ fn main() {
 		require_child('/opt/ios/regression')
 	} else if mode == 'objc' {
 		os.setenv('VINIX_IOS_CONSTANT_DICT_IMAGE', '/opt/ios/constant-dictionary-image', true)
-		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
+		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
 			require_child('/opt/ios/' + name + '-checks')
 		}
 		println('VINIX iOS OBJC: PASS')

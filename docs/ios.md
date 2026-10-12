@@ -3575,17 +3575,63 @@ at EOS's required `_OBJC_CLASS_$_GCKeyboard` import. Evidence is retained under
 five published runners are unchanged, and game entry, rendering and gameplay
 remain unverified.
 
+`GCKeyboard` now resolves its class and metaclass imports and supports
+no-device discovery in V. Installed Mac GameController supplied the measured
+32-byte NSObject subclass and `@16@0:8` coalescedKeyboard encoding. This Mac
+returns nil when no physical keyboard is connected. Native explicit
+construction creates a keyboard input profile, uses the main handler queue,
+and reports Generic Keyboard/Keyboard vendor and product strings; assigning
+nil clears the queue. EOS contains coalescedKeyboard, keyboardInput and
+setKeyChangedHandler selectors. Native RE injected no input and ran no app code.
+
+Vinix's desktop protocol currently delivers text pulses without physical key
+press/release transitions. coalescedKeyboard therefore returns nil, including
+through subclasses and concurrent callers. It allocates no device state and
+synthesizes no connection notifications. Explicit construction, input profiles,
+held-key polling and key callbacks remain unsupported. Selected construction,
+profile and queue operations reject explicitly. Raw Objective-C storage retains
+the measured opaque layout; private native ivars are not emulated.
+
+All 68 programs build and 88 original generated C streams restore to recorded
+hashes. Twenty host suites pass ASAN/UBSAN in both hashing modes. Vinix passes
+twenty-two Objective-C and 33 Swift/loader programs. Keyboard checks cover
+class/metaclass resolution, method encodings, inherited discovery, 5,000 queries
+per cycle across main/worker threads, caller storage, six exact rejection
+reasons and two shutdown cycles with zero live objects and blocks. Generated C
+checks confirm the discovery functions allocate no scratch state. Earlier
+checks remain enabled.
+
+The first rejection fixture used a 64-bit V int array for pipe's 32-bit
+descriptors and waited for EOF with its writer open. Its failed run and exact
+source were archived before correction. A second failed trial caught the
+missing respondsToSelector hook; both final sanitizer modes pass.
+
+The batch also retains the stopped waiting verifier, a premature module replay
+that failed before its host binary existed, and a missing native C++ fixture.
+The recorded fixture hashes verified its restoration. Module replay was moved
+after host completion; successful guest phases kept their original zero statuses,
+serial logs and retirement hashes. Production source stayed frozen throughout.
+
+Fortnite passes the GCKeyboard binding and exits with status 1 before entry at
+EOS's required `_OBJC_CLASS_$_NSUUID` import. Follow-up V measurements show an
+8-byte NSUUID class whose constructors return a 24-byte __NSConcreteUUID
+subclass; canonical string parsing, copied bytes and version-4 generation were
+measured against installed Foundation. No NSUUID runtime implementation changed
+in this batch. Evidence is retained under `build/ios/fortnite/keyboard-checks`.
+Full regression remains unpassed, the five published runners are unchanged,
+and game entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,434 | 726 | 79 |
-| EOSSDK | 649 | 13 | 18 |
+| Fortnite executable | 1,435 | 725 | 79 |
+| EOSSDK | 650 | 12 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,198 | 800 | 120 |
+| All images | 2,200 | 798 | 120 |
 
-The C++/GLES/Text variant reports 2,211 resolved imports, 787 unresolved strong
+The C++/GLES/Text variant reports 2,213 resolved imports, 785 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

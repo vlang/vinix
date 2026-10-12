@@ -89,6 +89,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_thread_types(info.name, info.meta, selector) { return types }
 	if types := web_auth_types(info.name, info.meta, selector) { return types }
 	if types := image_view_types(info.name, info.meta, selector) { return types }
+	if types := game_keyboard_types(info.name, info.meta, selector) { return types }
 	if types := cookie_builtin_types(info.name, info.meta, selector) { return types }
 	if types := webkit_builtin_types(info.name, info.meta, selector) { return types }
 	if types := http_url_builtin_types(info.name, info.meta, selector) { return types }

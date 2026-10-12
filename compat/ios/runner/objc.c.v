@@ -271,7 +271,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UIImageView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -325,6 +325,7 @@ fn objc_start() {
 			'NSThread' { u32(64) }
 			'ASWebAuthenticationSession' { u32(136) }
 			'UIImageView' { u32(512) }
+			'GCKeyboard' { u32(32) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
 			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
 			'NSURLResponse' { u32(24) }
@@ -472,6 +473,7 @@ fn objc_new(cls u64) u64 {
 	object := objc_allocate(cls)
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
+	game_keyboard_require_discovery(cls)
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }
