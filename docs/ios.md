@@ -3007,17 +3007,56 @@ Evidence is under `build/ios/fortnite/cookie-checks`. Full regression remains
 unpassed, five published runners are unchanged, and entry/rendering/gameplay
 remain unverified.
 
+`WKWebViewConfiguration` now has a V implementation of the public configuration
+profile measured against the installed macOS WebKit. It preserves the measured
+592-byte layout and navigation-limit ivar, with owned public state outside the
+reserved inline C++ storage. Its five dependencies have their measured class
+layouts too: preferences, process pool, user content controller, website data
+store and default webpage preferences. Configuration copies share dependency
+objects, nil setters recreate defaults, and the user-agent name is copied.
+Preference copies have independent scalar state. The default data-store identity
+is shared within a runtime; nonpersistent stores have separate identities.
+
+The configuration supports the measured boolean, enum and media policy
+properties. Preferences support minimum font size, JavaScript/window policies,
+tab focus and text interaction; webpage preferences support content mode,
+content JavaScript and lockdown policy. These objects hold configuration state.
+Process pools do not start browser processes, data stores do not persist browsing
+data, and the content controller currently exposes only an empty script list.
+Inline native C++ bytes remain zero-filled. Private engine access, coding,
+script registration/execution, URL scheme handlers, nonnil web extensions and
+unmeasured iOS-only properties remain unimplemented.
+
+All 57 final programs build, and 66 final generated C streams restore to their
+recorded hashes. Nine host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes eleven Objective-C programs and 33 Swift/loader programs. Shared native
+and guest fixtures check defaults, floating-point setters, dependency sharing,
+copies, nil resets and persistence policy. Repeated release, class changes and
+caller-storage destruction balance ownership across two runtime cycles; four
+rejection children verify unsupported operations fail explicitly. Generated-code
+checks confirm one fixed sidecar per initialized object and no temporary
+allocation during its disposal.
+
+Fortnite passes the configuration binding and still exits with status 1 before
+entry at EOS's required `_OBJC_CLASS_$_WKUserScript` import. Native metadata shows
+a 128-byte NSObject subclass with 120 bytes of script storage at offset 8,
+source/injection-time/main-frame getters and the public script initializer.
+The next-class measurement invokes metadata APIs only. Evidence is under
+`build/ios/fortnite/webkit-configuration-checks`. Full regression remains
+unpassed, the five published runners are unchanged, and entry/rendering/gameplay
+remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,419 | 740 | 80 |
-| EOSSDK | 633 | 29 | 18 |
+| Fortnite executable | 1,422 | 737 | 80 |
+| EOSSDK | 638 | 24 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,167 | 830 | 121 |
+| All images | 2,175 | 822 | 121 |
 
-The C++/GLES/Text variant reports 2,180 resolved imports, 817 unresolved strong
+The C++/GLES/Text variant reports 2,188 resolved imports, 809 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

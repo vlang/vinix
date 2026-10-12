@@ -80,6 +80,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	ns_error_dispose(object)
 	ns_condition_dispose(object, mut header)
 	cookie_dispose(object, mut header)
+	webkit_dispose(mut header)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])
