@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `eca3cb2ea8028caf02124f0e9e5b2d51460bde9a`,
+at source commit `92eff41e58e69e265ff9ab64dce8b43186117df1`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 597 | 2,395,782 | 5.76% |
-| Python | 33 | 241,463 | 0.58% |
-| Shell | 795 | 1,371,801 | 3.30% |
+| C | 599 | 2,396,555 | 5.73% |
+| Python | 29 | 222,643 | 0.53% |
+| Shell | 803 | 1,372,432 | 3.28% |
 
-All `.v` files are classified as V. The resulting V share is 82.85%, with no
+All `.v` files are classified as V. The resulting V share is 82.99%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 241,463 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 222,643 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev eca3cb2ea8028caf02124f0e9e5b2d51460bde9a --breakdown --json
+github-linguist --rev 92eff41e58e69e265ff9ab64dce8b43186117df1 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -98,6 +98,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ps2/bridge.h` | 697 |
 | `build-support/ps2/include/SDL3/SDL.h` | 640 |
 | `build-support/ps2/include/core.h` | 489 |
+| `build-support/qemu-system/tests/vncfixture/darwin_alias.h` | 286 |
 | `build-support/tarstream/filter_abi.h` | 916 |
 | `build-support/x86-translation/sppc-office-v-abi.h` | 514 |
 | `build-support/xorg-server/wine-host-v-abi.h` | 1,093 |
@@ -539,6 +540,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/mounted-disk-policy/hosttemplates/host.h` | 749 |
 | `tests/n64/guestfixture/n64-guest-native-abi.h` | 1,072 |
 | `tests/n64/rspbudgetfixture/n64-rsp-native-abi.h` | 626 |
+| `tests/native-launcher-tools/steamshim/steam-shim-abi.h` | 487 |
 | `tests/native-render-tools/test-abi.h` | 265 |
 | `tests/net-random/fixture/net-random-native-abi.h` | 351 |
 | `tests/network-ipv6/guestfixture/ipv6-guest-native-abi.h` | 558 |
@@ -663,10 +665,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/_native.py` | 5,749 |
 | `build-support/cpython_host.py` | 1,007 |
 | `build-support/native_host.py` | 6,504 |
-| `build-support/qemu-system/tests/run.py` | 5,316 |
-| `build-support/steam/lsof` | 2,979 |
-| `build-support/steam/tar` | 4,328 |
-| `build-support/venus/tests/run.py` | 6,197 |
 | `desktop/tools/_font_native.py` | 9,708 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 4,935 |
@@ -782,6 +780,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ps2-homebrew/build` | 231 |
 | `build-support/ps2/build` | 209 |
 | `build-support/qemu-storage.sh` | 9,938 |
+| `build-support/qemu-system/tests/run` | 131 |
 | `build-support/qemu-system/vinix-qemu` | 1,481 |
 | `build-support/qemu-system/vinix-qemu-desktop` | 851 |
 | `build-support/roblox/build` | 178 |
@@ -796,19 +795,25 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/stage-uname.sh` | 215 |
 | `build-support/staging-cache` | 127 |
 | `build-support/steam/bash` | 433 |
+| `build-support/steam/build-guest` | 170 |
 | `build-support/steam/compile-v-robust` | 165 |
 | `build-support/steam/ldd` | 1,459 |
+| `build-support/steam/lsof` | 135 |
 | `build-support/steam/qemu-dns` | 135 |
+| `build-support/steam/relative-link` | 138 |
 | `build-support/steam/steam` | 8,733 |
 | `build-support/steam/steam-hosted` | 3,522 |
 | `build-support/steam/steam-runtime-launcher-service` | 555 |
 | `build-support/steam/steamrt-entry-point` | 415 |
+| `build-support/steam/tar` | 134 |
 | `build-support/steam/uname` | 373 |
+| `build-support/steam/unpack-deb` | 141 |
 | `build-support/steam/zenity` | 653 |
 | `build-support/storage-tools/stage` | 163 |
 | `build-support/uname` | 1,025 |
 | `build-support/v-command` | 1,409 |
 | `build-support/venus/prepare-qemu` | 210 |
+| `build-support/venus/tests/run` | 133 |
 | `build-support/vinix-desktop-build` | 12,928 |
 | `build-support/vinix-desktop-reload` | 3,872 |
 | `build-support/vinix-files-sync` | 2,361 |
@@ -906,7 +911,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-qemu-system-aarch64.sh` | 5,225 |
 | `scripts/build-roblox-aarch64.sh` | 128 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
-| `scripts/build-steam-aarch64.sh` | 13,702 |
+| `scripts/build-steam-aarch64.sh` | 13,216 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
 | `scripts/build-userland-aarch64.sh` | 24,946 |
 | `scripts/build-userland-amd64.sh` | 5,989 |
@@ -1280,6 +1285,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/native-campaign-tools/campaignhost/verify-v4-init.txt` | 2,156 |
 | `tests/native-campaign-tools/run` | 179 |
 | `tests/native-game-tools/run` | 135 |
+| `tests/native-launcher-tools/run` | 135 |
 | `tests/native-linuxkpi-tools/run` | 135 |
 | `tests/native-render-tools/run` | 135 |
 | `tests/native-runtime-tools/run` | 135 |
