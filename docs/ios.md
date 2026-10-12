@@ -2768,17 +2768,49 @@ Evidence is under `build/ios/fortnite/weak-lookup-checks`. Full regression remai
 unpassed and the five published runners retain their last passing bytes. Entry,
 rendering and gameplay remain unverified.
 
+The subsequent Swift data increment exports `_$sBi64_WV` through the existing
+sealed Int value-witness table. Native measurement confirms that Builtin.Int64
+and Int use the same table address, including all eight function pointers and
+the size, stride, flags and extra-inhabitant fields. The direct export passes
+native and V witness calls for copy, assignment, take, destruction and enum
+storage, including aliasing, signed boundaries, an exact eight-byte allocation
+and guarded tag storage. Eight concurrent resolvers return the canonical table;
+two runtime lifetimes verify unchanged table contents and retired mappings.
+
+After that export, the IPA reached `_$sSHSQTb`, the Hashable-to-Equatable base
+conformance descriptor. Native inspection identifies data at the Hashable
+protocol descriptor plus 36: the first eight-byte protocol requirement, with
+zero flags and a null default implementation. Vinix now exports that existing
+record, preserving descriptor identity and the inherited witness-table index.
+Both exports reuse the sealed Int/Hashable records without another arena or
+allocation. A test-only unaligned eight-byte descriptor read was caught by
+UBSan and corrected to read the two four-byte fields separately; the failed run
+is retained alongside the completed Int64-only cohort.
+
+All 51 programs build, 55 final original C streams restore to their recorded
+hashes, and four host suites pass ASAN/UBSAN in both hashing modes. The four
+native dyld fixture processes pass again, and Vinix passes all 32 Swift programs
+plus the loader program. The supplied IPA passes both new exports and exits
+with status 1 before entry at CoreFoundation's
+`_OBJC_CLASS_$_NSConstantDictionary`. Typed native runtime inspection reports
+an NSDictionary subclass with a 40-byte instance: options at 8, count at 16,
+keys at 24 and objects at 32. EOS contains three class bindings in its
+`__objc_dictobj` section. Static dictionary instance decoding remains
+unimplemented. Evidence is under `build/ios/fortnite/swift-builtin-checks`.
+Full regression remains unpassed, the five published runners retain their last
+passing bytes, and entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,413 | 746 | 80 |
-| EOSSDK | 624 | 38 | 18 |
-| MarketplaceKitWrapper | 113 | 63 | 23 |
-| All images | 2,150 | 847 | 121 |
+| Fortnite executable | 1,415 | 744 | 80 |
+| EOSSDK | 626 | 36 | 18 |
+| MarketplaceKitWrapper | 115 | 61 | 23 |
+| All images | 2,156 | 841 | 121 |
 
-The C++/GLES/Text variant reports 2,163 resolved imports, 834 unresolved strong
+The C++/GLES/Text variant reports 2,169 resolved imports, 828 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

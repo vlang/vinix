@@ -159,6 +159,9 @@ fn swift_integer_symbol(symbol string) ?u64 {
 		return function
 	}
 	offset := match symbol {
+		// Native Builtin.Int64 and Int share this exact POD value-witness
+		// table. Export the sealed table, preserving Int's metadata identity.
+		'_$sBi64_WV' { 64 }
 		'_$sSiN' { 16 }
 		'_$sSiMn' { 160 }
 		'_$sSiSHsWP' { 256 }
@@ -167,6 +170,8 @@ fn swift_integer_symbol(symbol string) ?u64 {
 		'_$sSiSQsMc' { 336 }
 		'_$sSHMp' { 352 }
 		'_$sSHTL' { 380 }
+		// Hashable's first requirement is its inherited Equatable conformance.
+		'_$sSHSQTb' { 388 }
 		'_$sSH9hashValueSivgTq' { 396 }
 		'_$sSH4hash4intoys6HasherVz_tFTq' { 404 }
 		'_$sSH13_rawHashValue4seedS2i_tFTq' { 412 }

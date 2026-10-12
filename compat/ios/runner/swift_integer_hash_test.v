@@ -4,6 +4,7 @@ module main
 #include <dlfcn.h>
 fn C.dlopen(&char, i32) voidptr
 fn C.dlsym(voidptr, &char) voidptr
+fn C.dlclose(voidptr) i32
 fn C.mincore(voidptr, usize, &u8) i32
 type IntHashProbe = fn (u64, u64, u64, u64, u64, &u64) i64
 type IntHashAccessor = fn (u64) SwiftAssociatedMetadata
@@ -22,10 +23,10 @@ const int_hash_symbols = ['_$sSiN', '_$sSiMn', '_$sSiMa', '_$sSiSHsWP', '_$sSiSQ
 	'_$sSi9hashValueSivg', '_$sSi4hash4intoys6HasherVz_tF', '_$sSi13_rawHashValue4seedS2i_tF',
 	'_$sSH9hashValueSivgTj', '_$sSH4hash4intoys6HasherVz_tFTj', '_$sSH13_rawHashValue4seedS2i_tFTj',
 	'_$sSHsE13_rawHashValue4seedS2i_tF', '_$ss6HasherV7combineyyxSHRzlF', '_$ss10_hashValue3forSix_tSHRzlF',
-	'__swift_stdlib_Hashing_parameters']!
+	'__swift_stdlib_Hashing_parameters', '_$sSHSQTb']!
 struct IntHashApi {
 	native bool
-	entries [27]u64
+	entries [28]u64
 	probe IntHashProbe
 }
 struct IntHashGuard {
@@ -74,6 +75,12 @@ fn int_hash_layout(api IntHashApi) {
 	assert unsafe { (&char(int_hash_relative(hash + 28))).vstring() } == 'x'
 	assert int_hash_relative(hash + 32) == equal
 	assert api.entries[8] == hash + 28 && api.entries[13] == equal + 16
+	// This export names the actual first requirement, preserving pointer
+	// identity and its witness-table index independently of the symbol spelling.
+	assert api.entries[27] == hash + 36
+	assert unsafe { *(&u32(api.entries[27])) } == 0
+	assert unsafe { *(&i32(api.entries[27] + 4)) } == 0
+	assert read64(api.entries[3] + 8) == api.entries[4]
 	for i, flags in [u32(0), 0x026b0013, 0x3d890011, 0xc41a0011]! {
 		assert unsafe { *(&u32(hash + 36 + u64(i * 8))) } == flags
 		if i > 0 { assert api.entries[8 + i] == hash + 36 + u64(i * 8) }
@@ -83,7 +90,10 @@ fn int_hash_layout(api IntHashApi) {
 	assert int_hash_relative(hash + 64) != 0
 }
 fn int_hash_values(api IntHashApi) {
-	meta := api.entries[0]; vwt := read64(meta - 8)
+	int_hash_value_table(api.entries[0], read64(api.entries[0] - 8))
+}
+fn int_hash_value_table(meta u64, vwt u64) {
+	assert read64(vwt + 64) == 8 && read64(vwt + 72) == 8 && read64(vwt + 80) == 7
 	// ASAN sees the exact eight-byte allocation: no spare byte may be read by
 	// destruction or the zero-empty-case enum witnesses.
 	source := u64(C.malloc(8)); assert source != 0
@@ -115,6 +125,53 @@ fn int_hash_values(api IntHashApi) {
 			assert bytes[8] == if tag == 0 { u8(0) } else { u8(1) }
 		}
 	}
+}
+
+fn builtin_integer_resolve() u64 {
+	return runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sBi64_WV') or { panic(err) }
+}
+
+fn test_swift_builtin_int64_value_witness_export() {
+	$if macos {
+		lib := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', C.RTLD_NOW)
+		assert lib != unsafe { nil }
+		meta := u64(C.dlsym(lib, c'$sSiN'))
+		table := u64(C.dlsym(lib, c'$sBi64_WV'))
+		assert meta != 0 && table != 0 && table == read64(meta - 8)
+		int_hash_value_table(meta, table)
+		assert C.dlclose(lib) == 0
+		println('IOS-SWIFT-BUILTIN-NATIVE: exact shared Int64 table, all eight witnesses, alias copies, signed boundaries, zero-empty-case bounds and guarded enum storage passed')
+	}
+	for _ in 0 .. 2 {
+		objc_start()
+		mut resolvers := []thread u64{}
+		for _ in 0 .. 8 { resolvers << spawn builtin_integer_resolve() }
+		resolved := resolvers.wait()
+		table := resolved[0]
+		for address in resolved { assert address != 0 && address == table }
+		unsafe { resolved.free(); resolvers.free() }
+		meta := runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSiN') or { panic(err) }
+		assert table == read64(meta - 8) && table != meta
+		assert table == swift_integer_symbol('_$sBi64_WV') or { panic('missing builtin table') }
+		if _ := swift_integer_symbol('_$sBi32_WV') { assert false }
+		if _ := swift_integer_symbol('_$sBi128_WV') { assert false }
+		mut snapshot := [11]u64{}
+		for i in 0 .. 11 { snapshot[i] = read64(table + u64(i * 8)) }
+		int_hash_value_table(meta, table)
+		for i in 0 .. 11 { assert snapshot[i] == read64(table + u64(i * 8)) }
+		arena := ios_runtime.swift_integer_arena
+		page := usize(C.getpagesize())
+		assert arena != 0 && table == arena + u64(page) + 64
+		assert ios_runtime.swift_buffers.len == 0 && ios_runtime.live == 0
+		objc_stop()
+		assert ios_runtime.swift_integer_arena == 0
+		for offset in 0 .. 2 {
+			address := arena + u64(offset) * u64(page)
+			$if macos { assert C.mprotect(unsafe { voidptr(address) }, page, C.PROT_READ) == -1 }
+			$else { mut residency := u8(0); assert C.mincore(unsafe { voidptr(address) }, page, unsafe { &residency }) == -1 }
+		}
+	}
+	println('IOS-SWIFT-BUILTIN: canonical Int64 data export, native witness behavior, eight concurrent resolvers, unchanged table and two retired runtime lifetimes passed')
 }
 fn int_hash_word(api IntHashApi, value u64) {
 	meta := api.entries[0]; table := api.entries[3]
@@ -188,10 +245,10 @@ fn test_swift_integer_hashable() {
 	probe := unsafe { IntHashProbe(code) }
 	$if macos {
 		lib := C.dlopen(c'/usr/lib/swift/libswiftCore.dylib', C.RTLD_NOW)
-		mut entries := [27]u64{}
+		mut entries := [28]u64{}
 		for i, name in int_hash_symbols { entries[i] = u64(C.dlsym(lib, name[1..].str)); assert entries[i] != 0, name }
 		int_hash_run(IntHashApi{ native: true, entries: entries, probe: probe })
-		println('IOS-SWIFT-INTEGER-HASH-NATIVE: Int metadata/value witnesses, exact enum storage, Equatable, seeded hashing, witness/default/generic dispatch and preserved context matched')
+		println('IOS-SWIFT-INTEGER-HASH-NATIVE: Int metadata/value witnesses, exact enum storage, Hashable base conformance descriptor, Equatable, seeded hashing, witness/default/generic dispatch and preserved context matched')
 	}
 	for _ in 0 .. 2 {
 		objc_start()
@@ -199,7 +256,7 @@ fn test_swift_integer_hashable() {
 		for _ in 0 .. 8 { resolvers << spawn int_hash_resolver() }
 		resolved := resolvers.wait()
 		for address in resolved { assert address == resolved[0] && address != 0 }
-		mut entries := [27]u64{}
+		mut entries := [28]u64{}
 		for i, name in int_hash_symbols { entries[i] = runtime_symbol('/usr/lib/swift/libswiftCore.dylib', name) or { panic(err) } }
 		int_hash_run(IntHashApi{ entries: entries, probe: probe })
 		array_accessor := unsafe { IntHashArray(voidptr(runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSaMa') or { panic(err) })) }
@@ -215,5 +272,5 @@ fn test_swift_integer_hashable() {
 			$else { mut residency := u8(0); assert C.mincore(unsafe { voidptr(address) }, page, unsafe { &residency }) == -1 }
 		}
 	}
-	println('IOS-SWIFT-INTEGER-HASH: real Int metadata and inherited Equatable/Hashable tables, all value witnesses, enums, seeded/generic hashing, eight workers, Array<Int> and two drained teardowns')
+	println('IOS-SWIFT-INTEGER-HASH: real Int metadata, Hashable base conformance descriptor and inherited Equatable/Hashable tables, all value witnesses, enums, seeded/generic hashing, eight workers, Array<Int> and two drained teardowns')
 }
