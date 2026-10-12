@@ -34,7 +34,7 @@ if [ "${1:-}" = amd64 ]; then
 		"$repo/build-support/build-amd64-iso.sh" >/dev/null
 	qemu=$(command -v "${VINIX_QEMU_X86_64:-qemu-system-x86_64}")
 	firmware=${VINIX_OVMF_CODE:-"$(cd "$(dirname "$qemu")/.." && pwd)/share/qemu/edk2-x86_64-code.fd"}
-	python3 "$repo/tests/qemu-core/run_vm.py" --arch amd64 --iso "$work/test.iso" \
+	"$repo/tests/qemu-core/run-vm" --arch amd64 --iso "$work/test.iso" \
 		--qemu "$qemu" --firmware "$firmware" --timeout "${VINIX_QEMU_TIMEOUT:-900}" \
 		--cpus "${VINIX_QEMU_CORE_CPUS:-4}"
 	exit
@@ -51,7 +51,7 @@ for input in \
 		exit 1
 	fi
 done
-for command_name in "$cc" python3 tar; do
+for command_name in "$cc" tar; do
 	command -v "$command_name" >/dev/null 2>&1 || {
 		echo "ERROR: required command not found: $command_name" >&2
 		exit 1
@@ -79,7 +79,7 @@ mkdir -p "$work/rootfs/root" "$work/rootfs/sbin"
 COPYFILE_DISABLE=1 tar --format=ustar -cf "$work/initramfs.tar" \
 	-C "$work/rootfs" .
 
-python3 "$repo/tests/qemu-core/run_vm.py" \
+"$repo/tests/qemu-core/run-vm" \
 	--init "$work/init" \
 	--initramfs "$work/initramfs.tar" \
 	--state-dir "$work/vm" \

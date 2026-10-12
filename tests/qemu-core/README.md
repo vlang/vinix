@@ -21,6 +21,16 @@ Set `VINIX_QEMU_CORE_NO_BUILD=1` to reuse `kernel/bin/vinix`, or
 `VINIX_QEMU_TIMEOUT` to change the default 300-second deadline. The boot and
 EXT2 images are isolated in temporary directories and removed after the run.
 
+`run.sh` invokes the native V `run-vm` controller. Its direct ARM options are
+`--init`, `--initramfs`, `--state-dir` and `--timeout`; `--root` can select the
+repository supplying `scripts/run-aarch64.sh`. For amd64 use `--arch amd64`,
+`--iso`, `--qemu`, `--firmware` and `--cpus`. The Python frontend and child
+launch bridge are retired. Five saved allocation-campaign runners also have
+native `run-vm` entry points, retaining each captured CPU model. Existing saved
+logs and historical provenance records are unchanged; recover their original
+Python bytes from the Git source pinned in `native-vm-translation.json`.
+See [native VM controller qualification](native-vm-tools.md).
+
 The same test runs on amd64 against the kernel `scripts/build-amd64.sh` built, in a
 throwaway ISO booted once under TCG with four CPUs. amd64 has no persistent
 volume here, so the second, persistence-checking boot is skipped. It adds

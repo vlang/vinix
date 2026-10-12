@@ -1,0 +1,72 @@
+{
+    "cold_native_builds": 9,
+    "descriptor_launches_per_profile": 100,
+    "fresh_guest_boot": false,
+    "fresh_kernel_build": false,
+    "guest_test_sha256": "d05bf5cf0c025fc4881b5ce3b56ebd89a9c9ab0dbcbf90379bb5e336c3ff39a8",
+    "original_python_bytes": 74727,
+    "original_python_lines": 1953,
+    "originals": [
+        {
+            "blob": "535760aff233396a78964823dd322b4e2b7eca94",
+            "bytes": 13462,
+            "lines": 359,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/run_vm.py",
+            "sha256": "b93ec82e33d443697036c9fdd4c5c724959a265e6db19ca192f0d67386fe4447"
+        },
+        {
+            "blob": "535760aff233396a78964823dd322b4e2b7eca94",
+            "bytes": 13462,
+            "lines": 359,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-final/run_vm.py",
+            "sha256": "b93ec82e33d443697036c9fdd4c5c724959a265e6db19ca192f0d67386fe4447"
+        },
+        {
+            "blob": "0d9840dce31389e872af284e6ce02d9e8d8e8af4",
+            "bytes": 13468,
+            "lines": 359,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run_vm.py",
+            "sha256": "1257e6a3b20c6aa21dd77a8d27ecc6ff665249325120721fd270ad903a64e840"
+        },
+        {
+            "blob": "0d9840dce31389e872af284e6ce02d9e8d8e8af4",
+            "bytes": 13468,
+            "lines": 359,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run_vm.py",
+            "sha256": "1257e6a3b20c6aa21dd77a8d27ecc6ff665249325120721fd270ad903a64e840"
+        },
+        {
+            "blob": "0d9840dce31389e872af284e6ce02d9e8d8e8af4",
+            "bytes": 13468,
+            "lines": 359,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64-four-level/run_vm.py",
+            "sha256": "1257e6a3b20c6aa21dd77a8d27ecc6ff665249325120721fd270ad903a64e840"
+        },
+        {
+            "blob": "6be15c94fac8d7f23b7c01c1b419970cae634fd6",
+            "bytes": 6725,
+            "lines": 144,
+            "path": "tests/qemu-core/run_vm.py",
+            "sha256": "6c06a7a52b13a2b99533d77d76c43c13f283b32421feabc79c0515001cd8c5ff"
+        },
+        {
+            "blob": "e312840e1a8f8d33a792a88c9dc753404aa7124b",
+            "bytes": 674,
+            "lines": 14,
+            "path": "tests/qemu-core/_vm_native.py",
+            "sha256": "3036a1f3d9e1ae917758356a1603f956750f151b891feeccda09757db8af72ea"
+        }
+    ],
+    "profiles": [
+        "ARM",
+        "Rosetta x86",
+        "ARM ASan/UBSan"
+    ],
+    "public_native_fronts": 6,
+    "python_executed": false,
+    "python_files_retired": 7,
+    "qualification": "native-vm-tools.md",
+    "schema": 1,
+    "sdk_only_headers": true,
+    "source_commit": "536be4550f31f59800c390bd94b3264f76193be0"
+}

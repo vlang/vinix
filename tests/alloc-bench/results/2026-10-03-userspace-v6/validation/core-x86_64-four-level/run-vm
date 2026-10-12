@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo=$(CDPATH= cd -- "$here/../../../../../.." && pwd)
+exec sh "$repo/build-support/run-v-tool.sh" "$repo/tests/qemu-core/run-saved.v" "$here" "max,-la57" "$@"
