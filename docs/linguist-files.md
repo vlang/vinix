@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `109cc28b27d82d53f8a369a09e9c2942d5e31fb7`,
+at source commit `af9283246b39c3c4bba98c2c714b366f0f2553e6`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 591 | 2,393,745 | 5.85% |
-| Python | 62 | 365,570 | 0.89% |
-| Shell | 764 | 1,383,695 | 3.38% |
+| C | 592 | 2,394,197 | 5.82% |
+| Python | 56 | 329,431 | 0.80% |
+| Shell | 772 | 1,384,972 | 3.36% |
 
-All `.v` files are classified as V. The resulting V share is 82.25%, with no
+All `.v` files are classified as V. The resulting V share is 82.44%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 365,570 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 329,431 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 109cc28b27d82d53f8a369a09e9c2942d5e31fb7 --breakdown --json
+github-linguist --rev af9283246b39c3c4bba98c2c714b366f0f2553e6 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -107,6 +107,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `compat/ios/runner/abi/stack-probe-test.h` | 1,421 |
 | `compat/ios/runner/abi/text.h` | 1,848 |
 | `desktop/calculator_heap_test_guard.h` | 548 |
+| `desktop/gpu_egl_abi.h` | 247 |
 | `desktop/grapher_heap_test_guard.h` | 601 |
 | `desktop/libc_compat.h` | 1,911 |
 | `desktop/network_status.h` | 1,315 |
@@ -212,7 +213,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/verity.h` | 1,518 |
 | `kernel/c/vinix_endpoint.h` | 349 |
 | `kernel/c/vinix_inet6.h` | 1,534 |
-| `kernel/c/vinix_net.h` | 2,523 |
+| `kernel/c/vinix_net.h` | 2,728 |
 | `kernel/c/vmx.h` | 1,394 |
 | `kernel/c/x86_irq_v_contract.h` | 804 |
 | `kernel/c/x86_mitigations.h` | 1,098 |
@@ -662,13 +663,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/native_host.py` | 6,504 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
 | `build-support/steam/lsof` | 2,979 |
-| `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
 | `build-support/venus/tests/run.py` | 6,197 |
 | `desktop/tools/_font_native.py` | 9,708 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 4,935 |
-| `desktop/tools/test-gpu-present.py` | 8,956 |
 | `desktop/tools/tests/test_font_data.py` | 7,106 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `kernel/linuxkpi/audit.py` | 7,718 |
@@ -683,8 +682,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/android/_run_native.py` | 16,117 |
 | `tests/browsers/_native.py` | 5,357 |
 | `tests/browsers/run_vm.py` | 9,438 |
-| `tests/claude/smoke.py` | 7,250 |
-| `tests/codex/smoke.py` | 4,944 |
 | `tests/ext2-xattr/host.py` | 6,852 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/ios/desktop.py` | 7,962 |
@@ -705,13 +702,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/host_suite.py` | 1,162 |
 | `tests/linuxkpi/run_vm.py` | 1,671 |
 | `tests/native-host/stdio-test.py` | 3,995 |
-| `tests/packages/x-window-check.py` | 5,985 |
 | `tests/pointer-scroll/run.py` | 5,488 |
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tests/roblox-windows/_native.py` | 5,099 |
 | `tests/roblox-windows/run.py` | 7,180 |
-| `tests/roblox/launcher-test.py` | 6,516 |
 | `tests/virtio-gpu-virgl/_native.py` | 957 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 5,650 |
 | `tools/_package_store_native.py` | 4,314 |
@@ -750,6 +745,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/build-amd64-iso.sh` | 5,502 |
 | `build-support/build-amd64-uefi-disk.sh` | 3,064 |
 | `build-support/build-v-host-library.sh` | 1,559 |
+| `build-support/build-validation-guest` | 155 |
 | `build-support/check-m1-gpu-image.sh` | 6,312 |
 | `build-support/check-screenshot` | 171 |
 | `build-support/chromium/run-chromium` | 8,032 |
@@ -817,6 +813,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/steam/bash` | 433 |
 | `build-support/steam/compile-v-robust` | 165 |
 | `build-support/steam/ldd` | 1,459 |
+| `build-support/steam/qemu-dns` | 135 |
 | `build-support/steam/steam` | 8,733 |
 | `build-support/steam/steam-hosted` | 3,522 |
 | `build-support/steam/steam-runtime-launcher-service` | 555 |
@@ -863,6 +860,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/test-cache-tools` | 194 |
 | `desktop/tools/test-clipboard.sh` | 1,356 |
 | `desktop/tools/test-execinfo.sh` | 834 |
+| `desktop/tools/test-gpu-present` | 138 |
 | `desktop/tools/test-new-utilities.sh` | 2,637 |
 | `desktop/tools/test-settings.sh` | 5,219 |
 | `desktop/tools/test-utilities.sh` | 10,608 |
@@ -885,10 +883,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-asahi-aarch64.sh` | 11,744 |
 | `scripts/build-blender-native-aarch64.sh` | 7,179 |
 | `scripts/build-chromium-aarch64.sh` | 5,588 |
-| `scripts/build-claude-aarch64.sh` | 5,892 |
-| `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 92,581 |
-| `scripts/build-desktop-amd64.sh` | 15,166 |
+| `scripts/build-claude-aarch64.sh` | 5,923 |
+| `scripts/build-codex-aarch64.sh` | 4,845 |
+| `scripts/build-desktop-aarch64.sh` | 92,847 |
+| `scripts/build-desktop-amd64.sh` | 15,197 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 193 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |
@@ -898,7 +896,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-firefox-amd64.sh` | 178 |
 | `scripts/build-go-aarch64.sh` | 3,038 |
 | `scripts/build-hyprland-aarch64.sh` | 10,888 |
-| `scripts/build-ios-aarch64.sh` | 5,136 |
+| `scripts/build-ios-aarch64.sh` | 5,125 |
 | `scripts/build-java-aarch64.sh` | 4,674 |
 | `scripts/build-libreoffice-aarch64.sh` | 6,556 |
 | `scripts/build-limine-aarch64.sh` | 4,779 |
@@ -907,7 +905,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-minecraft-aarch64.sh` | 7,983 |
 | `scripts/build-n64-aarch64.sh` | 2,885 |
 | `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
-| `scripts/build-network-tools-aarch64.sh` | 8,755 |
+| `scripts/build-network-tools-aarch64.sh` | 8,758 |
 | `scripts/build-network-tools-amd64.sh` | 196 |
 | `scripts/build-opengothic-aarch64.sh` | 158 |
 | `scripts/build-ps1-aarch64.sh` | 3,148 |
@@ -919,7 +917,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-qemu-system-aarch64.sh` | 5,225 |
 | `scripts/build-roblox-aarch64.sh` | 128 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
-| `scripts/build-steam-aarch64.sh` | 13,672 |
+| `scripts/build-steam-aarch64.sh` | 13,702 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
 | `scripts/build-userland-aarch64.sh` | 24,946 |
 | `scripts/build-userland-amd64.sh` | 5,989 |
@@ -1106,18 +1104,20 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/application-sandbox/test-ui.sh` | 737 |
 | `tests/archive-tools/run.sh` | 333 |
 | `tests/block-storage/run` | 201 |
-| `tests/browsers/chromium-init.sh` | 6,410 |
+| `tests/browsers/chromium-init.sh` | 6,384 |
 | `tests/browsers/chromium-install-desktop-init.sh` | 1,916 |
-| `tests/browsers/desktop-init.sh` | 5,084 |
-| `tests/browsers/firefox-init.sh` | 3,839 |
+| `tests/browsers/desktop-init.sh` | 5,058 |
+| `tests/browsers/firefox-init.sh` | 3,813 |
 | `tests/browsers/pkg-init.sh` | 1,786 |
 | `tests/build-cache/run.sh` | 478 |
 | `tests/capability-exec/run` | 186 |
+| `tests/claude/smoke` | 139 |
 | `tests/clipboard/guest-init.sh` | 1,974 |
 | `tests/clipboard/run-vm` | 156 |
 | `tests/clipboard/test-host` | 174 |
 | `tests/clock-control/run` | 184 |
 | `tests/clock-control/run-host.sh` | 731 |
+| `tests/codex/smoke` | 138 |
 | `tests/compiler-selection/test-find-v.sh` | 6,624 |
 | `tests/compiler-selection/test-kernel-ar` | 145 |
 | `tests/cpu-mitigations/check-assembly` | 179 |
@@ -1279,6 +1279,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/native-campaign-tools/run` | 179 |
 | `tests/native-game-tools/run` | 135 |
 | `tests/native-runtime-tools/run` | 135 |
+| `tests/native-validation-tools/run` | 135 |
 | `tests/net-random/run` | 183 |
 | `tests/net-random/run.sh` | 283 |
 | `tests/network-ipv6/run-host.sh` | 124 |
@@ -1293,7 +1294,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/numa/run_vm` | 213 |
 | `tests/office-compat/run` | 184 |
 | `tests/office-compat/run-vm` | 185 |
-| `tests/office/libreoffice-init.sh` | 4,214 |
+| `tests/office/libreoffice-init.sh` | 4,188 |
 | `tests/office/run.sh` | 1,237 |
 | `tests/openbsd-security/run.sh` | 182 |
 | `tests/openbsd-security/run_vm` | 217 |
@@ -1302,18 +1303,19 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/opengothic/kekvm-guest.sh` | 2,747 |
 | `tests/opengothic/run` | 115 |
 | `tests/packages/blender-smoke.sh` | 1,269 |
-| `tests/packages/chromium-smoke.sh` | 2,694 |
+| `tests/packages/chromium-smoke.sh` | 2,685 |
 | `tests/packages/ffmpeg-smoke.sh` | 1,455 |
-| `tests/packages/gimp-smoke.sh` | 2,530 |
+| `tests/packages/gimp-smoke.sh` | 2,521 |
 | `tests/packages/gnumeric-smoke.sh` | 2,730 |
 | `tests/packages/gtk-smoke.sh` | 2,134 |
-| `tests/packages/obs-init.sh` | 6,626 |
+| `tests/packages/obs-init.sh` | 6,566 |
 | `tests/packages/qemu-install-gtk.sh` | 452 |
 | `tests/packages/qemu-persistence-guest.sh` | 951 |
-| `tests/packages/sublime-smoke.sh` | 2,670 |
+| `tests/packages/sublime-smoke.sh` | 2,661 |
 | `tests/packages/test-qemu-package-store` | 157 |
 | `tests/packages/test-qemu-persistence.sh` | 4,298 |
 | `tests/packages/test-vinix-pkg.sh` | 24,354 |
+| `tests/packages/x-window-check` | 141 |
 | `tests/pagecache/check-generated` | 146 |
 | `tests/pagecache/run-guest` | 182 |
 | `tests/pagecache/run.sh` | 3,296 |
@@ -1374,6 +1376,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/resource-open/run` | 186 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
 | `tests/roblox/build-test` | 169 |
+| `tests/roblox/launcher-test` | 142 |
 | `tests/scheduler-preemption/policy` | 152 |
 | `tests/scheduler-qos/policy` | 152 |
 | `tests/scheduler-qos/run` | 186 |
@@ -1403,7 +1406,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/steam/launcher-test.sh` | 6,952 |
 | `tests/steam/run-robust-vm` | 185 |
 | `tests/steam/run.sh` | 1,573 |
-| `tests/steam/steam-init.sh` | 11,673 |
+| `tests/steam/steam-init.sh` | 11,630 |
 | `tests/steam/steam-smoke` | 4,054 |
 | `tests/steam/test-robust-list` | 184 |
 | `tests/storage-volumes/host` | 184 |

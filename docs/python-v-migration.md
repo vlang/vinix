@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `109cc28b27d82d53f8a369a09e9c2942d5e31fb7`,
-Linguist 7.27.0 reports **Python 0.89%** (62 files, 365,570 bytes) and
-**V 82.25%** (3,615 files, 33,650,383 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `af9283246b39c3c4bba98c2c714b366f0f2553e6`,
+Linguist 7.27.0 reports **Python 0.80%** (56 files, 329,431 bytes) and
+**V 82.44%** (3,663 files, 33,933,328 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **4,840,715 Python bytes**. All remaining
-365,570 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **4,876,854 Python bytes**. All remaining
+329,431 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -24,7 +24,7 @@ to an archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 74 stages below remove **466 Python files / 1,995,294 original bytes** and
+The 75 stages below remove **472 Python files / 2,031,433 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -106,6 +106,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Android app supervision, runtime APIs, Roblox staging and host fixtures | `androidrun`, native PTY/QMP owners, image codecs and direct V APIs | 55,087 / 1,215 | `f21c1a5e` |
 | OpenGothic builder, guest, KekVM agent and desktop input closure | `gamehost`, direct V APIs, PTY/QMP owners and shared native input | 20,483 / 518 | `c961bf9e` |
 | Debian, dhewm3 and Dota runtime command and fixture closure | `runtimehost`, native Debian/JSON/newc, driver and LLVM tooling, PTY owners and Vulkan fixtures | 68,010 / 1,694 | `109cc28b` |
+| Launcher, GPU, DNS, CLI smoke and X11 checker closure | `validationhost`, `guestvalidation`, native event streams and process owners, guest ELF staging and checked cache | 36,139 / 972 | `af928324` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -738,9 +739,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 74 stages.
+or hidden in these 75 stages.
 
-The next thirty-six stages remove 314 Python files / 1,496,951 original bytes.
+The next thirty-seven stages remove 320 Python files / 1,533,090 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -753,7 +754,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **344 Python files / 1,631,228 original bytes**. Earlier qualification
+translates **350 Python files / 1,667,367 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -3108,3 +3109,23 @@ frontends and LLVM helper are V and do not bootstrap an interpreter environment.
 No Python or Meson is executed during qualification, and no fresh upstream
 engine/driver build or real Vinix guest boot is claimed. See
 [native runtime qualification](../tests/native-runtime-tools/README.md).
+
+The validation-tools stage retires six unchanged Python files and replaces their
+maintained host commands and guest image installations with V. Thirty-three
+fresh program/profile builds pass on ARM, x86 and ASan/UBSan. Each profile passes
+all nine original Roblox launcher cases, ten whole mock CLI HTTP cases, eight
+SIGINT/SIGTERM cases covering both host and guest frontend programs, the complete
+67-case GPU C/V comparison, DNS query/retry/Unicode/publication controls, ZIP/PBP
+validation, full-versus-legacy SDK capture bounds and repeated Xlib/descriptor
+ownership checks. Actual ARM and x86 static and dynamic musl ELF builds pass warm
+cache, corrupt-cache rebuild and failed-publication preservation controls. The
+long cache test pins its compiler executable because other sessions can rebuild
+the shared compiler. Both architectures compile the software and EGL presenters
+with the actual staged SDK qualification header. Twenty-two public help/guard
+bootstraps pass before retirement and nine whole command invocations afterward.
+All four V PSP fetchers pass real pinned archive extraction and reread controls,
+including a fresh native curl cube download. Their four original Python files
+remain while the concurrently staged iOS controller still invokes those paths;
+those prepared replacements receive no retirement credit in this stage. No
+Python, real model client or Vinix guest is executed during qualification. See
+[native validation tools](../tests/native-validation-tools/README.md).
