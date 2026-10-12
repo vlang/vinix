@@ -35,7 +35,7 @@ fn stage(arch string, staging string, cc string) ! {
 		'arm64'
 	} else {
 		'amd64'
-	}, '-gc', 'none', '-d', 'glibc', '-d', 'no_backtrace', '-o', source,
+	}, '-gc', 'none', '-d', 'glibc', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-o', source,
 		os.join_path(root, 'build-support/java-cacerts.v')])!
 	binary := os.join_path(work, 'java-cacerts')
 	command([cc, '-static', '-O2', '-D_GNU_SOURCE', source, '-pthread', '-lm', '-o', binary])!
