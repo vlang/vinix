@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+exec "$root/build-support/run-v-tool.sh" "$root/build-support/ios/main.v" generate-cxx-symbols "$@"

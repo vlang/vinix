@@ -36,7 +36,7 @@ mkdir -p "$OUTPUT/staging/usr/bin"
 VFLAGS=()
 CXXLIBS=()
 if [ "$WITH_CXX" = 1 ]; then
-    python3 "$SCRIPT_DIR/build-support/ios/build-cxx.py" --output "$OUTPUT/cxx" --sysroot "$SYSROOT"
+    "$SCRIPT_DIR/build-support/ios/build-cxx" --output "$OUTPUT/cxx" --sysroot "$SYSROOT"
     VFLAGS+=(-d ios_cxx)
     CXXLIBS+=("$OUTPUT/cxx/libcxx-ios.a" "$OUTPUT/cxx/sysroot/usr/lib/libc++abi.a" "$OUTPUT/cxx/sysroot/usr/lib/libunwind.a")
 fi
@@ -56,7 +56,7 @@ echo "Built $OUTPUT/staging/usr/bin/run-ios"
 
 if [ "$WITH_GLES" = 1 ]; then
     MESA_SYSROOT="${VINIX_IOS_MESA_SYSROOT:-$SCRIPT_DIR/build-aarch64-x11/sysroot}"
-    python3 "$SCRIPT_DIR/build-support/ios/stage-gles.py" --output "$OUTPUT/staging" \
+    "$SCRIPT_DIR/build-support/ios/stage-gles" --output "$OUTPUT/staging" \
         --sysroot "$SYSROOT" --mesa-sysroot "$MESA_SYSROOT" --readelf "$LLVM_BIN/llvm-readelf"
     "$V" -os linux -arch arm64 -enable-globals -gc none -prod -d glibc -d no_backtrace \
         -d ios_gles -d ios_text "${VFLAGS[@]}" -path "@vlib|$SCRIPT_DIR/compat/ios|@vmodules" \
