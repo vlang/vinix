@@ -37,7 +37,7 @@ raw extent data and original generations remain correct. Held descriptors surviv
 desired omission; cleanup restores exact baseline bytes and removes scratch
 live views explicitly. `PLAN ADDITION BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured **33-command cycles / 13200
+Each architecture runs 200 warmup and 200 measured **37-command cycles / 14800
 utility processes**, including 400 complete explicit addition previews and
 publications with 800 exact keep actions each. Existing allocation/growth rows
 are retried by identity before live preflight and scratch desired removal.

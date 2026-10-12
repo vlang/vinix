@@ -65,6 +65,7 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume pool-contract-batch BUNDLE POOL IDENTITY END_BYTES [...]\n       vinix-volume pool-preview-contract-batch BUNDLE POOL IDENTITY END_BYTES [...]\n')
 	C.printf(c'       vinix-volume pool-resize-batch BUNDLE IDENTITY POOL START_BYTES END_BYTES [...]\n       vinix-volume pool-preview-resize-batch BUNDLE IDENTITY POOL START_BYTES END_BYTES [...]\n')
 	C.printf(c'       vinix-volume plan-contract-capacity-batch BUNDLE IDENTITY DEVICE EXPECTED_BYTES [...]\n       vinix-volume plan-preview-contract-capacity-batch BUNDLE IDENTITY DEVICE EXPECTED_BYTES [...]\n')
+	C.printf(c'       vinix-volume pool-allocate-set-batch BUNDLE POOL SLOT LENGTH_BYTES MODE [...]\n       vinix-volume pool-preview-set-batch BUNDLE POOL SLOT LENGTH_BYTES MODE [...]\n')
 	C.printf(c'       vinix-volume plan-remove-batch BUNDLE SLOT [...]\n       vinix-volume plan-preview-remove-batch BUNDLE SLOT [...]\n')
 	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
 	C.printf(c'       vinix-volume plan-enroll-batch BUNDLE PLAN [...]\n       vinix-volume plan-preview-enroll-batch BUNDLE PLAN [...]\n')
@@ -84,6 +85,20 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'pool-allocate-set-batch') == 0 || C.strcmp(argv[1], c'pool-preview-set-batch') == 0) {
+			if argc < 7 || argc > 259 || (argc - 3) % 4 != 0 { return usage() }
+			mut batch := &MultiPoolBatch(C.alloca(sizeof(MultiPoolBatch)))
+			*batch = MultiPoolBatch{count: (argc - 3) / 4}
+			for i in 0 .. batch.count {
+				at := 3 + i * 4
+				pool := decimal(argv[at]) or { return usage() }; slot := decimal(argv[at + 1]) or { return usage() }
+				length := decimal(argv[at + 2]) or { return usage() }
+				if pool >= 64 || slot >= 64 || length == 0 || (C.strcmp(argv[at + 3], c'rw') != 0 && C.strcmp(argv[at + 3], c'ro') != 0) { return usage() }
+				batch.pools[i] = u32(pool); batch.rows[i] = Request{slot: u32(slot), length: length,
+					flags: if C.strcmp(argv[at + 3], c'ro') == 0 { u64(1) } else { u64(0) }}
+			}
+			return multi_pool_batch_plan(argv[2], batch, C.strcmp(argv[1], c'pool-preview-set-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'plan-contract-capacity-batch') == 0 || C.strcmp(argv[1], c'plan-preview-contract-capacity-batch') == 0) {
 			if argc < 6 || argc > 195 || (argc - 3) % 3 != 0 { return usage() }
 			mut batch := &CapacityContractBatch(C.alloca(sizeof(CapacityContractBatch)))

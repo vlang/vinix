@@ -184,6 +184,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Atomic identity-based pool eligibility contraction with protected occupied intersections, complete previews, whole-set rollback, preserved mappings/priority, durable equal-end retries and boot persistence](docs/storage-volumes.md#atomic-pool-eligibility-contraction).
   - [x] [Atomic cross-pool window resizing with two-sided occupied-byte protection, order-independent unused-capacity transfers, complete previews, whole-set rollback, durable equal-bound retries and boot persistence](docs/storage-volumes.md#atomic-cross-pool-window-resizing).
   - [x] [Atomic identity-based observed physical capacity contraction with protected desired mappings/pool bounds, pinned read-only probes and final rechecks, complete previews, whole-set rollback, durable retries and boot persistence](docs/storage-volumes.md#atomic-physical-capacity-contraction-batches).
+  - [x] [Atomic ordered multi-pool allocations with independent member priority, complete previews, whole-set rollback, preserved matching placements, durable retries and boot persistence](docs/storage-volumes.md#atomic-multi-pool-allocation-batches).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

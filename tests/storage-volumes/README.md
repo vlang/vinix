@@ -201,6 +201,14 @@ Two additional boots shrink the disposable physical disk from 24 to 20 MiB,
 adopt exact observed geometry and restore seven unchanged desired mappings/data.
 See [physical contraction qualification](capacity-contract-batch.md).
 
+Multi-pool allocation checks 4096 independent fragmentation/priority cases,
+interleaved same-pool requests, mixed exact retries and sector filtering. Full
+64-request/259-argument batches reach the V2 limit. Later failures retain every
+source/result field; changed/all-keep publisher/output faults and writer locks
+remain covered. A seventh boot restores two additional placements across two
+pools with all original rows and data intact. See
+[multi-pool qualification](multi-pool-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -227,8 +235,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 13200 utility processes across 200 warmup
-and 200 measured thirty-three-command cycles, with pool membership, query, batch
+its own process. The allowance includes 14800 utility processes across 200 warmup
+and 200 measured thirty-seven-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention

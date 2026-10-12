@@ -9,11 +9,11 @@ import bootcapture
 
 #include <signal.h>
 fn C.kill(i32, i32) i32
-fn C.ftruncate(i32, i64) i32
+fn C.ftruncate(i32, u64) i32
 
 // os.truncate opens with O_TRUNC. Keep the existing prefix of this disposable
 // backing file by resizing its retained writable descriptor instead.
-fn shrink_disk(path string, length i64) ! {
+fn shrink_disk(path string, length u64) ! {
 	mut disk := os.open_file(path, 'r+')!
 	defer { disk.close() }
 	if C.ftruncate(disk.fd, length) != 0 { return error('Cannot contract disposable backing disk') }
@@ -40,7 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -431,6 +431,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN POOL CONTRACTION BATCH PASSED:') { return error('Missing atomic pool contraction qualification') }
 	if !first.contains('PLAN POOL RESIZE BATCH PASSED:') { return error('Missing atomic cross-pool resize qualification') }
 	if !first.contains('PLAN CAPACITY CONTRACTION BATCH PASSED:') { return error('Missing identity-based physical contraction qualification') }
+	if !first.contains('PLAN MULTI POOL BATCH PASSED:') { return error('Missing atomic multi-pool allocation qualification') }
 	if !first.contains('PLAN LOCK PASSED:') { return error('Missing saved-plan locking qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
@@ -490,7 +491,14 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 		|| !sixth.contains('PLAN CAPACITY CONTRACTION BOOT PRESERVED') {
 		return error('Production init did not restore contracted geometry and preserved mappings')
 	}
-	println('PASS ${arch}: atomic physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, six-boot persistence and 200-cycle retention')
+	if !sixth.contains('PLAN MULTI POOL BATCH SAVED:') { return error('Missing persistent multi-pool placements') }
+	// Retain the completed six-boot evidence before new rows become the boot plan.
+	os.cp(work + '/config.ext2', work + '/contracted-config.ext2')!
+	seventh := boot(second_args, work + '/multi-pool-restored-boot.log')!
+	if seventh.contains('init: volume restore failed; continuing') || !seventh.contains('PLAN MULTI POOL BATCH BOOT PRESERVED') {
+		return error('Production init did not restore the complete multi-pool allocation')
+	}
+	println('PASS ${arch}: atomic multi-pool allocations, physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, seven-boot persistence and 200-cycle retention')
 }
 
 fn main() {

@@ -1326,3 +1326,98 @@ fn test_cross_pool_resize_preview_and_publication_detect_buffered_stdout_failure
 		mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded); if preview { assert decoded == set } else { assert decoded == expected }
 	}
 }
+
+fn test_multi_pool_batches_publish_all_rows_or_preserve_old_file_and_retry_every_durability_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-multi-pool-batch-io-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	mut batch := MultiPoolBatch{count: 2}
+	batch.pools[0] = 3; batch.pools[1] = 4
+	batch.rows[0] = Request{slot: 20, length: 4096, flags: 1}
+	batch.rows[1] = Request{slot: 21, length: 4096}
+	for retry in [false, true] {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}
+			for p in 0 .. 2 {
+				mut plan := Plan{key: DiskKey{bytes: 32768, sector: 512, kind: 1}}
+				plan.key.id[0] = u8(p + 1)
+				assert append_plan(mut set, &plan)
+				region := PoolRegion{pool: u32(3 + p), disk: u32(p), window: SpaceWindow{start: 4096, end: 8192, alignment: 4096}}
+				assert bundle_pool_add(mut set, &region)
+			}
+			bundle_io = BundleIO{}
+			assert publish_bundle(path.str, &set)
+			if retry { assert multi_pool_batch_plan(path.str, &batch, false) == 0 }
+			original := os.read_bytes(path)!
+			bundle_io = BundleIO{mode: mode}
+			assert multi_pool_batch_plan(path.str, &batch, false) == if mode == 1 { 0 } else { 1 }
+			assert bundle_io.closes == 2 && bundle_io.writes > 0 && os.ls(work)!.len == 1
+			current := os.read_bytes(path)!
+			mut decoded := PlanSet{}
+			assert decode_bundle(current.data, current.len, mut decoded)
+			if mode == 1 || mode == 4 {
+				assert (current == original) == retry && bundle_io.renames == 1 && bundle_io.flushes == 2
+				assert decoded.plans[0].count == 1 && decoded.plans[1].count == 1
+				assert decoded.plans[0].rows[0] == Request{slot: 20, offset: 4096, length: 4096, flags: 1}
+				assert decoded.plans[1].rows[0] == Request{slot: 21, offset: 4096, length: 4096}
+			} else { assert current == original }
+			// The failed directory flush left a complete new bundle. A retry
+			// keeps those exact rows and completes both publisher flushes.
+			bundle_io = BundleIO{}
+			assert multi_pool_batch_plan(path.str, &batch, false) == 0
+			assert bundle_io.writes > 0 && bundle_io.renames == 1 && bundle_io.flushes == 2 && bundle_io.closes == 2
+			completed := os.read_bytes(path)!
+			bundle_io = BundleIO{mode: mode}
+			assert multi_pool_batch_plan(path.str, &batch, true) == 0 && os.read_bytes(path)! == completed
+			assert bundle_io == BundleIO{mode: mode} // Preview never enters the publisher.
+			batch.rows[1].length = 8192
+			assert multi_pool_batch_plan(path.str, &batch, false) == 1 && os.read_bytes(path)! == completed
+			assert bundle_io == BundleIO{mode: mode}
+			batch.rows[1].length = 4096
+		}
+	}
+}
+
+
+fn test_multi_pool_batch_preview_and_publication_detect_buffered_stdout_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-multi-pool-batch-output-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	mut batch := MultiPoolBatch{count: 2}
+	batch.pools[0] = 3; batch.pools[1] = 4
+	batch.rows[0] = Request{slot: 20, length: 4096, flags: 1}
+	batch.rows[1] = Request{slot: 21, length: 4096}
+	for preview in [false, true] {
+		mut set := PlanSet{}
+		mut plan := Plan{key: DiskKey{bytes: 32768, sector: 512, kind: 1}}
+		plan.key.id[0] = 1
+		assert append_plan(mut set, &plan)
+		region := PoolRegion{pool: 3, disk: 0, window: SpaceWindow{start: 4096, end: 8192, alignment: 4096}}
+		assert bundle_pool_add(mut set, &region)
+		other := PoolRegion{pool: 4, disk: 0, window: SpaceWindow{start: 8192, end: 12288, alignment: 4096}}
+		assert bundle_pool_add(mut set, &other)
+		bundle_io = BundleIO{}
+		assert publish_bundle(path.str, &set) && C.fflush(C.stdout) == 0
+		original := os.read_bytes(path)!
+		child := C.fork()
+		assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY)
+			if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }
+			C.close(fd)
+			mut buffer := [4096]char{}
+			if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+			result := multi_pool_batch_plan(path.str, &batch, preview)
+			C._exit(if result == 1 { 0 } else { 4 })
+		}
+		mut result := i32(-1)
+		assert C.waitpid(child, &result, 0) == child && result == 0
+		current := os.read_bytes(path)!
+		assert (current == original) == preview
+		mut decoded := PlanSet{}
+		assert decode_bundle(current.data, current.len, mut decoded)
+		assert decoded.plans[0].count == if preview { u32(0) } else { u32(2) }
+	}
+}

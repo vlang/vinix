@@ -43,8 +43,8 @@ by a held directory lock; complete reverse-order preview remains available.
 Equal-capacity publication/retry retains exact bytes, live geometry/generations
 and a readable held view. `PLAN CAPACITY BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured thirty-three-command cycles:
-**13200 utility processes**, including 400 complete capacity previews/publications
+Each architecture runs 200 warmup and 200 measured thirty-seven-command cycles:
+**14800 utility processes**, including 400 complete capacity previews/publications
 with 800 retained-disk actions each, 400 expansion previews/publications, 400
 allocation previews/publications with 800 placements and 400 growth
 previews/publications with 800 desired growths. There are 800 cycle member

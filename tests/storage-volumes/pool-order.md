@@ -36,8 +36,8 @@ next allocation while preserving the earlier desired placement, live geometry,
 generations and held read-only data. Cleanup restores exact baseline bytes.
 `PLAN POOL PRIORITY PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured thirty-three-command cycles:
-**13200 utility processes**, including 400 priority previews/publications and
+Each architecture runs 200 warmup and 200 measured thirty-seven-command cycles:
+**14800 utility processes**, including 400 priority previews/publications and
 800 ordered member actions each. Existing capacity, membership, allocation,
 growth, expansion, preflight and replay operations remain enabled. Scratch
 mappings stay offline. Every slab class and large-page total must stay flat or

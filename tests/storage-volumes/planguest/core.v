@@ -183,6 +183,10 @@ fn cycles(parent &char, count int) {
 			c'mbr:12345678', c'14', c'6291456', c'8192', c'ro', true, 0, unsafe { nil })
 		mapping_additions(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'15', c'6291456', c'12288', c'rw',
 			c'mbr:12345678', c'14', c'6291456', c'8192', c'ro', false, 0, unsafe { nil })
+		pool_members_batch(c'/etc/vinix/volumes.vset', c'4', c'0', c'1048576', c'1056768', unsafe { nil }, unsafe { nil }, unsafe { nil }, false, false, 0, unsafe { nil })
+		multi_pool_allocations(c'/etc/vinix/volumes.vset', c'3', c'15', c'12288', c'rw', c'4', c'2', c'8192', c'rw', true, 0, unsafe { nil })
+		multi_pool_allocations(c'/etc/vinix/volumes.vset', c'3', c'15', c'12288', c'rw', c'4', c'2', c'8192', c'rw', false, 0, unsafe { nil })
+		tool(c'pool-remove', c'/etc/vinix/volumes.vset', c'4', c'0', unsafe { nil }, 0)
 		pool_contractions(c'/etc/vinix/volumes.vset', c'3', c'mbr:12345679', c'6303744', c'mbr:12345678', c'6299648', true, 0, unsafe { nil })
 		pool_contractions(c'/etc/vinix/volumes.vset', c'3', c'mbr:12345679', c'6303744', c'mbr:12345678', c'6299648', false, 0, unsafe { nil })
 		pool_resizes(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'3', c'6291456', c'6303744', c'mbr:12345678', c'3', c'6291456', c'6299648', true, 0, unsafe { nil })
@@ -467,6 +471,7 @@ fn first_boot(parent &char) {
 		planned_pool_contractions(parent)
 		planned_pool_resizes(parent)
 		planned_capacity_contracts(parent, wrong)
+		planned_multi_pool_batch(parent, wrong)
 		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
@@ -532,6 +537,11 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		C.close(phase)
 		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
+		multi := C.open(c'/multi-pool-boot', C.O_RDONLY)
+		if multi >= 0 {
+			check(C.close(multi) == 0, c'close multi-pool phase marker'); multi_pool_boot_phase(actual, other)
+			C.printf(c'PLAN DONE\n'); for { C.pause() }
+		}
 		if status(actual).bytes == 20971520 {
 			physical_capacity_contract_phase(actual, other)
 			C.printf(c'PLAN DONE\n')

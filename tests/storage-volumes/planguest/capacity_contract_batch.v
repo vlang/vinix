@@ -139,5 +139,6 @@ fn physical_capacity_contract_phase(parent &char, other &char) {
 		for byte in data { check(byte == 0xc1, c'held contracted tail data unchanged') }
 		check(status(c'/dev/mapper/vinix2').generation == first && status(c'/dev/mapper/vinix14').generation == tail, c'contraction metadata and replay preserve live generations')
 		C.printf(c'PLAN CAPACITY CONTRACTION BOOT PRESERVED\n')
+		if phase >= 0 { multi_pool_boot_prepare() }
 	}
 }

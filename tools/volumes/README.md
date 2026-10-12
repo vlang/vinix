@@ -202,6 +202,14 @@ same complete candidate without a writer lock or publication. Equal sizes
 report `keep` and still complete both publication flushes. See
 [physical contraction rules](../../docs/storage-volumes.md#atomic-physical-capacity-contraction-batches).
 
+`pool-allocate-set-batch BUNDLE POOL SLOT LENGTH_BYTES MODE [...]` allocates
+1–64 ordered requests across multiple pools in one atomic saved-state edit.
+Each request follows its own pool's member priority and aligned first fit.
+Matching rows stay fixed; a later failure discards every earlier placement.
+`pool-preview-set-batch` reports the same complete placements without a writer
+lock or publication. All-keep retries still complete both publication flushes.
+See [multi-pool allocation rules](../../docs/storage-volumes.md#atomic-multi-pool-allocation-batches).
+
 Saved-plan writers acquire a nonblocking exclusive lock on the destination
 directory before reading or snapshotting, holding it through atomic publication.
 A busy directory returns failure; retry reads the latest complete state. All

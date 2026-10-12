@@ -1265,6 +1265,48 @@ restore. Spanning, RAID, encryption and
 filesystem resizing remain open. See
 [batch qualification](../tests/storage-volumes/pool-batch.md).
 
+## Atomic multi-pool allocation batches
+
+```sh
+vinix-volume pool-preview-set-batch /root/layout.vset \
+  8 19 4096 ro 7 20 4096 rw
+vinix-volume pool-allocate-set-batch /root/layout.vset \
+  8 19 4096 ro 7 20 4096 rw
+```
+
+`pool-allocate-set-batch BUNDLE POOL SLOT LENGTH_BYTES MODE [...]` plans 1–64
+ordered requests across any existing allocation pools in one saved-state edit.
+Each request names its own pool and explicit `rw`/`ro` mode. Multiple requests
+may use the same pool; slots must be globally distinct across the whole batch.
+Complete argument counts and every token are checked before source I/O.
+
+Each new placement follows its pool's saved member priority and aligned first
+fit. Earlier placements consume space for later requests, including interleaved
+requests to the same pool. Placement remains one contiguous extent on one disk.
+A matching existing slot is kept only when length, mode and full containment in
+the requested pool still match; retries retain its original disk and offset
+even when earlier capacity becomes free. Pool membership, bounds, priority,
+disk identity/geometry and unrelated desired rows remain exact. A later absent
+pool, exhausted contiguous capacity or conflicting slot discards the private
+complete candidate and all caller action results.
+
+`pool-preview-set-batch` runs the same planning without physical-device probes,
+writer locking or publication. Reports start after the entire batch fits and
+contain request, pool, resolved disk, slot, `allocate`/`keep` action, offset,
+length and read-only mode in request order. Publication holds the pinned
+directory writer lock through source loading, atomic replacement, report
+flushing and cleanup. All-keep retries still write, file-fsync, rename and
+directory-fsync the complete bundle. Before rename failure preserves old bytes;
+afterward only the full candidate may be visible with durability unconfirmed.
+Buffered stdout failure returns an error. Retry the complete request under
+serialized administration to confirm durability.
+
+This configures desired mappings offline. Live creation remains a separate
+complete-set preflight/replay, with ordinary kernel protection and conflict
+checks. Existing views, descriptors and generations remain intact during
+planning. The V1/V2 formats and production boot restore are unchanged. See
+[multi-pool allocation qualification](../tests/storage-volumes/multi-pool-batch.md).
+
 ## Atomic pool growth batches
 
 ```sh
