@@ -49,6 +49,7 @@ pointed at.
 | Driver | Bus | Binds through the core | remove | suspend / resume | shutdown | reset | DMA |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `e1000` | PCI | yes | yes | yes | yes | yes | per-device domain |
+| `rtl8169` (x86 G/GU) | PCI | yes | yes | yes | yes | yes | per-device domain |
 | `ahci` | PCI | yes | no (mounted disks) | yes | flush, STANDBY IMMEDIATE, stop | port COMRESET | per-device domain |
 | `nvme` | PCI | yes | no | yes: flush and shutdown notification, set up again from nothing | shutdown notification | no | all of memory |
 | `ata` | PCI | yes | no | yes: requests held, drives waited for | no | no | all of memory |

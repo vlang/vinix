@@ -621,6 +621,7 @@ fn C.udp_send(pcb &C.udp_pcb, p &C.pbuf) Err_t
 fn C.udp_sendto(pcb &C.udp_pcb, p &C.pbuf, dst_ip &C.ip_addr, dst_port U16_t) Err_t
 fn C.vinix_apple_wifi_send(arg voidptr, arg_2 u64) i32
 fn C.vinix_e1000_send(arg voidptr, arg_2 u64) i32
+fn C.vinix_rtl8169_send(arg voidptr, arg_2 u64) i32
 fn C.vinix_ip_randomid() u16
 fn C.vinix_pick_port(first u16, last u16, taken Vinix_port_taken_fn, context voidptr) u16
 fn C.vinix_virtio_net_send(arg voidptr, arg_2 u64) i32
@@ -649,6 +650,7 @@ pub const driver_none = 0
 pub const driver_virtio = 1
 pub const driver_apple_wifi = 2
 pub const driver_e1000 = 3
+pub const driver_rtl8169 = 4
 
 pub type Driver_send_fn = fn (voidptr, u64) i32
 
@@ -665,6 +667,9 @@ pub fn driver_send(driver i32) Driver_send_fn {
 			}
 			driver_e1000 {
 				return C.vinix_e1000_send
+			}
+			driver_rtl8169 {
+				return C.vinix_rtl8169_send
 			}
 			else {
 				return Driver_send_fn(nil)

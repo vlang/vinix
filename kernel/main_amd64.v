@@ -40,6 +40,7 @@ import dev.serial
 import dev.streams
 import dev.ahci
 import dev.e1000
+import dev.rtl8169
 import dev.hda
 import dev.random
 import dev.mouse
@@ -65,6 +66,7 @@ import security
 // stack, then run the stack's timers -- DHCP, ARP, TCP retransmission.
 fn poll_network() {
 	e1000.poll()
+	rtl8169.poll()
 	inet.poll()
 }
 
@@ -101,6 +103,7 @@ fn kmain_thread() {
 	// Polled whether or not a card was found: one can arrive later, in a
 	// slot, and with none the poll costs a test of a flag.
 	e1000.initialise()
+	rtl8169.initialise()
 	sched.set_device_poll_callback(voidptr(poll_network))
 	pipe.initialise()
 	futex.initialise()

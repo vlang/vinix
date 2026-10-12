@@ -73,6 +73,7 @@ const ip_recverr = 11
 pub const driver_virtio = 1
 pub const driver_apple_wifi = 2
 pub const driver_e1000 = 3
+pub const driver_rtl8169 = 4
 
 pub struct SockaddrIn {
 pub mut:

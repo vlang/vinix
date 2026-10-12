@@ -385,6 +385,15 @@ const ec_selftest_actions = [
 
 pub const scenarios = [
 	Scenario{
+		name:         'bootlog'
+		about:        'kernel diagnostics readable without Settings; stable bounded snapshots'
+		arches:       ['aarch64', 'x86_64']
+		qemu_aarch64: ['-device', 'e1000,netdev=hwn0', '-netdev', 'user,id=hwn0']
+		qemu_x86_64:  ['-nic', 'user,model=e1000']
+		required:     ['HWTEST START bootlog', 'HWTEST PASS bootlog']
+		ending:       .poweroff
+	},
+	Scenario{
 		name:         'devices'
 		about:        'PCI devices in sysfs; unbind, bind, reset and remove an e1000'
 		arches:       ['aarch64', 'x86_64']

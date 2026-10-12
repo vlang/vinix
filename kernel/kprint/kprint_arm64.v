@@ -28,6 +28,7 @@ pub fn syscall_kprint(_ voidptr, message charptr) {
 
 pub fn kwrite(message charptr, msglen u64) {
 	kprint_lock.acquire()
+	bootlog.append(message, msglen)
 
 	uart.write(message, msglen)
 	term.print(message, msglen)

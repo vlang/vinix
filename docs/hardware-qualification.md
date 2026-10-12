@@ -80,7 +80,8 @@ driver has none, that is said.
 | Storage | IDE (PIIX) | `dev/ata` | implemented (VM) | ISO checks on QEMU `pc` and VirtualBox |
 | Storage | USB mass storage, SD, eMMC | none | open | |
 | Ethernet | Intel 8254x, 82574L | `dev/e1000` | implemented (VM) | hardware-platform `devices`, `iommu-*`; polled, one interface. These are the cards hypervisors emulate; no physical card tried |
-| Ethernet | Realtek r8169, Intel I219/I225, any other | none | open | the cards PCs actually have |
+| Ethernet | Realtek RTL8168G/GU, RTL8111G/GU (ThinkPad E470 R8111GUS) | `dev/rtl8169` | implemented (host fixture), physical unverified | V startup/firmware/DMA tests; [E470 diagnostics](thinkpad-e470-ethernet.md). One polled interface |
+| Ethernet | Other Realtek revisions, Intel I219/I225, any other | none | open | |
 | Wireless | any (Intel iwlwifi, Realtek, MediaTek) | none | open | |
 | Bluetooth | any | none | open | |
 | Graphics | firmware framebuffer | `dev/fbdev/simple` | implemented (VM) | the display on every x86 machine today; no mode setting, no acceleration, no blanking |

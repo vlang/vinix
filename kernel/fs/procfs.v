@@ -36,6 +36,7 @@ import security
 import time
 import pager
 import drm
+import kprint
 
 pub type NetTcpSnapshot = fn () string
 
@@ -70,6 +71,7 @@ enum ProcFSKind {
 	version
 	ostype
 	osrelease
+	bootlog
 	text
 	cpuinfo
 	machine_stat
@@ -300,6 +302,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	}
 	add_procfs_file(mut root, 'uptime', .uptime)
 	add_procfs_file(mut root, 'version', .version)
+	add_procfs_file(mut root, 'bootlog', .bootlog)
 	mut audit_node := add_procfs_file(mut root, 'security_audit', .security_audit)
 	audit_node.resource.stat.mode = stat.ifreg | 0o400
 	// Decisions the kernel made and trusted services report; see
@@ -675,6 +678,9 @@ fn (this &ProcFSResource) contents() string {
 			uptime_builder.add_byte(`\n`)
 			return lib.finish_text(*uptime_builder)
 		}
+		.bootlog {
+			return kprint.bootlog_snapshot()
+		}
 		.version {
 			// Match uname's host identity and Linux-compatible UTS namespaces.
 			in_container := utsnet.in_own_uts_namespace()
@@ -911,7 +917,7 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eacces)
 		return none
 	}
-	if (this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp
+	if (this.kind == .bootlog || this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp
 		|| this.kind == .security_audit || this.kind == .security_events || this.kind == .net_tcp6 || this.kind == .net_if_inet6)
 		&& _handle != unsafe { nil } {
 		return this.snapshot_read(_handle, buf, loc, count)
