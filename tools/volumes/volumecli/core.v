@@ -63,6 +63,7 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume plan-remove-batch BUNDLE SLOT [...]\n       vinix-volume plan-preview-remove-batch BUNDLE SLOT [...]\n')
 	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
 	C.printf(c'       vinix-volume plan-enroll-batch BUNDLE PLAN [...]\n       vinix-volume plan-preview-enroll-batch BUNDLE PLAN [...]\n')
+	C.printf(c'       vinix-volume plan-forget-batch BUNDLE IDENTITY [...]\n       vinix-volume plan-preview-forget-batch BUNDLE IDENTITY [...]\n')
 	C.printf(c'       vinix-volume plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES ALIGNMENT_BYTES [ro]\n')
 	C.printf(c'       vinix-volume plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES\n')
 	C.printf(c'       vinix-volume plan-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [DISK_INDEX DEVICE EXPECTED_BYTES ...]\n       vinix-volume plan-preview-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [DISK_INDEX DEVICE EXPECTED_BYTES ...]\n')
@@ -78,6 +79,13 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'plan-forget-batch') == 0 || C.strcmp(argv[1], c'plan-preview-forget-batch') == 0) {
+			if argc < 4 || argc > 67 { return usage() }
+			mut batch := &DiskForgetBatch(C.alloca(sizeof(DiskForgetBatch)))
+			*batch = DiskForgetBatch{count: argc - 3}
+			for i in 0 .. batch.count { if !parse_disk_identity(argv[3 + i], mut batch.keys[i]) { return usage() } }
+			return forget_batch_bundle_plan(argv[2], batch, C.strcmp(argv[1], c'plan-preview-forget-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'plan-enroll-batch') == 0 || C.strcmp(argv[1], c'plan-preview-enroll-batch') == 0) {
 			if argc < 4 || argc > 67 { return usage() }
 			for i in 3 .. argc { if argv[i][0] == 0 { return usage() } }

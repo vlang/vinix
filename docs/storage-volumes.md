@@ -524,6 +524,52 @@ all enrolled disks, including unavailable empty participants. Existing V1/V2
 formats and boot replay persist the imports. See
 [enrollment batch qualification](../tests/storage-volumes/enrollment-batch.md).
 
+## Atomic disk forgetting
+
+```sh
+vinix-volume show-bundle /root/layout.vset
+vinix-volume plan-preview-forget-batch /root/layout.vset mbr:1234567b mbr:1234567c
+vinix-volume plan-forget-batch /root/layout.vset mbr:1234567b mbr:1234567c
+```
+
+`plan-forget-batch BUNDLE IDENTITY [...]` removes 1–64 distinct empty enrolled
+disks in one saved-state publication. Select identities exactly as printed by
+`show-bundle`: `mbr:` followed by eight hexadecimal digits, or `gpt:` followed
+by a GUID in `8-4-4-4-12` form. Hexadecimal letters may use either case; prefixes
+are lowercase. Zero identities, malformed tokens, duplicate requests and
+ambiguous existing identities fail. Selection uses identity kind/value
+independently of capacity and sector size, so an absent-identity retry cannot
+accidentally select a disk that acquired a removed disk's old index.
+
+Each present disk must have no desired mappings or allocation pool membership.
+Remove those entries explicitly first. At least one enrolled disk must remain.
+A later protected participant or invalid request rolls back the entire edit;
+no prefix is published or reported. An absent identity reports `keep` and
+still participates in durable retries. Existing single-index `plan-forget`
+retains its original behavior.
+
+Surviving disks keep their relative order, identities, geometry, mapping rows,
+modes and global slot ownership. Every remaining pool reference is remapped to
+its disk's compacted index; bounds, alignment, region order and allocation
+priority remain exact. Reports list every requested forget/keep action and
+every survivor's old/new index and identity. Inspect the resulting indices
+before subsequent indexed edits.
+
+`plan-preview-forget-batch` runs the same complete planner without physical
+device probes, a writer lock, temporary or publication. Preview does not reserve
+the configuration. Publication retains the pinned directory writer lock from
+source read through report flushing and cleanup. All-absent retries still write,
+file-fsync, rename and directory-fsync the full bundle. Before rename, failures
+retain old bytes; afterward the complete new set may be visible with durability
+unconfirmed. Buffered output failure also returns an error. Repeating the same
+identity list is safe while administration serializes desired-state changes.
+
+This removes saved enrollment only. Live views, extents, generations, data and
+open descriptors remain protected by the existing kernel lifetime rules;
+separate live application/removal stays explicit. The checksummed V1/V2 formats
+and boot replay persist omissions and remapped pool references. See
+[disk forgetting qualification](../tests/storage-volumes/forget-batch.md).
+
 ## Bounded extent allocation
 
 ```sh

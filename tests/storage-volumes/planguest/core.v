@@ -181,8 +181,8 @@ fn cycles(parent &char, count int) {
 		mapping_removals(c'/etc/vinix/volumes.vset', c'15', c'14', unsafe { nil }, false, 0, unsafe { nil })
 		enrollment_plans(c'/etc/vinix/volumes.vset', c'/root/offline.vmap', c'/root/offline-second.vmap', true, 0, unsafe { nil })
 		enrollment_plans(c'/etc/vinix/volumes.vset', c'/root/offline.vmap', c'/root/offline-second.vmap', false, 0, unsafe { nil })
-		simple(c'plan-forget', c'/etc/vinix/volumes.vset', c'3', 0)
-		simple(c'plan-forget', c'/etc/vinix/volumes.vset', c'2', 0)
+		disk_forgets(c'/etc/vinix/volumes.vset', c'mbr:1234567c', c'mbr:1234567b', unsafe { nil }, true, 0, unsafe { nil })
+		disk_forgets(c'/etc/vinix/volumes.vset', c'mbr:1234567c', c'mbr:1234567b', unsafe { nil }, false, 0, unsafe { nil })
 		tool(c'restore-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 	}
@@ -450,6 +450,7 @@ fn first_boot(parent &char) {
 		planned_pool_order(parent, wrong)
 		planned_mapping_removals(parent, wrong)
 		planned_enrollment_batch(parent, wrong)
+		planned_forget_batch()
 		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)

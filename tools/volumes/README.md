@@ -78,6 +78,15 @@ geometry and ordered mappings match. Pinned read-only sources are rechecked
 before publication/reporting; later failures preserve the whole original set.
 See [enrollment batch rules](../../docs/storage-volumes.md#atomic-disk-enrollment-batches).
 
+`plan-forget-batch BUNDLE IDENTITY [...]` atomically removes 1–64 empty
+participants by the MBR/GPT identities printed by `show-bundle`. Absent identities
+are durable keep retries, independent of changing disk indices. Remaining disks
+keep their order; pool references follow their compacted indices without changing
+priority. `plan-preview-forget-batch` reports every action and survivor index
+without publication or writer locking. Populated disks, pool members and removal
+of the last disk fail as a whole. See
+[identity removal rules](../../docs/storage-volumes.md#atomic-disk-forgetting).
+
 `plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES` reports
 aligned gaps between saved mappings in an explicitly chosen region.
 `plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES

@@ -63,6 +63,9 @@ fn test_directory_lock_excludes_all_saved_state_writers_but_preserves_readonly_i
 		assert enroll_batch_bundle_plan(path.str, 1, &inputs[0], false) == 1
 	}
 	assert forget_bundle_disk(path.str, 0) == 1
+	mut forgotten := DiskForgetBatch{count: 1}; forgotten.keys[0] = DiskKey{kind: 1}; forgotten.keys[0].id[0] = 8
+	assert forget_batch_bundle_plan(path.str, &forgotten, false) == 1
+	assert forget_batch_bundle_plan(path.str, &forgotten, true) == 0
 	assert capacity_bundle_plan(path.str, 0, c'/unused', 32768) == 1
 	assert edit_pool_plan(path.str, &region, false) == 1
 	assert allocate_pool_plan(path.str, 3, &batch.rows[0]) == 1

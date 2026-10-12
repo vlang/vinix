@@ -1020,3 +1020,73 @@ fn test_enrollment_preview_and_publication_detect_buffered_stdout_failure() {
 		mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded) && decoded == expected
 	}
 }
+
+fn forget_io_fixture(mut set PlanSet, mut batch DiskForgetBatch, mut expected PlanSet) {
+	for member in [2, 1, 3, 4]! {
+		mut plan := Plan{key: DiskKey{bytes: 65536, sector: 512, kind: 1}}
+		plan.key.id[0] = u8(member)
+		if member == 1 { plan.count = 1; plan.rows[0] = Request{slot: 2, length: 4096, flags: 1} }
+		assert append_plan(mut set, &plan)
+	}
+	for disk in [u32(3), 1]! {
+		region := PoolRegion{pool: 3, disk: disk, window: SpaceWindow{start: 32768, end: 49152, alignment: 4096}}
+		assert bundle_pool_add(mut set, &region)
+	}
+	batch.count = 3; batch.keys[0] = set.plans[2].key; batch.keys[1] = set.plans[0].key
+	batch.keys[2] = DiskKey{kind: 1}; batch.keys[2].id[0] = 9
+	expected = PlanSet{count: 2, slots: set.slots, regions: 2}
+	expected.plans[0] = set.plans[1]; expected.plans[1] = set.plans[3]
+	expected.windows[0] = set.windows[0]; expected.windows[0].disk = 1
+	expected.windows[1] = set.windows[1]; expected.windows[1].disk = 0
+}
+
+fn test_forget_batches_and_absent_retries_preserve_complete_sets_under_publisher_faults() {
+	work := os.join_path(os.temp_dir(), 'vinix-forget-publish-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	for retry in [false, true] {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}; mut batch := DiskForgetBatch{}; mut expected := PlanSet{}
+			forget_io_fixture(mut set, mut batch, mut expected)
+			bundle_io = BundleIO{}
+			assert publish_bundle(path.str, &set)
+			if retry { assert forget_batch_bundle_plan(path.str, &batch, false) == 0 }
+			original := os.read_bytes(path)!
+			bundle_io = BundleIO{mode: mode}
+			assert forget_batch_bundle_plan(path.str, &batch, false) == if mode == 1 { 0 } else { 1 }
+			assert bundle_io.closes == 2 && bundle_io.writes > 0 && os.ls(work)!.len == 1
+			current := os.read_bytes(path)!; mut decoded := PlanSet{}
+			assert decode_bundle(current.data, current.len, mut decoded)
+			if mode == 1 || mode == 4 {
+				assert decoded == expected && (current == original) == retry && bundle_io.renames == 1 && bundle_io.flushes == 2
+			} else { assert current == original }
+			bundle_io = BundleIO{}
+			assert forget_batch_bundle_plan(path.str, &batch, false) == 0 && bundle_io.renames == 1 && bundle_io.flushes == 2
+			completed := os.read_bytes(path)!; bundle_io = BundleIO{mode: mode}
+			assert forget_batch_bundle_plan(path.str, &batch, true) == 0 && os.read_bytes(path)! == completed && bundle_io == BundleIO{mode: mode}
+		}
+	}
+}
+
+fn test_forget_preview_and_publication_detect_buffered_stdout_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-forget-output-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	for preview in [false, true] {
+		mut set := PlanSet{}; mut batch := DiskForgetBatch{}; mut expected := PlanSet{}
+		forget_io_fixture(mut set, mut batch, mut expected); bundle_io = BundleIO{}
+		assert publish_bundle(path.str, &set) && C.fflush(C.stdout) == 0
+		original := os.read_bytes(path)!
+		child := C.fork(); assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY)
+			if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }; C.close(fd)
+			mut buffer := [4096]char{}
+			if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+			C._exit(if forget_batch_bundle_plan(path.str, &batch, preview) == 1 { 0 } else { 4 })
+		}
+		mut code := i32(-1); assert C.waitpid(child, &code, 0) == child && code == 0
+		current := os.read_bytes(path)!; assert (current == original) == preview
+		mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded) && decoded == if preview { set } else { expected }
+	}
+}

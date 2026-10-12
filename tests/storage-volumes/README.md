@@ -145,6 +145,15 @@ retries. Guests verify unavailable participants, retained views, real physical
 reenrollment and exact persistent retries. See
 [enrollment batch qualification](enrollment-batch.md).
 
+Identity-based disk forgetting checks 1024 existing/requested subset combinations
+against independent stable-compaction and pool-index oracles. Tests preserve
+surviving desired rows and priority, reject later protected/duplicate/ambiguous
+requests and retain one disk. MBR/GPT parsing and full 64-identity CLIs cover
+safe absent retries after index changes. Publisher and buffered stdout faults
+cover changed/all-absent batches. Guests verify writer exclusion, held views and
+actual physical disk/pool compaction across reboot. See
+[disk forgetting qualification](forget-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -223,7 +232,8 @@ mapping capacity, previews/verifies/republishes both unchanged physical capaciti
 previews/publishes admission of two pool members and unchanged allocation priority,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
 batch, previews/publishes a two-mapping growth batch, checks and previews/removes the scratch
-mappings, previews/enrolls two empty offline participants and forgets both,
+mappings, previews/enrolls two empty offline participants and previews/forgets
+both by identity,
 explicitly replays growth and runs boot restoration.
 A flushed phase marker
 and the atomically published bundle stay on ext2 across an
