@@ -27,6 +27,7 @@ fn C.posix_spawn_file_actions_init(voidptr) i32
 fn C.posix_spawn_file_actions_destroy(voidptr) i32
 fn C.posix_spawn_file_actions_adddup2(voidptr, i32, i32) i32
 fn C.posix_spawn_file_actions_addclose(voidptr, i32) i32
+fn C.posix_spawn_file_actions_addchdir_np(voidptr, &char) i32
 fn C.posix_spawn_file_actions_addinherit_np(voidptr, i32) i32
 fn C.posix_spawnattr_init(voidptr) i32
 fn C.posix_spawnattr_destroy(voidptr) i32
@@ -67,21 +68,31 @@ pub fn capture(argv []string, env map[string]string, timeout f64, limit int, can
 // Use one SDK pipe for both child streams when the caller's original command
 // used stderr=STDOUT. Preserve their write ordering and one output bound.
 pub fn capture_combined(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
-	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, true, false, '')
+	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, true, false, '', '', false, '')
 }
 
 // Preserve a supplied argv[0] for independent executable oracles. The SDK
 // still resolves the explicit executable without a shell.
 pub fn capture_as(executable string, argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
 	if executable == '' || executable.contains('\x00') { return error('invalid executable') }
-	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, false, executable)
+	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, false, executable, '', false, '')
 }
 
 // A synchronous owner may inspect a live child through WNOWAIT while the
 // child inherits stdout/stderr. Its callback finishes before the sole reap;
 // verbose emulators cannot block behind undrained capture pipes.
 pub fn run_owned(argv []string, env map[string]string, cancel fn () bool, spawned fn (int, voidptr) !, context voidptr) !Output {
-	return capture_policy(argv, env, -1, 0, cancel, unsafe { nil }, spawned, context, 0, false, true, '')
+	return capture_policy(argv, env, -1, 0, cancel, unsafe { nil }, spawned, context, 0, false, true, '', '', false, '')
+}
+
+// SDK file actions stream both child outputs directly into an owned log.
+// A synchronous observer retains the leader identity through group retirement
+// and the sole reap; verbose children cannot fill an undrained capture pipe.
+pub fn run_logged_owned(argv []string, env map[string]string, cancel fn () bool, log string,
+	append bool, directory string, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64) !Output {
+	if log == '' || log.contains('\x00') { return error('invalid command log') }
+	return capture_policy(argv, env, -1, 0, cancel, unsafe { nil }, spawned, context, shutdown_grace,
+		false, true, '', log, append, directory)
 }
 
 pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
@@ -91,11 +102,11 @@ pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit
 
 pub fn capture_owned(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
 	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64) !Output {
-	return capture_policy(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, false, false, '')
+	return capture_policy(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, false, false, '', '', false, '')
 }
 
 fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
-	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string) !Output {
+	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string, log string, append bool, directory string) !Output {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid command') }
 	mut pipes := [i32(-1), -1, -1, -1]!
 	defer { for fd in pipes { if fd >= 0 { C.close(fd) } } }
@@ -108,14 +119,33 @@ fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, 
 		}
 		if C.fcntl(pipes[index], C.F_SETFD, C.FD_CLOEXEC) != 0 { return os.error_posix() }
 	}
+	mut log_fd := i32(-1)
+	defer { if log_fd >= 0 { C.close(log_fd) } }
+	if log != '' {
+		log_fd = unsafe { C.open(log.str, C.O_WRONLY | C.O_CREAT | C.O_CLOEXEC | if append { C.O_APPEND } else { C.O_TRUNC }, 0o666) }
+		if log_fd < 0 { return os.error_posix() }
+		if log_fd < 3 {
+			moved := C.fcntl(log_fd, C.F_DUPFD_CLOEXEC, 3)
+			if moved < 0 { return os.error_posix() }
+			C.close(log_fd)
+			log_fd = moved
+		}
+	}
 	mut actions := C.posix_spawn_file_actions_t{}
 	if C.posix_spawn_file_actions_init(&actions) != 0 { return error('cannot initialize spawn actions') }
 	defer { C.posix_spawn_file_actions_destroy(&actions) }
-	if !inherited {
-		for status in [C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1), C.posix_spawn_file_actions_adddup2(&actions, if combined { pipes[1] } else { pipes[3] }, 2)] {
+	if directory != '' {
+		if directory.contains('\x00') { return error('invalid command directory') }
+		status := C.posix_spawn_file_actions_addchdir_np(&actions, directory.str)
+		if status != 0 { return error_with_code('cannot configure command directory', int(status)) }
+	}
+	if !inherited || log_fd >= 0 {
+		for status in [C.posix_spawn_file_actions_adddup2(&actions, if log_fd >= 0 { log_fd } else { pipes[1] }, 1),
+			C.posix_spawn_file_actions_adddup2(&actions, if log_fd >= 0 { log_fd } else if combined { pipes[1] } else { pipes[3] }, 2)] {
 			if status != 0 { return error_with_code('cannot configure spawn streams', int(status)) }
 		}
 	}
+	if log_fd >= 0 && C.posix_spawn_file_actions_addclose(&actions, log_fd) != 0 { return error('cannot configure command log') }
 	for status in [C.posix_spawn_file_actions_addclose(&actions, pipes[0]), C.posix_spawn_file_actions_addclose(&actions, pipes[1]),
 		C.posix_spawn_file_actions_addclose(&actions, pipes[2]), C.posix_spawn_file_actions_addclose(&actions, pipes[3])] {
 		if status != 0 { return error_with_code('cannot configure spawn actions', int(status)) }
@@ -135,7 +165,7 @@ fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, 
 	$if macos {
 		flags |= i16(C.POSIX_SPAWN_CLOEXEC_DEFAULT)
 		if C.fcntl(0, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, 0) != 0 { return error('cannot preserve command stdin') }
-		if inherited { for fd in [1,2] { if C.fcntl(fd, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, fd) != 0 { return error('cannot preserve command output') } } }
+		if inherited && log_fd < 0 { for fd in [1,2] { if C.fcntl(fd, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, fd) != 0 { return error('cannot preserve command output') } } }
 	}
 	for status in [C.posix_spawnattr_setpgroup(&attributes, 0), C.posix_spawnattr_setsigdefault(&attributes, &signals),
 		C.posix_spawnattr_setflags(&attributes, flags)] {

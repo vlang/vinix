@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo=$here
+while [ ! -f "$repo/tests/native-allocation-tools/main.v" ]; do
+    [ "$repo" != / ] || { printf 'Native allocation tools repository not found\n' >&2; exit 1; }
+    repo=$(dirname -- "$repo")
+done
+exec "$repo/build-support/run-v-tool.sh" "$repo/tests/native-allocation-tools/main.v" kernel "$@"

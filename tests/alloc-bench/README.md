@@ -27,7 +27,7 @@ architecture, native page size, clock resolution, counts, size distribution,
 and access stride.
 Both runners record the V source hashes, V compiler version/hash, generated
 artifact hash and native header hash, then compile inside the guest with the
-same GCC flags as before. `test_v_bench.py --original-reference /outside/bench.c`
+same GCC flags as before. `test-v-bench --original-reference /outside/bench.c`
 compares the immutable original C under ASan/UBSan, using a deterministic clock
 and fault provider to check sample ordering, all mixed-batch OOM prefixes,
 syscall failures, both pipe closes and restoration of the first close's errno.
@@ -56,7 +56,7 @@ including Vinix's poison checks, remain enabled.
 `samplerfixture/core.v` independently checks the sampler's checksum, exact
 674,496 success allocations/frees, allocation failure and poisoned-zeroing
 rollback in each phase, a constant clock, and kext start/stop results.
-`python3 tests/alloc-bench/test_v_sampler.py` runs it under ASan/UBSan.
+`tests/alloc-bench/test-v-sampler` runs it under ASan/UBSan.
 The original calloc/free pair remains explicit. Native assembly captures the
 complete variadic register banks for the bounded libc log buffer; those three
 original va-list capture lines receive no V algorithm credit. Original C/V
@@ -102,7 +102,7 @@ VINIX_AMD64_USERLAND_BUILD_DIR="$PWD/build/alloc-userland" \
 Then run:
 
 ```sh
-python3 tests/alloc-bench/run-vinix.py \
+tests/alloc-bench/run-vinix \
   --kernel /absolute/worktree/kernel/bin/vinix \
   --sysroot build/alloc-userland/staging \
   --state-dir build/alloc-vinix \
@@ -141,7 +141,7 @@ outliers. Other sessions on the host can still introduce noise.
 With GNU GCC and Apple's development tools inside macOS:
 
 ```sh
-python3 tests/alloc-bench/run-macos.py \
+tests/alloc-bench/run-macos \
   --port 22322 --user vinix --identity /path/to/private-guest-key \
   --gcc /opt/local/bin/gcc-mp-14 \
   --vm-config /path/to/actual-qemu-config.json \
@@ -198,7 +198,7 @@ the compiler command and verify the kernel came from that build. The runner
 validates the complete three-phase sampler output before reporting success.
 
 ```sh
-python3 tests/alloc-bench/run-kernel-vinix.py \
+tests/alloc-bench/run-kernel-vinix \
   --kernel /absolute/worktree/kernel/bin/vinix \
   --cc /path/to/x86_64-linux-musl-gcc \
   --state-dir build/kernel-alloc-vinix
@@ -222,11 +222,11 @@ the compiler's fixed aggregate initializer to static native data, since the
 loader reads the descriptor before any V constructor. The 196-byte record,
 four-byte alignment and original start/stop symbol relocations are preserved;
 this metadata removal receives zero algorithm credit.
-`build-macos-kext.py` creates the bundle and records exact build commands and
+`build-macos-kext` creates the bundle and records exact build commands and
 both metadata source and generated-artifact hashes:
 
 ```sh
-python3 tests/alloc-bench/build-macos-kext.py \
+tests/alloc-bench/build-macos-kext \
   --gcc /opt/local/bin/gcc-mp-14 \
   --vm-config /path/to/actual-one-cpu-qemu-config.json \
   --state-dir build/kernel-alloc-macos
@@ -283,3 +283,6 @@ emulator, not native CPU cycles or universal allocator performance.
 Fixture and benchmark generators now use native V entry points. See
 [native generator qualification](../native-generators/README.md) for the
 compiler, descriptor and interrupt checks.
+
+The allocation controllers and host tests now run in native V. See
+[native controller qualification](../native-allocation-tools/README.md).

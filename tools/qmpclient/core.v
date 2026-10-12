@@ -51,6 +51,9 @@ fn connect_body(path string, deadline u64, cancel fn () bool, accept_errors bool
 }
 pub fn (mut monitor Monitor) close() { if !isnil(monitor.connection) { monitor.connection.close() or {}; monitor.connection = unsafe { nil } } }
 pub fn (mut monitor Monitor) set_deadline(deadline u64) { monitor.deadline = deadline }
+// Cleanup after an interrupt must still be able to stop the private guest.
+// The caller retains its signal status while bounding the final exchange.
+pub fn (mut monitor Monitor) set_cancel(cancel fn () bool) { monitor.cancel = cancel }
 fn (mut monitor Monitor) line() !map[string]json2.Any {
 	text := monitor.read_line()!
 	hosttest.module_decode_utf8(text)!

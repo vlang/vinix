@@ -1,0 +1,386 @@
+{
+    "benchmark_cases_per_profile": 136,
+    "c_goldens": [
+        {
+            "commit": "46ea29c75a0136efc2bd56a2865638831c3b972a",
+            "path": "tests/alloc-bench/bench.c",
+            "reference": "bench.c",
+            "sha256": "bd4a0d74f4f1e8d079d55877f8e90925e2622ce990120b54573a5dc94a9a54b9"
+        },
+        {
+            "commit": "175c3ae401c939894175fbdfdce11ed3827d368c",
+            "path": "tests/alloc-bench/kernel_sampler_test.c",
+            "reference": "kernel_sampler_test.c",
+            "sha256": "868b5c9fa5e00f752f71558a1130a4ae4bff6c2ea70d02d03601d58d637a7af7"
+        }
+    ],
+    "compiler_vm_ssh_kext_signals_per_profile": 12,
+    "console_workflows_per_profile": 7,
+    "controller_workflows_per_profile": 30,
+    "darwin_gcc_timing_campaign": false,
+    "fresh_guest_boot": false,
+    "fresh_kernel_build": false,
+    "fronts": [
+        {
+            "kind": "kext",
+            "original": "tests/alloc-bench/build-macos-kext.py",
+            "path": "tests/alloc-bench/build-macos-kext"
+        },
+        {
+            "kind": "vinix-preboot",
+            "original": "tests/alloc-bench/results/2026-10-02-userspace/excluded/vinix-release-1-preboot/run-vinix-before-fix.py",
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/excluded/vinix-release-1-preboot/run-vinix-before-fix"
+        },
+        {
+            "kind": "macos-driver",
+            "original": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/macos-driver.py",
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/macos-driver"
+        },
+        {
+            "kind": "vinix-saved",
+            "original": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/run-vinix.py",
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/run-vinix"
+        },
+        {
+            "kind": "vinix-driver",
+            "original": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/vinix-driver.py",
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/vinix-driver"
+        },
+        {
+            "kind": "vinix-driver",
+            "original": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-final-driver.py",
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-final-driver"
+        },
+        {
+            "kind": "macos-driver",
+            "original": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-macos-final-driver.py",
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-macos-final-driver"
+        },
+        {
+            "kind": "vinix-driver",
+            "original": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-final-driver.py",
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-final-driver"
+        },
+        {
+            "kind": "macos-driver",
+            "original": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-macos-final-driver.py",
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-macos-final-driver"
+        },
+        {
+            "kind": "vinix-saved",
+            "original": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/run-vinix.py",
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/run-vinix"
+        },
+        {
+            "kind": "vinix-driver",
+            "original": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-final-driver.py",
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-final-driver"
+        },
+        {
+            "kind": "macos-driver",
+            "original": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-macos-final-driver.py",
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-macos-final-driver"
+        },
+        {
+            "kind": "kernel",
+            "original": "tests/alloc-bench/run-kernel-vinix.py",
+            "path": "tests/alloc-bench/run-kernel-vinix"
+        },
+        {
+            "kind": "macos",
+            "original": "tests/alloc-bench/run-macos.py",
+            "path": "tests/alloc-bench/run-macos"
+        },
+        {
+            "kind": "vinix",
+            "original": "tests/alloc-bench/run-vinix.py",
+            "path": "tests/alloc-bench/run-vinix"
+        },
+        {
+            "kind": "bench",
+            "original": "tests/alloc-bench/test_v_bench.py",
+            "path": "tests/alloc-bench/test-v-bench"
+        },
+        {
+            "kind": "sampler",
+            "original": "tests/alloc-bench/test_v_sampler.py",
+            "path": "tests/alloc-bench/test-v-sampler"
+        },
+        {
+            "kind": "control",
+            "original": "tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/control.py",
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/control"
+        },
+        {
+            "kind": "measure",
+            "original": "tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/measure-recorded.py",
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/measure-recorded"
+        },
+        {
+            "kind": "measure",
+            "original": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/catalina-measure.py",
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/catalina-measure"
+        }
+    ],
+    "historical_archive_translation_credit": 0,
+    "kext_execution": false,
+    "obsolete_object_bridges": [
+        {
+            "blob": "5a4759b71c6bcd0e94e04d87056af1e3b4b9f85e",
+            "path": "tests/alloc-bench/benchtest/README.md",
+            "sha256": "3b2fbd0c17836dd3279717239a48c3a57408afebbb20b2b5f80a18ff5f410bfb"
+        },
+        {
+            "blob": "5f6d34011e4ef2c96bfff095d576f898761d89d0",
+            "path": "tests/alloc-bench/benchtest/bindings.v",
+            "sha256": "620b8e3255d0d0d6725f7ce27c14cd321570dd63282b71b804902efe4f6c4837"
+        },
+        {
+            "blob": "297c472a509b0b25b1d324ec87a8f34d83d100d9",
+            "path": "tests/alloc-bench/benchtest/build.v",
+            "sha256": "bffdd4d78fe5b02bd0708be53adb7c0edf032c7d33fa7d37a7231b0f80ecf08e"
+        },
+        {
+            "blob": "5a511e447b16fd514a1a66c7edfa7cdc91546cdd",
+            "path": "tests/alloc-bench/benchtest/compare.v",
+            "sha256": "caca8fbf4dceee2a53b6656543f21342544fe68ba189f0544bfce070d5acedf6"
+        },
+        {
+            "blob": "21807496f795db8498e319acf4446b0e2d972418",
+            "path": "tests/alloc-bench/benchtest/main.v",
+            "sha256": "0f829388a9282d3f1ffbffbc8fdc922e4387fd7181f937f16b5929a4f8b82496"
+        },
+        {
+            "blob": "a01b24591146bf321cca5e142ac407de552eceae",
+            "path": "tests/alloc-bench/kernel_vinix_query.v",
+            "sha256": "b63dd3a5c95b2fa1daf183a830275c2b798ddeaa85258818fdf354b55a668e5d"
+        },
+        {
+            "blob": "fa4c2ff179dff3e86987533167da314bad2deede",
+            "path": "tests/alloc-bench/kernelvinixcore/bindings.v",
+            "sha256": "c7a7d1cb5a491d5803d199335bfc5ab29189d10be0a1df7e8933343496d496bd"
+        },
+        {
+            "blob": "8e0dc52fda3c09910ef0c569878dc5d0ad0217fe",
+            "path": "tests/alloc-bench/kernelvinixcore/core.v",
+            "sha256": "71df253d897e6a9b5314b6b02d475f8d251aedfb286902cbcafdff51144e1162"
+        },
+        {
+            "blob": "617f0ab4f2b1952d1b8fe2621f48123984797f33",
+            "path": "tests/alloc-bench/sampler-query.v",
+            "sha256": "1bea80200b72425550eb2c760d7466b9d64e55fad1a11b62fbdfebe86f851b7b"
+        },
+        {
+            "blob": "1da5735258dc3575077da91a22ec9d6132642714",
+            "path": "tests/alloc-bench/samplertest/README.md",
+            "sha256": "4cab72e4d40d50c9e57deac0f83dbf56e0160eae2ce0ba38075f4ec8ae93acda"
+        },
+        {
+            "blob": "4afc55fade2d2f51c88971db4310ad1df373991e",
+            "path": "tests/alloc-bench/samplertest/bindings.v",
+            "sha256": "8a996a42f27404eaf3a6fc0870cdea03bd80fcb97c74a3f25ba4f7d6437ca629"
+        },
+        {
+            "blob": "b8a6b9baf483e7e8e3077cece8c82fef4abfe633",
+            "path": "tests/alloc-bench/samplertest/build.v",
+            "sha256": "f7693b3ea53dcc2ce5d6a4cd4a04d8a9bf723df3c7d123d2fe6387c39f7e24e6"
+        },
+        {
+            "blob": "68bc6bf85f598f64fdc5c4e61a997c009de56aac",
+            "path": "tests/alloc-bench/samplertest/main.v",
+            "sha256": "a4f8ecf9dd552127e5fe30fafbd615f0ca10e94738214f3ea9fda42b14c9c059"
+        },
+        {
+            "blob": "81d56269f26ff6dde255c1907c978314e167cfcd",
+            "path": "tests/alloc-bench/test-query.v",
+            "sha256": "e76b7f0aca7430f65c72a70dc1bc747dd8c33d666b27f1b441b6f7b5caa0845d"
+        },
+        {
+            "blob": "828d5488610134b0a1dd9f013d7c6c808d8d512b",
+            "path": "tests/alloc-bench/vinix_query.v",
+            "sha256": "9505693bf1fd42fee5aae93dfac8ff80f249365ee4c56684cebd186afcc1e025"
+        },
+        {
+            "blob": "a505b0844ed08c8fbf9c2f452b7ddf4dbfca7e2d",
+            "path": "tests/alloc-bench/vinixcore/bindings.v",
+            "sha256": "9c1df00e9e0177509236026647c5d4fdc93fbc7a992b78f98d1a5193c566d355"
+        },
+        {
+            "blob": "bb89ffc53a4257fbfe0f840c87463d95f76c0240",
+            "path": "tests/alloc-bench/vinixcore/core.v",
+            "sha256": "b8da09217faaee65c07d6ea182496476cad3685fa885dfb325e4605eba6ddde6"
+        }
+    ],
+    "original_python_bytes": 72433,
+    "original_python_lines": 1562,
+    "originals": [
+        {
+            "blob": "7a20af7b05864c5c560a038c71966843ac47cee6",
+            "bytes": 1002,
+            "lines": 27,
+            "path": "tests/alloc-bench/_kernel_vinix_native.py",
+            "sha256": "8d6858334b817d08866e10643a851de37a7b5d5d85b8aa48e5b3c6c838f631ad"
+        },
+        {
+            "blob": "15096fa8d844ff0876ba958bb9e348c91f17152f",
+            "bytes": 982,
+            "lines": 27,
+            "path": "tests/alloc-bench/_vinix_native.py",
+            "sha256": "3feb86e8cd97de42496a176d500b5461f7b59852706f4254c04d924380c977e2"
+        },
+        {
+            "blob": "baab88b1d4e2d88dbec905306d6c41cd68eb92e6",
+            "bytes": 6112,
+            "lines": 124,
+            "path": "tests/alloc-bench/build-macos-kext.py",
+            "sha256": "33891f6cfe5e6b3cec03390bf8a5f183d04b4aee4d1720182a7750794c84f527"
+        },
+        {
+            "blob": "a11953108388118781b68ce8c25289b1e4809cc6",
+            "bytes": 8908,
+            "lines": 179,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/excluded/vinix-release-1-preboot/run-vinix-before-fix.py",
+            "sha256": "824aa9375bbe44bf94b28c4bca6ffd74ca18fb8c5f20ba8ae52e2ebc0262601e"
+        },
+        {
+            "blob": "d147bcb4c30957c7b9f6208f6d99e05e5e1cfe65",
+            "bytes": 680,
+            "lines": 10,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/macos-driver.py",
+            "sha256": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48"
+        },
+        {
+            "blob": "403ada6e721bd7662588a971c02d61b865db981f",
+            "bytes": 9404,
+            "lines": 187,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/run-vinix.py",
+            "sha256": "146a8318f8f2ad1daccf0409f96f88f492563a584fee896697ed2d58409ebb6c"
+        },
+        {
+            "blob": "9a04cf06c8705be4e737128877e8a66eeffa43e1",
+            "bytes": 994,
+            "lines": 14,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/benchmark-runners-final/vinix-driver.py",
+            "sha256": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8"
+        },
+        {
+            "blob": "9a04cf06c8705be4e737128877e8a66eeffa43e1",
+            "bytes": 994,
+            "lines": 14,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-final-driver.py",
+            "sha256": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8"
+        },
+        {
+            "blob": "d147bcb4c30957c7b9f6208f6d99e05e5e1cfe65",
+            "bytes": 680,
+            "lines": 10,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-macos-final-driver.py",
+            "sha256": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48"
+        },
+        {
+            "blob": "9a04cf06c8705be4e737128877e8a66eeffa43e1",
+            "bytes": 994,
+            "lines": 14,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-final-driver.py",
+            "sha256": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8"
+        },
+        {
+            "blob": "d147bcb4c30957c7b9f6208f6d99e05e5e1cfe65",
+            "bytes": 680,
+            "lines": 10,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-macos-final-driver.py",
+            "sha256": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48"
+        },
+        {
+            "blob": "403ada6e721bd7662588a971c02d61b865db981f",
+            "bytes": 9404,
+            "lines": 187,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/run-vinix.py",
+            "sha256": "146a8318f8f2ad1daccf0409f96f88f492563a584fee896697ed2d58409ebb6c"
+        },
+        {
+            "blob": "9a04cf06c8705be4e737128877e8a66eeffa43e1",
+            "bytes": 994,
+            "lines": 14,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-final-driver.py",
+            "sha256": "271a7215f36c5dfcacc133f0fae2e80f5a8bfd9d1445044f4105843eb53681e8"
+        },
+        {
+            "blob": "d147bcb4c30957c7b9f6208f6d99e05e5e1cfe65",
+            "bytes": 680,
+            "lines": 10,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-macos-final-driver.py",
+            "sha256": "d649c51d8f599d4d90c2852fc26892dcc5596d9d5f848f3199698ccd12ddfa48"
+        },
+        {
+            "blob": "17889a19e4f528d767a714fbae05f759f8901892",
+            "bytes": 4226,
+            "lines": 107,
+            "path": "tests/alloc-bench/run-kernel-vinix.py",
+            "sha256": "33e7bb41877389d0e9d53dab2c53c2c76d5a48c2a71f97c5b8599f721db2f0c6"
+        },
+        {
+            "blob": "d40f2104467ced04f0ebab446d9388994e34552f",
+            "bytes": 7482,
+            "lines": 136,
+            "path": "tests/alloc-bench/run-macos.py",
+            "sha256": "dc1532934c4bdf7fe8120953f3d7d74ec7db1efb3f7b4b8f20f1d214f72977e2"
+        },
+        {
+            "blob": "305bfc9f265e06af255d94986ad5c5fa5d098da8",
+            "bytes": 6015,
+            "lines": 152,
+            "path": "tests/alloc-bench/run-vinix.py",
+            "sha256": "c42b7b3774e1d3fa2be70b33d8590f361dfd53a9ccce265e31ff910ad06ad03f"
+        },
+        {
+            "blob": "dde9614070b2d37c8034fe21cdd8256643d7e8d5",
+            "bytes": 3853,
+            "lines": 128,
+            "path": "tests/alloc-bench/test_v_bench.py",
+            "sha256": "c23935ca26aef79af00f8dbc4074f9bcd6c888209047e7a5618ea5bc5c6ce222"
+        },
+        {
+            "blob": "6d0f9df03d51dc79c8a763639dd7a5bbb434d4c8",
+            "bytes": 2841,
+            "lines": 99,
+            "path": "tests/alloc-bench/test_v_sampler.py",
+            "sha256": "da66422e41262fe01585c0f4610d74fae415a3b2484d414a252fc05f8b778acc"
+        },
+        {
+            "blob": "94c3e5fdc51993060bbd67c3c217210ece5cfe9e",
+            "bytes": 1058,
+            "lines": 31,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/control.py",
+            "sha256": "14c4eb64e2643e18cce5005c4e74cc29a5d17d2db5155e8f75d3027e0230abf8"
+        },
+        {
+            "blob": "b128b2451e354067125e925b96fe7bdde4188d29",
+            "bytes": 2225,
+            "lines": 41,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/catalina-reproduction/measure-recorded.py",
+            "sha256": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1"
+        },
+        {
+            "blob": "b128b2451e354067125e925b96fe7bdde4188d29",
+            "bytes": 2225,
+            "lines": 41,
+            "path": "tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/catalina-measure.py",
+            "sha256": "e321a5d856ff9f046b7ad287799c55199a64b04ea9309cbe0a4b8a33259effd1"
+        }
+    ],
+    "profiles": [
+        "ARM",
+        "Rosetta x86",
+        "ARM ASan/UBSan"
+    ],
+    "public_cold_builds": 30,
+    "python_executed": false,
+    "python_files_retired": 22,
+    "qualification": "README.md",
+    "qualified_cold_native_builds": 30,
+    "schema": 1,
+    "shell_syntax_checks": 20,
+    "source_commit": "fafff0b8b485ebe6c9d1f02d45c7324c9254f3a1",
+    "static_target_executables": 8
+}
