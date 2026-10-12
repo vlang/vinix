@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -459,6 +459,15 @@ startup failures, timeouts and output limits remain failures. Assets are never
 replaced or included in receipts: their SHA-256 identifies the external input.
 Visible rendering, audio, input, saves and foreign runtime qualification are
 separate requirements. See the dated game receipt and its limits.
+
+The `ambient` case issues raw PR_CAP_AMBIENT requests with nonzero reserved
+arguments, including bits above the C-int width. It checks all four commands,
+including CLEAR_ALL's third argument, before and after a real ambient raise
+and after dropping to UID/GID 1000. All 81 malformed requests must return
+EINVAL and leave the ambient set unchanged. Valid raises, queries, lowers and
+clears retain their behavior; an ordinary user without the required permitted
+and inheritable capability gets EPERM for a valid raise. This case qualifies
+argument validation, not per-thread capability credential isolation.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

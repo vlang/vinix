@@ -1060,3 +1060,39 @@ and the stated single-thread capability effects; concurrent per-thread
 credential isolation, file capabilities, fsuid-specific fixups, LSM behavior
 and complete application sandbox isolation remain unqualified. The three
 larger roadmap gates stay open.
+
+## Ambient capability argument validation
+
+PR_CAP_AMBIENT now rejects nonzero fourth/fifth arguments for every command
+and a nonzero third argument for CLEAR_ALL with EINVAL. The full native
+unsigned-long width is checked before mutation or a raise's permission test,
+following [Linux 6.12's capability implementation](https://github.com/torvalds/linux/blob/v6.12/security/commoncap.c#L1296).
+Previously, queries, raises and lowers ignored reserved arguments; a malformed
+CLEAR_ALL could erase the ambient set and return success.
+
+The V fixture raises a real CAP_CHOWN ambient bit, checks all four commands
+with reserved values 1, 2^32 and ULONG_MAX, and queries the state after each
+error. It repeats with the bit lowered and after dropping to UID/GID 1000.
+All 81 malformed requests must return EINVAL without changing state. Valid
+query/raise/lower/clear calls still work, while an ordinary user's valid raise
+without the required permitted/inheritable capability returns EPERM.
+
+The same fixture source detects the ignored argument on both earlier kernels:
+[AArch64 control](../tests/linux-compat/results/2026-10-12/ambient-before-aarch64.json),
+[x86-64 control](../tests/linux-compat/results/2026-10-12/ambient-before-x86_64.json).
+Both fixed kernels pass the ambient case and the existing securebits,
+KEEPCAPS and task-local no_new_privs cases:
+[AArch64 results](../tests/linux-compat/results/2026-10-12/ambient-after-aarch64.json),
+[x86-64 results](../tests/linux-compat/results/2026-10-12/ambient-after-x86_64.json).
+Capability-exec also passes on both kernels:
+[AArch64](../tests/linux-compat/results/2026-10-12/ambient-cap-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/ambient-cap-x86_64.json).
+All eight host test files pass. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/ambient-audit.v)
+checks the failure control, source inventory, isolated builds, frozen sources,
+ELF/image/kernel hashes and guest logs. The build uses an isolated V compiler
+and library snapshot rather than the changing shared compiler checkout.
+
+The new validation allocates and frees nothing. Capability sets remain
+process-wide; these argument checks do not qualify per-thread credentials,
+file capabilities or complete application sandbox isolation.

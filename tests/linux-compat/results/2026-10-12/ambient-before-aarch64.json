@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "3907b1949fce293f39a434acd278fe6fce6909ba64a01e00b002a6f66a58babc",
+    "results": [
+        {
+            "name": "ambient",
+            "source_sha256": "4158995567812d297b1cc5e3e3503600f5423fc1266627beb2930aea4646382f",
+            "init_sha256": "63073e4d307265a7d1dcfd1c778d6a2b25798ede20423530c734e7fdbaed7c49",
+            "iso_sha256": "873976cbb38a99672aa1631320658df8c4244986e18310e5f04823cb3b991032",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

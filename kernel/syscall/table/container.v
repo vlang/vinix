@@ -313,6 +313,9 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 		}
 		pr_cap_ambient {
 			// Linux ABI: 1 is_set, 2 raise, 3 lower, 4 clear_all.
+			if arg4 != 0 || arg5 != 0 || (arg2 == 4 && arg3 != 0) {
+				return errno.err, errno.einval
+			}
 			match arg2 {
 				4 {
 					process.caps.ambient = 0
