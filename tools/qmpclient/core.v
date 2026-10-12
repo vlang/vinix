@@ -19,6 +19,7 @@ mut:
 	deadline u64
 	cancel fn () bool = unsafe { nil }
 	accept_errors bool
+	sequence u64
 }
 pub fn connect(path string) !Monitor {
 	return connect_bounded(path, 0, unsafe { nil })
@@ -43,7 +44,13 @@ fn connect_body(path string, deadline u64, cancel fn () bool, accept_errors bool
 	defer { if !open { monitor.close() } }
 	if C.fcntl(connection.sock.handle, C.F_SETFD, C.FD_CLOEXEC) != 0 || C.fcntl(connection.sock.handle, C.F_SETFL, C.O_NONBLOCK) != 0 { return os.error_posix() }
 	if checked {
-		for { greeting := monitor.line()!; if 'event' !in greeting { break } }
+		for {
+			greeting := monitor.line()!
+			if 'event' in greeting { continue }
+			value := greeting['QMP'] or { return error('invalid QMP greeting') }
+			if value !is map[string]json2.Any { return error('invalid QMP greeting') }
+			break
+		}
 	} else { monitor.read_line()! }
 	monitor.command('qmp_capabilities', {})!
 	open = true
@@ -86,6 +93,31 @@ fn (mut monitor Monitor) read_line() !string {
 pub fn (mut monitor Monitor) command(name string, arguments map[string]json2.Any) ! {
 	mut object := {'execute': json2.Any(name)}
 	if arguments.len > 0 { object['arguments'] = json2.Any(arguments) }
+	monitor.send(object)!
+	for { reply := monitor.line()!; if 'error' in reply { if monitor.accept_errors { return }; return error(json2.encode(reply['error']!)) }; if 'return' in reply { return } }
+}
+
+// Typed callers need the returned status/data and must correlate the reply
+// across asynchronous events and unrelated replies. Keep command()'s original
+// wire format and saved-controller error policy unchanged.
+pub fn (mut monitor Monitor) request(name string, arguments map[string]json2.Any) !json2.Any {
+	monitor.sequence++
+	id := 'vinix-' + monitor.sequence.str()
+	mut object := {'execute': json2.Any(name), 'id': json2.Any(id)}
+	if arguments.len > 0 { object['arguments'] = json2.Any(arguments) }
+	monitor.send(object)!
+	for {
+		reply := monitor.line()!
+		if 'event' in reply { continue }
+		if 'error' in reply && 'id' !in reply { return error(json2.encode(reply['error']!)) }
+		if (reply['id'] or { json2.Null{} }) != json2.Any(id) { continue }
+		if value := reply['error'] { return error(json2.encode(value)) }
+		return reply['return'] or { return error('QMP response has no result') }
+	}
+	return error('QMP closed')
+}
+
+fn (mut monitor Monitor) send(object map[string]json2.Any) ! {
 	request := json2.encode(object) + '\n'
 	mut position := 0
 	for position < request.len {
@@ -95,5 +127,4 @@ pub fn (mut monitor Monitor) command(name string, arguments map[string]json2.Any
 		if count == 0 { return error('QMP closed') }
 		position += int(count)
 	}
-	for { reply := monitor.line()!; if 'error' in reply { if monitor.accept_errors { return }; return error(json2.encode(reply['error']!)) }; if 'return' in reply { return } }
 }
