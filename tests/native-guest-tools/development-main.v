@@ -101,6 +101,7 @@ struct Receipt {
 	kernel_sha256   string
 	fixture_sha256  string
 	sdk_sha256      string
+	v_root_sha256   string
 	tools           map[string]string
 	command         []string
 	native_receipts map[string]string
@@ -156,8 +157,8 @@ fn copy_sdk(source string, target string, base string, relative string, mut hash
 }
 
 fn run() !int {
-	if os.args.len !in [5, 6] {
-		return error('usage: run-guest aarch64|x86_64 KERNEL-DIR STAGED-TOOLS NEW-STATE [PREPARED-NATIVE-GCC-SDK]')
+	if os.args.len !in [5, 6, 8] {
+		return error('usage: run-guest aarch64|x86_64 KERNEL-DIR STAGED-TOOLS NEW-STATE [PREPARED-NATIVE-GCC-SDK [NATIVE-V-ROOT NATIVE-BUSYBOX]]')
 	}
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
@@ -221,8 +222,10 @@ fn run() !int {
 		}
 	}))!
 	mut sdk_hash := ''
+	mut v_root_hash := ''
+	mut profiles := []string{}
 	mut compiler_hashes := map[string]string{}
-	if os.args.len == 6 {
+	if os.args.len >= 6 {
 		sdk := os.real_path(os.args[5])
 		os.mkdir_all(root + '/opt')!
 		mut hash := sha256.new()
@@ -252,13 +255,40 @@ fn run() !int {
 			compiler_hashes[if name == 'cc' { 'c' } else { 'cpp' }] = digest(binary)!
 			os.symlink('/opt/native/bin/' + driver, root + '/usr/bin/' + name)!
 		}
-		os.write_file(root + '/home/developer/qualify-sdk', 'c,cpp')!
+		profiles = ['c', 'cpp']
+		if os.args.len == 8 {
+			v_root := os.real_path(os.args[6])
+			os.mkdir_all(root + '/usr/lib')!
+			mut v_hash := sha256.new()
+			copy_sdk(v_root, root + '/usr/lib/vlang', v_root, '.', mut v_hash)!
+			v_root_hash = v_hash.sum([]u8{}).hex()
+			v_binary := root + '/usr/lib/vlang/v'
+			shell := os.real_path(os.args[7])
+			for binary in [v_binary, shell] {
+				header := os.read_bytes(binary)!
+				if header.len < 20 || header[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
+					|| (u16(header[18]) | (u16(header[19]) << 8)) != if arch == 'aarch64' { u16(183) } else { u16(62) } {
+					return error('native V or shell has the wrong ELF architecture')
+				}
+			}
+			os.symlink('/usr/lib/vlang/v', root + '/usr/bin/v')!
+			compiler_hashes['v'] = digest(v_binary)!
+			hashes['v'] = compiler_hashes['v']
+			os.mkdir_all(root + '/bin')!
+			os.cp(shell, root + '/bin/busybox')!
+			os.chmod(root + '/bin/busybox', 0o755)!
+			if digest(shell)! != digest(root + '/bin/busybox')! { return error('shell changed during copy') }
+			hashes['sh'] = digest(root + '/bin/busybox')!
+			os.symlink('busybox', root + '/bin/sh')!
+			profiles << 'v'
+		}
+		os.write_file(root + '/home/developer/qualify-sdk', profiles.join(','))!
 	}
 	archive := guesthost.image(init, state)!
 	launch := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
 	mut command := launch.command.clone()
 	if sdk_hash != '' {
-		for i, argument in command { if argument == '-m' { command[i + 1] = '2048' } }
+		for i, argument in command { if argument == '-m' { command[i + 1] = if v_root_hash == '' { '2048' } else { '3072' } } }
 	}
 	mut expected := [
 		'DEVELOPMENT ACCOUNT PASS:',
@@ -305,7 +335,7 @@ fn run() !int {
 			if report.schema != 1 || report.kernel != 'Vinix' || report.architecture != arch
 				|| report.runner_sha256 != hashes['vinix-qualify']
 				|| !report.complete || !report.all_selected_passed || report.uid != 1000 || report.context != 'vinix-native'
-				|| report.requested != ['c', 'cpp'] || report.results.len != 2
+				|| report.requested != profiles || report.results.len != profiles.len
 				|| report.results.any(it.status != 'passed' || it.commands.len != 2) {
 				return error('native compiler project qualification failed')
 			}
@@ -324,6 +354,7 @@ fn run() !int {
 		kernel_sha256:   digest(state + '/kernel/bin/vinix')!
 		fixture_sha256:  digest(init)!
 		sdk_sha256:      sdk_hash
+		v_root_sha256:   v_root_hash
 		tools:           hashes
 		command:         command
 		native_receipts: receipts

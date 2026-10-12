@@ -50,8 +50,9 @@ compiler startup alone cannot pass it. Host V invocations retain their host
 target settings.
 
 The [V guest controller](../../tests/development/README.md) can stage a prepared
-native musl GCC SDK and run the C/C++ projects as UID/GID 1000. It preserves
-the SDK closure hash, compiler versions and native report, and independently
+native musl GCC SDK and run the C/C++ projects as UID/GID 1000. Supplying a
+prepared native V root and BusyBox adds the V compile/run project. It preserves
+SDK/V closure hashes, compiler versions and the native report, and independently
 checks the runner/compiler hashes and the successful compile/run receipts.
 Other profiles retain their own acceptance gates; supplying this SDK does not
 qualify the complete catalog or IDE workflows.

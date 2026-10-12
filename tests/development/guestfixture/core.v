@@ -164,6 +164,18 @@ fn emit_receipt(path &char, expected &char, owner_only_file bool) {
 	}
 }
 
+fn emit_command_log(path &char) {
+	unsafe {
+		fd := C.open(path, C.O_RDONLY)
+		if fd < 0 { return }
+		mut text := [8192]char{}
+		count := C.read(fd, &text[0], text.len - 1)
+		check(count >= 0 && C.close(fd) == 0, 255)
+		check(C.strstr(&text[0], c'vinix-native-fixture-secret') == nil, 256)
+		C.printf(c'DEVELOPMENT COMMAND LOG %s\n%s\n', path, &text[0])
+	}
+}
+
 fn build_checks() {
 	unsafe {
 		check(C.symlink(c'input.txt', c'/home/developer/source/internal-link') == 0, 209)
@@ -240,14 +252,28 @@ fn account_checks() {
 		build_checks()
 		sdk := C.open(c'/home/developer/qualify-sdk', C.O_RDONLY)
 		if sdk >= 0 {
-			check(C.close(sdk) == 0 && C.setenv(c'PATH', c'/usr/bin:/opt/native/bin', 1) == 0, 251)
+			mut profiles := [64]char{}
+			count := C.read(sdk, &profiles[0], profiles.len - 1)
+			check(count > 0 && count < profiles.len - 1 && C.close(sdk) == 0, 257)
+			check(C.setenv(c'PATH', c'/usr/bin:/bin:/opt/native/bin', 1) == 0, 251)
 			C.puts(c'DEVELOPMENT COMPILER VERSIONS:')
 			check(command(c'/usr/bin/cc', c'--version', nil, nil) == 0, 253)
 			check(command(c'/usr/bin/c++', c'--version', nil, nil) == 0, 254)
-			status := command(c'/usr/bin/vinix-qualify', c'--require-vinix', c'/home/developer/qualification', c'c,cpp')
+			if C.strstr(&profiles[0], c',v') != nil {
+				check(command(c'/usr/bin/v', c'version', nil, nil) == 0, 258)
+			}
+			status := command(c'/usr/bin/vinix-qualify', c'--require-vinix', c'/home/developer/qualification', &profiles[0])
 			emit_receipt(c'/home/developer/qualification/report.json', c'vinix-native', false)
+			if status != 0 {
+				for path in [&char(c'/home/developer/qualification/c/command-0.log'),
+					&char(c'/home/developer/qualification/c/command-1.log'),
+					&char(c'/home/developer/qualification/cpp/command-0.log'),
+					&char(c'/home/developer/qualification/cpp/command-1.log'),
+					&char(c'/home/developer/qualification/v/command-0.log'),
+					&char(c'/home/developer/qualification/v/command-1.log')]! { emit_command_log(path) }
+			}
 			check(status == 0, 252)
-			C.puts(c'DEVELOPMENT TOOLCHAINS PASS: UID 1000 C/C++ compilation, threads, files and executed artifacts')
+			C.printf(c'DEVELOPMENT TOOLCHAINS PASS: UID 1000, profiles %s, compilation and executed artifacts\n', &profiles[0])
 		}
 	}
 }

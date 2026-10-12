@@ -57,11 +57,29 @@ hashes, both successful command statuses and the executed artifact paths.
 Compiler versions remain in the serial transcript. A missing compiler or
 failed project fails the run.
 
+For the native V reference project, append a prepared V installation root
+(containing `v`, its matching `vlib`, `thirdparty` and `cmd`) and a native
+BusyBox executable with its shell applet. A static BusyBox avoids additional
+loader dependencies:
+
+```
+tests/development/run-guest aarch64 /path/to/kernel /tmp/development-arm /tmp/new-v-state /path/to/aarch64-linux-musl-native /path/to/vlang /path/to/native-static-busybox
+```
+
+This copies and hashes the V root with Python helpers excluded, installs the
+compiler beside its matching library at `/usr/lib/vlang`, checks V/BusyBox ELF
+architectures and records both executable hashes. The V project uses the
+explicit Vinix/musl target, serial V3 workers and the native C compiler. It
+must compile, write/read a file and execute its resulting binary. These runs
+receive 3 GiB of RAM. Failed qualification retains bounded command-log excerpts
+in the serial transcript as well as the native report.
+
 `receipt.json` records the architecture, UID, kernel/fixture/tool hashes,
 QEMU argv, passing verdict and six native plan/state/build receipts. SDK runs
 also retain the SDK hash and native compiler report. `serial.log`,
 the ISO and compiled fixture remain beside it. Credential values do not enter
 the receipts. The credential in this fixture is public synthetic test data.
+V runs additionally record `v_root_sha256` and the `v`/`sh` executable pins.
 
 On 13 October 2026 these workflows passed on x86_64 and AArch64 using the
 previously staged commands and isolated production kernels. Receipts are in
@@ -82,6 +100,18 @@ epoch. The copied SDK hash is
 The extended controller's x86 job/build regression passed in
 `/tmp/vinix-development-compilers-x86-base-20261013-a`.
 No native x86 GCC SDK was supplied for a compiler-project run.
+
+The C/C++/V run passed on AArch64 as UID/GID 1000 in
+`/tmp/vinix-development-v-arm-20261013-a`, using the updated staged commands in
+`/tmp/vinix-dev-aarch64-20261013-v-a`, GCC/G++ 11.2.1 and V 0.5.2. The prepared V
+tree's `VERSION` identifies revision `9bfa1dc3f3455d5733d5c226662b6aaba8544f2c`;
+its copied closure hash is
+`f2a67e54f237e64cefba4f1935ca301f305a4186488677e68b926bf5ff1dc2ea`.
+The receipt records the actual V executable and BusyBox hashes separately.
+The x86 controller/fixture regression passed in
+`/tmp/vinix-development-v-x86-base-20261013-a` without a compiler SDK.
+This compiles a reference V project; rebuilding the V compiler itself and all
+Vinix layers remains open.
 
 This qualifies the tested per-account job workflows in Vinix guests. Watcher
 signal/deadline/interruption tests still have host coverage; installed service
