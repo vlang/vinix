@@ -622,6 +622,7 @@ fn C.udp_sendto(pcb &C.udp_pcb, p &C.pbuf, dst_ip &C.ip_addr, dst_port U16_t) Er
 fn C.vinix_apple_wifi_send(arg voidptr, arg_2 u64) i32
 fn C.vinix_e1000_send(arg voidptr, arg_2 u64) i32
 fn C.vinix_rtl8169_send(arg voidptr, arg_2 u64) i32
+fn C.vinix_ath10k_send(arg voidptr, arg_2 u64) i32
 fn C.vinix_ip_randomid() u16
 fn C.vinix_pick_port(first u16, last u16, taken Vinix_port_taken_fn, context voidptr) u16
 fn C.vinix_virtio_net_send(arg voidptr, arg_2 u64) i32
@@ -651,6 +652,10 @@ pub const driver_virtio = 1
 pub const driver_apple_wifi = 2
 pub const driver_e1000 = 3
 pub const driver_rtl8169 = 4
+pub const driver_ath10k = 5
+
+@[export: 'vinix_net_owner']
+pub fn vinix_net_owner() i32 { return if net_link_attached != 0 { net_active_driver } else { driver_none } }
 
 pub type Driver_send_fn = fn (voidptr, u64) i32
 
@@ -671,6 +676,7 @@ pub fn driver_send(driver i32) Driver_send_fn {
 			driver_rtl8169 {
 				return C.vinix_rtl8169_send
 			}
+			driver_ath10k { return C.vinix_ath10k_send }
 			else {
 				return Driver_send_fn(nil)
 			}
@@ -1356,10 +1362,9 @@ pub fn vinix_net_attach(mac &u8, driver i32) i32 {
 			// while()
 			break
 		}
-		// A physical Realtek PHY is still negotiating after MAC startup. Keep
-		// DHCP in INIT until the driver reports carrier; hypervisor and Wi-Fi
-		// drivers retain their existing attach behavior.
-		if driver != driver_rtl8169 {
+		// Physical drivers report carrier after PHY negotiation or Wi-Fi
+		// authorization. DHCP waits until that event.
+		if driver != driver_rtl8169 && driver != driver_ath10k {
 			C.netif_set_link_up(&net_physical_netif)
 		}
 		C.netif_set_up(&net_physical_netif)

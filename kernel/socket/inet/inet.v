@@ -31,6 +31,7 @@ fn C.vinix_net_link(mac &u8, mtu &u32) i32
 fn C.vinix_net_set_link(driver i32, up i32)
 fn C.vinix_net_carrier() i32
 fn C.vinix_net_detach()
+fn C.vinix_net_owner() i32
 fn C.vinix_net_input(frame voidptr, length u64) i32
 fn C.vinix_net_config(address &u32, netmask &u32, gateway &u32, dns &u32) i32
 fn C.vinix_socket_free(socket &C.vinix_socket)
@@ -73,9 +74,11 @@ const ip_recverr = 11
 
 // Driver identifiers shared with netcore.
 pub const driver_virtio = 1
+pub const driver_none = 0
 pub const driver_apple_wifi = 2
 pub const driver_e1000 = 3
 pub const driver_rtl8169 = 4
+pub const driver_ath10k = 5
 
 pub struct SockaddrIn {
 pub mut:
@@ -451,6 +454,20 @@ pub fn publish_resolver() {
 pub fn attach(mac &[6]u8, driver int) bool {
 	net_lock.acquire()
 	ret := unsafe { C.vinix_net_attach(&mac[0], driver) }
+	if ret == 0 {
+		network_ready = false
+		last_address = 0
+		resolver_published = false
+		pending_resolver = ''
+	}
+	net_lock.release()
+	return ret == 0
+}
+
+pub fn attach_if_idle(mac &[6]u8, driver int) bool {
+	net_lock.acquire()
+	ret := if C.vinix_net_owner() == driver_none { unsafe { C.vinix_net_attach(&mac[0], driver) } } else { -16 }
+	if ret == 0 { network_ready = false; last_address = 0; resolver_published = false; pending_resolver = '' }
 	net_lock.release()
 	return ret == 0
 }
@@ -477,6 +494,33 @@ pub fn detach() {
 	last_address = 0
 	resolver_published = false
 	pending_resolver = ''
+}
+
+pub fn owner() int {
+	net_lock.acquire()
+	driver := C.vinix_net_owner()
+	net_lock.release()
+	return driver
+}
+
+// Ownership and detach are checked under the same lock as attach.
+pub fn detach_owned(driver int) {
+	net_lock.acquire()
+	if C.vinix_net_owner() == driver {
+		C.vinix_net_detach()
+		network_ready = false
+		last_address = 0
+		resolver_published = false
+		pending_resolver = ''
+	}
+	net_lock.release()
+}
+
+pub fn receive_owned(driver int, frame voidptr, length u64) bool {
+	net_lock.acquire()
+	ret := if C.vinix_net_owner() == driver { C.vinix_net_input(frame, usize(length)) } else { -19 }
+	net_lock.release()
+	return ret == 0
 }
 
 pub fn receive(frame voidptr, length u64) bool {

@@ -317,7 +317,7 @@ fn fence() {
 
 fn card_remove(mut dev devcore.Device) {
 	fence()
-	inet.detach()
+	inet.detach_owned(inet.driver_rtl8169)
 	hardware_stop(mut dev)
 	free_rings(mut dev)
 	rtl_device = unsafe { nil }
@@ -411,6 +411,11 @@ pub fn poll() {
 			C.kprintf(c'rtl8169: link %s, PHY status=%02llx\n', if link { c'up' } else { c'down' }, u64(status))
 			if link { write8(0x38, 0x40) }
 		}
+		// Wi-Fi explicitly selects the shared physical stack on join. Once it
+		// detaches, restore this live wired adapter without stealing Wi-Fi.
+		if link {
+			if inet.attach_if_idle(unsafe { &rtl_mac }, inet.driver_rtl8169) { inet.set_link(inet.driver_rtl8169, true) }
+		}
 	}
 	// Ring addresses are only read under the lock: remove waits before free.
 	for drained := u32(0); drained < descriptors; drained++ {
@@ -421,7 +426,7 @@ pub fn poll() {
 		dma_barrier()
 		length := received_length(status)
 		if length != 0 {
-			if inet.receive(voidptr(rtl_rx_buffers.virt + u64(index) * buffer_bytes), length) {
+			if inet.receive_owned(inet.driver_rtl8169, voidptr(rtl_rx_buffers.virt + u64(index) * buffer_bytes), length) {
 				rtl_rx_packets++
 			} else {
 				rtl_rx_dropped++

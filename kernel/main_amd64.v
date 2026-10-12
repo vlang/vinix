@@ -41,6 +41,7 @@ import dev.streams
 import dev.ahci
 import dev.e1000
 import dev.rtl8169
+import dev.ath10k
 import dev.hda
 import dev.random
 import dev.mouse
@@ -67,6 +68,7 @@ import security
 fn poll_network() {
 	e1000.poll()
 	rtl8169.poll()
+	ath10k.poll()
 	inet.poll()
 }
 
@@ -191,6 +193,8 @@ fn kmain_thread() {
 
 	streams.initialise()
 	random.initialise()
+	// Firmware-backed Wi-Fi probes after the initramfs and devtmpfs exist.
+	ath10k.initialise()
 	procdev.initialise()
 	pty.initialise()
 	fbdev.initialise()

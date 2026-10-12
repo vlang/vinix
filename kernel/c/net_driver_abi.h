@@ -7,6 +7,7 @@ int vinix_virtio_net_send(void *, uint64_t) __attribute__((weak));
 int vinix_apple_wifi_send(void *, uint64_t) __attribute__((weak));
 int vinix_e1000_send(void *, uint64_t) __attribute__((weak));
 int vinix_rtl8169_send(void *, uint64_t) __attribute__((weak));
+int vinix_ath10k_send(void *, uint64_t) __attribute__((weak));
 /* These adapters only preserve const-qualified lwIP callback types at the V ABI. */
 #include <lwip/netif.h>
 #include <lwip/udp.h>

@@ -32,6 +32,7 @@ int vinix_net_attach(VINIX_NET_CONST uint8_t mac[6], int driver);
 void vinix_net_set_link(int driver, int up);
 int vinix_net_carrier(void);
 void vinix_net_detach(void);
+int vinix_net_owner(void);
 int vinix_net_input(VINIX_NET_CONST void *frame, size_t length);
 int vinix_net_config(uint32_t *address, uint32_t *netmask, uint32_t *gateway,
                      uint32_t dns[3]);
