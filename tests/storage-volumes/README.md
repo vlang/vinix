@@ -217,6 +217,13 @@ covered. An eighth boot restores both grown lengths with held-descriptor and
 extension data intact. See
 [multi-pool growth qualification](multi-pool-grow-batch.md).
 
+SHA-256 manifests hash every desired extent through pinned read-only devices.
+Later corruption rejects complete verification without success rows. Reference
+creation, writer exclusion, partial reads, identity changes and publication
+faults are covered. All eight existing boots remain enabled; a ninth verifies
+nine grown extents against a guest-produced persistent manifest. See
+[data checksum qualification](data-checksums.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -243,8 +250,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 15600 utility processes across 200 warmup
-and 200 measured thirty-nine-command cycles, with pool membership, query, batch
+its own process. The allowance includes 16000 utility processes across 200 warmup
+and 200 measured forty-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
@@ -289,7 +296,10 @@ rejects invalid edits and default replay, and checks later-disk/extension
 conflicts before growth. Writable and read-only views grow in place, keeping
 their generations. An already open raw descriptor writes and flushes the new
 extent, which remains readable after reboot at the saved larger capacity.
-The fixture measures slab/large retention over 200 cycles after 200 warmup
+The fixture warms both retained snapshot buffers and the snapshot reader before
+measurement, resets them on reuse, and records paired ready snapshots before
+recapturing the baseline. Every class and large-page count must stay flat or
+decrease. It measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, previews/publishes unchanged
 two-disk mapping capacity, previews/verifies/republishes both unchanged physical capacities,
 previews/publishes admission of two pool members and unchanged allocation priority,

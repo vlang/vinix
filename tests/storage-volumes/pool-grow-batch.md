@@ -41,8 +41,8 @@ Held read-only/writable descriptors read prepared extension pages. Equal-size
 retry reports two `keep` actions and preserves exact bytes; cleanup restores
 the original bundle. `PLAN POOL GROWTH BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured thirty-nine-command cycles:
-**15600 utility processes**, including 400 allocation batch previews/publications,
+Each architecture runs 200 warmup and 200 measured forty-command cycles:
+**16000 utility processes**, including 400 allocation batch previews/publications,
 800 scratch placements, 400 growth batch previews/publications, 800 desired
 scratch growths, 400 expansion batch previews/publications, 400 capacity batch
 previews/publications, 400 pool queries and 800 member additions.

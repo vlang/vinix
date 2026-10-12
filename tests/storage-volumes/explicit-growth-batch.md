@@ -40,7 +40,7 @@ exact bytes. Desired omission keeps unlisted grown views until explicit removal;
 cleanup recovers the baseline and preserves original generations/data.
 `PLAN EXPLICIT GROWTH BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured **39-command cycles / 15600
+Each architecture runs 200 warmup and 200 measured **40-command cycles / 16000
 utility processes**, including 400 complete explicit growth previews/publications
 with 800 ordered keep actions each. The former single unchanged desired growth
 becomes a two-disk identity preview and publication. Existing allocation, growth,

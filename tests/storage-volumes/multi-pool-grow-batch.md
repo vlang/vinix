@@ -42,7 +42,7 @@ A7/A8 data, modes and starts stay exact. Reverse-order all-keep retry preserves
 the full bundle. Existing cleanup restores the baseline and original held
 E7 data. `PLAN MULTI POOL GROWTH PASSED:` is required.
 
-Both targets retain **200 warmup + 200 measured 39-command cycles / 15600
+Both targets retain **200 warmup + 200 measured 40-command cycles / 16000
 utility processes**, with every earlier storage assertion enabled. Two new
 commands preview/publish a two-pool equal-size growth inside the existing
 temporary pool-membership interval. Each family runs 400 batches and 800

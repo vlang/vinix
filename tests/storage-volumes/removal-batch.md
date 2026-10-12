@@ -40,8 +40,8 @@ be planned on another disk, but live preflight rejects its conflicting old
 view before creating a prefix. Cleanup restores exact baseline bytes/modes.
 `PLAN REMOVAL BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured thirty-nine-command cycles:
-**15600 utility processes**. The two single-slot scratch removals become one
+Each architecture runs 200 warmup and 200 measured forty-command cycles:
+**16000 utility processes**. The two single-slot scratch removals become one
 complete preview and one complete publication, with 400 batches and 800 ordered
 removals in each family. Existing capacity, membership, priority, allocation,
 growth, expansion, preflight and replay checks remain enabled. Scratch views

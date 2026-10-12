@@ -8,6 +8,10 @@ move its contents. Kernel mappings last until reboot. Saved volume plans retain
 their geometry and disk identity for explicit or configured restore after boot;
 multi-disk bundles publish a complete saved configuration in one file.
 
+Saved desired extents can also be hashed into a separate SHA-256 manifest and
+verified later, including after physical device reordering. See
+[data checksum manifests](#data-checksum-manifests).
+
 The native V utility is installed as `/usr/sbin/vinix-volume` by both userland
 and desktop image builders. Commands require a trusted MAC domain,
 `CAP_SYS_ADMIN`, and the initial user namespace for management; status requires
@@ -1857,3 +1861,64 @@ encryption and recovery, online filesystem resize,
 filesystem-aware trimming and predictive health monitoring are not
 implemented by this increment. The anonymous pager's encrypted swap remains a
 separate feature.
+
+## Data checksum manifests
+
+`hash-bundle BUNDLE MANIFEST DISK_INDEX DEVICE [...]` reads every desired
+mapping extent in a saved bundle and atomically publishes a separate SHA-256
+reference. The bundle retains its exact bytes, mappings and pool priority.
+Provide all saved disk indices exactly once (1–64 participants), paired with
+their current whole physical device paths. Participant order may differ from
+saved disk order. Each pinned read-only device must match the saved MBR/GPT
+identity, logical sector size and exact physical capacity; logical views,
+partitions, offline devices, repeated physical IDs and ambiguous saved
+identities fail. All devices are rechecked before and after streaming reads.
+
+```sh
+vinix-volume hash-bundle /etc/vinix/volumes.vset /root/data.vhash 0 /dev/vda 1 /dev/vdb
+vinix-volume verify-data /root/data.vhash 1 /dev/vda 0 /dev/vdb
+vinix-volume show-data /root/data.vhash
+```
+
+The verification example assumes the two physical devices have been reordered.
+`verify-data MANIFEST DISK_INDEX DEVICE [...]` hashes the embedded desired
+extents and compares every digest with the saved reference. Complete success
+prints `operation=verified-data disks=N mappings=N algorithm=sha256`, followed
+by canonical disk/row records with slot, offset, byte length, read-only flag
+and lowercase `sha256=`. A read failure, identity/geometry change or mismatch
+returns failure before any successful record is printed. `show-data MANIFEST`
+prints the saved reference offline (`operation=manifest-data`), with no device
+access. Successful creation reports `operation=recorded-data`.
+
+Keep writes to the data quiescent for the whole operation. Descriptor pinning
+and identity rechecks do not provide a coherent snapshot of concurrent writes.
+Retain a trusted manifest separately: checksums detect accidental corruption
+against that reference; they provide no authentication or repair. Geometry
+adoption, desired extent changes and legitimate writes require an intentionally
+new reference. A verification failure preserves the reference. Inspection and
+verification are available while saved-plan writer locks are held.
+
+Creation holds the manifest directory's nonblocking writer lock through
+file-fsync/close/atomic-rename/directory-fsync and final report flush. Equal
+references still execute both flushes. Before rename, failures preserve the
+old manifest; after rename, directory-fsync or report failure can leave the
+complete new manifest visible and must be retried. Source and destination
+cannot name the same directory entry, including lexical path aliases. Final
+symlinks and unbounded/nonregular input files are rejected. Manifest destinations
+must be absent or regular; device nodes, directories and FIFOs are rejected
+before participants open and rechecked before publication. Hashing uses a
+single 64-KiB stack workspace for all rows, accepts interrupted and positive
+sector-aligned short reads, and rejects zero/failed/oversized/unaligned
+transfers. Extents must fit signed file offsets and SHA-256's byte limit.
+
+The little-endian `VINIXDH1` format is separate from existing V1/V2 bundles.
+Its 64-byte header stores magic at 0, u32 version 1 at 8, header bytes 64 at
+12, total file bytes at 16, embedded bundle bytes at 20, digest record count
+at 24 and CRC32 at 28 (computed with that field zero); bytes 32–63 are zero.
+The exact complete encoded bundle follows, then up to 64 ordered 40-byte
+records: saved disk index u32, global slot u32 and 32 digest bytes. Records
+must match every desired row in canonical disk/row order. The maximum file
+is 11392 bytes. Decoding validates the entire manifest privately before
+changing caller state; embedded identities, bounds, pools and global slots
+retain the ordinary bundle validation. See
+[qualification](../tests/storage-volumes/data-checksums.md).

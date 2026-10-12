@@ -40,7 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -52,6 +52,7 @@ fn host(root string, work string) ! {
 	growth_io_tests(root, work, v)!
 	capacity_io_tests(root, work, v)!
 	capacity_batch_io_tests(root, work, v)!
+	data_io_tests(root, work, v)!
 	for arch in ['aarch64', 'x86_64'] {
 		path := work + '/volume-' + arch + '.c'
 		generate(root, root + '/tools/volumes/volumecli', path, arch)!
@@ -59,6 +60,34 @@ fn host(root string, work string) ! {
 	}
 	init_policy(root, work)!
 	println('PASS host: plan format, identity, corruption, bounded plan sets, atomic publication and sanitizers')
+}
+
+fn data_io_tests(root string, work string, v string) ! {
+	fixture := work + '/dataio'
+	os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
+		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file == 'data_io.v' {
+			for name in ['open', 'close', 'pread'] { source = source.replace('C.' + name + '(', 'data_mock_' + name + '(') }
+		}
+		if file == 'plan_io.v' {
+			for name in ['ioctl', 'pread'] { source = source.replace('C.' + name + '(', 'data_mock_' + name + '(').replace('fn data_mock_' + name + '(', 'fn C.' + name + '(') }
+			start := source.index('fn publish_bytes(') or { return error('Missing shared publisher') }
+			end := source.index('\nfn volume_path(') or { return error('Missing publisher boundary') }
+			mut publisher := source[start..end]
+			for name in ['write', 'fsync', 'close', 'renameat'] { publisher = publisher.replace('C.' + name + '(', 'data_publish_' + name + '(') }
+			source = source[..start] + publisher + source[end..]
+		}
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/data_io_test.v', fixture + '/data_io_test.v')!
+	binary := work + '/data-io-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, fixture + '/data_io_test.v'])!
+	print(command([binary])!)
+	println('PASS data checksums: all-device pinning/rechecks, streaming short reads, later corruption, atomic publication and output failures under ASan/UBSan')
 }
 
 fn capacity_batch_io_tests(root string, work string, v string) ! {
@@ -434,6 +463,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN MULTI POOL BATCH PASSED:') { return error('Missing atomic multi-pool allocation qualification') }
 	if !first.contains('PLAN MULTI POOL GROWTH PASSED:') { return error('Missing atomic multi-pool growth qualification') }
 	if !first.contains('PLAN LOCK PASSED:') { return error('Missing saved-plan locking qualification') }
+	if !first.contains('PLAN DATA PASSED:') { return error('Missing data checksum and corruption qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
@@ -448,6 +478,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
 	if !second.contains('PLAN POOL BOOT PRESERVED') { return error('Pool configuration did not survive reordered boot') }
+	if !second.contains('PLAN DATA BOOT VERIFIED') { return error('Data manifest did not verify across reordered boot') }
 	// Enlarge the existing disposable backing file without changing its MBR or
 	// prior bytes. The saved bundle and all guest files remain guest-produced.
 	mut disk := os.open_file(work + '/volume.raw', 'r+')!
@@ -505,7 +536,11 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if eighth.contains('init: volume restore failed; continuing') || !eighth.contains('PLAN MULTI POOL GROWTH BOOT PRESERVED') {
 		return error('Production init did not restore complete multi-pool growth')
 	}
-	println('PASS ${arch}: atomic multi-pool allocation/growth, physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, eight-boot persistence and 200-cycle retention')
+	if !eighth.contains('PLAN DATA SAVED:') { return error('Missing persisted nine-mapping checksum manifest') }
+	os.cp(work + '/config.ext2', work + '/data-config.ext2')!
+	ninth := boot(second_args, work + '/data-restored-boot.log')!
+	if ninth.contains('init: volume restore failed; continuing') || !ninth.contains('PLAN DATA BOOT PRESERVED') { return error('Data checksum verification failed after production boot') }
+	println('PASS ${arch}: SHA-256 data manifests, atomic multi-pool allocation/growth, physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, nine-boot persistence and 200-cycle retention')
 }
 
 fn main() {

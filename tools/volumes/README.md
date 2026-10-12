@@ -218,6 +218,15 @@ reports the complete candidate without a writer lock or publication. All-keep
 retries still complete both publication flushes. See
 [multi-pool growth rules](../../docs/storage-volumes.md#atomic-multi-pool-growth-batches).
 
+`hash-bundle BUNDLE MANIFEST DISK_INDEX DEVICE [...]` records SHA-256 for every
+desired extent in a separate atomic manifest. Supply every saved disk exactly
+once; devices are pinned read-only and their identities/geometry rechecked.
+`verify-data MANIFEST DISK_INDEX DEVICE [...]` verifies the complete saved
+reference after device reordering. `show-data MANIFEST` inspects the reference
+offline. Keep data writes quiescent while hashing/verifying and retain a trusted
+manifest separately. See [data checksum manifests](../../docs/storage-volumes.md#data-checksum-manifests)
+for consistency, format and corruption detection limits.
+
 Saved-plan writers acquire a nonblocking exclusive lock on the destination
 directory before reading or snapshotting, holding it through atomic publication.
 A busy directory returns failure; retry reads the latest complete state. All

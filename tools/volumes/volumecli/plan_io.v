@@ -12,6 +12,8 @@ mut:
 	st_mode u32
 	st_size i64
 	st_uid u32
+	st_dev u64
+	st_ino u64
 }
 
 @[c_extern] __global C.errno i32

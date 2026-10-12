@@ -46,9 +46,9 @@ Invalid growth requests preserve the saved file; equal-size expansion/growth
 retain its exact bytes and repeated replay keeps the generation. Scratch cleanup
 restores the exact original bundle and member order.
 
-Each of 200 warmup and 200 measured cycles now executes thirty-nine utility
+Each of 200 warmup and 200 measured cycles now executes forty utility
 processes, including allocation, growth and expansion batch previews/publications:
-15600 processes, 400 expansions, 800 desired growths, 800 scratch placements,
+16000 processes, 400 expansions, 800 desired growths, 800 scratch placements,
 400 pool queries and 800 cycle member additions. No scratch view is created.
 Every slab class and the large-page
 total must stay flat or decrease.

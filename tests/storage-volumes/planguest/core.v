@@ -143,6 +143,7 @@ fn view_data() {
 
 @[direct_array_access]
 fn heap_snapshot(mut snapshot Heap) {
+	snapshot = Heap{}
 	file := C.fopen(c'/proc/slabinfo', c'r')
 	check(file != unsafe { nil }, c'open heap snapshot')
 	mut text := [256]char{}
@@ -161,6 +162,7 @@ fn heap_snapshot(mut snapshot Heap) {
 fn cycles(parent &char, count int) {
 	other := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 	for _ in 0 .. count {
+		data_tool(unsafe { nil }, c'/root/data.vhash', parent, other, false, 0, unsafe { nil })
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, other, unsafe { &char(nil) }, 0)
 		mapping_growths(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'9', c'8192', c'mbr:12345678', c'2', c'8192', true, 0, unsafe { nil })
 		mapping_growths(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'9', c'8192', c'mbr:12345678', c'2', c'8192', false, 0, unsafe { nil })
@@ -474,17 +476,25 @@ fn first_boot(parent &char) {
 		planned_pool_resizes(parent)
 		planned_capacity_contracts(parent, wrong)
 		planned_multi_pool_batch(parent, wrong)
+		planned_data(parent, wrong)
 		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
+		// Warm both retained measurement buffers and the snapshot reader before
+		// either baseline. The fixture remains alive across the whole workload.
+		mut before := Heap{}; mut after := Heap{}
+		heap_snapshot(mut before); heap_snapshot(mut after)
+		C.printf(c'PLAN SNAPSHOT WARM first=%ld second=%ld\n', before.large, after.large)
 		allocation_trace(c'/proc/allocstart', false)
 		cycles(parent, 200)
-		mut before := Heap{}; heap_snapshot(mut before)
+		heap_snapshot(mut before); heap_snapshot(mut after)
+		C.printf(c'PLAN SNAPSHOT READY first=%ld second=%ld\n', before.large, after.large)
+		heap_snapshot(mut before)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_cycles() }
 		cycles(parent, 200)
-		mut after := Heap{}; heap_snapshot(mut after)
+		heap_snapshot(mut after)
 		C.printf(c'PLAN LARGE before=%ld after=%ld\n', before.large, after.large)
 		mut retained := before.count != after.count || after.large > before.large
 		for i := 0; i < before.count; i++ {
@@ -539,9 +549,15 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		C.close(phase)
 		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
+		data_phase := C.open(c'/data-boot', C.O_RDONLY)
+		if data_phase >= 0 {
+			check(C.close(data_phase) == 0, c'close checksum phase marker'); data_boot_phase(actual, other)
+			C.printf(c'PLAN DONE\n'); for { C.pause() }
+		}
 		multi_growth := C.open(c'/multi-pool-growth-boot', C.O_RDONLY)
 		if multi_growth >= 0 {
 			check(C.close(multi_growth) == 0, c'close multi-pool growth phase marker'); multi_pool_growth_boot_phase(actual, other)
+			prepare_data_boot(actual, other)
 			C.printf(c'PLAN DONE\n'); for { C.pause() }
 		}
 		multi := C.open(c'/multi-pool-boot', C.O_RDONLY)
@@ -566,6 +582,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		check(C.getppid() == 1 && status(c'/dev/mapper/vinix2').disk_id == status(actual).disk_id
 			&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id, c'init restored reordered physical disks')
 		C.printf(c'PLAN BOOT RESTORED\n')
+		data_tool(unsafe { nil }, c'/root/data.vhash', actual, other, false, 0, unsafe { nil }); C.printf(c'PLAN DATA BOOT VERIFIED\n')
 		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation
 		second_before := status(c'/dev/mapper/vinix9').generation

@@ -59,6 +59,7 @@ fn usage() i32 {
 	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume health DEVICE\n       vinix-volume monitor DEVICE INTERVAL_SECONDS [SAMPLES]\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n       vinix-volume save DEVICE PLAN\n       vinix-volume restore DEVICE PLAN\n       vinix-volume discover PLAN\n       vinix-volume restore-auto PLAN\n       vinix-volume restore-set DIRECTORY\n       vinix-volume boot-restore\n')
 	C.printf(c'       vinix-volume save-set BUNDLE DEVICE [DEVICE ...]\n       vinix-volume plan-grow BUNDLE SLOT LENGTH_BYTES\n       vinix-volume restore-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume show-bundle BUNDLE\n       vinix-volume check-bundle BUNDLE [grow]\n')
+	C.printf(c'       vinix-volume hash-bundle BUNDLE MANIFEST DISK_INDEX DEVICE [...]\n       vinix-volume verify-data MANIFEST DISK_INDEX DEVICE [...]\n       vinix-volume show-data MANIFEST\n')
 	C.printf(c'       vinix-volume plan-add BUNDLE DISK_INDEX SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume plan-remove BUNDLE SLOT\n')
 	C.printf(c'       vinix-volume plan-add-batch BUNDLE IDENTITY SLOT OFFSET_BYTES LENGTH_BYTES MODE [...]\n       vinix-volume plan-preview-add-batch BUNDLE IDENTITY SLOT OFFSET_BYTES LENGTH_BYTES MODE [...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
 	C.printf(c'       vinix-volume plan-grow-batch BUNDLE IDENTITY SLOT LENGTH_BYTES [...]\n       vinix-volume plan-preview-grow-batch BUNDLE IDENTITY SLOT LENGTH_BYTES [...]\n')
@@ -86,6 +87,20 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'show-data') == 0 {
+			if argc != 3 { return usage() }; return verify_manifest_data(argv[2], nil, true)
+		}
+		if argc >= 2 && (C.strcmp(argv[1], c'hash-bundle') == 0 || C.strcmp(argv[1], c'verify-data') == 0) {
+			create := C.strcmp(argv[1], c'hash-bundle') == 0; start := if create { i32(4) } else { i32(3) }
+			if argc < start + 2 || argc > start + 128 || (argc - start) % 2 != 0 { return usage() }
+			mut devices := &DataDevices(C.alloca(sizeof(DataDevices))); *devices = DataDevices{count: (argc - start) / 2}
+			for i in 0 .. devices.count {
+				at := start + i * 2; disk := decimal(argv[at]) or { return usage() }
+				if disk >= 64 || argv[at + 1][0] == 0 { return usage() }; devices.disks[i] = u32(disk); devices.paths[i] = argv[at + 1]
+			}
+			if create { return hash_bundle_data(argv[2], argv[3], devices) }
+			return verify_manifest_data(argv[2], devices, false)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'pool-grow-set-batch') == 0 || C.strcmp(argv[1], c'pool-preview-grow-set-batch') == 0) {
 			if argc < 6 || argc > 195 || (argc - 3) % 3 != 0 { return usage() }
 			mut batch := &MultiPoolGrowthBatch(C.alloca(sizeof(MultiPoolGrowthBatch)))

@@ -42,8 +42,8 @@ and apply separately; preexisting geometry, generations and a held descriptor's
 data stay intact. Cleanup restores exact baseline bytes.
 `PLAN POOL EXPANSION BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured thirty-nine-command cycles:
-**15600 utility processes**, including 400 expansion batch previews/publications
+Each architecture runs 200 warmup and 200 measured forty-command cycles:
+**16000 utility processes**, including 400 expansion batch previews/publications
 with one expansion and one retained member each, 400 allocation batch
 previews/publications with 800 scratch placements, and 400 growth batch
 previews/publications with 800 desired growths. There are 800 member additions
