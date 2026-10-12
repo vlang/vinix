@@ -1,0 +1,98 @@
+{
+    "abi_fields": 78,
+    "boot_fixture_assertions_preserved": 18,
+    "cold_native_builds": 48,
+    "complete_historical_image_match": false,
+    "converter_c_v_cases_per_profile": 10,
+    "explicit_launch_descriptor_check_iterations": 100,
+    "fresh_guest_boot": false,
+    "fresh_kernel_build": false,
+    "fresh_private_loader_bytes": 228416,
+    "fresh_private_loader_end": 229376,
+    "fresh_reporter_ustar_build": true,
+    "hardware_boot": false,
+    "historical_image_compared_bytes": 1048576,
+    "live_xnu_failures": 0,
+    "live_xnu_matched_nodes": 233,
+    "live_xnu_skipped_nodes": 4,
+    "original_python_bytes": 42568,
+    "original_python_lines": 1006,
+    "originals": [
+        {
+            "blob": "0761bb6cfba25b1b9d4c32c791169acf7b747148",
+            "bytes": 4340,
+            "lines": 95,
+            "path": "apple-boot/build.py",
+            "sha256": "f0881669ed543136c3214aa18cf18fbb782a5f4587a078352f6a2e49674b3bbb"
+        },
+        {
+            "blob": "77bb870562fd7d6bb9f5854a932bbba4ee40d692",
+            "bytes": 4497,
+            "lines": 103,
+            "path": "apple-boot/pack.py",
+            "sha256": "e169f3f187615f315d476dbc813e879ceef307639808f632cdac409a87320e28"
+        },
+        {
+            "blob": "1bac2bc5a04b73e1fc6a8b0e73b3206b94d4f54c",
+            "bytes": 3047,
+            "lines": 52,
+            "path": "apple-boot/tests/check-v-abi.py",
+            "sha256": "e4b758a48e049740a99104a422d498fde9d5174c2a3be0302d2a9a4a00a71644"
+        },
+        {
+            "blob": "ccbd4d5058650b6a74c02fbd28107c37dd9cd96d",
+            "bytes": 3283,
+            "lines": 86,
+            "path": "apple-boot/tests/check_converter.py",
+            "sha256": "fc1c32b19d46d67d535ed3bdfe452c049cc315573d4df95ee86889c3a63770fa"
+        },
+        {
+            "blob": "f07e87c4cfad2ec06a53697abf1cac6a54d55cd1",
+            "bytes": 5286,
+            "lines": 153,
+            "path": "apple-boot/tests/fdt_check.py",
+            "sha256": "0a62d2ca1861f3eac5dd7855daee3b2100c0cb729074c8021d663fea768def5b"
+        },
+        {
+            "blob": "b3d35e8cc90faecff4194f0dd6ac011292c96e5e",
+            "bytes": 5066,
+            "lines": 101,
+            "path": "apple-boot/tests/fixture-parity.py",
+            "sha256": "576b97875944afea8960bf0b3c6519d36f9ea9b59ca78726eac9d3d2415960b8"
+        },
+        {
+            "blob": "7a4c5e52e2c0a6d1d32d16d63d54a73b0d9fb184",
+            "bytes": 3303,
+            "lines": 94,
+            "path": "apple-boot/tests/ioreg_adt.py",
+            "sha256": "48d5a30b791564a852652726ab676c3eb571961ac7134def6c4d8f5b0f0f54da"
+        },
+        {
+            "blob": "792357edb418de9c5a1d5ded1fab1abc98d2451b",
+            "bytes": 9857,
+            "lines": 257,
+            "path": "apple-boot/tests/qemu_iboot.py",
+            "sha256": "1d84ef900cfa9b22df1844dc127c30dd1d0c18d27073becc3cdfb48cc7fa041b"
+        },
+        {
+            "blob": "b28bb191b22fe4ff923b73169fe648d516f77149",
+            "bytes": 3889,
+            "lines": 65,
+            "path": "apple-boot/tests/run-v-core.py",
+            "sha256": "fbb0e4c2a59c3d9f2aea83ae0185faad29462e64b0805687375d8a4b7cc20653"
+        }
+    ],
+    "profiles": [
+        "ARM",
+        "Rosetta x86",
+        "ARM ASan/UBSan"
+    ],
+    "public_cold_fronts": 8,
+    "python_executed": false,
+    "python_files_retired": 9,
+    "qmp_fixture_modes": 11,
+    "qualification": "native-tools.md",
+    "schema": 1,
+    "shell_syntax_checks": 9,
+    "source_commit": "5b5b7a7a2eac8d12303d17d63d14fb84befef8d3"
+}

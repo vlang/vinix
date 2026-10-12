@@ -14,7 +14,7 @@ no Python runtime; loader make rules invoke them directly.
 ```sh
 v -cc cc test apple-boot/hostcompiler
 make -C apple-boot
-python3 apple-boot/tests/run-v-core.py
+apple-boot/tests/run-v-core
 ```
 
 Qualification compared complete generated C bytes with the old Python drivers
@@ -25,7 +25,7 @@ behavior and removed private scratch trees. The actual AArch64 loader
 cross-build passed, and host checks matched all 78 C/V ABI fields and found no
 allocator imports in the loader core.
 
-The remaining Python host test suite reaches an existing strict-build failure:
-the current compiler emits undeclared `memdup` calls in the boot fixture. The
-original driver produces identical C and fails the same compilation. This
-stage does not claim that suite passed or establish a new guest boot.
+The original compiler stage encountered undeclared `memdup` calls in three
+large boot-fixture records. The native host-tool stage gives this one-shot
+fixture explicit static storage, keeps every assertion and verifies the
+results against the frozen C goldens. See [native host-tool qualification](../native-tools.md).

@@ -29,17 +29,28 @@ pub fn connect_bounded(path string, deadline u64, cancel fn () bool) !Monitor {
 // Saved performance runners treated a QMP error as a completed reply. Other
 // consumers retain the default policy that raises the returned error.
 pub fn connect_policy(path string, deadline u64, cancel fn () bool, accept_errors bool) !Monitor {
+	return connect_body(path, deadline, cancel, accept_errors, false)
+}
+// iBoot validates its greeting and skips events. Existing consumers keep
+// their previous greeting policy.
+pub fn connect_checked(path string, deadline u64, cancel fn () bool) !Monitor {
+	return connect_body(path, deadline, cancel, false, true)
+}
+fn connect_body(path string, deadline u64, cancel fn () bool, accept_errors bool, checked bool) !Monitor {
 	mut connection := unix.connect_stream(path)!
 	mut monitor := Monitor{connection: connection, deadline: deadline, cancel: cancel, accept_errors: accept_errors}
 	mut open := false
 	defer { if !open { monitor.close() } }
 	if C.fcntl(connection.sock.handle, C.F_SETFD, C.FD_CLOEXEC) != 0 || C.fcntl(connection.sock.handle, C.F_SETFL, C.O_NONBLOCK) != 0 { return os.error_posix() }
-	monitor.read_line()!
+	if checked {
+		for { greeting := monitor.line()!; if 'event' !in greeting { break } }
+	} else { monitor.read_line()! }
 	monitor.command('qmp_capabilities', {})!
 	open = true
 	return monitor
 }
 pub fn (mut monitor Monitor) close() { if !isnil(monitor.connection) { monitor.connection.close() or {}; monitor.connection = unsafe { nil } } }
+pub fn (mut monitor Monitor) set_deadline(deadline u64) { monitor.deadline = deadline }
 fn (mut monitor Monitor) line() !map[string]json2.Any {
 	text := monitor.read_line()!
 	hosttest.module_decode_utf8(text)!

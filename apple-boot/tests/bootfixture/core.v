@@ -33,6 +33,9 @@ fn C.memmap_add(&C.memmap, u64, u64, u64, &C.reserved_set)
 fn C.memmap_add_reserved(&C.memmap, &C.reserved_set)
 
 __global fixture_mmfr u64
+__global fixture_kernel C.loaded_kernel
+__global fixture_reserved C.reserved_set
+__global fixture_memmap C.memmap
 @[export: 'loader_end'] __global fixture_end [8]char
 @[export: 'read_id_aa64mmfr0'] pub fn read_mmfr() u64 { return fixture_mmfr }
 @[export: 'read_current_el'] pub fn read_el() u64 { return 8 }
@@ -50,6 +53,15 @@ fn put64(p &u8, value u64) { unsafe { for i := u32(0); i < 8; i++ { p[i] = u8(va
 
 @[export: 'main']
 pub fn run() i32 {
+ // This one-shot executable owns static fixture storage. The current V
+ // compiler otherwise boxes these large records when their addresses escape
+ // to the independent C ABI, violating the fixture's allocator-import check.
+ fixture_kernel = C.loaded_kernel{}
+ fixture_reserved = C.reserved_set{}
+ fixture_memmap = C.memmap{}
+ mut kernel := unsafe { &fixture_kernel }
+ mut reserved := unsafe { &fixture_reserved }
+ mut memmap := unsafe { &fixture_memmap }
  unsafe {
   for revision := u32(1); revision <= 4; revision++ {
    mut args := [1200]u8{}
@@ -99,7 +111,6 @@ pub fn run() i32 {
   l3 := &u64(usize(l2[0] & u64(0x0000fffffffff000)))
   C.assert(l3[1] == u64(0x50001000) | (u64(1) << 54) | (u64(1) << 53) | (u64(1) << 10) | (u64(3) << 8) | (u64(1) << 7) | (u64(1) << 2) | u64(3))
   mut image := [256]u8{}
-  mut kernel := C.loaded_kernel{}
   C.memcpy(&image[0], c'\x7f\x45LF', 4)
   image[4] = 2
   image[5] = 1
@@ -115,21 +126,19 @@ pub fn run() i32 {
   put64(&image[0] + 96, 4)
   put64(&image[0] + 104, 8)
   C.memcpy(&image[0] + 128, c'ELF!', 4)
-  C.assert(C.load_elf(&image[0], sizeof(image), &allocator, &kernel) == 0)
+  C.assert(C.load_elf(&image[0], sizeof(image), &allocator, kernel) == 0)
   C.assert(kernel.entry == 0xffffffff80000000 && kernel.bytes == 0x4000 && kernel.segment_count == 1 && kernel.segments[0].flags == C.MAP_WRITE | C.MAP_EXEC)
   C.assert(C.memcmp(voidptr(usize(kernel.phys_base)), c'ELF!\x00\x00\x00\x00', 8) == 0)
   image[4] = 1
-  C.assert(C.load_elf(&image[0], sizeof(image), &allocator, &kernel) < 0)
-  mut reserved := C.reserved_set{}
+  C.assert(C.load_elf(&image[0], sizeof(image), &allocator, kernel) < 0)
   reserved.ranges[0].base = 0x20000
   reserved.ranges[0].end = 0x30000
   reserved.ranges[1].base = 0x50000
   reserved.ranges[1].end = 0x60000
   reserved.count = 2
-  C.assert(C.reserved_window(&reserved, 0x10000, 0x100000, 0x30000, 0x4000) == 0x60000)
-  mut memmap := C.memmap{}
-  C.memmap_add(&memmap, 0x10000, 0x70000, C.MEMMAP_USABLE, &reserved)
-  C.memmap_add_reserved(&memmap, &reserved)
+  C.assert(C.reserved_window(reserved, 0x10000, 0x100000, 0x30000, 0x4000) == 0x60000)
+  C.memmap_add(memmap, 0x10000, 0x70000, C.MEMMAP_USABLE, reserved)
+  C.memmap_add_reserved(memmap, reserved)
   C.assert(memmap.count == 5 && memmap.entries[0].base == 0x10000 && memmap.entries[0].length == 0x10000)
   C.assert(memmap.entries[1].base == 0x20000 && memmap.entries[1].@type == C.MEMMAP_RESERVED)
   C.assert(memmap.entries[4].base == 0x60000 && memmap.entries[4].length == 0x10000)

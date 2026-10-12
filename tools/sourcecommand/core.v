@@ -50,6 +50,14 @@ pub fn temporary(prefix string) !string {
 
 pub struct Output { pub: status int stdout string stderr string }
 
+// Only use from a run_owned/capture_owned callback, which reserves the PID
+// until this observation and all callback work have finished.
+pub fn child_exited(pid int) !bool {
+	mut info := C.vinix_source_child_info{}
+	if C.waitid(C.P_PID, u32(pid), &info, C.WEXITED | C.WNOHANG | C.WNOWAIT) != 0 && C.errno != C.EINTR { return os.error_posix() }
+	return info.si_pid == pid
+}
+
 // Keep the child unreaped until its private group is retired. Drain both pipes
 // concurrently, cap memory before append, and check cancellation on every poll.
 pub fn capture(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
@@ -59,7 +67,21 @@ pub fn capture(argv []string, env map[string]string, timeout f64, limit int, can
 // Use one SDK pipe for both child streams when the caller's original command
 // used stderr=STDOUT. Preserve their write ordering and one output bound.
 pub fn capture_combined(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
-	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, true)
+	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, true, false, '')
+}
+
+// Preserve a supplied argv[0] for independent executable oracles. The SDK
+// still resolves the explicit executable without a shell.
+pub fn capture_as(executable string, argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
+	if executable == '' || executable.contains('\x00') { return error('invalid executable') }
+	return capture_policy(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, unsafe { nil }, 0, false, false, executable)
+}
+
+// A synchronous owner may inspect a live child through WNOWAIT while the
+// child inherits stdout/stderr. Its callback finishes before the sole reap;
+// verbose emulators cannot block behind undrained capture pipes.
+pub fn run_owned(argv []string, env map[string]string, cancel fn () bool, spawned fn (int, voidptr) !, context voidptr) !Output {
+	return capture_policy(argv, env, -1, 0, cancel, unsafe { nil }, spawned, context, 0, false, true, '')
 }
 
 pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
@@ -69,11 +91,11 @@ pub fn capture_observed(argv []string, env map[string]string, timeout f64, limit
 
 pub fn capture_owned(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
 	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64) !Output {
-	return capture_policy(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, false)
+	return capture_policy(argv, env, timeout, limit, cancel, observe, spawned, context, shutdown_grace, false, false, '')
 }
 
 fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
-	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool) !Output {
+	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string) !Output {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid command') }
 	mut pipes := [i32(-1), -1, -1, -1]!
 	defer { for fd in pipes { if fd >= 0 { C.close(fd) } } }
@@ -89,8 +111,12 @@ fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, 
 	mut actions := C.posix_spawn_file_actions_t{}
 	if C.posix_spawn_file_actions_init(&actions) != 0 { return error('cannot initialize spawn actions') }
 	defer { C.posix_spawn_file_actions_destroy(&actions) }
-	for status in [C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1), C.posix_spawn_file_actions_adddup2(&actions, if combined { pipes[1] } else { pipes[3] }, 2),
-		C.posix_spawn_file_actions_addclose(&actions, pipes[0]), C.posix_spawn_file_actions_addclose(&actions, pipes[1]),
+	if !inherited {
+		for status in [C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1), C.posix_spawn_file_actions_adddup2(&actions, if combined { pipes[1] } else { pipes[3] }, 2)] {
+			if status != 0 { return error_with_code('cannot configure spawn streams', int(status)) }
+		}
+	}
+	for status in [C.posix_spawn_file_actions_addclose(&actions, pipes[0]), C.posix_spawn_file_actions_addclose(&actions, pipes[1]),
 		C.posix_spawn_file_actions_addclose(&actions, pipes[2]), C.posix_spawn_file_actions_addclose(&actions, pipes[3])] {
 		if status != 0 { return error_with_code('cannot configure spawn actions', int(status)) }
 	}
@@ -109,6 +135,7 @@ fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, 
 	$if macos {
 		flags |= i16(C.POSIX_SPAWN_CLOEXEC_DEFAULT)
 		if C.fcntl(0, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, 0) != 0 { return error('cannot preserve command stdin') }
+		if inherited { for fd in [1,2] { if C.fcntl(fd, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, fd) != 0 { return error('cannot preserve command output') } } }
 	}
 	for status in [C.posix_spawnattr_setpgroup(&attributes, 0), C.posix_spawnattr_setsigdefault(&attributes, &signals),
 		C.posix_spawnattr_setflags(&attributes, flags)] {
@@ -123,7 +150,8 @@ fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, 
 	for value in env_text { environment << unsafe { &char(value.str) } }
 	environment << &char(unsafe { nil })
 	mut pid := i32(0)
-	spawn_status := C.posix_spawnp(&pid, argv[0].str, &actions, &attributes, args.data, environment.data)
+	program := if executable == '' { argv[0] } else { executable }
+	spawn_status := C.posix_spawnp(&pid, program.str, &actions, &attributes, args.data, environment.data)
 	if spawn_status != 0 { return error_with_code('cannot start ' + argv[0], int(spawn_status)) }
 	mut raw := i32(0)
 	defer {

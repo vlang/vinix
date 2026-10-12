@@ -32,10 +32,10 @@ without `ranges` -- and drives the interrupt controller from the ADT's
 
 ```
 make -C kernel CC=clang ARCH=aarch64 LIMINE_MP=1 V=~/code/v/v -j8
-apple-boot/build.py                 # -> apple-boot/build/vinix-apple.bin
+apple-boot/build-image              # -> apple-boot/build/vinix-apple.bin
 ```
 
-`build.py` takes `--kernel`, `--initramfs` (a ustar archive) and
+`build-image` takes `--kernel`, `--initramfs` (a ustar archive) and
 `--cmdline`. Without `--initramfs` the image carries the native V `reportcore` as
 PID 1, which prints what the kernel found and stays up: the first boots on a
 new Mac have no keyboard to type at. It warns when the kernel binary is
@@ -47,12 +47,12 @@ older than its sources.
 make -C apple-boot test
 ```
 
-- `tests/check_converter.py` rebuilds this Mac's ADT from the IORegistry,
+- `tests/check_converter` rebuilds this Mac's ADT from the IORegistry,
   converts it with the loader's V code through the independent V converter,
   reads it back as the kernel
   does, and checks every node's translated `reg` against the windows XNU
   mapped (on an M5 Max: 233 nodes, 0 differences).
-- `tests/qemu_iboot.py` boots the image in QEMU through a stub that hands
+- `tests/qemu_iboot` boots the image in QEMU through a stub that hands
   over as iBoot does (EL2 with E2H set, MMU off, boot arguments revision 2,
   a 30-bit framebuffer at the top of RAM) with a tree that has a watchdog
   behind a translating bus, a firmware segment and an AICv3 described with
@@ -66,12 +66,19 @@ make -C apple-boot test
   occurs with the unchanged C baseline; its evidence is recorded in
   [the migration record](../docs/kernel-v-migration.md).
 
-`python3 apple-boot/tests/run-v-core.py` checks the public structure ABI,
+`apple-boot/tests/run-v-core` checks the public structure ABI,
 the converter and boot-runtime goldens with address and undefined-behavior
-sanitizers. `python3 apple-boot/tests/fixture-parity.py --state-dir <new-dir>`
+sanitizers. `apple-boot/tests/fixture-parity --state-dir <new-dir>`
 builds the frozen pre-port C fixtures from Git and compares every boot golden
 and ten converter cases, including binary FDT output. Maintained fixture
 bodies are V; generated C is only a build artifact.
+
+The image packer (`apple-boot/pack`), IORegistry exporter
+(`apple-boot/tests/ioreg_adt`) and host commands are native V tools. They use
+the same compiler selection as `compile-v`; no Python interpreter is needed.
+The QEMU runner owns its emulator group and QMP connection through success,
+failure and interruption. `--keep` retains work artifacts in an existing or
+new directory. See [the tooling qualification](native-tools.md).
 
 ## Install on a Mac
 

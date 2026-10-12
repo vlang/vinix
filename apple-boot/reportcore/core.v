@@ -20,6 +20,9 @@ fn C.uname(&C.utsname) i32
 fn C.pause() i32
 @[cinit]
 __global report_console = i32(1)
+// PID1 owns this SDK record for its whole lifetime. Keep the escaped field
+// addresses in static storage so freestanding V emits no memdup allocation.
+__global report_machine C.utsname
 
 fn say(text &char) { C.write(report_console, text, C.strlen(text)) }
 fn show(path &char, lines i32) {
@@ -40,13 +43,12 @@ fn show(path &char, lines i32) {
 @[export: 'main']
 pub fn report() i32 {
     unsafe {
-        mut name := C.utsname{}
         fd := C.open(c'/dev/console', C.O_WRONLY)
         if fd >= 0 { report_console = fd }
         say(c'APPLE-BOOT: init reached user space\n')
-        if C.uname(&name) == 0 {
-            say(&name.sysname[0]); say(c' '); say(&name.release[0]); say(c' ')
-            say(&name.machine[0]); say(c'\n')
+        if C.uname(&report_machine) == 0 {
+            say(&report_machine.sysname[0]); say(c' '); say(&report_machine.release[0]); say(c' ')
+            say(&report_machine.machine[0]); say(c'\n')
         }
         show(c'/proc/meminfo', 3)
         show(c'/proc/cpuinfo', 12)

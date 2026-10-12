@@ -3,7 +3,7 @@
 # that can be found in the LICENSE file.
 #
 # Builds the Apple-silicon loader and its host tests. `make` produces
-# build/vinix-apple-loader.bin; ../build-apple-boot.sh appends the kernel,
+# build/vinix-apple-loader.bin; ./build-image appends the kernel,
 # initramfs and command line to it.
 
 LLVM ?= /opt/homebrew/opt/llvm/bin
@@ -79,9 +79,9 @@ $(BUILD)/adt2fdt: $(BUILD)/obj/converter-fixture.o $(BUILD)/obj/vcore-host.o
 # The converter check reads this Mac's IORegistry; the QEMU test boots
 # $(VINIX_KERNEL_DIR)/bin/vinix (default ../kernel) through a fake iBoot.
 test: $(BUILD)/adt2fdt $(BUILD)/vinix-apple-loader.bin
-	python3 tests/check_converter.py
-	python3 tests/qemu_iboot.py
-	python3 tests/qemu_iboot.py --real-adt
+	tests/check_converter
+	tests/qemu_iboot
+	tests/qemu_iboot --real-adt
 
 clean:
 	rm -rf $(BUILD)
