@@ -2634,6 +2634,52 @@ additional strong imports across the bundled frameworks. Full regression
 remains unpassed; these runners stay in the evidence directory and the five published runners
 keep their last passing bytes. Entry, rendering and gameplay remain unverified.
 
+V now also resolves Foundation's
+`String._unconditionallyBridgeFromObjectiveC(NSString?)`. The installed Mac
+export and both pinned EOS callers establish a borrowed optional NSString
+argument in `x0` and an owned String result in `x0/x1`; nil returns the empty
+small String. Native measurements cover tagged strings, shared ASCII and
+foreign UTF-16 storage, source retain counts, Unicode and embedded NUL bytes,
+and result use after releasing the caller's NSString reference.
+
+Vinix validates the object registry before reading its class or bytes and
+copies stored NSString text into the existing inline or owned native-tail
+Swift String representation. The recursive registry lock protects the borrowed
+text through the copy, which runs without guest callbacks. Source ownership
+stays with the caller; large result storage drains through normal Swift bridge
+ARC. Loaded UTF-8 and decoded UTF-16 constants use the same path. Inputs are
+limited to 1 MiB and registered storage-backed NSString objects or constants;
+foreign Objective-C objects and custom NSString primitive overrides remain
+unsupported.
+
+The main executable requests both String bridges through Foundation.framework,
+whereas EOS requests them through libswiftFoundation. Installed native
+measurements confirm that the four currently supported Swift Foundation exports
+have identical addresses under both install names. Vinix routes those exact
+exports through the same resolver for Foundation.framework; other frameworks
+do not acquire these Swift aliases.
+
+The final eight host sanitizer processes pass in both hash modes, all
+forty-nine programs build, and all thirty-one Swift checks pass in Vinix.
+Fixtures cover source/result destruction in either order, repeated and
+concurrent bridges, byte lengths across the inline boundary, nil, embedded
+NUL, Unicode, decoded constants and inaccessible or retired object handles.
+Generated C confirms that the bridge and framework routing add no hidden
+successful V allocations; all fifty-three final C streams are retained with
+verified lossless compression.
+
+Both import audits resolve three more strong imports than the preceding
+logging cohort: the two main-executable String bridges and EOS's reverse
+bridge. The supplied IPA still exits with status 1 before entry at
+`_$ss5ErrorP10FoundationE20localizedDescriptionSSvg`, Swift
+`Error.localizedDescription`. Its native export and four EOS plus two
+Marketplace wrapper call sites are captured without invoking that ABI.
+Evidence is under `build/ios/fortnite/swift-string-unbridge-checks`, including
+the initial host header collision and the entire earlier passing cohort whose
+audit exposed the missing framework aliases. Full regression remains unpassed;
+the candidates stay in the evidence directory and the five published runners
+retain their last passing bytes. Entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 

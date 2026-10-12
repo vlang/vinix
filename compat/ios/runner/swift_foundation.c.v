@@ -11,6 +11,35 @@ fn swift_foundation_bridge(first u64, second u64) u64 {
 	if bytes.count > 1024 * 1024 { panic('iOS: Swift Foundation String exceeds limits') }
 	return owned_string(unsafe { tos(&u8(bytes.address), int(bytes.count)) })
 }
+
+// Optional NSString is borrowed in x0; the two-word String result is owned.
+// Copy into native-tail/inline storage rather than exporting Apple's foreign
+// NSString-backed representation, which our String operations do not support.
+fn swift_foundation_unbridge_checked(source u64) !SwiftStringWords {
+	if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired {
+		return error('iOS: Swift NSString bridge outside runtime lifetime')
+	}
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	if source == 0 { return SwiftStringWords{ second: u64(0xe000000000000000) } }
+	// Registry validation must precede even the isa read. Keep the borrowed
+	// bytes protected until the copy has been published; no guest callbacks.
+	if source !in ios_runtime.objects && source !in ios_runtime.constants {
+		return error('iOS: Swift NSString bridge requires a live registered object')
+	}
+	if !objc_is_kind(source, ios_runtime.names['NSString']) {
+		return error('iOS: Swift NSString bridge requires NSString')
+	}
+	text := string_text(source)
+	if text.len > 1024 * 1024 { return error('iOS: Swift NSString bridge exceeds limits') }
+	destination := u64(C.__builtin_alloca(16))
+	unsafe { *(&SwiftStringWords(destination)) = SwiftStringWords{ second: u64(0xe000000000000000) } }
+	swift_string_append_bytes(destination, u64(text.str), u64(text.len))
+	return unsafe { *(&SwiftStringWords(destination)) }
+}
+fn swift_foundation_unbridge(source u64) SwiftStringWords {
+	return swift_foundation_unbridge_checked(source) or { panic(err) }
+}
 fn swift_foundation_string_encoding(first u64, second u64) u64 {
 	object := objc_autorelease(swift_foundation_bridge(first, second))
 	return swift_integer_vararg(object)
@@ -193,6 +222,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 	return match symbol {
 		'_$s10Foundation5NSLogyySS_s7CVarArg_pdtF' { u64(voidptr(swift_nslog)) }
 		'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF' { u64(voidptr(swift_foundation_bridge)) }
+		'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ' { u64(voidptr(swift_foundation_unbridge)) }
 		'_$sSSs7CVarArg10FoundationMc' { swift_foundation_arena() + u64(C.getpagesize()) + 32 }
 		else { return error('iOS: Swift Foundation symbol is not implemented: ${symbol}') }
 	}
