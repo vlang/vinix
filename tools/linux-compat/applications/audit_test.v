@@ -34,7 +34,7 @@ fn test_host_architecture_duplicate_and_exit_contradictions_are_refused() {
 	assert false, 'contradictory controller exit was accepted'
 }
 
-fn test_index_preserves_all_families_and_failing_browser_results() {
+fn test_index_preserves_all_families_qualified_runtimes_and_remaining_failures() {
 	root := os.real_path(os.dir(@FILE) + '/../../..')
 	index := application_index(root)!
 	assert !index.complete_support_qualified
@@ -43,7 +43,13 @@ fn test_index_preserves_all_families_and_failing_browser_results() {
 			assert index.applications.any(it.architecture == arch && it.category == category)
 		}
 		browsers := index.applications.filter(it.architecture == arch && it.category == 'browsers')
-		assert browsers.len == 2 && browsers.all(it.status == 'failed')
+		assert browsers.len == 2
+		assert browsers.filter(it.workload == 'chromium').all(it.status == 'failed')
+		firefox := browsers.filter(it.workload == 'firefox')[0]
+		assert firefox.status == if arch == 'x86_64' { 'passed' } else { 'failed' }
+		if arch == 'x86_64' { assert firefox.limitations.contains('4096 MiB') && !firefox.full_lifecycle_qualified }
+		java := index.applications.filter(it.architecture == arch && it.workload == 'java')[0]
+		assert java.status == 'passed' && java.limitations.contains('UID 1000') && !java.full_lifecycle_qualified
 	}
 	assert index.applications.all(valid_hash(it.report_sha256) && valid_hash(it.receipt_sha256)
 		&& valid_hash(it.kernel_sha256) && it.limitations != '')

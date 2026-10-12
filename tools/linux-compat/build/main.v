@@ -69,7 +69,7 @@ fn main() {
 				'amd64'
 			}, '-d', 'nofloat']
 	} else {
-		[compiler, '-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
+		[compiler, '-nocache', '-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
 			'-gc', 'none', '-prod', '-o', work + '/workloads.c', root + '/tools/linux-compat/workloads']
 	}
 	if glibc { generate << ['-d', 'glibc'] }
@@ -186,7 +186,7 @@ fn main() {
 	for source in if runtime {
 		['tests/linux-compat/runtimefixture/core.v']
 	} else {
-		['tools/linux-compat/workloads/main.v', 'tools/linux-compat/workloads/diagnostics.v', 'tools/linux-compat/workloads/debugger.v', 'tools/linux-compat/workloads/packages.v', 'tools/linux-compat/workloads/games.v', 'tools/linux-compat/workloads/service_units.v', 'tools/linux-compat/workloads/browsers.v', 'tools/linux-compat/workloads/runtime_sources.v', 'tests/go/smoke.go', 'tests/java/VinixJavaSmoke.java']
+		['tools/linux-compat/workloads/main.v', 'tools/linux-compat/workloads/diagnostics.v', 'tools/linux-compat/workloads/debugger.v', 'tools/linux-compat/workloads/packages.v', 'tools/linux-compat/workloads/games.v', 'tools/linux-compat/workloads/service_units.v', 'tools/linux-compat/workloads/browsers.v', 'tools/linux-compat/workloads/jit.v', 'tools/linux-compat/workloads/runtime_sources.v', 'tests/go/smoke.go', 'tests/java/VinixJavaSmoke.java']
 	} {
 		inputs[source] = sha256.sum(os.read_bytes(root + '/' + source) or {
 			eprintln(err.msg())

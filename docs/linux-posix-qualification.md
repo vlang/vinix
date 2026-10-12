@@ -838,3 +838,57 @@ The [dated receipts, raw logs and assertion-enabled auditor](../tests/linux-comp
 record the before/after controls and inspection results. The auditor verifies
 49 inventory inputs against both isolated build trees, the generated lock
 ordering and architecture-specific serial calls, and the frozen test artifacts.
+
+## Administrator-approved native JIT runtimes
+
+The workload controller now accepts `--jit-runtimes firefox` or `java` for
+selected native workloads running as UID/GID 1000. PID 1 approves only the
+runtime's executable directory with a read-only `nosuid,nodev,wxallowed`
+self-bind. The driver remains outside it and sends VINIX_ALLOW_WX only to
+runtime children. Their report requires and records the actual most-specific
+mountinfo entry. Each helper exec still receives the kernel's existing
+authorization check; the global W^X policy and resource limits remain in force.
+
+The new native conformance fixture passes on both architectures. An ordinary
+user cannot remount the runtime or write its otherwise-writable file; setuid
+and setgid bits do not change effective credentials through the approved
+`nosuid` mount. Exec with an explicit request outside approval returns EPERM.
+Approved children can make RWX mappings and protection changes; a child
+without the request retains EOPNOTSUPP. Administrator revocation rejects new
+requests. The [AArch64](../tests/linux-compat/results/2026-10-12/jit-policy-aarch64.json)
+and [x86-64](../tests/linux-compat/results/2026-10-12/jit-policy-x86_64.json)
+receipts bind these checks to the unchanged production kernels.
+
+Firefox 128.14.0esr passes its native x86-64 ordinary-user regression in a
+4096 MiB guest. The [report](../tests/linux-compat/results/2026-10-12/jit-firefox-x86_64.json)
+records successful version and headless commands, the scoped runtime mount,
+a nonce-bearing JavaScript result of 42 and a rendered PNG hash. No browser
+sandbox-disable environment or flag is used. This qualifies that default
+browser workload, including JIT setup; complete seccomp thread ownership and
+sandbox isolation still require separate work. OpenGL/libpci are absent in
+this headless root, so GPU and ordinary windowed desktop use remain unqualified.
+
+An earlier approved 2048 MiB diagnostic run still reached the kernel's global
+and owner resource budgets. Its last refusal was a 139,520-byte scratch
+request against an owner already charged 95,440,210 of 95,443,456 bytes, with
+905,048 KiB physical memory free. The passing run uses the existing limits
+derived from 4096 MiB of guest memory. This does not establish a general
+minimum memory requirement or qualify the 2048 MiB workload.
+
+OpenJDK 21.0.10_p7 passes all five native commands as UID/GID 1000 on
+[AArch64](../tests/linux-compat/results/2026-10-12/jit-java-aarch64.json) and
+[x86-64](../tests/linux-compat/results/2026-10-12/jit-java-x86_64.json), in
+2048 MiB guests. Each uses the complete JDK's direct entry points through its
+read-only approved mount: version discovery, javac, application execution,
+JAR creation and execution from that JAR. The existing application verifies
+NIO file roundtrip, SHA-256, threaded TCP loopback and the native architecture.
+The package closures and both roots use pinned Alpine 3.21 musl 1.2.5 inputs;
+they have not run APK installation or alternative-registration scripts.
+
+The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/jit-audit.v)
+checks a failing assertion control, native permissions, input/package hashes,
+all prepared-root entries and explicit controller overlays, frozen kernel,
+init/archive/ISO, driver build, literal command vectors and JavaScript proof.
+The builder generates without V's module cache so a cached host declaration
+cannot replace a target runtime definition. Installation signatures/scripts,
+updates and approval persistence remain separate from these extracted roots.

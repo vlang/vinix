@@ -7,6 +7,7 @@ module appinitfixture
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 #include <unistd.h>
 
 fn C.open(&char, i32, ...) i32
@@ -29,6 +30,37 @@ fn C.waitpid(i32, &i32, i32) i32
 fn C.WIFEXITED(i32) bool
 fn C.WEXITSTATUS(i32) i32
 fn C.pause() i32
+fn C.mount(&char, &char, &char, usize, voidptr) i32
+fn C.umount2(&char, i32) i32
+
+// This input comes from an explicit host-controller choice. The exception
+// applies to these read-only runtime mounts, before dropping credentials.
+fn prepare_jit_mounts() bool {
+	unsafe {
+		fd := C.open(c'/etc/linux-compat-jit-mounts', C.O_RDONLY)
+		if fd < 0 { return true }
+		mut paths := [512]char{}
+		n := C.read(fd, &paths[0], sizeof(paths))
+		C.close(fd)
+		if n < 0 || n >= isize(sizeof(paths)) { return false }
+		mut start := isize(0)
+		for at := isize(0); at < n; at++ {
+			if paths[at] != char(`\n`) { continue }
+			if at == start || paths[start] != char(`/`) { return false }
+			paths[at] = 0
+			target := &paths[start]
+			if C.mount(target, target, nil, usize(C.MS_BIND), nil) != 0 { return false }
+			if C.mount(c'none', target, nil,
+				usize(C.MS_REMOUNT | C.MS_BIND | C.MS_RDONLY | C.MS_NOSUID | C.MS_NODEV), c'wxallowed') != 0 {
+				C.umount2(target, 0)
+				return false
+			}
+			C.printf(c'LINUX JIT MOUNT: %s ro,nosuid,nodev,wxallowed\n', target)
+			start = at + 1
+		}
+		return start == n
+	}
+}
 
 @[export: 'main']
 pub fn run() i32 {
@@ -73,6 +105,10 @@ pub fn run() i32 {
 			C.setenv(c'LOGNAME', c'compat', 1)
 			C.setenv(c'XDG_RUNTIME_DIR', c'/run/user/1000', 1)
 		}
+		if !prepare_jit_mounts() {
+			C.puts(c'LINUX APPLICATIONS FAIL: JIT runtime mounts')
+			return 1
+		}
 		mut options := [1024]char{}
 		fd := C.open(c'/etc/linux-compat-options', C.O_RDONLY)
 		if fd < 0 {
@@ -86,9 +122,9 @@ pub fn run() i32 {
 			return 1
 		}
 		options[n] = 0
-		// Three fixed arguments, up to five controller options (including
-		// command timeout and a package data device), then the terminating NULL.
-		mut arguments := [9]&char{}
+		// Three fixed arguments, up to six controller options (including
+		// command timeout, package data device and JIT policy), then NULL.
+		mut arguments := [10]&char{}
 		arguments[0] = c'/usr/bin/linux-compat-workloads'
 		arguments[1] = c'--work=/tmp/linux-compat-evidence'
 		arguments[2] = c'--runtime-probe=/usr/share/linux-compat/runtime'

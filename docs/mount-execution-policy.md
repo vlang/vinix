@@ -24,6 +24,37 @@ mount -o remount,wxallowed /compat
 VINIX_ALLOW_WX=1 /compat/program
 ```
 
+An installed runtime can instead receive its own read-only executable mount.
+For example, an administrator can approve the packaged Firefox ELF directory:
+
+```sh
+mount --bind /usr/lib/firefox-esr /usr/lib/firefox-esr
+mount -o remount,bind,ro,nosuid,nodev,wxallowed /usr/lib/firefox-esr
+```
+
+An ordinary user then launches the approved ELF directly:
+
+```sh
+VINIX_ALLOW_WX=1 /usr/lib/firefox-esr/firefox-esr
+```
+
+The `/usr/bin` shell wrapper is outside this approval. Helpers must execute
+through approved mounts too. Keep the runtime directory administrator-owned;
+`nosuid` preserves ordinary effective credentials. For a complete OpenJDK 21,
+the corresponding directory is `/usr/lib/jvm/java-21-openjdk`, and the direct
+entry points are its `bin/java`, `bin/javac` and `bin/jar`.
+
+Revocation removes `wxallowed` while preserving the restrictions:
+
+```sh
+mount -o remount,bind,ro,nosuid,nodev /usr/lib/firefox-esr
+```
+
+Unmount the self-bind before an administrator updates or removes the package,
+then approve the resulting installed runtime explicitly. The qualification
+controller's `--jit-runtimes` option performs the scoped setup in a disposable
+guest; it does not persist a production administrator's approval across boots.
+
 Bind mounts inherit the source policy and can be remounted independently. A
 remount without `wxallowed` revokes the exception for future launches through
 that mount; running processes retain their exec decision. The current option

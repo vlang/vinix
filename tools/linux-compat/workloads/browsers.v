@@ -85,6 +85,12 @@ fn (mut suite Suite) browser(name string) ! {
 		}
 	}
 	expect(C.getuid() != 0, 'browser qualification requires an ordinary user')!
+	if name in suite.jit_runtimes {
+		suite.require_jit_mount(name, program)!
+		// Request only this child's exception. The kernel independently checks
+		// the administrator-approved mount at every exec, including helpers.
+		suite.environment['VINIX_ALLOW_WX'] = '1'
+	}
 	suite.execute(program, ['--version'])!
 	profile := suite.work + '/' + name + '-profile'
 	os.mkdir(profile)!

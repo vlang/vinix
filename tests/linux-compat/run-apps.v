@@ -14,6 +14,7 @@ struct AppReceipt {
 	memory_mib     int
 	workload_timeout int
 	cases          string
+	jit_runtimes   []string
 	inputs         map[string]string
 	exit_code      int
 }
@@ -61,6 +62,7 @@ fn main() {
 		hosttest.Option{ name: '--memory', value: true },
 		hosttest.Option{ name: '--data-disk', value: true },
 		hosttest.Option{ name: '--cases', value: true },
+		hosttest.Option{ name: '--jit-runtimes', value: true },
 		hosttest.Option{ name: '--timeout', value: true },
 		hosttest.Option{ name: '--workload-timeout', value: true },
 	], [], 'Usage: run-apps.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR --rootfs PREPARED-ROOT --workloads NATIVE-ELF --runtime-probe MATCHING-ELF [--path PATH] [--cases runtime,server] [--workload-timeout SECONDS]') or {
@@ -113,6 +115,33 @@ fn main() {
 	}
 	mut inputs := map[string]string{}
 	uid := options.integer('--uid', 0) or { eprintln(err.msg()); exit(2) }
+	mut jit_runtimes := []string{}
+	mut jit_mounts := []string{}
+	if options.has('--jit-runtimes') {
+		if uid != 1000 || path.starts_with('translated-') {
+			eprintln('JIT mount qualification requires an ordinary user and native runtime')
+			exit(2)
+		}
+		for name in options.value('--jit-runtimes', '').split(',') {
+			if name !in ['firefox', 'java'] || name !in cases.split(',') || name in jit_runtimes {
+				eprintln('JIT runtimes must name distinct selected Firefox or Java workloads')
+				exit(2)
+			}
+			candidates := if name == 'firefox' { ['/usr/lib/firefox-esr', '/usr/lib/firefox'] }
+				else { ['/usr/lib/jvm/java-21-openjdk'] }
+			mut selected := ''
+			for candidate in candidates {
+				if os.is_dir(rootfs + candidate) && !os.is_link(rootfs + candidate)
+					&& os.real_path(rootfs + candidate) == rootfs + candidate {
+					selected = candidate
+					break
+				}
+			}
+			if selected == '' { eprintln('missing canonical runtime directory: ' + name); exit(2) }
+			jit_runtimes << name
+			jit_mounts << selected
+		}
+	}
 	memory := options.integer('--memory', 1024) or { eprintln(err.msg()); exit(2) }
 	if memory < 1024 || memory > 16384 { eprintln('memory must be 1024..16384 MiB'); exit(2) }
 	workload_timeout := options.integer('--workload-timeout', 120) or { eprintln(err.msg()); exit(2) }
@@ -173,7 +202,12 @@ fn main() {
 	credentials := uid.str() + '\n'
 	os.write_file(state + '/rootfs/etc/linux-compat-uid', credentials) or { eprintln(err.msg()); exit(1) }
 	inputs['guest_credentials'] = sha256.sum(credentials.bytes()).hex()
-	guest_options := '--cases=' + cases + '\x00--path=' + path + '\x00--runtime-libc=' + options.value('--runtime-libc', 'musl') + '\x00--timeout=' + workload_timeout.str() + '\x00' + if disk != '' { '--data-device=' + if arch == 'aarch64' { '/dev/vda' } else { '/dev/sd0' } + '\x00' } else { '' }
+	jit_policy := if jit_mounts.len == 0 { '' } else { jit_mounts.join('\n') + '\n' }
+	os.write_file(state + '/rootfs/etc/linux-compat-jit-mounts', jit_policy) or { eprintln(err.msg()); exit(1) }
+	inputs['guest_jit_mounts'] = sha256.sum(jit_policy.bytes()).hex()
+	guest_options := '--cases=' + cases + '\x00--path=' + path + '\x00--runtime-libc=' + options.value('--runtime-libc', 'musl') + '\x00--timeout=' + workload_timeout.str() + '\x00'
+		+ (if disk != '' { '--data-device=' + (if arch == 'aarch64' { '/dev/vda' } else { '/dev/sd0' }) + '\x00' } else { '' })
+		+ (if jit_runtimes.len > 0 { '--jit-runtimes=' + jit_runtimes.join(',') + '\x00' } else { '' })
 	inputs['guest_options'] = sha256.sum(guest_options.bytes()).hex()
 	os.write_file(state + '/rootfs/etc/linux-compat-options', guest_options) or {
 		eprintln(err.msg())
@@ -234,7 +268,7 @@ fn main() {
 	}
 	inputs['snapshot_kernel'] = sha256.sum(os.read_bytes(state + '/kernel/bin/vinix') or { []u8{} }).hex()
 	if disk != '' { inputs['data_disk_after'] = sha256.sum(os.read_bytes(disk) or { eprintln(err.msg()); exit(1) }).hex() }
-	os.write_file(state + '/application-inputs.json', json2.encode(AppReceipt{arch, path, uid, memory, workload_timeout, cases, inputs, code},
+	os.write_file(state + '/application-inputs.json', json2.encode(AppReceipt{arch, path, uid, memory, workload_timeout, cases, jit_runtimes, inputs, code},
 		prettify: true
 	)) or {
 		eprintln(err.msg())

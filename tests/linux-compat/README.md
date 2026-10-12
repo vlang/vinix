@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -160,6 +160,14 @@ row. Production kernels retain the graphical console report and also send
 these explicit requests to serial. A busy thread list is reported without
 waiting for its lock; broader deadlock recovery remains a separate concern.
 
+The `jit` case self-binds one runtime directory read-only with
+`nosuid,nodev,wxallowed`. UID/GID 1000 must retain ordinary effective credentials
+even when the executable has setuid/setgid bits; writes return EROFS and user
+remounts return EPERM. An explicit W^X request through an unapproved path fails
+exec with EPERM. Approved exec permits RWX mmap/mprotect, while exec without
+the request retains EOPNOTSUPP. Administrator revocation rejects future
+requests and preserves the default behavior.
+
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,
 source symlinks, a read-only alias, data readback and unmount/remount. The kernel,
@@ -238,6 +246,25 @@ alternatives have not been registered. This does not qualify package scripts
 or installation. That launch requirement is recorded in command receipts;
 ordinary unprivileged
 launches without the administrator's policy are not qualified.
+
+For ordinary-user Firefox or Java qualification, add `--uid 1000
+--jit-runtimes firefox` (or `java`) to `run-apps.v` and select that workload.
+The controller accepts distinct selected native Firefox/Java runtimes only;
+it records the exact mount input and the guest init prepares read-only
+`nosuid,nodev,wxallowed` self-binds before dropping credentials. The driver
+remains outside those mounts. Firefox requests VINIX_ALLOW_WX only for its
+children; every helper exec still receives the kernel's mount check. Reports
+retain the requested names and actual most-specific mountinfo rows, whose
+permissions are required before launching. No sandbox-disable environment
+or command is added. Foreign execution chains and Chromium's setuid sandbox
+require separate integration.
+
+The native x86-64 Firefox 128.14.0esr workload passes in a 4096 MiB guest with
+this explicit approval. It requires a real nonce-bearing JavaScript callback
+and a rendered PNG. The earlier 2048 MiB approved run reaches kernel resource
+limits; approval alone does not increase those limits. These are extracted
+runtime workloads, with installation scripts and persistent lifecycle checks
+still separate. See the [dated qualification evidence](../../docs/linux-posix-qualification.md#administrator-approved-native-jit-runtimes).
 
 `--host` labels host-only evidence and prohibits installation. `--path` chooses
 native AArch64/x86-64 or AArch64's translated x86-64/i386 launcher. Native paths

@@ -1,0 +1,24 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "uid": 1000,
+    "memory_mib": 2048,
+    "workload_timeout": 180,
+    "cases": "java",
+    "jit_runtimes": [
+        "java"
+    ],
+    "inputs": {
+        "guest_credentials": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "guest_jit_mounts": "08a372b6601a4a3bce832f5d73f9d35e5b700984b9947b34bb679c39902e8804",
+        "guest_options": "52518bbf3a1f46c636b618664c852f72f96b4315d83d96214209d5715dacdbe9",
+        "guest_report": "883ed1416fff2f1c9ea36104401fc7f1fd503af02e63f92c3c809b8ed2ec4244",
+        "init_source": "bd66b64e37a72946dc055c8e30df0d63639a393e638140a32e0a1bb38bb0bd9c",
+        "kernel": "5c366983708a94050da2484a6a97b808b1926c304c6850743204ff894b3a7585",
+        "rootfs_manifest": "79474b968eb60905aeee72b87a92df11399e194b2c1e4131377d11310221cd1e",
+        "runtime-probe": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+        "snapshot_kernel": "5c366983708a94050da2484a6a97b808b1926c304c6850743204ff894b3a7585",
+        "workloads": "18aa8abd10d52ebbf26badf5249bd6c80f2f92e0dcb3c5381578b6bcf7e82eb4"
+    },
+    "exit_code": 0
+}

@@ -1,0 +1,24 @@
+{
+    "architecture": "x86_64",
+    "execution_path": "native-x86_64",
+    "uid": 1000,
+    "memory_mib": 4096,
+    "workload_timeout": 120,
+    "cases": "firefox",
+    "jit_runtimes": [
+        "firefox"
+    ],
+    "inputs": {
+        "guest_credentials": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "guest_jit_mounts": "2cf75b18b99269b4e7cccff187da0f272ebc30494429944671cd6fa19b4a92f8",
+        "guest_options": "d7147fc3ea2d64b5c6f863771c90745010aec6d4d0f735e9a34a4c17f98100a8",
+        "guest_report": "0f2439ef8b5420930657729c60717e50726522682eb89bee46246154a84126bb",
+        "init_source": "bd66b64e37a72946dc055c8e30df0d63639a393e638140a32e0a1bb38bb0bd9c",
+        "kernel": "ba02e6240e95e98acd4bc5212cb06749e38515bc273b88c4a6d7996dfd7670ea",
+        "rootfs_manifest": "cd32679fc3ba490939f7c8a5fa65c681360829f785490292a07ab636989d3df6",
+        "runtime-probe": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+        "snapshot_kernel": "ba02e6240e95e98acd4bc5212cb06749e38515bc273b88c4a6d7996dfd7670ea",
+        "workloads": "a4647fa263ff8a9b6d5ca267a530be4c5b2017cfbd1edc5c8e410ee34f5956c8"
+    },
+    "exit_code": 0
+}

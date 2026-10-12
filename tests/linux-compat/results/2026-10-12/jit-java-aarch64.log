@@ -1,0 +1,395 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 000BFDB6000 start failed: 00000001
+Error: Image at 000BFCB2000 start failed: Unsupported
+Error: Image at 000BFC37000 start failed: Not Found
+Error: Image at 000BFB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0xb830c000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0xb830c000 to 0xffffffff80000000, length: 0x2c8000
+vmm: Kernel: Mapping 0xb85d4000 to 0xffffffff802c8000, length: 0x2c000
+vmm: Kernel: Mapping 0xb8600000 to 0xffffffff802f4000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (525714 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x8000 mapped
+vmm: framebuffer 0xbc7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0xb830c000 +0x2f4000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000a4908000
+initramfs: Size:    329195008
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./.trigger sz=210
+!>+ [4] ./usr/ sz=0
+!>+ [5] ./.post-deinstall sz=137
+!>+ [6] ./bin/ sz=0
+!>+ [7] ./.post-upgrade sz=233
+!>+ [8] ./.pre-deinstall sz=46
+!>+ [9] ./sbin/ sz=0
+!>+ [10] ./etc/ sz=0
+!>+ [11] ./.post-install sz=135
+!>+ [12] ./sys/ sz=0
+!>+ [13] ./.SIGN.RSA.alpine-devel@lists.alpinelinux.org-616ae350.rsa.pub sz=512
+!>+ [14] ./root/ sz=0
+!>+ [15] ./lib/ sz=0
+!>+ [16] ./dev/ sz=0
+!>+ [17] ./.PKGINFO sz=537
+!>+ [18] ./tmp/ sz=0
+!>+ [19] ./lib/libc.musl-aarch64.so.1 sz=1022776
+!>+ [20] ./lib/ld-musl-aarch64.so.1 sz=1022776
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [200] ./usr/share/X11/XErrorDB sz=42077
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [400] ./usr/share/X11/locale/iso8859-6/XLC_LOCALE sz=763
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [600] ./usr/lib/libXtst.so.6.1.0 sz=67432
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [800] ./usr/lib/jvm/java-21-openjdk/legal/jdk.jsobject/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1000] ./usr/lib/jvm/java-21-openjdk/legal/java.base/cldr.md sz=9601
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+ [1200] ./usr/libexec/p11-kit/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xffff0000b82f9a00
+initramfs: Done (1243 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2113f0
+LINUX JIT MOUNT: /usr/lib/jvm/java-21-openjdk ro,nosuid,nodev,wxallowed
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2316c0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x48200000 phdr=0x39000040 entry=0x39000ab8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x7c200000 phdr=0x3cc00040 entry=0x3cc00ab8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x74e00000 phdr=0x1f400040 entry=0x1f400abc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x65200000 phdr=0x22400040 entry=0x22400abc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x47c00000 phdr=0x33a00040 entry=0x33a00ab8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x5f400000 phdr=0x1ee00040 entry=0x1ee00ab8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x79e00000 phdr=0x36e00040 entry=0x36e00abc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x73e00000 phdr=0x2c200040 entry=0x2c200abc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x41e00000 phdr=0x1c400040 entry=0x1c400ab8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x78800000 phdr=0x28200040 entry=0x28200ab8
+java: passed
+LINUX APPLICATION REPORT BEGIN
+{
+    "context": "vinix-guest",
+    "execution_path": "native-aarch64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "18aa8abd10d52ebbf26badf5249bd6c80f2f92e0dcb3c5381578b6bcf7e82eb4",
+    "runtime_probe_sha256": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+    "runtime_libc": "musl",
+    "uid": 1000,
+    "gid": 1000,
+    "requested_jit_runtimes": [
+        "java"
+    ],
+    "jit_mounts": [
+        {
+            "runtime": "java",
+            "executable": "/usr/lib/jvm/java-21-openjdk/bin/java",
+            "mountinfo": "6 1 0:1 /usr/lib/jvm/java-21-openjdk /usr/lib/jvm/java-21-openjdk ro,nosuid,nodev,wxallowed,relatime - tmpfs /usr/lib/jvm/java-21-openjdk rw"
+        }
+    ],
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "java",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/java",
+                "-version"
+            ],
+            "executable_sha256": "b60328ada1e29999bf1177113c6bc464918775b95ee05404a056b2fbdcc6c21d",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "openjdk version \"21.0.10\" 2026-01-20\nOpenJDK Runtime Environment (build 21.0.10+7-alpine-r0)\nOpenJDK 64-Bit Server VM (build 21.0.10+7-alpine-r0, mixed mode, sharing)\n",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1701136 kB\nMemFree:        1639984 kB\nMemAvailable:   1639984 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           3856 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 217745408\nOwnerLimit: 108872704\nCharged: 2913080\nAccounts: 3\nDenied: 0\nKind Objects Bytes\nfile 21 93270\ndescriptor 19 51200\nsocket 0 0\nipc 3 12288\nmapping 81 2233856\nprocess 6 83298\nthread 4 422656\nscratch 1 16512\nDenied.invalid: 0\nDenied.accounts: 0\nDenied.objects: 0\nDenied.global: 0\nDenied.owner: 0\nDenied.cgroup: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/javac",
+                "/tmp/linux-compat-evidence/VinixJavaSmoke.java"
+            ],
+            "executable_sha256": "97d94d81596d243ff7d532ec4e3673971633f412beeaa00c7ead76c074680f34",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1701136 kB\nMemFree:        1499824 kB\nMemAvailable:   1499824 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           4032 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 217745408\nOwnerLimit: 108872704\nCharged: 3592260\nAccounts: 4\nDenied: 0\nKind Objects Bytes\nfile 30 286372\ndescriptor 19 51200\nsocket 0 0\nipc 3 12288\nmapping 99 2692352\nprocess 8 110880\nthread 4 422656\nscratch 1 16512\nDenied.invalid: 0\nDenied.accounts: 0\nDenied.objects: 0\nDenied.global: 0\nDenied.owner: 0\nDenied.cgroup: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/java",
+                "-Xms16m",
+                "-Xmx128m",
+                "-cp",
+                "/tmp/linux-compat-evidence",
+                "VinixJavaSmoke"
+            ],
+            "executable_sha256": "b60328ada1e29999bf1177113c6bc464918775b95ee05404a056b2fbdcc6c21d",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "OpenJDK 21 (OpenJDK 64-Bit Server VM) on Vinix: PASS\n",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1701136 kB\nMemFree:        1499328 kB\nMemAvailable:   1499328 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           4096 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 217745408\nOwnerLimit: 108872704\nCharged: 4013742\nAccounts: 5\nDenied: 0\nKind Objects Bytes\nfile 36 323586\ndescriptor 19 51200\nsocket 0 0\nipc 3 12288\nmapping 113 3048960\nprocess 10 138540\nthread 4 422656\nscratch 1 16512\nDenied.invalid: 0\nDenied.accounts: 0\nDenied.objects: 0\nDenied.global: 0\nDenied.owner: 0\nDenied.cgroup: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/jar",
+                "--create",
+                "--file",
+                "/tmp/linux-compat-evidence/vinix-java-smoke.jar",
+                "-C",
+                "/tmp/linux-compat-evidence",
+                "VinixJavaSmoke.class"
+            ],
+            "executable_sha256": "2ddfdb0709259e32fbc3ac1ad2002fa617517286406f4599a9ff0a257e7dbdfc",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1701136 kB\nMemFree:        1498656 kB\nMemAvailable:   1498656 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           4096 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 217745408\nOwnerLimit: 108872704\nCharged: 4485492\nAccounts: 6\nDenied: 0\nKind Objects Bytes\nfile 40 348008\ndescriptor 19 51200\nsocket 2 16384\nipc 3 12288\nmapping 131 3507456\nprocess 8 110988\nthread 4 422656\nscratch 1 16512\nDenied.invalid: 0\nDenied.accounts: 0\nDenied.objects: 0\nDenied.global: 0\nDenied.owner: 0\nDenied.cgroup: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "argv": [
+                "/usr/lib/jvm/java-21-openjdk/bin/java",
+                "-Xms16m",
+                "-Xmx128m",
+                "-cp",
+                "/tmp/linux-compat-evidence/vinix-java-smoke.jar",
+                "VinixJavaSmoke"
+            ],
+            "executable_sha256": "b60328ada1e29999bf1177113c6bc464918775b95ee05404a056b2fbdcc6c21d",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "OpenJDK 21 (OpenJDK 64-Bit Server VM) on Vinix: PASS\n",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       1701136 kB\nMemFree:        1498336 kB\nMemAvailable:   1498336 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           4112 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 217745408\nOwnerLimit: 108872704\nCharged: 4698714\nAccounts: 7\nDenied: 0\nKind Objects Bytes\nfile 44 372712\ndescriptor 19 51200\nsocket 0 0\nipc 3 12288\nmapping 139 3712256\nprocess 8 111090\nthread 4 422656\nscratch 1 16512\nDenied.invalid: 0\nDenied.accounts: 0\nDenied.objects: 0\nDenied.global: 0\nDenied.owner: 0\nDenied.cgroup: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": []
+}
+LINUX APPLICATION REPORT END
+LINUX APPLICATIONS: PASS
+QEMU: Terminated
+

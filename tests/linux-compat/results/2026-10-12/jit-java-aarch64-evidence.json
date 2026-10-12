@@ -1,0 +1,29 @@
+{
+    "architecture": "aarch64",
+    "context": "UID/GID 1000; scoped read-only administrator-approved executable mount; per-child W^X request; native guest workload; assertion-enabled audit",
+    "artifacts": {
+        "archive": "3ba00acf35faa165a37fb62880d061b9cf6ec9861172b61bd3158d91eaa4438b",
+        "audit": "2b6b28f68a093869ce2d7a57c3d92e1a7de6de40c2355e6af150a9f9730d92d0",
+        "compiler": "24c19beab399d14b40d9cff8d54bc3890b26f7f6e51c444b859d3c323157744a",
+        "controller": "530192e3efa26274237540e0e1080a4398519f848e36d8dc3d69f15ef86bf109",
+        "controller_source": "f79628af1de9a2d36ccaa595de5767f16400809df0e78791808505d95a5cc3a1",
+        "driver_build": "767fea7ad68ef2887f4633f16f81591d5a98a3c14bfd9152b1fe016039a4b1b4",
+        "generated_c": "9658d29e196522d15220877bebcd28394b3ca49ca5f384b8f0dc79f00eac82ed",
+        "init": "b4c9bea7af37d26f3db716b13b9cc3713c9ee5e944572d8ccadc02561287c2da",
+        "inputs": "a15903106cab62df5cf7497d0bd2401048ee6e633af53c6d8edc213aeffe6ea3",
+        "iso": "eb56854a410f0bea8e84ee09f8f042150ce7db7b8bf6333ac93a08a9185d9fab",
+        "kernel": "5c366983708a94050da2484a6a97b808b1926c304c6850743204ff894b3a7585",
+        "package_inputs": "bee3e1671db8d9a90d91795605865a74d05aca86efd0fbd4d0dc8a2941a87c52",
+        "report": "a9e43e70237d212f02428801e0d1d6d1793135b16288244e09e606d79e2435a7",
+        "rootfs_manifest": "79474b968eb60905aeee72b87a92df11399e194b2c1e4131377d11310221cd1e",
+        "serial": "9474c7369f796cf2bc77f409c070fc9c36464fcb547086d6d24430335687bd62"
+    },
+    "rootfs_overrides": {
+        "/etc/linux-compat-jit-mounts": "08a372b6601a4a3bce832f5d73f9d35e5b700984b9947b34bb679c39902e8804",
+        "/etc/linux-compat-options": "52518bbf3a1f46c636b618664c852f72f96b4315d83d96214209d5715dacdbe9",
+        "/etc/linux-compat-uid": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "/sbin/init": "b4c9bea7af37d26f3db716b13b9cc3713c9ee5e944572d8ccadc02561287c2da",
+        "/usr/bin/linux-compat-workloads": "18aa8abd10d52ebbf26badf5249bd6c80f2f92e0dcb3c5381578b6bcf7e82eb4",
+        "/usr/share/linux-compat/runtime": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53"
+    }
+}

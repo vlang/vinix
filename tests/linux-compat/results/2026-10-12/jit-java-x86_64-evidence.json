@@ -1,0 +1,29 @@
+{
+    "architecture": "x86_64",
+    "context": "UID/GID 1000; scoped read-only administrator-approved executable mount; per-child W^X request; native guest workload; assertion-enabled audit",
+    "artifacts": {
+        "archive": "530af2428c88c7ce3e8bede471ddc8acedb222151b96ea15dcc639e5a15ab5be",
+        "audit": "2b6b28f68a093869ce2d7a57c3d92e1a7de6de40c2355e6af150a9f9730d92d0",
+        "compiler": "24c19beab399d14b40d9cff8d54bc3890b26f7f6e51c444b859d3c323157744a",
+        "controller": "530192e3efa26274237540e0e1080a4398519f848e36d8dc3d69f15ef86bf109",
+        "controller_source": "f79628af1de9a2d36ccaa595de5767f16400809df0e78791808505d95a5cc3a1",
+        "driver_build": "1df3b85168c4e3b70978dd6eae8bbcead2abb63a82ed2be9dcf3eeaf5a625046",
+        "generated_c": "760e54a4c69a772694bf704df664aff7ba8008c78d8ac87ac6a328f25e501ad2",
+        "init": "8a9b674755e0266b956797b6ce780ccd3ce2a163823bc648b936a5a8831c3204",
+        "inputs": "d728ad3afa01e914ef58857f2cc1fa7f87fe2de479182e07ae811b8013584f61",
+        "iso": "db1c8c73a3f5c97861a87f4aff2f7317b7dc68de332dd4597133582a556034b1",
+        "kernel": "ba02e6240e95e98acd4bc5212cb06749e38515bc273b88c4a6d7996dfd7670ea",
+        "package_inputs": "ee6926d3d7499eee8a57464fdc8027d631810e578b313f94c417c0a6dd3e17ba",
+        "report": "8d03dbf1a6857e60b82441f360a4d1cc450ff0763d9dd812f1385b34e0b618e6",
+        "rootfs_manifest": "d95f97c9a408355691ffe770999c067c55330cd6b00e742eecd2d0e0b4642111",
+        "serial": "9fef6505a7d333efdf8a938f6d1432c0e7d40f0241a314c61541cc946c5f7c50"
+    },
+    "rootfs_overrides": {
+        "/etc/linux-compat-jit-mounts": "08a372b6601a4a3bce832f5d73f9d35e5b700984b9947b34bb679c39902e8804",
+        "/etc/linux-compat-options": "64264f312cc11465449d4576f7e3e5fb8e2e9fb96b3cfa6e3a267ed5667ec502",
+        "/etc/linux-compat-uid": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "/sbin/init": "8a9b674755e0266b956797b6ce780ccd3ce2a163823bc648b936a5a8831c3204",
+        "/usr/bin/linux-compat-workloads": "a4647fa263ff8a9b6d5ca267a530be4c5b2017cfbd1edc5c8e410ee34f5956c8",
+        "/usr/share/linux-compat/runtime": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788"
+    }
+}

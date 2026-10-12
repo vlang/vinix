@@ -99,6 +99,10 @@ fn evidence(root string, category string, workload string, arch string, name str
 	base := 'tests/linux-compat/results/2026-10-11/'
 	report := base + name + '.json'
 	receipt := base + 'inputs-' + name + '.json'
+	return evidence_files(root, category, workload, arch, report, receipt, limits)
+}
+
+fn evidence_files(root string, category string, workload string, arch string, report string, receipt string, limits string) !ApplicationEvidence {
 	mut result := audit_application(os.read_file(root + '/' + report)!,
 		os.read_file(root + '/' + receipt)!, arch, workload)!
 	result.category = category
@@ -121,12 +125,23 @@ fn application_index(root string) !ApplicationIndex {
 			rows << evidence(root, category, workload, arch, 'catalog-' + arch, limits)!
 		}
 		for language in ['go', 'java'] {
+			if language == 'java' {
+				base := 'tests/linux-compat/results/2026-10-12/jit-java-' + arch
+				rows << evidence_files(root, 'language runtimes', language, arch, base + '.json', base + '-inputs.json',
+					'OpenJDK 21 compiles, runs and creates/reopens a JAR as UID 1000 through a read-only administrator-approved JIT runtime mount; extracted inputs do not qualify package scripts, install/update or desktop integration')!
+				continue
+			}
 			rows << evidence(root, 'language runtimes', language, arch, language + '-' + arch,
-				if language == 'java' { 'OpenJDK thread/NIO/TCP and JAR workload needs the privileged VINIX_ALLOW_WX launch policy; ordinary-user JIT and desktop install/update unqualified' }
-				else if arch == 'x86_64' { 'Go compiles and runs as UID 1000: threads, files, timers, subprocesses and TCP; extracted inputs do not qualify package installation or desktop integration' }
+				if arch == 'x86_64' { 'Go compiles and runs as UID 1000: threads, files, timers, subprocesses and TCP; extracted inputs do not qualify package installation or desktop integration' }
 				else { 'Go compilation, threads, files, timers and TCP; package install/update and desktop integration unqualified' })!
 		}
 		for browser in ['firefox', 'chromium'] {
+			if browser == 'firefox' && arch == 'x86_64' {
+				base := 'tests/linux-compat/results/2026-10-12/jit-firefox-x86_64'
+				rows << evidence_files(root, 'browsers', browser, arch, base + '.json', base + '-inputs.json',
+					'Firefox 128.14.0esr default sandbox settings, UID 1000, scoped read-only JIT mount, 4096 MiB guest: actual JavaScript callback and PNG; full isolation, GPU, portals and installed lifecycle unqualified')!
+				continue
+			}
 			name := if arch == 'x86_64' { 'browsers-x86_64' }
 				else if browser == 'firefox' { 'firefox-shared-memory-aarch64' }
 				else { 'browsers-before-aarch64' }
@@ -149,7 +164,7 @@ fn application_index(root string) !ApplicationIndex {
 		}
 	}
 	rows.sort(a.key() < b.key())
-	return ApplicationIndex{'2026-10-11', 'vinix-guest receipts; exact recorded inputs only',
+	return ApplicationIndex{'2026-10-12', 'vinix-guest receipts; exact recorded inputs only',
 		rows.all(it.status == 'passed' && it.full_lifecycle_qualified), rows}
 }
 

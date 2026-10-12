@@ -47,6 +47,8 @@ struct Report {
 	runtime_libc                 string
 	uid                          int
 	gid                          int
+	requested_jit_runtimes       []string
+	jit_mounts                   []JitMountResult
 	complete_lifecycle_qualified bool
 	results                      []Verdict
 	commands                     []CommandResult
@@ -68,6 +70,7 @@ struct Suite {
 	data_device string
 	// Only guest main enables this. Host evidence must not read host /proc.
 	diagnostics_root string
+	jit_runtimes []string
 mut:
 	environment map[string]string
 	commands []CommandResult
@@ -78,6 +81,7 @@ mut:
 	service_units []ServiceUnitResult
 	unit_requests []ServiceUnitRequest
 	browsers []BrowserResult
+	jit_mounts []JitMountResult
 }
 
 fn stop(mut child os.Process) {
@@ -300,6 +304,7 @@ fn (mut suite Suite) run(name string) ! {
 			source := native_runtime_fixture('java', suite.path, $embed_file('../../../tests/java/VinixJavaSmoke.java').to_string())!
 			suite.package('openjdk21-jdk')!
 			jdk := native_java_bin()!
+			if 'java' in suite.jit_runtimes { suite.require_jit_mount('java', jdk + '/java')! }
 			// HotSpot needs writable executable code pages. Request the existing
 			// compatibility exception only for these children; exec still
 			// requires a privileged launcher or an administrator's wxallowed mount.
@@ -409,7 +414,7 @@ fn main() {
 	mut values := map[string]string{}
 	for arg in os.args[1..] {
 		key := arg.all_before('=')
-		if key !in ['--work', '--cases', '--path', '--timeout', '--runtime-probe', '--runtime-libc', '--data-device', '--host', '--install'] || key in values {
+		if key !in ['--work', '--cases', '--path', '--timeout', '--runtime-probe', '--runtime-libc', '--data-device', '--jit-runtimes', '--host', '--install'] || key in values {
 			eprintln('Usage: workloads --work=FRESH-DIR [--cases=sqlite,media,...] [--path=native-aarch64|native-x86_64|translated-x86_64|translated-i386] [--timeout=SECONDS] [--runtime-probe=ELF] [--host] [--install]')
 			exit(2)
 		}
@@ -459,6 +464,14 @@ fn main() {
 		exit(2)
 	}
 	host := '--host' in values
+	jit_runtimes := parse_jit_runtimes(values['--jit-runtimes'] or { '' }, cases, path) or {
+		eprintln(err.msg())
+		exit(2)
+	}
+	if host && jit_runtimes.len > 0 {
+		eprintln('JIT mount qualification is permitted only inside Vinix')
+		exit(2)
+	}
 	if host && ('--install' in values || 'packages' in cases) {
 		eprintln('installation is permitted only inside Vinix')
 		exit(2)
@@ -476,7 +489,7 @@ fn main() {
 		eprintln(err.msg())
 		exit(1)
 	}
-	mut suite := Suite{ work: os.real_path(work), path: path, timeout: timeout, install: '--install' in values, runtime: values['--runtime-probe'] or { '' }, runtime_libc: runtime_libc, data_device: values['--data-device'] or { '' }, diagnostics_root: if host { '' } else { '/proc' } }
+	mut suite := Suite{ work: os.real_path(work), path: path, timeout: timeout, install: '--install' in values, runtime: values['--runtime-probe'] or { '' }, runtime_libc: runtime_libc, data_device: values['--data-device'] or { '' }, diagnostics_root: if host { '' } else { '/proc' }, jit_runtimes: jit_runtimes }
 	mut verdicts := []Verdict{}
 	for name in cases {
 		suite.run(name) or {
@@ -493,7 +506,7 @@ fn main() {
 	} else {
 		''
 	}
-	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, int(C.getuid()), int(C.getgid()), false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages, suite.games, suite.service_units, suite.browsers}
+	report := Report{if host { 'host' } else { 'vinix-guest' }, path, version, sha256.sum(os.read_bytes(os.executable()) or { []u8{} }).hex(), runtime_hash, runtime_libc, int(C.getuid()), int(C.getgid()), jit_runtimes, suite.jit_mounts, false, verdicts, suite.commands, suite.services, suite.debuggers, suite.packages, suite.games, suite.service_units, suite.browsers}
 	os.write_file(suite.work + '/report.json', json2.encode(report, prettify: true) + '\n') or {
 		eprintln(err.msg())
 		exit(1)

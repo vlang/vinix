@@ -1,0 +1,123 @@
+{
+    "context": "vinix-guest",
+    "execution_path": "native-x86_64",
+    "kernel": "Linux version 0.1.0 (vinix) #1 SMP\n",
+    "suite_sha256": "a4647fa263ff8a9b6d5ca267a530be4c5b2017cfbd1edc5c8e410ee34f5956c8",
+    "runtime_probe_sha256": "8f16854ef58c1bc3a33ab0049aa468b42f75cbbd8fdc07665a3d2fa3831aa788",
+    "runtime_libc": "musl",
+    "uid": 1000,
+    "gid": 1000,
+    "requested_jit_runtimes": [
+        "firefox"
+    ],
+    "jit_mounts": [
+        {
+            "runtime": "firefox",
+            "executable": "/usr/lib/firefox-esr/firefox-esr",
+            "mountinfo": "6 1 0:1 /usr/lib/firefox-esr /usr/lib/firefox-esr ro,nosuid,nodev,wxallowed,relatime - tmpfs /usr/lib/firefox-esr rw"
+        }
+    ],
+    "complete_lifecycle_qualified": false,
+    "results": [
+        {
+            "name": "firefox",
+            "status": "passed",
+            "detail": "workload predicates passed; full install/update/desktop lifecycle remains separate"
+        }
+    ],
+    "commands": [
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--version"
+            ],
+            "executable_sha256": "143aeed9b12686c25130cac64524508ee9342533e5da76d059aef5e26524601f",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "Mozilla Firefox 128.14.0esr\n",
+            "stderr": "",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       3588528 kB\nMemFree:        3500188 kB\nMemAvailable:   3500188 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           13188 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 459331584\nOwnerLimit: 229665792\nCharged: 3045086\nAccounts: 3\nDenied: 0\nKind Objects Bytes\nfile 18 69704\ndescriptor 21 51456\nsocket 0 0\nipc 3 12288\nmapping 95 1120000\nprocess 6 82694\nthread 3 1692432\nscratch 1 16512\nDenied.invalid: 0\nDenied.accounts: 0\nDenied.objects: 0\nDenied.global: 0\nDenied.owner: 0\nDenied.cgroup: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "argv": [
+                "/usr/lib/firefox-esr/firefox-esr",
+                "--headless",
+                "--no-remote",
+                "--profile",
+                "/tmp/linux-compat-evidence/firefox-profile",
+                "--window-size",
+                "800,600",
+                "--screenshot",
+                "/tmp/linux-compat-evidence/firefox.png",
+                "http://127.0.0.1:49422/"
+            ],
+            "executable_sha256": "143aeed9b12686c25130cac64524508ee9342533e5da76d059aef5e26524601f",
+            "environment_overrides": {
+                "VINIX_ALLOW_WX": "1"
+            },
+            "environment_unset": [],
+            "exit_code": 0,
+            "timed_out": false,
+            "output_limited": false,
+            "stdout": "[GFX1-]: glxtest: libpci missing\n[GFX1-]: glxtest: libGL.so.1 missing\n[GFX1-]: No GPUs detected via PCI\n\n",
+            "stderr": "*** You are running in headless mode.\n",
+            "diagnostics": [
+                {
+                    "phase": "started",
+                    "files": [
+                        {
+                            "path": "/proc/meminfo",
+                            "content": "MemTotal:       3588528 kB\nMemFree:        3490144 kB\nMemAvailable:   3490144 kB\nBuffers:               0 kB\nCached:         0 kB\nSwapTotal:      0 kB\nSwapFree:       0 kB\nZswap:          0 kB\nZswapped:       0 kB\nVinixPageouts:  0\nVinixRefaults:  0\nVinixSwapErrors: 0\nSlab:           13320 kB\nVinixMemoryPressure: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        },
+                        {
+                            "path": "/proc/kernel-resources",
+                            "content": "Limit: 459331584\nOwnerLimit: 229665792\nCharged: 4469566\nAccounts: 4\nDenied: 0\nKind Objects Bytes\nfile 35 169234\ndescriptor 23 51712\nsocket 1 131072\nipc 3 12288\nmapping 145 1722112\nprocess 8 110060\nthread 4 2256576\nscratch 1 16512\nDenied.invalid: 0\nDenied.accounts: 0\nDenied.objects: 0\nDenied.global: 0\nDenied.owner: 0\nDenied.cgroup: 0\n",
+                            "truncated": false,
+                            "error": ""
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "services": [],
+    "debuggers": [],
+    "packages": [],
+    "games": [],
+    "service_units": [],
+    "browsers": [
+        {
+            "name": "firefox",
+            "executable": "/usr/lib/firefox-esr/firefox-esr",
+            "page_sha256": "bb338d4e8f1d7280772781b523eb2be0a946f61b602c2f52afeb093e2bddeb4a",
+            "javascript_callback": "GET /result/a74d13d027dd6b485b7781d829bca4afc8f4753ed4bfd6911df1cc8388b5f8ed/42 HTTP/1.1",
+            "dom_verified": false,
+            "screenshot_sha256": "14a5b6d209b1baccb516c0bf8c7a4c141885794caa0cf486aff3bf2e100c358a"
+        }
+    ]
+}
