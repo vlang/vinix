@@ -190,7 +190,11 @@ fn abi_atomic_adapter(metadata map[string]AbiValue, exported map[string]AbiExpor
 	if operation == 'compare_exchange' { lines << '__typeof__(*${p}) ${old} = (old);' }
 	lines << '__typeof__(*${p}) ${value} = (value);'
 	lines << '__typeof__(*${p}) ${out};'
-	lines << '(void)sizeof(__atomic_load_n(${p}, __ATOMIC_RELAXED));'
+	// A generic, unevaluated witness accepts original one-word page-table
+	// records without loading storage. Remove result qualifiers only for the
+	// compiler check; the typed value/result and real V bit backend stay intact.
+	lines << '_Static_assert(__builtin_classify_type(*${p}) == 1 || __builtin_classify_type(*${p}) == 5 || ((__builtin_classify_type(*${p}) == 12 || __builtin_classify_type(*${p}) == 13) && sizeof(*${p}) <= 8 && __alignof__(*${p}) >= sizeof(*${p})), "atomic storage must be integer, pointer or naturally aligned word aggregate");'
+	lines << '(void)sizeof((__atomic_load(${p}, (__typeof__((0, *${p})) *)&${out}, __ATOMIC_RELAXED), 0));'
 	lines << '_Static_assert(!__builtin_types_compatible_p(__typeof__(${p}), const __typeof__(*${p}) *), "atomic storage must be writable");'
 	accepted := [1, 2, 4, 8, 16].map('sizeof(*${p}) == ${it}').join(' || ')
 	lines << '_Static_assert(${accepted}, "unsupported native atomic width");'

@@ -1693,11 +1693,11 @@ no guest success. Evidence and independent reviews stay under `smp-oct10/`.
 The completed SME worktrees were retired only after exact saved artifact and
 source checks; copied runtime caches remain private to each architecture.
 
-The coherent audit remains **5/269**, with 226 task/MM/vfork and 33 aggregate
-exchange first errors. A reviewed private generic exchange witness design
-exists under `aggregate-exchange-design-oct12/`; it is not implemented. Its
-small-word record support must preserve const/float/array/width rejection,
-natural alignment and the existing separate scalar128 availability boundary.
+That increment's coherent audit remained **5/269**, with 226 task/MM/vfork and
+33 aggregate exchange first errors. The private generic exchange witness design
+under `aggregate-exchange-design-oct12/` was not yet implemented at that snapshot;
+the completed increment below preserves the required rejection, alignment and
+separate scalar128 boundaries.
 Actual vfork rendezvous still needs retained actor/process owners, non-last
 actor exit and abort semantics; see `vfork-native-design-oct12/design.md`.
 Neither a predicate nor dummy task fields completes MM/GFP ownership.
@@ -1705,3 +1705,41 @@ Neither a predicate nor dummy task fields completes MM/GFP ownership.
 Continue through genuine device/DMA/DRM/firmware dependencies. Tiger Lake
 identity and physical/passthrough validation are still pending; GPU support
 remains incomplete.
+
+## Latest typed aggregate exchange increment
+
+Raw TSC is committed as `0a94db7c`. The V ABI generator now accepts naturally
+aligned 1/2/4/8-byte records/unions through an unevaluated generic type witness.
+Original Linux wrappers and the V exchange/CAS backend remain unchanged.
+Operands are captured once; exact old/new bytes are retained. Const, floating,
+array, packed, width3 and explicitly aligned16 aggregate controls fail genuine
+compiler checks. Scalar128 controls retain prior helper imports only, without
+execution or an expanded availability claim. No MM service is supplied.
+
+Two sanitizer profiles each pass 792 cases, 16,000 concurrent token exchanges
+and 16,000 successful CAS increments. Four genuine freestanding production
+objects import only `memcpy`. One independent no-override replay and source/
+lifetime review bind the repository generator, genuine original types and
+all compiler dependencies.
+
+Fresh native architecture worktrees at `0a94db7c` plus six exact integration
+paths build enabled/default x86 and default ARM. Enabled ELF
+`0fbde437f087f965aea860649857394c80e8ba0fa817fc5fa63d545740674e45`
+boots normal/SSE/four-level guests, each with 46 markers and 28 strict allocation
+equalities. The native fixture uses ten concrete original/record/union types
+on the stack and original `xchg`/`cmpxchg` wrappers. Across four query cycles it
+executes 120,000 calls with IRQs on/off and nested pins. Fourth-batch free bytes
+return to `387395584` for normal/SSE and `387424256` for four-level; live heap
+counts remain equal. Default Linux-ABI startup passes. Exact actual C/object
+review distinguishes the allocation-free warmed module guard from standalone
+exports. Completed raw-TSC worktrees were retired only after exact saved
+artifact/source checks; private runtime cache copies remain available.
+
+The isolated coherent audit remains **5/269**. Its 33 former aggregate first
+errors now reach genuine `boot_cpu_has_bug` dependencies; 226 task/MM/vfork,
+two timer and one each entry-stack, IRQ-header and nested-lock errors remain.
+Use `aggregate-final-isolated-audit/` and the exact `aggregate-*-native/`,
+`aggregate-guest-review/` and `aggregate-independent-review/` evidence.
+Full link, Tiger Lake PCI identity and physical/passthrough validation remain
+pending. Continue genuine CPU-bug policy and task/MM/GFP ownership work, then
+device/DMA/DRM/firmware services. GPU support is incomplete.

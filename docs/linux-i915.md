@@ -154,6 +154,11 @@ after a filesystem failure. Mutable build inputs still require isolation.
   Native, hosted and audit translation units force-include the unchanged
   `compiler_types.h` after `kconfig.h`, matching the pinned Kbuild contract.
   A separate first-header probe checks the original DRM atomic declarations.
+  Typed exchange and compare/exchange accept naturally aligned 1/2/4/8-byte
+  records and unions, including original `pte_t` and `pmd_t`. Operands retain
+  single evaluation and exact object bytes. Const, floating, array, packed,
+  unsupported-width and 16-byte aggregate operands fail compiler checks.
+  Scalar 128-bit dispatch retains its separate existing availability boundary.
 - Upstream `refcount_t` and ordinary `kref_get`/`kref_put`, including saturation,
   final-release ordering, spinlock release helpers and
   `refcount_dec_and_mutex_lock`.
@@ -1976,7 +1981,7 @@ existing allocation-free initialization guard, warmed during bootstrap before
 measured queries; it is not byte-identical to a standalone test export thunk.
 No asynchronous pointer ownership or per-query allocation is introduced.
 
-The coherent full audit remains **5/269**. The former TSC declaration error now
+That increment's coherent full audit remained **5/269**. The former TSC declaration error
 reaches task/MM/vfork ownership, bringing that first-error group to 226 files.
 Thirty-three files still fail the aggregate exchange type witness. Hardware
 operation, full linking and GPU support remain unvalidated.
@@ -1986,3 +1991,43 @@ Run `build-support/run-v-tool.sh tests/linuxkpi/raw_tsc.v`. Evidence is under
 failed with disk exhaustion and did not validate a boot; use the fresh retry
 states and saved final artifacts. The existing broad allocation baseline is
 unchanged in scope; these measurements do not establish a global gate pass.
+
+## Original typed aggregate exchange
+
+The V ABI generator now uses an unevaluated generic atomic type witness for
+naturally aligned word records and unions. The original Linux wrappers and
+the existing V byte backend remain unchanged. The witness performs no storage
+load; exchange and failed/successful CAS return the exact previous bytes.
+Callers still provide valid storage aligned for its declared type. This adds
+no Linux MM, page-table ownership or new scalar 128-bit guarantee.
+
+Two strict GNU99/GNU11 sanitizer profiles pass 792 bit-pattern cases each,
+including original PTE/PMD and volatile storage, single operand evaluation,
+16,000 concurrent token exchanges and 16,000 successful CAS increments.
+Fourteen compiler controls reject unsupported operands; two scalar128
+controls preserve the separate original helper imports without executing them.
+Four freestanding production objects retain only `memcpy` as an unresolved
+dependency. Independent replay authenticates the actual generated header and
+unchanged production bodies.
+
+Fresh worktrees at `0a94db7c` with six integration overlays build enabled/default
+x86 and default ARM. Enabled ELF
+`0fbde437f087f965aea860649857394c80e8ba0fa817fc5fa63d545740674e45`
+boots normal, SSE and four-level guests. Each passes 46 markers and 28 strict
+allocation equalities. The query batches execute 120,000 native fixture calls
+through original `xchg`/`cmpxchg` wrappers across enabled/disabled IRQs and nested
+pins. All ten concrete types use synchronous stack operands/results; no hidden
+V allocation or asynchronous owner is introduced. Fourth-batch free bytes
+recover `387395584` in normal/SSE and `387424256` in four-level, with all live
+heap counts unchanged. Default Linux-ABI startup passes.
+
+The coherent isolated full audit remains **5/269**. All 33 former aggregate
+exchange first errors now reach `boot_cpu_has_bug`; 226 task/MM/vfork first
+errors and the remaining timer/entry/IRQ/lock dependencies remain unresolved.
+Full compile/link and Tiger Lake GPU validation are still pending.
+
+Run `build-support/run-v-tool.sh tests/linuxkpi/aggregate_exchange.v`.
+Evidence is under `smp-oct10/aggregate-*`, including independent source/lifetime
+review, exact saved native artifacts, guest ISO proofs and complete audit
+diagnostics. These feature measurements do not establish a global allocation
+gate pass.

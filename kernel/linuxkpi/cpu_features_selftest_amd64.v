@@ -14,6 +14,7 @@ mut:
 }
 
 fn C.vinix_linuxkpi_tsc_fixture_queries() i32
+fn C.vinix_linuxkpi_aggregate_fixture_queries() i32
 
 fn cpu_feature_test_heap(snapshot &CPUFeatureHeapSnapshot) bool {
 	$if linuxkpi ? {
@@ -38,7 +39,8 @@ fn cpu_feature_test_queries(expected u32) bool {
 			|| cpu_has(feature_movdir64b) != (expected & (u32(1) << 28) != 0)
 			|| cpu_has(feature_hw_shstk) != (boot_infrastructure_bits & (u32(1) << 7) != 0)
 			|| cpu_has(feature_active_la57) != (boot_infrastructure_bits & (u32(1) << 16) != 0)
-			|| C.vinix_linuxkpi_tsc_fixture_queries() != 1 {
+			|| C.vinix_linuxkpi_tsc_fixture_queries() != 1
+			|| C.vinix_linuxkpi_aggregate_fixture_queries() != 0 {
 			return false
 		}
 	}
