@@ -50,7 +50,7 @@ fn package_application_probe() int {
 	return 37
 }
 
-fn qualify_package_session(mut t Test) ! {
+fn qualify_package_session(mut t Test, enforced bool) ! {
 	db := t.make_accounts()
 	alex := must_user(db, 'alex')
 	assert alex.uid == 1000 && db.supplementary_gids(alex).len == 2
@@ -59,8 +59,10 @@ fn qualify_package_session(mut t Test) ! {
 	os.mkdir_all('/var/lib/vinix-packages')!
 	os.cp('/sbin/init', '/tmp/package-source/bin/app')!
 	os.chmod('/tmp/package-source/bin/app', 0o755)!
-	os.cp('/sbin/init', '/usr/bin/vinix-sandbox')!
-	os.chmod('/usr/bin/vinix-sandbox', 0o755)!
+	if !enforced {
+		os.cp('/sbin/init', '/usr/bin/vinix-sandbox')!
+		os.chmod('/usr/bin/vinix-sandbox', 0o755)!
+	}
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
 	public_key := pkgcore.keygen('/tmp/package-signing-seed')!
 	package := pkgcore.Package{
@@ -87,6 +89,7 @@ fn qualify_package_session(mut t Test) ! {
 		policy:       pkgcore.Policy{ reserve_bytes: 0 }
 	}
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(config))!
+	if enforced { os.write_file('/tmp/package-enforcement-config.json', json2.encode(config))! }
 	for path in ['/etc/vinix-packages', '/var/lib/vinix-packages'] { os.chmod(path, 0o755)! }
 	os.chmod('/etc/vinix-packages/config.json', 0o644)!
 	document := '/home/alex/Documents/a space; \$literal.txt'
@@ -125,5 +128,10 @@ fn qualify_package_session(mut t Test) ! {
 }
 
 fn scenario_packages(mut t Test) {
-	qualify_package_session(mut t) or { t.check(false, err.msg()) }
+	qualify_package_session(mut t, false) or { t.check(false, err.msg()) }
+}
+
+fn scenario_packages_enforced(mut t Test) {
+	qualify_package_session(mut t, true) or { t.check(false, err.msg()) }
+	qualify_package_enforcement(mut t) or { t.check(false, err.msg()) }
 }

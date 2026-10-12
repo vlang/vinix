@@ -218,6 +218,22 @@ for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute
 observes the exec boundary; it does not qualify pledge/unveil or GUI runtimes.
 
+The [production-sandbox guest check](../tests/packages/runtime-check.md) signs
+native applications and an explicit runtime dependency, installs them with the
+real CLI and launches through the staged native `vinix-sandbox`. It checks
+private-data writes, literal document grants, denied reads outside those grants,
+read-only application/runtime files, network and process permission enforcement,
+and rejection of modified application/runtime payloads. While an app is running,
+it upgrades the app/runtime, uninstalls them and collects garbage: the leased old
+payload closure stays readable until the app exits, after which it is collected
+and personal data remains. Passing retained runs include artifact hashes.
+
+This checks the native package launch contract on both architectures. A socket
+creation check does not qualify network services; the explicit native fixture
+runtime does not qualify Linux, Wine, Mach-O or graphical API compatibility.
+The guest root is an initramfs, so these runs do not qualify persistent-device
+power-cut durability.
+
 The release gate remains open: enroll a release publisher, migrate/qualify the
 advertised native/Linux/Wine/Apple catalog, integrate ordinary-user graphical
 sessions, qualify guest power-cut/reboot behavior and measure wider

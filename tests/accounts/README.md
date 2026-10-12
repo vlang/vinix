@@ -19,6 +19,13 @@ The guest (`guest/`) is init and also what the scenarios run *as an
 account* to see what that account can do: `/sbin/init probe <what>`. The
 image has no shell.
 
+The separate [package runtime controller](../packages/runtime-check.md) reuses
+the `packages-enforced` guest scenario with the production native sandbox. It
+adds real pledge/unveil permission checks, a signed runtime dependency, payload
+tamper refusal and maintenance of a running app's leased generation. The ordinary
+accounts controller keeps the `packages` sandbox substitute so the identity
+handoff can be diagnosed independently of the production enforcer.
+
 | Scenario | What must hold |
 | --- | --- |
 | `packages` | Signed local installation through the real package CLI; a root launch re-executes it as the configured ordinary account with empty supplementary groups, empty capabilities, no new privileges and login attribution. A sandbox substitute checks the exec boundary and passes the literal document to the signed native payload, which writes private data as the user and exits with status 37. Missing launch identity fails, publisher revocation is rechecked by the ordinary child, and removal retains personal data. This checks the session handoff, not the real pledge/unveil enforcer or graphical runtime. |

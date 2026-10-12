@@ -152,3 +152,11 @@ Sign/enroll the repository, then install/verify/run/remove
 on an ordinary Vinix session. Run [the V fixtures](../../tests/packages/distribution-check.v)
 before publishing, and advertise only host/runtime/app tuples with retained guest
 qualification receipts.
+
+For the native launch contract, run the
+[production-sandbox qualification](../../tests/packages/runtime-check.md) against
+both target kernels. It checks real permissions, explicit immutable runtime
+dependencies, tamper refusal and generation leases through update/uninstall/GC;
+retained passing runs record hashes of the kernel, sandbox, payload, service,
+session runner and serial output. These fixtures qualify package mechanics,
+not the API coverage of a Linux, Windows, Apple or graphical runtime.

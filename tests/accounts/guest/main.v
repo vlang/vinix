@@ -18,6 +18,7 @@ import os
 fn main() {
 	if os.args.len > 1 && os.args[1] == '--uid' { exit(package_sandbox_handoff_probe()) }
 	if os.args.len > 1 && os.args[1] == 'package-probe' { exit(package_application_probe()) }
+	if os.args.len > 1 && os.args[1] == 'package-policy-probe' { exit(package_policy_probe()) }
 	if os.args.len > 1 && os.args[1] == 'probe' {
 		exit(run_probe(os.args[2..]))
 	}
@@ -35,6 +36,7 @@ fn main() {
 	match name {
 		'accounts' { scenario_accounts(mut t) }
 		'packages' { scenario_packages(mut t) }
+		'packages-enforced' { scenario_packages_enforced(mut t) }
 		'elevation' { scenario_elevation(mut t) }
 		'unprivileged' { scenario_unprivileged(mut t) }
 		'seat' { scenario_seat(mut t) }
