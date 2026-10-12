@@ -207,6 +207,7 @@ install -m755 "$SCRIPT_DIR/build-support/vinix-desktop-reload" \
 # Refresh security utilities when using an existing or custom userland root.
 "$SCRIPT_DIR/build-support/security-tools/stage" --arch x86_64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/storage-tools/stage.v" --arch x86_64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/ath10k/stage.v" "$SYSROOT" "$STAGING"
 "$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"
 install -m755 "$SCRIPT_DIR/build-support/vinix-pkg" "$STAGING/usr/bin/pkg"
 install -m755 "$SCRIPT_DIR/build-support/xorg-server/startx" "$STAGING/usr/bin/startx"

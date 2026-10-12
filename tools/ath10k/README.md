@@ -11,7 +11,9 @@ are discarded; their buffers are recycled. Normal data uses full RX descriptors
 with CCMP replay checks.
 Physical hardware validation is still required; QEMU has no QCA9377 model.
 
-Install a kernel containing `dev.ath10k` and extract the supplied
+The amd64 desktop image builder includes the pinned firmware, licences and
+`wifi-ctl` automatically. For an existing installation, install a kernel
+containing `dev.ath10k` and extract the supplied
 `qca9377-firmware-and-tools.tar.gz` into the Vinix root filesystem. Keep the
 included Qualcomm licence and notices with the firmware. The firmware files
 must be present at:
