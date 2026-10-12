@@ -59,6 +59,7 @@ fn qualify_busy_configuration(binary string, root string) ! {
 		['review', 'install', 'app'], ['apply', '0'.repeat(64), 'install', 'app'],
 		['install', 'app'], ['upgrade'], ['remove', 'app'], ['rollback'], ['gc'],
 		['mirror', root + '/absent-mirror', 'app'], ['deploy', root + '/absent-deployment.json'],
+		['policy'], ['policy-review', root + '/absent-policy.json'], ['policy-apply', '0'.repeat(64), root + '/absent-policy.json'],
 	] {
 		reply := command(binary, ['--root', root, ...args])!
 		assert reply.code != 0 && reply.text.contains('another package transaction'), '${args}: ${reply.text}'
@@ -78,6 +79,8 @@ fn qualify(binary string) ! {
 	config := pkgcore.Config{ architecture: 'aarch64', policy: pkgcore.Policy{ reserve_bytes: 0 } }
 	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(config))!
 	assert success(binary, [...root_args, 'repo-list'])!.contains('No trusted repositories')
+	initial_policy := json2.decode[pkgcore.PolicyDocument](success(binary, [...root_args, '--offline', 'policy'])!)!
+	assert !initial_policy.policy.offline && !os.exists(pkgcore.state_directory(work + '/root'))
 	for id in ['app', 'other'] {
 		os.write_file(work + '/payload/bin/app', id + ' payload')!
 		os.chmod(work + '/payload/bin/app', 0o755)!
@@ -143,16 +146,28 @@ fn qualify(binary string) ! {
 	// An unsatisfiable installed closure is a useful failure, not an empty
 	// successful Updates result. View still exposes the installed provenance.
 	enrolled_config := pkgcore.load_config(work + '/root')!
-	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{
-		...enrolled_config, policy: pkgcore.Policy{ ...enrolled_config.policy, permissions: [] }
-	}))!
+	policy_path := work + '/organization-policy.json'
+	os.write_file(policy_path, json2.encode(pkgcore.PolicyDocument{ architecture: 'aarch64',
+		policy: pkgcore.Policy{ ...enrolled_config.policy, permissions: [] } }))!
+	mut policy_review := pkgcore.decode_policy_review(success(binary, [...root_args, 'policy-review', policy_path])!)!
+	defer { policy_review.close() }
+	assert policy_review.rows.len == 1 && policy_review.rows[0].diagnostic_before == ''
+	assert policy_review.rows[0].diagnostic_after.contains('permissions blocked')
+	assert pkgcore.load_config(work + '/root')!.policy == enrolled_config.policy
+	success(binary, [...root_args, 'policy-apply', policy_review.fingerprint, policy_path])!
+	stale_policy := command(binary, [...root_args, 'policy-apply', policy_review.fingerprint, policy_path])!
+	assert stale_policy.code != 0 && stale_policy.text.contains('stale')
+	assert pkgcore.load_config(work + '/root')!.repositories == enrolled_config.repositories
 	blocked_view := json2.decode[pkgcore.SoftwareView](success(binary, [...root_args, 'view'])!)!
 	assert blocked_view.update_error.contains('permissions blocked') && blocked_view.rows.all(!it.updatable)
 	assert blocked_view.rows.any(it.id == 'app' && it.installed_version == '1.0.0' && it.repository == 'fixture')
 	blocked_updates := command(binary, [...root_args, '--json', 'updates'])!
 	assert blocked_updates.code != 0 && blocked_updates.text.contains('permissions blocked')
 	assert pkgcore.read_state(store, 'aarch64')!.generation == installed.generation
-	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(enrolled_config))!
+	os.write_file(policy_path, json2.encode(pkgcore.PolicyDocument{ architecture: 'aarch64', policy: enrolled_config.policy }))!
+	mut restore_policy := pkgcore.decode_policy_review(success(binary, [...root_args, 'policy-review', policy_path])!)!
+	success(binary, [...root_args, 'policy-apply', restore_policy.fingerprint, policy_path])!
+	restore_policy.close()
 	success(binary, [...root_args, 'verify'])!
 	// JSON output must not bypass integrity verification.
 	installed_file := store + '/generations/' + installed.generation.str() + '/apps/app/bin/app'

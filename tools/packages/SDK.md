@@ -304,6 +304,42 @@ loading configuration. Config-taking core functions remain explicit snapshot
 operations for isolated fixtures; they do not reload administrator configuration.
 Production clients should use the service or the versioned CLI protocol.
 
+`policy` emits a canonical format-1 `{format,architecture,policy}` document from
+persistent configuration. `policy-review FILE` emits
+`{format:1,architecture,generation,fingerprint,previous,proposed,rows}` without
+modifying configuration or fetching metadata. Input files must contain the format,
+matching host architecture and all policy fields: `offline`, `allowed`, `pins`,
+`permissions`, `licenses`, `allow_firmware`, `reserve_bytes`. Boolean/number fields
+use their JSON types; null/missing fields and type coercion are refused. Policy
+sets contain unique entries; pin IDs appear once and version ranges use the
+dependency contract. Allowlists/pins/licenses have at most 4096 entries, licenses
+are nonempty printable strings up to 256 bytes, permissions use the five named
+grants and disk reserve is at most 1 TiB. Sets/pins are sorted in output.
+
+Review rows cover every installed package with ID/name/version/kind, license,
+proprietary/firmware flags, publisher ID/key, requested-root flag and
+`diagnostic_before`/`diagnostic_after`. Empty diagnostics mean the complete
+dependency closure is allowed by current trust and the corresponding policy.
+Runtime restrictions consequently appear on dependent application rows too.
+Review needs neither a usable catalog nor a live publisher.
+
+`policy-apply FINGERPRINT FILE` loads the complete configuration, installed state
+and canonical proposed document under the writer lock, refuses stale reviews and
+atomically saves only organization policy. Whitespace/list ordering does not
+change proposed-policy identity; changed settings, trust, account selection or
+installed state do. Successful unchanged proposals may reuse a fingerprint: it
+is a freshness check, not a one-time authorization token. Both `policy` and apply
+return a format-1 document. `--offline` never implicitly changes persistent policy.
+Existing applications/data/generations/trust are retained; restrictive policy
+still allows uninstall. Explicit administrator-owned configuration is required.
+
+V clients use `Service.policy`, `Service.review_policy`, `Service.apply_policy`,
+`PolicyDocument` and `PolicyReview`. `decode_policy_review` checks bounded complete
+responses and installed provenance. Returned documents/reviews and decoded
+reviews own their presentation fields; call `.close()` after use under manual
+memory management. Additional JSON fields are ignored; formats other than 1 are
+refused. See [organization administration](../../docs/application-distribution.md#offline-and-organization-deployment).
+
 `review install|remove|upgrade|deploy|rollback [ID...]` emits a format-1 review
 without downloading payloads or changing installed state. It includes the active
 generation, rollback target generation, operation/IDs, target requested roots,
@@ -353,6 +389,13 @@ The [dynamic Linux check](../../tests/packages/linux-runtime-check.md) exercises
 `pack-root`, this runner, a target musl loader and a shared V library under the
 production sandbox on both architectures. Its receipts qualify this narrow
 loader/package tuple; qualify actual upstream applications separately.
+
+The current dynamic Linux fixture uses a position-independent executable. The
+explicit loader is itself mapped as an executable, so a fixed-address program
+can collide with its randomized image on the qualified kernel. Qualify that
+address layout separately; the current PIE fixture is not evidence that every
+fixed-address binary works. The dynamic-check documentation retains the observed
+collision and the passing PIE reruns.
 
 [Persistent package recovery](../../tests/packages/persistence-check.md) tests
 abrupt QEMU termination and recovery on the same ext2 disk at the staged,

@@ -14,6 +14,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  repo-review enroll ID URL KEY | repo-review revoke ID\n' +
 	'  repo-apply REVIEW_FINGERPRINT enroll ID URL KEY | repo-apply REVIEW_FINGERPRINT revoke ID\n' +
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
+	'  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
@@ -83,6 +84,18 @@ fn checked(arguments []string) !int {
 	}
 	service := pkgcore.Service{ root: root, offline: offline }
 	match command {
+		'policy' {
+			if names.len != 0 { return error('policy takes no arguments') }
+			println(json2.encode(service.policy()!))
+		}
+		'policy-review' {
+			if names.len != 1 { return error('policy-review requires an organization policy document') }
+			println(json2.encode(service.review_policy(names[0])!))
+		}
+		'policy-apply' {
+			if names.len != 2 { return error('policy-apply requires a review fingerprint and organization policy document') }
+			println(json2.encode(service.apply_policy(names[1], names[0])!))
+		}
 		'repo-review', 'repo-apply' {
 			applying := command == 'repo-apply'
 			offset := if applying { 1 } else { 0 }

@@ -247,18 +247,30 @@ pub fn (c Config) validate() ! {
 		}
 		ids[repository.id] = true
 	}
-	if c.policy.allowed.any(!identifier(it)) || c.policy.permissions.any(it !in [
-		'network',
-		'files',
-		'process',
-		'display',
-		'audio',
-	]) {
-		return error('invalid organization policy')
+	c.policy.validate()!
+}
+
+pub fn (policy Policy) validate() ! {
+	if policy.allowed.len > 4096 || policy.pins.len > 4096 || policy.licenses.len > 4096
+		|| policy.permissions.len > 5 || policy.reserve_bytes > u64(1024) * 1024 * 1024 * 1024 {
+		return error('organization policy exceeds its supported limits')
 	}
-	for pin in c.policy.pins { pin.validate()! }
-	if c.policy.reserve_bytes > u64(1024) * 1024 * 1024 * 1024 {
-		return error('invalid disk reserve')
+	for label, values in {'allowlist': policy.allowed, 'permissions': policy.permissions, 'licenses': policy.licenses} {
+		mut seen := map[string]bool{}
+		for value in values {
+			if value in seen || value == '' || !printable(value, 256)
+				|| (label == 'allowlist' && !identifier(value))
+				|| (label == 'permissions' && value !in ['network', 'files', 'process', 'display', 'audio']) {
+				return error('invalid or duplicate organization ${label} entry: ${value}')
+			}
+			seen[value] = true
+		}
+	}
+	mut pins := map[string]bool{}
+	for pin in policy.pins {
+		pin.validate()!
+		if pin.id in pins { return error('duplicate organization version pin: ${pin.id}') }
+		pins[pin.id] = true
 	}
 }
 

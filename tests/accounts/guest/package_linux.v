@@ -24,6 +24,8 @@ fn qualify_package_configuration_lock() ! {
 		['update'], ['status'], ['--json', 'verify'], ['review', 'install', 'linux-probe'],
 		['apply', '0'.repeat(64), 'install', 'linux-probe'], ['rollback'], ['gc'],
 		['run', 'linux-probe'],
+		['policy'], ['policy-review', '/tmp/absent-policy.json'],
+		['policy-apply', '0'.repeat(64), '/tmp/absent-policy.json'],
 	] {
 		busy := run(['/usr/bin/vinix-package', ...args], '', none, none)
 		assert busy.status != 0 && busy.output.contains('another package transaction'), busy.output
@@ -31,7 +33,7 @@ fn qualify_package_configuration_lock() ! {
 }
 
 fn qualify_package_linux(mut t Test) ! {
-	t.make_accounts()
+	db := t.make_accounts()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
 	prepared := '/tmp/linux-root'
 	for directory in ['bin', 'lib', 'usr/lib', 'licenses'] {
@@ -149,6 +151,33 @@ fn qualify_package_linux(mut t Test) ! {
 	assert package_success(['run', application.id])!.contains('PACKAGE LINUX')
 	data := '/home/alex/.local/share/vinix-apps/linux-probe/result'
 	assert owner_of(data) == 1000 && read_text(data) == 'packaged shared library: 23\n'
+	// Organization restrictions are reviewed and atomically persisted without
+	// editing trust, the account selection or the installed generation.
+	policy_path := '/tmp/organization-policy.json'
+	original_configuration := pkgcore.load_config('')!
+	original_state := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
+	os.write_file(policy_path, json2.encode(pkgcore.PolicyDocument{ architecture: architecture,
+		policy: pkgcore.Policy{ allowed: [application.id], reserve_bytes: 0 } }))!
+	mut policy_review := pkgcore.decode_policy_review(package_success(['policy-review', policy_path])!)!
+	defer { policy_review.close() }
+	assert policy_review.rows.len == 2 && policy_review.rows.all(it.diagnostic_before == '')
+	assert policy_review.rows.all(it.diagnostic_after.contains(runtime.id + ': blocked by organization allowlist'))
+	assert pkgcore.load_config('')! == original_configuration
+	ordinary_policy := run(['/usr/bin/vinix-package', 'policy-apply', policy_review.fingerprint, policy_path], '', db, must_user(db, 'alex'))
+	assert ordinary_policy.status != 0 && pkgcore.load_config('')! == original_configuration, ordinary_policy.output
+	package_success(['policy-apply', policy_review.fingerprint, policy_path])!
+	policy_denied_launch := run(['/usr/bin/vinix-package', 'run', application.id], '', none, none)
+	assert policy_denied_launch.status != 0 && policy_denied_launch.output.contains('blocked by organization allowlist'), policy_denied_launch.output
+	policy_reused := run(['/usr/bin/vinix-package', 'policy-apply', policy_review.fingerprint, policy_path], '', none, none)
+	assert policy_reused.status != 0 && policy_reused.output.contains('review is stale'), policy_reused.output
+	assert pkgcore.read_state('/var/lib/vinix-packages', architecture)! == original_state
+	os.write_file(policy_path, json2.encode(pkgcore.PolicyDocument{ architecture: architecture, policy: original_configuration.policy }))!
+	mut policy_restore := pkgcore.decode_policy_review(package_success(['policy-review', policy_path])!)!
+	package_success(['policy-apply', policy_restore.fingerprint, policy_path])!
+	policy_restore.close()
+	assert pkgcore.load_config('')!.repositories == original_configuration.repositories
+	assert pkgcore.load_config('')!.launch_user == original_configuration.launch_user
+	assert package_success(['run', application.id])!.contains('PACKAGE LINUX')
 	// Verification covers the complete runtime, including usr/lib dependencies.
 	library := generation + '/apps/' + runtime.id + '/usr/lib/libfixture.so'
 	original := os.read_bytes(library)!
@@ -215,6 +244,7 @@ fn qualify_package_linux(mut t Test) ! {
 	assert os.is_file(data)
 	t.say('PACKAGE TRUST REVIEW read-only authenticated-metadata stale-confirmation reviewed-revocation PASS')
 	t.say('PACKAGE CONFIGURATION lock-scoped-policy verified-json-status busy-launch PASS')
+	t.say('PACKAGE ORGANIZATION reviewed-policy dependency-impact stale-refusal ordinary-user-denial atomic-restore PASS')
 	t.say('PACKAGE REPOSITORY authenticated-enrollment revocation retained-replay-floor re-enrollment PASS')
 	t.say('PACKAGE LINUX IMPORT signed-source-aliases explicit-runtime tamper-refusal missing-library rollback clean-uninstall PASS')
 }

@@ -14,8 +14,9 @@ migration of that catalog remains part of roadmap acceptance.
 ## Trust and configuration
 
 The image stage creates `/etc/vinix-packages/config.json` with an empty
-repository list and the target architecture. An administrator can configure
-organization policy and the launch account in that file:
+repository list and the target architecture. An administrator can review and save
+organization policy with the commands below; the launch account remains selected
+in that file:
 
 ```json
 {
@@ -308,6 +309,48 @@ version `pins`, permitted `permissions` and accepted proprietary `licenses`.
 Firmware is blocked unless `allow_firmware` is explicitly set; packaging does not
 flash hardware. Apps cannot grant themselves policy or accept their own license.
 
+Use the supported policy commands to serialize administration with package
+operations:
+
+```sh
+vinix-package policy
+vinix-package policy-review /etc/company/package-policy.json
+vinix-package policy-apply REVIEW_FINGERPRINT /etc/company/package-policy.json
+```
+
+A format-1 policy document declares the host architecture and all seven policy
+fields explicitly. For example:
+
+```json
+{"format":1,"architecture":"aarch64","policy":{"offline":true,"allowed":["editor","editor-runtime"],"pins":[{"id":"editor","minimum":"1.0.0","before":"2.0.0"}],"permissions":["files","display"],"licenses":[],"allow_firmware":false,"reserve_bytes":67108864}}
+```
+
+`policy` exports a canonical document from persistent configuration; `--offline`
+does not alter that output. Review shows the previous/proposed settings and all
+installed packages, including runtimes, licenses, firmware flags and publisher
+identity. Before/after diagnostics follow each package's dependency closure, so
+a denied runtime is reported against the applications that need it. Neither
+catalog access nor network downloads are required. A fresh-image review does not
+initialize the store.
+
+Apply binds the complete configuration, installed state and canonical proposed
+policy to the review fingerprint, rechecks them under the writer lock and saves
+only policy through a flushed temporary file and atomic rename. Changed trust,
+launch account, installation or proposal requires another review. Repository
+keys, launch account, architecture, generations, cached objects and personal data
+are preserved. Restrictions take effect for subsequent launch/maintenance;
+already admitted applications retain their launch snapshot. Uninstall stays
+available under restrictive policy. This does not reconcile installed roots or
+activate a package generation; use a separately reviewed deployment afterward.
+
+Documents reject missing/null fields, type coercion, malformed version ranges,
+duplicate entries/pin IDs and unknown permissions. Allowlists, pins and accepted
+licenses are limited to 4096 entries, permissions to the five named grants and
+disk reserve to 1 TiB. Lists are sorted for reproducible review identity; input
+order is immaterial. Existing configurations with duplicate policy entries must
+be corrected before use. License acceptance and firmware permission are explicit
+administrator choices; no package or per-command option adds them implicitly.
+
 A deployment manifest reconciles the requested roots atomically:
 
 ```json
@@ -355,6 +398,11 @@ invalidating review before acquisition/cleanup, revocation denying rollback/mirr
 export, offline overlays, architecture changes and refusal of unsafe lock links.
 CLI and guest fixtures check busy-writer diagnostics before decoding a corrupt
 configuration and reject tampered payloads even with `--json verify`.
+Policy fixtures cover complete strict documents, reproducible review identity,
+runtime denial propagation, license/firmware disclosure, atomic policy-only
+publication, stale configuration/state/proposal refusal, administrator ownership,
+busy locks and uninstall under restrictions. CLI/guest checks apply and restore
+policy and reject ordinary-user policy writes.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute

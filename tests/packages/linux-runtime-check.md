@@ -2,8 +2,8 @@
 
 The V controller builds a target musl dynamic executable and a shared V library,
 the static SDK Linux runner, and the production native sandbox. It checks that
-the executable has both PT_INTERP and PT_DYNAMIC before staging. The guest
-imports the prepared app/runtime roots with the actual `pack-root` CLI, creates
+the executable is a PIE (ET_DYN) with both PT_INTERP and PT_DYNAMIC before staging.
+The guest imports the prepared app/runtime roots with the actual `pack-root` CLI, creates
 a throwaway signing key, authenticates/enrolls a local repository through the CLI
 and installs the Linux app.
 The runtime includes upstream copyright and Vinix licensing documents.
@@ -60,6 +60,11 @@ host PT_INTERP path is bypassed. Guest assertions cover:
   the pre-install review stale before any object acquisition; restoring the exact
   policy permits that review. `--json verify` refuses tampered runtime bytes.
   The `PACKAGE CONFIGURATION` marker covers these assertions.
+- Read-only organization policy review exposing a blocked runtime on both its
+  own row and the dependent app, ordinary-user apply denial, atomic policy-only
+  publication, blocked launch and stale fingerprint refusal. A reviewed restore
+  retains trust/account/installed state and permits the same app to launch again.
+  The `PACKAGE ORGANIZATION` marker covers this flow.
 
 A passing retained run writes `qualification.json` with architecture, SDK,
 scenario and hashes/lengths for kernel, sandbox, dynamic payload, shared library,
@@ -143,3 +148,26 @@ using those same cached kernels:
 busy launch refusal, changed-policy stale confirmation before acquisition and
 integrity checks with JSON output. The host service fixture also covers client
 reuse after trust/policy changes and confirms fresh-image status stays read-only.
+
+Organization policy review/apply and restoration passed on both targets on
+2026-10-12 with those cached kernels:
+[AArch64 organization receipt](results/2026-10-12/organization-aarch64.json),
+[AArch64 serial](results/2026-10-12/organization-aarch64.serial.txt),
+[x86_64 organization receipt](results/2026-10-12/organization-x86_64.json),
+[x86_64 serial](results/2026-10-12/organization-x86_64.serial.txt).
+`PACKAGE ORGANIZATION` covers dependency impact, ordinary-user denial, policy-only
+publication, blocked launch, stale confirmation and reviewed restoration. Host
+fixtures additionally cover explicit license/firmware acceptance, strict input
+validation, cyclic dependencies and policy removal/deployment behavior.
+
+The first AArch64 run failed after the organization-policy flow when the explicit
+musl loader's randomized base was `0x400000`, overlapping the original probe's
+fixed-address ELF image. This produced `Not a valid dynamic program` instead of
+the missing-library diagnostic:
+[failure artifact record](results/2026-10-12/organization-aarch64-fixed-address-failure.json),
+[complete failed serial log](results/2026-10-12/organization-aarch64-fixed-address-failure.serial.txt).
+It produced no passing receipt. The controller now builds the probe with
+`-fPIE -pie` and requires ET_DYN before staging; the retained organization runs
+use that PIE payload. Fixed-address executables require separate address-layout
+qualification with this explicit-loader path. These runs do not fix or qualify
+all kernel ASLR/address-layout combinations.

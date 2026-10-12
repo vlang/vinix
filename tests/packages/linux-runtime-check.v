@@ -85,7 +85,7 @@ fn linux_suite(work string, repository string) !hwhost.Suite {
 			name:     'packages-linux'
 			arches:   ['aarch64', 'x86_64']
 			about:    'prepared-root import and signed musl loader/library execution under real sandbox enforcement'
-			required: ['HWTEST START packages-linux', 'PACKAGE REVIEW', 'PACKAGE TRUST REVIEW', 'PACKAGE CONFIGURATION', 'PACKAGE REPOSITORY', 'PACKAGE UPDATES', 'PACKAGE LINUX IMPORT',
+			required: ['HWTEST START packages-linux', 'PACKAGE REVIEW', 'PACKAGE TRUST REVIEW', 'PACKAGE CONFIGURATION', 'PACKAGE ORGANIZATION', 'PACKAGE REPOSITORY', 'PACKAGE UPDATES', 'PACKAGE LINUX IMPORT',
 				'HWTEST PASS packages-linux']
 			ending:   .poweroff
 			timeout:  180
@@ -97,6 +97,9 @@ fn require_dynamic_payload(path string) ! {
 	bytes := os.read_bytes(path)!
 	if bytes.len < 64 || bytes[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1] {
 		return error('Linux probe is not ELF64 little-endian')
+	}
+	if bytes[16] != 3 || bytes[17] != 0 {
+		return error('Linux probe must be a position-independent executable; a fixed image can collide with the explicit loader')
 	}
 	mut offset := u64(0)
 	for i in 0 .. 8 { offset |= u64(bytes[32 + i]) << (i * 8) }
@@ -136,7 +139,7 @@ fn stage_linux(repository string, work string, architecture string) ! {
 	invoke([cc, '-shared', '-fPIC', '-O2', '-std=gnu11', '-D_GNU_SOURCE', work + '/linux-library.c',
 		'-Wl,-soname,libfixture.so.1', '-o', work + '/linux-library', '-lm', '-lpthread'])!
 	os.symlink('linux-library', work + '/libfixture.so')!
-	invoke([cc, '-O2', '-std=gnu11', '-D_GNU_SOURCE', work + '/linux-probe.c', '-L' + work, '-lfixture',
+	invoke([cc, '-fPIE', '-pie', '-O2', '-std=gnu11', '-D_GNU_SOURCE', work + '/linux-probe.c', '-L' + work, '-lfixture',
 		'-o', work + '/linux-probe', '-lm', '-lpthread'])!
 	require_dynamic_payload(work + '/linux-probe')!
 	invoke([cc, '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', work + '/linux-runner.c', '-o',

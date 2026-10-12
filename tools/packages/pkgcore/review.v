@@ -47,8 +47,14 @@ fn operation_plan(config Config, directory string, current State, operation stri
 	} else {
 		load_catalog(config, directory)!
 	}
+	mut licenses := []string{}
+	if operation == 'remove' {
+		for installed in current.packages {
+			if installed.package.license !in licenses { licenses << installed.package.license }
+		}
+	}
 	resolution_config := if operation == 'remove' {
-		Config{ ...config, policy: Policy{ allow_firmware: true, licenses: current.packages.map(it.package.license) } }
+		Config{ ...config, policy: Policy{ allow_firmware: true, licenses: licenses } }
 	} else {
 		config
 	}
