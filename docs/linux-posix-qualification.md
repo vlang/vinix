@@ -902,3 +902,22 @@ The [fixed audit tests](../tests/linux-compat/results/2026-10-12/browser-audit-a
 reject that report, a bad PNG hash, root or mismatched identities, timeout,
 version-only invocation, and sandbox-disable flags or environment. These are
 host checks of guest receipts, with no additional guest qualification claim.
+
+The [AArch64 Firefox report](../tests/linux-compat/results/2026-10-12/jit-firefox-aarch64.json)
+also passes version discovery, the exact JavaScript callback and PNG rendering
+as UID/GID 1000 in a 4096 MiB guest. It uses the same production kernel as the
+native permission fixture, with 16 KiB pages, the same maintained driver source
+and explicit read-only runtime approval. A separately acquired Alpine 3.21
+Firefox 128.14.0esr dependency closure includes DejaVu fonts. The
+[assertion-enabled ARM auditor](../tests/linux-compat/results/2026-10-12/jit-firefox-aarch64-audit.v)
+binds every prepared-root entry, controller overlay, package input and frozen
+boot artifact to this result, and reconstructs the nonce-bearing HTML to check
+the page hash. The index now retains passing default-settings Firefox results
+on both native architectures while preserving Chromium's failure and the
+broader installation, GPU, portal and sandbox-isolation gaps.
+
+The ARM receipt was reproduced on persistent storage after the original RAM
+artifact volume disappeared. The surviving native kernel and driver were
+verified against their existing published receipts. The driver's original
+generated C is unavailable locally; its prior audited build receipt is reused
+and that limitation is recorded explicitly in the new evidence.

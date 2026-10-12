@@ -1,0 +1,30 @@
+{
+    "architecture": "aarch64",
+    "context": "UID/GID 1000; scoped read-only administrator-approved executable mount; per-child W^X request; native guest workload; assertion-enabled audit",
+    "artifacts": {
+        "archive": "9c3d07a8f1f1d4c078776f0f22dcfc585eb3fa37c4c44400c75ee0f4526b76a3",
+        "audit": "05eeaeace4c607f6970b894f8c4e4859aee328f0176c40370aec123d32de8c8a",
+        "compiler": "24c19beab399d14b40d9cff8d54bc3890b26f7f6e51c444b859d3c323157744a",
+        "controller": "530192e3efa26274237540e0e1080a4398519f848e36d8dc3d69f15ef86bf109",
+        "controller_source": "f79628af1de9a2d36ccaa595de5767f16400809df0e78791808505d95a5cc3a1",
+        "driver_build": "767fea7ad68ef2887f4633f16f81591d5a98a3c14bfd9152b1fe016039a4b1b4",
+        "generated_c_locally_available": "false",
+        "generated_c_original_receipt_hash": "9658d29e196522d15220877bebcd28394b3ca49ca5f384b8f0dc79f00eac82ed",
+        "init": "b4c9bea7af37d26f3db716b13b9cc3713c9ee5e944572d8ccadc02561287c2da",
+        "inputs": "33af248c377b2893c6cfecc3372534c190e53700821dccb8777d6018cb2c9172",
+        "iso": "17e0d4050cdac7aec79bc5113e04fe96175b604a163c2d0984e8c493ba1e2b88",
+        "kernel": "5c366983708a94050da2484a6a97b808b1926c304c6850743204ff894b3a7585",
+        "package_inputs": "239a6df086ee924e2c0fa4ddecce92321410ab61ddf851e82beb1263214a1d50",
+        "report": "159c701676050a95de15b62a8a7b4e6ef3b4e9e4ca783ec774c3118e798d1437",
+        "rootfs_manifest": "b91696bedd9d4f05695a551f53a295abc8e2b93ff9fe6b60bcab961967ffa2a9",
+        "serial": "6b1a698f89bb7a559b6e7371c898b9dfe31ac97ab35a847f573543d751d98e5b"
+    },
+    "rootfs_overrides": {
+        "/etc/linux-compat-jit-mounts": "2cf75b18b99269b4e7cccff187da0f272ebc30494429944671cd6fa19b4a92f8",
+        "/etc/linux-compat-options": "bb8dabcb83640a7dfa88cf4569581f261550e73fa9e85fd4c771734ae975a422",
+        "/etc/linux-compat-uid": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "/sbin/init": "b4c9bea7af37d26f3db716b13b9cc3713c9ee5e944572d8ccadc02561287c2da",
+        "/usr/bin/linux-compat-workloads": "18aa8abd10d52ebbf26badf5249bd6c80f2f92e0dcb3c5381578b6bcf7e82eb4",
+        "/usr/share/linux-compat/runtime": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53"
+    }
+}

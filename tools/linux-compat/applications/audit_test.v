@@ -67,8 +67,7 @@ fn test_index_preserves_all_families_qualified_runtimes_and_remaining_failures()
 		assert browsers.len == 2
 		assert browsers.filter(it.workload == 'chromium').all(it.status == 'failed')
 		firefox := browsers.filter(it.workload == 'firefox')[0]
-		assert firefox.status == if arch == 'x86_64' { 'passed' } else { 'failed' }
-		if arch == 'x86_64' { assert firefox.limitations.contains('4096 MiB') && !firefox.full_lifecycle_qualified }
+		assert firefox.status == 'passed' && firefox.limitations.contains('4096 MiB') && !firefox.full_lifecycle_qualified
 		java := index.applications.filter(it.architecture == arch && it.workload == 'java')[0]
 		assert java.status == 'passed' && java.limitations.contains('UID 1000') && !java.full_lifecycle_qualified
 	}

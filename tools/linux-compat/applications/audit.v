@@ -199,18 +199,16 @@ fn application_index(root string) !ApplicationIndex {
 				else { 'Go compilation, threads, files, timers and TCP; package install/update and desktop integration unqualified' })!
 		}
 		for browser in ['firefox', 'chromium'] {
-			if browser == 'firefox' && arch == 'x86_64' {
-				base := 'tests/linux-compat/results/2026-10-12/jit-firefox-x86_64'
+			if browser == 'firefox' {
+				base := 'tests/linux-compat/results/2026-10-12/jit-firefox-' + arch
 				rows << evidence_files(root, 'browsers', browser, arch, base + '.json', base + '-inputs.json',
 					'Firefox 128.14.0esr default sandbox settings, UID 1000, scoped read-only JIT mount, 4096 MiB guest: actual JavaScript callback and PNG; full isolation, GPU, portals and installed lifecycle unqualified')!
 				continue
 			}
 			name := if arch == 'x86_64' { 'browsers-x86_64' }
-				else if browser == 'firefox' { 'firefox-shared-memory-aarch64' }
 				else { 'browsers-before-aarch64' }
 			rows << evidence(root, 'browsers', browser, arch, name,
-				if browser == 'firefox' { 'Default-policy ordinary-user headless run times out without JavaScript/PNG proof; libpci/libGL probing fails; sandbox, portals and install/update unqualified' }
-				else { 'Packaged sandbox helper is mode 0755; required setuid setup refused, crash handler ptrace unavailable; no JavaScript/DOM proof' })!
+				'Packaged sandbox helper is mode 0755; required setuid setup refused, crash handler ptrace unavailable; no JavaScript/DOM proof')!
 		}
 		if arch == 'aarch64' {
 			rows << evidence(root, 'games', 'games', arch, 'game-doom-aarch64',

@@ -1,0 +1,24 @@
+{
+    "architecture": "aarch64",
+    "execution_path": "native-aarch64",
+    "uid": 1000,
+    "memory_mib": 4096,
+    "workload_timeout": 120,
+    "cases": "firefox",
+    "jit_runtimes": [
+        "firefox"
+    ],
+    "inputs": {
+        "guest_credentials": "83c02ac2d48c863dab2ccf6870455aadfc2cec073b8db269b517c879d76aa6d9",
+        "guest_jit_mounts": "2cf75b18b99269b4e7cccff187da0f272ebc30494429944671cd6fa19b4a92f8",
+        "guest_options": "bb8dabcb83640a7dfa88cf4569581f261550e73fa9e85fd4c771734ae975a422",
+        "guest_report": "e2999a076e224e953f6a60d69b857f2c0cb7ccf7a1756417462558d8383e2de1",
+        "init_source": "bd66b64e37a72946dc055c8e30df0d63639a393e638140a32e0a1bb38bb0bd9c",
+        "kernel": "5c366983708a94050da2484a6a97b808b1926c304c6850743204ff894b3a7585",
+        "rootfs_manifest": "b91696bedd9d4f05695a551f53a295abc8e2b93ff9fe6b60bcab961967ffa2a9",
+        "runtime-probe": "14acb3f28d8195dce3e5bbd8fb9d651d06e0ac2036f4dc78decbf41f8998fa53",
+        "snapshot_kernel": "5c366983708a94050da2484a6a97b808b1926c304c6850743204ff894b3a7585",
+        "workloads": "18aa8abd10d52ebbf26badf5249bd6c80f2f92e0dcb3c5381578b6bcf7e82eb4"
+    },
+    "exit_code": 0
+}

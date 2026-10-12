@@ -259,8 +259,9 @@ permissions are required before launching. No sandbox-disable environment
 or command is added. Foreign execution chains and Chromium's setuid sandbox
 require separate integration.
 
-The native x86-64 Firefox 128.14.0esr workload passes in a 4096 MiB guest with
-this explicit approval. It requires a real nonce-bearing JavaScript callback
+The Firefox 128.14.0esr workload passes on both native architectures in 4096 MiB
+guests with this explicit approval, including AArch64's 16 KiB pages. It requires
+a real nonce-bearing JavaScript callback
 and a rendered PNG. The earlier 2048 MiB approved run reaches kernel resource
 limits; approval alone does not increase those limits. These are extracted
 runtime workloads, with installation scripts and persistent lifecycle checks
