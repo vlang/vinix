@@ -355,10 +355,11 @@ fn run() !int {
 		os.write_file(root + '/home/developer/qualify-sdk', profiles.join(','))!
 	}
 	archive := guesthost.image(init, state)!
-	launch := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
-	// Both architectures boot solely from the completed ISO. Retain it,
-	// the fixture, input pins and transcripts without duplicate SDK trees.
+	// The archive already holds the complete guest closure. ISO assembly
+	// needs it and the kernel, so retire the duplicate SDK tree first.
 	os.rmdir_all(root)!
+	launch := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
+	// Both architectures boot solely from the completed ISO.
 	os.rm(archive)!
 	mut command := launch.command.clone()
 	if arch == 'x86_64' {

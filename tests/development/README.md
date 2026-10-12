@@ -111,8 +111,9 @@ the ISO and compiled fixture remain beside it. Credential values do not enter
 the receipts. The credential in this fixture is public synthetic test data.
 V runs additionally record `v_root_sha256`, `native_source_sha256`, the `v`/`sh`
 executable pins, the utility build plan and two native build receipts.
-Once the ISO is complete, its duplicate staging tree and standalone initramfs
-are removed. The ISO, compiled fixture, receipts and transcripts remain; obsolete
+Once the initramfs archive is complete, its duplicate staging tree is removed
+before ISO assembly. The standalone archive is removed once the ISO is complete.
+The ISO, compiled fixture, receipts and transcripts remain; obsolete
 images from earlier runs may be pruned independently of their retained evidence.
 
 On 13 October 2026 these workflows passed on x86_64 and AArch64 using the
