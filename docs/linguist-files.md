@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `73741f9d8cf24cbface3973325ff2fa48f45363e`,
+at source commit `88708dd9e9d476420ec77d19ec6ef3581a4fdc31`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 572 | 2,367,937 | 6.10% |
-| Python | 208 | 886,214 | 2.28% |
-| Shell | 621 | 1,366,666 | 3.52% |
+| C | 572 | 2,367,937 | 6.09% |
+| Python | 202 | 868,576 | 2.23% |
+| Shell | 626 | 1,367,210 | 3.52% |
 
-All `.v` files are classified as V. The resulting V share is 80.07%, with no
+All `.v` files are classified as V. The resulting V share is 80.14%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 886,214 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 868,576 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 73741f9d8cf24cbface3973325ff2fa48f45363e --breakdown --json
+github-linguist --rev 88708dd9e9d476420ec77d19ec6ef3581a4fdc31 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -643,7 +643,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/ioreg_adt.py` | 3,303 |
 | `apple-boot/tests/qemu_iboot.py` | 9,857 |
 | `apple-boot/tests/run-v-core.py` | 3,889 |
-| `build-support/_cache_native.py` | 2,147 |
 | `build-support/android/_boot_native.py` | 20,549 |
 | `build-support/android/_native.py` | 5,749 |
 | `build-support/android/art-bootclasspath.py` | 4,172 |
@@ -654,10 +653,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/compile-v-runtime.py` | 3,918 |
 | `build-support/android/musl-runtime.py` | 2,803 |
 | `build-support/compile-v-module.py` | 2,801 |
-| `build-support/content-key.py` | 1,440 |
 | `build-support/cpython_host.py` | 1,007 |
 | `build-support/debian-root.py` | 4,231 |
-| `build-support/desktop-build-key.py` | 4,588 |
 | `build-support/dhewm3/build.py` | 1,738 |
 | `build-support/dota2/_vulkan_native.py` | 12,992 |
 | `build-support/dota2/compile-v-compat.py` | 393 |
@@ -675,7 +672,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/roblox/_native.py` | 948 |
 | `build-support/roblox/build.py` | 5,502 |
 | `build-support/security-tools/compile-v-core.py` | 2,919 |
-| `build-support/staging-cache.py` | 2,980 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
@@ -683,8 +679,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/compile-v-host.py` | 1,972 |
 | `desktop/tools/_font_native.py` | 9,708 |
 | `desktop/tools/_input_native.py` | 792 |
-| `desktop/tools/build_cache.py` | 848 |
-| `desktop/tools/build_voffice.py` | 5,635 |
 | `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 4,935 |
 | `desktop/tools/input.py` | 6,196 |
@@ -864,6 +858,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/check-screenshot` | 171 |
 | `build-support/chromium/run-chromium` | 8,032 |
 | `build-support/compile-v-module` | 168 |
+| `build-support/content-key` | 125 |
+| `build-support/desktop-build-key` | 131 |
 | `build-support/dhewm3/run-dhewm3` | 571 |
 | `build-support/dictionary/prepare` | 124 |
 | `build-support/docker/vinix-dockerd` | 1,499 |
@@ -911,6 +907,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/sparse-file` | 178 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
 | `build-support/stage-uname.sh` | 656 |
+| `build-support/staging-cache` | 127 |
 | `build-support/steam/bash` | 433 |
 | `build-support/steam/compile-v-robust` | 165 |
 | `build-support/steam/ldd` | 1,459 |
@@ -949,12 +946,14 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/build-wine-host.sh` | 1,990 |
 | `build-support/xorg-server/compile-v-host` | 162 |
 | `build-support/xorg-server/startx` | 2,994 |
+| `desktop/tools/build_voffice` | 147 |
 | `desktop/tools/screenshot.sh` | 258 |
 | `desktop/tools/stage_app` | 143 |
 | `desktop/tools/stage_host_gpu` | 148 |
 | `desktop/tools/stage_ui2` | 143 |
 | `desktop/tools/test-activity.sh` | 2,440 |
 | `desktop/tools/test-battery.sh` | 673 |
+| `desktop/tools/test-cache-tools` | 194 |
 | `desktop/tools/test-clipboard.sh` | 1,356 |
 | `desktop/tools/test-execinfo.sh` | 834 |
 | `desktop/tools/test-new-utilities.sh` | 2,637 |
@@ -978,23 +977,23 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-android-aarch64.sh` | 207 |
 | `scripts/build-asahi-aarch64.sh` | 11,744 |
 | `scripts/build-blender-native-aarch64.sh` | 7,179 |
-| `scripts/build-chromium-aarch64.sh` | 5,613 |
+| `scripts/build-chromium-aarch64.sh` | 5,588 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 93,750 |
+| `scripts/build-desktop-aarch64.sh` | 93,695 |
 | `scripts/build-desktop-amd64.sh` | 14,940 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |
 | `scripts/build-doom-aarch64.sh` | 3,151 |
 | `scripts/build-dota2-aarch64.sh` | 1,600 |
-| `scripts/build-firefox-aarch64.sh` | 6,365 |
+| `scripts/build-firefox-aarch64.sh` | 6,340 |
 | `scripts/build-firefox-amd64.sh` | 178 |
 | `scripts/build-go-aarch64.sh` | 3,038 |
 | `scripts/build-hyprland-aarch64.sh` | 10,888 |
 | `scripts/build-ios-aarch64.sh` | 5,136 |
 | `scripts/build-java-aarch64.sh` | 4,674 |
-| `scripts/build-libreoffice-aarch64.sh` | 6,581 |
+| `scripts/build-libreoffice-aarch64.sh` | 6,556 |
 | `scripts/build-limine-aarch64.sh` | 4,779 |
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
 | `scripts/build-macos-installer.sh` | 3,383 |
@@ -1020,7 +1019,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-v-amd64.sh` | 160 |
 | `scripts/build-venus-aarch64.sh` | 5,339 |
 | `scripts/build-vinix-guest-disk.sh` | 1,837 |
-| `scripts/build-voffice-aarch64.sh` | 6,899 |
+| `scripts/build-voffice-aarch64.sh` | 6,888 |
 | `scripts/build-x11-aarch64.sh` | 20,691 |
 | `scripts/build-x11-amd64.sh` | 197 |
 | `scripts/build-x86-translation-aarch64.sh` | 22,821 |
@@ -1034,7 +1033,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/push-to-m1.sh` | 6,967 |
 | `scripts/run-aarch64.sh` | 63,398 |
 | `scripts/run-amd64-alpine.sh` | 5,108 |
-| `scripts/run-desktop-aarch64.sh` | 16,575 |
+| `scripts/run-desktop-aarch64.sh` | 16,558 |
 | `scripts/run-desktop-amd64.sh` | 2,920 |
 | `scripts/run-hyprland-aarch64.sh` | 840 |
 | `scripts/run-iso-virtualbox.sh` | 8,448 |
@@ -1420,8 +1419,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/vlang/smoke.sh` | 987 |
 | `tests/vlang/test-desktop-build-helper.sh` | 10,292 |
 | `tests/vlang/test-host-source-sync.sh` | 3,885 |
-| `tests/vlang/test-staging-cache.sh` | 1,155 |
-| `tests/vlang/test-voffice-cache.sh` | 4,845 |
+| `tests/vlang/test-staging-cache.sh` | 1,144 |
+| `tests/vlang/test-voffice-cache.sh` | 4,834 |
 | `tests/wine-host/run-vm` | 183 |
 | `tests/wine-host/run.sh` | 1,493 |
 | `tests/wine/office2010-launchers-test.sh` | 1,830 |
