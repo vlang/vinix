@@ -192,6 +192,16 @@ retries still complete publication and both flushes. Adopt physical capacity
 separately before expanding beyond its saved bounds. See
 [atomic expansion batch rules](../../docs/storage-volumes.md#atomic-pool-expansion-batches).
 
+`plan-contract-capacity-batch BUNDLE IDENTITY DEVICE EXPECTED_BYTES [...]`
+adopts observed smaller or equal physical capacities for 1–64 enrolled MBR/GPT
+identities together. Every desired row and pool window must fit; adjust unused
+pool eligibility first. All devices remain pinned read-only through final
+identity/geometry rechecks, publication and reporting. A later failure preserves
+the complete saved state. `plan-preview-contract-capacity-batch` verifies the
+same complete candidate without a writer lock or publication. Equal sizes
+report `keep` and still complete both publication flushes. See
+[physical contraction rules](../../docs/storage-volumes.md#atomic-physical-capacity-contraction-batches).
+
 Saved-plan writers acquire a nonblocking exclusive lock on the destination
 directory before reading or snapshotting, holding it through atomic publication.
 A busy directory returns failure; retry reads the latest complete state. All

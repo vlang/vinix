@@ -9,6 +9,15 @@ import bootcapture
 
 #include <signal.h>
 fn C.kill(i32, i32) i32
+fn C.ftruncate(i32, i64) i32
+
+// os.truncate opens with O_TRUNC. Keep the existing prefix of this disposable
+// backing file by resizing its retained writable descriptor instead.
+fn shrink_disk(path string, length i64) ! {
+	mut disk := os.open_file(path, 'r+')!
+	defer { disk.close() }
+	if C.ftruncate(disk.fd, length) != 0 { return error('Cannot contract disposable backing disk') }
+}
 
 fn command(args []string) !string {
 	result := os.exec(args)
@@ -31,7 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -58,7 +67,7 @@ fn capacity_batch_io_tests(root string, work string, v string) ! {
 	for file in os.ls(root + '/tools/volumes/volumecli')! {
 		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
 		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
-		if file == 'plan_capacity_batch.v' {
+		if file in ['plan_capacity_batch.v', 'plan_capacity_contract_batch.v'] {
 			for name in ['open', 'close'] { source = source.replace('C.' + name + '(', 'capacity_batch_mock_' + name + '(') }
 		}
 		if file == 'plan_io.v' {
@@ -421,6 +430,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN EXPLICIT GROWTH BATCH PASSED:') { return error('Missing atomic explicit mapping growth qualification') }
 	if !first.contains('PLAN POOL CONTRACTION BATCH PASSED:') { return error('Missing atomic pool contraction qualification') }
 	if !first.contains('PLAN POOL RESIZE BATCH PASSED:') { return error('Missing atomic cross-pool resize qualification') }
+	if !first.contains('PLAN CAPACITY CONTRACTION BATCH PASSED:') { return error('Missing identity-based physical contraction qualification') }
 	if !first.contains('PLAN LOCK PASSED:') { return error('Missing saved-plan locking qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
@@ -465,7 +475,22 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !third.contains('PLAN EXPLICIT GROWTH BATCH SAVED:') || !fourth.contains('PLAN EXPLICIT GROWTH BATCH BOOT PRESERVED') { return error('Explicit mapping growth did not survive boot') }
 	if !third.contains('PLAN POOL CONTRACTION BATCH SAVED:') || !fourth.contains('PLAN POOL CONTRACTION BATCH BOOT PRESERVED') { return error('Pool contraction did not survive boot') }
 	if !third.contains('PLAN POOL RESIZE BATCH SAVED:') || !fourth.contains('PLAN POOL RESIZE BATCH BOOT PRESERVED') { return error('Cross-pool resize did not survive boot') }
-	println('PASS ${arch}: atomic physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, four-boot persistence and 200-cycle retention')
+	if !fourth.contains('PLAN CAPACITY CONTRACTION PREPARED:') { return error('Missing bounded contraction candidate') }
+	// Preserve the completed growth qualification before shrinking only the
+	// disposable physical backing. Guest plans stay on their own filesystem.
+	os.cp(work + '/config.ext2', work + '/expanded-config.ext2')!
+	os.cp(work + '/volume.raw', work + '/volume-grown.raw')!
+	shrink_disk(work + '/volume.raw', 20 * 1024 * 1024)!
+	fifth := boot(second_args, work + '/capacity-contracted-boot.log')!
+	if !fifth.contains('init: volume restore failed; continuing') || !fifth.contains('PLAN CAPACITY CONTRACTION SAVED:') {
+		return error('Missing old-geometry rejection or verified physical contraction')
+	}
+	sixth := boot(second_args, work + '/capacity-contract-restored-boot.log')!
+	if sixth.contains('init: volume restore failed; continuing') || !sixth.contains('PLAN CAPACITY CONTRACT BOOT RESTORED:')
+		|| !sixth.contains('PLAN CAPACITY CONTRACTION BOOT PRESERVED') {
+		return error('Production init did not restore contracted geometry and preserved mappings')
+	}
+	println('PASS ${arch}: atomic physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, six-boot persistence and 200-cycle retention')
 }
 
 fn main() {

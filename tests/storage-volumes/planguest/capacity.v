@@ -59,6 +59,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 				&& status(c'/dev/mapper/vinix14').generation == tail, c'capacity boot replay is idempotent')
 			C.printf(c'PLAN CAPACITY BOOT RESTORED: exact enlarged identity, old data and new physical tail\n')
 			C.printf(c'PLAN CAPACITY BATCH BOOT PRESERVED\n')
+			capacity_contract_boot_prepare()
 			return
 		}
 		missing(c'/dev/mapper/vinix2'); missing(c'/dev/mapper/vinix5'); missing(c'/dev/mapper/vinix9')

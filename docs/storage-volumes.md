@@ -587,6 +587,59 @@ independent. Complete live preflight and ordinary kernel protection govern
 later application. Existing V1/V2 formats and boot replay retain the resized
 windows. See [cross-pool resizing qualification](../tests/storage-volumes/pool-resize-batch.md).
 
+## Atomic physical capacity contraction batches
+
+```sh
+# Adopt an already observed 20 MiB disk after reducing unused pool eligibility.
+vinix-volume plan-preview-contract-capacity-batch /root/layout.vset \
+  mbr:12345678 /dev/sd0 20971520 mbr:12345679 /dev/sd1 16777216
+vinix-volume plan-contract-capacity-batch /root/layout.vset \
+  mbr:12345678 /dev/sd0 20971520 mbr:12345679 /dev/sd1 16777216
+```
+
+`plan-contract-capacity-batch BUNDLE IDENTITY DEVICE EXPECTED_BYTES [...]`
+adopts the observed smaller or equal capacity of 1–64 enrolled physical disks
+as one saved-state edit. Identity selects MBR/GPT participants independently of
+their current disk indices. Duplicate normalized identities, ambiguous saved
+identities, missing participants and repeated physical disks reject the entire
+batch. Every expected size must be positive, sector-aligned, at least two saved
+sectors and no larger than the saved capacity.
+
+Every desired mapping, including a pending length, must fit inside its selected
+disk's new capacity. Every pool window on that disk must also fit, including
+unselected pools. Contract unused pool eligibility first with `pool-contract-batch`
+or `pool-resize-batch`; occupied mappings cannot be discarded implicitly. All
+mapping rows, modes, slots, pending lengths, disk identifiers/sectors, pool bounds,
+region order and allocation priority remain exact. Only selected saved capacity
+fields change. The existing growth adoption commands keep their growth-only
+contract.
+
+The command opens every named device read-only with CLOEXEC, NOFOLLOW and
+NONBLOCK, retaining all descriptors through publication, report flushing and
+cleanup. It probes whole physical online devices through status and the first
+two sectors. Each observed identifier and sector size must match saved state,
+and observed bytes must equal the requested size exactly. A final all-descriptor
+pass after complete planning rechecks physical ID and full identity/geometry;
+an early disk changing while a later disk is probed rejects the whole batch.
+It issues no physical writes, resize requests or live mapping operations.
+
+`plan-preview-contract-capacity-batch` performs the same verification without
+a writer lock or publication. Successful reports contain every resolved disk,
+identity, old/new capacity, sector size and `contract`/`keep` action in request
+order. A later failure emits no partial action list. Publication holds the
+directory writer lock through source loading, replacement, report flushing and
+device-pin cleanup. Equal-capacity retries still write, file-fsync, rename and
+directory-fsync the complete bundle. Before rename, failure preserves old bytes;
+afterward the complete candidate may be visible with durability unconfirmed.
+Buffered stdout failure also returns an error. Retry the complete request under
+serialized administration to confirm durability.
+
+This adopts geometry already provided by a physical backend. Filesystem shrink,
+data relocation and physical resizing require separate procedures. Live mappings
+and held descriptors remain intact; later explicit replay and production boot
+require exact adopted geometry. V1/V2 formats are unchanged. See
+[physical contraction qualification](../tests/storage-volumes/capacity-contract-batch.md).
+
 ## Atomic desired mapping removal batches
 
 ```sh

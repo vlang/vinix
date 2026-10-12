@@ -193,6 +193,14 @@ final overlaps and later failures roll back every field. Maximum 64-request/
 remain covered. Guests check new capacity, held views and actual resized bounds
 across reboot. See [cross-pool resize qualification](pool-resize-batch.md).
 
+Observed capacity contraction checks 4096 independent identity/sector/size
+conditions, full 64-identity/195-argument batches, protected desired tails and
+every pool window. Retained read-only devices undergo a final all-descriptor
+recheck; later probe/race/publication/output failures preserve whole-set rules.
+Two additional boots shrink the disposable physical disk from 24 to 20 MiB,
+adopt exact observed geometry and restore seven unchanged desired mappings/data.
+See [physical contraction qualification](capacity-contract-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -219,8 +227,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 12400 utility processes across 200 warmup
-and 200 measured thirty-one-command cycles, with pool membership, query, batch
+its own process. The allowance includes 13200 utility processes across 200 warmup
+and 200 measured thirty-three-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention

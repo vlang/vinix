@@ -402,3 +402,158 @@ fn test_maximum_capacity_batch_cli_pins_all_64_devices_with_all_195_arguments() 
 		assert_capacity_batch_pins_drained()
 	}
 }
+
+fn contract_capacity_io_reset(count int) {
+	capacity_batch_reset(count)
+	for disk in 0 .. count { capacity_batch_io.bytes[disk] = 16777216 }
+}
+
+fn contract_capacity_io_fixture(path string, count int) PlanSet {
+	mut set := capacity_batch_io_fixture(path, count)
+	capacity_batch_io.active = false
+	for disk in 0 .. count { set.plans[disk].key.bytes = 33554432 }
+	assert publish_bundle(path.str, &set)
+	contract_capacity_io_reset(count)
+	return set
+}
+
+fn two_contract_capacity_requests(set &PlanSet) CapacityContractBatch {
+	mut batch := CapacityContractBatch{count: 2}
+	for i in 0 .. 2 { batch.keys[i] = set.plans[i].key; batch.expected[i] = 16777216 }
+	batch.devices[0] = c'/capacity-batch-device-0'; batch.devices[1] = c'/capacity-batch-device-1'
+	return batch
+}
+
+fn test_contract_capacity_complete_validation_before_open_and_saved_input_rejection() {
+	work := os.join_path(os.temp_dir(), 'vinix-contract-capacity-input-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }; path := work + '/saved.vset'
+	before := contract_capacity_io_fixture(path, 2); original := os.read_bytes(path)!
+	for preview in [false, true] { for bad in 0 .. 8 {
+		mut batch := two_contract_capacity_requests(&before)
+		match bad {
+			0 { batch.keys[1] = batch.keys[0] }
+			1 { batch.keys[1].id[0] = 67 }
+			2 { batch.expected[1] = 4194304 }
+			3 { batch.expected[1] = 33554433 }
+			4 { batch.devices[1] = unsafe { nil } }
+			5 { batch.devices[1] = c'' }
+			6 { batch.expected[1] = 67108864 }
+			else { batch.expected[1] = 4096 }
+		}
+		assert contract_capacity_batch_plan(path.str, &batch, preview) == 1 && os.read_bytes(path)! == original
+	} }
+	batch := two_contract_capacity_requests(&before); os.symlink(path, work + '/link')!
+	for input in [work + '/link', work + '/missing', work] { for preview in [false, true] { assert contract_capacity_batch_plan(input.str, &batch, preview) == 1 } }
+	mut damaged := original.clone(); damaged[24] ^= 1; os.write_file_array(path, damaged)!
+	for preview in [false, true] { assert contract_capacity_batch_plan(path.str, &batch, preview) == 1 && os.read_bytes(path)! == damaged }
+	assert capacity_batch_io.opened[0] == 0 && capacity_batch_io.opened[1] == 0 && capacity_batch_io.writes == 0
+}
+
+fn test_contract_capacity_later_device_probe_and_final_recheck_failures_rollback_and_drain() {
+	work := os.join_path(os.temp_dir(), 'vinix-contract-capacity-fail-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }; path := work + '/saved.vset'
+	before := contract_capacity_io_fixture(path, 2); original := os.read_bytes(path)!; requests := two_contract_capacity_requests(&before)
+	os.symlink(path, work + '/device-link')!
+	for preview in [false, true] {
+		for device in [path, work + '/device-link', work + '/missing-device'] {
+			contract_capacity_io_reset(2); mut batch := requests; batch.devices[1] = device.str
+			assert contract_capacity_batch_plan(path.str, &batch, preview) == 1 && os.read_bytes(path)! == original
+			assert capacity_batch_io.opened[0] == 1 && capacity_batch_io.closed[0] == 1 && capacity_batch_io.writes == 0
+			assert_capacity_batch_pins_drained()
+		}
+		for mode in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18] {
+			contract_capacity_io_reset(2); capacity_batch_io.mode = mode; capacity_batch_io.preview = preview; capacity_batch_io.lock_path = work.str
+			assert contract_capacity_batch_plan(path.str, &requests, preview) == 1 && os.read_bytes(path)! == original
+			assert capacity_batch_io.writes == 0 && os.ls(work)!.len == 2; assert_capacity_batch_pins_drained()
+		}
+		contract_capacity_io_reset(2); capacity_batch_io.ids[1] = capacity_batch_io.ids[0]
+		assert contract_capacity_batch_plan(path.str, &requests, preview) == 1 && os.read_bytes(path)! == original
+		assert_capacity_batch_pins_drained()
+	}
+}
+
+fn test_contract_capacity_mixed_keep_contract_writer_exclusion_preview_and_pin_order() {
+	work := os.join_path(os.temp_dir(), 'vinix-contract-capacity-probe-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }; path := work + '/saved.vset'
+	mut before := contract_capacity_io_fixture(path, 2); before.plans[1].key.bytes = 16777216
+	capacity_batch_io.active = false; assert publish_bundle(path.str, &before); contract_capacity_io_reset(2)
+	batch := two_contract_capacity_requests(&before); original := os.read_bytes(path)!
+	mut editor := PlanEdit{}; assert open_plan_edit(path.str, mut editor, true)
+	assert contract_capacity_batch_plan(path.str, &batch, false) == 1 && capacity_batch_io.opened[0] == 0
+	capacity_batch_io.preview = true
+	assert contract_capacity_batch_plan(path.str, &batch, true) == 0 && os.read_bytes(path)! == original
+	assert capacity_batch_io.maximum == 2 && capacity_batch_io.steps == 4 && capacity_batch_io.sequence[..4] == [0, 1, 0, 1]
+	assert capacity_batch_io.writes == 0; assert_capacity_batch_pins_drained(); close_plan_edit(mut editor)
+	contract_capacity_io_reset(2); capacity_batch_io.mode = 1; capacity_batch_io.lock_path = work.str
+	assert contract_capacity_batch_plan(path.str, &batch, false) == 0
+	assert capacity_batch_io.reads[0] == 2 && capacity_batch_io.reads[1] == 3; assert_capacity_batch_pins_drained()
+	mut decoded := PlanSet{}; data := os.read_bytes(path)!; assert decode_bundle(data.data, data.len, mut decoded)
+	mut expected := before; expected.plans[0].key.bytes = 16777216; assert decoded == expected
+}
+
+fn test_contract_capacity_changed_and_keep_publication_faults_preview_and_buffered_output_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-contract-capacity-publish-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }; path := work + '/saved.vset'
+	for retry in [false, true] { for mode in 1 .. 7 {
+		before := contract_capacity_io_fixture(path, 2); batch := two_contract_capacity_requests(&before)
+		if retry { assert contract_capacity_batch_plan(path.str, &batch, false) == 0 }
+		original := os.read_bytes(path)!
+		contract_capacity_io_reset(2); capacity_batch_io.publish_mode = mode; capacity_batch_io.lock_path = work.str
+		assert contract_capacity_batch_plan(path.str, &batch, false) == if mode == 1 { 0 } else { 1 }
+		assert_capacity_batch_pins_drained(); assert capacity_batch_io.publish_closes == 2 && os.ls(work)!.len == 1
+		current := os.read_bytes(path)!; mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded)
+		mut expected := before
+		if retry || mode == 1 || mode == 4 { expected.plans[0].key.bytes = 16777216; expected.plans[1].key.bytes = 16777216 }
+		assert decoded == expected
+		if mode == 1 || mode == 4 { assert (current == original) == retry && capacity_batch_io.renames == 1 && capacity_batch_io.flushes == 2 }
+		else { assert current == original }
+		contract_capacity_io_reset(2); assert contract_capacity_batch_plan(path.str, &batch, false) == 0
+		assert capacity_batch_io.flushes == 2 && capacity_batch_io.renames == 1; complete := os.read_bytes(path)!
+		contract_capacity_io_reset(2); capacity_batch_io.publish_mode = mode; capacity_batch_io.preview = true; capacity_batch_io.lock_path = work.str
+		assert contract_capacity_batch_plan(path.str, &batch, true) == 0 && os.read_bytes(path)! == complete
+		assert capacity_batch_io.writes == 0 && capacity_batch_io.flushes == 0 && capacity_batch_io.renames == 0; assert_capacity_batch_pins_drained()
+	} }
+	for preview in [false, true] {
+		before := contract_capacity_io_fixture(path, 2); batch := two_contract_capacity_requests(&before); original := os.read_bytes(path)!
+		assert C.fflush(C.stdout) == 0; child := C.fork(); assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY); if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }; C.close(fd)
+			mut buffer := [4096]char{}; if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+			capacity_batch_io.preview = preview; capacity_batch_io.lock_path = work.str
+			result := contract_capacity_batch_plan(path.str, &batch, preview)
+			C._exit(if result == 1 && capacity_batch_io.live == 0 && capacity_batch_io.closed[0] == 1 && capacity_batch_io.closed[1] == 1 { 0 } else { 4 })
+		}
+		mut code := i32(-1); assert C.waitpid(child, &code, 0) == child && code == 0
+		current := os.read_bytes(path)!; assert (current == original) == preview
+		mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded)
+		if preview { assert decoded == before } else { assert decoded.plans[0].key.bytes == 16777216 && decoded.plans[1].key.bytes == 16777216 }
+	}
+}
+
+fn test_maximum_contract_capacity_cli_64_identities_195_arguments_full_width_rechecks_and_retry() {
+	work := os.join_path(os.temp_dir(), 'vinix-contract-capacity-full-${os.getpid()}')
+	os.mkdir(work)!; defer { os.rmdir_all(work) or {} }; path := work + '/saved.vset'
+	mut before := contract_capacity_io_fixture(path, 64); capacity_batch_io.active = false
+	for disk in 0 .. 64 { before.plans[disk].key.bytes = u64(-1) & ~(before.plans[disk].key.sector - 1) }
+	assert publish_bundle(path.str, &before); contract_capacity_io_reset(64)
+	unsafe {
+		mut args := [196]&char{}; mut identities := [64][41]char{}; mut devices := [64][64]char{}; mut ends := [64][21]char{}
+		args[0] = &char(c'vinix-volume'); args[1] = &char(c'plan-preview-contract-capacity-batch'); args[2] = path.str
+		for i in 0 .. 64 {
+			disk := 63 - i; capacity_batch_io.bytes[disk] = before.plans[disk].key.bytes - 8192
+			disk_identity(&before.plans[disk].key, &identities[i][0]); C.snprintf(&devices[i][0], 64, c'/capacity-batch-device-%u', u32(disk))
+			C.snprintf(&ends[i][0], 21, c'%lu', capacity_batch_io.bytes[disk])
+			args[3 + i * 3] = &identities[i][0]; args[4 + i * 3] = &devices[i][0]; args[5 + i * 3] = &ends[i][0]
+		}
+		original := os.read_bytes(path)!; assert run(195, &args[0]) == 0 && os.read_bytes(path)! == original
+		assert capacity_batch_io.maximum == 64 && capacity_batch_io.steps == 128 && capacity_batch_io.writes == 0; assert_capacity_batch_pins_drained()
+		mut observed := capacity_batch_io.bytes; contract_capacity_io_reset(64); capacity_batch_io.bytes = observed
+		args[1] = &char(c'plan-contract-capacity-batch'); assert run(195, &args[0]) == 0
+		current := os.read_bytes(path)!; mut decoded := PlanSet{}; assert current.len == 8768 && decode_bundle(current.data, current.len, mut decoded)
+		mut expected := before; for disk in 0 .. 64 { expected.plans[disk].key.bytes = observed[disk] }; assert decoded == expected
+		assert capacity_batch_io.maximum == 64 && capacity_batch_io.steps == 128; assert_capacity_batch_pins_drained()
+		contract_capacity_io_reset(64); capacity_batch_io.bytes = observed; capacity_batch_io.mode = 1
+		assert run(195, &args[0]) == 0 && os.read_bytes(path)! == current && capacity_batch_io.renames == 1 && capacity_batch_io.flushes == 2
+		assert_capacity_batch_pins_drained()
+	}
+}

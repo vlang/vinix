@@ -166,6 +166,8 @@ fn cycles(parent &char, count int) {
 		mapping_growths(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'9', c'8192', c'mbr:12345678', c'2', c'8192', false, 0, unsafe { nil })
 		capacity_batch(c'/etc/vinix/volumes.vset', c'0', parent, c'16777216', c'1', other, c'16777216', true, 0, unsafe { nil })
 		capacity_batch(c'/etc/vinix/volumes.vset', c'0', parent, c'16777216', c'1', other, c'16777216', false, 0, unsafe { nil })
+		capacity_contracts(c'/etc/vinix/volumes.vset', c'mbr:12345679', other, c'16777216', c'mbr:12345678', parent, c'16777216', true, 0, unsafe { nil })
+		capacity_contracts(c'/etc/vinix/volumes.vset', c'mbr:12345679', other, c'16777216', c'mbr:12345678', parent, c'16777216', false, 0, unsafe { nil })
 		pool_members_batch(c'/etc/vinix/volumes.vset', c'3', c'0', c'6291456', c'6295552', c'1', c'6291456', c'6303744', false, true, 0, unsafe { nil })
 		pool_members_batch(c'/etc/vinix/volumes.vset', c'3', c'0', c'6291456', c'6295552', c'1', c'6291456', c'6303744', false, false, 0, unsafe { nil })
 		pool_order(c'/etc/vinix/volumes.vset', c'3', c'0', c'1', true, 0, unsafe { nil })
@@ -464,6 +466,7 @@ fn first_boot(parent &char) {
 		planned_explicit_growth_batch(parent, wrong)
 		planned_pool_contractions(parent)
 		planned_pool_resizes(parent)
+		planned_capacity_contracts(parent, wrong)
 		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
@@ -529,6 +532,11 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		C.close(phase)
 		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
+		if status(actual).bytes == 20971520 {
+			physical_capacity_contract_phase(actual, other)
+			C.printf(c'PLAN DONE\n')
+			for { C.pause() }
+		}
 		if status(actual).bytes == 25165824 {
 			physical_capacity_phase(actual, other)
 			C.printf(c'PLAN DONE\n')
