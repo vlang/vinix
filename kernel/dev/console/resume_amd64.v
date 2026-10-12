@@ -6,7 +6,7 @@
 // The 8042 loses its command byte with the power. What comes back is
 // firmware's or the chip's default: scancodes are no longer translated to the
 // set the keyboard thread reads, and interrupts may be off. So the controller
-// is told again what keyboard_handler() told it at boot -- both ports off
+// is told again what setup_keyboard() told it at boot -- both ports off
 // while it is talked to, the buffer emptied, the command byte, the ports on
 // again -- with every wait bounded, since this runs on the way out of a sleep
 // and a controller that does not answer must not keep the machine there.
@@ -79,7 +79,7 @@ fn ps2_flush() {
 	}
 }
 
-// What keyboard_handler() has just written to the controller, to be written
+// What setup_keyboard() has just written to the controller, to be written
 // again after a loss of power.
 fn remember_ps2_config(config u8) {
 	console_ps2_pointer = config & ps2_pointer_clock_off != 0

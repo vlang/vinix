@@ -401,6 +401,7 @@ pub fn initialise() {
 
 	ps2_mouse_vector = idt.allocate_vector()
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, ps2_mouse_vector, 12, true)
+	console.pointer_interrupt(true)
 
 	// Resumed with the other devices, after the keyboard controller it is
 	// reached through: that one is registered first.

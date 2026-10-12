@@ -8,7 +8,6 @@ import dev.keyboard
 import wakesrc
 import event
 import klock
-import sched
 import flanterm as _
 
 const capslock = 0x3a
@@ -123,7 +122,9 @@ fn console_add_csi_u(codepoint u8) {
 	console_meta_chorded = true
 }
 
-fn keyboard_handler() {
+// The 8042 is shared with the mouse. Finish its setup in initialise(), before
+// dev.mouse negotiates its protocol, rather than racing it from a thread.
+fn setup_keyboard() ?u8 {
 	// First: a key of a USB keyboard is decoded with these too (usb_key()),
 	// whether or not there is a PS/2 keyboard to read.
 	console_convtab_numpad_numlock = {
@@ -148,8 +149,7 @@ fn keyboard_handler() {
 	// for its input buffer to empty, as the writes below do, would never end.
 	if kio.port_in[u8](0x64) == 0xff {
 		C.kprintf(c'console: no PS/2 keyboard controller\n')
-		// A thread does not return: it ends.
-		sched.dequeue_and_die()
+		return none
 	}
 
 	vect := idt.allocate_vector()
@@ -159,36 +159,45 @@ fn keyboard_handler() {
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, vect, 1, true)
 
 	// Disable primary and secondary PS/2 ports
-	write_ps2(0x64, 0xad)
-	write_ps2(0x64, 0xa7)
-
-	// Read from port 0x60 to flush the PS/2 controller buffer
-	for kio.port_in[u8](0x64) & 1 != 0 {
-		kio.port_in[u8](0x60)
+	if !ps2_command(0xad) || !ps2_command(0xa7) {
+		return none
 	}
 
-	mut ps2_config := read_ps2_config()
+	// Read from port 0x60 to flush the PS/2 controller buffer
+	ps2_flush()
+
+	if !ps2_command(0x20) {
+		return none
+	}
+	mut ps2_config := read_ps2() or { return none }
 
 	// Enable keyboard interrupt and keyboard scancode translation
 	ps2_config |= (1 << 0) | (1 << 6)
 
-	// Enable mouse interrupt if any
-	if ps2_config & (1 << 5) != 0 {
-		ps2_config |= (1 << 1)
+	// The mouse enables its interrupt after reading its command replies.
+	ps2_config &= ~ps2_pointer_interrupt
+
+	if !ps2_set_config(ps2_config) {
+		return none
 	}
 
-	write_ps2_config(ps2_config)
-
 	// Enable keyboard port
-	write_ps2(0x64, 0xae)
+	if !ps2_command(0xae) {
+		return none
+	}
 
 	// Enable mouse port if any
 	if ps2_config & (1 << 5) != 0 {
-		write_ps2(0x64, 0xa8)
+		if !ps2_command(0xa8) {
+			return none
+		}
 	}
 	// Kept for the day the controller has to be told again: resume_amd64.v.
 	remember_ps2_config(ps2_config)
+	return vect
+}
 
+fn keyboard_handler(vect u8) {
 	for {
 		event.await_one(mut int_events[vect], true) or {}
 		// The byte the interrupt announced may be gone: whoever set the
@@ -472,26 +481,13 @@ fn console_scancode(input_byte u8) {
 	add_to_buf(&c, 1, true)
 }
 
-fn read_ps2() u8 {
-	for kio.port_in[u8](0x64) & 1 == 0 {
+fn read_ps2() ?u8 {
+	for _ in 0 .. ps2_spins {
+		if kio.port_in[u8](0x64) & 1 != 0 {
+			return kio.port_in[u8](0x60)
+		}
 	}
-	return kio.port_in[u8](0x60)
-}
-
-fn write_ps2(port u16, value u8) {
-	for kio.port_in[u8](0x64) & 2 != 0 {
-	}
-	kio.port_out[u8](port, value)
-}
-
-fn read_ps2_config() u8 {
-	write_ps2(0x64, 0x20)
-	return read_ps2()
-}
-
-fn write_ps2_config(value u8) {
-	write_ps2(0x64, 0x60)
-	write_ps2(0x60, value)
+	return none
 }
 
 pub fn initialise() {
@@ -505,7 +501,11 @@ pub fn initialise() {
 	setup_console()
 
 	register_keyboard_controller()
-	spawn keyboard_handler()
+	if vect := setup_keyboard() {
+		spawn keyboard_handler(vect)
+	} else {
+		C.kprintf(c'console: PS/2 setup unavailable; USB input remains enabled\n')
+	}
 }
 
 fn caps_lock_on() bool {
@@ -543,8 +543,7 @@ const usb_extended_keys = [
 // there, so that every chord, layout and escape sequence is one piece of
 // code. A key this console has no scancode for is dropped.
 pub fn usb_key(code u16, value u32) {
-	// Before the keyboard thread has made its tables there is nobody to type
-	// to either.
+	// Input is decoded only after setup_keyboard() has made its tables.
 	if console_convtab_numpad_numlock.len == 0 || code == 0 || code > 0xff {
 		return
 	}
