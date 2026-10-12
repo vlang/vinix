@@ -1,0 +1,56 @@
+{
+    "bigio_c_v_faults_per_profile": 22,
+    "c_goldens": [
+        {
+            "path": "tests/memory/runtime.c",
+            "revision": "b39872cf0b400d1b5f9fd3fbce1486e406be3766",
+            "sha256": "96415ae95d1937d0e7bd44152ac7d7109899159945dd047399b1540132624596"
+        },
+        {
+            "path": "tests/memory/big_io_guest.c",
+            "revision": "770ba03991d642c8cd4d7d3be363f6b41076412d",
+            "sha256": "46c08c37787ad4b400fea1fd94d9b1bf790e170a9e605350234d8818156b0775"
+        }
+    ],
+    "compiler_signal_cases_per_profile": 4,
+    "darwin_lsan_enabled": false,
+    "fresh_guest_boot": false,
+    "fresh_kernel_build": false,
+    "guest_signal_cases_per_profile": 2,
+    "hardware_boot": false,
+    "linux_lsan_enabled": true,
+    "original_python_bytes": 13403,
+    "original_python_lines": 246,
+    "originals": [
+        {
+            "blob": "dbf6f88460e4d08043e107a02d9a17e3d471709d",
+            "bytes": 7331,
+            "lines": 130,
+            "path": "tests/memory/run-runtime.py",
+            "sha256": "73af44a760dd660a731bf4362cef15ea8d0b16e11912c2e555a49947eaa2d0d5"
+        },
+        {
+            "blob": "273ca8927c7401c908bfef0e95222b6044f4fb86",
+            "bytes": 6072,
+            "lines": 116,
+            "path": "tests/memory/test-big-io.py",
+            "sha256": "6488424325cd053c39e1acf3051c44ae3a474096da7e86359d80883a121ae0b4"
+        }
+    ],
+    "profiles": [
+        "ARM",
+        "Rosetta x86",
+        "ARM ASan/UBSan"
+    ],
+    "public_cold_fronts": 2,
+    "python_executed": false,
+    "python_files_retired": 2,
+    "qualification": "native-tools.md",
+    "qualified_cold_native_builds": 21,
+    "runtime_cases_arm": 410739,
+    "runtime_cases_x86": 226419,
+    "schema": 1,
+    "shell_syntax_checks": 4,
+    "source_commit": "5cddb2d9b7e6de3495d821818b276dcb7984f24d",
+    "static_target_executables": 8
+}

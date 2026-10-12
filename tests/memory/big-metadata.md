@@ -43,7 +43,7 @@ grace and exact page equality remain unchanged. Compare it with an immutable
 C reference on an actual host architecture using the shared V syscall model:
 
 ```sh
-python3 tests/memory/test-big-io.py --host-arch arm64 \
+tests/memory/test-big-io --host-arch arm64 \
   --state-dir /tmp/big-io-host --original-reference /path/to/original.c
 ```
 

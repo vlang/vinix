@@ -202,6 +202,12 @@ fn launch_at(_init string, archive string, state string, kernel_dir string, arch
 
 pub fn guest(source string, prebuilt string, state_arg string, kernel_arg string, arch string,
 	expected []string, failures []string, panic_mode bool, no_network bool, timeout int) !int {
+	return guest_with_cancel(source, prebuilt, state_arg, kernel_arg, arch, expected, failures, panic_mode, no_network, timeout, unsafe { nil })!
+}
+
+pub fn guest_with_cancel(source string, prebuilt string, state_arg string, kernel_arg string, arch string,
+	expected []string, failures []string, panic_mode bool, no_network bool, timeout int, cancelled fn () bool) !int {
+	if cancelled != unsafe { nil } && cancelled() { return error('Guest run interrupted') }
 	if timeout <= 0 || expected.len == 0 || expected.any(it == '') {
 		return error('timeout and expected verdicts must be nonempty/positive')
 	}
@@ -230,8 +236,10 @@ pub fn guest(source string, prebuilt string, state_arg string, kernel_arg string
 		state + '/init'
 	}
 	archive := image(init, state)!
+	if cancelled != unsafe { nil } && cancelled() { return error('Guest run interrupted') }
 	configured := launch(init, archive, state, kernel_dir, arch, no_network)!
+	if cancelled != unsafe { nil } && cancelled() { return error('Guest run interrupted') }
 	positive, negative := verdict_policy(expected, failures, panic_mode)
 	println('Guest artifacts: ' + state)
-	return boot(configured.command, configured.env, state, positive, negative, timeout, true)!
+	return boot_from_cancelled(configured.command, configured.env, state, positive, negative, timeout, true, '', cancelled)!
 }

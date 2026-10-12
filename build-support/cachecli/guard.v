@@ -12,7 +12,7 @@ __global (
 	pending_signal i32
 )
 
-fn interrupted(signal i32) {
+fn cachecli_signal_received(signal i32) {
 	unsafe { C.__atomic_store_n(&pending_signal, signal, C.__ATOMIC_RELAXED) }
 }
 
@@ -36,7 +36,7 @@ pub struct Guard {
 
 pub fn own_commands() Guard {
 	unsafe { C.__atomic_store_n(&pending_signal, 0, C.__ATOMIC_RELAXED) }
-	return Guard{unsafe { C.signal(C.SIGINT, voidptr(interrupted)) }, unsafe { C.signal(C.SIGTERM, voidptr(interrupted)) }, unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }}
+	return Guard{unsafe { C.signal(C.SIGINT, voidptr(cachecli_signal_received)) }, unsafe { C.signal(C.SIGTERM, voidptr(cachecli_signal_received)) }, unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }}
 }
 
 pub fn (guard Guard) close() {

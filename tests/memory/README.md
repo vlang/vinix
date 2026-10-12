@@ -137,12 +137,18 @@ The default host run enables ASan/UBSan and rejects allocator imports.
 `--original-reference /path/to/immutable/runtime.c` also runs the original
 oracle against the identical production primitive object and compares complete
 output. Case counts are 226,419 with 4 KiB pages and 410,739 with 16 KiB pages.
-Native C/V controls use `run-runtime.py --arch`, an isolated `--kernel-dir`,
+Native C/V controls use `run-runtime --arch`, an isolated `--kernel-dir`,
 fresh `--state-dir` and `--guest-state-dir`; their complete workload gets a
 3,600-second outer allowance. Both mappings are unmapped before the success
 marker, and the native entry keeps PID 1 alive afterward. The primitive object
 retains general-register-only compilation; only its unused Darwin x86 math
 header is skipped because the SDK defines floating-point inline functions.
+
+The runtime and large-I/O controllers are native V commands. `test-big-io`
+retains all 22 independent C/V fault comparisons; `--build-only --arch` builds
+static target artifacts without booting a kernel. On macOS, ASan and UBSan run
+with LeakSanitizer disabled because Darwin's ASan runtime rejects that option.
+Linux retains leak detection. See [controller qualification](native-tools.md).
 
 Build the actual kernel in debug and production with the repository's toolchain
 and dependencies. Enable the boot tests by adding `VFLAGS='-d heap_selftest'`

@@ -283,6 +283,10 @@ pub fn boot(command []string, env map[string]string, state string, expected []st
 }
 
 pub fn boot_from(command []string, env map[string]string, state string, expected []string, failures []string, timeout int, inherit bool, directory string) !int {
+	return boot_from_cancelled(command, env, state, expected, failures, timeout, inherit, directory, unsafe { nil })!
+}
+
+pub fn boot_from_cancelled(command []string, env map[string]string, state string, expected []string, failures []string, timeout int, inherit bool, directory string, cancelled fn () bool) !int {
 	if timeout <= 0 { return error('Guest timeout must be positive') }
 	unsafe { C.__atomic_store_n(&interrupted, i32(0), C.__ATOMIC_RELAXED) }
 	previous := unsafe { C.signal(C.SIGINT, voidptr(interrupt)) }
@@ -307,6 +311,7 @@ pub fn boot_from(command []string, env map[string]string, state string, expected
 	mut status := 0
 	mut cause := ''
 	for {
+		if cancelled != unsafe { nil } && cancelled() { cause = 'Guest run interrupted'; break }
 		if now() >= deadline {
 			timed_out = true
 			break
