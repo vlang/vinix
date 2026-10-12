@@ -27,6 +27,10 @@ account IDs and are installed mode 0755, without set-ID bits.
 It runs a pinned build plan in a new private workspace, preserves source links
 and permissions, sets `SOURCE_DATE_EPOCH`, and records command results and output
 SHA-256s. It stops on the first failure and retains logs and a failed receipt.
+Each build gets new mode-0700 `home` and `tmp` directories inside its private
+output, selected as `HOME` and `TMPDIR` for compiler caches and temporary files.
+A plan can explicitly override those environment values when a shared cache
+is intended. Other inherited environment credentials remain omitted.
 Commands receive argument arrays, never an implicit shell. Each command has a
 deadline; the command owner retires its process group before reaping it.
 

@@ -98,6 +98,11 @@ fn build_payload() i32 {
 		check(C.getuid() == 1000 && C.geteuid() == 1000, 190)
 		check(C.strcmp(C.getenv(c'SOURCE_DATE_EPOCH'), c'1700000000') == 0, 191)
 		check(C.getenv(c'UNSELECTED_PARENT_SECRET') == nil, 192)
+		for name in [&char(c'HOME'), &char(c'TMPDIR')]! {
+			path := C.getenv(name)
+			mut st := C.stat{}
+			check(path != nil && C.stat(path, &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o777 == 0o700, 197)
+		}
 		mut data := [64]char{}
 		fd := C.open(c'internal-link', C.O_RDONLY)
 		check(fd >= 0 && C.read(fd, &data[0], 63) == 20 && C.close(fd) == 0, 195)

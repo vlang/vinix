@@ -10,7 +10,14 @@ fn test_build_compiles_and_runs_a_real_project_and_records_artifacts() {
 	defer { os.rmdir_all(root) or {} }
 	source := root + '/source'
 	os.mkdir(source)!
-	os.write_file(source + '/main.v', "module main\nfn main() { println('native-build-ok') }\n")!
+	os.write_file(source + '/main.v', 'module main\nimport os\nfn main() {\n' +
+		'    if os.getenv("VINIX_BUILD_PARENT_SECRET") != "" { exit(1) }\n' +
+		'    if os.getenv("SOURCE_DATE_EPOCH") != "1700000000" { exit(2) }\n' +
+		'    os.write_file(os.getenv("HOME") + "/compiler-state", "private home")!\n' +
+		'    os.write_file(os.getenv("TMPDIR") + "/compiler-state", "private temporary")!\n' +
+		'    println("native-build-ok")\n}\n')!
+	os.setenv('VINIX_BUILD_PARENT_SECRET', 'must-not-reach-build', true)
+	defer { os.unsetenv('VINIX_BUILD_PARENT_SECRET') }
 	v := os.real_path(@VEXE)
 	cc := os.real_path(os.find_abs_path_of_executable('cc')!)
 	plan := BuildPlan{
@@ -33,6 +40,12 @@ fn test_build_compiles_and_runs_a_real_project_and_records_artifacts() {
 	assert receipt.steps.len == 2
 	assert receipt.steps[0].artifacts['hello'] == file_hash(root + '/result/work/hello')!
 	assert os.read_file(root + '/result/execute.log')!.contains('native-build-ok')
+	assert os.read_file(root + '/result/home/compiler-state')! == 'private home'
+	assert os.read_file(root + '/result/tmp/compiler-state')! == 'private temporary'
+	for directory in ['home', 'tmp'] {
+		st := os.stat(root + '/result/' + directory)!
+		assert st.uid == u32(os.getuid()) && st.mode & 0o077 == 0
+	}
 	assert tree_hash(source)! == plan.source.sha256
 	assert (os.stat(root + '/result')!.mode & 0o077) == 0
 	assert receipt.uid == os.getuid()

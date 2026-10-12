@@ -112,6 +112,8 @@ pub fn build(plan_text string, output_path string) !BuildReceipt {
 		return error('output must be outside the pinned source')
 	}
 	fresh_directory(output)!
+	os.mkdir(output + '/home', mode: 0o700)!
+	os.mkdir(output + '/tmp', mode: 0o700)!
 	work := output + '/work'
 	mut receipt := BuildReceipt{
 		plan_sha256: sha256_text(plan_text)
@@ -128,6 +130,8 @@ pub fn build(plan_text string, output_path string) !BuildReceipt {
 	// Catch source mutation during the copy before executing anything.
 	if tree_hash(work)! != plan.source.sha256 { return error('source changed while copying') }
 	mut env := environment(plan.epoch)
+	env['HOME'] = output + '/home'
+	env['TMPDIR'] = output + '/tmp'
 	for name, value in plan.environment { env[name] = expand(value, work, output, plan.tools)! }
 	mut generated := map[string]string{}
 	for step in plan.steps {

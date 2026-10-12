@@ -27,7 +27,7 @@ Successful jobs produce a file, and rejected jobs must produce none.
 The same ordinary account then runs a pinned build plan in two new workspaces.
 Its prebuilt V payload reads through a copied internal symlink, checks the fixed
 build epoch and sanitized environment, and writes an artifact. The fixture
-checks source/link preservation, private output directories and actual artifact
+checks source/link preservation, account-owned private output/HOME/temporary directories and actual artifact
 contents. The controller independently checks both native receipt hashes against
 the expected bytes. Altering the pinned source must stop the next build before
 execution. This tests runner behavior with a prebuilt payload; compiling all
@@ -112,6 +112,12 @@ The x86 controller/fixture regression passed in
 `/tmp/vinix-development-v-x86-base-20261013-a` without a compiler SDK.
 This compiles a reference V project; rebuilding the V compiler itself and all
 Vinix layers remains open.
+
+The private build HOME/temporary-directory checks passed as UID/GID 1000 on
+both architectures in `/tmp/vinix-development-home-arm-20261013-a` and
+`/tmp/vinix-development-home-x86-20261013-a`, with the updated commands staged
+in `/tmp/vinix-dev-aarch64-20261013-home-a` and
+`/tmp/vinix-dev-x86_64-20261013-home-a`.
 
 This qualifies the tested per-account job workflows in Vinix guests. Watcher
 signal/deadline/interruption tests still have host coverage; installed service
