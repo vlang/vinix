@@ -24,8 +24,17 @@ credential files. The payload deliberately writes the synthetic credential to
 both stdout and stderr; the controller fails if it appears in the serial log.
 Successful jobs produce a file, and rejected jobs must produce none.
 
+The same ordinary account then runs a pinned build plan in two new workspaces.
+Its prebuilt V payload reads through a copied internal symlink, checks the fixed
+build epoch and sanitized environment, and writes an artifact. The fixture
+checks source/link preservation, private output directories and actual artifact
+contents. The controller independently checks both native receipt hashes against
+the expected bytes. Altering the pinned source must stop the next build before
+execution. This tests runner behavior with a prebuilt payload; compiling all
+Vinix layers inside an installed system remains open.
+
 `receipt.json` records the architecture, UID, kernel/fixture/tool hashes,
-QEMU argv, passing verdict and four native plan/state receipts. `serial.log`,
+QEMU argv, passing verdict and six native plan/state/build receipts. `serial.log`,
 the ISO and compiled fixture remain beside it. Credential values do not enter
 the receipts. The credential in this fixture is public synthetic test data.
 
@@ -33,6 +42,10 @@ On 13 October 2026 these workflows passed on x86_64 and AArch64 using the
 previously staged commands and isolated production kernels. Receipts are in
 `/tmp/vinix-development-guest-x86-20261013-e` and
 `/tmp/vinix-development-guest-arm-20261013-e`.
+The extended build-plan runs passed in
+`/tmp/vinix-development-build-x86-20261013-b` and
+`/tmp/vinix-development-build-arm-20261013-b`; both architectures produced
+artifact hash `8f62334d280332417efb4876a0690270b65488e01a24a4752f6e512653bb4cc9`.
 
 This qualifies the tested per-account job workflows in Vinix guests. Watcher
 signal/deadline/interruption tests still have host coverage; installed service

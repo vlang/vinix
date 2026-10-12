@@ -37,6 +37,38 @@ struct Stage {
 	binaries     map[string]string
 }
 
+struct BuildStep {
+	name      string   = 'payload'
+	argv      []string = ['{payload}']
+	directory string   = '.'
+	artifacts []string = ['artifact.txt']
+}
+
+struct BuildPlan {
+	schema          int = 1
+	source          Pin
+	tools           map[string]Pin
+	epoch           i64               = 1700000000
+	timeout_seconds int               = 10
+	environment     map[string]string = {
+		'VINIX_DEVELOPMENT_PAYLOAD': 'build'
+	}
+	steps           []BuildStep = [BuildStep{}]
+}
+
+struct NativeStep {
+	exit_code int
+	artifacts map[string]string
+}
+
+struct NativeBuild {
+	complete bool
+	uid      int
+	kernel   string
+	epoch    i64
+	steps    []NativeStep
+}
+
 struct Receipt {
 	schema          int = 1
 	arch            string
@@ -108,10 +140,19 @@ fn run() !int {
 		os.write_file(root + '/home/developer/' + name + '.json', json2.encode(plan))!
 	}
 	os.write_file(root + '/home/developer/token', 'vinix-native-fixture-secret')!
+	os.mkdir_all(root + '/home/developer/source')!
+	os.write_file(root + '/home/developer/source/input.txt', 'build-fixture-input\n')!
+	os.write_file(root + '/home/developer/build-template.json', json2.encode(BuildPlan{
+		source: Pin{'/home/developer/source', '%s'}
+		tools:  {
+			'payload': Pin{'/usr/bin/development-payload', digest(init)!}
+		}
+	}))!
 	archive := guesthost.image(init, state)!
 	launch := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
 	result := guesthost.boot(launch.command, launch.env, state, [
 		'DEVELOPMENT ACCOUNT PASS:',
+		'DEVELOPMENT BUILD PASS:',
 		'DEVELOPMENT GUEST PASS',
 	],
 		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], 180, true)!
@@ -122,13 +163,27 @@ fn run() !int {
 		path := entry.all_before(' ')
 		body := entry.all_after(' ')
 		if path !in ['/home/developer/good/state.json', '/home/developer/good/plan.json',
-			'/home/developer/public-token/state.json', '/home/developer/link-token/state.json'] {
+			'/home/developer/public-token/state.json', '/home/developer/link-token/state.json',
+			'/home/developer/build-a/receipt.json', '/home/developer/build-b/receipt.json'] {
 			return error('unexpected guest receipt path')
 		}
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != 4 { return error('missing native scheduler receipts') }
+	if result == 0 && receipts.len != 6 { return error('missing native workflow receipts') }
+	if result == 0 {
+		expected := sha256.sum('build-fixture-input\n'.bytes()).hex()
+		for name in ['build-a', 'build-b'] {
+			receipt := json2.decode[NativeBuild](receipts['/home/developer/' + name + '/receipt.json'],
+				strict: true
+			)!
+			if !receipt.complete || receipt.uid != 1000 || receipt.kernel != 'Vinix'
+				|| receipt.epoch != 1700000000 || receipt.steps.len != 1
+				|| receipt.steps[0].exit_code != 0 || receipt.steps[0].artifacts['artifact.txt'] != expected {
+				return error('native build receipt failed independent artifact check')
+			}
+		}
+	}
 	os.write_file(state + '/receipt.json', json2.encode(Receipt{
 		arch:            arch
 		kernel_sha256:   digest(state + '/kernel/bin/vinix')!
