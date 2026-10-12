@@ -27,7 +27,7 @@ pub fn repository_status(root string) !RepositoryStatus {
 	directory := state_directory(root)
 	// Listing a fresh image does not initialize its store. Once a writer has
 	// created the lock, configuration and retained history are read together.
-	if os.exists(directory + '/lock') {
+	if os.exists(directory + '/lock') || os.is_link(directory + '/lock') {
 		guard := acquire_reader(directory)!
 		defer { guard.release() }
 		return configured_repository_status(load_config(root)!, directory)

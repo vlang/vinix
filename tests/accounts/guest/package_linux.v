@@ -13,6 +13,23 @@ fn reviewed_package_operation(operation string, names []string) !string {
 	return package_success(['apply', review.fingerprint, operation, ...names])
 }
 
+fn qualify_package_configuration_lock() ! {
+	guard := pkgcore.acquire('/var/lib/vinix-packages')!
+	defer { guard.release() }
+	path := '/etc/vinix-packages/config.json'
+	original := os.read_file(path)!
+	defer { os.write_file(path, original) or { panic(err) } }
+	os.write_file(path, '{broken configuration')!
+	for args in [
+		['update'], ['status'], ['--json', 'verify'], ['review', 'install', 'linux-probe'],
+		['apply', '0'.repeat(64), 'install', 'linux-probe'], ['rollback'], ['gc'],
+		['run', 'linux-probe'],
+	] {
+		busy := run(['/usr/bin/vinix-package', ...args], '', none, none)
+		assert busy.status != 0 && busy.output.contains('another package transaction'), busy.output
+	}
+}
+
 fn qualify_package_linux(mut t Test) ! {
 	t.make_accounts()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
@@ -104,12 +121,21 @@ fn qualify_package_linux(mut t Test) ! {
 	os.write_file('/home/alex/outside.txt', 'not granted\n')!
 	os.chown('/home/alex/outside.txt', 1000, 1000)!
 	package_success(['update'])!
+	qualify_package_configuration_lock()!
 	mut installation := pkgprotocol.decode_review(package_success(['review', 'install', application.id])!)!
 	defer { installation.close() }
 	assert installation.rows.len == 2
 	assert installation.rows.any(it.id == runtime.id && it.kind == 'runtime' && it.license == runtime.license)
 	assert installation.rows.all(it.action == 'install' && it.repository == 'fixture' && it.public_key == key)
 	assert pkgcore.read_state('/var/lib/vinix-packages', architecture)!.generation == 0
+	enrolled_config := pkgcore.load_config('')!
+	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{
+		...enrolled_config, policy: pkgcore.Policy{ ...enrolled_config.policy, reserve_bytes: 1 }
+	}))!
+	stale_policy := run(['/usr/bin/vinix-package', 'apply', installation.fingerprint, 'install', application.id], '', none, none)
+	assert stale_policy.status != 0 && stale_policy.output.contains('review is stale'), stale_policy.output
+	assert os.ls('/var/lib/vinix-packages/objects')!.len == 0
+	os.write_file('/etc/vinix-packages/config.json', json2.encode(enrolled_config))!
 	package_success(['apply', installation.fingerprint, 'install', application.id])!
 	stale := run(['/usr/bin/vinix-package', 'apply', installation.fingerprint, 'install', application.id], '', none, none)
 	assert stale.status != 0 && stale.output.contains('review is stale'), stale.output
@@ -127,6 +153,8 @@ fn qualify_package_linux(mut t Test) ! {
 	library := generation + '/apps/' + runtime.id + '/usr/lib/libfixture.so'
 	original := os.read_bytes(library)!
 	os.write_file(library, 'tampered\n')!
+	bad_verification := run(['/usr/bin/vinix-package', '--json', 'verify'], '', none, none)
+	assert bad_verification.status != 0 && bad_verification.output.contains('installed payload verification failed'), bad_verification.output
 	changed := run(['/usr/bin/vinix-package', 'run', application.id], '', none, none)
 	assert changed.status != 0 && changed.output.contains('installed application payload changed'), changed.output
 	os.write_file_array(library, original)!
@@ -186,6 +214,7 @@ fn qualify_package_linux(mut t Test) ! {
 	assert pkgcore.read_state('/var/lib/vinix-packages', architecture)!.generation == removed.generation
 	assert os.is_file(data)
 	t.say('PACKAGE TRUST REVIEW read-only authenticated-metadata stale-confirmation reviewed-revocation PASS')
+	t.say('PACKAGE CONFIGURATION lock-scoped-policy verified-json-status busy-launch PASS')
 	t.say('PACKAGE REPOSITORY authenticated-enrollment revocation retained-replay-floor re-enrollment PASS')
 	t.say('PACKAGE LINUX IMPORT signed-source-aliases explicit-runtime tamper-refusal missing-library rollback clean-uninstall PASS')
 }

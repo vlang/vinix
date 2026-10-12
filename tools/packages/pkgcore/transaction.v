@@ -21,6 +21,14 @@ pub fn load_config(root string) !Config {
 	}
 	config := json2.decode[Config](read_metadata(path)!)!
 	config.validate()!
+	if root == '' || root == '/' {
+		$if arm64 {
+			if config.architecture != 'aarch64' { return error('package configuration targets another architecture') }
+		}
+		$if amd64 {
+			if config.architecture != 'x86_64' { return error('package configuration targets another architecture') }
+		}
+	}
 	return config
 }
 
@@ -168,6 +176,10 @@ pub fn transact(config Config, directory string, operation string, names []strin
 	config.validate()!
 	guard := acquire(directory)!
 	defer { guard.release() }
+	return transact_locked(config, directory, operation, names, options)
+}
+
+fn transact_locked(config Config, directory string, operation string, names []string, options TransactionOptions) !State {
 	current := read_state(directory, config.architecture)!
 	plan := operation_plan(config, directory, current, operation, names)!
 	if options.expected_review != '' {
@@ -271,6 +283,10 @@ pub fn rollback_reviewed(config Config, directory string, expected string) !Stat
 	config.validate()!
 	guard := acquire(directory)!
 	defer { guard.release() }
+	return rollback_locked(config, directory, expected)
+}
+
+fn rollback_locked(config Config, directory string, expected string) !State {
 	current := read_state(directory, config.architecture)!
 	old := rollback_target(config, directory, current)!
 	if expected != '' {
@@ -285,6 +301,10 @@ pub fn rollback_reviewed(config Config, directory string, expected string) !Stat
 pub fn collect(config Config, directory string) ! {
 	guard := acquire(directory)!
 	defer { guard.release() }
+	collect_locked(config, directory)!
+}
+
+fn collect_locked(config Config, directory string) ! {
 	current := read_state(directory, config.architecture)!
 	for name in os.ls(directory + '/generations')! {
 		if name.bytes().all(it >= `0` && it <= `9`) && name.u64() !in [

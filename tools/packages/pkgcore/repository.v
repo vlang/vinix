@@ -78,6 +78,10 @@ pub fn refresh(config Config, directory string) !Catalog {
 	config.validate()!
 	guard := acquire(directory)!
 	defer { guard.release() }
+	return refresh_locked(config, directory)
+}
+
+fn refresh_locked(config Config, directory string) !Catalog {
 	previous := read_snapshots(directory)!
 	mut history := history_with_snapshots(directory, previous)!
 	mut snapshots := []Snapshot{}

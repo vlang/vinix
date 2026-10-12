@@ -144,6 +144,17 @@ complete hash. Complete partial files are promoted without network access. Hash
 failures discard the partial file. Network/storage failure leaves activation
 unchanged.
 
+The command service loads configuration after acquiring that lock, so a completed
+repository revocation, key replacement or policy change cannot be followed by a
+transaction using the command's earlier configuration. Refresh, deployment,
+rollback, mirror export and garbage collection use the same boundary. Reviews,
+plans, status and payload verification load configuration under a shared lock;
+a busy writer yields a diagnostic before configuration is decoded. Fresh-image
+status remains read-only. `--json verify` verifies every installed payload before
+emitting state, just as the text command does. Administrators editing policy
+files directly must serialize those writes with the package lock or stop package
+operations; an unrestricted administrator can bypass the service's guarantees.
+
 Each generation contains package state, the full payload closure, launcher
 records and a running-application lease. Files/directories are flushed before
 publication; POSIX rename switches `current` atomically. The next transaction
@@ -210,6 +221,13 @@ memberships and capabilities, and set `no_new_privs`. The ordinary service then
 re-reads current trust/policy, acquires the generation lease, verifies payloads
 and creates private data as that user. Root never creates or changes files in
 the application data directory. The child's exit status and output reach Software.
+
+Launch selects configuration under the reader lock. The ordinary child repeats
+that read and acquires its generation lease before releasing the lock, closing
+the gap between configuration loading and launch admission. Busy package writers
+refuse launch promptly. Once admitted, a process retains its validated policy
+snapshot and generation lease until it exits; later revocation prevents new
+launches and does not terminate an already admitted application.
 
 An empty `launch_user` requires the caller to be an ordinary user already.
 Root/system/greeter accounts cannot be selected, and an ordinary caller cannot
@@ -332,6 +350,11 @@ dependencies, constrained version selection, policy/key changes, blocked plans
 and retained publisher ownership. UI checks exercise complete upgrade review
 from each pending row and prevent accidental dependency-root promotion; allocator
 checks cover redraw, decoded view replacement and repeated blocked-plan status.
+Service fixtures check configuration reads after lock acquisition, policy changes
+invalidating review before acquisition/cleanup, revocation denying rollback/mirror
+export, offline overlays, architecture changes and refusal of unsafe lock links.
+CLI and guest fixtures check busy-writer diagnostics before decoding a corrupt
+configuration and reject tampered payloads even with `--json verify`.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute

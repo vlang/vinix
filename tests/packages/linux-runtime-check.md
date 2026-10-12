@@ -55,6 +55,11 @@ host PT_INTERP path is bypassed. Guest assertions cover:
 - Read-only signed repository enrollment review, fingerprint-bound trust apply,
   refusal of reused/stale trust confirmation, and reviewed revocation through
   the production CLI. The `PACKAGE TRUST REVIEW` marker covers this flow.
+- Busy-writer diagnostics for maintenance, state, verification and launch before
+  the service decodes a deliberately corrupt configuration. A policy change makes
+  the pre-install review stale before any object acquisition; restoring the exact
+  policy permits that review. `--json verify` refuses tampered runtime bytes.
+  The `PACKAGE CONFIGURATION` marker covers these assertions.
 
 A passing retained run writes `qualification.json` with architecture, SDK,
 scenario and hashes/lengths for kernel, sandbox, dynamic payload, shared library,
@@ -127,3 +132,14 @@ long URL review, cancellation, invalid/stale responses and saved-trust/failed-re
 diagnostics. Form/review redraws retained zero allocations; status/review reloads
 matched the JSON decoder baseline after retirement. These are CLI/host-UI checks;
 the ordinary-user graphical session and public display broker remain release gates.
+
+Configuration-lock and JSON integrity checks passed on both targets on 2026-10-12
+using those same cached kernels:
+[AArch64 configuration receipt](results/2026-10-12/configuration-aarch64.json),
+[AArch64 serial](results/2026-10-12/configuration-aarch64.serial.txt),
+[x86_64 configuration receipt](results/2026-10-12/configuration-x86_64.json),
+[x86_64 serial](results/2026-10-12/configuration-x86_64.serial.txt).
+`PACKAGE CONFIGURATION` covers writer exclusion before configuration decoding,
+busy launch refusal, changed-policy stale confirmation before acquisition and
+integrity checks with JSON output. The host service fixture also covers client
+reuse after trust/policy changes and confirms fresh-image status stays read-only.

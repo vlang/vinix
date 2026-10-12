@@ -19,12 +19,6 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n'
 
-struct Deployment {
-	format       int = 1
-	architecture string
-	packages     []string
-}
-
 fn checked(arguments []string) !int {
 	mut args := arguments.clone()
 	mut root := ''
@@ -87,21 +81,7 @@ fn checked(arguments []string) !int {
 		}
 		else {}
 	}
-	initial := pkgcore.load_config(root)!
-	if root == '' {
-		$if arm64 {
-			if initial.architecture != 'aarch64' {
-				return error('package configuration targets another architecture')
-			}
-		}
-		$if amd64 {
-			if initial.architecture != 'x86_64' {
-				return error('package configuration targets another architecture')
-			}
-		}
-	}
-	config := pkgcore.Config{ ...initial, policy: pkgcore.Policy{ ...initial.policy, offline: offline || initial.policy.offline } }
-	directory := pkgcore.state_directory(root)
+	service := pkgcore.Service{ root: root, offline: offline }
 	match command {
 		'repo-review', 'repo-apply' {
 			applying := command == 'repo-apply'
@@ -153,7 +133,7 @@ fn checked(arguments []string) !int {
 		}
 		'update' {
 			if names.len != 0 { return error('update takes no package IDs') }
-			pkgcore.refresh(config, directory)!
+			service.refresh()!
 		}
 		'view', 'search', 'info', 'updates' {
 			view := pkgcore.software_view(root, offline)!
@@ -187,33 +167,26 @@ fn checked(arguments []string) !int {
 			if command == 'updates' && view.update_error != '' { return error(view.update_error) }
 		}
 		'status', 'list', 'verify' {
-			state := pkgcore.read_state(directory, config.architecture)!
+			state := if command == 'verify' { service.verify()! } else { service.state()! }
 			if as_json || command == 'status' {
 				println(json2.encode(state))
 				return 0
 			}
 			for installed in state.packages {
 				p := installed.package
-				if command == 'verify' {
-					for file in p.files {
-						if !pkgcore.verified_file(directory + '/generations/' + state.generation.str() + '/apps/' + p.id + '/' + file.path, file) {
-							return error('${p.id}: installed payload verification failed: ${file.path}')
-						}
-					}
-				}
 				println('${p.id} ${p.version} ${p.architecture} ${installed.repository}')
 			}
 		}
 		'install', 'remove', 'upgrade' {
-			pkgcore.transact(config, directory, command, names, pkgcore.TransactionOptions{})!
+			service.transact(command, names, pkgcore.TransactionOptions{})!
 		}
 		'plan' {
 			if names.len < 1 { return error('plan requires an operation') }
-			println(json2.encode(pkgcore.preview_plan(config, directory, names[0], names[1..])!))
+			println(json2.encode(service.plan(names[0], names[1..])!))
 		}
 		'review' {
 			if names.len < 1 { return error('review requires an operation') }
-			text := json2.encode(pkgcore.review_operation(config, directory, names[0], names[1..])!)
+			text := json2.encode(service.review(names[0], names[1..])!)
 			if text.len > pkgcore.max_metadata { return error('package review exceeds metadata limit') }
 			println(text)
 		}
@@ -223,45 +196,41 @@ fn checked(arguments []string) !int {
 			}
 			if names[1] == 'rollback' {
 				if names.len != 2 { return error('rollback takes no package IDs') }
-				pkgcore.rollback_reviewed(config, directory, names[0])!
+				service.rollback(names[0])!
 			} else {
-				pkgcore.transact(config, directory, names[1], names[2..], pkgcore.TransactionOptions{ expected_review: names[0] })!
+				service.transact(names[1], names[2..], pkgcore.TransactionOptions{ expected_review: names[0] })!
 			}
 		}
 		'deploy' {
 			if names.len != 1 { return error('deploy requires a deployment manifest') }
-			deployment := json2.decode[Deployment](pkgcore.read_metadata(names[0])!)!
-			if deployment.format != 1 || deployment.architecture != config.architecture {
-				return error('deployment format or architecture mismatch')
-			}
-			pkgcore.transact(config, directory, 'deploy', deployment.packages, pkgcore.TransactionOptions{})!
+			service.deploy(names[0])!
 		}
 		'rollback' {
 			if names.len != 0 { return error('rollback takes no arguments') }
-			pkgcore.rollback(config, directory)!
+			service.rollback('')!
 		}
 		'gc' {
 			if names.len != 0 { return error('gc takes no arguments') }
-			pkgcore.collect(config, directory)!
+			service.collect()!
 		}
 		'mirror' {
 			if names.len < 2 {
 				return error('mirror requires a new destination directory and package IDs')
 			}
-			pkgcore.mirror(config, directory, names[0], names[1..])!
+			service.mirror(names[0], names[1..])!
 		}
 		'run' {
 			if root != '' {
 				return error('application launch cannot use an alternate installation root')
 			}
 			if names.len < 1 { return error('run requires an application ID') }
-			return pkgcore.run_application(config, directory, names[0], names[1..])
+			return service.run(names[0], names[1..])
 		}
 		'purge-data' {
 			if root != '' || names.len != 1 || !pkgcore.identifier(names[0]) || os.geteuid() == 0 {
 				return error('purge-data requires an application ID and an ordinary user session')
 			}
-			state := pkgcore.read_state(directory, config.architecture)!
+			state := service.state()!
 			if state.packages.any(it.package.id == names[0]) {
 				return error('remove the application before purging its data')
 			}

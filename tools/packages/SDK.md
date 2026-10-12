@@ -190,6 +190,11 @@ The chosen account cannot come from a package, an argument or an environment
 variable. This profile does not acquire the hardware seat; display/audio runtimes
 still require broker qualification. An ordinary caller uses its own identity.
 
+Launch reads trust/policy under the package reader lock and acquires its generation
+lease before releasing that lock. The ordinary child repeats this admission check
+after the credential handoff. Later revocation prevents new launches; an already
+admitted process retains its validated snapshot and lease until exit.
+
 The built-in `NativeApp` V interface and VAPP version 11 remain internal desktop
 contracts. Third-party ui2 clients need compositor adapter qualification. Importing
 `desktop/app_process.v` is not a supported standalone UI SDK protocol.
@@ -281,6 +286,23 @@ state; `plan` emits `{requested,packages}`; `--json search/info/updates` emits o
 row per line. Consumers ignore additional fields and reject unknown formats.
 Success is exit 0; failures are nonzero with stderr diagnostics. Human progress
 text is not a machine protocol.
+
+Maintenance commands load configuration under the package writer lock; read-only
+review/plan/status/verification use its reader lock. The command's startup cannot
+retain an older policy or publisher after a completed administration change.
+`verify`, including `--json verify`, checks all installed payloads before reporting
+success. Readers and launches return a busy-transaction diagnostic promptly.
+On a fresh image, status/verification do not initialize package state. Direct
+administrator edits to configuration must honor the same lock or quiesce package
+operations; arbitrary root filesystem writes are outside this contract.
+
+V administrative clients can use [`pkgcore.Service`](pkgcore/service.v) with
+`root` and a per-command `offline` flag. It retains no configuration snapshot.
+Its `refresh`, `transact`, `deploy`, `plan`, `review`, `rollback`, `collect`,
+`mirror`, `state`, `verify` and `run` methods acquire the appropriate lock before
+loading configuration. Config-taking core functions remain explicit snapshot
+operations for isolated fixtures; they do not reload administrator configuration.
+Production clients should use the service or the versioned CLI protocol.
 
 `review install|remove|upgrade|deploy|rollback [ID...]` emits a format-1 review
 without downloading payloads or changing installed state. It includes the active

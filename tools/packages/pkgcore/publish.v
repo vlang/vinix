@@ -103,6 +103,11 @@ pub fn mirror(config Config, directory string, destination string, names []strin
 	if os.exists(destination) || os.is_link(destination) { return error('offline mirror destination must be new') }
 	guard := acquire(directory)!
 	defer { guard.release() }
+	mirror_locked(config, directory, destination, names)!
+}
+
+fn mirror_locked(config Config, directory string, destination string, names []string) ! {
+	if os.exists(destination) || os.is_link(destination) { return error('offline mirror destination must be new') }
 	catalog := load_catalog(config, directory)!
 	plan := resolve(catalog, config, State{}, names, true)!
 	os.mkdir_all(destination)!

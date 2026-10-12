@@ -98,23 +98,31 @@ pub fn run_application(config Config, directory string, id string, documents []s
 		if fd >= 0 { C.close(fd) }
 		return error('cannot read package state lock')
 	}
-	state := read_state(directory, config.architecture) or {
+	state, lease := generation_lease(directory, config.architecture, id) or {
 		C.close(fd)
 		return err
 	}
+	C.close(fd)
+	defer { C.close(lease) }
+	return run_leased_application(config, directory, state, id, documents)
+}
+
+// The caller holds the package reader lock until this lease has been acquired.
+fn generation_lease(directory string, architecture string, id string) !(State, int) {
+	state := read_state(directory, architecture)!
 	if state.generation == 0 || !state.packages.any(it.package.id == id) {
-		C.close(fd)
 		return error('application is not installed: ${id}')
 	}
 	lease_path := directory + '/generations/' + state.generation.str() + '/lease'
 	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if lease < 0 || C.flock(lease, C.LOCK_SH) != 0 {
 		if lease >= 0 { C.close(lease) }
-		C.close(fd)
 		return error('cannot hold application generation lease')
 	}
-	C.close(fd)
-	defer { C.close(lease) }
+	return state, lease
+}
+
+fn run_leased_application(config Config, directory string, state State, id string, documents []string) !int {
 	uid := int(C.geteuid())
 	gid := int(C.getegid())
 	if uid == 0 || gid == 0 { return error('run applications from an ordinary user session') }

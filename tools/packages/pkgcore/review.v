@@ -62,6 +62,10 @@ fn operation_plan(config Config, directory string, current State, operation stri
 pub fn preview_plan(config Config, directory string, operation string, names []string) !Plan {
 	guard := acquire_reader(directory)!
 	defer { guard.release() }
+	return preview_plan_locked(config, directory, operation, names)
+}
+
+fn preview_plan_locked(config Config, directory string, operation string, names []string) !Plan {
 	current := read_state(directory, config.architecture)!
 	return operation_plan(config, directory, current, operation, names)
 }
@@ -102,6 +106,10 @@ pub fn review_operation(config Config, directory string, operation string, names
 	config.validate()!
 	guard := acquire_reader(directory)!
 	defer { guard.release() }
+	return review_operation_locked(config, directory, operation, names)
+}
+
+fn review_operation_locked(config Config, directory string, operation string, names []string) !pkgprotocol.Review {
 	current := read_state(directory, config.architecture)!
 	mut target := u64(0)
 	plan := if operation == 'rollback' {

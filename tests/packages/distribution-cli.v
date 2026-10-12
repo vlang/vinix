@@ -47,6 +47,24 @@ fn package_template(id string, version string) pkgcore.Package {
 	}
 }
 
+fn qualify_busy_configuration(binary string, root string) ! {
+	guard := pkgcore.acquire(pkgcore.state_directory(root))!
+	defer { guard.release() }
+	path := root + '/etc/vinix-packages/config.json'
+	original := os.read_file(path)!
+	defer { os.write_file(path, original) or { panic(err) } }
+	os.write_file(path, '{broken configuration')!
+	for args in [
+		['update'], ['status'], ['list'], ['--json', 'verify'], ['plan', 'install', 'app'],
+		['review', 'install', 'app'], ['apply', '0'.repeat(64), 'install', 'app'],
+		['install', 'app'], ['upgrade'], ['remove', 'app'], ['rollback'], ['gc'],
+		['mirror', root + '/absent-mirror', 'app'], ['deploy', root + '/absent-deployment.json'],
+	] {
+		reply := command(binary, ['--root', root, ...args])!
+		assert reply.code != 0 && reply.text.contains('another package transaction'), '${args}: ${reply.text}'
+	}
+}
+
 fn qualify(binary string) ! {
 	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
@@ -95,6 +113,7 @@ fn qualify(binary string) ! {
 	assert enrolled.repositories[0].public_key == key && enrolled.history[0].sequence == 1
 	assert !pkgcore.load_config(work + '/root')!.policy.offline
 	success(binary, [...root_args, 'update'])!
+	qualify_busy_configuration(binary, work + '/root')!
 	assert success(binary, [...root_args, 'search', 'distribution'])!.contains('app')
 	assert command(binary, [...root_args, 'info', 'absent'])!.code != 0
 	assert success(binary, [...root_args, 'plan', 'install', 'app'])!.contains('requested')
@@ -135,6 +154,14 @@ fn qualify(binary string) ! {
 	assert pkgcore.read_state(store, 'aarch64')!.generation == installed.generation
 	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(enrolled_config))!
 	success(binary, [...root_args, 'verify'])!
+	// JSON output must not bypass integrity verification.
+	installed_file := store + '/generations/' + installed.generation.str() + '/apps/app/bin/app'
+	original_payload := os.read_file(installed_file)!
+	os.write_file(installed_file, 'tampered payload')!
+	invalid_json_verify := command(binary, [...root_args, '--json', 'verify'])!
+	assert invalid_json_verify.code != 0 && invalid_json_verify.text.contains('installed payload verification failed')
+	os.write_file(installed_file, original_payload)!
+	assert json2.decode[pkgcore.State](success(binary, [...root_args, '--json', 'verify'])!)!.generation == installed.generation
 	// A mirror is used by another completely clean installation, offline.
 	success(binary, [...root_args, 'mirror', work + '/mirror', 'app'])!
 	offline_root := work + '/offline'
@@ -190,7 +217,7 @@ fn qualify(binary string) ! {
 	os.write_file(repository + '/index.sig', latest_signature)!
 	success(binary, [...root_args, 'repo-enroll', 'fixture', 'file://' + repository, key])!
 	success(binary, [...root_args, 'update'])!
-	println('Package CLI: authenticated enrollment, offline mirror, retained replay floors, deployment, rollback and revoked-publisher uninstall passed')
+	println('Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, deployment, rollback and revoked-publisher uninstall passed')
 }
 
 fn main() {

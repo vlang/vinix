@@ -59,6 +59,18 @@ receipts: [AArch64](results/2026-10-12/aarch64.json) and
 [x86_64](results/2026-10-12/x86_64.json). Their complete serial logs and images
 were retained in the corresponding host state directories during qualification.
 
+The configuration-after-lock service also passed the complete enforcement/lease
+scenario on both targets on 2026-10-12 with the cached kernels built from
+revision `7ac619bd`:
+[AArch64 lease receipt](results/2026-10-12/configuration-leases-aarch64.json),
+[AArch64 serial](results/2026-10-12/configuration-leases-aarch64.serial.txt),
+[x86_64 lease receipt](results/2026-10-12/configuration-leases-x86_64.json),
+[x86_64 serial](results/2026-10-12/configuration-leases-x86_64.serial.txt).
+These runs verify that the new lock-scoped launch admission still retains the
+running application's generation through upgrade, uninstall and garbage collection
+and releases it after exit. Every receipt artifact was independently hashed before
+the complete serial output was retained.
+
 These are native package-mechanics checks. They do not qualify network traffic,
 graphical display/audio brokers or Linux/Wine/Apple API coverage. The guest uses
 an initramfs; [the separate ext2 recovery suite](persistence-check.md) checks
