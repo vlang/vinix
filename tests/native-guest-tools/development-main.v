@@ -5,6 +5,7 @@ import crypto.sha256
 import guesthost
 import json2
 import os
+import tools.development.devcore
 
 struct Pin {
 	path   string
@@ -47,6 +48,7 @@ struct BuildStep {
 struct BuildPlan {
 	schema          int = 1
 	source          Pin
+	inputs          []Pin
 	tools           map[string]Pin
 	epoch           i64               = 1700000000
 	timeout_seconds int               = 10
@@ -57,11 +59,17 @@ struct BuildPlan {
 }
 
 struct NativeStep {
+	name      string
+	argv      []string
 	exit_code int
 	artifacts map[string]string
+	detail    string
 }
 
 struct NativeBuild {
+	source   Pin
+	inputs   []Pin
+	tools    map[string]Pin
 	complete bool
 	uid      int
 	kernel   string
@@ -102,6 +110,7 @@ struct Receipt {
 	fixture_sha256  string
 	sdk_sha256      string
 	v_root_sha256   string
+	native_source_sha256 string
 	tools           map[string]string
 	command         []string
 	native_receipts map[string]string
@@ -116,7 +125,7 @@ fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 fn copy_sdk(source string, target string, base string, relative string, mut hash sha256.Digest) ! {
 	if source.ends_with('.py') || source.ends_with('.pyc') || source.ends_with('.pyo') { return }
 	st := os.lstat(source)!
-	mode := st.mode & 0o777
+	mode := if st.get_filetype() == .symbolic_link { u32(0o777) } else { st.mode & 0o777 }
 	hash.write('${relative.len}:${relative}:${mode}:'.bytes())!
 	match st.get_filetype() {
 		.directory {
@@ -137,11 +146,17 @@ fn copy_sdk(source string, target string, base string, relative string, mut hash
 			hash.write(('file:' + copied + '\n').bytes())!
 		}
 		.symbolic_link {
-			link := os.readlink(source)!
+			mut link := os.readlink(source)!
 			if link.starts_with('/') {
 				if link != '/lib/libc.so' {
 					return error('unsupported absolute SDK link: ' + source)
 				}
+				// Make the musl loader portable and pin-able as part of the
+				// copied SDK closure, rather than resolving a host /lib path.
+				if os.lstat(os.dir(source) + '/libc.so')!.get_filetype() != .regular {
+					return error('absolute musl loader needs an adjacent regular libc.so')
+				}
+				link = 'libc.so'
 			} else {
 				if !os.exists(source) { return error('dangling SDK link: ' + source) }
 				resolved := os.real_path(source)
@@ -223,6 +238,7 @@ fn run() !int {
 	}))!
 	mut sdk_hash := ''
 	mut v_root_hash := ''
+	mut native_plan := BuildPlan{}
 	mut profiles := []string{}
 	mut compiler_hashes := map[string]string{}
 	if os.args.len >= 6 {
@@ -281,11 +297,48 @@ fn run() !int {
 			hashes['sh'] = digest(root + '/bin/busybox')!
 			os.symlink('busybox', root + '/bin/sh')!
 			profiles << 'v'
+			userland := root + '/home/developer/native-source'
+			os.mkdir(userland)!
+			mut steps := []BuildStep{}
+			for name in ['fetch', 'mount', 'chsh'] {
+				os.mkdir(userland + '/' + name)!
+				for file in ['main.v', 'v.mod'] {
+					os.cp(guesthost.root() + '/util-vinix/' + name + '/' + file, userland + '/' + name + '/' + file)!
+					os.chmod(userland + '/' + name + '/' + file, 0o644)!
+				}
+				steps << BuildStep{
+					name: 'compile-' + name
+					argv: ['{v}', '-new-compiler', '-no-retry-compilation', '-no-parallel',
+						'-no-memory-limit', '-os', 'vinix', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
+						'-musl', '-gc', 'none', '-cc', '{cc}', '-o', '{work}/' + name + '-bin', '{work}/' + name]
+					artifacts: [name + '-bin']
+				}
+				steps << BuildStep{ name: 'run-' + name, argv: ['{work}/' + name + '-bin', '--version'], artifacts: []string{} }
+			}
+			native_plan = BuildPlan{
+				source: Pin{'/home/developer/native-source', devcore.tree_hash(userland)!}
+				inputs: [Pin{'/opt/native', devcore.tree_hash(root + '/opt/native')!},
+					Pin{'/usr/lib/vlang', devcore.tree_hash(root + '/usr/lib/vlang')!},
+					Pin{'/lib', devcore.tree_hash(root + '/lib')!}]
+				tools: {
+					'v': Pin{'/usr/lib/vlang/v', compiler_hashes['v']}
+					'cc': Pin{'/usr/bin/cc', compiler_hashes['c']}
+					'sh': Pin{'/bin/sh', hashes['sh']}
+				}
+				timeout_seconds: 240
+				environment: { 'VJOBS': '1' }
+				steps: steps
+			}
+			os.write_file(root + '/home/developer/native-build.json', json2.encode(native_plan))!
 		}
 		os.write_file(root + '/home/developer/qualify-sdk', profiles.join(','))!
 	}
 	archive := guesthost.image(init, state)!
 	launch := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
+	// Both architectures boot solely from the completed ISO. Retain it,
+	// the fixture, input pins and transcripts without duplicate SDK trees.
+	os.rmdir_all(root)!
+	os.rm(archive)!
 	mut command := launch.command.clone()
 	if sdk_hash != '' {
 		for i, argument in command { if argument == '-m' { command[i + 1] = if v_root_hash == '' { '2048' } else { '3072' } } }
@@ -296,8 +349,9 @@ fn run() !int {
 		'DEVELOPMENT GUEST PASS',
 	]
 	if sdk_hash != '' { expected << 'DEVELOPMENT TOOLCHAINS PASS:' }
+	if v_root_hash != '' { expected << 'DEVELOPMENT USERLAND PASS:' }
 	result := guesthost.boot(command, launch.env, state, expected,
-		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], 400, true)!
+		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], 900, true)!
 	mut receipts := map[string]string{}
 	for line in os.read_lines(state + '/serial.log')! {
 		if !line.starts_with('DEVELOPMENT RECEIPT ') { continue }
@@ -307,13 +361,14 @@ fn run() !int {
 		if path !in ['/home/developer/good/state.json', '/home/developer/good/plan.json',
 			'/home/developer/public-token/state.json', '/home/developer/link-token/state.json',
 			'/home/developer/build-a/receipt.json', '/home/developer/build-b/receipt.json',
-			'/home/developer/qualification/report.json'] {
+			'/home/developer/qualification/report.json', '/home/developer/native-build.json',
+			'/home/developer/native-a/receipt.json', '/home/developer/native-b/receipt.json'] {
 			return error('unexpected guest receipt path')
 		}
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != if sdk_hash == '' { 6 } else { 7 } {
+	if result == 0 && receipts.len != if sdk_hash == '' { 6 } else if v_root_hash == '' { 7 } else { 10 } {
 		return error('missing native workflow receipts')
 	}
 	if result == 0 {
@@ -348,6 +403,29 @@ fn run() !int {
 				}
 			}
 		}
+		if v_root_hash != '' {
+			mut artifacts := map[string]string{}
+			for output in ['native-a', 'native-b'] {
+				receipt := json2.decode[NativeBuild](receipts['/home/developer/' + output + '/receipt.json'], strict: true)!
+				if !receipt.complete || receipt.uid != 1000 || receipt.kernel != 'Vinix' || receipt.epoch != 1700000000
+					|| receipt.source != native_plan.source || receipt.inputs != native_plan.inputs || receipt.tools != native_plan.tools
+					|| receipt.steps.len != native_plan.steps.len || receipt.steps.any(it.exit_code != 0 || it.detail != '') {
+					return error('native userland build inputs or steps failed validation')
+				}
+				for i, step in receipt.steps {
+					if step.name != native_plan.steps[i].name { return error('native userland step order changed') }
+					if i % 2 == 0 {
+						name := native_plan.steps[i].artifacts[0]
+						hash := step.artifacts[name]
+						if step.artifacts.len != 1 || hash.len != 64 { return error('missing compiled userland artifact') }
+						if output == 'native-a' { artifacts[name] = hash }
+						else if artifacts[name] != hash { return error('userland artifacts differ between fresh workspaces') }
+					} else if step.argv != ['/home/developer/' + output + '/work/' + native_plan.steps[i - 1].artifacts[0], '--version'] {
+						return error('native userland execution does not match its recorded artifact')
+					}
+				}
+			}
+		}
 	}
 	os.write_file(state + '/receipt.json', json2.encode(Receipt{
 		arch:            arch
@@ -355,6 +433,7 @@ fn run() !int {
 		fixture_sha256:  digest(init)!
 		sdk_sha256:      sdk_hash
 		v_root_sha256:   v_root_hash
+		native_source_sha256: native_plan.source.sha256
 		tools:           hashes
 		command:         command
 		native_receipts: receipts

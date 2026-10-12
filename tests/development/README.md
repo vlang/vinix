@@ -48,6 +48,8 @@ runtime copy. Relative links must stay inside the SDK; `/lib/libc.so` is the
 only accepted absolute link target. Unused `.py`, `.pyc` and `.pyo` helpers are
 excluded before copying. The SDK is prepared input, not downloaded or built by
 this controller. Compiler workloads receive 2 GiB of guest RAM.
+The musl loader link is normalized to its adjacent `libc.so`, so the copied
+SDK and runtime are portable closures that `vinix-build` can pin.
 
 As UID/GID 1000, the fixture invokes `vinix-qualify --require-vinix` for `c,cpp`.
 Both projects must compile with symbols, create/join a thread, write/read a
@@ -74,12 +76,27 @@ must compile, write/read a file and execute its resulting binary. These runs
 receive 3 GiB of RAM. Failed qualification retains bounded command-log excerpts
 in the serial transcript as well as the native report.
 
+V runs also copy this repository's `fetch`, `mount` and `chsh` sources and
+generate a build plan pinning those sources, V, GCC, the shell and the complete
+SDK/V/runtime trees. UID/GID 1000 builds them in two fresh workspaces with
+private HOME/temporary directories, then executes each recorded artifact's
+`--version` entry point. The fixture checks ownership, executable ELF headers
+and expected utility output. The controller independently checks both build
+receipts, their input pins, step order, executed artifact paths and matching
+binary hashes. The native plan and both receipts are retained alongside the
+compiler report. Version entry points provide execution smoke coverage;
+filesystem mounting and account-changing workflows have their own gates.
+
 `receipt.json` records the architecture, UID, kernel/fixture/tool hashes,
 QEMU argv, passing verdict and six native plan/state/build receipts. SDK runs
 also retain the SDK hash and native compiler report. `serial.log`,
 the ISO and compiled fixture remain beside it. Credential values do not enter
 the receipts. The credential in this fixture is public synthetic test data.
-V runs additionally record `v_root_sha256` and the `v`/`sh` executable pins.
+V runs additionally record `v_root_sha256`, `native_source_sha256`, the `v`/`sh`
+executable pins, the utility build plan and two native build receipts.
+Once the ISO is complete, its duplicate staging tree and standalone initramfs
+are removed. The ISO, compiled fixture, receipts and transcripts remain; obsolete
+images from earlier runs may be pruned independently of their retained evidence.
 
 On 13 October 2026 these workflows passed on x86_64 and AArch64 using the
 previously staged commands and isolated production kernels. Receipts are in
@@ -118,6 +135,28 @@ both architectures in `/tmp/vinix-development-home-arm-20261013-a` and
 `/tmp/vinix-development-home-x86-20261013-a`, with the updated commands staged
 in `/tmp/vinix-dev-aarch64-20261013-home-a` and
 `/tmp/vinix-dev-x86_64-20261013-home-a`.
+
+The utility rebuild run passed on AArch64 in
+`/tmp/vinix-development-userland-arm-20261013-g`, with commands staged in
+`/tmp/vinix-dev-aarch64-20261013-buffer-a`. Both fresh workspaces compiled and
+executed `fetch`, `mount` and `chsh` as UID/GID 1000, retained complete receipts
+and produced matching artifact hashes. This includes successful SDK/V/runtime
+pin verification before and after each build. The extended x86 controller and
+fixture regression passed without a compiler SDK in
+`/tmp/vinix-development-userland-x86-base-20261013-a`.
+The copied utility source hash is
+`7640e3bca2b9b35861843fb5ee7ad453ac7d39ff1568379f3901e5060cc34b52`.
+Both workspaces produced these artifact SHA-256s:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `fetch-bin` | `516190cc02a02176ad45633c8cb3e30c8e98942015e3a5eea90525f2fd79cf7a` |
+| `mount-bin` | `0808686c516603edbe08c1863727387b8e326c9d55d7ebb3a5298416093a2c2d` |
+| `chsh-bin` | `45ca2c0c495d8d972ea094fceb9dfeb86197c7a00515bf7a449ccd447f63ff5d` |
+
+Earlier diagnostics exposed Darwin/Vinix symlink-mode differences and retained
+64 KiB stream buffers under `-gc none`. Canonical link modes and explicit
+buffer release fix those runner failures; input pins are still verified.
 
 This qualifies the tested per-account job workflows in Vinix guests. Watcher
 signal/deadline/interruption tests still have host coverage; installed service

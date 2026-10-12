@@ -146,7 +146,7 @@ fn private_receipt(path &char, expected &char) {
 
 fn emit_receipt(path &char, expected &char, owner_only_file bool) {
 	unsafe {
-		mut text := [8192]char{}
+		mut text := [32768]char{}
 		fd := C.open(path, C.O_RDONLY)
 		check(fd >= 0, 106)
 		count := C.read(fd, &text[0], text.len - 1)
@@ -223,6 +223,53 @@ fn build_checks() {
 	}
 }
 
+fn native_userland_checks() {
+	unsafe {
+		private_receipt(c'/home/developer/native-build.json', c'/home/developer/native-source')
+		for output in [&char(c'/home/developer/native-a'), &char(c'/home/developer/native-b')]! {
+			status := command(c'/usr/bin/vinix-build', c'build', c'/home/developer/native-build.json', output)
+			mut path := [256]char{}
+			check(C.snprintf(&path[0], path.len, c'%s/receipt.json', output) > 0, 261)
+			if status != 0 {
+				check(command(c'/bin/busybox', c'ls', c'-la', c'/opt/native/lib') == 0, 268)
+				check(command_output(c'/usr/bin/vinix-build', c'hash', c'/opt/native', nil, c'/home/developer/sdk-pin.sha') == 0, 269)
+				emit_command_log(c'/home/developer/sdk-pin.sha')
+				for step in [&char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh')]! {
+					C.snprintf(&path[0], path.len, c'%s/%s.log', output, step)
+					emit_command_log(&path[0])
+				}
+			}
+			check(status == 0, 262)
+			C.snprintf(&path[0], path.len, c'%s/receipt.json', output)
+			emit_receipt(&path[0], c'Vinix', false)
+			for directory in [&char(c'.'), &char(c'home'), &char(c'tmp')]! {
+				C.snprintf(&path[0], path.len, c'%s/%s', output, directory)
+				mut st := C.stat{}
+				check(C.stat(&path[0], &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o777 == 0o700, 263)
+			}
+			for name in [&char(c'fetch'), &char(c'mount'), &char(c'chsh')]! {
+				C.snprintf(&path[0], path.len, c'%s/work/%s-bin', output, name)
+				fd := C.open(&path[0], C.O_RDONLY)
+				mut elf := [20]u8{}
+				mut st := C.stat{}
+				check(fd >= 0 && C.fstat(fd, &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o111 != 0, 264)
+				check(C.read(fd, &elf[0], elf.len) == elf.len && C.close(fd) == 0
+					&& elf[0] == 0x7f && elf[1] == `E` && elf[2] == `L` && elf[3] == `F`
+					&& elf[4] == 2 && elf[5] == 1, 265)
+				C.snprintf(&path[0], path.len, c'%s/run-%s.log', output, name)
+				log := C.open(&path[0], C.O_RDONLY)
+				mut text := [128]char{}
+				mut expected := [128]char{}
+				C.snprintf(&expected[0], expected.len, c'%s from util-vinix\n', name)
+				count := C.read(log, &text[0], text.len - 1)
+				check(log >= 0 && count > 0 && count < text.len - 1 && C.close(log) == 0
+					&& C.strcmp(&text[0], &expected[0]) == 0, 266)
+			}
+		}
+		C.puts(c'DEVELOPMENT USERLAND PASS: UID 1000, pinned SDK/V/runtime, two fresh workspaces, fetch/mount/chsh compiled and executed')
+	}
+}
+
 fn account_checks() {
 	unsafe {
 		check(C.setgroups(0, nil) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0, 116)
@@ -279,6 +326,7 @@ fn account_checks() {
 			}
 			check(status == 0, 252)
 			C.printf(c'DEVELOPMENT TOOLCHAINS PASS: UID 1000, profiles %s, compilation and executed artifacts\n', &profiles[0])
+			if C.strstr(&profiles[0], c',v') != nil { native_userland_checks() }
 		}
 	}
 }
@@ -300,6 +348,11 @@ pub fn run() i32 {
 		}
 		check(C.chown(c'/home/developer/source', 1000, 1000) == 0 && C.chmod(c'/home/developer/source', 0o755) == 0, 177)
 		check(C.chown(c'/home/developer/source/input.txt', 1000, 1000) == 0 && C.chmod(c'/home/developer/source/input.txt', 0o644) == 0, 178)
+		native_plan := C.open(c'/home/developer/native-build.json', C.O_RDONLY)
+		if native_plan >= 0 {
+			check(C.close(native_plan) == 0 && C.chown(c'/home/developer/native-build.json', 1000, 1000) == 0
+				&& C.chmod(c'/home/developer/native-build.json', 0o600) == 0, 267)
+		}
 		// Even root must not silently run a schedule labelled as another account.
 		check(command(c'/usr/bin/vinix-jobs', c'init', c'/home/developer/jobs.json', c'/root/wrong-owner') == 1, 159)
 		pid := C.fork()
