@@ -2,7 +2,9 @@ module main
 
 import os
 
-fn C.mount(source charptr, target charptr, filesystem charptr, flags u64, data voidptr) int
+#include <sys/mount.h>
+
+fn C.mount(source &char, target &char, filesystem &char, flags usize, data voidptr) i32
 
 fn main() {
 	// Get command line options, and set defaults.
@@ -64,7 +66,7 @@ fn main() {
 	}
 
 	// Do the actual mounting.
-	if C.mount(source.str, destination.str, filesystem.str, 0, 0) != 0 {
+	if unsafe { C.mount(&char(source.str), &char(destination.str), &char(filesystem.str), 0, nil) } != 0 {
 		println("Couldn't mount (${C.errno})")
 		exit(0)
 	}

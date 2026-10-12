@@ -4,7 +4,7 @@ import os
 
 #include <unistd.h>
 
-fn C.access(name charptr, mode u32) int
+fn C.access(name &char, mode i32) i32
 
 const access_f_ok = 1
 const access_r_ok = 2
@@ -82,9 +82,9 @@ fn main() {
 	}
 
 	// Check whether the shell is valid.
-	if C.access(new_shell.str, access_f_ok | access_r_ok) == 1 {
+	if unsafe { C.access(&char(new_shell.str), access_f_ok | access_r_ok) } == 1 {
 		println('${new_shell} cannot be found')
-	} else if C.access(new_shell.str, access_x_ok) == 1 {
+	} else if unsafe { C.access(&char(new_shell.str), access_x_ok) } == 1 {
 		println('${new_shell} is not executable')
 	} else if new_shell !in shells {
 		println('${new_shell} is not listed in ${shells_file}')
