@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `4f93ffc9e95fcce04aeb0936fb7ca503b71106ee`,
+at source commit `d64921522dabfac2ba482858ad9bc244fc98217b`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 573 | 2,368,101 | 6.08% |
-| Python | 193 | 826,008 | 2.12% |
-| Shell | 635 | 1,368,878 | 3.51% |
+| C | 573 | 2,368,101 | 6.07% |
+| Python | 191 | 812,605 | 2.08% |
+| Shell | 638 | 1,369,289 | 3.51% |
 
-All `.v` files are classified as V. The resulting V share is 80.28%, with no
+All `.v` files are classified as V. The resulting V share is 80.34%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 826,008 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 812,605 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 4f93ffc9e95fcce04aeb0936fb7ca503b71106ee --breakdown --json
+github-linguist --rev d64921522dabfac2ba482858ad9bc244fc98217b --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -811,8 +811,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/fixture-goldens.py` | 7,324 |
 | `tests/linuxkpi/host_suite.py` | 1,162 |
 | `tests/linuxkpi/run_vm.py` | 1,671 |
-| `tests/memory/run-runtime.py` | 7,331 |
-| `tests/memory/test-big-io.py` | 6,072 |
 | `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/opengothic/_native.py` | 3,643 |
 | `tests/opengothic/kekvm-control.py` | 4,448 |
@@ -1250,7 +1248,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/memory-retention/run` | 189 |
 | `tests/memory/run-big-metadata.sh` | 735 |
 | `tests/memory/run-pagetable` | 170 |
-| `tests/memory/run-runtime.sh` | 177 |
+| `tests/memory/run-runtime` | 155 |
+| `tests/memory/run-runtime.sh` | 117 |
+| `tests/memory/test-big-io` | 155 |
+| `tests/memory/test-memory-tools` | 161 |
 | `tests/minecraft/smoke.sh` | 939 |
 | `tests/minecraft/test-fetcher` | 206 |
 | `tests/minecraft/test-launcher.sh` | 8,276 |
