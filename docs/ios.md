@@ -3667,17 +3667,70 @@ EOS's required `_OBJC_CLASS_$_NSFileManager` import. Evidence is retained under
 published runners are unchanged, and game entry, rendering and gameplay remain
 unverified.
 
+`NSFileManager` now resolves its class/metaclass imports and supports POSIX
+directory creation and path queries in V. Installed Foundation measures a
+32-byte NSObject subclass. EOS contains defaultManager and
+createDirectoryAtPath:withIntermediateDirectories:attributes:error:. Native
+probes exercised owned temporary files; no application code was executed.
+
+The runtime owns one lazily created default manager until quiescent shutdown.
+Explicit construction remains distinct. Existence queries follow symlink
+targets and leave isDirectory untouched on failure. Readable, writable and
+executable queries use native access checks. A nil delegate is supported;
+nonzero delegate callbacks and copies reject explicitly.
+
+Path and file-URL directory creation use actual POSIX mkdir/chmod operations.
+Recursive creation accepts existing directories, including symlink targets,
+and preserves their permissions. Each newly created parent and child receives
+an explicit NSFilePosixPermissions attribute, overriding umask; defaults obey
+umask. Nil and empty attribute dictionaries are accepted. Ordinary filesystem
+paths and app synchronization apply; private native ivars remain opaque.
+
+Failures return false and autorelease an owned NSError graph with a copied
+NSFilePath and an underlying NSPOSIXErrorDomain error. Measured missing-path,
+existing-item, non-directory, dangling-link and permission failures preserve
+Cocoa codes 4, 516, 512 and 513 and the failing path component. Success leaves
+a preexisting error output untouched. Other native errors currently use the
+generic Cocoa write code 512; exhaustive Foundation error mapping remains
+outside this profile. Paths are bounded to 1,023 bytes without embedded NULs.
+Other directory attributes, non-file URLs and broader file-manager APIs
+remain unsupported.
+
+All 70 programs build and 92 original generated C streams restore to recorded
+hashes. Twenty-two host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes twenty-four Objective-C and 33 Swift/loader programs. Shared native and
+runtime fixtures exercise real files, fourteen directory cases, error
+ownership, permission/umask behavior, file URLs and guarded output bytes.
+Runtime checks cover 8,000 concurrent singleton queries, caller-owned storage,
+100 isa changes per cycle, ten exact rejection reasons and two shutdowns
+with zero live objects and blocks. Generated C checks verify stack-only
+path/stat/permission helpers, singleton retirement and error graph ownership.
+
+Compiler trials retain the missing native header, V fixture declaration
+corrections and an allocation-auditor variable collision. An archival helper
+also moved a validation tool; the failed launch and original bytes are kept,
+and the tool/source were restored byte-identically before the successful batch.
+The native C++ fixture was restored from its recorded hashes. Guest phases
+run sequentially and retire their payloads only after joined success; native
+module replay waits for the host build.
+
+Fortnite passes the NSFileManager binding and exits with status 1 before entry
+at the required `_OBJC_CLASS_$_NSAutoreleasePool` import. Evidence is retained under
+`build/ios/fortnite/filemanager-checks`. Full regression remains unpassed, the
+five published runners are unchanged, and game entry, rendering and gameplay
+remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,436 | 724 | 79 |
-| EOSSDK | 651 | 11 | 18 |
+| Fortnite executable | 1,437 | 723 | 79 |
+| EOSSDK | 652 | 10 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,202 | 796 | 120 |
+| All images | 2,204 | 794 | 120 |
 
-The C++/GLES/Text variant reports 2,215 resolved imports, 783 unresolved strong
+The C++/GLES/Text variant reports 2,217 resolved imports, 781 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

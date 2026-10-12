@@ -217,6 +217,7 @@ mut:
 	load_categories []ObjLoad
 	framework_data map[string]u64
 	framework_objects []u64
+	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
 	timers       []u64
 	display_links []u64
@@ -271,7 +272,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'NSFileManager', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -330,6 +331,7 @@ fn objc_start() {
 			'ASWebAuthenticationSession' { u32(136) }
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
+			'NSFileManager' { u32(32) }
 			'NSUUID', '_NSUUIDBridge' { u32(8) }
 			'__NSConcreteUUID' { u32(24) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
@@ -523,6 +525,8 @@ fn objc_stop() {
 	objc_release(ios_runtime.notification_center)
 	objc_release(ios_runtime.audio_session)
 	objc_release(ios_runtime.defaults)
+	objc_release(ios_runtime.file_manager)
+	ios_runtime.file_manager = 0
 	objc_release(ios_runtime.locale)
 	objc_release(ios_runtime.run_loop)
 	webkit_stop()
