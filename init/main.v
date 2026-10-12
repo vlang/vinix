@@ -4,9 +4,21 @@ import os
 
 #include <unistd.h>
 
-fn C.sethostname(name charptr, len u64) int
+fn C.sethostname(name &char, len usize) i32
 
 fn main() {
+	if os.args.len > 1 {
+		if os.args.len == 2 && os.args[1] == '--version' {
+			println('init from Vinix')
+			return
+		}
+		if os.args.len == 2 && os.args[1] == '--help' {
+			println('Usage: ${os.args[0]} [--help|--version]')
+			return
+		}
+		eprintln('Unexpected init arguments')
+		exit(1)
+	}
 	println('Vinix Init started')
 
 	os.setenv('HOME', '/root', true)
@@ -22,11 +34,11 @@ fn main() {
 
 	// Read hostname from /etc/hostname and pass to the kernel.
 	hostname_file := os.read_file('/etc/hostname') or { 'vinix' }
-	mut length := u64(0)
+	mut length := 0
 	for length < hostname_file.len && hostname_file[length] != `\n` {
 		length++
 	}
-	C.sethostname(hostname_file[..length].str, length)
+	unsafe { C.sethostname(&char(hostname_file.str), usize(length)) }
 
 	for {
 		os.system("exec -a '-bash' bash --login")
