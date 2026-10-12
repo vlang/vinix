@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `af9283246b39c3c4bba98c2c714b366f0f2553e6`,
+at source commit `8f4b4b4d6dc8789bab9c6a2a00753648596ff5e4`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 592 | 2,394,197 | 5.82% |
-| Python | 56 | 329,431 | 0.80% |
-| Shell | 772 | 1,384,972 | 3.36% |
+| C | 593 | 2,394,789 | 5.80% |
+| Python | 43 | 275,389 | 0.67% |
+| Shell | 785 | 1,370,383 | 3.32% |
 
-All `.v` files are classified as V. The resulting V share is 82.44%, with no
+All `.v` files are classified as V. The resulting V share is 82.66%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 329,431 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 275,389 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev af9283246b39c3c4bba98c2c714b366f0f2553e6 --breakdown --json
+github-linguist --rev 8f4b4b4d6dc8789bab9c6a2a00753648596ff5e4 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -66,7 +66,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/boot-fixture-v-abi.h` | 276 |
 | `apple-boot/tests/converter-v-abi.h` | 443 |
 | `apple-boot/tests/helper-fixture-v-abi.h` | 193 |
-| `base-files/usr/include/vinix/hypervisor.h` | 1,315 |
+| `base-files/usr/include/vinix/hypervisor.h` | 1,318 |
 | `build-support/aarch64-cc-shim/stdatomic.h` | 4,425 |
 | `build-support/android/androidhost/probe_spawn_abi.h` | 706 |
 | `build-support/android/atl-configuration-v-abi.h` | 1,394 |
@@ -214,7 +214,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/vinix_endpoint.h` | 349 |
 | `kernel/c/vinix_inet6.h` | 1,534 |
 | `kernel/c/vinix_net.h` | 2,728 |
-| `kernel/c/vmx.h` | 1,394 |
+| `kernel/c/vmx.h` | 1,446 |
 | `kernel/c/x86_irq_v_contract.h` | 804 |
 | `kernel/c/x86_mitigations.h` | 1,098 |
 | `kernel/linuxkpi/include/asm/atomic.h` | 3,241 |
@@ -289,7 +289,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/acpi-sync/native-abi.h` | 995 |
 | `tests/activity-monitor/metrics.c` | 9,958 |
 | `tests/activity-monitor/test.c` | 10,664 |
-| `tests/agx-fake-g17/agxhost/vm_abi.h` | 1,024 |
+| `tests/agx-fake-g17/agxhost/vm_abi.h` | 1,056 |
 | `tests/agx-fake-g17/encodefixture/encoder-native-abi.h` | 853 |
 | `tests/agx-fake-g17/ioctl_fault.c` | 17,891 |
 | `tests/agx-fake-g17/verifyfixture/verifier-native-abi.h` | 609 |
@@ -403,6 +403,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/gl-triangle/native_fixture.c` | 10,868 |
 | `tests/hypervisor/abifixture/abi-fixture-native-abi.h` | 643 |
 | `tests/hypervisor/guestfixture/hypervisor-guest-native-abi.h` | 506 |
+| `tests/hypervisor/memoryguest/native-abi.h` | 505 |
 | `tests/hypervisor/vmx_test.c` | 4,436 |
 | `tests/init-policy/guestfixture/guest-native-abi.h` | 1,070 |
 | `tests/init-policy/hostfixture/host-native-abi.h` | 1,617 |
@@ -670,10 +671,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/genfont.py` | 4,935 |
 | `desktop/tools/tests/test_font_data.py` | 7,106 |
 | `installer/macos/vinix_auto.py` | 8,147 |
-| `kernel/linuxkpi/audit.py` | 7,718 |
-| `kernel/linuxkpi/generate-abi.py` | 713 |
-| `kernel/linuxkpi/generate-bounds.py` | 2,882 |
-| `kernel/linuxkpi/upstream.py` | 1,586 |
 | `tests/activity-monitor/run.py` | 5,933 |
 | `tests/agx-fake-g17/_native.py` | 7,413 |
 | `tests/agx-fake-g17/run.py` | 1,075 |
@@ -691,16 +688,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/run.py` | 3,048 |
 | `tests/krandom/run_native.py` | 2,478 |
-| `tests/linuxkpi/_audit_native.py` | 7,668 |
-| `tests/linuxkpi/_guest_native.py` | 6,611 |
-| `tests/linuxkpi/_host_native.py` | 4,257 |
-| `tests/linuxkpi/audit_generation_test.py` | 1,281 |
-| `tests/linuxkpi/compile-native-host.py` | 7,987 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,384 |
-| `tests/linuxkpi/exchange_test.py` | 3,182 |
-| `tests/linuxkpi/fixture-goldens.py` | 7,324 |
-| `tests/linuxkpi/host_suite.py` | 1,162 |
-| `tests/linuxkpi/run_vm.py` | 1,671 |
 | `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/pointer-scroll/run.py` | 5,488 |
 | `tests/python3/smoke.py` | 9,112 |
@@ -876,6 +864,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `installer/macos/install-vinix.sh` | 8,313 |
 | `installer/macos/test.sh` | 2,189 |
 | `kernel/get-deps` | 3,277 |
+| `kernel/linuxkpi/audit` | 130 |
+| `kernel/linuxkpi/generate-abi` | 158 |
+| `kernel/linuxkpi/generate-bounds` | 161 |
+| `kernel/linuxkpi/upstream` | 161 |
 | `scripts/build-aarch64.sh` | 3,252 |
 | `scripts/build-all-aarch64.sh` | 6,834 |
 | `scripts/build-amd64.sh` | 3,259 |
@@ -1182,6 +1174,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/hypervisor/check-vmx` | 110 |
 | `tests/hypervisor/host-test` | 185 |
 | `tests/hypervisor/run-abi` | 164 |
+| `tests/hypervisor/run-memory` | 170 |
 | `tests/hypervisor/run-vm` | 171 |
 | `tests/hypervisor/run.sh` | 118 |
 | `tests/hyprland/smoke.sh` | 413 |
@@ -1225,9 +1218,16 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/krandom/run.sh` | 1,734 |
 | `tests/limine-aarch64/test-patch` | 111 |
 | `tests/linux-compat/run` | 153 |
+| `tests/linuxkpi/audit_generation_test` | 141 |
+| `tests/linuxkpi/compile-native-host` | 136 |
 | `tests/linuxkpi/compile-v-core` | 166 |
+| `tests/linuxkpi/compile-v-fixture` | 132 |
 | `tests/linuxkpi/compile-v-host` | 158 |
-| `tests/linuxkpi/run.sh` | 11,272 |
+| `tests/linuxkpi/exchange_test` | 133 |
+| `tests/linuxkpi/fixture-goldens` | 132 |
+| `tests/linuxkpi/host_suite` | 156 |
+| `tests/linuxkpi/run.sh` | 128 |
+| `tests/linuxkpi/run_vm` | 152 |
 | `tests/listen-backlog/run` | 187 |
 | `tests/m1-deploy/run.sh` | 2,686 |
 | `tests/m1-wifi/build.sh` | 2,603 |
@@ -1278,6 +1278,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/native-campaign-tools/campaignhost/verify-v4-init.txt` | 2,156 |
 | `tests/native-campaign-tools/run` | 179 |
 | `tests/native-game-tools/run` | 135 |
+| `tests/native-linuxkpi-tools/run` | 135 |
 | `tests/native-runtime-tools/run` | 135 |
 | `tests/native-validation-tools/run` | 135 |
 | `tests/net-random/run` | 183 |
@@ -1322,7 +1323,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/paging/run` | 215 |
 | `tests/paging/run-host.sh` | 178 |
 | `tests/pci-config/arm_vm` | 216 |
-| `tests/pci-config/run.sh` | 5,477 |
+| `tests/pci-config/run.sh` | 135 |
 | `tests/pci-config/topology` | 169 |
 | `tests/pci-hotplug/run` | 757 |
 | `tests/posix-timer/check-generated` | 146 |
