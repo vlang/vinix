@@ -216,6 +216,7 @@ fn swift_buffers_stop() {
 	swift_array_storage_stop()
 	swift_heap_stop()
 	swift_arc_stop()
+	swift_foundation_stop()
 	swift_metadata_stop()
 	swift_hash_stop()
 	swift_fatal_stop()

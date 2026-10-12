@@ -2586,17 +2586,65 @@ strong imports. Evidence is under
 the candidates stay there, and the five published runners retain their last
 passing bytes. Gameplay remains unverified.
 
+V now resolves Swift Foundation's `NSLog(String, CVarArg...)`,
+`String._bridgeToObjectiveC()` and the String `CVarArg` conformance. The
+measured logger takes String words in `x0/x1` and a borrowed Array in `x2`.
+Each existential element occupies forty bytes, with concrete metadata and
+its witness table at offsets 24 and 32. Vinix copies supported inline values
+through their value witnesses, invokes the actual encoding getter with
+borrowed Self in `x20`, concatenates its owned `Array<Int>` result as Darwin
+stack words, then releases both the encoding and copied value. Format String
+ownership stays pinned through callbacks. A getter can join another resolver.
+
+String encoding bridges to a scoped autoreleased NSString; the standalone
+String bridge returns a caller-owned NSString. A concrete specialization of
+Foundation's retroactive String conformance has real relative protocol/type/
+table/module records. It uses the existing witness lookup. A sealed two-page
+arena holds the adapters and conformance, and is retired before the core
+metadata it references. Logging writes a formatted UTF-8 message to stderr
+from one explicitly owned buffer; temporary objects drain with its pool.
+
+The native Mac and V fixtures compare String/Int and custom multiword encoding,
+Unicode, percent escaping, empty arrays, caller-owned bridging, preserved
+inputs and cleanup. Eight sanitizer processes pass in both hash modes, all
+forty-eight programs build, and all thirty Swift guest checks pass. Generated
+C audits cover the logging path and all fifty-two original C streams are
+retained with verified lossless compression. The initial capture fixture used
+V `int` pipe slots emitted as 64-bit by this compiler, while libc requires
+32-bit slots; bounded captures and explicit `i32` slots corrected it. Its
+exact failed fixture, C, binary and joined termination status are retained.
+
+Evidence is under `build/ios/fortnite/swift-nslog-checks`, including the installed
+native metadata/witness layout, expanded native export and both EOS call sites,
+and hashed official Swift [varargs implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/VarArgs.swift)
+and [metadata API](https://github.com/swiftlang/swift/blob/main/include/swift/Runtime/Metadata.h).
+Only registered value Array storage and inline struct/enum CVarArgs are
+supported, with at most 512 encoded words and 1 MiB of formatted output.
+Boxed/reference values, general existential metadata creation, positional/star
+formats, long doubles and object formatting beyond NSString remain unsupported.
+The log destination follows Vinix's stderr convention; Apple's timestamp and
+system-log routing are not implemented.
+
+The supplied IPA resolves these logging, String bridge and conformance imports
+and still exits with status 1 before entry at EOS's
+`_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ`,
+the reverse optional NSString-to-String bridge. Its native export and two EOS
+call sites are retained for measurement. Both import audits resolve four
+additional strong imports across the bundled frameworks. Full regression
+remains unpassed; these runners stay in the evidence directory and the five published runners
+keep their last passing bytes. Entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,411 | 748 | 80 |
-| EOSSDK | 618 | 44 | 18 |
-| MarketplaceKitWrapper | 109 | 67 | 23 |
-| All images | 2,138 | 859 | 121 |
+| EOSSDK | 621 | 41 | 18 |
+| MarketplaceKitWrapper | 110 | 66 | 23 |
+| All images | 2,142 | 855 | 121 |
 
-The C++/GLES/Text variant reports 2,151 resolved imports, 846 unresolved strong
+The C++/GLES/Text variant reports 2,155 resolved imports, 842 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -138,6 +138,7 @@ mut:
 	swift_array_arena u64 // Array accessor/descriptor/witness pages and zero-filled generic cache.
 	swift_array_metadata map[u64]u64 // Element metadata -> sealed Array metadata, under the runtime lock.
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
+	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
 	swift_error_arena u64 // Sealed ObjC value witnesses and the concrete CFError: Error conformance.
 	swift_objc_metadata map[u64]u64 // Class -> canonical sealed Swift wrapper, under the runtime lock.
@@ -443,6 +444,7 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 }
 
 fn runtime_symbol(library string, symbol string) !u64 {
+	if library == '/usr/lib/swift/libswiftFoundation.dylib' { return swift_foundation_symbol(symbol) }
 	if library == '/usr/lib/swift/libswift_Concurrency.dylib' { return swift_concurrency_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftObjectiveC.dylib' {
 		if address := swift_objc_bool_symbol(symbol) { return address }
