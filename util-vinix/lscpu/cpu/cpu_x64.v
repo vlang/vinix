@@ -1,5 +1,7 @@
 module cpu
 
+import runtime
+
 @[packed]
 struct RawVendorID {
 mut:
@@ -258,10 +260,12 @@ pub fn get_cpu_info() ?CPUInfo {
 	flags.sort()
 
 	// Fetch address sizes.
-	_, a2, _, c2, _ := cpuid(0x80000008, 0)
+	_, a2, _, _, _ := cpuid(0x80000008, 0)
 	physical_size := '${(a2 & 0xff)} bits physical'
 	linear_size := '${((a2 >> 8) & 0xff)} bits linear'
-	core_count := (c2 & 0xff) + 1
+	// CPUID's package topology is vendor-specific and does not count the
+	// logical CPUs online in this OS (in particular on Intel and with SMT).
+	core_count := u32(runtime.nr_cpus())
 
 	// Fetch model string.
 	mut str1 := &RawModelName{}
