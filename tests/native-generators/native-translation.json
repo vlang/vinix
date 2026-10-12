@@ -1,0 +1,121 @@
+{
+  "historical_archive_translation_credit": 0,
+  "replacements": [
+    {
+      "blob": "70586253df3fd5f3396bb87d04903a4fd7da8484",
+      "bytes": 2801,
+      "lines": 67,
+      "native_paths": [
+        "build-support/compile-v-module",
+        "tests/linuxkpi/hosttest/module.v",
+        "tests/linuxkpi/generate_module.v"
+      ],
+      "path": "build-support/compile-v-module.py",
+      "sha256": "d032bf2a30ef51c917473d25ba9c19ab99282241ba401263c64ba88a3801fc85"
+    },
+    {
+      "blob": "3b80f489c87fcd9781f9e4a9d00054d889d209d5",
+      "bytes": 2919,
+      "lines": 51,
+      "native_paths": [
+        "build-support/security-tools/compile-v-core",
+        "build-support/native-compat-tools/compathost/project.v"
+      ],
+      "path": "build-support/security-tools/compile-v-core.py",
+      "sha256": "b662c1dcb047061bee77d4c3d69b9ce028b5b51e680f3e4e2e993f5865677835"
+    },
+    {
+      "blob": "0d089b9c2261e1232c450021eb6786b0760b2438",
+      "bytes": 1972,
+      "lines": 32,
+      "native_paths": [
+        "build-support/xorg-server/compile-v-host",
+        "build-support/native-compat-tools/compathost/project.v"
+      ],
+      "path": "build-support/xorg-server/compile-v-host.py",
+      "sha256": "6e25c79202883aaedd46e7af159aaee9ba7fcb956db9ced6414955588fdc8732"
+    },
+    {
+      "blob": "7d68e2bb76a3eebb4e16f2d9e00e16a5eef39517",
+      "bytes": 2092,
+      "lines": 50,
+      "native_paths": [
+        "tests/kernel-gaps/compile-v-fixture",
+        "tests/native-generators/generators/core.v"
+      ],
+      "path": "tests/kernel-gaps/compile-v-fixture.py",
+      "sha256": "5db76ba7b422829f3717ea82aea243553d3d13398b7032f3bb744484487fbeac"
+    },
+    {
+      "blob": "7a171eda43b3850500cecf00f70d2d39424984ed",
+      "bytes": 1929,
+      "lines": 35,
+      "native_paths": [
+        "tests/linuxkpi/compile-v-core",
+        "tests/native-generators/generators/core.v"
+      ],
+      "path": "tests/linuxkpi/compile-v-core.py",
+      "sha256": "d2ac140cca6947fa55be7d7ee6b176372cf0f457c6d0a5d9018bb7e47b57f7b3"
+    },
+    {
+      "blob": "2026e2d4a813d636c97a3bb7e3c1457e4414e1da",
+      "bytes": 1165,
+      "lines": 30,
+      "native_paths": [
+        "tests/linuxkpi/compile-v-host",
+        "tests/linuxkpi/compile_host.v",
+        "tests/linuxkpi/hostfixturebuild/core.v"
+      ],
+      "path": "tests/linuxkpi/compile-v-host.py",
+      "sha256": "3a8ee51a0fc1ab72aa183635f697c19cc9f4735f47d532c6de0e17d9dd14b4f4"
+    },
+    {
+      "blob": "f1437b60b758c9a6583a45703a98ec6a7f584181",
+      "bytes": 2110,
+      "lines": 49,
+      "native_paths": [
+        "tests/alloc-bench/compile-v-bench",
+        "tests/native-generators/generators/core.v"
+      ],
+      "path": "tests/alloc-bench/compile-v-bench.py",
+      "sha256": "203aca14ddc3653d425fc153209abee9463bf679377ae6e9d04f91efedad8add"
+    },
+    {
+      "blob": "92911f93c81df9c163803db763fbfb22ebfa533b",
+      "bytes": 2480,
+      "lines": 44,
+      "native_paths": [
+        "tests/alloc-bench/compile-v-sampler",
+        "tests/native-generators/generators/core.v"
+      ],
+      "path": "tests/alloc-bench/compile-v-sampler.py",
+      "sha256": "5a47681e553de965a8f78b05022ce97dffa9b2b8848ecd94820d973585e34230"
+    },
+    {
+      "blob": "51021bb9bb515ddefb36a053d4e90617b73ce91c",
+      "bytes": 3828,
+      "lines": 69,
+      "native_paths": [
+        "tests/alloc-bench/compile-v-kmod-info",
+        "tests/native-generators/generators/metadata.v"
+      ],
+      "path": "tests/alloc-bench/compile-v-kmod-info.py",
+      "sha256": "7ff954b270979f907f303decc7be9ffcbbd8bc0a7b5440d0a4a6667d84695fab"
+    },
+    {
+      "blob": "1dd07a2e8ebf05589148184724f4ac3eff82c3a2",
+      "bytes": 4484,
+      "lines": 104,
+      "native_paths": [
+        "tests/alloc-bench/test-kmod-info",
+        "tests/native-generators/generators/object.v"
+      ],
+      "path": "tests/alloc-bench/test_kmod_info.py",
+      "sha256": "ffe0bdb362e47db18c16705be016a6797ffcff79af7f3bc874b3a55b49065bc5"
+    }
+  ],
+  "schema": 1,
+  "source_commit": "edde5b8dc705e647463b30b83cadc125b55bf385",
+  "translated_python_bytes": 25780,
+  "translated_python_files": 10
+}
