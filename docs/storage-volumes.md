@@ -537,6 +537,56 @@ govern later application. Existing V1/V2 formats and boot restoration persist
 contracted windows. See
 [contraction qualification](../tests/storage-volumes/pool-contract-batch.md).
 
+## Atomic cross-pool window resizing
+
+```sh
+# Transfer an unused 4 KiB boundary region from pool 5 to adjacent pool 6.
+vinix-volume pool-preview-resize-batch /root/layout.vset \
+  mbr:12345679 6 12587008 12599296 mbr:12345679 5 12582912 12587008
+vinix-volume pool-resize-batch /root/layout.vset \
+  mbr:12345679 6 12587008 12599296 mbr:12345679 5 12582912 12587008
+```
+
+`pool-resize-batch BUNDLE IDENTITY POOL START_BYTES END_BYTES [...]` changes both
+bounds of 1–64 existing pool members in one atomic edit. Every request selects
+an enrolled MBR/GPT disk identity and pool. The same disk may appear in different
+pools; duplicate identity/pool pairs, ambiguous saved identities and absent
+disks/members reject the complete request. Selection follows current saved
+geometry and survives unrelated disk-index compaction.
+
+Requested windows must be nonempty, sector-aligned and within saved disk
+capacity. Allocation alignment stays unchanged; bounds need not match that
+larger alignment. A resize must retain the entire occupied intersection of
+each desired mapping with its original window, protecting both the head and
+tail, including mappings crossing either original boundary. Rows outside the
+original window do not prevent releasing unused capacity. Newly admitted
+desired rows count as occupied in subsequent pool queries and allocations.
+
+Disjointness is checked on the complete candidate, allowing unused capacity
+to pass between adjacent pools in either request order. An intermediate
+overlap exists only in private planning storage. A later invalid request or
+overlapping final window preserves every original field and reports no action
+prefix. Desired rows, offsets, modes, pending lengths, slots, disk geometry,
+region count/order and allocation priority remain exact. Empty members may
+move to other free bounds; existing memberships and alignment are preserved.
+
+`pool-preview-resize-batch` reports every resolved disk/pool, identity,
+old/new start/end, alignment and `resize`/`keep` action without physical-device
+probes, writer locking or publication. Publication holds the pinned directory
+writer lock through source loading, whole-set validation, atomic replacement,
+report flushing and cleanup. Equal-bound retries still write, file-fsync,
+rename and directory-fsync the whole bundle. Before rename failure leaves old
+bytes; afterward only the complete new candidate may be visible with durability
+unconfirmed. Buffered stdout failure returns an error. Inspect or retry the
+complete request under serialized administration to confirm durability.
+
+This edits saved allocation eligibility. It leaves live mappings, descriptors,
+generations and data intact, including unlisted live views outside the new
+window. Future pool placement uses the new bounds; explicit placement remains
+independent. Complete live preflight and ordinary kernel protection govern
+later application. Existing V1/V2 formats and boot replay retain the resized
+windows. See [cross-pool resizing qualification](../tests/storage-volumes/pool-resize-batch.md).
+
 ## Atomic desired mapping removal batches
 
 ```sh

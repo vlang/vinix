@@ -82,6 +82,13 @@ stay exact; equal ends are durable keep retries. `pool-preview-contract-batch`
 reports all actions without device probes, writer locking or publication. Live
 views remain intact. See [contraction rules](../../docs/storage-volumes.md#atomic-pool-eligibility-contraction).
 
+`pool-resize-batch BUNDLE IDENTITY POOL START_BYTES END_BYTES [...]` atomically
+resizes 1–64 existing windows across pools, protecting occupied intersections
+at both ends. Final-set validation permits adjacent pools to exchange unused
+capacity in either order while retaining alignment and priority. Equal bounds
+are durable keep retries. `pool-preview-resize-batch` reports the complete edit
+without writer locking or publication. See [cross-pool resizing rules](../../docs/storage-volumes.md#atomic-cross-pool-window-resizing).
+
 `plan-remove-batch BUNDLE SLOT [...]` removes 1–64 distinct desired slots across
 disks in one atomic publication. Absent slots are durable `keep` retries;
 remaining mappings, enrolled disks and pool priority are preserved.

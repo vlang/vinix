@@ -182,6 +182,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Atomic identity-based explicit mapping additions with complete previews, whole-set rollback, preserved row/pool order, durable exact retries across disk compaction and boot persistence](docs/storage-volumes.md#atomic-explicit-mapping-additions).
   - [x] [Atomic identity-based explicit mapping growth with complete previews, whole-set rollback, preserved offsets/modes/row/pool order, durable equal-size retries and boot persistence](docs/storage-volumes.md#atomic-explicit-mapping-growth).
   - [x] [Atomic identity-based pool eligibility contraction with protected occupied intersections, complete previews, whole-set rollback, preserved mappings/priority, durable equal-end retries and boot persistence](docs/storage-volumes.md#atomic-pool-eligibility-contraction).
+  - [x] [Atomic cross-pool window resizing with two-sided occupied-byte protection, order-independent unused-capacity transfers, complete previews, whole-set rollback, durable equal-bound retries and boot persistence](docs/storage-volumes.md#atomic-cross-pool-window-resizing).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

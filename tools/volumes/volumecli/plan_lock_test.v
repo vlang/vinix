@@ -65,6 +65,9 @@ fn test_directory_lock_excludes_all_saved_state_writers_but_preserves_readonly_i
 	mut contractions := PoolContractionBatch{count: 1}; contractions.keys[0] = set.plans[0].key; contractions.ends[0] = 12288
 	assert contract_batch_pool_plan(path.str, 3, &contractions, false) == 1
 	assert contract_batch_pool_plan(path.str, 3, &contractions, true) == 0
+	mut resizes := PoolResizeBatch{count: 1}; resizes.rows[0] = PoolResizeRequest{key: set.plans[0].key, pool: 3, start: 0, end: 12288}
+	assert resize_batch_pool_plan(path.str, &resizes, false) == 1
+	assert resize_batch_pool_plan(path.str, &resizes, true) == 0
 	assert grow_bundle_plan(path.str, 2, 8192) == 1
 	assert enroll_bundle_disk(path.str, c'/unused') == 1
 	unsafe {
