@@ -87,6 +87,13 @@ pub fn capture(argv []string, env map[string]string, timeout f64, limit int, can
 	return capture_observed(argv, env, timeout, limit, cancel, unsafe { nil }, unsafe { nil }, 0)
 }
 
+// Byte-comparison fixtures need both complete streams. Ordinary command
+// diagnostics retain their existing 64 KiB stderr prefix policy.
+pub fn capture_full(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
+ if limit < 0 { return error('invalid command output limit') }
+ return capture_stream_policy_arch(argv,env,timeout,limit,cancel,unsafe { nil },unsafe { nil },unsafe { nil },0,false,false,'','',false,'','',false,limit,true)
+}
+
 // Use one SDK pipe for both child streams when the caller's original command
 // used stderr=STDOUT. Preserve their write ordering and one output bound.
 pub fn capture_combined(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool) !Output {
@@ -159,6 +166,11 @@ fn capture_policy(argv []string, env map[string]string, timeout f64, limit int, 
 
 fn capture_policy_arch(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
 	observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string, log string, append bool, directory string, host_arch string, stderr_inherited bool) !Output {
+ return capture_stream_policy_arch(argv,env,timeout,limit,cancel,observe,spawned,context,shutdown_grace,combined,inherited,executable,log,append,directory,host_arch,stderr_inherited,64 * 1024,false)
+}
+
+fn capture_stream_policy_arch(argv []string, env map[string]string, timeout f64, limit int, cancel fn () bool,
+ observe fn (string, voidptr) !, spawned fn (int, voidptr) !, context voidptr, shutdown_grace f64, combined bool, inherited bool, executable string, log string, append bool, directory string, host_arch string, stderr_inherited bool, stderr_limit int, strict_stderr bool) !Output {
 	if argv.len == 0 || argv.any(it.contains('\x00')) { return error('invalid command') }
 	mut pipes := [i32(-1), -1, -1, -1]!
 	defer { for fd in pipes { if fd >= 0 { C.close(fd) } } }
@@ -290,8 +302,9 @@ fn capture_policy_arch(argv []string, env map[string]string, timeout f64, limit 
 				if stdout.len > limit - int(count) { return error('command output exceeds limit') }
 				stdout.write(buffer[..int(count)])!
 				if observe != unsafe { nil } { observe(buffer[..int(count)].bytestr(), context)! }
-			} else if stderr.len < 64 * 1024 {
-				stderr.write(buffer[..int_min(int(count), 64 * 1024 - stderr.len)])!
+			} else {
+    if strict_stderr && stderr.len > stderr_limit - int(count) { return error('command stderr exceeds limit') }
+    if stderr.len < stderr_limit { stderr.write(buffer[..int_min(int(count), stderr_limit - stderr.len)])! }
 			}
 		}
 	}

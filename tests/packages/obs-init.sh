@@ -16,7 +16,7 @@ fail() {
 	[ ! -d /tmp/vinix-obs-test ] || ls -la /tmp/vinix-obs-test
 	[ ! -e /run/vinix-obs-screen ] || ls -l /run/vinix-obs-screen
 	ps -ef | grep -E 'obs|Xvfb' || true
-	/usr/bin/python3 /usr/share/vinix/x-window-check.py :99 '' 2>/dev/null || true
+	/usr/share/vinix/x-window-check :99 '' 2>/dev/null || true
 	if [ -d /root/.config/obs-studio/logs ]; then
 		for log in /root/.config/obs-studio/logs/*; do
 			[ ! -f "$log" ] || tail -40 "$log"
@@ -50,7 +50,7 @@ while [ "$i" -lt 180 ]; do
 	if [ -e /tmp/vinix-obs-test/Xvfb_screen0 ] \
 		&& [ -e /tmp/vinix-obs-test/Xvfb_screen1 ] \
 		&& [ -e /run/vinix-obs-screen ] \
-		&& /usr/bin/python3 /usr/share/vinix/x-window-check.py :99 'OBS' 2>/dev/null; then
+		&& /usr/share/vinix/x-window-check :99 'OBS' 2>/dev/null; then
 		break
 	fi
 	sleep 1
@@ -59,7 +59,7 @@ done
 [ "$i" -lt 180 ] || fail "OBS did not map its window and capture screen"
 sleep 5
 kill -0 "$host_pid" 2>/dev/null || fail "OBS exited after mapping its window"
-/usr/bin/python3 /usr/share/vinix/x-window-check.py :99 'OBS' 2>/dev/null \
+/usr/share/vinix/x-window-check :99 'OBS' 2>/dev/null \
 	|| fail "OBS window did not stay mapped"
 grep -q 'Switched to scene' /root/.config/obs-studio/logs/* \
 	|| fail "OBS did not finish loading its default scene"

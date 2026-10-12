@@ -132,10 +132,9 @@ install -m755 "$SCRIPT_DIR/tests/packages/sublime-smoke.sh" \
 # A persistent /root shadows the copy the image ships there, so the checker the
 # guest tests run lives under /usr/share as well.
 mkdir -p "$STAGING/usr/share/vinix"
-install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
-    "$STAGING/usr/share/vinix/x-window-check.py"
-install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
-    "$STAGING/root/x-window-check.py"
+"$SCRIPT_DIR/build-support/build-validation-guest" --arch "$VINIX_ARCH" \
+    --output "$STAGING/usr/share/vinix/x-window-check"
+install -m755 "$STAGING/usr/share/vinix/x-window-check" "$STAGING/root/x-window-check"
 install -m755 "$SCRIPT_DIR/build-support/gimp/run-gimp" \
     "$STAGING/usr/bin/run-gimp"
 # Chromium is fetched on demand with `pkg install chromium`, so its launcher,

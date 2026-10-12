@@ -224,10 +224,10 @@ PY
 echo "VINIX STEAM PASS: large shared-memory mapping"
 
 # A persistent /root can shadow the copy the image ships there.
-if [ -x /usr/share/vinix/x-window-check.py ]; then
-	x_window_check=/usr/share/vinix/x-window-check.py
+if [ -x /usr/share/vinix/x-window-check ]; then
+	x_window_check=/usr/share/vinix/x-window-check
 else
-	x_window_check=/root/x-window-check.py
+	x_window_check=/root/x-window-check
 fi
 
 display=:99
@@ -255,7 +255,7 @@ echo "VINIX STEAM: launching the client through the desktop's X11 bridge"
 # Keep one X11 connection open while waiting. Reopening the GLX display for
 # every check makes its server retain memory on each client disconnect.
 window_log=/tmp/steam-window-check.log
-/usr/bin/python3 "$x_window_check" "$display" 'Steam' 1800 >"$window_log" 2>&1 &
+"$x_window_check" "$display" 'Steam' 1800 >"$window_log" 2>&1 &
 window_watch_pid=$!
 
 surfaced=false
@@ -285,7 +285,7 @@ while [ "$i" -lt 1800 ]; do
 		# Xlib's default handler exits if a window disappears halfway through
 		# the tree walk. Reopen the display for this rare race rather than
 		# treating a watcher failure as a client failure.
-		/usr/bin/python3 "$x_window_check" "$display" 'Steam' 1800 >>"$window_log" 2>&1 &
+		"$x_window_check" "$display" 'Steam' 1800 >>"$window_log" 2>&1 &
 		window_watch_pid=$!
 	fi
 	sleep 1

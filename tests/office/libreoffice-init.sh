@@ -38,10 +38,10 @@ mkdir -p /tmp /run/user/0 /dev/shm /var/log /tmp/.X11-unix /var/lib/xkb
 chmod 1777 /tmp /dev/shm /tmp/.X11-unix
 
 # A persistent /root can shadow the copy the image ships there.
-if [ -x /usr/share/vinix/x-window-check.py ]; then
-	x_window_check=/usr/share/vinix/x-window-check.py
+if [ -x /usr/share/vinix/x-window-check ]; then
+	x_window_check=/usr/share/vinix/x-window-check
 else
-	x_window_check=/root/x-window-check.py
+	x_window_check=/root/x-window-check
 fi
 
 # VCL's own log stream. Without it a refusal to build the user interface is
@@ -72,7 +72,7 @@ while [ "$i" -lt 600 ]; do
 		surfaced=true
 		echo "VINIX LIBREOFFICE PASS: the hosted display has a framebuffer"
 	fi
-	if /usr/bin/python3 "$x_window_check" "$display" 'LibreOffice Writer' 2>/dev/null; then
+	if "$x_window_check" "$display" 'LibreOffice Writer' 2>/dev/null; then
 		mapped=true
 		break
 	fi

@@ -1381,8 +1381,8 @@ else
 fi
 install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
-install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
-    "$STAGING/usr/share/vinix/x-window-check.py"
+"$SCRIPT_DIR/build-support/build-validation-guest" --arch aarch64 \
+    --sysroot "$SYSROOT" --output "$STAGING/usr/share/vinix/x-window-check"
 install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" "$STAGING/root/chromium-smoke.html"
 mkdir -p "$STAGING/etc/chromium/policies/managed"
 install -m644 "$SCRIPT_DIR/build-support/chromium/policies.json" \
@@ -1781,7 +1781,11 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/gl-triangle/stage.v"
     "$SCRIPT_DIR/tests/browsers/firefox-smoke.html"
     "$SCRIPT_DIR/tests/browsers/chromium-smoke.html"
-    "$SCRIPT_DIR/tests/packages/x-window-check.py"
+    "$SCRIPT_DIR/tests/packages/x-window-check"
+    "$SCRIPT_DIR/build-support/build-validation-guest"
+    "$SCRIPT_DIR/tests/native-validation-tools/guest.v"
+    "$SCRIPT_DIR/tests/native-validation-tools/build-guest.v"
+    "$SCRIPT_DIR/tests/native-validation-tools/guestvalidation"
 )
 if [ -n "$WIFI_BUNDLE" ]; then
     CONTENT_KEY_INPUTS+=("$WIFI_BUNDLE")

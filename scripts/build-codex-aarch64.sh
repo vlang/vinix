@@ -104,7 +104,8 @@ done
 
 install -m755 "$STAGING/usr/bin/rg" "$CODEX_ROOT/codex-path/rg"
 install -m755 "$STAGING/bin/zsh" "$CODEX_ROOT/codex-resources/zsh/bin/zsh"
-install -m644 "$SCRIPT_DIR/tests/codex/smoke.py" "$STAGING/root/codex-smoke.py"
+"$SCRIPT_DIR/build-support/build-validation-guest" --arch aarch64 --static \
+    --output "$STAGING/root/codex-smoke"
 
 # Make absolute package symlinks self-contained in the staging tree.
 find "$STAGING" -type l | while IFS= read -r link; do

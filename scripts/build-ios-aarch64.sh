@@ -90,7 +90,7 @@ if [ "$WITH_2048" = 1 ]; then
 fi
 
 if [ "$WITH_PPSSPP" = 1 ]; then
-    python3 "$SCRIPT_DIR/examples/ios-ppsspp/download.py" --output "$OUTPUT/ppsspp"
+    "$SCRIPT_DIR/examples/ios-ppsspp/download" --output "$OUTPUT/ppsspp"
     cp -R "$OUTPUT/ppsspp/unpacked/Payload/PPSSPP.app" "$OUTPUT/staging/usr/share/vinix/ios/"
     ln -sf run-ios-gles "$OUTPUT/staging/usr/bin/vinix-ios-ppsspp"
 fi

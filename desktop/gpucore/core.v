@@ -13,6 +13,10 @@ module gpucore
 #include <string.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include "gpu_egl_abi.h"
+
+@[typedef]
+struct C.vinix_gpu_egl_attribute {}
 $if gpu_presenter_enabled ? {
     #include <EGL/egl.h>
     #include <EGL/eglext.h>
@@ -90,7 +94,7 @@ mut:
     readback &u32
 }
 
-type PlatformDisplay = fn (u32, voidptr, &i32) voidptr
+type PlatformDisplay = fn (u32, voidptr, &C.vinix_gpu_egl_attribute) voidptr
 
 // GL retains these client-array addresses after a frame. Preserve the original
 // static lifetime even between frames and during context destruction.

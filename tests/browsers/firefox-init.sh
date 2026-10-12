@@ -32,10 +32,10 @@ mkdir -p /tmp /run/user/0 /dev/shm /var/log /tmp/.X11-unix /var/lib/xkb
 chmod 1777 /tmp /dev/shm /tmp/.X11-unix
 
 # A persistent /root can shadow the copy the image ships there.
-if [ -x /usr/share/vinix/x-window-check.py ]; then
-	x_window_check=/usr/share/vinix/x-window-check.py
+if [ -x /usr/share/vinix/x-window-check ]; then
+	x_window_check=/usr/share/vinix/x-window-check
 else
-	x_window_check=/root/x-window-check.py
+	x_window_check=/root/x-window-check
 fi
 
 display=:99
@@ -61,7 +61,7 @@ while [ "$i" -lt 300 ]; do
 		surfaced=true
 		echo "VINIX FIREFOX PASS: the hosted display has a framebuffer"
 	fi
-	if /usr/bin/python3 "$x_window_check" "$display" 'Mozilla Firefox' 2>/dev/null; then
+	if "$x_window_check" "$display" 'Mozilla Firefox' 2>/dev/null; then
 		mapped=true
 		break
 	fi

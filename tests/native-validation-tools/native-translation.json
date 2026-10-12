@@ -1,0 +1,103 @@
+{
+    "bytes": 36139,
+    "files": 6,
+    "lines": 972,
+    "originals": [
+        {
+            "bytes": 2488,
+            "lines": 75,
+            "path": "build-support/steam/qemu-dns.py",
+            "sha256": "d5488b816768ea98da4a1b8013e6ac09cd5a9f3ba688c7f4464c9066ca866875"
+        },
+        {
+            "bytes": 6516,
+            "lines": 130,
+            "path": "tests/roblox/launcher-test.py",
+            "sha256": "91bac89ad9067ebc516d801bb55b0fd8e3c521f0ff5871f29b5b4982b20de123"
+        },
+        {
+            "bytes": 8956,
+            "lines": 183,
+            "path": "desktop/tools/test-gpu-present.py",
+            "sha256": "b5a023d775a52de82759cc7d58456df6616f5aad2296bc75d9d7057f0d19cc81"
+        },
+        {
+            "bytes": 4944,
+            "lines": 160,
+            "path": "tests/codex/smoke.py",
+            "sha256": "305312df940e7b78cad224094b938e68a94f88faf097b6099bddf0f4b7046267"
+        },
+        {
+            "bytes": 7250,
+            "lines": 232,
+            "path": "tests/claude/smoke.py",
+            "sha256": "9a8a31d6f57a556e7ba0a691672b49b9f6bcc40e6287fe30ea90917a31f7ed4a"
+        },
+        {
+            "bytes": 5985,
+            "lines": 192,
+            "path": "tests/packages/x-window-check.py",
+            "sha256": "b8033dcdc5297446e3e2b2e1f0d4874c4f457d8c117cf6e56802dbcb4ad266c0"
+        }
+    ],
+    "prepared_psp_note": "All four V fetchers pass the real pinned package controls. Their original files remain until the concurrently staged iOS controller stops invoking them through Python. They receive no retirement credit here.",
+    "prepared_psp_replacements": [
+        {
+            "bytes": 3845,
+            "lines": 85,
+            "path": "examples/ios-ppsspp/download.py",
+            "sha256": "d914e427fc03011ac3846bba5420f2b46d6a3ab249b375aff120f52950ea47d8"
+        },
+        {
+            "bytes": 1636,
+            "lines": 41,
+            "path": "examples/ios-ppsspp/download-cube.py",
+            "sha256": "4a380edad0d8843cc2d8ecef38f9ebe3c5014b5f62c893b0e72f84f32d7cd3e3"
+        },
+        {
+            "bytes": 3947,
+            "lines": 84,
+            "path": "examples/ios-ppsspp/download-gow.py",
+            "sha256": "4eb6d12c237c771f5177f9ea8be95e610db97f0cd062ee593e88b0607310422c"
+        },
+        {
+            "bytes": 3694,
+            "lines": 80,
+            "path": "examples/ios-ppsspp/download-nzp.py",
+            "sha256": "7f1dd443c5a8da44cb002fb84ac247e5217b16b91ec8b8a9cac32c4ba68def53"
+        }
+    ],
+    "qualification": {
+        "actual_guest_elf_profiles": 4,
+        "actual_staged_gpu_header_cross_profiles": 2,
+        "first_party_python_executed": false,
+        "fresh_program_profiles": 33,
+        "full_and_legacy_capture_limits": true,
+        "gpu_cases_per_profile": 67,
+        "guest_cache_corruption_and_failed_publication": true,
+        "original_launcher_cases_per_profile": 9,
+        "profiles": [
+            "arm",
+            "x86",
+            "san"
+        ],
+        "public_bootstraps_after_retirement": 9,
+        "public_help_and_guard_bootstraps": 22,
+        "real_client_or_vinix_guest_execution_claimed": false,
+        "real_pinned_psp_archives_and_curl": true,
+        "real_udp_and_descriptor_cycles": true,
+        "receipt_sha256": {
+            "arm": "a3b598f797708c08fff9342e70e4d19204d9a45a9077ad7e5b7b9f2191034888",
+            "public-after-retirement": "a6ba35d63ca552b15e4ced88b8dfbebcc04145cd1fe412086f9306a40ed013ee",
+            "public-before-retirement": "bb91c089a1ccf690e9288df377110ef641e53ffe11a4028ef912714a1286e6c0",
+            "real-psp": "5feb22bd57a3029815e795bd9f04613ee066bd1d8f2874af09b8db175421e2f5",
+            "san": "f25811489a7088477f91d06f32576321ceed404fec4e85ec23e557aecc5a3027",
+            "x86": "b2c430a672becfed964a36ecf0d95d7c7867e2bff51c2fe67061dcad653abc4b"
+        },
+        "whole_http_cases_per_profile": 10,
+        "whole_signal_cases_per_profile": 8,
+        "xlib_owner_cycles_per_profile": 100
+    },
+    "source_commit": "71d666c443582443a99f4ef3ab618beac7b387a8",
+    "status": "PASS"
+}

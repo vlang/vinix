@@ -239,8 +239,8 @@ install -m644 "$SCRIPT_DIR/tests/browsers/firefox-smoke.html" \
     "$STAGING/usr/share/vinix/firefox-smoke.html"
 install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
-install -m755 "$SCRIPT_DIR/tests/packages/x-window-check.py" \
-    "$STAGING/usr/share/vinix/x-window-check.py"
+"$SCRIPT_DIR/build-support/build-validation-guest" --arch x86_64 \
+    --sysroot "$SYSROOT" --output "$STAGING/usr/share/vinix/x-window-check"
 rm -f "$STAGING/sbin/init"
 install -m755 "$SCRIPT_DIR/build-support/init-amd64/desktop-init" "$STAGING/sbin/init"
 # The release this image is, for the desktop to compare with the newest one

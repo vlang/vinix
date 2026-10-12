@@ -6,6 +6,10 @@ module gpufixture
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "gpu_egl_abi.h"
+
+@[typedef]
+struct C.vinix_gpu_egl_attribute {}
 fn C.printf(&char, ...voidptr) i32
 fn C.fprintf(voidptr, &char, ...voidptr) i32
 fn C.abort()
@@ -17,7 +21,7 @@ fn C.strcmp(&char, &char) i32
 fn C.vinix_gpu_present_create(i32, i32) voidptr
 fn C.vinix_gpu_present_frame(voidptr, &u32, i32, i32, i32, &u32, i32, i32, i32) i32
 fn C.vinix_gpu_present_destroy(voidptr)
-fn C.gpf_platform(u32, voidptr, &i32) voidptr
+fn C.gpf_platform(u32, voidptr, &C.vinix_gpu_egl_attribute) voidptr
 
 __global fixture_failure i32
 __global fixture_allocs [8]voidptr
@@ -132,7 +136,7 @@ pub fn proc_address(name &char) voidptr {
  return if fixture_failure == 24 || fixture_failure == 34 { unsafe { nil } } else { unsafe { voidptr(C.gpf_platform) } }
 }
 @[export: 'gpf_platform']
-pub fn platform(kind u32, native voidptr, attributes &i32) voidptr {
+pub fn platform(kind u32, native voidptr, attributes &C.vinix_gpu_egl_attribute) voidptr {
  check(kind == 0x31dd && native == unsafe { nil } && attributes == unsafe { nil }, c'platform display arguments')
  trace(c'platform-display', kind, 0)
  if fixture_failure == 3 { return unsafe { nil } }

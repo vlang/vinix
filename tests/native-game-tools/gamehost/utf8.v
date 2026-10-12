@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module gamehost
 
+// Native diagnostic and X11 adapters share the qualified replacement decoder.
+pub fn decode_utf8(bytes []u8) string { return replace_utf8(bytes) }
+
 fn replace_utf8(bytes []u8) string {
 	// Decode malformed serial diagnostics without discarding valid text.
 	mut result := []u8{}

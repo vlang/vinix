@@ -16,6 +16,19 @@ pub:
 	mode u32 = 0o644
 }
 
+// Native package fetchers validate the complete central-directory policy
+// before opening any output file. Compression and CRC checks stay shared.
+pub struct ArchiveEntry {
+pub:
+ name string
+ size u64
+ mode u32
+}
+
+pub fn (archive Archive) entries() []ArchiveEntry {
+ return archive.archive.entries.map(ArchiveEntry{name:it.name,size:it.size,mode:elf_u32(it.central,38) >> 16})
+}
+
 pub struct ArchiveWriter {
 mut:
 	stream os.File

@@ -100,7 +100,11 @@ const desktop_source_paths = [
 	'gl-triangle/stage.v',
 	'tests/browsers/firefox-smoke.html',
 	'tests/browsers/chromium-smoke.html',
-	'tests/packages/x-window-check.py',
+	'tests/packages/x-window-check',
+	'build-support/build-validation-guest',
+	'tests/native-validation-tools/guest.v',
+	'tests/native-validation-tools/build-guest.v',
+	'tests/native-validation-tools/guestvalidation',
 	'build/wallpapers-cache',
 ]
 

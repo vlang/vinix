@@ -99,8 +99,8 @@ for pkg in "${ALPINE_PKGS[@]}"; do
     }
 done
 
-install -m644 "$SCRIPT_DIR/tests/claude/smoke.py" \
-    "$STAGING/root/claude-smoke.py"
+"$SCRIPT_DIR/build-support/build-validation-guest" --arch aarch64 --static \
+    --output "$STAGING/root/claude-smoke"
 
 # Keep update and telemetry workers out of the compatibility surface. The CLI
 # still makes the model requests and tool calls explicitly requested by users.

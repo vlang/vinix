@@ -63,10 +63,10 @@ DISPLAY="$display" subl --multiinstance --foreground --safe-mode -n \
 sublime_pid=$!
 
 # A persistent /root can shadow the copy the image ships there.
-if [ -x /usr/share/vinix/x-window-check.py ]; then
-	x_window_check=/usr/share/vinix/x-window-check.py
+if [ -x /usr/share/vinix/x-window-check ]; then
+	x_window_check=/usr/share/vinix/x-window-check
 else
-	x_window_check=/root/x-window-check.py
+	x_window_check=/root/x-window-check
 fi
 mapped=false
 i=0

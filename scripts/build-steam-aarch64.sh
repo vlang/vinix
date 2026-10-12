@@ -273,7 +273,8 @@ install -m755 "$SCRIPT_DIR/build-support/steam/steam-runtime-launcher-service" \
 for helper in zenity ldd uname tar; do
     install -m755 "$SCRIPT_DIR/build-support/steam/$helper" "$HELPERS/$helper"
 done
-install -m755 "$SCRIPT_DIR/build-support/steam/qemu-dns.py" "$HELPERS/qemu-dns"
+"$SCRIPT_DIR/build-support/build-validation-guest" --arch aarch64 --static \
+    --output "$HELPERS/qemu-dns"
 # Steam's WebUI transport resolves the PID behind its loopback socket through
 # lsof -P -F upnR -i TCP@127.0.0.1:<port>. The BusyBox applet has different
 # output and cannot perform the required socket lookup.

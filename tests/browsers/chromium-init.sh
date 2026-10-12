@@ -68,10 +68,10 @@ fi
 # a display this file invented.
 display=:99
 # A persistent /root can shadow the copy the image ships there.
-if [ -x /usr/share/vinix/x-window-check.py ]; then
-	x_window_check=/usr/share/vinix/x-window-check.py
+if [ -x /usr/share/vinix/x-window-check ]; then
+	x_window_check=/usr/share/vinix/x-window-check
 else
-	x_window_check=/root/x-window-check.py
+	x_window_check=/root/x-window-check
 fi
 surface=/tmp/vinix-chromium
 # The bridge treats end of file on stdin as "the window closed", so its input
@@ -96,7 +96,7 @@ while [ "$i" -lt 300 ]; do
 		surfaced=true
 		echo "VINIX CHROMIUM PASS: the hosted display has a framebuffer"
 	fi
-	if /usr/bin/python3 "$x_window_check" "$display" 'Chromium' 2>/dev/null; then
+	if "$x_window_check" "$display" 'Chromium' 2>/dev/null; then
 		mapped=true
 		break
 	fi

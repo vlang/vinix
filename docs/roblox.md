@@ -179,8 +179,8 @@ reaches Roblox's native welcome screen. Base metadata comes from the base
 manifest; combined resources and native-library extraction read both unchanged
 archives. A normal fixture APK verifies metadata, copied split paths, a split
 asset and a real ARM64 JNI library on Vinix. Login and gameplay remain unverified.
-Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test.py` and
-`tests/roblox/build-test.py`.
+Host launcher and shared-runtime validation checks are in `tests/roblox/launcher-test` and
+`tests/roblox/build-test`.
 
 ## The Windows client and Wine
 
