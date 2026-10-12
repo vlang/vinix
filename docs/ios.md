@@ -3046,17 +3046,61 @@ The next-class measurement invokes metadata APIs only. Evidence is under
 unpassed, the five published runners are unchanged, and entry/rendering/gameplay
 remain unverified.
 
+`WKUserScript` and `WKContentWorld` now implement their measured public data
+APIs in V. Scripts copy source strings, preserve document-start/document-end and
+main-frame policies, and support both public initializers, including an explicit
+content world. Copying an immutable script retains that same object. Page and
+default-client worlds have distinct identities and nil names; named worlds copy
+their names and are interned within a runtime. Their measured native records are
+128 and 80 bytes, with public state in the existing owned sidecars.
+
+`WKUserContentController` now registers scripts in order, including duplicates,
+and removes all registrations. Its `userScripts` getter returns a stable,
+read-only 40-byte `WKNSArray` adapter. The list changes when registrations change;
+copying it retains the same live list. A retained list keeps its scripts alive
+after controller destruction. Configuration copies share their controller and
+registrations. Array storage owns each script reference; each script owns its
+copied source and world. Disposal still works after class changes and
+caller-storage destruction. Explicit app methods remain discoverable when added
+to WebKit classes whose native profile has no copy implementation.
+
+Sources are bounded to 1 MiB, lists to 1,024 entries and world names to 4,096 UTF-8
+bytes. The runtime owns page/client worlds and at most 126 named worlds until
+shutdown. Script reinitialization, other injection values, private engine/C++
+access, coding and script execution remain unimplemented. Native inline C++
+storage stays zero-filled. The first native probe read a borrowed script after
+clearing registrations and failed; subsequent probes used explicit retains and
+verified live-list ownership. Original trials and their actual statuses remain
+preserved.
+
+All 58 final programs build and 68 final generated C streams restore to their
+recorded hashes. Ten host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes twelve Objective-C programs and 33 Swift/loader programs. Shared fixtures
+verify copied mutable inputs, immutable copies, world identity, duplicates,
+registration order, live lists and retained-list lifetimes. Repeated release,
+class changes and caller-storage checks balance ownership across two runtime
+cycles, with six explicit rejection children. Generated-code checks verify
+allocation-free list clearing and world-cache retirement.
+
+Fortnite passes script binding and still exits with status 1 before entry at
+EOS's required `_OBJC_CLASS_$_WKWebView` import. The metadata probe observes a
+1,008-byte macOS NSView subclass; that platform layout does not establish the
+iOS UIView layout. No web view is constructed. Evidence is under
+`build/ios/fortnite/user-script-checks`. Full regression remains unpassed, the
+five published runners are unchanged, and entry/rendering/gameplay remain
+unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,422 | 737 | 80 |
-| EOSSDK | 638 | 24 | 18 |
+| EOSSDK | 639 | 23 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,175 | 822 | 121 |
+| All images | 2,176 | 821 | 121 |
 
-The C++/GLES/Text variant reports 2,188 resolved imports, 809 unresolved strong
+The C++/GLES/Text variant reports 2,189 resolved imports, 808 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -101,6 +101,7 @@ mut:
 	condition_initialized bool
 	cookie_owned bool
 	webkit &WebKitState = unsafe { nil }
+	webkit_array bool // Read-only script list; its contents change through its controller.
 	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
 	font_face voidptr // Optional FreeType face, disposed before its descriptor.
 	autoresizing u64
@@ -204,6 +205,8 @@ mut:
 	locale u64
 	empty_dictionary u64
 	webkit_default_store u64
+	webkit_worlds [128]u64 // Owned interned page/client/named worlds, retired at shutdown.
+	webkit_world_count int = 2
 	image_dictionaries u64 // Intrusive list retired after all collection/pool users.
 	observers []&NotificationObserver
 	selectors    []string
@@ -233,7 +236,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences',
+		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
@@ -259,7 +262,7 @@ fn objc_start() {
 			'UIWindowScene' { ios_runtime.names['UIScene'] }
 			'UIButton' { ios_runtime.names['UIControl'] }
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
-			'NSMutableArray' { ios_runtime.names['NSArray'] }
+			'NSMutableArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
 			'NSMutableData' { ios_runtime.names['NSData'] }
@@ -411,6 +414,7 @@ fn objc_new(cls u64) u64 {
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	name := webkit_object_name(object)
 	if name == 'WKWebsiteDataStore' { panic('iOS: use WebKit data store factories') }
+	if name in ['WKUserScript', 'WKContentWorld', 'WKNSArray'] { panic('iOS: WebKit object requires designated construction') }
 	if name != '' { webkit_initialize(object, name) }
 	return object
 }

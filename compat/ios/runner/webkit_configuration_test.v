@@ -220,7 +220,7 @@ fn test_webkit_runtime_configuration() {
 		controller := objc_new(api.content_controller)
 		assert !objc_responds(controller, c'copyWithZone:')
 		assert !objc_responds(controller, c'copy') && objc_instance_method(api.content_controller, u64(c'copy')) == 0
-		assert !objc_responds(controller, c'addUserScript:')
+		assert objc_responds(controller, c'addUserScript:')
 		objc_release(controller)
 		objc_release(object)
 		webkit_stop()

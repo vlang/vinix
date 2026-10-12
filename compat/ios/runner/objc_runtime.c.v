@@ -107,16 +107,12 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	name := ctext(selector)
-	if info := ios_runtime.classes[cls] {
-		if !info.meta && webkit_name(info.name) && info.name !in ['WKWebViewConfiguration', 'WKPreferences'] && name == 'copy' {
-			return 0
-		}
-	}
 	mut current := cls
 	for _ in 0 .. 128 {
 		if current == 0 { return 0 }
 		info := ios_runtime.classes[current] or { return 0 }
 		if method := info.method_info[name] { return u64(method) }
+		if !info.meta && webkit_name(info.name) && name == 'copy' && webkit_builtin_types(info.name, false, name) == none { return 0 }
 		if types := objc_builtin_types(current, name) {
 			return u64(objc_record_method(current, unsafe { &char(selector) }, u64(unsafe { voidptr(C.ios_objc_builtin) }), unsafe { &char(types.str) }, true))
 		}

@@ -15,7 +15,7 @@ mut:
 
 fn webkit_name(name string) bool {
 	return name in ['WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController',
-		'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences']
+		'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray']
 }
 
 fn webkit_size(name string) u32 {
@@ -26,6 +26,9 @@ fn webkit_size(name string) u32 {
 		'WKProcessPool' { 1456 }
 		'WKWebsiteDataStore' { 600 }
 		'WKWebpagePreferences' { 496 }
+		'WKUserScript' { 128 }
+		'WKContentWorld' { 80 }
+		'WKNSArray' { 40 }
 		else { 8 }
 	}
 }
@@ -62,6 +65,9 @@ fn webkit_metadata() {
 	webkit_ivar('WKProcessPool', '_automationSession', '{RetainPtr<_WKAutomationSession>="m_ptr"@"_WKAutomationSession"}', 1448, 8)
 	webkit_ivar('WKWebsiteDataStore', '_delegate', '{WeakObjCPtr<id<_WKWebsiteDataStoreDelegate>>="m_weakReference"@}', 584, 8)
 	webkit_ivar('WKWebsiteDataStore', '_proxyConfigurations', '{RetainPtr<NSArray>="m_ptr"@"NSArray"}', 592, 8)
+	webkit_ivar('WKUserScript', '_userScript', '{AlignedStorage<API::UserScript, 8UL>="m_storage"{Storage="data"[120C]}}', 8, 120)
+	webkit_ivar('WKContentWorld', '_contentWorld', '{AlignedStorage<API::ContentWorld, 8UL>="m_storage"{Storage="data"[72C]}}', 8, 72)
+	webkit_ivar('WKNSArray', '_array', '{AlignedStorage<API::Array, 8UL>="m_storage"{Storage="data"[32C]}}', 8, 32)
 }
 
 fn webkit_ivar(name string, ivar string, types string, offset i64, size u64) {
@@ -116,6 +122,12 @@ fn webkit_stop() {
 	object := ios_runtime.webkit_default_store
 	ios_runtime.webkit_default_store = 0
 	objc_release(object)
+	for index in 0 .. ios_runtime.webkit_world_count {
+		world := ios_runtime.webkit_worlds[index]
+		ios_runtime.webkit_worlds[index] = 0
+		objc_release(world)
+	}
+	ios_runtime.webkit_world_count = 2
 }
 
 fn webkit_dependency(object u64, index int) u64 {
@@ -146,11 +158,12 @@ fn webkit_copy(object u64, name string) u64 {
 
 fn webkit_builtin_types(name string, meta bool, selector string) ?string {
 	if !webkit_name(name) { return none }
+	if types := webkit_script_types(name, meta, selector) { return types }
 	if meta {
 		if name == 'WKWebsiteDataStore' && selector in ['defaultDataStore', 'nonPersistentDataStore'] { return '@16@0:8' }
 		return none
 	}
-	if selector == 'init' && name != 'WKWebsiteDataStore' { return '@16@0:8' }
+	if selector == 'init' && name !in ['WKWebsiteDataStore', 'WKUserScript', 'WKContentWorld', 'WKNSArray'] { return '@16@0:8' }
 	if name in ['WKWebViewConfiguration', 'WKPreferences'] && selector in ['copy', 'copyWithZone:'] {
 		return if selector == 'copy' { '@16@0:8' } else { '@24@0:8^{_NSZone=}16' }
 	}
@@ -187,6 +200,7 @@ fn webkit_builtin_types(name string, meta bool, selector string) ?string {
 	}
 	if name == 'WKWebsiteDataStore' && selector == 'isPersistent' { return 'B16@0:8' }
 	if name == 'WKUserContentController' {
+		if selector == 'addUserScript:' { return 'v24@0:8@16' }
 		if selector == 'userScripts' { return '@16@0:8' }
 		if selector == 'removeAllUserScripts' { return 'v16@0:8' }
 	}
@@ -201,6 +215,7 @@ fn webkit_selector(object u64, selector string) bool {
 fn webkit_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	name := webkit_object_name(object)
 	if name == '' { return false }
+	if webkit_script_dispatch(object, name, selector, mut frame) { return true }
 	if object in ios_runtime.classes {
 		if name == 'WKWebsiteDataStore' && selector == 'defaultDataStore' { frame.x[0] = webkit_default_store(); return true }
 		if name == 'WKWebsiteDataStore' && selector == 'nonPersistentDataStore' {
@@ -213,11 +228,14 @@ fn webkit_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 		return false
 	}
 	if selector == 'init' {
-		if name == 'WKWebsiteDataStore' { panic('iOS: use WebKit data store factories') }
+		if name in ['WKWebsiteDataStore', 'WKUserScript', 'WKContentWorld', 'WKNSArray'] { panic('iOS: WebKit object requires designated construction') }
 		webkit_initialize(object, name)
 		frame.x[0] = object
 		return true
 	}
+	// The read-only adapter uses ordinary collection storage, not a WebKit
+	// configuration sidecar; its getters continue through Foundation dispatch.
+	if name == 'WKNSArray' { return false }
 	if selector in ['copy', 'copyWithZone:'] {
 		if name !in ['WKWebViewConfiguration', 'WKPreferences'] { panic('iOS: this WebKit object does not implement copying') }
 		if obj_header(object).webkit == unsafe { nil } { panic('iOS: WebKit configuration is not initialized') }
@@ -290,9 +308,5 @@ fn webkit_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 		if selector == 'setPreferredContentMode:' { unsafe { *(&u64(object + 488)) = frame.x[2] }; return true }
 	}
 	if name == 'WKWebsiteDataStore' && selector == 'isPersistent' { frame.x[0] = u64(state.flags[0]); return true }
-	if name == 'WKUserContentController' {
-		if selector == 'userScripts' { frame.x[0] = objc_autorelease(objc_allocate(ios_runtime.names['NSArray'])); return true }
-		if selector == 'removeAllUserScripts' { return true }
-	}
 	return false
 }
