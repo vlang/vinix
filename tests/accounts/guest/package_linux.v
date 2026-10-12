@@ -151,6 +151,51 @@ fn qualify_package_linux(mut t Test) ! {
 	assert package_success(['run', application.id])!.contains('PACKAGE LINUX')
 	data := '/home/alex/.local/share/vinix-apps/linux-probe/result'
 	assert owner_of(data) == 1000 && read_text(data) == 'packaged shared library: 23\n'
+	// Failure leaves no final mirror. Retry retains verified source-cache objects
+	// and a clean offline installation receives the complete Linux/runtime closure.
+	exporter := '/tmp/mirror-exporter'
+	os.mkdir_all(exporter + '/etc/vinix-packages')!
+	os.write_file(exporter + '/etc/vinix-packages/config.json', json2.encode(enrolled_config))!
+	package_success(['--root', exporter, 'update'])!
+	runtime_package := state.packages.filter(it.package.id == runtime.id)[0].package
+	probe_package := state.packages.filter(it.package.id == application.id)[0].package
+	missing_object := repository + '/objects/' + runtime_package.files.filter(it.path == 'bin/vinix-linux-runner')[0].sha256
+	missing_bytes := os.read_bytes(missing_object)!
+	os.rm(missing_object)!
+	defer { os.write_file_array(missing_object, missing_bytes) or {} }
+	mirror_path := '/tmp/offline-mirror'
+	failed_export := run(['/usr/bin/vinix-package', '--root', exporter, 'mirror', mirror_path, application.id], '', none, none)
+	assert failed_export.status != 0 && failed_export.output.contains('unavailable'), failed_export.output
+	assert !os.exists(mirror_path) && os.ls('/tmp')!.all(!it.starts_with('.vinix-mirror-'))
+	probe_object := repository + '/objects/' + probe_package.files.filter(it.path == 'bin/probe')[0].sha256
+	probe_bytes := os.read_bytes(probe_object)!
+	os.rm(probe_object)!
+	defer { os.write_file_array(probe_object, probe_bytes) or {} }
+	os.write_file_array(missing_object, missing_bytes)!
+	package_success(['--root', exporter, 'mirror', mirror_path, application.id])!
+	os.write_file_array(probe_object, probe_bytes)!
+	assert pkgcore.read_state(pkgcore.state_directory(exporter), architecture)!.generation == 0
+	assert os.ls('/tmp')!.all(!it.starts_with('.vinix-mirror-'))
+	for payload in probe_package.files {
+		path := mirror_path + '/fixture/objects/' + payload.sha256
+		assert pkgcore.verified_file(path, payload) && mode_of(path) == 0o644
+		ordinary := run([os.executable(), 'probe', 'read', path], '', db, must_user(db, 'alex'))
+		assert ordinary.status == 0 && ordinary.output.contains('ok '), ordinary.output
+	}
+	repeated_export := run(['/usr/bin/vinix-package', '--root', exporter, 'mirror', mirror_path, application.id], '', none, none)
+	assert repeated_export.status != 0 && repeated_export.output.contains('must be new'), repeated_export.output
+	offline_root := '/tmp/offline-client'
+	os.mkdir_all(offline_root + '/etc/vinix-packages')!
+	os.write_file(offline_root + '/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{
+		architecture: architecture, policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 }
+	}))!
+	package_success(['--root', offline_root, 'repo-enroll', 'fixture', 'file://' + mirror_path + '/fixture', key])!
+	package_success(['--root', offline_root, 'update'])!
+	package_success(['--root', offline_root, 'install', application.id])!
+	offline_state := pkgcore.read_state(pkgcore.state_directory(offline_root), architecture)!
+	assert offline_state.requested == state.requested && offline_state.packages == state.packages
+	package_success(['--root', offline_root, '--json', 'verify'])!
+	t.say('PACKAGE OFFLINE atomic-export failure-cleanup cached-retry ordinary-read signed-runtime-closure PASS')
 	// Organization restrictions are reviewed and atomically persisted without
 	// editing trust, the account selection or the installed generation.
 	policy_path := '/tmp/organization-policy.json'

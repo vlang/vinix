@@ -179,6 +179,13 @@ fn qualify(binary string) ! {
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, '--json', 'verify'])!)!.generation == installed.generation
 	// A mirror is used by another completely clean installation, offline.
 	success(binary, [...root_args, 'mirror', work + '/mirror', 'app'])!
+	assert os.ls(work)!.all(!it.starts_with('.vinix-mirror-'))
+	for object in os.ls(work + '/mirror/fixture/objects')! {
+		assert os.stat(work + '/mirror/fixture/objects/' + object)!.mode & 0o777 == 0o644
+	}
+	repeat_mirror := command(binary, [...root_args, 'mirror', work + '/mirror', 'other'])!
+	assert repeat_mirror.code != 0 && repeat_mirror.text.contains('must be new')
+	assert os.ls(work + '/mirror/fixture/objects')!.len == 1
 	offline_root := work + '/offline'
 	os.mkdir_all(offline_root + '/etc/vinix-packages')!
 	offline := pkgcore.Config{ ...config, policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }

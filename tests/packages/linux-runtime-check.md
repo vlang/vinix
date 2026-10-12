@@ -65,6 +65,12 @@ host PT_INTERP path is bypassed. Guest assertions cover:
   publication, blocked launch and stale fingerprint refusal. A reviewed restore
   retains trust/account/installed state and permits the same app to launch again.
   The `PACKAGE ORGANIZATION` marker covers this flow.
+- Failed offline mirror acquisition leaving no final repository, cleanup of its
+  private staging tree, and retry using verified cached app bytes after the
+  upstream app object is removed. The complete signed app/runtime mirror can be
+  read under ordinary credentials and installed/verified in a clean offline
+  store; exporting over the same destination is refused. `PACKAGE OFFLINE`
+  covers these assertions.
 
 A passing retained run writes `qualification.json` with architecture, SDK,
 scenario and hashes/lengths for kernel, sandbox, dynamic payload, shared library,
@@ -171,3 +177,15 @@ It produced no passing receipt. The controller now builds the probe with
 use that PIE payload. Fixed-address executables require separate address-layout
 qualification with this explicit-loader path. These runs do not fix or qualify
 all kernel ASLR/address-layout combinations.
+
+Atomic offline mirror export and clean offline app/runtime installation passed
+on both targets on 2026-10-12 using those same cached kernels:
+[AArch64 offline receipt](results/2026-10-12/offline-aarch64.json),
+[AArch64 serial](results/2026-10-12/offline-aarch64.serial.txt),
+[x86_64 offline receipt](results/2026-10-12/offline-x86_64.json),
+[x86_64 serial](results/2026-10-12/offline-x86_64.serial.txt).
+The host fixture also interrupts the exporter before publication, verifies the
+destination is absent, removes upstream objects, and completes a cache-only retry.
+It checks corruption and a directory created immediately before the exclusive
+rename. These offline export runs use an initramfs; persistent-device power-cut
+durability of removable media still needs separate qualification.

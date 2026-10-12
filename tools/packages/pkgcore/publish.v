@@ -98,33 +98,3 @@ pub fn publish(repository string, id string, seed_path string, sequence u64, exp
 	atomic_write(repository + '/index.sig', sig + '\n')!
 	atomic_write(repository + '/index.json', text)!
 }
-
-pub fn mirror(config Config, directory string, destination string, names []string) ! {
-	if os.exists(destination) || os.is_link(destination) { return error('offline mirror destination must be new') }
-	guard := acquire(directory)!
-	defer { guard.release() }
-	mirror_locked(config, directory, destination, names)!
-}
-
-fn mirror_locked(config Config, directory string, destination string, names []string) ! {
-	if os.exists(destination) || os.is_link(destination) { return error('offline mirror destination must be new') }
-	catalog := load_catalog(config, directory)!
-	plan := resolve(catalog, config, State{}, names, true)!
-	os.mkdir_all(destination)!
-	for snapshot in read_snapshots(directory)! {
-		if !config.repositories.any(it == snapshot.repository) { continue }
-		path := destination + '/' + snapshot.repository.id
-		os.mkdir_all(path + '/objects')!
-		atomic_write(path + '/index.json', snapshot.text)!
-		atomic_write(path + '/index.sig', snapshot.signature + '\n')!
-	}
-	for installed in plan.packages {
-		for payload in installed.package.files {
-			cached := cached_payload(config, installed, payload, directory)!
-			path := destination + '/' + installed.repository + '/objects/' + payload.sha256
-			copy_file(cached, path, 0, payload.bytes)!
-		}
-	}
-	flush_tree(destination)!
-	println('Offline mirror ready: ${destination}; enroll its file:// repository paths with the same public keys')
-}

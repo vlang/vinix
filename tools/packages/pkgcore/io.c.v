@@ -8,6 +8,10 @@ import os
 #include <sys/statvfs.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <stdio.h>
+$if linux {
+	#include <sys/syscall.h>
+}
 
 struct C.statvfs {
 	f_bsize  usize
@@ -24,6 +28,25 @@ fn C.chown(&char, i32, i32) int
 fn C.rename(&char, &char) int
 fn C.fchmod(int, u32) int
 fn C.write(int, voidptr, usize) isize
+fn C.syscall(i64, ...voidptr) i64
+fn C.renamex_np(&char, &char, u32) int
+
+fn publish_new_directory(source string, destination string) ! {
+	// Refuse a destination created during acquisition, including an empty
+	// directory or dangling symlink. Plain rename can replace those names.
+	mut code := -1
+	$if macos {
+		code = C.renamex_np(source.str, destination.str, C.RENAME_EXCL)
+	} $else $if linux {
+		code = int(C.syscall(i64(C.SYS_renameat2), int(-100), source.str,
+			int(-100), destination.str, u32(1)))
+	} $else {
+		return error('atomic offline mirror publication is unsupported on this platform')
+	}
+	if code != 0 {
+		return error('cannot publish offline mirror without replacing ${destination}: ${os.last_error()}; destination must be new and the filesystem must support exclusive atomic rename')
+	}
+}
 
 pub fn replace_path(source string, destination string) ! {
 	// os.rename treats a directory symlink as a destination directory. POSIX

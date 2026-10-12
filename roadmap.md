@@ -557,7 +557,7 @@ files and accounts; local data remains usable when accounts or networking are of
 
 The [native V application store and Software manager](docs/application-distribution.md)
 implement signed repositories, dependency planning, staged generations, rollback,
-download recovery, offline mirrors, organization policy, authenticated repository
+download recovery, atomic offline mirror exports, organization policy, authenticated repository
 enrollment/revocation with retained replay history, and
 [package/launch SDK 1](tools/packages/SDK.md). The original Alpine frontend still
 manages system ports. Installed apps integrate with Start, Quick Launch and

@@ -304,6 +304,24 @@ with the same ID/key, then `update`. Expiry and sequence checks still apply;
 publishers must plan suitable expiry for offline use. Indexes may advertise apps
 outside the exported closure; those requests report missing payloads.
 
+Export requires a new destination. The service checks space for unique objects,
+metadata and policy reserves on the destination disk and for missing source-cache
+objects; when both paths share a disk it budgets both copies together. It builds
+an exclusive `.vinix-mirror-*` sibling directory, verifies copied sizes/hashes,
+sets readable metadata/object modes, flushes the tree and publishes it with an
+atomic rename that refuses to replace any existing name. Filesystems without
+exclusive atomic rename support report a failure and leave the final name absent.
+Normal failures clean the staging tree and retain verified cache/partial downloads
+for retry. Abrupt termination may leave a hidden staging directory; after the
+export process has stopped, an administrator may remove that specific directory.
+A retry builds fresh staging data from authenticated metadata and verified cache;
+it never imports abandoned staging data or sweeps other exports. A directory-flush
+failure after publication reports that the complete mirror exists but its storage
+durability needs checking. Keep media attached until export finishes.
+The destination's resolved ancestors must belong to root or the invoking
+administrator. Shared writable ancestors need the sticky bit (as `/tmp` has), so
+another user cannot replace the staging path while an administrator writes it.
+
 Organization policy restricts the complete dependency closure through `allowed`,
 version `pins`, permitted `permissions` and accepted proprietary `licenses`.
 Firmware is blocked unless `allow_firmware` is explicitly set; packaging does not
@@ -403,6 +421,11 @@ runtime denial propagation, license/firmware disclosure, atomic policy-only
 publication, stale configuration/state/proposal refusal, administrator ownership,
 busy locks and uninstall under restrictions. CLI/guest checks apply and restore
 policy and reject ordinary-user policy writes.
+Mirror fixtures cover unique-object space estimates, failed acquisition cleanup,
+same-size copy corruption, existing files/directories/dangling links, a destination
+created immediately before publication, and abrupt process exit followed by a
+cache-only retry. CLI and both Linux guests consume signed offline closures on
+clean stores; guest checks include readable objects under ordinary credentials.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute
