@@ -105,6 +105,8 @@ fn validate(plan Plan) ! {
 // Check the opened descriptor, not a pathname followed by a separate open.
 // Secret rotation cannot race the ownership/mode check into reading a link.
 pub fn private_file(path string, limit int) !string {
+	devcore.check_account()!
+	if limit < 1 || limit > 1024 * 1024 { return error('invalid private file limit') }
 	fd := unsafe { C.open(path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW) }
 	if fd < 0 { return error('cannot open private file: ${path}') }
 	defer { C.close(fd) }
@@ -259,7 +261,8 @@ pub fn watch(path string) ! {
 	time.sleep(time.second)
 	if stdatomic.load_u64(&interrupted) != 0 { return }
 	argv := [os.executable(), 'watch', os.abs_path(path)]
-	mut pointers := argv.map(unsafe { &char(it.str) })
+	mut pointers := []&char{}
+	for argument in argv { pointers << unsafe { &char(argument.str) } }
 	pointers << &char(unsafe { nil })
 	unsafe { C.execv(argv[0].str, pointers.data) }
 	return os.error_posix()

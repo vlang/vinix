@@ -7,6 +7,10 @@ import os
 import sourcecommand
 import time
 
+#include <signal.h>
+
+fn C.kill(int, int) int
+
 fn test_due_job_runs_with_owned_credentials_and_no_credential_receipt() {
 	root := sourcecommand.temporary('vinix-jobs-test')!
 	defer { os.rmdir_all(root) or {} }
@@ -115,4 +119,37 @@ fn test_job_deadline_retires_child_and_records_failure() {
 	state := run_due(root + '/state', time.now().unix())!
 	assert state.jobs['slow'].exit_code == -1 && !state.jobs['slow'].in_flight
 	assert state.jobs['slow'].detail.contains('deadline')
+}
+
+fn test_watch_reexec_keeps_one_owner_and_repeats_due_jobs() {
+	root := sourcecommand.temporary('vinix-jobs-watch')!
+	defer { os.rmdir_all(root) or {} }
+	compiled := sourcecommand.capture([@VEXE, '-enable-globals', '-gc', 'none', '-cc', 'cc', '-o',
+		root + '/vinix-jobs', os.dir(os.dir(@FILE)) + '/jobs.v'], os.environ(), 120, 65536, unsafe { nil })!
+	assert compiled.status == 0, compiled.stderr
+	program := os.real_path(os.find_abs_path_of_executable('true')!)
+	plan := Plan{ uid: os.getuid(), jobs: [Job{ id: 'tick', executable: devcore.Pin{program, devcore.file_hash(program)!}, directory: root, interval_seconds: 1 }] }
+	initialise(json2.encode(plan), root + '/state')!
+	mut owner := os.new_process(root + '/vinix-jobs')
+	owner.set_args(['watch', root + '/state'])
+	owner.set_redirect_stdio()
+	owner.run()
+	mut reaped := false
+	defer {
+		if !reaped && owner.pid > 0 {
+			C.kill(owner.pid, C.SIGTERM)
+			owner.wait()
+		}
+		owner.close()
+	}
+	deadline := time.sys_mono_now() + u64(20 * time.second)
+	for inspect(root + '/state')!.jobs['tick'].runs < 2 {
+		assert time.sys_mono_now() < deadline, owner.stdout_read() + owner.stderr_read()
+		time.sleep(20 * time.millisecond)
+	}
+	assert C.kill(owner.pid, 0) == 0
+	assert C.kill(owner.pid, C.SIGTERM) == 0
+	owner.wait()
+	reaped = true
+	assert owner.code == 0, owner.stdout_read() + owner.stderr_read()
 }
