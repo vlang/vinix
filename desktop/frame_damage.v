@@ -312,20 +312,23 @@ fn (mut d Desktop) save_cursor_backing(clip Clip) {
 // new position and draws it there. It returns the two areas that changed.
 // Only valid while `cursor_backing.box` is.
 fn (mut d Desktop) move_cursor() (DamageRect, DamageRect) {
-	old := d.cursor_backing.box
-	d.copy_cursor_backing(old, old, false)
-	box := d.cursor_box(d.pointer_x, d.pointer_y)
-	d.cursor_backing.box = DamageRect{}
-	if box.valid {
-		d.copy_cursor_backing(box, box, true)
-		d.cursor_backing.box = box
-	}
-	d.canvas.clip = Clip{
-		x: 0
-		y: 0
-		w: d.canvas.width
-		h: d.canvas.height
-	}
-	d.draw_cursor()
+	old := d.remove_cursor()
+	box := d.paint_cursor()
 	return old, box
+}
+
+fn (mut d Desktop) remove_cursor() DamageRect {
+	old := d.cursor_backing.box
+	if old.valid {
+		d.copy_cursor_backing(old, old, false)
+	}
+	d.cursor_backing.box = DamageRect{}
+	return old
+}
+
+fn (mut d Desktop) paint_cursor() DamageRect {
+	d.canvas.clip = d.damage_clip(d.canvas_damage())
+	d.save_cursor_backing(d.canvas.clip)
+	d.draw_cursor()
+	return d.cursor_backing.box
 }

@@ -987,6 +987,17 @@ reused, and `free_tree` releases each frame's child arrays after it has been
 presented. An idle desktop is not recomposed until input or application state
 changes.
 
+Cursor motion restores its old backing pixels and draws only the new pointer.
+Partial app, clock and hover updates compose their own damage with the cursor
+removed, then draw it once; cursor movement does not expand the repaint area.
+Software presentation clips those changes to each display's viewport.
+`--stats` includes cursor-only frames as well as composed frames.
+
+Run the cursor, framebuffer, resize and glass regressions with
+`v run desktop/tools/test-cursor-rendering.v`. The runner stages a source
+snapshot in a temporary directory and also reports a cursor-plus-clock
+microbenchmark. Those host timings do not measure physical framebuffer writes.
+
 ## Building and running
 
 ui2 is not vendored; check out its current VML version beside the sources,

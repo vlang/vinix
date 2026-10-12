@@ -33,9 +33,7 @@ fn glass_test_partial_frames(mut desktop Desktop) int {
 		desktop.frame_damage = FrameDamage{}
 		damage.align_to_glass()
 		tree := desktop.build_tree()
-		for i in 0 .. damage.count {
-			desktop.render_clipped(tree, desktop.damage_clip(damage.rects[i]), false)
-		}
+		desktop.render_partial_frame(tree, mut damage, false)
 		free_tree(tree)
 		frames++
 		assert frames < 8, 'glass keeps asking for another frame'

@@ -429,7 +429,7 @@ fn main() {
 		// redrawing. See frame_damage.v.
 		mut damage := desktop.frame_damage
 		desktop.frame_damage = FrameDamage{}
-		if pointer_only && !desktop.cursor_backing.box.valid {
+		if (pointer_only || damage.valid()) && !desktop.cursor_backing.box.valid {
 			// Where the pointer was last drawn is not known, so it cannot be
 			// taken off the picture by itself.
 			desktop.dirty = true
@@ -446,18 +446,19 @@ fn main() {
 
 		if !desktop.dirty && pointer_only && !damage.valid() {
 			old_cursor, new_cursor := desktop.move_cursor()
+			after_cursor := if options.stats { desktop_monotonic_us() } else { i64(0) }
 			fb.present_damages(&desktop.canvas, old_cursor, new_cursor)
 			desktop.capture_presented(&desktop.canvas)
 			obs_capture_presented(&desktop.canvas)
+			after_present := if options.stats { desktop_monotonic_us() } else { i64(0) }
 			sleep_to_next_frame(frame_started, options.frame_interval)
+			if options.stats {
+				now := desktop_monotonic_us()
+				stats.add(after_input - stats_started, 0, after_cursor - after_input,
+					after_present - after_cursor, now - after_present)
+				stats.report_every(200, now)
+			}
 			continue
-		}
-		if !desktop.dirty && pointer_only {
-			// The partial frame below takes the pointer off where it was and
-			// puts it where it is, in one rectangle so the new position is
-			// wholly repainted by one pass.
-			damage.add(damage_union(desktop.cursor_backing.box, desktop.cursor_box(desktop.pointer_x,
-				desktop.pointer_y)))
 		}
 
 		// Nothing has changed: the framebuffer already holds the right
@@ -508,9 +509,7 @@ fn main() {
 		if full_frame {
 			desktop.render_desktop_frame(tree, desktop.canvas_damage())
 		} else {
-			for i in 0 .. damage.count {
-				desktop.render_desktop_frame(tree, damage.rects[i])
-			}
+			desktop.render_partial_frame(tree, mut damage, true)
 		}
 		desktop.paint_full = true
 		if desktop.frames == 1 {

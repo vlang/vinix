@@ -258,6 +258,35 @@ fn (mut d Desktop) render_desktop_frame(root ui2.Element, damage DamageRect) {
 }
 
 fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip, desktop_overlays bool) {
+	d.render_scene_clipped(root, clip, desktop_overlays)
+	d.canvas.clip = clip
+	d.save_cursor_backing(clip)
+	d.draw_cursor()
+	d.canvas.clip = d.damage_clip(d.canvas_damage())
+}
+
+// Compose independent changes with the pointer removed. Cursor movement only
+// needs its two footprints copied to the display; it must not enlarge the area
+// in which wallpaper, windows, text and glass are rendered again.
+fn (mut d Desktop) render_partial_frame(root ui2.Element, mut damage FrameDamage, desktop_overlays bool) {
+	if !d.cursor_backing.box.valid {
+		damage = FrameDamage{}
+		damage.add(d.canvas_damage())
+		d.render_clipped(root, d.damage_clip(d.canvas_damage()), desktop_overlays)
+		return
+	}
+	old_cursor := d.remove_cursor()
+	for i in 0 .. damage.count {
+		d.render_scene_clipped(root, d.damage_clip(damage.rects[i]), desktop_overlays)
+	}
+	new_cursor := d.paint_cursor()
+	// These are presentation damage only. Adding them after composition also
+// keeps cursor pixels out of glass backdrop sampling and cached thumbnails.
+	damage.add(old_cursor)
+	damage.add(new_cursor)
+}
+
+fn (mut d Desktop) render_scene_clipped(root ui2.Element, clip Clip, desktop_overlays bool) {
 	// Keep the target array's buffer, but release action ids retained from the
 	// preceding remote tree before collecting this frame's targets.
 	d.clear_hit_targets()
@@ -274,8 +303,6 @@ fn (mut d Desktop) render_clipped(root ui2.Element, clip Clip, desktop_overlays 
 	if desktop_overlays && !d.window_overlay_active() {
 		d.render_create_context_overlays()
 	}
-	d.save_cursor_backing(clip)
-	d.draw_cursor()
 	// A partial frame must not leak its clip into the next full one.
 	d.canvas.clip = Clip{
 		x: 0

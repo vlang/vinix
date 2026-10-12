@@ -232,49 +232,54 @@ fn (mut fb Framebuffer) present_damages(canvas &Canvas, first DamageRect, second
 
 fn (mut fb Framebuffer) present_frame_damage(canvas &Canvas, damage FrameDamage) {
 	if fb.fd<0 { return }
-	if fb.extra_count>0 { fb.present(canvas,canvas.scale); return }
 	if !damage.valid() {
 		return
 	}
-	if fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
+	if fb.extra_count == 0 && fb.direct && fb.gpu.present(canvas, fb.base, fb.width, fb.height, fb.stride) {
 		fb.graphics_claimed = true
 		return
 	}
 	fb.claim_graphics()
 	for i in 0 .. damage.count {
 		fb.copy_damage(canvas, damage.rects[i])
+		for j in 0 .. fb.extra_count {
+			fb.extra[j].copy_damage(canvas, damage.rects[i])
+		}
 	}
 }
 
 fn (mut fb Framebuffer) copy_damage(canvas &Canvas, damage DamageRect) {
-	if !damage.valid {
+	if fb.fd < 0 || fb.base == unsafe { nil } || !damage.valid || damage.w <= 0 || damage.h <= 0 {
 		return
 	}
-	x0 := if damage.x > 0 { damage.x } else { 0 }
-	y0 := if damage.y > 0 { damage.y } else { 0 }
-	x1 := if damage.x + damage.w < canvas.width { damage.x + damage.w } else { canvas.width }
-	y1 := if damage.y + damage.h < canvas.height { damage.y + damage.h } else { canvas.height }
-	if x1 <= x0 || y1 <= y0 {
+	// Output origins are physical coordinates in the shared canvas. Clip there
+	// before translating to this display's mapping, including at a 2x seam.
+	area := damage_intersection(damage_intersection(DamageRect{
+		x: damage.x * canvas.scale
+		y: damage.y * canvas.scale
+		w: damage.w * canvas.scale
+		h: damage.h * canvas.scale
+		valid: true
+	}, DamageRect{w: canvas.physical_width, h: canvas.physical_height, valid: true}),
+		DamageRect{x: fb.origin_x, y: fb.origin_y, w: fb.width, h: fb.height, valid: true})
+	if !area.valid {
 		return
 	}
-	physical_x0 := x0 * canvas.scale
-	physical_y0 := y0 * canvas.scale
-	physical_x1 := if x1 * canvas.scale < fb.width { x1 * canvas.scale } else { fb.width }
-	physical_y1 := if y1 * canvas.scale < fb.height { y1 * canvas.scale } else { fb.height }
 	if fb.direct {
-		for y := physical_y0; y < physical_y1; y++ {
+		for y := area.y; y < area.y + area.h; y++ {
 			unsafe {
-				vmemcpy(&fb.base[y * fb.stride + physical_x0], &canvas.pixels[y * canvas.stride + physical_x0], usize((physical_x1 - physical_x0) * 4))
+				vmemcpy(&fb.base[(y - fb.origin_y) * fb.stride + area.x - fb.origin_x],
+					&canvas.pixels[y * canvas.stride + area.x], usize(area.w * 4))
 			}
 		}
 		return
 	}
-	for y := physical_y0; y < physical_y1; y++ {
+	for y := area.y; y < area.y + area.h; y++ {
 		src := y * canvas.stride
-		dst := y * fb.stride
-		for x := physical_x0; x < physical_x1; x++ {
+		dst := (y - fb.origin_y) * fb.stride
+		for x := area.x; x < area.x + area.w; x++ {
 			pixel := unsafe { canvas.pixels[src + x] }
-			unsafe { fb.base[dst + x] = fb.pack_pixel(pixel) }
+			unsafe { fb.base[dst + x - fb.origin_x] = fb.pack_pixel(pixel) }
 		}
 	}
 }
