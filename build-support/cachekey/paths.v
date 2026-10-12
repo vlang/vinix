@@ -67,7 +67,7 @@ pub fn resolve_path(path string) !string {
 	return if value == '' { '/' } else { value }
 }
 
-fn expand_user(path string) !string {
+pub fn expand_user(path string) !string {
 	if !path.starts_with('~') { return path }
 	separator := path.index('/') or { path.len }
 	mut home := ''

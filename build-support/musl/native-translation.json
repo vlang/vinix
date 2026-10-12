@@ -1,0 +1,42 @@
+{
+    "complete_userland_or_desktop_build": false,
+    "final_cold_v_builds": 12,
+    "fresh_guest_boot": false,
+    "fresh_kernel_build": false,
+    "host_profiles": [
+        "ARM",
+        "Rosetta x86",
+        "ARM ASan/UBSan"
+    ],
+    "interrupt_cases_per_profile": 4,
+    "original_immutable_cache_keys": 4,
+    "original_python_bytes": 16518,
+    "original_python_files": 2,
+    "original_python_lines": 320,
+    "originals": [
+        {
+            "blob": "41dfd2415924375f1c8960b8482902d020f1d03f",
+            "bytes": 11764,
+            "lines": 219,
+            "path": "tests/alloc-bench/results/2026-10-02-userspace/validation/production-packaging-v3/stage.py",
+            "sha256": "0a15d3ca7562d3fbf1fc66df570d8516cdde39e52343116ebf8f4a795e90084d"
+        },
+        {
+            "blob": "aac92988a32ede1a9cefa5ae2a5f2621fc97f693",
+            "bytes": 4754,
+            "lines": 101,
+            "path": "build-support/musl/stage.py",
+            "sha256": "131c91f6d0c9a647071c638c3a590b26645814ed73b6c2eb11108794edb779f9"
+        }
+    ],
+    "public_cold_builds": 6,
+    "python_executed": false,
+    "real_gnu_cold_musl_builds": 3,
+    "real_gnu_static_link_targets": [
+        "x86_64",
+        "aarch64"
+    ],
+    "repeated_publications_per_profile": 20,
+    "source_commit": "9b2d911e24522fc9aa7184691e5878ea13535b61",
+    "stable_artifacts": "/Users/alex/.cache/vinix-campaign-tools-native-20261012"
+}

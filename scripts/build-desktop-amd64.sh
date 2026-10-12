@@ -102,7 +102,7 @@ echo "==> Staging Alpine's prebuilt amd64 userland and toolchain..."
 VINIX_AMD64_USERLAND_BUILD_DIR="$USERLAND_DIR" VINIX_ALPINE_DEVTOOLS=1 \
     "$SCRIPT_DIR/scripts/build-userland-amd64.sh"
 # Existing/custom sysroots must use the optimized allocator for the static desktop.
-python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch x86_64 --staging "$SYSROOT"
+"$SCRIPT_DIR/build-support/musl/stage" --arch x86_64 --staging "$SYSROOT"
 if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
     echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT" >&2
     exit 1
@@ -251,7 +251,7 @@ if [ -n "${VINIX_RELEASE:-}" ]; then
 fi
 # Restore the default loader after Alpine package layers have been merged.
 echo "==> Installing Vinix's optimized musl allocator..."
-python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch x86_64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/musl/stage" --arch x86_64 --staging "$STAGING"
 
 for command_path in bin/zsh usr/bin/python3 usr/bin/v usr/bin/tcc usr/bin/pkg sbin/apk \
     usr/bin/curl usr/bin/git usr/bin/Xorg usr/bin/Xvfb usr/bin/Xvfb-glx \

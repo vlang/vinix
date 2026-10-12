@@ -140,6 +140,20 @@ fn test_dictionary_native_producer_dependencies_invalidate() {
 	}
 }
 
+fn test_musl_native_producer_dependencies_invalidate() {
+	root := desktop_temporary()!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	v, env := desktop_fixture(root)!
+	for name in ['build-support/musl/stage', 'build-support/musl/stage.v',
+		'build-support/muslnative/publication.v'] {
+		path := root + '/' + name
+		fixture_write(path, 'original musl producer\n')!
+		first := fixture_key(root, v, env)!
+		fixture_write(path, 'changed musl producer\n')!
+		assert first != fixture_key(root, v, env)!, name
+	}
+}
+
 fn test_nested_x11_rewrite_invalidates_in_place() {
 	root := desktop_temporary()!
 	defer { os.rmdir_all(root) or { panic(err) } }

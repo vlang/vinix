@@ -63,7 +63,9 @@ fn (e Engine) sources() ![]ah.Value {
 		'musl-mallinfo.patch', 'musl-statistics.h'] {
 		paths << e.support_path(name)!
 	}
-	for name in ['build-support/musl/stage.py', 'build-support/musl/malloc-retain.patch',
+	for name in ['build-support/musl/stage', 'build-support/musl/stage.v', 'build-support/muslnative', 'build-support/musl/malloc-retain.patch',
+		'build-support/cachecli', 'build-support/cachekey', 'tools/sourcecommand',
+		'tests/linuxkpi/hosttest', 'build-support/tarstream',
 		'build-support/musl/alpine-1.2.6/manifest.json', 'build-support/java-cacerts',
 		'build-support/java-cacerts.v', 'build-support/javacacerts/core.v',
 		'build-support/run-v-tool.sh', 'build-support/find-v.sh'] {
@@ -232,7 +234,7 @@ fn (e Engine) stage(args ah.Value, package_lock ah.Value, downloads ah.Value) !a
 		'VINIX_OPTIMIZED_MUSL': ah.Value('1')
 		'VINIX_MUSL_RETAIN':    ah.Value('1')
 	})!
-	run(['python3', str(e.root_path('build-support/musl/stage.py')!)!, '--arch', 'aarch64', '--staging',
+	run([str(e.root_path('build-support/musl/stage')!)!, '--arch', 'aarch64', '--staging',
 		str(runtime)!, '--build-dir', str(join(build_dir, 'musl-build')!)!, '--cc', str(compiler)!,
 		'--extra-patch', str(e.support_path('musl-mallinfo.patch')!)!, '--max-page-size', '65536',
 		'--require-export', '__vinix_malloc_stats'], env)!

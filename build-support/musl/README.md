@@ -7,12 +7,19 @@ architecture check and an exported-symbol check prevent silent ABI downgrades.
 Alpine's loader SONAME and existing exported functions are preserved. The build also optimizes the `mallocng`
 functions for speed, alongside musl's normal optimized string functions.
 
-`stage.py --arch x86_64 --staging ROOT` and its `aarch64` equivalent install the
+`stage --arch x86_64 --staging ROOT` and its `aarch64` equivalent install the
 loader and, when development headers are present, `libc.a` and the extended
 `malloc.h`. The userland and desktop builders call it after package overlays;
 both desktop builders also update their static build sysroots. This applies to normal
 programs and native GCC builds, without `LD_PRELOAD` or benchmark changes.
 Builds are cached by source, patches, compiler, flags, architecture and policy.
+
+The command compiles native V through `build-support/run-v-tool.sh`; no Python
+controller is involved. `--extra-patch`, `--max-page-size` and `--require-export`
+retain the private Android runtime recipe and export checks. Native recipe,
+cache, publication and ownership checks are in `test-musl.v` and `test-stage.v`.
+See [the native implementation](../muslnative/README.md) for qualification and
+the saved production campaign's original CLI defaults.
 
 The default policy keeps the final ordinary group in each size class when its
 footprint is at most 128 KiB. Existing consolidation still releases extra free

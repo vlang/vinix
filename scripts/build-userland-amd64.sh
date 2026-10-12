@@ -142,7 +142,7 @@ if [ "$ALPINE_DEVTOOLS" = 1 ] && [ ! -x "$STAGING/usr/bin/gcc" ]; then
 fi
 
 echo "==> Installing Vinix's optimized musl allocator..."
-python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch x86_64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/musl/stage" --arch x86_64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/security-tools/stage" --arch x86_64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/storage-tools/stage.v" --arch x86_64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"

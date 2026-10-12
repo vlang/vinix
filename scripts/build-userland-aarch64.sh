@@ -597,7 +597,7 @@ fi
 
 echo "==> Packaging initramfs..."
 echo "==> Installing Vinix's optimized musl allocator..."
-python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch aarch64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/musl/stage" --arch aarch64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/security-tools/stage" --arch aarch64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/storage-tools/stage.v" --arch aarch64 --staging "$STAGING"
 "$SCRIPT_DIR/build-support/stage-uname.sh" "$STAGING"

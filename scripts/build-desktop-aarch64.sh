@@ -357,7 +357,7 @@ fi
 
 # ── The Alpine musl sysroot ──
 # The desktop is static, so its build sysroot needs the same allocator as apps.
-python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch aarch64 --staging "$SYSROOT"
+"$SCRIPT_DIR/build-support/musl/stage" --arch aarch64 --staging "$SYSROOT"
 
 if [ ! -f "$SYSROOT/usr/lib/libc.a" ] || [ ! -d "$SYSROOT/usr/include" ]; then
     echo "ERROR: Alpine development sysroot is incomplete: $SYSROOT"
@@ -1447,7 +1447,7 @@ if [ ! -x "$STAGING/bin/zsh" ]; then
 fi
 # Package overlays carry Alpine loaders; restore the optimized default after them.
 echo "==> Installing Vinix's optimized musl allocator..."
-python3 "$SCRIPT_DIR/build-support/musl/stage.py" --arch aarch64 --staging "$STAGING"
+"$SCRIPT_DIR/build-support/musl/stage" --arch aarch64 --staging "$STAGING"
 
 # A staged command whose NEEDED library was left behind still looks correct
 # here: it is present and executable, and only fails in the guest, as a loader
@@ -1738,7 +1738,14 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/tools/security-audit"
     "$SCRIPT_DIR/tools/security-mac"
     "$SCRIPT_DIR/tools/sandbox"
-    "$SCRIPT_DIR/build-support/musl/stage.py"
+    "$SCRIPT_DIR/build-support/musl/stage"
+    "$SCRIPT_DIR/build-support/musl/stage.v"
+    "$SCRIPT_DIR/build-support/muslnative"
+    "$SCRIPT_DIR/build-support/cachecli"
+    "$SCRIPT_DIR/build-support/cachekey"
+    "$SCRIPT_DIR/tools/sourcecommand"
+    "$SCRIPT_DIR/tests/linuxkpi/hosttest"
+    "$SCRIPT_DIR/build-support/tarstream"
     "$SCRIPT_DIR/build-support/musl/malloc-retain.patch"
     "$SCRIPT_DIR/build-support/musl/alpine"
     "$SCRIPT_DIR/build-support/musl/alpine-1.2.6"
