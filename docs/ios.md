@@ -3090,17 +3090,54 @@ iOS UIView layout. No web view is constructed. Evidence is under
 five published runners are unchanged, and entry/rendering/gameplay remain
 unverified.
 
+`WKWebView` now implements a blank UIView frontend in V. Typed probes of the
+installed Catalyst WebKit verify frame initialization, fresh configuration
+copies with shared dependencies, copied user agents, zeroing weak navigation/UI
+delegates, floating-point zoom/progress properties and retained empty history.
+`WKBackForwardList` exposes empty, read-only history arrays and nil items. Its
+lifetime remains valid after releasing the view. View destruction unregisters
+both weak slots and releases its configuration, strings and history, including
+after class changes and caller-storage destruction.
+
+The reference view record is 1,992 bytes, with the configuration reference at
+offset 408; the history record is 88 bytes. These sizes come from a genuine
+Catalyst process using the installed iOSSupport frameworks. They do not establish
+the private device iOS ABI. The existing UIView and macOS configuration profiles
+still supply the public state; other native C++ bytes remain reserved and
+zero-filled. Navigation, reload, JavaScript execution, script-message handlers,
+rendering, coding and private engine APIs remain unimplemented. An earlier
+Catalyst probe returned a navigation object for blank reload, so reload is
+explicitly unavailable in this profile.
+
+All 59 programs build and 70 original generated C streams restore to their
+recorded hashes. Eleven host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes thirteen Objective-C programs and 33 Swift/loader programs. The new
+fixtures check 100 release cycles, changed classes, caller storage, two runtime
+cycles and seven explicit rejection children. Generated-code checks confirm
+one fixed view state and no temporary allocation during disposal. The build
+driver links the installed V runtime helper sources that the current toolchain
+keeps outside generated C. The original host link failure and native measurement
+trials are preserved.
+
+Fortnite passes the WebKit view binding and exits with status 1 before entry at
+EOS's required `_OBJC_CLASS_$_NSURLRequest` import. Native metadata shows a
+24-byte NSObject subclass with `_internal` and `_cookiePartitionIdentifier`
+references at offsets 8 and 16. That next-class probe invokes metadata APIs
+only. Evidence is under `build/ios/fortnite/webview-checks`. Full regression
+remains unpassed, the five published runners are unchanged, and game entry,
+rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,422 | 737 | 80 |
-| EOSSDK | 639 | 23 | 18 |
+| Fortnite executable | 1,423 | 736 | 80 |
+| EOSSDK | 640 | 22 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,176 | 821 | 121 |
+| All images | 2,178 | 819 | 121 |
 
-The C++/GLES/Text variant reports 2,189 resolved imports, 808 unresolved strong
+The C++/GLES/Text variant reports 2,191 resolved imports, 806 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

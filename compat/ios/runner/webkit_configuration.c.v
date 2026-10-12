@@ -15,7 +15,7 @@ mut:
 
 fn webkit_name(name string) bool {
 	return name in ['WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController',
-		'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray']
+		'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray', 'WKWebView', 'WKBackForwardList']
 }
 
 fn webkit_size(name string) u32 {
@@ -29,6 +29,8 @@ fn webkit_size(name string) u32 {
 		'WKUserScript' { 128 }
 		'WKContentWorld' { 80 }
 		'WKNSArray' { 40 }
+		'WKWebView' { 1992 }
+		'WKBackForwardList' { 88 }
 		else { 8 }
 	}
 }
@@ -68,6 +70,8 @@ fn webkit_metadata() {
 	webkit_ivar('WKUserScript', '_userScript', '{AlignedStorage<API::UserScript, 8UL>="m_storage"{Storage="data"[120C]}}', 8, 120)
 	webkit_ivar('WKContentWorld', '_contentWorld', '{AlignedStorage<API::ContentWorld, 8UL>="m_storage"{Storage="data"[72C]}}', 8, 72)
 	webkit_ivar('WKNSArray', '_array', '{AlignedStorage<API::Array, 8UL>="m_storage"{Storage="data"[32C]}}', 8, 32)
+	webkit_ivar('WKWebView', '_configuration', '{RetainPtr<WKWebViewConfiguration>="m_ptr"@"WKWebViewConfiguration"}', 408, 8)
+	webkit_ivar('WKBackForwardList', '_list', '{AlignedStorage<WebKit::WebBackForwardList, 8UL>="m_storage"{Storage="data"[80C]}}', 8, 80)
 }
 
 fn webkit_ivar(name string, ivar string, types string, offset i64, size u64) {
@@ -159,11 +163,12 @@ fn webkit_copy(object u64, name string) u64 {
 fn webkit_builtin_types(name string, meta bool, selector string) ?string {
 	if !webkit_name(name) { return none }
 	if types := webkit_script_types(name, meta, selector) { return types }
+	if types := webview_types(name, meta, selector) { return types }
 	if meta {
 		if name == 'WKWebsiteDataStore' && selector in ['defaultDataStore', 'nonPersistentDataStore'] { return '@16@0:8' }
 		return none
 	}
-	if selector == 'init' && name !in ['WKWebsiteDataStore', 'WKUserScript', 'WKContentWorld', 'WKNSArray'] { return '@16@0:8' }
+	if selector == 'init' && name !in ['WKWebsiteDataStore', 'WKUserScript', 'WKContentWorld', 'WKNSArray', 'WKBackForwardList'] { return '@16@0:8' }
 	if name in ['WKWebViewConfiguration', 'WKPreferences'] && selector in ['copy', 'copyWithZone:'] {
 		return if selector == 'copy' { '@16@0:8' } else { '@24@0:8^{_NSZone=}16' }
 	}
@@ -216,6 +221,7 @@ fn webkit_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
 	name := webkit_object_name(object)
 	if name == '' { return false }
 	if webkit_script_dispatch(object, name, selector, mut frame) { return true }
+	if webview_dispatch(object, name, selector, mut frame) { return true }
 	if object in ios_runtime.classes {
 		if name == 'WKWebsiteDataStore' && selector == 'defaultDataStore' { frame.x[0] = webkit_default_store(); return true }
 		if name == 'WKWebsiteDataStore' && selector == 'nonPersistentDataStore' {

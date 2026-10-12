@@ -102,6 +102,10 @@ mut:
 	cookie_owned bool
 	webkit &WebKitState = unsafe { nil }
 	webkit_array bool // Read-only script list; its contents change through its controller.
+	webview &WebViewState = unsafe { nil }
+	webview_owned bool
+	web_history bool
+	web_history_array bool
 	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
 	font_face voidptr // Optional FreeType face, disposed before its descriptor.
 	autoresizing u64
@@ -244,7 +248,7 @@ fn objc_start() {
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSUserDefaults',
-        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard',
+        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
 		'UIAccessibilityElement',
@@ -256,6 +260,7 @@ fn objc_start() {
 			'NSObject' { u64(0) }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
 			'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
+			'WKWebView' { ios_runtime.names['UIView'] }
 			'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController' { ios_runtime.names['UIViewController'] }
             'CAMetalLayer', 'AVCaptureVideoPreviewLayer' { ios_runtime.names['CALayer'] }
             'UIScreenEdgePanGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
@@ -413,8 +418,9 @@ fn objc_new(cls u64) u64 {
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	name := webkit_object_name(object)
+	if name == 'WKWebView' { webview_initialize(object, ObjRect{}, 0); return object }
 	if name == 'WKWebsiteDataStore' { panic('iOS: use WebKit data store factories') }
-	if name in ['WKUserScript', 'WKContentWorld', 'WKNSArray'] { panic('iOS: WebKit object requires designated construction') }
+	if name in ['WKUserScript', 'WKContentWorld', 'WKNSArray', 'WKBackForwardList'] { panic('iOS: WebKit object requires designated construction') }
 	if name != '' { webkit_initialize(object, name) }
 	return object
 }
