@@ -7,9 +7,9 @@ import os
 fn C.getlogin() &char
 fn C.gethostname(name &char, len usize) i32
 
-const escape_cyan = '\e[1;36m'
-const escape_blue = '\e[1;34m'
-const escape_reset = '\e[0m'
+const escape_cyan = '\x1b[1;36m'
+const escape_blue = '\x1b[1;34m'
+const escape_reset = '\x1b[0m'
 
 fn main() {
 	mut idx := 1
