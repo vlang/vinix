@@ -50,6 +50,15 @@ Startup stages in `wifi-ctl status`: 1 firmware/board parsing, 2 reset/CE rings,
 3 target PCI configuration, 4 BMI download, 5 HTC services, 6 WMI initialization,
 7 HTT/vdev/channel setup, 8 ready. `/proc/bootlog` is readable independently of
 Settings. Preserve it together with `wifi-ctl status` if a physical boot fails.
+`cat /proc/net/dev` lists an attached interface even before a DHCP lease, with
+software RX/TX counters; `ifconfig -a` can therefore enumerate it. Hardware-only
+counter fields and loopback counters currently read zero. For Ethernet stuck
+waiting for a lease, the `rtl8169: awaiting DHCP` boot-log lines also include
+hardware descriptor ownership and completion counts.
+
+Install the kernel and `wifi-ctl` from the same build. The public Wi-Fi state
+and scan-record layout follow the desktop ABI. QCA connection phases and errors
+are separate diagnostic fields at offsets 176 and 200; scan errors use 172.
 
 Build firmware/tools with a musl x86_64 sysroot containing libc and libgcc:
 
@@ -68,9 +77,10 @@ Protocol/register definitions follow the primary
 Firmware distribution follows the
 [ath10k firmware documentation](https://wireless.docs.kernel.org/en/latest/en/users/drivers/ath10k/firmware.html).
 
-The host suite contains 15 tests covering real firmware/board parsing, malformed
+The host suite contains 17 tests covering real firmware/board parsing, malformed
 DMA and TLV input, ring wrap and timeouts, standard crypto vectors, WPA2 replay
-and key reinstallation, key-install acknowledgements and disconnects. On macOS
+and key reinstallation, key-install acknowledgements and disconnects, and the
+desktop's decoding of driver states and scan records. On macOS
 it measures live malloc bytes with GC disabled: 1,000 command/HMAC iterations
 must keep memory flat. QEMU validates kernel boot logging and the production
 carrier/DHCP state machine; it does not exercise a physical Wi-Fi radio.

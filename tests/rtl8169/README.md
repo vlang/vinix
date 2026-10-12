@@ -9,7 +9,8 @@ DMA and stack boundaries. It executes both revision-specific startup paths
 and their bundled firmware. Tests cover descriptor ownership and ring wrap,
 CRC removal and invalid RX frames, short TX padding, allocation rollback,
 indirect-access/reset/OOB timeouts, resume/reset/removal, delayed carrier,
-DHCP discovery on carrier and reconnect/resume, failed stack
+DHCP discovery on carrier and reconnect/resume, lost TxPoll recovery without
+reusing hardware-owned buffers, failed stack
 attachment and malformed/unbounded firmware programs. DMA addresses differ
 from CPU addresses, and the allocator refuses to free while bus mastering
 is enabled; RX/TX enable also requires mastering and programmed DMA addresses.

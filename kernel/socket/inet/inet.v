@@ -33,6 +33,7 @@ fn C.vinix_net_carrier() i32
 fn C.vinix_net_detach()
 fn C.vinix_net_owner() i32
 fn C.vinix_net_input(frame voidptr, length u64) i32
+fn C.vinix_net_counters(index i32, fields &u64) i32
 fn C.vinix_net_config(address &u32, netmask &u32, gateway &u32, dns &u32) i32
 fn C.vinix_socket_free(socket &C.vinix_socket)
 fn C.vinix_socket_pending(socket &C.vinix_socket) i32
@@ -149,6 +150,7 @@ pub fn initialise() {
 	C.vinix_net_init()
 	net_lock.release()
 	fs.register_net_tcp_snapshot(proc_net_tcp_text)
+	fs.register_net_dev_snapshot(proc_net_dev_text)
 	fs.register_net_ipv6_snapshots(proc_net_tcp6_text, proc_net_if_inet6_text)
 }
 

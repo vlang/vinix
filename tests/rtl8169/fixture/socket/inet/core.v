@@ -24,7 +24,25 @@ pub fn attach(address &[6]u8, kind int) bool {
 	return attached
 }
 
-pub fn detach() { attached = false }
+pub fn detach() {
+	attached = false
+	active_driver = 0
+	carrier_up = false
+	has_lease = false
+}
+
+pub fn detach_owned(kind int) {
+	if attached && active_driver == kind { detach() }
+}
+
+pub fn attach_if_idle(address &[6]u8, kind int) bool {
+	if attached { return false }
+	return attach(address, kind)
+}
+
+pub fn receive_owned(kind int, frame voidptr, length u64) bool {
+	return attached && active_driver == kind && receive(frame, length)
+}
 
 pub fn set_link(kind int, up bool) {
 	if !attached || kind != active_driver || carrier_up == up { return }

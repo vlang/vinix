@@ -22,6 +22,7 @@ __global (
 	rtl_tx_next           u32
 	rtl_tx_clean          u32
 	rtl_tx_pending        u32
+	rtl_tx_kick           u64
 	rtl_rx_lock           klock.Lock
 	rtl_tx_lock           klock.Lock
 	rtl_link              bool
@@ -293,6 +294,7 @@ fn initialise_rings() {
 	rtl_tx_next = 0
 	rtl_tx_clean = 0
 	rtl_tx_pending = 0
+	rtl_tx_kick = 0
 	dma_barrier()
 }
 
@@ -392,6 +394,7 @@ pub fn send(frame voidptr, length u64) int {
 	rtl_tx_queued++
 	rtl_tx_next = (index + 1) % descriptors
 	write8(0x38, 0x40)
+	rtl_tx_kick = devcore.now_ns()
 	return 0
 }
 
@@ -416,6 +419,22 @@ pub fn poll() {
 		if link {
 			if inet.attach_if_idle(unsafe { &rtl_mac }, inet.driver_rtl8169) { inet.set_link(inet.driver_rtl8169, true) }
 		}
+	}
+	// RTL8168 can lose TxPoll requests when packets are queued close together
+	// (r8169's completion path kicks the remaining burst again). Poll owns
+	// reclamation too, so DHCP cannot leave an owned descriptor stranded until
+	// another send. Never release a buffer while the device still owns it.
+	if rtl_tx_lock.test_and_acquire() {
+		completed := rtl_tx_completed
+		reclaim_tx()
+		if rtl_tx_pending != 0 && rtl_link
+			&& (rtl_tx_completed != completed
+				|| (now >= rtl_tx_kick && now - rtl_tx_kick >= devcore.millisecond)) {
+			dma_barrier()
+			write8(0x38, 0x40)
+			rtl_tx_kick = now
+		}
+		rtl_tx_lock.release()
 	}
 	// Ring addresses are only read under the lock: remove waits before free.
 	for drained := u32(0); drained < descriptors; drained++ {

@@ -31,6 +31,11 @@ pub fn carrier_selftest() bool {
 			if is_null(client) || vinix_net_carrier() != 0 || client.state != C.DHCP_STATE_INIT {
 				return false
 			}
+			// Interface enumeration must work while IPv4 and carrier are absent.
+			mut fields := [16]u64{}
+			if vinix_net_counters(1, &fields[0]) != 1
+				|| vinix_net_counters(2, &fields[0]) != 1
+				|| net_physical_netif.ip_addr.u_addr.ip4.addr != 0 { return false }
 			vinix_net_set_link(driver_e1000, 1)
 			if vinix_net_carrier() != 0 || client.state != C.DHCP_STATE_INIT { return false }
 			vinix_net_set_link(driver, 1)
@@ -47,6 +52,7 @@ pub fn carrier_selftest() bool {
 				return false
 			}
 			vinix_net_detach()
+			if vinix_net_counters(2, &fields[0]) != 0 { return false }
 		}
 		C.kprintf(c'NET-CARRIER PASS: deferred DHCP, immediate carrier discovery, reconnect, driver ownership\n')
 		C.printf_benchmark(c'NET-CARRIER PASS: deferred DHCP, immediate carrier discovery, reconnect, driver ownership\n')

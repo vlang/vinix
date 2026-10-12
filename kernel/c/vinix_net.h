@@ -37,6 +37,9 @@ int vinix_net_input(VINIX_NET_CONST void *frame, size_t length);
 int vinix_net_config(uint32_t *address, uint32_t *netmask, uint32_t *gateway,
                      uint32_t dns[3]);
 int vinix_net_link(uint8_t mac[6], uint32_t *mtu);
+/* Linux /proc/net/dev field order; index 1 is lo, 2 is the attached eth0.
+ * Caller holds inet's network lock, as for config and link snapshots. */
+int vinix_net_counters(int index, uint64_t fields[16]);
 
 struct vinix_socket *vinix_socket_new(int type, int protocol);
 void vinix_socket_free(struct vinix_socket *socket);

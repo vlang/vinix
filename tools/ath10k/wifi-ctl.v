@@ -75,7 +75,7 @@ fn status(fd int) u32 {
 		'WPA2 handshake', 'connected', 'failed']
 	state := word(unsafe { &data[0] }, 176)
 	label := if state < u32(states.len) { states[state] } else { 'unknown' }
-	println('QCA9377: ${label}; radio=${word(unsafe { &data[0] }, 160)}, startup stage=${word(unsafe { &data[0] }, 12)}, startup error=${i32(word(unsafe { &data[0] }, 4))}, connection error=${i32(word(unsafe { &data[0] }, 172))}')
+	println('QCA9377: ${label}; radio=${word(unsafe { &data[0] }, 160)}, startup stage=${word(unsafe { &data[0] }, 12)}, driver error=${i32(word(unsafe { &data[0] }, 4))}, scan error=${i32(word(unsafe { &data[0] }, 172))}, connection error=${i32(word(unsafe { &data[0] }, 200))}')
 	println('TX queued/completed=${word(unsafe { &data[0] }, 184)}/${word(unsafe { &data[0] }, 188)}, RX received/dropped=${word(unsafe { &data[0] }, 192)}/${word(unsafe { &data[0] }, 196)}')
 	return state
 }
@@ -105,7 +105,7 @@ fn networks(fd int, scan bool) {
 		// Escape control bytes supplied by APs before printing to a terminal.
 		mut name := ''
 		for j in 0 .. length {
-			b := data[offset + 12 + j]
+			b := data[offset + 16 + j]
 			name += if b >= 32 && b < 127 { b.ascii_str() } else { '?' }
 		}
 		channel := u16(data[offset + 2]) | u16(data[offset + 3]) << 8

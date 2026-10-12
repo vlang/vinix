@@ -23,7 +23,7 @@ fn main() {
 	os.write_file(os.join_path(work, 'v.mod'), "Module { name: 'rtl8169_fixture' }") or { panic(err) }
 	compiler := os.getenv_opt('V') or { @VEXE }
 	mut p := os.new_process(compiler)
-	p.set_args(['-enable-globals', '-cc', 'clang', '-path', '@vlib|${work}', 'test', work])
+	p.set_args(['-nocache', '-enable-globals', '-cc', 'clang', '-path', '@vlib|${work}', 'test', work])
 	p.set_redirect_stdio()
 	p.run()
 	p.wait()

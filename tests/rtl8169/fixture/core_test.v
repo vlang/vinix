@@ -24,6 +24,7 @@ fn setup(version int) {
 	inet.has_lease = false
 	inet.link_up_hook = unsafe { nil }
 	phy_writes = 0
+	tx_kicks = 0
 	regs[0] = 2
 	regs[5] = 1
 	regs[0xd3] = 0x82 // firmware OOB receiver, FIFO ready
@@ -104,6 +105,36 @@ fn test_both_revisions_boot_transmit_receive_wrap_reset_and_remove() {
 fn transmit_dhcp_on_carrier() {
 	frame := [342]u8{}
 	assert send(unsafe { &frame[0] }, u64(frame.len)) == 0
+}
+
+fn test_lost_transmit_doorbell_is_retried_without_reusing_owned_buffers() {
+	setup(42)
+	mut dev := devcore.Device{}
+	assert card_probe(mut dev)
+	defer { card_remove(mut dev) }
+	frame := [342]u8{}
+	assert send(unsafe { &frame[0] }, u64(frame.len)) == 0
+	assert send(unsafe { &frame[0] }, u64(frame.len)) == 0
+	// First packet completes; hardware loses the request for the next one.
+	set_descriptor_status(rtl_tx_ring.virt, desc_first | desc_last | 342)
+	regs[0x38] = 0
+	kicks := tx_kicks
+	poll()
+	assert tx_kicks > kicks && regs[0x38] == 0x40
+	assert rtl_tx_pending == 1
+	assert descriptor_status(rtl_tx_ring.virt + 16) & desc_owned != 0
+	// A lost first request is also recovered, without a subsequent send.
+	regs[0x38] = 0
+	retried := tx_kicks
+	devcore.sleep_ms(2)
+	poll()
+	assert tx_kicks > retried && rtl_tx_pending == 1
+	set_descriptor_status(rtl_tx_ring.virt + 16, desc_first | desc_last | 342)
+	poll()
+	assert rtl_tx_pending == 0
+	completed_kicks := tx_kicks
+	poll()
+	assert tx_kicks == completed_kicks
 }
 
 fn test_dhcp_waits_for_carrier_and_restarts_after_reconnect_and_resume() {

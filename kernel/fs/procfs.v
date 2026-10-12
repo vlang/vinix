@@ -99,6 +99,7 @@ enum ProcFSKind {
 	security_audit
 	security_events
 	net_tcp
+	net_dev
 	activity_io
 	activity_gpu
 	process_io
@@ -167,12 +168,17 @@ __global (
 	// and must not start to.
 	procfs_lock klock.Lock
 	net_tcp_snapshot NetTcpSnapshot = unsafe { nil }
+	net_dev_snapshot NetTcpSnapshot = unsafe { nil }
 	net_tcp6_snapshot NetTcpSnapshot = unsafe { nil }
 	net_if_inet6_snapshot NetTcpSnapshot = unsafe { nil }
 )
 
 pub fn register_net_tcp_snapshot(snapshot NetTcpSnapshot) {
 	net_tcp_snapshot = snapshot
+}
+
+pub fn register_net_dev_snapshot(snapshot NetTcpSnapshot) {
+	net_dev_snapshot = snapshot
 }
 
 pub fn register_net_ipv6_snapshots(tcp NetTcpSnapshot, addresses NetTcpSnapshot) {
@@ -375,6 +381,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	build_net_sysctls(mut sys_net)
 	mut net := add_procfs_directory(mut root, 'net')
 	add_procfs_file(mut net, 'tcp', .net_tcp)
+	add_procfs_file(mut net, 'dev', .net_dev)
 	add_procfs_file(mut net, 'tcp6', .net_tcp6)
 	add_procfs_file(mut net, 'if_inet6', .net_if_inet6)
 
@@ -738,6 +745,10 @@ fn (this &ProcFSResource) contents() string {
 		.process_io {
 			return proc.process_io_text(this.pid)
 		}
+		.net_dev {
+			if net_dev_snapshot != unsafe { nil } { return net_dev_snapshot() }
+			return 'Inter-|   Receive                                                |  Transmit\n face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n'
+		}
 		.net_tcp {
 			if net_tcp_snapshot != unsafe { nil } {
 				return net_tcp_snapshot()
@@ -917,7 +928,7 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eacces)
 		return none
 	}
-	if (this.kind == .bootlog || this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp
+	if (this.kind == .bootlog || this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp || this.kind == .net_dev
 		|| this.kind == .security_audit || this.kind == .security_events || this.kind == .net_tcp6 || this.kind == .net_if_inet6)
 		&& _handle != unsafe { nil } {
 		return this.snapshot_read(_handle, buf, loc, count)

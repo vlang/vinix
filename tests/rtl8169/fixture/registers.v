@@ -17,6 +17,7 @@ __global (
 	fail_port   u64 = 0xffff
 	stuck_reset bool
 	phy_writes  int
+	tx_kicks    int
 )
 
 fn map_registers(phys u64, length u64) u64 { return phys }
@@ -28,6 +29,7 @@ fn read16(port u64) u16 { return u16(read8(port)) | u16(read8(port + 1)) << 8 }
 fn read32(port u64) u32 { return u32(read16(port)) | u32(read16(port + 2)) << 16 }
 
 fn write8(port u64, value u8) {
+	if port == 0x38 && value == 0x40 { tx_kicks++ }
 	if port == 0x37 && value == 0x0c {
 		assert devcore.last_command & 4 != 0
 		assert read32(0xe4) != 0 && read32(0x20) != 0

@@ -409,21 +409,22 @@ fn (mut d WifiDevice) ioctl(handle voidptr, request u64, arg voidptr) ?int {
 		0x5700 {
 			mut data := [256]u8{}
 			card_rx_lock.acquire()
-			put32(unsafe { &data[0] }, 0, if card_active { u32(6) } else { u32(1) })
-			put32(unsafe { &data[0] }, 4, u32(card_error))
+			put32(unsafe { &data[0] }, 0, status_state(card_active, card_radio, card_stage, card_error, card_station.state))
+			put32(unsafe { &data[0] }, 4, u32(if card_error != 0 { card_error } else if card_active { card_station.error } else { 0 }))
 			put32(unsafe { &data[0] }, 8, 0x9377)
 			put32(unsafe { &data[0] }, 12, card_stage)
 			for i in 0 .. 6 { data[32 + i] = card_wmi.mac[i] }
 			put32(unsafe { &data[0] }, 160, if card_radio { u32(1) } else { u32(0) })
 			put32(unsafe { &data[0] }, 164, if card_wmi.scanning { u32(1) } else { u32(0) })
 			put32(unsafe { &data[0] }, 168, u32(card_wmi.network_count))
-			put32(unsafe { &data[0] }, 172, u32(card_station.error))
+			put32(unsafe { &data[0] }, 172, u32(card_wmi.scan_error))
 			put32(unsafe { &data[0] }, 176, u32(card_station.state))
 			put32(unsafe { &data[0] }, 180, if card_link { u32(1) } else { u32(0) })
 			put32(unsafe { &data[0] }, 184, u32(card_htt.tx_queued))
 			put32(unsafe { &data[0] }, 188, u32(card_htt.tx_completed))
 			put32(unsafe { &data[0] }, 192, u32(card_htt.rx_packets))
 			put32(unsafe { &data[0] }, 196, u32(card_htt.rx_dropped))
+			put32(unsafe { &data[0] }, 200, u32(card_station.error))
 			card_rx_lock.release()
 			if !usercopy.copy_to_user(u64(arg), unsafe { &data[0] }, 256) { result = -14 }
 		}
@@ -478,20 +479,7 @@ fn (mut d WifiDevice) ioctl(handle voidptr, request u64, arg voidptr) ?int {
 		0x5707 {
 			mut data := [1552]u8{}
 			card_rx_lock.acquire()
-			put32(unsafe { &data[0] }, 0, 1)
-			put32(unsafe { &data[0] }, 4, u32(card_wmi.network_count))
-			put32(unsafe { &data[0] }, 8, if card_wmi.scanning { u32(1) } else { u32(0) })
-			put32(unsafe { &data[0] }, 12, u32(card_wmi.scan_error))
-			for i in 0 .. card_wmi.network_count {
-				n := card_wmi.networks[i]
-				offset := u32(16 + i * 48)
-				data[offset] = n.ssid_len
-				data[offset + 1] = if n.secure { u8(1) } else { u8(0) }
-				put16(unsafe { &data[0] }, offset + 2, n.channel)
-				put16(unsafe { &data[0] }, offset + 4, u16(n.rssi))
-				for j in 0 .. 6 { data[offset + 6 + u32(j)] = n.bssid[j] }
-				for j in 0 .. 32 { data[offset + 12 + u32(j)] = n.ssid[j] }
-			}
+			card_wmi.pack_networks(unsafe { &data[0] })
 			card_rx_lock.release()
 			if !usercopy.copy_to_user(u64(arg), unsafe { &data[0] }, 1552) { result = -14 }
 		}

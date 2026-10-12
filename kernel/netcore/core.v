@@ -764,6 +764,10 @@ __global net_active_driver i32
 
 __global net_active_mac [6]u8
 
+// Software counters at the driver's boundary. Hardware-only counters stay
+// zero; the network lock serializes input, output and procfs snapshots.
+__global net_physical_counters [16]u64
+
 __global net_clock_ms u32
 
 __global net_clock_anchor_ms u32
@@ -1270,8 +1274,25 @@ pub fn vinix_net_init() {
 pub fn driver_output(frame voidptr, length usize) i32 {
 	unsafe {
 		send := driver_send(net_active_driver)
-		return if send { send(voidptr(frame), u64(length)) } else { -1 }
+		result := if send { send(voidptr(frame), u64(length)) } else { -1 }
+		if result == 0 {
+			net_physical_counters[8] += u64(length)
+			net_physical_counters[9]++
+		} else {
+			net_physical_counters[10]++
+			net_physical_counters[11]++
+		}
+		return result
 	}
+}
+
+@[export: 'vinix_net_counters']
+pub fn vinix_net_counters(index i32, fields &u64) i32 {
+	if index != 1 && (index != 2 || net_link_attached == 0) { return 0 }
+	for i in 0 .. 16 {
+		unsafe { fields[i] = if index == 2 { net_physical_counters[i] } else { u64(0) } }
+	}
+	return 1
 }
 
 pub fn link_output(netif &C.netif, p &C.pbuf) Err_t {
@@ -1344,6 +1365,7 @@ pub fn vinix_net_attach(mac &u8, driver i32) i32 {
 			vinix_net_detach()
 		}
 		net_active_driver = driver
+		net_physical_counters = [16]u64{}
 		C.memcpy(voidptr(&net_active_mac[0]), voidptr(mac), usize(6))
 		zero.addr = U32_t(0)
 		C.memset(voidptr(&net_physical_netif), 0, sizeof(net_physical_netif))
@@ -1420,19 +1442,27 @@ pub fn vinix_net_input(frame voidptr, length usize) i32 {
 	unsafe {
 		p := &C.pbuf(0)
 		error_ := Err_t(0)
-		if !net_link_attached || (usize(frame) == 0) || length < usize(14) || length > usize(65535) {
+		if !net_link_attached { return -22 }
+		if (usize(frame) == 0) || length < usize(14) || length > usize(65535) {
+			net_physical_counters[2]++
+			net_physical_counters[3]++
 			return -22
 		}
+		net_physical_counters[0] += u64(length)
+		net_physical_counters[1]++
 		p = C.pbuf_alloc(i32(Pbuf_layer.pbuf_raw_tx), u16(length), i32(Pbuf_type.pbuf_pool))
 		if usize(p) == 0 {
+			net_physical_counters[3]++
 			return -12
 		}
 		if i32(C.pbuf_take(p, voidptr(frame), u16(length))) != Err_enum_t.err_ok {
+			net_physical_counters[3]++
 			C.pbuf_free(p)
 			return -12
 		}
 		error_ = net_physical_netif.input(p, &net_physical_netif)
 		if i32(error_) != Err_enum_t.err_ok {
+			net_physical_counters[3]++
 			C.pbuf_free(p)
 			return -linux_error(error_)
 		}
