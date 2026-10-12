@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `45a0f271b6dd2f47c9b3759c34d7d74d8cb84a9c`,
+at source commit `73741f9d8cf24cbface3973325ff2fa48f45363e`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 570 | 2,367,492 | 6.09% |
-| Python | 215 | 960,941 | 2.47% |
-| Shell | 614 | 1,365,287 | 3.51% |
+| C | 572 | 2,367,937 | 6.10% |
+| Python | 208 | 886,214 | 2.28% |
+| Shell | 621 | 1,366,666 | 3.52% |
 
-All `.v` files are classified as V. The resulting V share is 79.89%, with no
+All `.v` files are classified as V. The resulting V share is 80.07%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 960,941 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 886,214 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 45a0f271b6dd2f47c9b3759c34d7d74d8cb84a9c --breakdown --json
+github-linguist --rev 73741f9d8cf24cbface3973325ff2fa48f45363e --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -548,6 +548,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ps2/guestfixture/ps2-guest-native-abi.h` | 1,111 |
 | `tests/qemu-core/blockedfixture/blockedfixture_v_contract.h` | 577 |
 | `tests/qemu-core/blockedoracle/blocked-oracle-native-abi.h` | 1,147 |
+| `tests/qemu-core/corevm/abi.h` | 306 |
 | `tests/qemu-core/epollfixture/epollfixture_v_contract.h` | 943 |
 | `tests/qemu-core/epolloracle/epoll-oracle-native-abi.h` | 742 |
 | `tests/qemu-core/fixturehost/spawn_abi.h` | 1,311 |
@@ -565,6 +566,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-core/touchfixture/touchfixture_v_contract.h` | 1,400 |
 | `tests/qemu-core/touchmodel/touch-model-native-abi.h` | 733 |
 | `tests/qemu-core/touchoracle/touch-oracle-native-abi.h` | 319 |
+| `tests/qemu-core/vmfixture/abi.h` | 139 |
 | `tests/qemu-nested/inner-init.c` | 1,452 |
 | `tests/realtime/test.c` | 22,685 |
 | `tests/reboot-persistence/persistfixture/persistence-native-abi.h` | 605 |
@@ -722,9 +724,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-macos-final-driver.py` | 680 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/campaign-v4-complete/useralloc-v4-final-cohorts.py` | 4,526 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/run.py` | 1,004 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/run_vm.py` | 13,462 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-v4/run.py` | 602 |
-| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-final/run_vm.py` | 13,462 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-v4/run.py` | 602 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run-driver.py` | 2,815 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run-driver.py` | 2,830 |
@@ -735,7 +735,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-aarch64-before-cpuid-guard/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/earlier-validation/core-x86_64-before-cpuid-guard/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run_vm.py` | 13,468 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-wait-eintr/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run-baseline.py` | 944 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/allocation-audit/run.py` | 1,553 |
@@ -746,7 +745,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/campaign-complete/useralloc-v5-final-cohorts.py` | 7,043 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-aarch64/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run.py` | 776 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run_vm.py` | 13,468 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64/run.py` | 776 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/static-desktop/run-build.py` | 2,088 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/excluded/desktop-perf-controller/validate-completed.py` | 1,616 |
@@ -759,7 +757,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/campaign-complete/useralloc-v6-verify-readiness.py` | 2,950 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-aarch64/run.py` | 678 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64-four-level/run.py` | 678 |
-| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64-four-level/run_vm.py` | 13,468 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64/run.py` | 678 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/driver.py` | 15,387 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core/evidence-audit.py` | 4,682 |
@@ -837,8 +834,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/x-window-check.py` | 5,985 |
 | `tests/pointer-scroll/run.py` | 5,488 |
 | `tests/python3/smoke.py` | 9,112 |
-| `tests/qemu-core/_vm_native.py` | 674 |
-| `tests/qemu-core/run_vm.py` | 6,725 |
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tests/roblox-windows/_native.py` | 5,099 |
 | `tests/roblox-windows/run.py` | 7,180 |
@@ -1065,18 +1060,23 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/alloc-bench/results/2026-10-02-userspace/compare` | 147 |
 | `tests/alloc-bench/results/2026-10-02-userspace/recompute` | 149 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/allocator-x86-v4/init.sh` | 2,156 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-aarch64-final/run-vm` | 222 |
+| `tests/alloc-bench/results/2026-10-02-userspace/validation/core-x86_64-final/run-vm` | 222 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-final/run` | 325 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-02-userspace/validation/desktop-perf-v4/run` | 322 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/check-recompute` | 155 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/compare` | 147 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/excluded/core-four-level-limit-errno/run-vm` | 228 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/recompute` | 149 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/core-x86_64-four-level/run-vm` | 228 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v5/validation/desktop-perf/run` | 322 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/check-recompute` | 155 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/compare` | 147 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/recompute` | 149 |
+| `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/core-x86_64-four-level/run-vm` | 228 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/perf-init.sh` | 6,852 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/pipeline` | 335 |
 | `tests/alloc-bench/results/2026-10-03-userspace-v6/validation/desktop-perf/preparation/run` | 322 |
@@ -1331,7 +1331,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ps2/run` | 213 |
 | `tests/qemu-core/compile-basefixture` | 165 |
 | `tests/qemu-core/compile-fixtures` | 162 |
-| `tests/qemu-core/run.sh` | 3,987 |
+| `tests/qemu-core/run-vm` | 140 |
+| `tests/qemu-core/run.sh` | 3,957 |
 | `tests/qemu-core/test-basefixture` | 162 |
 | `tests/qemu-core/test-blockedfixture` | 165 |
 | `tests/qemu-core/test-epollfixture` | 163 |
@@ -1342,6 +1343,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-core/test-restartfixture` | 165 |
 | `tests/qemu-core/test-signalfixture` | 164 |
 | `tests/qemu-core/test-touchfixture` | 163 |
+| `tests/qemu-core/test-vm` | 141 |
 | `tests/qemu-initramfs-split/run.sh` | 171 |
 | `tests/qemu-module-iso/run.sh` | 164 |
 | `tests/qemu-nested/outer-init.sh` | 309 |
