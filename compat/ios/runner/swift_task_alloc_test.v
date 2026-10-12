@@ -152,7 +152,7 @@ fn test_swift_task_alloc() {
 	if _ := swift_task_alloc_symbol('_swift_task_alloc') { assert false }
 	for _ in 0 .. 2 {
 		objc_start()
-		for symbol in ['_swift_task_create', '_swift_task_switch', '_swift_task_getCurrent',
+		for symbol in ['_swift_task_switch',
 			'_swift_task_alloc_specific', '_swift_task_dealloc_specific', '_swift_task_deallocThrough', '_swift_job_alloc']! {
 			if _ := runtime_symbol('/usr/lib/swift/libswift_Concurrency.dylib', symbol) { assert false }
 		}

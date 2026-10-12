@@ -2484,17 +2484,77 @@ additional strong imports across the three images. Full regression remains
 unpassed, candidates remain in the evidence directory, and the five published
 runners retain their last passing bytes. Gameplay remains unverified.
 
+V now implements `_swift_task_create`, `_swift_task_getCurrent` and
+`_swift_job_run` for unstructured tasks on the generic executor. Creation
+returns the task and its initial context as two words. The installed runtime
+reports Task heap kind `0x502`, a 176-byte task header, the resume entry at
+offset 56 and context at offset 64. Relative async descriptors supply the
+entry and frame size. Sealed V-emitted adapters pass context in `x22`, closure
+in `x20`, and a future's indirect result in `x0`; completion receives its
+error argument in `x20`. Context/result allocation is aligned to 16 bytes.
+
+Tasks carry one caller reference. Enqueue or an explicitly retained job run
+adds the execution reference, released at completion. Current-task TLS is
+installed for execution and restored on return. Running tasks use their own
+LIFO allocation stack; a live fallback allocation stays unchanged while tasks
+run. A consumed closure context is opaque and may point into protected storage;
+creation and completion do not read or release it. Transferred heap closures
+are released before clearing current-task TLS. Typed future results remain
+alive until final task destruction, which calls their value witness. Failed
+futures own and release a supported CFError instead of destroying a result.
+Task names are copied from option records into task-owned storage.
+
+The implementation uses an intrusive task registry in private header storage,
+with no per-task V box or map. Registry removal precedes result destruction;
+a disposal count protects unlocked destruction callbacks. A closure destructor
+can join another resolver. Queued and executing callbacks drain before dispatch
+shutdown, and callers must release task handles before metadata, TLS and
+synchronization are retired. Early invalid descriptors, option cycles, custom
+executors, structured/inline/immediate flags and premature destruction reject
+without publishing a task. Enqueue requires a live dispatch scheduler.
+
+Standalone native measurements create and execute twelve real tasks, use their
+private allocators and complete integer futures. Native/V fixtures additionally
+cover discarded, Int, String and Void futures, CFError failures, actual enqueue,
+an exact protected eight-byte descriptor, opaque consumed contexts, transferred
+closure ownership and eight workers. All eight final host sanitizer processes
+pass in both hash modes; all forty-six programs build and all twenty-eight
+focused Swift guest checks pass. Generated C audits check publication, explicit
+allocations, unlocked callbacks, no task access after completion can free it,
+and join/drain ordering. Initial fixture failures involving the Void metadata
+address point and omitted dispatch initialization were corrected; the dispatch
+failure's exact C, binary and status are retained.
+
+Evidence is under `build/ios/fortnite/swift-task-create-checks`, including native
+measurements, six pinned framework creation calls, opcode measurements and
+hashed official Swift [task implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/Concurrency/Task.cpp)
+and [ABI definitions](https://github.com/swiftlang/swift/blob/main/include/swift/ABI/Task.h).
+Custom executors, task groups, async-let, native error boxes, cancellation,
+future waiting, immediate/inline tasks and async suspension remain unsupported.
+Task-local copying currently covers the empty state; no task-local APIs have
+been implemented. This compares the installed Mac runtime with V and IPA
+callers; it does not claim an iOS device runtime comparison.
+
+The IPA probe now passes task creation and exits with status 1 before entry
+at EOS's `_swift_task_switch`. Its native export and twenty framework call
+sites (eleven EOS, nine Marketplace) are retained for suspension/executor work.
+Both audits resolve three more strong imports across the supplied images.
+Full regression remains unpassed, so these runners remain candidates and the
+five published runners keep their last passing bytes. Host disk pressure was
+handled with a private RAM volume; final compressed evidence is verified back
+to persistent repository storage before that volume is detached.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,409 | 750 | 80 |
-| EOSSDK | 616 | 46 | 18 |
-| MarketplaceKitWrapper | 107 | 69 | 23 |
-| All images | 2,132 | 865 | 121 |
+| Fortnite executable | 1,410 | 749 | 80 |
+| EOSSDK | 617 | 45 | 18 |
+| MarketplaceKitWrapper | 108 | 68 | 23 |
+| All images | 2,135 | 862 | 121 |
 
-The C++/GLES/Text variant reports 2,145 resolved imports, 852 unresolved strong
+The C++/GLES/Text variant reports 2,148 resolved imports, 849 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
@@ -2546,7 +2606,7 @@ CoreFoundation dictionary, supplied Objective-C storage, associated-object,
 property, object-monitor, Swift string/buffer and String metadata/witness checks before the
 existing Mach-O suite and requires the guest PASS marker.
 
-`swift` runs all twenty-seven Swift ABI checks in a small, independent guest and
+`swift` runs all twenty-eight Swift ABI checks in a small, independent guest and
 requires `VINIX iOS SWIFT: PASS`. It does not establish full regression success.
 Probe, audit and Swift modes retire their staging copies after archiving the
 root filesystem, before constructing the boot disk, to limit host disk use.

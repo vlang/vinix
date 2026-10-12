@@ -105,6 +105,7 @@ fn swift_string_utf8_cstring(first u64, second u64) u64 {
 
 fn swift_buffer_refs(object u64, delta i64) !u64 {
 	if object == 0 { return 0 }
+	if swift_task_registered(object) { return swift_task_refs(object, delta) }
 	C.ios_objc_initialize_lock()
 	if object == ios_runtime.swift_empty_array {
 		C.ios_objc_initialize_unlock()
@@ -187,6 +188,7 @@ fn swift_bridge_release(object u64) { swift_bridge_release_n(object, 1) }
 fn swift_unknown_is_native(object u64) bool {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
+	if swift_task_find_locked(object) != 0 { return true }
 	if object == ios_runtime.swift_empty_array || object in ios_runtime.swift_buffers
 		|| object in ios_runtime.swift_strings || object in ios_runtime.swift_arrays
 		|| object in ios_runtime.swift_heap { return true }
@@ -206,6 +208,7 @@ fn swift_unknown_release(object u64) {
 fn swift_buffers_stop() {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
+	swift_tasks_drain_checked() or { panic(err) }
 	if ios_runtime.swift_buffers.len != 0 { panic('iOS: Swift UTF-8 arrays still owned at shutdown') }
 	if ios_runtime.swift_strings.len != 0 { panic('iOS: Swift Strings still owned at shutdown') }
 	unsafe { ios_runtime.swift_buffers.free() }

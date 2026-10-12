@@ -146,6 +146,15 @@ mut:
 	swift_task_priority_arena u64 // Sealed TaskPriority accessor and read-only metadata/value witnesses.
 	swift_task_alloc_top u64 // Shared no-current-task allocation stack; protected by the runtime lock.
 	swift_task_alloc_count u64 // Live fallback allocations; shutdown requires the stack to drain.
+	swift_tasks u64 // Intrusive owned task registry, under the runtime lock.
+	swift_task_count u64
+	swift_task_disposing u64 // Keep result destruction callbacks inside the runtime lifetime.
+	swift_task_sequence u32
+	swift_task_arena u64 // Sealed async adapters and read-only Task heap metadata.
+	swift_task_key u64
+	swift_task_key_live bool
+	swift_task_sync u64 // Mutex/condition for queued and executing task callbacks.
+	swift_task_jobs u64 // Protected by the task synchronization mutex.
 	swift_hash_code u64 // Sealed generic Hashable forwarding entries, retired after callbacks drain.
 	swift_fatal_code u64 // Assertion argument capture and BRK, retired at quiescent teardown.
 	names        map[string]u64
@@ -363,6 +372,7 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	swift_tasks_join()
 	dispatch_stop()
 	audio_stop()
 	ui_context_stop()
