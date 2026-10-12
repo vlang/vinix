@@ -628,6 +628,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   threaded file/network workloads and JAR execution with recorded runtime
   hashes and the required privileged Java launch policy. Installation, updates
   and desktop integration remain unqualified.
+- [x] Retain the original open description through complete readv/writev calls;
+  qualify blocked pipe close/dup2 races, untouched replacement data and final
+  reference release as root/UID 1000 on both native architectures, with flat
+  storage measurements. See [the vector lifetime receipts](docs/linux-posix-qualification.md#vectored-io-descriptor-lifetime).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

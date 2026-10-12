@@ -197,11 +197,9 @@ fn read_linux_iov(iov_ptr u64, index int) ?LinuxIOVec {
 }
 
 // Linux validates descriptor access before importing even an empty vector.
-// Snapshot only immutable access bits while the lookup reference is live.
-fn linux_iov_access_error(fdnum int, write bool) u64 {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.get() }
+// The vector caller holds the lookup reference through its final operation.
+fn linux_iov_access_error(fd &file.FD, write bool) u64 {
 	flags := fd.handle.flags
-	fd.unref()
 	access := flags & resource.o_accmode
 	if flags & resource.o_path != 0 || (access != resource.o_rdwr
 		&& access != if write { resource.o_wronly } else { resource.o_rdonly }) {
@@ -215,7 +213,9 @@ fn linux_iov_access_error(fdnum int, write bool) u64 {
 // one resource write per iovec lets the peer consume an incomplete message and
 // close before the payload is written.
 fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
-	access_error := linux_iov_access_error(fdnum, true)
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer { fd.unref() }
+	access_error := linux_iov_access_error(fd, true)
 	if access_error != 0 { return errno.err, access_error }
 	total, validation_error := validate_linux_iov(iov_ptr, iovcnt)
 	if validation_error != 0 {
@@ -261,7 +261,7 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 			if filled < size {
 				continue
 			}
-			ret, err := fs.write_from_kernel(fdnum, buffer, filled)
+			ret, err := fs.write_pinned_descriptor(mut fd, buffer, filled, false)
 			if err != 0 {
 				if written != 0 {
 					return written, 0
@@ -276,7 +276,7 @@ fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (
 		}
 	}
 	if filled != 0 {
-		ret, err := fs.write_from_kernel(fdnum, buffer, filled)
+		ret, err := fs.write_pinned_descriptor(mut fd, buffer, filled, false)
 		if err != 0 {
 			if written != 0 {
 				return written, 0
@@ -780,7 +780,9 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _m
 
 // readv(fd, iov, iovcnt)
 fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
-	access_error := linux_iov_access_error(fdnum, false)
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.err, errno.get() }
+	defer { fd.unref() }
+	access_error := linux_iov_access_error(fd, false)
 	if access_error != 0 { return errno.err, access_error }
 	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
 	if validation_error != 0 {
@@ -796,7 +798,7 @@ fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u
 		if iov.len == 0 {
 			continue
 		}
-		ret, err := fs.syscall_read(gpr_state, fdnum, voidptr(iov.base), iov.len)
+		ret, err := fs.read_pinned_descriptor(mut fd, voidptr(iov.base), iov.len, true)
 		if err != 0 {
 			if total > 0 {
 				return total, 0

@@ -1,0 +1,21 @@
+/private/tmp/vinix-iovpin-1013/before2-arm/iovpin/fixture.c:1452:57: error: call to undeclared function 'memdup'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1452 |                 iovpinfixture__Slabs* before = (iovpinfixture__Slabs*)memdup(&(iovpinfixture__Slabs){0}, sizeof(iovpinfixture__Slabs));
+      |                                                                       ^
+/private/tmp/vinix-iovpin-1013/before2-arm/iovpin/fixture.c:1452:57: note: did you mean 'memcmp'?
+/Users/alex/code/vinix/build-aarch64-userland/sysroot/include/string.h:30:5: note: 'memcmp' declared here
+   30 | int memcmp (const void *, const void *, size_t);
+      |     ^
+/private/tmp/vinix-iovpin-1013/before2-arm/iovpin/fixture.c:1452:34: error: cast to 'iovpinfixture__Slabs *' (aka 'struct iovpinfixture__Slabs *') from smaller integer type 'int' [-Werror,-Wint-to-pointer-cast]
+ 1452 |                 iovpinfixture__Slabs* before = (iovpinfixture__Slabs*)memdup(&(iovpinfixture__Slabs){0}, sizeof(iovpinfixture__Slabs));
+      |                                                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/private/tmp/vinix-iovpin-1013/before2-arm/iovpin/fixture.c:1473:33: error: cast to 'iovpinfixture__Slabs *' (aka 'struct iovpinfixture__Slabs *') from smaller integer type 'int' [-Werror,-Wint-to-pointer-cast]
+ 1473 |                 iovpinfixture__Slabs* after = (iovpinfixture__Slabs*)memdup(&(iovpinfixture__Slabs){0}, sizeof(iovpinfixture__Slabs));
+      |                                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/private/tmp/vinix-iovpin-1013/before2-arm/iovpin/fixture.c:1496:15: error: assigning to 'u8 *' (aka 'unsigned char *') from 'char[5]' converts between pointers to integer types where one is of the unique plain 'char' type and the other is not [-Werror,-Wpointer-sign]
+ 1496 |                         __if_val_3 = "PASS";
+      |                                    ^ ~~~~~~
+/private/tmp/vinix-iovpin-1013/before2-arm/iovpin/fixture.c:1498:15: error: assigning to 'u8 *' (aka 'unsigned char *') from 'char[5]' converts between pointers to integer types where one is of the unique plain 'char' type and the other is not [-Werror,-Wpointer-sign]
+ 1498 |                         __if_val_3 = "FAIL";
+      |                                    ^ ~~~~~~
+5 errors generated.
+Linux compatibility qualification failed; see /private/tmp/vinix-iovpin-1013/before2-arm/receipt.json

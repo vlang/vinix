@@ -1297,6 +1297,12 @@ fn read_descriptor(fdnum int, buf voidptr, count u64, to_user bool) (u64, u64) {
 	defer {
 		fd.unref()
 	}
+	return read_pinned_descriptor(mut fd, buf, count, to_user)
+}
+
+// The caller keeps its fd_from_fdnum reference until all pieces of the I/O
+// finish. In particular, a vector must not resolve a reused number again.
+pub fn read_pinned_descriptor(mut fd file.FD, buf voidptr, count u64, to_user bool) (u64, u64) {
 	access := fd.handle.flags & resource.o_accmode
 	if access != resource.o_rdonly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
@@ -1336,6 +1342,12 @@ fn write_descriptor(fdnum int, buf voidptr, count u64, from_user bool) (u64, u64
 	defer {
 		fd.unref()
 	}
+	return write_pinned_descriptor(mut fd, buf, count, from_user)
+}
+
+// Borrow the caller's live descriptor, retaining access checks, policy,
+// accounting and filesystem notifications for each resource operation.
+pub fn write_pinned_descriptor(mut fd file.FD, buf voidptr, count u64, from_user bool) (u64, u64) {
 	access := fd.handle.flags & resource.o_accmode
 	if access != resource.o_wronly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf

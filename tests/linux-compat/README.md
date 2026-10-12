@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -65,6 +65,17 @@ and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
 The [coverage matrix](../../docs/linux-posix-compatibility.md) separates missing
 interfaces from implemented behavior and lists unsupported dependencies.
+
+The `iovpin` case checks 32 blocked readv and 24 multi-chunk writev calls per
+architecture in root and UID/GID 1000 children. Another pthread closes the
+descriptor or replaces it with a pipe, regular file or wrong-access handle;
+all bytes must still use the original open description. Pipe readiness/queued
+bytes verify that the call entered the original pipe before replacement, and
+EOF verifies final writer-reference release. Two 200-cycle pipe/vector cohorts
+exercise successful, empty, invalid-header, invalid-payload and wrong-access
+returns, comparing every live slab class and big-page count after warmup.
+Shared-offset atomicity, mutable vector import, stream short reads and foreign
+ABIs require separate qualification.
 
 The `sharedmem` case drops to UID 1000/GID 2000 and checks memfd creator
 ownership, mode 0777 independent of umask, zero links, owner chmod and a

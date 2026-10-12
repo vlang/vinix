@@ -1645,8 +1645,9 @@ with EFAULT. This follows Linux's
 [vector access checks](https://github.com/torvalds/linux/blob/v6.12/fs/read_write.c#L950)
 and [documented O_PATH contract](https://man7.org/linux/man-pages/man2/open.2.html).
 
-The vector helper snapshots flags while its lookup reference is live, then
-releases that reference and uses only the scalar access bits. It creates no
+At this qualification revision, the vector helper snapshots flags while its
+lookup reference is live, then releases that reference and uses only the scalar
+access bits. It creates no
 object and retains no pointer. The existing I/O paths continue to acquire
 their own references; descriptor identity during concurrent close/reuse across
 an entire vector remains separate work. The permission check also replaces
@@ -1682,6 +1683,59 @@ returns, and stack/mapping lifetimes through synchronous calls. The isolated
 4f30c2944 worktrees change two kernel files and the inventory generator;
 no allocation or reclamation implementation is added.
 
-Other O_PATH APIs, complete positioned-vectored/error ordering, concurrent
-descriptor identity, foreign/ELF32 paths and full application acceptance
+Other O_PATH APIs, complete positioned-vectored/error ordering,
+foreign/ELF32 paths and full application acceptance
 remain unqualified. The broad section-15 gates remain open.
+Concurrent descriptor identity is qualified by the later change below.
+
+## Vectored I/O descriptor lifetime
+
+readv and writev now retain one descriptor lookup reference until the complete
+call returns, matching Linux's
+[single open-description reference](https://github.com/torvalds/linux/blob/v6.1/fs/read_write.c#L888).
+Previously readv looked up the number for each iovec and writev looked it up
+for each buffer flush. A concurrent close or dup2 could therefore redirect
+the remainder to a replacement file, fail with EBADF after partial I/O, or
+release an original pipe endpoint before the vector completed. The VFS helpers
+borrow the retained descriptor and preserve access checks, MAC/device policy,
+file accounting and inotify events. Scalar read/write retain their existing
+lookup and deferred release around those same helpers.
+
+The V `iovpin` fixture qualifies 32 blocked readv and 24 multi-chunk writev
+calls per native architecture, split between root and UID/GID 1000 children.
+Read tests replace the descriptor with another pipe, a regular file, a
+write-only endpoint or leave it closed. After removing the only user reader,
+the original writer must lack POLLERR: the blocked syscall's reference keeps
+the old endpoint alive. Only then does the peer supply the two original bytes.
+Replacement contents and regular-file offsets must remain untouched.
+
+Write tests send 1,052,673 bytes through two iovecs, crossing the 1,048,577-byte
+kernel buffer bound. Queued bytes in the original pipe prove that its first
+write has entered and blocked before the descriptor is replaced with another
+writer, a read-only endpoint or closed. The peer verifies every byte on the
+original pipe and drains to EOF. The replacement receives no bytes, and EOF
+also proves that the final syscall reference is released.
+
+All 56 concurrency cases fail on each unchanged production kernel: pipe/file
+read replacements yield `41,58` instead of `41,42`, closed/wrong-mode read
+descriptors return one byte, replacement writers receive the final 4096 bytes,
+and closed/wrong-mode writers return only 1,048,577 bytes. Both changed kernels
+pass all cases. Each credential group also runs 32 warmup and 200 measured
+pipe/vector cycles covering success, empty vectors, invalid counts/headers,
+invalid payload pointers and wrong access modes. Every live slab class stays
+flat, and big pages stay at 63/63 on ARM and 160/160 on x86. These measurements
+cover the scoped vector workload, rather than a whole-desktop retention test.
+
+The [dated receipts](../tests/linux-compat/results/2026-10-13/) and
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/iovpin-audit.v)
+retain both native controls, kernel/fixture/init/ISO/source hashes, raw logs,
+and nine regression cases per architecture. The auditor retains and rejects an earlier
+fixture compilation failure as a native control and checks the actual slab
+counts independently. All eight host test files and the 62-input isolated
+inventory check pass. An independent review of both generated kernels and
+fixtures verified paired FD/Handle ownership, all error/partial returns,
+borrowed notification paths, stack snapshots, worker join and failure exits.
+
+Shared file-offset atomicity across a whole vector, immutable iovec imports,
+Linux stream short-read/message behavior and translated/ELF32 variants remain
+unqualified. The three broad Linux/POSIX acceptance gates stay open.

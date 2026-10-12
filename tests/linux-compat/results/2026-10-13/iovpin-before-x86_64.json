@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "5f237869fb80c27c8c432b23bb31083d4caae610c138d3176d4b901724c52f7d",
+    "results": [
+        {
+            "name": "iovpin",
+            "source_sha256": "3a4e4decb1c124fcf4470a94e5fd3a7d4efb31767abef4bb2a71b9164be2df61",
+            "init_sha256": "103ed0c0236d663b541c7ee0dc8435a669b7151225781c20e45e4b949871fb86",
+            "iso_sha256": "30fa6630ae03ce3a88959390cf718977c3d56840473652ccf45cd1c2139e3dc7",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
