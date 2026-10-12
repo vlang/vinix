@@ -3400,17 +3400,79 @@ at EOS's required `_OBJC_CLASS_$_NSThread` import. Evidence is retained under
 published runners are unchanged, and game entry, rendering and gameplay
 remain unverified.
 
+`NSThread` now implements Foundation thread identities and basic workers in V.
+EOS strongly imports the class and contains currentThread and isMainThread
+selectors. Installed Foundation supplied typed metadata and behavior probes;
+native RE never executed application code.
+
+The class has the measured 64-byte opaque record and private ivar offsets.
+Public state lives in an owned sidecar, so isa changes and caller-provided
+storage keep the same retirement path. Main/current identities are stable,
+including on foreign pthreads, and each thread lazily owns a mutable dictionary.
+The main identity uses the Vinix label Main Thread; native process labels
+are platform-dependent. Names are copied; configured stack size defaults to
+512 KiB. State distinguishes unstarted, executing, finished and cooperatively
+cancelled threads.
+
+Target/selector constructors retain their target and object argument. Block
+constructors promote stack blocks through the existing copy/dispose helpers.
+start and both detach factories use real native pthreads through the existing
+Mach lifetime wrapper. TLS owns an executing identity; its destructor releases
+captures, drains autoreleases and publishes completion on normal return and
+explicit pthread_exit. Cancellation before entry skips the callback; cancellation
+while executing leaves the callback running until it returns or exits.
+
+A small join record keeps the native handle until pthread_join finishes every
+key-destructor iteration. Completed workers are reaped on later starts and all
+remaining workers join before runtime and application mappings are retired.
+Dispatch/Swift workers and foreign app pthreads must finish before thread TLS
+is deleted. The main identity cache also releases at shutdown.
+
+The native Mac retains a block cancelled before start even after the thread
+is released and its pool drained. That observation has a separate bounded
+probe with valid persistent capture storage. Shared native sanitizer cases
+use a block-free thread for pre-start cancellation; Vinix additionally verifies
+that its cancelled block is disposed. Normal and explicit-exit block disposal
+are checked against native Foundation. Failed exploratory assumptions and
+compiler trials remain archived with their actual exit statuses.
+
+This profile caps 256 unreaped workers, accepts unstarted configured stacks in
+16 KiB multiples through 8 MiB, and implements finite sleeps through one day.
+Scheduling/QoS, thread run loops, call-stack introspection, notifications and
+perform-selector routing remain outside the profile. Main-thread exit, restart,
+reinitialization, invalid stack sizes, nil blocks and currentThread during TLS
+destruction reject explicitly. Dictionary mutation requires application
+synchronization; no private Foundation thread ivar layout is emulated.
+
+All 65 programs build and 82 original generated C streams restore to recorded
+hashes. Seventeen host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes nineteen Objective-C and 33 Swift/loader programs. Thread fixtures cover
+target/argument retention, block promotion/disposal, explicit exit, cooperative
+and pre-start cancellation, detached callbacks, two simultaneous foreign
+identities, copied names, dictionaries, stacks and sleeps. They also cover 100
+isa-change releases, caller storage, seven rejected operations and two shutdown
+cycles with zero live objects, heap blocks, workers and TLS identities.
+Generated C audits check sidecar/context/join-record retirement and verify
+that TLS cleanup allocates no scratch state. Earlier checks remain enabled.
+
+Fortnite passes the NSThread binding and exits with status 1 before entry at
+EOS's required `_OBJC_CLASS_$_ASWebAuthenticationSession` import.
+Evidence is retained under
+`build/ios/fortnite/thread-checks`. Full regression remains unpassed, the five
+published runners are unchanged, and game entry, rendering and gameplay
+remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,431 | 728 | 80 |
-| EOSSDK | 646 | 16 | 18 |
+| Fortnite executable | 1,432 | 727 | 80 |
+| EOSSDK | 647 | 15 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,192 | 805 | 121 |
+| All images | 2,194 | 803 | 121 |
 
-The C++/GLES/Text variant reports 2,205 resolved imports, 792 unresolved strong
+The C++/GLES/Text variant reports 2,207 resolved imports, 790 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -25,6 +25,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if layout_selector(object, name) { return true }
 	if json_selector(object, name) { return true }
 	if ns_condition_selector(object, name) { return true }
+	if ns_thread_selector(object, name) { return true }
 	if cookie_selector(object, name) { return true }
 	if request_selector(object, name) { return true }
 	if response_selector(object, name) { return true }

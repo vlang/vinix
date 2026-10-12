@@ -104,6 +104,7 @@ mut:
 	set_mutating bool
 	condition_owned bool
 	condition_initialized bool
+	thread &FoundationThread = unsafe { nil }
 	cookie_owned bool
 	webkit &WebKitState = unsafe { nil }
 	webkit_array bool // Read-only script list; its contents change through its controller.
@@ -191,6 +192,13 @@ mut:
 	swift_fatal_code u64 // Assertion argument capture and BRK, retired at quiescent teardown.
 	names        map[string]u64
 	pool_key u64
+	thread_key u64
+	foundation_main_thread u64
+	foundation_multithreaded bool
+	foundation_thread_count int
+	foundation_workers &FoundationWorker = unsafe { nil }
+	foundation_worker_count int
+	threads_stopping bool
 	graphics_key u64
 	window       u64
 	screen       u64
@@ -247,6 +255,7 @@ fn objc_start() {
 		panic('iOS: cannot create autorelease TLS')
 	}
 	if C.ios_key_create(unsafe { &ios_runtime.graphics_key }, unsafe { voidptr(ui_context_cleanup) }) != 0 { panic('iOS: cannot create graphics TLS') }
+	if C.ios_key_create(unsafe { &ios_runtime.thread_key }, unsafe { voidptr(ns_thread_cleanup) }) != 0 { panic('iOS: cannot create Foundation thread TLS') }
 	ios_runtime.timers.flags |= .noslices
 	ios_runtime.load_classes.flags |= .noslices
 	ios_runtime.load_categories.flags |= .noslices
@@ -257,7 +266,7 @@ fn objc_start() {
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
@@ -308,6 +317,7 @@ fn objc_start() {
 			'NSConcreteValue' { u32(24) }
 			'NSError' { u32(sizeof(AbiNSError)) }
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
+			'NSThread' { u32(64) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
 			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
 			'NSURLResponse' { u32(24) }
@@ -337,6 +347,9 @@ fn objc_start() {
 		condition_class.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: [i64(8), 72, 120]![i], size: [u64(64), 48, 8]![i]}
 	}
 	mut cookie_class := ios_runtime.classes[ios_runtime.names['NSHTTPCookie']] or { panic('iOS: missing cookie class') }
+	mut thread_class := ios_runtime.classes[ios_runtime.names['NSThread']] or { panic('iOS: missing thread class') }
+	thread_class.ivars['_private'] = &ObjIvar{name: '_private'.clone(), types: '@'.clone(), offset: 8, size: 8}
+	thread_class.ivars['_bytes'] = &ObjIvar{name: '_bytes'.clone(), types: '[44C]'.clone(), offset: 16, size: 44}
 	cookie_class.ivars['_cookiePrivate'] = &ObjIvar{name:'_cookiePrivate'.clone(), types:'@"NSHTTPCookieInternal"'.clone(), offset:8, size:8}
 	webkit_metadata()
 	mut request_class := ios_runtime.classes[ios_runtime.names['NSURLRequest']] or { panic('iOS: missing request class') }
@@ -454,6 +467,7 @@ fn objc_new(cls u64) u64 {
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
+	if obj_header(object).thread != unsafe { nil } { ns_thread_initialize(object, 0, 0, 0, 0) }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
 	if obj_header(object).response_owned { response_initialize(object) }
 	if obj_header(object).set_owned { ns_set_initialize(object, 0) }
@@ -467,6 +481,7 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	ns_threads_join()
 	swift_tasks_join()
 	dispatch_stop()
 	audio_stop()
@@ -492,6 +507,7 @@ fn objc_stop() {
 	objc_release(ios_runtime.locale)
 	objc_release(ios_runtime.run_loop)
 	webkit_stop()
+	ns_threads_stop()
 	objc_associations_stop()
 	// Keep the immortal empty dictionary available through all collection and
 	// autorelease teardown. Release its cache reference after those users stop.
