@@ -61,6 +61,7 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume show-bundle BUNDLE\n       vinix-volume check-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume plan-add BUNDLE DISK_INDEX SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume plan-remove BUNDLE SLOT\n')
 	C.printf(c'       vinix-volume plan-add-batch BUNDLE IDENTITY SLOT OFFSET_BYTES LENGTH_BYTES MODE [...]\n       vinix-volume plan-preview-add-batch BUNDLE IDENTITY SLOT OFFSET_BYTES LENGTH_BYTES MODE [...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
+	C.printf(c'       vinix-volume plan-grow-batch BUNDLE IDENTITY SLOT LENGTH_BYTES [...]\n       vinix-volume plan-preview-grow-batch BUNDLE IDENTITY SLOT LENGTH_BYTES [...]\n')
 	C.printf(c'       vinix-volume plan-remove-batch BUNDLE SLOT [...]\n       vinix-volume plan-preview-remove-batch BUNDLE SLOT [...]\n')
 	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
 	C.printf(c'       vinix-volume plan-enroll-batch BUNDLE PLAN [...]\n       vinix-volume plan-preview-enroll-batch BUNDLE PLAN [...]\n')
@@ -80,6 +81,20 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'plan-grow-batch') == 0 || C.strcmp(argv[1], c'plan-preview-grow-batch') == 0) {
+			if argc < 6 || argc > 195 || (argc - 3) % 3 != 0 { return usage() }
+			mut batch := &MappingGrowthBatch(C.alloca(sizeof(MappingGrowthBatch)))
+			*batch = MappingGrowthBatch{count: (argc - 3) / 3}
+			for i in 0 .. batch.count {
+				at := 3 + i * 3
+				if !parse_disk_identity(argv[at], mut batch.keys[i]) { return usage() }
+				slot := decimal(argv[at + 1]) or { return usage() }
+				length := decimal(argv[at + 2]) or { return usage() }
+				if slot >= 64 || length == 0 { return usage() }
+				batch.slots[i] = u32(slot); batch.lengths[i] = length
+			}
+			return grow_batch_bundle_plan(argv[2], batch, C.strcmp(argv[1], c'plan-preview-grow-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'plan-add-batch') == 0 || C.strcmp(argv[1], c'plan-preview-add-batch') == 0) {
 			if argc < 8 || argc > 323 || (argc - 3) % 5 != 0 { return usage() }
 			mut batch := &MappingAdditionBatch(C.alloca(sizeof(MappingAdditionBatch)))

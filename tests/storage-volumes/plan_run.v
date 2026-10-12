@@ -31,7 +31,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -418,6 +418,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN ENROLLMENT BATCH PASSED:') { return error('Missing atomic disk enrollment batch qualification') }
 	if !first.contains('PLAN FORGET BATCH PASSED:') { return error('Missing atomic identity disk forget qualification') }
 	if !first.contains('PLAN ADDITION BATCH PASSED:') { return error('Missing atomic explicit mapping addition qualification') }
+	if !first.contains('PLAN EXPLICIT GROWTH BATCH PASSED:') { return error('Missing atomic explicit mapping growth qualification') }
 	if !first.contains('PLAN LOCK PASSED:') { return error('Missing saved-plan locking qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
@@ -459,6 +460,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !third.contains('PLAN ENROLLMENT BATCH SAVED:') || !fourth.contains('PLAN ENROLLMENT BATCH BOOT PRESERVED') { return error('Disk enrollment batch did not survive boot') }
 	if !third.contains('PLAN FORGET BATCH SAVED:') || !fourth.contains('PLAN FORGET BATCH BOOT PRESERVED') { return error('Disk forget compaction did not survive boot') }
 	if !third.contains('PLAN ADDITION BATCH SAVED:') || !fourth.contains('PLAN ADDITION BATCH BOOT PRESERVED') { return error('Explicit mapping additions did not survive boot') }
+	if !third.contains('PLAN EXPLICIT GROWTH BATCH SAVED:') || !fourth.contains('PLAN EXPLICIT GROWTH BATCH BOOT PRESERVED') { return error('Explicit mapping growth did not survive boot') }
 	println('PASS ${arch}: atomic physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, four-boot persistence and 200-cycle retention')
 }
 

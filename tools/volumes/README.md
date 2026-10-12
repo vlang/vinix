@@ -67,6 +67,14 @@ shift. A later conflict preserves the whole saved set and pool priority.
 locking or publication. Live preflight/replay remains separate. See
 [explicit addition batch rules](../../docs/storage-volumes.md#atomic-explicit-mapping-additions).
 
+`plan-grow-batch BUNDLE IDENTITY SLOT LENGTH_BYTES [...]` grows 1–64 explicit
+desired mappings in one atomic edit, preserving offsets, modes and pool priority.
+Select MBR/GPT identities from `show-bundle`; equal-size requests keep their rows.
+Wrong-disk, later overlap/alignment/overflow/shrink or duplicate-slot failures
+roll back the complete set. `plan-preview-grow-batch` reports every action without
+physical probes, writer locking or publication. Explicit live growth replay stays
+separate. See [explicit growth rules](../../docs/storage-volumes.md#atomic-explicit-mapping-growth).
+
 `plan-remove-batch BUNDLE SLOT [...]` removes 1–64 distinct desired slots across
 disks in one atomic publication. Absent slots are durable `keep` retries;
 remaining mappings, enrolled disks and pool priority are preserved.

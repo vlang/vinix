@@ -45,6 +45,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 			enrollment_boot_check()
 			forget_boot_check()
 			addition_boot_check()
+			explicit_growth_boot_check()
 			check(status(c'/dev/mapper/vinix14').disk_id == status(parent).disk_id
 				&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id,
 				c'capacity boot maps the correct physical disks')
@@ -153,6 +154,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 		enrollment_boot_prepare(parent, other)
 		forget_boot_prepare()
 		addition_boot_prepare()
+		explicit_growth_boot_prepare()
 		copy_plan(c'/root/saved.vset', c'/etc/vinix/volumes.vset')
 		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0,
 			c'capacity aliases cleanup')

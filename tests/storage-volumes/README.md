@@ -164,6 +164,16 @@ actions, later live conflicts, retained views and exact seven-row reconstitution
 before persistent boot replay. See
 [addition batch qualification](addition-batch.md).
 
+Explicit mapping growth batches check 1024 existing-growth/requested subsets
+against independent length/action oracles, preserving offsets, modes, row/disk
+order and pool priority. Identity-based equal-size retries follow compaction.
+Maximum 64-request/195-argument CLIs exercise the full V2 limit near u64 bounds.
+Later identity, shrink, overlap, alignment/overflow and slot conflicts preserve
+every field and file byte. Publisher/output faults cover changed/all-keep batches.
+Guests verify mixed actions, complete live-extension preflight, held descriptors
+and exact desired-length reconstitution across persistent boot replay. See
+[explicit growth qualification](explicit-growth-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -190,8 +200,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 10400 utility processes across 200 warmup
-and 200 measured twenty-six-command cycles, with pool membership, query, batch
+its own process. The allowance includes 10800 utility processes across 200 warmup
+and 200 measured twenty-seven-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
@@ -237,8 +247,8 @@ conflicts before growth. Writable and read-only views grow in place, keeping
 their generations. An already open raw descriptor writes and flushes the new
 extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
-cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
-mapping capacity, previews/verifies/republishes both unchanged physical capacities,
+cycles, with both disks enabled. Each cycle saves the bundle, previews/publishes unchanged
+two-disk mapping capacity, previews/verifies/republishes both unchanged physical capacities,
 previews/publishes admission of two pool members and unchanged allocation priority,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
 batch, previews/publishes a two-mapping growth batch and explicit identity retries, checks and previews/removes the scratch

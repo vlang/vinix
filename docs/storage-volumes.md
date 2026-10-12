@@ -432,6 +432,59 @@ keeps matching generations; desired omission does not remove them. Existing
 V1/V2 formats and boot replay persist the rows. See
 [explicit addition qualification](../tests/storage-volumes/addition-batch.md).
 
+## Atomic explicit mapping growth
+
+```sh
+vinix-volume plan-preview-grow-batch /root/layout.vset \
+  mbr:12345679 9 8192 mbr:12345678 2 8192
+vinix-volume plan-grow-batch /root/layout.vset \
+  mbr:12345679 9 8192 mbr:12345678 2 8192
+vinix-volume check-bundle /root/layout.vset grow
+vinix-volume restore-bundle /root/layout.vset grow
+```
+
+`plan-grow-batch BUNDLE IDENTITY SLOT LENGTH_BYTES [...]` grows 1–64 existing
+desired mappings in place as one atomic saved-state edit. Identities use the
+MBR/GPT format printed by `show-bundle`, accepting either hexadecimal case.
+Every slot must belong to the selected identity. Identity selection ignores
+saved geometry and shifting indices; current saved capacity and sector size
+validate the requested length. Several distinct slots may select one disk.
+
+Lengths are decimal, nonzero and sector-aligned. Equal-size requests are durable
+`keep` retries. Growth preserves offsets, modes, generations of matching live
+views, desired row/disk order and pool bounds/alignment/priority. Shrinking,
+relocation and mode changes are not growth operations. Missing slots, wrong or
+ambiguous identities, repeated requested slots, overlaps, unaligned/out-of-bounds
+or overflowing extents reject the complete batch without caller state/results
+or partial action reports. A later failure cannot retain an earlier growth.
+Identity-based retries stay valid after unrelated empty-disk compaction.
+
+This editor grows explicit extents without requiring pool membership, eligibility
+or pool alignment. Ordinary disk sector/bounds/overlap rules apply; pool queries
+account for desired rows that intersect their regions. `pool-grow-batch` keeps
+its additional eligibility checks. Existing single `plan-grow` stays available.
+
+`plan-preview-grow-batch` uses the same planner and reports every request's
+identity, current disk index, slot, offset, previous/requested lengths, mode and
+grow/keep action. It opens only the saved file, taking no writer lock and creating
+no temporary or publication. Publication keeps the pinned directory writer lock
+through source reads, replacement, report flushing and cleanup. All-keep retries
+still write, file-fsync, rename and directory-fsync the complete bundle. Before
+rename an I/O failure retains the old bytes; after rename only the whole new set
+may be visible with durability unconfirmed. Buffered output failures also return
+an error. Retry the full list or inspect the saved state under serialized
+administration to establish durability.
+
+Published growth remains desired state until explicit `check-bundle ... grow`
+and `restore-bundle ... grow`. Their complete live preflight detects extension
+conflicts before the first mutation; ordinary replay rejects smaller live views.
+Successful growth retains each live generation and its open descriptors, which
+can access the new extent, preserving read-only modes. Runtime application can
+still fail after earlier mutations; replay resumes from matching views. Removing
+desired rows does not remove live views. Boot restoration persists desired
+lengths in the unchanged V1/V2 formats. See
+[explicit growth qualification](../tests/storage-volumes/explicit-growth-batch.md).
+
 ## Atomic desired mapping removal batches
 
 ```sh
