@@ -1265,6 +1265,7 @@ pub fn new_user_thread(_process &proc.Process, want_elf bool, pc voidptr, arg vo
 	mut t := unsafe { &proc.Thread(thread_mem) }
 	unsafe { *t = proc.Thread{
 		kernel_charge: charge
+		no_new_privs: proc.no_new_privs_state(proc.current_thread())
 		process: process
 		ttbr0: process.pagemap.tagged_root()
 		gpr_state: gpr_state
@@ -1372,6 +1373,7 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 	mut t := unsafe { &proc.Thread(thread_mem) }
 	unsafe { *t = proc.Thread{
 		kernel_charge: charge
+		no_new_privs: proc.no_new_privs_state(source)
 		process: process
 		ttbr0: process.pagemap.tagged_root()
 		gpr_state: state

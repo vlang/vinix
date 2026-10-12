@@ -421,14 +421,14 @@ fn syscall_linux_prctl(gpr_state voidptr, _option int, arg2 u64, _arg3 u64, _arg
 			if arg2 != 1 || _arg3 != 0 || _arg4 != 0 || _arg5 != 0 {
 				return errno.err, errno.einval
 			}
-			process.no_new_privs = true
+			proc.set_no_new_privs()
 			return 0, 0
 		}
 		pr_get_no_new_privs {
 			if arg2 != 0 || _arg3 != 0 || _arg4 != 0 || _arg5 != 0 {
 				return errno.err, errno.einval
 			}
-			return if process.no_new_privs { u64(1) } else { u64(0) }, 0
+			return u64(proc.no_new_privs_state(proc.current_thread())), 0
 		}
 		else {
 			return errno.err, errno.einval

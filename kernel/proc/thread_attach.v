@@ -3,6 +3,7 @@
 module proc
 
 import errno
+import katomic
 
 // Publish a fully numbered thread in its process. Process inspection takes
 // the table lock before the thread-list lock, so attachment must use that
@@ -19,6 +20,7 @@ pub fn attach_thread(mut process Process, mut t Thread) ?int {
 		t.tid = process.pid
 		if !bind_tid_locked(t.tid, t) { errno.set(errno.eagain); return none }
 		number_thread_locked(mut t, true)
+		katomic.store(mut &process.leader_no_new_privs, no_new_privs_state(t))
 	} else {
 		t.tid = allocate_tid_locked(t) or { errno.set(errno.eagain); return none }
 		number_thread_locked(mut t, false)

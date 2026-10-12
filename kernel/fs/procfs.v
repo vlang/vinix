@@ -698,7 +698,7 @@ fn (this &ProcFSResource) contents() string {
 			return lib.finish_text(*statm_builder)
 		}
 		.status {
-			return proc.process_status_text(this.pid, unsafe { &proc.Namespace(this.view) })
+			return proc.process_status_text(this.pid, this.tid, unsafe { &proc.Namespace(this.view) })
 		}
 		.cpuinfo {
 			return cpuinfo_text()

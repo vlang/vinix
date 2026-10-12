@@ -224,7 +224,7 @@ fn seccomp_install(prog u64) (u64, u64) {
 	if process.seccomp_mode == proc.seccomp_mode_strict {
 		return errno.err, errno.einval
 	}
-	if !process.no_new_privs && !proc.current_has_capability(proc.cap_sys_admin) {
+	if proc.no_new_privs_state(proc.current_thread()) == 0 && !proc.current_has_capability(proc.cap_sys_admin) {
 		return errno.err, errno.eacces
 	}
 	// struct sock_fprog: an unsigned short length, then the pointer.

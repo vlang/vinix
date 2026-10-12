@@ -931,7 +931,9 @@ and base handlers, while these arguments retain their full native width.
 This follows [Linux 6.12's prctl implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/sys.c#L2478).
 The native V fixture checks 34 exact refusals, high argument bits, high selector
 bits, preserved state after invalid requests, and idempotent valid setting.
-It does not qualify Linux's per-thread ownership of no_new_privs or seccomp.
+These argument-validation receipts do not qualify per-thread ownership; the
+later [task-local no_new_privs results](#task-local-no_new_privs) cover that flag.
+Seccomp filter ownership remains unqualified.
 
 The before-controls on [AArch64](../tests/linux-compat/results/2026-10-12/nnp-before-aarch64.json)
 and [x86-64](../tests/linux-compat/results/2026-10-12/nnp-before-x86_64.json)
@@ -941,3 +943,45 @@ fixture plus seccomp queries/trap delivery and approved JIT permission checks:
 [x86-64 results](../tests/linux-compat/results/2026-10-12/nnp-after-x86_64.json).
 The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/nnp-audit.v)
 checks source/inventory hashes, the isolated builds and frozen guest artifacts.
+
+## Task-local no_new_privs
+
+no_new_privs now belongs to each Thread on both architectures. Setting it
+cannot change an existing sibling; new tasks inherit the calling thread's
+flag. The replacement thread after exec retains that caller's flag even when
+a nonleader execs with a different flag from its leader. Seccomp installation
+authorization and the exec capability ceiling read the calling thread's state.
+This follows the [Linux no_new_privs contract](https://docs.kernel.org/userspace-api/no_new_privs.html).
+
+Procfs reads the selected task's atomic flag under the process table lock.
+A diagnostic leader copy preserves status after that thread retires, including
+zombies; it is never used for authorization or inheritance. Attachment resets
+that copy when exec creates a new leader. The change adds scalar fields and
+introduces no allocations, frees or retained pointers. A separate kernel
+lifetime/concurrency review found no blocker in the borrowed reads or handoff.
+
+The unchanged ordinary-user V fixture fails on the original process-wide
+implementation, where a clear nonleader incorrectly retains its set leader's
+flag after exec: [AArch64 control](../tests/linux-compat/results/2026-10-12/nnpthread-before-aarch64.json),
+[x86-64 control](../tests/linux-compat/results/2026-10-12/nnpthread-before-x86_64.json).
+Both isolated final builds pass sibling independence, clone/fork/exec,
+direct nonleader exec, exact seccomp EACCES/EFAULT authorization and
+live/zombie procfs checks. They also pass the existing 34-error prctl test,
+seccomp queries/trap delivery, approved JIT permissions and TLS/atomic/SIMD
+runtime checks: [AArch64](../tests/linux-compat/results/2026-10-12/nnpthread-after-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/nnpthread-after-x86_64.json).
+
+Six existing capability-exec groups pass on the same kernels, including
+repeated root exec without capability regain, low/high permitted bits,
+mixed credentials and nonroot ambient capabilities:
+[AArch64](../tests/linux-compat/results/2026-10-12/nnpthread-cap-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/nnpthread-cap-x86_64.json).
+All eight host test files pass. The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/nnpthread-audit.v)
+requires its deliberate failing assertion to exit nonzero, verifies the
+53-input inventory and isolated source changes, and rehashes frozen kernels,
+fixtures, generated C, binaries, ISOs, serial logs and receipts.
+
+These results qualify task-local flag behavior and the stated capability
+checks. Seccomp filters remain process-wide; TSYNC, setuid/file-capability
+execution, LSM transition behavior and complete application sandbox isolation
+remain unqualified. The larger roadmap gates stay open.

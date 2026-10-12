@@ -403,7 +403,9 @@ pub mut:
 	caps            Capabilities
 	mac_domain     u32
 	mac_next_domain u32
-	no_new_privs    bool
+	// Diagnostic copy of the leader's flag, retained after its Thread retires.
+	// Live prctl, inheritance and exec authorization use only Thread state.
+	leader_no_new_privs u32
 	// Who logged in, and which login this is; see login.v.
 	login_uid       u32 = 0xffffffff
 	login_session   u32
@@ -1532,7 +1534,7 @@ fn (t &Thread) sched_or_default() SchedParams {
 	return t.sched
 }
 
-pub fn process_status_text(pid int, viewer &Namespace) string {
+pub fn process_status_text(pid int, tid int, viewer &Namespace) string {
 	lock_table()
 	defer { unlock_table() }
 	process := process_at(pid)
@@ -1541,7 +1543,12 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	}
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
 	caps := process.caps
-	no_new_privs := if process.no_new_privs { 1 } else { 0 }
+	// The table lock keeps the selected task alive through this snapshot.
+	target := threads_by_tid[if tid == 0 { pid } else { tid }]
+	if tid != 0 && (target == unsafe { nil } || voidptr(target.process) != voidptr(process)) { return '' }
+	nnp := if target == unsafe { nil } || voidptr(target.process) != voidptr(process) {
+		katomic.load(&process.leader_no_new_privs)
+	} else { no_new_privs_state(target) }
 	state := match process_state(process) { `Z` { 'Z (zombie)' } `T` { 'T (stopped)' } `S` { 'S (sleeping)' } else { 'R (running)' } }
 	shown_pid := pid_in(process, viewer)
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
@@ -1590,7 +1597,7 @@ pub fn process_status_text(pid int, viewer &Namespace) string {
 	text.add('\nCapAmb:\t')
 	text.add_radix(caps.ambient, 16, 16)
 	text.add('\nNoNewPrivs:\t')
-	text.add_decimal(no_new_privs)
+	text.add_decimal(int(nnp))
 	text.add('\nSeccomp:\t')
 	text.add_decimal(process.seccomp_mode)
 	text.add('\nSeccomp_filters:\t')

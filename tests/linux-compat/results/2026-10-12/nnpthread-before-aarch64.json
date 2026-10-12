@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "cd8ca9218d5864adac8e7c592f1963a12c613a95794f46d0eacd7af6a85e6e4e",
+    "results": [
+        {
+            "name": "nnpthread",
+            "source_sha256": "fd96c5dbbeb72a805fe2d3898760453433b99200b9b0bc447a56d866ca702f88",
+            "init_sha256": "8e452843569b2fd65218e9981692c1b64051d82bc154a78162fba2029c942e07",
+            "iso_sha256": "038cbc836f34b9739c3b7e2d08c1d12c2ca069a2a2bc025b24c474301f90509d",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

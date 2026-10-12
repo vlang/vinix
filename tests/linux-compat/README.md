@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -172,8 +172,20 @@ The `nnp` case runs as UID/GID 1000 and checks 34 exact EINVAL results for
 PR_GET_NO_NEW_PRIVS and PR_SET_NO_NEW_PRIVS, before and after a valid set.
 Reserved arguments retain their full native unsigned-long width; invalid
 requests cannot set or clear the state. The C-int option selector ignores
-upper register bits. Valid setting remains idempotent and sticky. Per-thread
-ownership, synchronized filters and complete sandbox isolation remain separate.
+upper register bits. Valid setting remains idempotent and sticky.
+
+The `nnpthread` case runs as UID/GID 1000. A worker sets no_new_privs without
+changing its leader, then the leader sets it without changing an existing worker.
+Each state must survive new pthreads, fork and exec. Two direct execs from a
+nonleader whose flag differs from its leader require the caller's state in the
+replacement leader. Seccomp authorization must use the calling thread:
+an inaccessible filter returns EACCES for state 0 and EFAULT for state 1.
+No filter is installed by that authorization probe. `/proc/self/status`,
+`/proc/thread-self/status` and another task's status must report the selected
+thread's flag. WNOWAIT permits checking status after child exit before reaping.
+The capability-exec suite separately checks retained privilege ceilings.
+Seccomp filter ownership, TSYNC, setuid/file-capability execution and complete
+sandbox isolation remain separate qualifications.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,

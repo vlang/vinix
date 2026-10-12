@@ -57,6 +57,8 @@ pub mut:
 	user_stack   u64
 	syscall_num  u64
 	// Movable members
+	// Linux task-local, sticky across clone/fork/exec. Atomic for procfs readers.
+	no_new_privs u32
 	// Borrowed Linux current-task view, owned by this Thread. Its C layout
 	// and alignment are checked in c/linuxkpi_task_v_primitives.c.
 	// The view adds no allocation.

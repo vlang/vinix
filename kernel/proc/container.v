@@ -322,7 +322,6 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	unlock_table()
 	child.mac_domain = parent.mac_domain
 	child.mac_next_domain = parent.mac_next_domain
-	child.no_new_privs = parent.no_new_privs
 	child.login_uid = parent.login_uid
 	child.login_session = parent.login_session
 	child.stack_policy_mode = katomic.load(&parent.stack_policy_mode)
@@ -357,6 +356,21 @@ pub fn current_has_capability(cap int) bool {
 	return has_capability(current_thread().process, cap)
 }
 
+// Read while owning the running task, a lookup lock, or a pinned reference.
+// A constructor can run before a boot CPU has a current task.
+pub fn no_new_privs_state(task &Thread) u32 {
+	if task == unsafe { nil } { return 0 }
+	return katomic.load(&task.no_new_privs)
+}
+
+pub fn set_no_new_privs() {
+	mut task := current_thread()
+	katomic.store(mut &task.no_new_privs, u32(1))
+	if task.tid == task.process.pid {
+		katomic.store(mut &task.process.leader_no_new_privs, u32(1))
+	}
+}
+
 // The capability sets a program starts with after execve(2), for a file that
 // carries no file capabilities: root gets everything its bounding set and
 // inheritable set allow, everybody else keeps only the ambient set.
@@ -377,7 +391,7 @@ pub fn capabilities_after_exec(mut process Process) {
 	}
 	// Even uid 0 must not regain dropped privileges through exec when NNP
 	// is set. The bounding/inheritable sets are not the pre-exec ceiling.
-	if process.no_new_privs {
+	if no_new_privs_state(current_thread()) != 0 {
 		caps.permitted &= old_permitted
 		caps.effective &= caps.permitted
 	}
