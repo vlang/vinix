@@ -40,6 +40,40 @@ staging receipts and binaries are retained in
 the host project receipt is in `/tmp/vinix-development-qualification-20261012-a`.
 These paths are local evidence, not dependencies of the maintained commands.
 
+Native hypervisor memory validation on the same date built isolated kernels
+from `1c2e33ce` plus the memory changes. The x86 memory fixture allocated and
+released 1 GiB, checked EPT entries and zeroed frames, injected failures through
+VMCS/table/RAM/FPU allocation, and restored exact free-page counts after 100
+VM lifetimes. The public API also created a 1 GiB VM and accessed its final
+byte. Another 100 sessions checked unaligned I/O, shared mappings after close
+and fork, concurrent creation, private/out-of-bounds mapping refusal and
+ordinary-user permissions. Slab snapshots after the retirement grace remained
+within the fixture's four-object allowance for timer/thread noise. New kernel
+lifetimes received an independent source and generated-C review.
+
+The V [memory controller](../tests/hypervisor/README.md#guest-memory-and-session-lifetime)
+retains kernel, fixture and ISO SHA-256s, QEMU arguments and a passing receipt
+at `/tmp/vinix-hv-memory-guest-20261012-i/receipt.json`, with the serial transcript
+beside it. Production kernels built and booted on x86_64 and AArch64 with the
+test tags disabled. The ABI/VMX ASan/UBSan and optimized assembly checks passed,
+including INVEPT operand order and immediate status capture; the four checker
+test files also passed. Actual INVEPT and hardware guest entry were not run:
+the x86 host backend here is QEMU TCG, and ARM has no native backend.
+
+The AArch64 desktop harness passed `idle,apps,drag` and `ops,churn,cache` using
+the isolated production kernel. All 36 cohorts of 200 system calls reported
+zero retained bytes per operation; all four programs run 300 times each
+reported zero retained bytes. The cache scenario retained 16 MiB of cache
+after writing 32 MiB. Results are in `/tmp/vinix-hv-memory-desktop-full.json`
+and `/tmp/vinix-hv-memory-retention.json`. These broad AArch64 regressions
+complement the x86 hypervisor memory fixture.
+
+`tests/kernel-allocs/run.sh` still fails its existing allocation-site allowlist
+on both the unchanged `1c2e33ce` baseline and the ownership refactor. Comparing
+the 215 file/kind counts showed no increases. The global allowlist was not
+expanded to conceal those baseline failures; they remain a separate failing
+gate, alongside the hardware VM-entry and wider section 17 acceptance work.
+
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,
 and hosts a practical hardware-accelerated guest OS under supported authorization.
