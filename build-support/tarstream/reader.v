@@ -2,12 +2,27 @@
 module tarstream
 
 import crypto.sha256
+import os
 import strconv
 import tarcore
 
-#flag -larchive
-#flag -I @DIR
-#include "filter_abi.h"
+$if !tarstream_fd_only ? {
+	#flag -larchive
+	#flag -I @DIR
+	#include "filter_abi.h"
+}
+
+#include <unistd.h>
+#include <errno.h>
+#include <poll.h>
+struct C.pollfd {
+mut:
+	fd      i32
+	events  i16
+	revents i16
+}
+
+fn C.poll(&C.pollfd, usize, i32) i32
 
 struct C.archive {}
 
@@ -31,20 +46,60 @@ pub fn (err End) code() int { return 0 }
 
 pub struct Reader {
 mut:
-	stream    &C.archive = unsafe { nil }
-	remaining i64
-	padding   int
-	started   bool
-	ended     bool
-	ignore_zeros bool
-	globals   map[string]string
-	metadata_limit i64 = 0x7fffffff
+	stream            &C.archive = unsafe { nil }
+	descriptor        i32        = -1
+	cancel            fn () bool = unsafe { nil }
+	remaining         i64
+	padding           int
+	started           bool
+	ended             bool
+	ignore_zeros      bool
+	globals           map[string]string
+	metadata_limit    i64 = 0x7fffffff
+	allow_sparse      bool
+	sparse            []SparseExtent
+	logical_size      i64 = -1
+	sparse_meta_bytes int
+	precise_mtime string
 }
 
+pub struct SparseExtent {
+pub:
+	offset i64
+	length i64
+}
+
+pub fn (mut reader Reader) enable_sparse() { reader.allow_sparse = true }
+
+pub fn (reader &Reader) sparse_layout() (i64, []SparseExtent) {
+	return reader.logical_size, reader.sparse
+}
+
+// Preserve a PAX fractional time for extractors; rewrite callers still use the
+// integral Member.mtime field and keep their existing archive representation.
+pub fn (reader &Reader) modification_time() string {return reader.precise_mtime}
+
 fn filter_error(stream &C.archive) IError {
-	pointer := C.archive_error_string(stream)
-	if pointer == unsafe { nil } { return error('cannot read archive stream') }
-	return error(unsafe { pointer.vstring().clone() })
+	$if tarstream_fd_only ? {
+		return error('archive filter is unavailable in a descriptor reader')
+	} $else {
+		pointer := C.archive_error_string(stream)
+		if pointer == unsafe { nil } { return error('cannot read archive stream') }
+		return error(unsafe { pointer.vstring().clone() })
+	}
+}
+
+// Borrow a decompressed input descriptor. The caller owns its closure and any
+// decoder process; the shared V parser retains all tar metadata semantics.
+pub fn from_descriptor(descriptor i32) !Reader {
+	if descriptor < 0 { return error('invalid archive descriptor') }
+	return Reader{ descriptor: descriptor }
+}
+
+pub fn from_descriptor_cancelled(descriptor i32, cancel fn () bool) !Reader {
+	mut reader := from_descriptor(descriptor)!
+	reader.cancel = cancel
+	return reader
 }
 
 // libarchive only unwraps compression. Parsing names in V preserves their
@@ -75,34 +130,70 @@ pub fn open_plain_bounded(path string, metadata_limit i64) !Reader {
 }
 
 fn open_filtered(path string, compressed bool) !Reader {
-	stream := C.archive_read_new()
-	if stream == unsafe { nil } { return error('cannot allocate archive stream') }
-	mut opened := false
-	defer { if !opened { C.archive_read_free(stream) } }
-	filter := if compressed { C.archive_read_support_filter_all(stream) } else { C.archive_read_support_filter_none(stream) }
-	if filter < 0 || C.archive_read_support_format_raw(stream) != 0
-		|| C.archive_read_open_filename(stream, path.str, 10240) != 0 {
-		return filter_error(stream)
+	$if tarstream_fd_only ? {
+		return error('use a decompressed descriptor for this reader')
+	} $else {
+		stream := C.archive_read_new()
+		if stream == unsafe { nil } { return error('cannot allocate archive stream') }
+		mut opened := false
+		defer { if !opened { C.archive_read_free(stream) } }
+		filter := if compressed {
+			C.archive_read_support_filter_all(stream)
+		} else {
+			C.archive_read_support_filter_none(stream)
+		}
+		if filter < 0 || C.archive_read_support_format_raw(stream) != 0
+			|| C.archive_read_open_filename(stream, path.str, 10240) != 0 {
+			return filter_error(stream)
+		}
+		mut entry := &C.archive_entry(unsafe { nil })
+		if C.archive_read_next_header(stream, &entry) != 0 { return filter_error(stream) }
+		opened = true
+		return Reader{ stream: stream }
 	}
-	mut entry := &C.archive_entry(unsafe { nil })
-	if C.archive_read_next_header(stream, &entry) != 0 { return filter_error(stream) }
-	opened = true
-	return Reader{ stream: stream }
 }
 
 pub fn (mut reader Reader) close() {
-	if reader.stream != unsafe { nil } {
-		C.archive_read_free(reader.stream)
-		reader.stream = unsafe { nil }
+	$if !tarstream_fd_only ? {
+		if reader.stream != unsafe { nil } {
+			C.archive_read_free(reader.stream)
+			reader.stream = unsafe { nil }
+		}
 	}
+	reader.descriptor = -1
 }
 
 fn (mut reader Reader) exact(mut buffer []u8, allow_eof bool) !bool {
-	if reader.stream == unsafe { nil } { return error('archive stream is closed') }
+	if reader.descriptor < 0 && reader.stream == unsafe { nil } {
+		return error('archive stream is closed')
+	}
 	mut position := 0
 	for position < buffer.len {
-		count := unsafe { C.archive_read_data(reader.stream, &buffer[position], usize(buffer.len - position)) }
-		if count < 0 { return filter_error(reader.stream) }
+		if reader.cancel != unsafe { nil } && reader.cancel() {
+			return error('archive input interrupted')
+		}
+		mut count := isize(0)
+		if reader.descriptor >= 0 {
+			count = unsafe { C.read(reader.descriptor, &buffer[position], usize(buffer.len - position)) }
+			if count < 0 {
+				if C.errno == C.EINTR { continue }
+				if C.errno in [C.EAGAIN, C.EWOULDBLOCK] {
+					mut descriptor := C.pollfd{ fd: reader.descriptor, events: i16(C.POLLIN) }
+					if C.poll(&descriptor, 1, 50) < 0 && C.errno != C.EINTR {
+						return os.error_posix()
+					}
+					continue
+				}
+				return os.error_posix()
+			}
+		} else {
+			$if tarstream_fd_only ? {
+				return error('archive stream is closed')
+			} $else {
+				count = unsafe { C.archive_read_data(reader.stream, &buffer[position], usize(buffer.len - position)) }
+				if count < 0 { return filter_error(reader.stream) }
+			}
+		}
 		if count == 0 {
 			if position == 0 && allow_eof { return false }
 			return error('unexpected end of archive')
@@ -184,7 +275,9 @@ fn parse_header(data []u8) !tarcore.Member {
 	return member
 }
 
-fn parse_pax(data []u8) !map[string]string {
+fn parse_pax(data []u8) !map[string]string {return parse_pax_mode(data,false)!}
+
+fn parse_pax_mode(data []u8, allow_sparse bool) !map[string]string {
 	mut fields := map[string]string{}
 	mut pos := 0
 	for pos < data.len {
@@ -198,10 +291,14 @@ fn parse_pax(data []u8) !map[string]string {
 		record := data[delimiter + 1..pos + int(length) - 1].bytestr()
 		if !record.contains('=') || record.starts_with('=') { return error('invalid PAX record') }
 		key := record.all_before('=')
-		if key.starts_with('GNU.sparse.') {
+		if key.starts_with('GNU.sparse.') && !allow_sparse {
 			return error('sparse archive members cannot be rewritten as USTAR')
 		}
 		fields[key] = record.all_after('=')
+		if key in ['GNU.sparse.offset', 'GNU.sparse.numbytes'] {
+			collected := '_native.' + key
+			fields[collected] = (fields[collected] or { '' }) + record.all_after('=') + ','
+		}
 		pos += int(length)
 	}
 	return fields
@@ -232,6 +329,8 @@ fn apply_pax(mut member tarcore.Member, fields map[string]string) ! {
 pub fn (mut reader Reader) next() !tarcore.Member {
 	if reader.ended { return End{} }
 	reader.skip()!
+	reader.sparse = []SparseExtent{}
+	reader.logical_size = -1
 	mut local := map[string]string{}
 	mut extensions := false
 	for {
@@ -251,7 +350,9 @@ pub fn (mut reader Reader) next() !tarcore.Member {
 		mut member := parse_header(data)!
 		if member.size < 0 { return error('negative archive member size') }
 		if member.kind in [u8(`x`), `g`, `X`, `L`, `K`] {
-			if member.size > reader.metadata_limit || member.size > 0x7fffffff { return error('archive metadata is too large') }
+			if member.size > reader.metadata_limit || member.size > 0x7fffffff {
+				return error('archive metadata is too large')
+			}
 			mut body := []u8{len: int(member.size)}
 			reader.exact(mut body, false)!
 			reader.padding = int((512 - member.size % 512) % 512)
@@ -260,7 +361,7 @@ pub fn (mut reader Reader) next() !tarcore.Member {
 			if member.kind in [u8(`L`), `K`] {
 				local[if member.kind == `L` { 'path' } else { 'linkpath' }] = body.bytestr().all_before('\x00')
 			} else {
-				fields := parse_pax(body)!
+				fields := parse_pax_mode(body, reader.allow_sparse)!
 				for key, value in fields {
 					if member.kind == `g` {
 						reader.globals[key] = value
@@ -271,13 +372,15 @@ pub fn (mut reader Reader) next() !tarcore.Member {
 			}
 			continue
 		}
-		if member.kind !in [u8(0), `0`, `1`, `2`, `3`, `4`, `5`, `6`, `7`] {
+		if member.kind !in [u8(0), `0`, `1`, `2`, `3`, `4`, `5`, `6`, `7`] && !(reader.allow_sparse && member.kind == `S`) {
 			return error('unsupported archive member type: ${member.kind}')
 		}
 		apply_pax(mut member, reader.globals)!
 		apply_pax(mut member, local)!
+		reader.precise_mtime=local['mtime'] or {reader.globals['mtime'] or {member.mtime.str()}}
+		if reader.allow_sparse { reader.process_sparse(mut member, data, local)! }
 		if member.size < 0 { return error('negative archive member size') }
-		if member.regular() {
+		if member.regular() || member.kind == `S` {
 			reader.remaining = member.size
 			reader.padding = int((512 - member.size % 512) % 512)
 		}

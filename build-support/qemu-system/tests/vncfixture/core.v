@@ -15,6 +15,8 @@ module vncfixture
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#flag -I @DIR
+#include <darwin_alias.h>
 @[typedef]
 struct C.Display {
 	fd             i32

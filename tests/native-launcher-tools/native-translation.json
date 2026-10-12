@@ -1,0 +1,34 @@
+{
+    "bytes": 18820,
+    "evidence": "~/.cache/vinix-launcher-tools-native-20261013",
+    "files": 4,
+    "lines": 419,
+    "originals": [
+        {
+            "bytes": 5316,
+            "lines": 103,
+            "path": "build-support/qemu-system/tests/run.py",
+            "sha256": "20331e6ac129d255dece7e20bdf2db8aee3e917449922635b3007c5a43fe0f54"
+        },
+        {
+            "bytes": 6197,
+            "lines": 113,
+            "path": "build-support/venus/tests/run.py",
+            "sha256": "ecdf9b7183703a4f0c5e248fc78dac24068814f5afd9ee7b236c6890a3063545"
+        },
+        {
+            "bytes": 4328,
+            "lines": 116,
+            "path": "build-support/steam/tar",
+            "sha256": "d9506885b3f890016711b61a0a9191d4f35a89bffbf2c1a31561599df897afb5"
+        },
+        {
+            "bytes": 2979,
+            "lines": 87,
+            "path": "build-support/steam/lsof",
+            "sha256": "4ce8785a6330e020160a11334b69c2ea64d7693482428de9695e103ed9d60b7a"
+        }
+    ],
+    "qualification": "15 final cold ARM/x86/ASanUBSan builds; real C/V 34 VNC and 13 Venus cases per profile; proc/archive/sparse/metadata/reader ownership and signals; six real static ARM/x86 helper/model ELFs; default and custom guest cache regressions; public cold fronts/guards; no Python or Vinix guest executed",
+    "source_commit": "27271ae3cdb5ce21c8a41f8a289e60a34e0fb70b"
+}

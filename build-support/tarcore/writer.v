@@ -103,6 +103,7 @@ pub fn (mut writer Writer) close() { writer.close_checked() or {} }
 // Stream writers have no stdio buffer: surface a close error before publishing.
 pub fn (mut writer Writer) close_checked() ! {
 	if writer.compressed {
+		$if tarstream_fd_only ? { return error('gzip writing is unavailable in a descriptor reader') } $else {
 		if writer.gzip_stream == unsafe { nil } { return }
 		stream := writer.gzip_stream
 		writer.gzip_stream = unsafe { nil }
@@ -111,6 +112,7 @@ pub fn (mut writer Writer) close_checked() ! {
 		if status == C.Z_ERRNO { return os.error_posix() }
 		if status != C.Z_OK { return error('cannot close gzip archive: ${status}') }
 		return
+		}
 	}
 	if !writer.streaming { writer.file.close(); return }
 	if writer.stream_fd < 0 { return }
@@ -123,9 +125,11 @@ pub fn (mut writer Writer) write(data []u8) ! {
 	mut offset := 0
 	for offset < data.len {
 		count := if writer.compressed {
+			$if tarstream_fd_only ? { return error('gzip writing is unavailable in a descriptor reader') } $else {
 			if writer.gzip_stream == unsafe { nil } { return error('gzip archive is closed') }
 			// gzwrite accepts an unsigned length and returns a signed count.
 			int(unsafe { C.gzwrite(writer.gzip_stream, &data[offset], u32(int_min(data.len - offset, 1024 * 1024))) })
+			}
 		} else if writer.streaming {
 			int(unsafe { C.write(writer.stream_fd, &data[offset], usize(data.len - offset)) })
 		} else {

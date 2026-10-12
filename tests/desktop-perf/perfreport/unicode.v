@@ -775,7 +775,7 @@ fn printable(ch rune) bool {
 	return true
 }
 
-fn decimal(ch rune) int {
+pub fn decimal(ch rune) int {
 	for zero in decimal_zeros {
 		if int(ch) >= zero && int(ch) < zero + 10 { return int(ch) - zero }
 	}

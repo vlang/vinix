@@ -30,7 +30,8 @@ fn guest_input_key(paths []string, vlib string) !string {
 }
 
 fn build_guest(argv []string) ! {
-	args := cachecli.arguments(argv, ['--arch', '--sysroot', '--output', '--cc', '--v', '--cache'], [], ['--static'], 0, 0, 'Build the V guest smoke, DNS and X11 commands.\nUsage: build-validation-guest --arch aarch64|x86_64 --output PATH [--sysroot DIR --cc CLANG --v V --cache DIR --static]') or { return error_with_code(err.msg(), 2) }
+	args := cachecli.arguments(argv, ['--arch', '--sysroot', '--output', '--cc', '--v', '--cache',
+		'--source'], ['--define', '--source-input', '--include-dir'], ['--static'], 0, 0, 'Build maintained V guest commands from qualified source inputs.\nUsage: build-validation-guest --arch aarch64|x86_64 --output PATH [--sysroot DIR --cc CLANG --v V --cache DIR --static --source MAIN.v --define NAME --source-input PATH]') or { return error_with_code(err.msg(), 2) }
 	arch := args.required('--arch') or { return error_with_code(err.msg(), 2) }
 	output := os.abs_path(args.required('--output') or { return error_with_code(err.msg(), 2) })
 	if arch !in ['aarch64', 'x86_64'] {
@@ -63,6 +64,10 @@ fn build_guest(argv []string) ! {
 	v := args.value('--v', @VEXE)
 	vroot := os.dir(os.real_path(v))
 	static_link := '--static' in args.options
+	guest_source := os.abs_path(args.value('--source', root + '/tests/native-validation-tools/guest.v'))
+	defines := args.options['--define']
+	extra_inputs := args.options['--source-input']
+	include_dirs := args.options['--include-dir'].map(os.abs_path(it))
 	mut inputs := [@FILE, root + '/tests/native-validation-tools/guest.v',
 		root + '/tests/native-validation-tools/guestvalidation', root + '/build-support/cachecli',
 		root + '/build-support/cachekey', root + '/tools/sourcecommand',
@@ -71,11 +76,18 @@ fn build_guest(argv []string) ! {
 		inputs << sysroot + '/usr/lib/' + name
 	}
 	inputs << sysroot + '/lib/ld-musl-' + arch + '.so.1'
+	if '--source' in args.options { inputs << guest_source }
+	inputs << extra_inputs.map(os.abs_path(it))
+	inputs << include_dirs
 	input_key := guest_input_key(inputs, vroot + '/vlib')!
 	key := sha256.hexhash(input_key + '\n' + checked_command([
 		cc,
 		'--version',
-	], root)! + '\n' + arch + '\nstatic=' + static_link.str())
+	], root)! + '\n' + arch + '\nstatic=' + static_link.str() + if defines.len > 0 {
+		'\ndefines=' + defines.join('\x00')
+	} else {
+		''
+	})
 	cache := os.abs_path(args.value('--cache', os.getenv_opt('VINIX_VALIDATION_GUEST_CACHE') or { os.getenv('HOME') + '/.cache/vinix-validation-guest' }))
 	os.mkdir_all(cache)!
 	cached := cache + '/' + key
@@ -85,15 +97,19 @@ fn build_guest(argv []string) ! {
 		private := sourcecommand.temporary('vinix-validation-guest-')!
 		defer { os.rmdir_all(private) or {} }
 		source := private + '/guest.c'
-		checked_command([v, '-nocache', '-new-compiler', '-os', 'linux', '-arch',
+		mut generate := [v, '-nocache', '-new-compiler', '-os', 'linux', '-arch',
 			if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree',
 			'-enable-globals', '-prod', '-d', 'glibc', '-d', 'no_backtrace', '-d', 'no_segfault_handler',
-			'-o', source, root + '/tests/native-validation-tools/guest.v'], root)!
+			'-o', source]
+		for define in defines { generate << ['-d', define] }
+		generate << guest_source
+		checked_command(generate, root)!
 		binary := private + '/validation-guest'
 		mut flags := [cc, '--target=' + arch + '-linux-musl', '-nostdinc', '-nostdlib', '-isystem',
 			gcc + '/include', '-isystem', sysroot + '/usr/include', '-I',
 			root + '/tools/sourcecommand', '-D_GNU_SOURCE', '-O2', '-fno-stack-protector', '-w',
 			'-no-pie']
+		for directory in include_dirs { flags << ['-I', directory] }
 		if arch == 'aarch64' { flags << ['-isystem', root + '/build-support/aarch64-cc-shim'] }
 		if static_link {
 			flags << '-static'

@@ -35,7 +35,7 @@ case "${1:-}" in
         ;;
 esac
 
-for tool in curl python3 tar xz file clang ld.lld; do
+for tool in curl tar xz file clang ld.lld; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "missing build tool: $tool" >&2
         exit 1
@@ -54,23 +54,7 @@ if [ ! -f "$DOWNLOADS/steam.deb" ]; then
 fi
 rm -rf "$BUILD_DIR/steam-deb"
 mkdir -p "$BUILD_DIR/steam-deb"
-python3 - "$DOWNLOADS/steam.deb" "$BUILD_DIR/steam-deb" <<'EOF'
-import io, sys, tarfile
-from pathlib import Path
-deb = Path(sys.argv[1]).read_bytes()
-out = Path(sys.argv[2])
-assert deb.startswith(b"!<arch>\n"), "not a Debian package"
-offset = 8
-while offset + 60 <= len(deb):
-    header = deb[offset:offset + 60]
-    name = header[0:16].decode().strip().rstrip("/")
-    size = int(header[48:58].decode().strip())
-    payload = deb[offset + 60:offset + 60 + size]
-    if name.startswith(("control.tar", "data.tar")):
-        with tarfile.open(fileobj=io.BytesIO(payload), mode="r:*") as archive:
-            archive.extractall(out / name.split(".")[0])
-    offset += 60 + size + (size & 1)
-EOF
+"$SCRIPT_DIR/build-support/steam/unpack-deb" "$DOWNLOADS/steam.deb" "$BUILD_DIR/steam-deb"
 steam_version="$(sed -n 's/^Version: //p' "$BUILD_DIR/steam-deb/control/control")"
 bootstrap="$BUILD_DIR/steam-deb/data/usr/lib/steam/bootstraplinux_ubuntu12_32.tar.xz"
 if [ ! -f "$bootstrap" ]; then
@@ -117,7 +101,7 @@ client_libraries_amd64=(libglib2.0-0 libxi6 libxrender1 libxrandr2 \
 # Steam's launch scripts are bash and lean on GNU tar, xz, coreutils,
 # findutils and util-linux's getopt; the image's busybox has none of the
 # options they use.
-guest_tools=(bash coreutils tar xz-utils gzip grep sed mawk findutils \
+guest_tools=(bash coreutils tar xz-utils gzip bzip2 grep sed mawk findutils \
     diffutils debianutils util-linux xdg-user-dirs dbus-daemon dbus-x11)
 # Package management, documentation, init scripts and the bits a maintainer
 # script would have generated are not part of a runtime that is never
@@ -158,7 +142,7 @@ find "$ROOT" -type l | while IFS= read -r link; do
         cp "$real" "$link"
     elif [ -d "$real" ]; then
         rm -f "$link"
-        ln -s "$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], os.path.dirname(sys.argv[2])))' "$real" "$link")" "$link"
+        ln -s "$("$SCRIPT_DIR/build-support/steam/relative-link" "$real" "$link")" "$link"
     fi
 done
 
@@ -270,7 +254,7 @@ install -m755 "$SCRIPT_DIR/build-support/steam/steamrt-entry-point" \
 mkdir -p "$HELPERS/steamrt-direct/bin"
 install -m755 "$SCRIPT_DIR/build-support/steam/steam-runtime-launcher-service" \
     "$HELPERS/steamrt-direct/bin/steam-runtime-launcher-service"
-for helper in zenity ldd uname tar; do
+for helper in zenity ldd uname; do
     install -m755 "$SCRIPT_DIR/build-support/steam/$helper" "$HELPERS/$helper"
 done
 "$SCRIPT_DIR/build-support/build-validation-guest" --arch aarch64 --static \
@@ -278,7 +262,9 @@ done
 # Steam's WebUI transport resolves the PID behind its loopback socket through
 # lsof -P -F upnR -i TCP@127.0.0.1:<port>. The BusyBox applet has different
 # output and cannot perform the required socket lookup.
-install -m755 "$SCRIPT_DIR/build-support/steam/lsof" "$STAGING/usr/bin/lsof"
+"$SCRIPT_DIR/build-support/steam/build-guest" --arch aarch64 --static --output "$BUILD_DIR/steam-guest-helpers"
+install -m755 "$BUILD_DIR/steam-guest-helpers" "$STAGING/usr/bin/lsof"
+install -m755 "$BUILD_DIR/steam-guest-helpers" "$HELPERS/tar"
 # Valve's runtime scripts start with #!/bin/bash. The desktop build installs
 # this only into an image that has no bash of its own.
 install -m755 "$SCRIPT_DIR/build-support/steam/bash" "$STAGING/usr/libexec/vinix-steam/bash"
