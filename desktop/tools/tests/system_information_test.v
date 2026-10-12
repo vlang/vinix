@@ -209,7 +209,7 @@ fn system_information_test_release_sources(s SystemInformationSources) {
 }
 
 fn system_information_test_write_sources(s SystemInformationSources) ! {
-	os.write_file(s.version, 'Linux version test-vinix\n')!
+	os.write_file(s.version, 'Vinix version test-vinix\n')!
 	os.write_file(s.cpu, 'processor: 0\nmodel name: Test CPU\nCPU architecture: 8\nFeatures: fp asimd\n')!
 	os.write_file(s.memory, 'MemTotal: 16384 kB\nMemAvailable: 8192 kB\nCached: 1024 kB\n')!
 	os.write_file(s.uptime, '123.45 111.00\n')!
@@ -286,7 +286,7 @@ fn test_system_information_refresh_collects_actual_sources_and_replaces_snapshot
 	mut app := SystemInformationApp{}
 	defer { app.close_app() }
 	app.refresh_sources(sources)
-	assert system_information_test_has(app.sections[0], 'system_information.kernel', 'Linux version test-vinix')
+	assert system_information_test_has(app.sections[0], 'system_information.kernel', 'Vinix version test-vinix')
 	assert system_information_test_has(app.sections[0], 'system_information.cpu', 'Test CPU')
 	assert system_information_test_has(app.sections[0], 'system_information.memory_total', '16384 kB')
 	assert system_information_test_has(app.sections[0], 'system_information.uptime', '123.45')

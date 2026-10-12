@@ -31,6 +31,7 @@ import event.eventstruct
 import memory.mmap
 import pagecache
 import numa
+import net as utsnet
 import security
 import time
 import pager
@@ -669,8 +670,10 @@ fn (this &ProcFSResource) contents() string {
 			return lib.finish_text(*uptime_builder)
 		}
 		.version {
+			// Match uname's host identity and Linux-compatible UTS namespaces.
+			sysname := if utsnet.in_own_uts_namespace() { 'Linux' } else { 'Vinix' }
 			// Freed by read(), as every generated text is.
-			text := 'Linux version ${uname_release} (vinix) #1 SMP\n' @[freed]
+			text := '${sysname} version ${uname_release} (vinix) #1 SMP\n' @[freed]
 			return text
 		}
 		.cmdline {
