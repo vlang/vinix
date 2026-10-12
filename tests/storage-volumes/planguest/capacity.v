@@ -39,6 +39,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 			pool_batch_boot_check(parent)
 			pool_boot_check()
 			pool_growth_boot_check()
+			pool_members_batch_boot_check()
 			check(status(c'/dev/mapper/vinix14').disk_id == status(parent).disk_id
 				&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id,
 				c'capacity boot maps the correct physical disks')
@@ -100,7 +101,9 @@ fn physical_capacity_phase(parent &char, other &char) {
 		first := status(c'/dev/mapper/vinix2').generation
 		old := C.open(c'/dev/mapper/vinix2', C.O_RDONLY)
 		check(old >= 0, c'hold old descriptor across capacity planning')
-		pool_add(c'/root/saved.vset', c'4', c'0', c'16777216', c'16781312', c'4096', 0)
+		pool_members_batch(c'/root/saved.vset', c'4', c'0', c'16777216', c'16781312', nil, nil, nil, false, true, 0, &output[0])
+		check(contains(&output[0], c'request=0 disk=0 action=add start=16777216 end=16781312 alignment=4096'), c'preview admission on newly adopted physical tail')
+		pool_members_batch(c'/root/saved.vset', c'4', c'0', c'16777216', c'16781312', nil, nil, nil, false, false, 0, nil)
 		pool_expand_batch(c'/root/saved.vset', c'4', c'0', c'25165824', nil, nil, true, 0, &output[0])
 		check(contains(&output[0], c'action=expand start=16777216 previous_end=16781312 end=25165824 alignment=4096'), c'preview adopted tail eligibility')
 		pool_expand_batch(c'/root/saved.vset', c'4', c'0', c'25165824', nil, nil, false, 0, nil)

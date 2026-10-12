@@ -665,6 +665,54 @@ detects unlisted live conflicts, and application retains kernel extent
 protection. Spanning, striping, RAID, filesystem resizing and encryption remain
 separate work. See [pool qualification](../tests/storage-volumes/pool-bundle.md).
 
+## Atomic pool membership batches
+
+```sh
+vinix-volume pool-preview-add-batch /root/layout.vset 3 0 6291456 6295552 4096 1 6291456 6303744 4096
+vinix-volume pool-add-batch /root/layout.vset 3 0 6291456 6295552 4096 1 6291456 6303744 4096
+vinix-volume pool-preview-remove-batch /root/layout.vset 3 0 1
+vinix-volume pool-remove-batch /root/layout.vset 3 0 1
+```
+
+`pool-add-batch BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES
+[...]` adds 1–64 distinct enrolled disks to one pool in a single atomic saved
+bundle publication. Numeric arguments are unsigned decimal; pool and disk
+indices are below 64. Every window must satisfy the existing sector, alignment,
+saved-capacity, disjoint-region and unambiguous-identity rules. Existing members
+must match their complete saved start, end and alignment. They report `keep`
+and retain their original position; new members report `add` and append in
+request order. A reverse-order retry never changes allocation priority.
+
+`pool-remove-batch BUNDLE POOL_ID DISK_INDEX [...]` removes 1–64 distinct enrolled
+members together. Remaining regions keep their relative order and disk indices.
+An absent member reports `keep`, allowing a complete retry after removal;
+an absent pool is also a successful all-keep removal. Missing enrolled disks
+and repeated indices fail. Removal preserves every desired mapping, including
+rows in removed regions, and cannot detach live views or their descriptors.
+
+Both planners use a private candidate. A later invalid window, conflicting
+existing member, overlapping region, ambiguous identifier or full table changes
+neither the original bundle nor caller results and emits no partial actions.
+All-keep additions work at the full 64-region limit. Additions and removals
+preserve identities, capacities, mapping rows/modes and unrelated pools.
+Removing the last region returns to the existing version-1 bundle format;
+otherwise existing version-2 encoding is retained.
+
+`pool-preview-add-batch` and `pool-preview-remove-batch` use the same complete
+planners and report actions in request order without publication, a temporary
+file, device probes or a writer lock. Reports begin only after every request
+passes. Publication holds the pinned directory lock from source read through
+report flushing. Every retry, including all-keep, writes, fsyncs, atomically
+renames and fsyncs the directory. Before rename, publication failure preserves
+the old file; after rename, the complete new membership may already be visible.
+Buffered output failure returns an error even after successful publication.
+Inspect saved state or repeat the same batch to complete durability.
+
+Membership uses saved disk geometry and provides offline allocation eligibility.
+Physical capacity adoption, mapping allocation/growth and live preflight/replay
+remain explicit separate operations. Single-member commands retain their
+existing behavior. See [membership batch qualification](../tests/storage-volumes/pool-members-batch.md).
+
 ## Pool expansion and mapping growth
 
 ```sh

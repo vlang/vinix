@@ -48,7 +48,7 @@ regions restores the exact configured version-2 file.
 
 Each of 200 warmup and 200 measured cycles launches twenty utility processes:
 save-set, unchanged plan-grow, plan-preview-capacity-batch and plan-capacity-batch,
-two pool-add commands,
+pool-preview-add-batch and pool-add-batch,
 pool-preview-expand-batch, pool-expand-batch, pool-space,
 pool-preview-batch, pool-allocate-batch,
 pool-preview-grow-batch, pool-grow-batch,

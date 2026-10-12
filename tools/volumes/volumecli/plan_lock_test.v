@@ -42,6 +42,13 @@ fn test_directory_lock_excludes_all_saved_state_writers_but_preserves_readonly_i
 	window := SpaceWindow{start: 4096, end: 16384, alignment: 4096}
 	mut batch := PoolBatch{count: 1}
 	batch.rows[0] = Request{slot: 20, length: 4096}
+	mut members := PoolMembersBatch{count: 1}
+	members.rows[0] = region
+	assert members_batch_pool_plan(path.str, 4, &members, false, false) == 1
+	assert members_batch_pool_plan(path.str, 4, &members, false, true) == 0
+	members.rows[0] = PoolRegion{pool: 3, disk: 0}
+	assert members_batch_pool_plan(path.str, 3, &members, true, false) == 1
+	assert members_batch_pool_plan(path.str, 3, &members, true, true) == 0
 	assert edit_bundle_plan(path.str, 0, &row, false) == 1
 	assert grow_bundle_plan(path.str, 2, 8192) == 1
 	assert enroll_bundle_disk(path.str, c'/unused') == 1

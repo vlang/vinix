@@ -48,7 +48,7 @@ changing the bundle. Cleanup restores exact baseline bytes.
 
 Each of 200 warmup and 200 measured cycles now executes 20 utility processes:
 save-set, unchanged plan-grow, plan-preview-capacity-batch and plan-capacity-batch,
-two pool-add commands,
+pool-preview-add-batch and pool-add-batch,
 pool-preview-expand-batch and pool-expand-batch,
 pool-space, two-request pool-preview-batch and pool-allocate-batch,
 pool-preview-grow-batch and pool-grow-batch,

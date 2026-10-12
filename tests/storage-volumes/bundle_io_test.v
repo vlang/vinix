@@ -621,3 +621,99 @@ fn test_pool_expansion_batch_preview_and_publication_detect_buffered_output_fail
 		assert decoded.windows[0].window.end == if preview { u64(8192) } else { u64(16384) }
 	}
 }
+
+fn members_io_fixture(mut set PlanSet, present bool) {
+	for disk in 0 .. 2 {
+		mut plan := Plan{count: 1, key: DiskKey{bytes: 32768, sector: if disk == 0 { u64(512) } else { u64(4096) }, kind: 1}}
+		plan.key.id[0] = u8(disk + 1)
+		plan.rows[0] = Request{slot: u32(disk + 2), length: 8192, flags: u64(disk)}
+		assert append_plan(mut set, &plan)
+		other := PoolRegion{pool: 4, disk: u32(disk), window: SpaceWindow{start: 16384, end: 24576, alignment: 4096}}
+		assert bundle_pool_add(mut set, &other)
+		if present {
+			row := PoolRegion{pool: 3, disk: u32(disk), window: SpaceWindow{start: 8192, end: 12288, alignment: 4096}}
+			assert bundle_pool_add(mut set, &row)
+		}
+	}
+}
+
+fn test_pool_membership_batches_and_retries_use_shared_atomic_publication_under_every_fault() {
+	work := os.join_path(os.temp_dir(), 'vinix-members-batch-io-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	mut batch := PoolMembersBatch{count: 2}
+	for i in 0 .. 2 { batch.rows[i] = PoolRegion{pool: 3, disk: u32(1 - i), window: SpaceWindow{start: 8192, end: 12288, alignment: 4096}} }
+	for remove in [false, true] {
+		for retry in [false, true] {
+			for mode in 1 .. 7 {
+				mut set := PlanSet{}
+				members_io_fixture(mut set, remove)
+				bundle_io = BundleIO{}
+				assert publish_bundle(path.str, &set)
+				mut expected := set
+				mut outcome := PoolMembersResults{}
+				assert bundle_pool_members_batch(mut expected, 3, &batch, remove, mut outcome)
+				if retry { assert members_batch_pool_plan(path.str, 3, &batch, remove, false) == 0 }
+				original := os.read_bytes(path)!
+				bundle_io = BundleIO{mode: mode}
+				assert members_batch_pool_plan(path.str, 3, &batch, remove, false) == if mode == 1 { 0 } else { 1 }
+				assert bundle_io.closes == 2 && bundle_io.writes > 0 && os.ls(work)!.len == 1
+				current := os.read_bytes(path)!
+				mut decoded := PlanSet{}
+				assert decode_bundle(current.data, current.len, mut decoded)
+				if mode == 1 || mode == 4 {
+					assert decoded == expected && (current == original) == retry
+					assert bundle_io.renames == 1 && bundle_io.flushes == 2
+				} else { assert current == original }
+				bundle_io = BundleIO{}
+				assert members_batch_pool_plan(path.str, 3, &batch, remove, false) == 0
+				assert bundle_io.renames == 1 && bundle_io.flushes == 2 && bundle_io.closes == 2 && bundle_io.writes > 0
+				completed := os.read_bytes(path)!
+				bundle_io = BundleIO{mode: mode}
+				assert members_batch_pool_plan(path.str, 3, &batch, remove, true) == 0
+				assert os.read_bytes(path)! == completed && bundle_io == BundleIO{mode: mode}
+				batch.rows[1].disk = 2
+				assert members_batch_pool_plan(path.str, 3, &batch, remove, false) == 1
+				assert os.read_bytes(path)! == completed && bundle_io == BundleIO{mode: mode}
+				batch.rows[1].disk = 0
+			}
+		}
+	}
+}
+
+fn test_pool_membership_batch_previews_and_publication_detect_buffered_stdout_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-members-batch-output-${os.getpid()}')
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/saved.vset'
+	mut batch := PoolMembersBatch{count: 2}
+	for disk in 0 .. 2 { batch.rows[disk] = PoolRegion{pool: 3, disk: u32(disk), window: SpaceWindow{start: 8192, end: 12288, alignment: 4096}} }
+	for remove in [false, true] {
+		for preview in [false, true] {
+			mut set := PlanSet{}
+			members_io_fixture(mut set, remove)
+			bundle_io = BundleIO{}
+			assert publish_bundle(path.str, &set) && C.fflush(C.stdout) == 0
+			original := os.read_bytes(path)!
+			child := C.fork(); assert child >= 0
+			if child == 0 {
+				fd := C.open(c'/dev/null', C.O_RDONLY)
+				if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }
+				C.close(fd)
+				mut buffer := [4096]char{}
+				if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+				C._exit(if members_batch_pool_plan(path.str, 3, &batch, remove, preview) == 1 { 0 } else { 4 })
+			}
+			mut code := i32(-1)
+			assert C.waitpid(child, &code, 0) == child && code == 0
+			current := os.read_bytes(path)!
+			assert (current == original) == preview
+			mut expected := set
+			mut result := PoolMembersResults{}
+			if !preview { assert bundle_pool_members_batch(mut expected, 3, &batch, remove, mut result) }
+			mut decoded := PlanSet{}
+			assert decode_bundle(current.data, current.len, mut decoded) && decoded == expected
+		}
+	}
+}

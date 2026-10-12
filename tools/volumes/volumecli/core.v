@@ -65,6 +65,7 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES\n')
 	C.printf(c'       vinix-volume plan-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [DISK_INDEX DEVICE EXPECTED_BYTES ...]\n       vinix-volume plan-preview-capacity-batch BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES [DISK_INDEX DEVICE EXPECTED_BYTES ...]\n')
 	C.printf(c'       vinix-volume pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume pool-remove BUNDLE POOL_ID DISK_INDEX\n       vinix-volume pool-space BUNDLE POOL_ID\n       vinix-volume pool-allocate BUNDLE POOL_ID SLOT LENGTH_BYTES [ro]\n')
+	C.printf(c'       vinix-volume pool-add-batch BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES [...]\n       vinix-volume pool-preview-add-batch BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES [...]\n       vinix-volume pool-remove-batch BUNDLE POOL_ID DISK_INDEX [...]\n       vinix-volume pool-preview-remove-batch BUNDLE POOL_ID DISK_INDEX [...]\n')
 	C.printf(c'       vinix-volume pool-expand BUNDLE POOL_ID DISK_INDEX END_BYTES\n       vinix-volume pool-grow BUNDLE POOL_ID SLOT LENGTH_BYTES\n')
 	C.printf(c'       vinix-volume pool-allocate-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       vinix-volume pool-preview-batch BUNDLE POOL_ID SLOT LENGTH_BYTES MODE [SLOT LENGTH_BYTES MODE ...]\n       MODE is rw or ro; batches contain 1..64 requests\n')
 	C.printf(c'       vinix-volume pool-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [SLOT LENGTH_BYTES ...]\n       vinix-volume pool-preview-grow-batch BUNDLE POOL_ID SLOT LENGTH_BYTES [SLOT LENGTH_BYTES ...]\n')
@@ -74,6 +75,32 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'pool-add-batch') == 0
+			|| C.strcmp(argv[1], c'pool-preview-add-batch') == 0
+			|| C.strcmp(argv[1], c'pool-remove-batch') == 0
+			|| C.strcmp(argv[1], c'pool-preview-remove-batch') == 0) {
+			remove := C.strcmp(argv[1], c'pool-remove-batch') == 0 || C.strcmp(argv[1], c'pool-preview-remove-batch') == 0
+			width := if remove { 1 } else { 4 }
+			if argc < 4 + width || argc > 4 + width * 64 || (argc - 4) % width != 0 { return usage() }
+			pool := decimal(argv[3]) or { return usage() }
+			if pool >= 64 { return usage() }
+			mut batch := &PoolMembersBatch(C.alloca(sizeof(PoolMembersBatch)))
+			*batch = PoolMembersBatch{count: (argc - 4) / width}
+			for i in 0 .. batch.count {
+				at := 4 + width * i
+				disk := decimal(argv[at]) or { return usage() }
+				if disk >= 64 { return usage() }
+				batch.rows[i] = PoolRegion{pool: u32(pool), disk: u32(disk)}
+				if !remove {
+					window := SpaceWindow{start: decimal(argv[at + 1]) or { return usage() },
+						end: decimal(argv[at + 2]) or { return usage() }, alignment: decimal(argv[at + 3]) or { return usage() }}
+					if !space_window_valid(window) { return usage() }
+					batch.rows[i].window = window
+				}
+			}
+			preview := C.strcmp(argv[1], c'pool-preview-add-batch') == 0 || C.strcmp(argv[1], c'pool-preview-remove-batch') == 0
+			return members_batch_pool_plan(argv[2], u32(pool), batch, remove, preview)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'plan-capacity-batch') == 0 || C.strcmp(argv[1], c'plan-preview-capacity-batch') == 0) {
 			if argc < 6 || argc > 195 || (argc - 3) % 3 != 0 { return usage() }
 			mut batch := &CapacityBatch(C.alloca(sizeof(CapacityBatch)))

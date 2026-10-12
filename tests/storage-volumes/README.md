@@ -106,6 +106,15 @@ races, all publisher faults, equal-capacity retries and buffered stdout failure.
 Guests preview/publish a mixed keep/adopt batch after physical growth and verify
 four-boot persistence. See [capacity batch qualification](capacity-batch.md).
 
+Pool membership batches check 4096 addition and 4096 removal cases against an
+independent bounds/sector/overlap oracle, retain original member priority and
+roll back all state after a later failure. Matching additions and absent removals
+retry through every publisher fault. Both previews remain available under writer
+locks and preserve saved bytes. Host tests cover maximum 260/68-argument CLIs,
+corrupt/symlink sources, version transitions and buffered output failure. Guests
+check mixed edits, first fit, desired mappings and persistent reverse-order
+retries. See [membership batch qualification](pool-members-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -181,7 +190,7 @@ extent, which remains readable after reboot at the saved larger capacity.
 The fixture measures slab/large retention over 200 cycles after 200 warmup
 cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
 mapping capacity, previews/verifies/republishes both unchanged physical capacities,
-adds two pool members,
+previews/publishes admission of two pool members,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
 batch, previews/publishes a two-mapping growth batch, checks/removes the scratch
 mappings, enrolls/forgets an empty offline

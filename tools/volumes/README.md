@@ -84,6 +84,14 @@ the same verification without publication or a writer lock. Equal-capacity
 retries still complete publication and both flushes. See
 [atomic capacity adoption rules](../../docs/storage-volumes.md#atomic-physical-capacity-adoption-batches).
 
+`pool-add-batch BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES
+[...]` and `pool-remove-batch BUNDLE POOL_ID DISK_INDEX [...]` atomically change
+1–64 pool members together. Matching additions preserve member priority; absent
+removals support durable retries. A later failure discards the entire edit.
+`pool-preview-add-batch` and `pool-preview-remove-batch` perform complete planning
+without a writer lock or publication. See
+[membership batch rules](../../docs/storage-volumes.md#atomic-pool-membership-batches).
+
 `pool-add BUNDLE POOL_ID DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES`
 enrolls an eligible region in a persistent allocation pool. `pool-space BUNDLE
 POOL_ID` reports each member and full-width aggregate capacity. `pool-allocate
