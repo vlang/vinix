@@ -89,6 +89,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := cookie_builtin_types(info.name, info.meta, selector) { return types }
 	if types := webkit_builtin_types(info.name, info.meta, selector) { return types }
 	if types := http_url_builtin_types(info.name, info.meta, selector) { return types }
+	if types := request_types(info.name, info.meta, selector) { return types }
 	if info.name == 'NSMutableDictionary' && !info.meta && selector == 'setObject:forKey:' { return 'v32@0:8@16@24' }
 	if info.name != 'NSObject' { return none }
 	return match selector {

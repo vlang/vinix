@@ -3127,17 +3127,70 @@ only. Evidence is under `build/ios/fortnite/webview-checks`. Full regression
 remains unpassed, the five published runners are unchanged, and game entry,
 rendering and gameplay remain unverified.
 
+`NSURLRequest` and `NSMutableURLRequest` now implement public request data in V.
+Factories and initializers accept the existing HTTP/file URL objects and nil
+URLs, including the mixed integer/floating-point cache-policy/timeout arguments.
+Defaults match installed Foundation: GET, a 60-second timeout, protocol cache
+policy, and enabled cellular, expensive-network, constrained-network and cookie
+policies. Finite timeouts preserve zero and negative values. Mutable requests
+store the measured boolean, cache, service, attribution and DNSSEC policy fields.
+These fields describe a request; they do not initiate network operations.
+
+Copying an immutable request retains it. Copying a mutable request creates a
+separate mutable request, as observed on this Mac; `mutableCopy` also creates a
+mutable request. Header dictionaries are independent between copies. Header
+lookups fold ASCII case, replacement preserves the supplied field spelling,
+append joins values with a comma, and nil removes a field. Header getters return
+independent mutable snapshots. Bulk setters skip non-string entries. Values,
+custom methods and cookie partition strings retain their inputs, including
+mutable strings, matching the typed native observations despite copy property
+declarations. GET, HEAD, POST, PUT, DELETE, CONNECT and PATCH normalize their
+method spelling; other methods preserve it. Bodies copy mutable NSData inputs
+and retain immutable data. A nil body-stream setter clears the body.
+
+Both reference records are 24 bytes, with native private ivar metadata at
+offsets 8 and 16. This is a macOS Foundation measurement, not a private device
+iOS ABI measurement. Owned public state stays outside those reserved,
+zero-filled slots. Destruction releases all six object references and frees the
+state, including after class changes and caller-storage destruction. Header
+replacement acquires both arguments before retiring old slots, so a value may
+alias the key being replaced.
+
+The profile supports 128 fields, 256-byte ASCII field names and 64 KiB strings.
+Field names must remain unchanged after insertion. Embedded NUL, CR and LF are
+rejected; cache/service/attribution values are limited to the declared enum
+profile. Request equality/hash, coding, reinitialization, private CFNetwork
+bridges, nonnil body streams and URL loading remain unimplemented.
+
+All 60 programs build and 72 original generated C streams restore to their
+recorded hashes. Twelve host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes fourteen Objective-C programs and 33 Swift/loader programs. Request
+fixtures compare the native data behavior, exercise 100 release cycles after
+class changes, check caller storage and run nine explicit rejection children.
+The additional header key-to-value alias case passes both sanitizer modes.
+Generated-code checks verify fixed state allocation, six-reference retirement
+and appended-text cleanup. Earlier compile trials and their actual statuses
+remain preserved.
+
+Fortnite passes both request class imports and exits with status 1 before entry
+at EOS's required `_OBJC_CLASS_$_NSValue` import. Native metadata shows an
+8-byte NSObject subclass with generic byte/type, pointer, nonretained-object,
+range and geometry value APIs. The next-class probe constructs no values or
+application objects. Evidence is under `build/ios/fortnite/request-checks`.
+Full regression remains unpassed, the five published runners are unchanged,
+and game entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,423 | 736 | 80 |
-| EOSSDK | 640 | 22 | 18 |
+| Fortnite executable | 1,425 | 734 | 80 |
+| EOSSDK | 642 | 20 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,178 | 819 | 121 |
+| All images | 2,182 | 815 | 121 |
 
-The C++/GLES/Text variant reports 2,191 resolved imports, 806 unresolved strong
+The C++/GLES/Text variant reports 2,195 resolved imports, 802 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

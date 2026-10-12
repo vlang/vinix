@@ -104,6 +104,8 @@ mut:
 	webkit_array bool // Read-only script list; its contents change through its controller.
 	webview &WebViewState = unsafe { nil }
 	webview_owned bool
+	request &URLRequestState = unsafe { nil }
+	request_owned bool
 	web_history bool
 	web_history_array bool
 	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
@@ -247,7 +249,7 @@ fn objc_start() {
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
-        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSUserDefaults',
+        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
@@ -271,6 +273,7 @@ fn objc_start() {
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
 			'NSMutableData' { ios_runtime.names['NSData'] }
+			'NSMutableURLRequest' { ios_runtime.names['NSURLRequest'] }
 			'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			else { ios_runtime.names['NSObject'] }
 		}
@@ -288,6 +291,7 @@ fn objc_start() {
 			'NSError' { u32(sizeof(AbiNSError)) }
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
+			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
 			'NSLayoutAnchor', 'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { u32(sizeof(AbiLayoutAnchor)) }
 			else { webkit_size(name) }
@@ -313,6 +317,10 @@ fn objc_start() {
 	mut cookie_class := ios_runtime.classes[ios_runtime.names['NSHTTPCookie']] or { panic('iOS: missing cookie class') }
 	cookie_class.ivars['_cookiePrivate'] = &ObjIvar{name:'_cookiePrivate'.clone(), types:'@"NSHTTPCookieInternal"'.clone(), offset:8, size:8}
 	webkit_metadata()
+	mut request_class := ios_runtime.classes[ios_runtime.names['NSURLRequest']] or { panic('iOS: missing request class') }
+	for i, pair in [['_internal', '@"NSURLRequestInternal"']!, ['_cookiePartitionIdentifier', '@"NSString"']!]! {
+		request_class.ivars[pair[0]] = &ObjIvar{name:pair[0].clone(), types:pair[1].clone(), offset:i64(8 + i * 8), size:8}
+	}
 }
 
 fn read64(address u64) u64 { return unsafe { *(&u64(address)) } }
@@ -417,6 +425,7 @@ fn objc_new(cls u64) u64 {
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
+	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
 	name := webkit_object_name(object)
 	if name == 'WKWebView' { webview_initialize(object, ObjRect{}, 0); return object }
 	if name == 'WKWebsiteDataStore' { panic('iOS: use WebKit data store factories') }

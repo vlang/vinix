@@ -98,6 +98,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if cookie_dispatch(object, selector, mut frame) { return true }
 	if webkit_dispatch(object, selector, mut frame) { return true }
 	if http_url_dispatch(object, selector, mut frame) { return true }
+	if request_dispatch(object, selector, mut frame) { return true }
 	if image_dispatch(object, selector, mut frame) { return true }
 	if accessibility_dispatch(object, selector, mut frame) { return true }
 	if selector == 'self' { return true }
