@@ -148,6 +148,26 @@ refresh, update-all, rollback, launch, progress and recent failure output. A run
 mutation prevents normal window close. Mutations require administrator access;
 there is no setuid service or automatic privilege escalation.
 
+The Updates filter and `vinix-package updates` use the same complete dependency
+resolution as `review upgrade`. They show runtime/data changes even when the
+application's version stays unchanged, dependencies added or removed by an
+update, same-version manifest/key changes and any version change required by
+organization pins. Planned versions satisfy the full set of installed roots;
+incompatible newer versions and another publisher's replacement of an installed
+identity are not advertised as updates. Signed index expiry/sequence renewal
+alone does not advertise an application update.
+
+Each pending change offers **Review updates**, which reviews the complete
+upgrade rather than making a dependency an explicit installation root. Repairing
+an unchanged implicit dependency is also unavailable in Software; use **Update
+all** to maintain it with its applications. Dependency removals remain visible
+until the reviewed upgrade is applied. If resolution fails, Software shows
+**Updates unavailable** with the resolver's reason and retains installed versions
+and provenance. The `updates` CLI also returns a failure diagnostic. Catalog
+entries for new applications show publisher metadata and still require full
+installation review. Reading the view holds a package reader lock and neither
+downloads objects nor activates a generation.
+
 `vinix-package run ID [ABSOLUTE_DOCUMENT...]` executes as an ordinary user through
 `vinix-sandbox`, failing closed if confinement is unavailable. Apps have private
 data, temporary directories and Wine prefixes. Package/runtime paths come from
@@ -274,6 +294,11 @@ revocation with corrupt metadata, key rotation, mirror changes, legacy expiry
 migration, retained replay/equivocation floors after empty refresh, and recovery
 from history published ahead of the catalog. Unsafe configuration and predictable
 temporary-file symlinks are also covered.
+Software view fixtures additionally check dependency-only upgrades, new/removed
+dependencies, constrained version selection, policy/key changes, blocked plans
+and retained publisher ownership. UI checks exercise complete upgrade review
+from each pending row and prevent accidental dependency-root promotion; allocator
+checks cover redraw, decoded view replacement and repeated blocked-plan status.
 The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
 for signed installation, the root-to-account handoff, literal documents,
 user-owned data, publisher revocation and uninstall. Its sandbox substitute
@@ -312,7 +337,8 @@ The fixture checks ordinary identity, literal arguments, private-data writes,
 hidden host paths, runtime tamper refusal, missing-library diagnostics, rollback
 and removal of the unused runtime with personal data preserved. It also checks
 CLI enrollment/revocation, launch/rollback denial after revocation, replay refusal
-after an empty refresh, and re-enrollment without changing installed state. It
+after an empty refresh, re-enrollment without changing installed state, and a
+runtime-only update appearing in both the Software JSON view and CLI Updates. It
 qualifies the loader/package contract; individual upstream applications and graphics
 services still require their own coverage.
 

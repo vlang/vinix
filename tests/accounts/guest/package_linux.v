@@ -141,7 +141,15 @@ fn qualify_package_linux(mut t Test) ! {
 	latest_index := os.read_file(repository + '/index.json')!
 	latest_signature := os.read_file(repository + '/index.sig')!
 	package_success(['update'])!
+	updates := json2.decode[pkgcore.SoftwareView](package_success(['view'])!)!
+	assert updates.update_error == '' && updates.rows.filter(it.updatable).map(it.id) == [runtime.id]
+	assert updates.rows.any(it.id == runtime.id && it.kind == 'runtime' && it.version == '1.1.0'
+		&& it.installed_version == '1.0.0' && it.update_action == 'update' && it.public_key == key)
+	update_row := json2.decode[pkgcore.SoftwareRow](package_success(['--json', 'updates'])!)!
+	assert update_row.id == runtime.id && update_row.updatable
 	reviewed_package_operation('upgrade', [])!
+	assert package_success(['--json', 'updates'])!.trim_space() == ''
+	t.say('PACKAGE UPDATES runtime-only resolved-version complete-closure PASS')
 	missing := run(['/usr/bin/vinix-package', 'run', application.id], '', none, none)
 	assert missing.status == 127 && missing.output.contains('libfixture.so.1'), missing.output
 	reviewed_package_operation('rollback', [])!

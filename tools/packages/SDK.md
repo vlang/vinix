@@ -229,11 +229,27 @@ cache is refused until refreshed. The administrator owns this local history;
 it is not a hardware trust anchor. See the
 [administration and recovery contract](../../docs/application-distribution.md#trust-and-configuration).
 
-`view` emits one `{format:1,generation,architecture,offline,catalog_error,rows}`
+`view` emits one `{format:1,generation,architecture,offline,catalog_error,update_error,rows}`
 JSON object. Rows include ID/name/description, available/installed version, target,
 kind, repository/key, license/proprietary/firmware flags, permissions, explicit
-install/update flags and policy diagnostic. Expired/missing catalogs set
-`catalog_error`; installed rows remain visible. `status` emits format-1 installed
+install/update flags and policy diagnostic. Pending rows include `update_action`
+(`install`, `update`, `remove`; otherwise empty), with `updatable:true`. They
+come from one complete `upgrade` resolution and include runtime/data additions,
+updates and removals, even if no application version increases. `version` is the
+planned target; removals retain the installed version/provenance. Constraints,
+policy and installed publisher ownership determine this plan. Manifest/key
+changes and pin-required downgrades also count; index sequence renewal alone
+does not. Call `review upgrade`, then `apply` with that review to maintain this
+whole set. Installing an individual dependency makes it an explicit root and
+has different semantics.
+
+Expired/missing catalogs set `catalog_error`; resolution failures set
+`update_error`, leave all update flags false, and retain installed metadata.
+`updates` returns nonzero for either error, so an empty successful result means
+no advertised package changes. New catalog applications show available publisher
+metadata; full installation resolution occurs during review. The view is read
+under a shared package lock and rejects more than 4096 rows or 8 MiB of encoded
+metadata. `status` emits format-1 installed
 state; `plan` emits `{requested,packages}`; `--json search/info/updates` emits one
 row per line. Consumers ignore additional fields and reject unknown formats.
 Success is exit 0; failures are nonzero with stderr diagnostics. Human progress

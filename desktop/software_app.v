@@ -30,6 +30,7 @@ struct SoftwareRow {
 	permissions       []string
 	requested         bool
 	updatable         bool
+	update_action     string
 	diagnostic        string
 }
 
@@ -39,6 +40,7 @@ struct SoftwareView {
 	architecture  string
 	offline       bool
 	catalog_error string
+	update_error  string
 	rows          []SoftwareRow
 	launch_user   string
 }
@@ -51,6 +53,7 @@ mut:
 	output          []u8
 	status          string
 	catalog_error   string
+	update_error    string
 	selected        int = -1
 	scroll          int
 	page_rows       int = 10
@@ -99,6 +102,12 @@ fn (mut a SoftwareApp) set_status(text string) {
 	a.status = next
 }
 
+fn (mut a SoftwareApp) set_update_status() {
+	text := 'Updates unavailable: ' + a.update_error
+	a.set_status(text)
+	unsafe { text.free() }
+}
+
 fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	if a.worker != unsafe { nil } { return }
 	if C.access(&char(a.service_path.str), C.X_OK) != 0 {
@@ -137,6 +146,7 @@ fn software_free_row(row SoftwareRow) {
 		row.public_key.free()
 		row.license.free()
 		row.diagnostic.free()
+		row.update_action.free()
 		for permission in row.permissions { permission.free() }
 		(&array(&row.permissions)).free()
 	}
@@ -173,6 +183,7 @@ fn (mut a SoftwareApp) load_view() {
 			view.rows.free()
 			view.architecture.free()
 			view.catalog_error.free()
+			view.update_error.free()
 			view.launch_user.free()
 		}
 		a.set_status('Unsupported package service response')
@@ -187,21 +198,27 @@ fn (mut a SoftwareApp) load_view() {
 		view.rows.free()
 		view.architecture.free()
 		a.catalog_error.free()
+		a.update_error.free()
 	}
 	a.catalog_error = view.catalog_error
+	a.update_error = view.update_error
 	unsafe { a.launch_label.free() }
 	a.launch_label = if view.launch_user == '' { 'Launch' } else { 'Launch as ' + view.launch_user }
 	unsafe { view.launch_user.free() }
 	a.offline = view.offline
 	a.selected = -1
 	a.filter_rows()
-	a.set_status(if a.catalog_error.len > 0 {
-		a.catalog_error
-	} else if a.offline {
-		'Offline mode: verified caches and local repositories are available.'
+	if a.catalog_error.len > 0 {
+		a.set_status(a.catalog_error)
+	} else if a.update_error.len > 0 {
+		a.set_update_status()
 	} else {
-		'Select an application to review its publisher, license and permissions.'
-	})
+		a.set_status(if a.offline {
+			'Offline mode: verified caches and local repositories are available.'
+		} else {
+			'Select an application to review its publisher, license and permissions.'
+		})
+	}
 }
 
 fn (mut a SoftwareApp) clear_review() {
@@ -434,6 +451,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 				a.review_selected = a.review_scroll + row
 			} else if a.review.len == 0 && a.scroll + row < a.matching.len {
 				a.selected = a.matching[a.scroll + row]
+				if a.rows[a.selected].diagnostic.len > 0 { a.set_status(a.rows[a.selected].diagnostic) }
 			}
 			return
 		}
@@ -464,6 +482,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 			a.clear_review()
 			a.filter = 2
 			a.filter_rows()
+			if a.update_error.len > 0 { a.set_update_status() }
 		}
 		'software.refresh' {
 			a.clear_review()
@@ -502,12 +521,20 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		'software.install', 'software.remove' {
 			if a.selected < 0 || a.selected >= a.rows.len { return }
 			row := a.rows[a.selected]
+			if event_id == 'software.install' && row.updatable {
+				a.begin_review('upgrade', [])
+				return
+			}
 			if event_id == 'software.install' && (row.diagnostic.len > 0 || a.catalog_error.len > 0) {
 				a.set_status(if row.diagnostic.len > 0 { row.diagnostic } else { a.catalog_error })
 				return
 			}
 			if event_id == 'software.remove' && !row.requested {
 				a.set_status('This package is a dependency. Remove the applications that require it first.')
+				return
+			}
+			if event_id == 'software.install' && row.installed_version != '' && !row.requested {
+				a.set_status('This package is a dependency. Use Update all to maintain the complete application set.')
 				return
 			}
 			a.begin_review(if event_id == 'software.install' { 'install' } else { 'remove' }, [row.id])
@@ -648,7 +675,13 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		}
 		children << software_label(row.name, 274, 90, width - 288, 28, false)
 		children << software_label(row.description, 274, 124, width - 288, 72, false)
-		children << software_label('Version: ${row.version}    Installed: ${row.installed_version}', 274, 204, width - 288, 28, true)
+		children << software_label(if !reviewing && row.update_action == 'remove' {
+			'Installed: ${row.installed_version}    Removed by Update all'
+		} else if !reviewing && row.updatable {
+			'Planned: ${row.version}    Installed: ${row.installed_version}'
+		} else {
+			'Version: ${row.version}    Installed: ${row.installed_version}'
+		}, 274, 204, width - 288, 28, true)
 		children << software_label('Architecture: ${row.architecture}    Kind: ${row.kind}    Runtime: ${row.runtime}', 274, 236, width - 288, 28, true)
 		children << software_label('Repository: ${row.repository}', 274, 268, width - 288, 28, true)
 		children << software_label('Publisher key: ${row.public_key}', 274, 300, width - 288, 48, true)
@@ -666,11 +699,15 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			},
 				274, height - 176, width - 288, 28, false)
 		} else {
-			children << software_button('software.install', if row.installed_version == '' {
-				'Install'
-			} else {
-				'Repair / install'
-			}, 274, height - 176, 160)
+			if row.updatable || row.installed_version == '' || row.requested {
+				children << software_button('software.install', if row.updatable {
+					'Review updates'
+				} else if row.installed_version == '' {
+					'Install'
+				} else {
+					'Repair / install'
+				}, 274, height - 176, 160)
+			}
 			if row.installed_version != '' {
 				children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
 				if row.kind !in ['runtime', 'data'] {
@@ -726,6 +763,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.output.free()
 		a.status.free()
 		a.catalog_error.free()
+		a.update_error.free()
 	}
 	a = SoftwareApp{}
 }

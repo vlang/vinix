@@ -44,6 +44,9 @@ host PT_INTERP path is bypassed. Guest assertions cover:
   bytes permits launch again.
 - Reviewed upgrade to a signed runtime without the required shared library producing
   the loader's library-name diagnostic and status 127; reviewed rollback restoring launch.
+- That runtime-only update appearing in `view` and `--json updates` with the
+  resolved version, publisher and action while the application's version stays
+  unchanged. After the reviewed upgrade, Updates returns an empty success.
 - Reviewed uninstall removing both the app and unused runtime while preserving user data.
 - Repository revocation denying launches/rollback while reviewed uninstall remains
   usable, and an empty refresh retaining the sequence floor. Re-enrollment with
@@ -85,6 +88,22 @@ Their `PACKAGE REPOSITORY` marker covers authenticated enrollment, revocation,
 retained replay floors after an empty refresh and successful re-enrollment.
 These guests use initramfs; metadata publication interruption is simulated by
 host fixtures, rather than tested as a physical power cut in these runs.
+
+The resolved runtime-update view passed on both targets on 2026-10-12:
+[AArch64 updates receipt](results/2026-10-12/updates-aarch64.json),
+[AArch64 serial](results/2026-10-12/updates-aarch64.serial.txt),
+[x86_64 updates receipt](results/2026-10-12/updates-x86_64.json),
+[x86_64 serial](results/2026-10-12/updates-x86_64.serial.txt).
+The `PACKAGE UPDATES` marker checks the service view/CLI Updates before and after
+the reviewed runtime-only upgrade. Kernels were rebuilt from revision `7ac619bd`
+in isolated worktrees with LLVM and `KERNEL_LINK_RANDOMIZE=0`; the x86_64 sampler
+used the V generator directly. These are newly built artifacts, with hashes in
+the receipts. Exact kernels are cached locally under
+`build/package-update-qualification/kernels/ARCH-7ac619bd` for reruns.
+Headless UI fixtures separately check per-row complete upgrade review, new/removed
+dependency presentation, dependency-root guards, blocked-plan diagnostics and
+zero retained redraw allocations. View reload and blocked-status measurements
+match the JSON decoder's independent EOF allocation baseline.
 
 This qualifies this musl loader/package tuple and its stated assertions. It does
 not qualify arbitrary Linux libraries, upstream apps, glibc, graphics/audio

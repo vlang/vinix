@@ -116,6 +116,19 @@ fn qualify(binary string) ! {
 	associations.set('text/plain', 'package.' + 'a'.repeat(128), false)!
 	assert sessioncore.decode_associations(associations.encode())!.count == 1
 	assert success(binary, [...root_args, 'view'])!.contains('installed_version')
+	// An unsatisfiable installed closure is a useful failure, not an empty
+	// successful Updates result. View still exposes the installed provenance.
+	enrolled_config := pkgcore.load_config(work + '/root')!
+	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{
+		...enrolled_config, policy: pkgcore.Policy{ ...enrolled_config.policy, permissions: [] }
+	}))!
+	blocked_view := json2.decode[pkgcore.SoftwareView](success(binary, [...root_args, 'view'])!)!
+	assert blocked_view.update_error.contains('permissions blocked') && blocked_view.rows.all(!it.updatable)
+	assert blocked_view.rows.any(it.id == 'app' && it.installed_version == '1.0.0' && it.repository == 'fixture')
+	blocked_updates := command(binary, [...root_args, '--json', 'updates'])!
+	assert blocked_updates.code != 0 && blocked_updates.text.contains('permissions blocked')
+	assert pkgcore.read_state(store, 'aarch64')!.generation == installed.generation
+	os.write_file(work + '/root/etc/vinix-packages/config.json', json2.encode(enrolled_config))!
 	success(binary, [...root_args, 'verify'])!
 	// A mirror is used by another completely clean installation, offline.
 	success(binary, [...root_args, 'mirror', work + '/mirror', 'app'])!

@@ -201,7 +201,7 @@ fn main() {
 	app.handle('software.row.0') or { panic(err) }
 	assert app.selected == 0
 	app.handle('software.install') or { panic(err) }
-	assert app.review == 'install'
+	assert app.review == 'upgrade'
 	app.handle('software.cancel') or { panic(err) }
 	assert app.review == ''
 	app.selected = 2
@@ -265,5 +265,47 @@ fn main() {
 	mut child_status := 0
 	assert C.waitpid(pid, &child_status, 0) == pid
 	check_package_review()
+	check_resolved_updates() or { panic(err) }
 	println('Software UI: catalog, complete dependency review, literal confirmation, stale-plan failure, paging, diagnostics and close guard passed')
+}
+
+fn check_resolved_updates() ! {
+	mut app := SoftwareApp{ service_path: os.executable(), query: []u8{cap: 256}, output: []u8{cap: 8192} }
+	view := SoftwareView{ format: 1, architecture: 'aarch64', rows: [
+		SoftwareRow{ id: 'editor', name: 'Editor', kind: 'linux', version: '1.0.0', installed_version: '1.0.0', requested: true },
+		SoftwareRow{ id: 'runtime', name: 'Explicit runtime', kind: 'runtime', version: '2.0.0', installed_version: '1.0.0', updatable: true, update_action: 'update' },
+		SoftwareRow{ id: 'new-data', name: 'New data', kind: 'data', version: '1.0.0', updatable: true, update_action: 'install' },
+		SoftwareRow{ id: 'old-data', name: 'Retired data', kind: 'data', version: '1.0.0', installed_version: '1.0.0', updatable: true, update_action: 'remove' },
+		SoftwareRow{ id: 'unchanged-data', name: 'Retained dependency', kind: 'data', version: '1.0.0', installed_version: '1.0.0' },
+	] }
+	app.output << json2.encode(view).bytes()
+	app.load_view()
+	app.handle('software.updates')!
+	assert app.matching == [1, 2, 3]
+	for slot in 0 .. 3 {
+		app.handle(software_row_actions[slot])!
+		tree := app.build(ui2.rect(0, 0, 900, 660))!
+		assert tree.children.any(it.id == 'software.install' && it.text == 'Review updates')
+		assert !tree.children.any(it.id == 'software.run')
+		if slot == 2 { assert tree.children.any(it.text.contains('Removed by Update all')) }
+		app.handle('software.install')!
+		assert app.worker_review && app.review == 'upgrade' && app.review_names.len == 0
+		wait_for_software(mut app)
+		assert app.review_ready && app.review_snapshot.operation == 'upgrade'
+		app.handle('software.cancel')!
+	}
+	// Repairing an implicit dependency must not silently turn it into a root.
+	app.selected = 4
+	assert !app.build(ui2.rect(0, 0, 900, 660))!.children.any(it.id == 'software.install')
+	app.handle('software.install')!
+	assert app.review == '' && app.status.contains('complete application set')
+	// A failed full plan is visible on reload and when selecting Updates.
+	app.output.clear()
+	app.output << json2.encode(SoftwareView{ ...view, update_error: 'runtime: permissions blocked by organization policy',
+		rows: view.rows.map(SoftwareRow{ ...it, updatable: false, update_action: '' }) }).bytes()
+	app.load_view()
+	assert app.status.contains('Updates unavailable') && app.status.contains('permissions blocked')
+	app.handle('software.updates')!
+	assert app.matching.len == 0 && app.status.contains('permissions blocked')
+	app.close_app()
 }

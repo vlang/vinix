@@ -17,104 +17,10 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n'
 
-struct SoftwareRow {
-	id                string
-	name              string
-	description       string
-	version           string
-	installed_version string
-	architecture      string
-	kind              string
-	runtime           string
-	repository        string
-	public_key        string
-	license           string
-	proprietary       bool
-	firmware          bool
-	permissions       []string
-	requested         bool
-	updatable         bool
-	diagnostic        string
-}
-
-struct SoftwareView {
-	format        int = 1
-	generation    u64
-	architecture  string
-	offline       bool
-	catalog_error string
-	rows          []SoftwareRow
-	launch_user   string
-}
-
 struct Deployment {
 	format       int = 1
 	architecture string
 	packages     []string
-}
-
-fn software_view(config pkgcore.Config, directory string) !SoftwareView {
-	state := pkgcore.read_state(directory, config.architecture)!
-	mut catalog_error := ''
-	if config.repositories.len == 0 {
-		catalog_error = 'No trusted repositories are configured. An administrator must enroll a publisher with vinix-package repo-enroll.'
-	}
-	catalog := pkgcore.load_catalog(config, directory) or {
-		catalog_error = err.msg()
-		pkgcore.Catalog{}
-	}
-	mut choices := map[string]pkgcore.Installed{}
-	for installed in state.packages { choices[installed.package.id] = installed }
-	for candidate in catalog.packages {
-		p := candidate.package
-		if p.architecture !in [config.architecture, 'all'] || p.kind in ['runtime', 'data'] {
-			continue
-		}
-		old := choices[p.id] or { pkgcore.Installed{} }
-		if old.package.id == '' || pkgcore.compare_versions(p.version, old.package.version) >= 0 {
-			choices[p.id] = candidate
-		}
-	}
-	mut rows := []SoftwareRow{}
-	mut ids := choices.keys()
-	ids.sort()
-	for id in ids {
-		candidate := choices[id]
-		p := candidate.package
-		mut installed_version := ''
-		for installed in state.packages {
-			if installed.package.id == id { installed_version = installed.package.version }
-		}
-		mut diagnostic := ''
-		pkgcore.check_policy(p, config.policy) or { diagnostic = err.msg() }
-		rows << SoftwareRow{
-			id:                id
-			name:              p.name
-			description:       p.description
-			version:           p.version
-			installed_version: installed_version
-			architecture:      p.architecture
-			kind:              p.kind
-			runtime:           p.runtime
-			repository:        candidate.repository
-			public_key:        candidate.public_key
-			license:           p.license
-			proprietary:       p.proprietary
-			firmware:          p.firmware
-			permissions:       p.permissions
-			requested:         id in state.requested
-			updatable:         installed_version != '' && pkgcore.compare_versions(p.version, installed_version) > 0
-			diagnostic:        diagnostic
-		}
-	}
-	return SoftwareView{
-		generation:    state.generation
-		architecture:  config.architecture
-		offline:       config.policy.offline
-		catalog_error: catalog_error
-		rows:          rows
-		launch_user:   if os.geteuid() == 0 { config.launch_user } else { '' }
-	}
 }
 
 fn checked(arguments []string) !int {
@@ -227,9 +133,11 @@ fn checked(arguments []string) !int {
 			pkgcore.refresh(config, directory)!
 		}
 		'view', 'search', 'info', 'updates' {
-			view := software_view(config, directory)!
+			view := pkgcore.software_view(root, offline)!
 			if command == 'view' {
-				println(json2.encode(view))
+				text := json2.encode(view)
+				if text.len > pkgcore.max_metadata { return error('software catalog exceeds metadata limit') }
+				println(text)
 				return 0
 			}
 			if command == 'info' && names.len != 1 { return error('info requires one package ID') }
@@ -253,6 +161,7 @@ fn checked(arguments []string) !int {
 			}
 			if command == 'info' && !found { return error('package not found: ${query}') }
 			if view.catalog_error != '' { return error(view.catalog_error) }
+			if command == 'updates' && view.update_error != '' { return error(view.update_error) }
 		}
 		'status', 'list', 'verify' {
 			state := pkgcore.read_state(directory, config.architecture)!

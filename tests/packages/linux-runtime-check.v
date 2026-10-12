@@ -85,7 +85,7 @@ fn linux_suite(work string, repository string) !hwhost.Suite {
 			name:     'packages-linux'
 			arches:   ['aarch64', 'x86_64']
 			about:    'prepared-root import and signed musl loader/library execution under real sandbox enforcement'
-			required: ['HWTEST START packages-linux', 'PACKAGE REVIEW', 'PACKAGE REPOSITORY', 'PACKAGE LINUX IMPORT',
+			required: ['HWTEST START packages-linux', 'PACKAGE REVIEW', 'PACKAGE REPOSITORY', 'PACKAGE UPDATES', 'PACKAGE LINUX IMPORT',
 				'HWTEST PASS packages-linux']
 			ending:   .poweroff
 			timeout:  180

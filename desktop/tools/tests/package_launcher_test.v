@@ -175,6 +175,44 @@ fn test_package_registry_reload_and_retirement_release_all_storage() {
 
 const software_review_fixture = '{"format":1,"operation":"install","names":["editor"],"architecture":"aarch64","generation":1,"target_generation":0,"fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","requested":["editor"],"disk_needed":4096,"disk_available":65536,"disk_reserve":1024,"rows":[{"id":"editor","name":"Editor","description":"Write text","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"linux","runtime":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","permissions":["files"],"requested":true,"action":"update"},{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","repository":"vendor","public_key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","license":"Vendor-EULA","proprietary":true,"firmware":true,"permissions":["network","process"],"action":"update"}]}'
 
+const software_updates_fixture = '{"format":1,"architecture":"aarch64","rows":[{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","permissions":["process"],"updatable":true,"update_action":"update"},{"id":"assets","name":"Retired assets","version":"1.0.0","installed_version":"1.0.0","architecture":"all","kind":"data","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","updatable":true,"update_action":"remove"}]}'
+const software_blocked_updates_fixture = '{"format":1,"architecture":"aarch64","update_error":"runtime: permissions blocked by organization policy","rows":[{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"1.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","permissions":["process"],"diagnostic":"runtime: permissions blocked by organization policy"}]}'
+
+fn test_software_resolved_update_redraw_reload_and_failure_storage_are_released() {
+	mut app := SoftwareApp{ output: software_updates_fixture.bytes() }
+	app.load_view()
+	app.selected = 0
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		for selected in 0 .. 2 {
+			app.selected = selected
+			begin_frame_elements()
+			free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+		}
+	}
+	package_assert_heap_flat('Software resolved updates redraw')
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
+	baseline := C.vinix_heap_end()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 { app.load_view() }
+	app.close_app()
+	assert C.vinix_heap_end() == baseline
+	mut blocked := SoftwareApp{ output: software_blocked_updates_fixture.bytes() }
+	blocked.load_view()
+	blocked.handle('software.updates')!
+	assert blocked.status.contains('permissions blocked') && blocked.matching.len == 0
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		blocked.load_view()
+		blocked.handle('software.updates')!
+	}
+	blocked.close_app()
+	assert C.vinix_heap_end() == baseline
+}
+
 fn test_software_review_redraw_cancel_and_decoded_storage_are_released() {
 	mut app := SoftwareApp{ output: software_review_fixture.bytes(), review: 'install'.clone(), review_names: ['editor'.clone()] }
 	app.load_review()
