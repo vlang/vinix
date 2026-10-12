@@ -69,8 +69,80 @@ fn compile_c(root string, generated string, output string, gles bool) {
 	checked(args)
 }
 
+fn native_fixture_source(item string) string {
+	return match item {
+		'objc-constant-dictionary-checks' { 'objc_constant_dictionary_test.v' }
+		'layout-constraint-checks' { 'layout_constraints_test.v' }
+		'json-serialization-checks' { 'json_serialization_test.v' }
+		'nsuuid-checks' { 'ns_uuid_test.v' }
+		'keyboard-checks' { 'game_keyboard_test.v' }
+		'image-view-checks' { 'image_view_test.v' }
+		'auth-session-checks' { 'web_auth_test.v' }
+		'thread-checks' { 'ns_thread_test.v' }
+		'set-checks' { 'ns_set_test.v' }
+		'alert-checks' { 'ui_alert_test.v' }
+		'response-checks' { 'url_response_test.v' }
+		'value-checks' { 'ns_value_test.v' }
+		'request-checks' { 'url_request_test.v' }
+		'webview-checks' { 'webkit_view_test.v' }
+		'user-script-checks' { 'webkit_script_test.v' }
+		'webkit-configuration-checks' { 'webkit_configuration_test.v' }
+		'cookie-checks' { 'http_cookie_test.v' }
+		'condition-checks' { 'ns_condition_test.v' }
+		'module-lookup-checks' { 'module_lookup_test.v' }
+		'select-checks' { 'select_test.v' }
+		'semaphore-checks' { 'mach_semaphore_test.v' }
+		'signal-checks' { 'signals_test.v' }
+		'error-checks' { 'errors_test.v' }
+		'sysctl-checks' { 'sysctl_test.v' }
+		'terminal-checks' { 'terminal_test.v' }
+		'file-time-checks' { 'file_times_test.v' }
+		'uuid-checks' { 'uuid_test.v' }
+		'audio-session-checks' { 'audio_session_test.v' }
+		'cf-dictionary-checks' { 'core_foundation_test.v' }
+		'objc-storage-checks' { 'objc_storage_test.v' }
+		'objc-associated-checks' { 'objc_associated_test.v' }
+		'objc-property-checks' { 'objc_properties_test.v' }
+		'objc-sync-checks' { 'objc_sync_test.v' }
+		'swift-string-checks' { 'swift_string_test.v' }
+		'swift-metadata-checks' { 'swift_metadata_test.v' }
+		'swift-protocol-checks' { 'swift_protocol_test.v' }
+		'swift-hash-checks' { 'swift_hash_test.v' }
+		'swift-hasher-checks' { 'swift_hasher_test.v' }
+		'swift-raw-representable-checks' { 'swift_raw_representable_test.v' }
+		'swift-array-checks' { 'swift_array_test.v' }
+		'swift-integer-checks' { 'swift_integer_test.v' }
+		'swift-integer-hash-checks' { 'swift_integer_hash_test.v' }
+		'swift-fatal-checks' { 'swift_fatal_test.v' }
+		'swift-interpolation-checks' { 'swift_interpolation_test.v' }
+		'swift-array-storage-checks' { 'swift_array_storage_test.v' }
+		'swift-vararg-checks' { 'swift_vararg_test.v' }
+		'swift-void-checks' { 'swift_void_test.v' }
+		'swift-version-checks' { 'swift_version_test.v' }
+		'swift-initializer-checks' { 'swift_initializer_test.v' }
+		'swift-heap-checks' { 'swift_heap_test.v' }
+		'swift-error-checks' { 'swift_error_test.v' }
+		'swift-error-value-checks' { 'swift_error_value_test.v' }
+		'swift-object-type-checks' { 'swift_object_type_test.v' }
+		'swift-mangled-checks' { 'swift_mangled_test.v' }
+		'swift-witness-checks' { 'swift_witness_test.v' }
+		'swift-error-description-checks' { 'swift_error_description_test.v' }
+		'swift-string-unbridge-checks' { 'swift_string_unbridge_test.v' }
+		'swift-nslog-checks' { 'swift_foundation_test.v' }
+		'swift-task-switch-checks' { 'swift_task_switch_test.v' }
+		'swift-task-create-checks' { 'swift_task_create_test.v' }
+		'swift-task-alloc-checks' { 'swift_task_alloc_test.v' }
+		'swift-task-priority-checks' { 'swift_task_priority_test.v' }
+		'swift-actor-executor-checks' { 'swift_actor_executor_test.v' }
+		'swift-objc-bool-checks' { 'swift_objc_bool_test.v' }
+		'swift-once-checks' { 'swift_once_test.v' }
+		'thread-policy-checks' { 'thread_policy_test.v' }
+		else { panic('unknown native fixture') }
+	}
+}
+
 fn build(root string, out string, only string) {
-	for item in ['run-ios', 'run-ios-gles', 'objc-constant-dictionary-checks', 'layout-constraint-checks', 'json-serialization-checks', 'condition-checks', 'cookie-checks', 'webkit-configuration-checks', 'user-script-checks', 'webview-checks', 'request-checks', 'value-checks', 'response-checks', 'alert-checks', 'set-checks', 'thread-checks', 'auth-session-checks', 'image-view-checks', 'keyboard-checks', 'select-checks', 'semaphore-checks', 'signal-checks',
+	for item in ['run-ios', 'run-ios-gles', 'objc-constant-dictionary-checks', 'layout-constraint-checks', 'json-serialization-checks', 'condition-checks', 'cookie-checks', 'webkit-configuration-checks', 'user-script-checks', 'webview-checks', 'request-checks', 'value-checks', 'response-checks', 'alert-checks', 'set-checks', 'thread-checks', 'auth-session-checks', 'image-view-checks', 'keyboard-checks', 'nsuuid-checks', 'select-checks', 'semaphore-checks', 'signal-checks',
 		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-string-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'swift-array-storage-checks', 'swift-vararg-checks', 'swift-void-checks', 'swift-version-checks', 'swift-initializer-checks', 'swift-heap-checks', 'swift-error-checks', 'swift-error-value-checks', 'swift-object-type-checks', 'swift-mangled-checks', 'swift-witness-checks', 'swift-once-checks', 'swift-objc-bool-checks', 'swift-actor-executor-checks', 'swift-task-priority-checks', 'swift-task-alloc-checks', 'swift-task-create-checks', 'swift-task-switch-checks', 'swift-nslog-checks', 'swift-string-unbridge-checks', 'swift-error-description-checks', 'module-lookup-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
@@ -84,137 +156,7 @@ fn build(root string, out string, only string) {
 			if item.ends_with('-checks') { args = args.filter(it != '-prod') }
 			if item == 'run-ios-gles' { args << ['-d', 'ios_gles', '-d', 'ios_text'] }
 			args << root + if item.ends_with('-checks') {
-				'/compat/ios/runner/' + if item == 'objc-constant-dictionary-checks' {
-					'objc_constant_dictionary_test.v'
-				} else if item == 'layout-constraint-checks' {
-					'layout_constraints_test.v'
-				} else if item == 'json-serialization-checks' {
-					'json_serialization_test.v'
-				} else if item == 'keyboard-checks' {
-					'game_keyboard_test.v'
-				} else if item == 'image-view-checks' {
-					'image_view_test.v'
-				} else if item == 'auth-session-checks' {
-					'web_auth_test.v'
-				} else if item == 'thread-checks' {
-					'ns_thread_test.v'
-				} else if item == 'set-checks' {
-					'ns_set_test.v'
-				} else if item == 'alert-checks' {
-					'ui_alert_test.v'
-				} else if item == 'response-checks' {
-					'url_response_test.v'
-				} else if item == 'value-checks' {
-					'ns_value_test.v'
-				} else if item == 'request-checks' {
-					'url_request_test.v'
-				} else if item == 'webview-checks' {
-					'webkit_view_test.v'
-				} else if item == 'user-script-checks' {
-					'webkit_script_test.v'
-				} else if item == 'webkit-configuration-checks' {
-					'webkit_configuration_test.v'
-				} else if item == 'cookie-checks' {
-					'http_cookie_test.v'
-				} else if item == 'condition-checks' {
-					'ns_condition_test.v'
-				} else if item == 'module-lookup-checks' {
-					'module_lookup_test.v'
-				} else if item == 'select-checks' {
-					'select_test.v'
-				} else if item == 'semaphore-checks' {
-					'mach_semaphore_test.v'
-				} else if item == 'signal-checks' {
-					'signals_test.v'
-				} else if item == 'error-checks' {
-					'errors_test.v'
-				} else if item == 'sysctl-checks' {
-					'sysctl_test.v'
-				} else if item == 'terminal-checks' {
-					'terminal_test.v'
-				} else if item == 'file-time-checks' {
-					'file_times_test.v'
-				} else if item == 'uuid-checks' {
-					'uuid_test.v'
-				} else if item == 'audio-session-checks' {
-					'audio_session_test.v'
-				} else if item == 'cf-dictionary-checks' {
-					'core_foundation_test.v'
-				} else if item == 'objc-storage-checks' {
-					'objc_storage_test.v'
-				} else if item == 'objc-associated-checks' {
-					'objc_associated_test.v'
-				} else if item == 'objc-property-checks' {
-					'objc_properties_test.v'
-				} else if item == 'objc-sync-checks' {
-					'objc_sync_test.v'
-				} else if item == 'swift-string-checks' {
-					'swift_string_test.v'
-				} else if item == 'swift-metadata-checks' {
-					'swift_metadata_test.v'
-				} else if item == 'swift-protocol-checks' {
-					'swift_protocol_test.v'
-				} else if item == 'swift-hash-checks' {
-					'swift_hash_test.v'
-				} else if item == 'swift-hasher-checks' {
-					'swift_hasher_test.v'
-				} else if item == 'swift-raw-representable-checks' {
-					'swift_raw_representable_test.v'
-				} else if item == 'swift-array-checks' {
-					'swift_array_test.v'
-				} else if item == 'swift-integer-checks' {
-					'swift_integer_test.v'
-				} else if item == 'swift-integer-hash-checks' {
-					'swift_integer_hash_test.v'
-				} else if item == 'swift-fatal-checks' {
-					'swift_fatal_test.v'
-				} else if item == 'swift-interpolation-checks' {
-					'swift_interpolation_test.v'
-				} else if item == 'swift-array-storage-checks' {
-					'swift_array_storage_test.v'
-				} else if item == 'swift-vararg-checks' {
-					'swift_vararg_test.v'
-				} else if item == 'swift-void-checks' {
-					'swift_void_test.v'
-				} else if item == 'swift-version-checks' {
-					'swift_version_test.v'
-				} else if item == 'swift-initializer-checks' {
-					'swift_initializer_test.v'
-				} else if item == 'swift-heap-checks' {
-					'swift_heap_test.v'
-				} else if item == 'swift-error-checks' {
-					'swift_error_test.v'
-				} else if item == 'swift-error-value-checks' {
-					'swift_error_value_test.v'
-				} else if item == 'swift-object-type-checks' {
-					'swift_object_type_test.v'
-				} else if item == 'swift-mangled-checks' {
-					'swift_mangled_test.v'
-				} else if item == 'swift-witness-checks' {
-					'swift_witness_test.v'
-				} else if item == 'swift-error-description-checks' {
-					'swift_error_description_test.v'
-				} else if item == 'swift-string-unbridge-checks' {
-					'swift_string_unbridge_test.v'
-				} else if item == 'swift-nslog-checks' {
-					'swift_foundation_test.v'
-				} else if item == 'swift-task-switch-checks' {
-					'swift_task_switch_test.v'
-				} else if item == 'swift-task-create-checks' {
-					'swift_task_create_test.v'
-				} else if item == 'swift-task-alloc-checks' {
-					'swift_task_alloc_test.v'
-				} else if item == 'swift-task-priority-checks' {
-					'swift_task_priority_test.v'
-				} else if item == 'swift-actor-executor-checks' {
-					'swift_actor_executor_test.v'
-				} else if item == 'swift-objc-bool-checks' {
-					'swift_objc_bool_test.v'
-				} else if item == 'swift-once-checks' {
-					'swift_once_test.v'
-				} else {
-					'thread_policy_test.v'
-				}
+				'/compat/ios/runner/' + native_fixture_source(item)
 			} else {
 				'/compat/ios/runner'
 			}
@@ -340,6 +282,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/auth-session-checks', fs + '/opt/ios/auth-session-checks')
 	copy_file(out + '/image-view-checks', fs + '/opt/ios/image-view-checks')
 	copy_file(out + '/keyboard-checks', fs + '/opt/ios/keyboard-checks')
+	copy_file(out + '/nsuuid-checks', fs + '/opt/ios/nsuuid-checks')
 	copy_file(out + '/objc-storage-checks', fs + '/opt/ios/objc-storage-checks')
 	copy_file(out + '/objc-associated-checks', fs + '/opt/ios/objc-associated-checks')
 	copy_file(out + '/objc-property-checks', fs + '/opt/ios/objc-property-checks')
@@ -444,7 +387,7 @@ fn vm(root string, out string, mode string) {
 	} else if mode == 'objc' {
 		for directory in ['sbin', 'proc', 'sys', 'dev', 'tmp', 'opt/ios'] { os.mkdir_all(fs + '/' + directory) or { panic(err) } }
 		copy_file(root + '/build/ios/fortnite/local/Payload/FortniteClient-IOS-Shipping.app/Frameworks/EOSSDK.framework/EOSSDK', fs + '/opt/ios/constant-dictionary-image')
-		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
+		for name in ['objc-constant-dictionary', 'layout-constraint', 'json-serialization', 'condition', 'cookie', 'webkit-configuration', 'user-script', 'webview', 'request', 'value', 'response', 'alert', 'set', 'thread', 'auth-session', 'image-view', 'keyboard', 'nsuuid', 'cf-dictionary', 'objc-storage', 'objc-associated', 'objc-property', 'objc-sync'] {
 			copy_file(out + '/' + name + '-checks', fs + '/opt/ios/' + name + '-checks')
 		}
 	} else if mode == 'swift' {
@@ -524,7 +467,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-objc-constant-dictionary|build-layout-constraint|build-json-serialization|build-condition|build-cookie|build-webkit-configuration|build-user-script|build-webview|build-request|build-value|build-response|build-alert|build-set|build-thread|build-auth-session|build-image-view|build-keyboard|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|build-swift-void|build-swift-version|build-swift-initializer|build-swift-heap|build-swift-error|build-swift-error-value|build-swift-object-type|build-swift-mangled|build-swift-witness|build-swift-once|build-swift-objc-bool|build-swift-actor-executor|build-swift-task-priority|build-swift-task-alloc|build-swift-task-create|build-swift-task-switch|build-swift-nslog|build-swift-string-unbridge|build-swift-error-description|build-module-lookup|verify-monitor|regression|swift|objc|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-objc-constant-dictionary|build-layout-constraint|build-json-serialization|build-condition|build-cookie|build-webkit-configuration|build-user-script|build-webview|build-request|build-value|build-response|build-alert|build-set|build-thread|build-auth-session|build-image-view|build-keyboard|build-nsuuid|build-swift-string|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|build-swift-void|build-swift-version|build-swift-initializer|build-swift-heap|build-swift-error|build-swift-error-value|build-swift-object-type|build-swift-mangled|build-swift-witness|build-swift-once|build-swift-objc-bool|build-swift-actor-executor|build-swift-task-priority|build-swift-task-alloc|build-swift-task-create|build-swift-task-switch|build-swift-nslog|build-swift-string-unbridge|build-swift-error-description|build-module-lookup|verify-monitor|regression|swift|objc|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -580,6 +523,8 @@ fn main() {
 		build(root, out, 'layout-constraint-checks')
 	} else if mode == 'build-json-serialization' {
 		build(root, out, 'json-serialization-checks')
+	} else if mode == 'build-nsuuid' {
+		build(root, out, 'nsuuid-checks')
 	} else if mode == 'build-keyboard' {
 		build(root, out, 'keyboard-checks')
 	} else if mode == 'build-image-view' {

@@ -30,6 +30,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	ns_thread_install(object, mut header)
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
+	header.uuid_owned = objc_is_kind(object, ios_runtime.names['NSUUID'])
 	header.cookie_owned = objc_is_kind(object, ios_runtime.names['NSHTTPCookie'])
 	header.webview_owned = objc_is_kind(object, ios_runtime.names['WKWebView'])
 	header.request_owned = objc_is_kind(object, ios_runtime.names['NSURLRequest'])

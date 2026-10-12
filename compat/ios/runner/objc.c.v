@@ -110,6 +110,8 @@ mut:
 	image_view_owned bool
 	image_view &ImageViewState = unsafe { nil }
 	image_view_array bool
+	uuid_owned bool
+	uuid_bytes [16]u8
 	cookie_owned bool
 	webkit &WebKitState = unsafe { nil }
 	webkit_array bool // Read-only script list; its contents change through its controller.
@@ -269,7 +271,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -289,6 +291,8 @@ fn objc_start() {
 		parent := match name {
 			'NSObject' { u64(0) }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
+			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
+			'__NSConcreteUUID' { ios_runtime.names['_NSUUIDBridge'] }
 			'UIView', 'UIViewController', 'UIApplication' { ios_runtime.names['UIResponder'] }
 			'UIImageView', 'UILabel', 'UIControl', 'UIWindow', 'UIAlertView', 'GLKView' { ios_runtime.names['UIView'] }
 			'WKWebView' { ios_runtime.names['UIView'] }
@@ -326,6 +330,8 @@ fn objc_start() {
 			'ASWebAuthenticationSession' { u32(136) }
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
+			'NSUUID', '_NSUUIDBridge' { u32(8) }
+			'__NSConcreteUUID' { u32(24) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
 			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
 			'NSURLResponse' { u32(24) }
@@ -392,13 +398,14 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
-	objc_initialize(cls)
-	info := ios_runtime.classes[cls] or { panic('iOS: allocation of an unknown class') }
+	allocation_class := ns_uuid_allocation_class(cls)
+	objc_initialize(allocation_class)
+	info := ios_runtime.classes[allocation_class] or { panic('iOS: allocation of an unknown class') }
 	if info.dynamic && !info.registered { panic('iOS: allocating an instance of an unregistered class') }
 	object := u64(C.calloc(1, usize(info.size)))
 	if object == 0 { panic('iOS: out of memory') }
-	objc_install_storage(cls, object, false)
-	return objc_construct(object, cls)
+	objc_install_storage(allocation_class, object, false)
+	return objc_construct(object, allocation_class)
 }
 
 fn objc_retain(object u64) u64 {
@@ -474,6 +481,7 @@ fn objc_new(cls u64) u64 {
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
 	game_keyboard_require_discovery(cls)
+	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }

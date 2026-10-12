@@ -289,6 +289,7 @@ fn cf_callback_release(allocator u64, value u64) { _ = allocator; objc_release(v
 
 fn cf_hash(object u64) u64 {
 	if object == 0 { return 0 }
+	if objc_is_kind(object, ios_runtime.names['NSUUID']) { return ns_uuid_hash(object) }
 	if read64(object) == cf_date_id() {
 		value := obj_header(object).real_number
 		return if value == 0 { u64(0) } else { unsafe { *(&u64(&value)) } }
@@ -319,6 +320,7 @@ fn cf_hash(object u64) u64 {
 }
 
 fn cf_copy_description(object u64) u64 {
+	if objc_is_kind(object, ios_runtime.names['NSUUID']) { return ns_uuid_string(object) }
 	if objc_is_kind(object, ios_runtime.names['NSString']) { return objc_retain(object) }
 	mut bytes := [128]u8{}
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {

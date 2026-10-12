@@ -3621,17 +3621,63 @@ in this batch. Evidence is retained under `build/ios/fortnite/keyboard-checks`.
 Full regression remains unpassed, the five published runners are unchanged,
 and game entry, rendering and gameplay remain unverified.
 
+`NSUUID` now supports its measured value APIs in V. EOS strongly imports the
+class and contains UUID and UUIDString selectors. Installed Foundation probes
+confirm the 8-byte NSUUID base, 8-byte _NSUUIDBridge and 24-byte __NSConcreteUUID
+class cluster. Allocation returns the concrete class with zero bytes; new, init
+and UUID generate secure version-4 identifiers through the existing entropy
+adapter. No native application code was executed.
+
+Canonical 36-byte UUID strings parse case-insensitively and render uppercase.
+Invalid or nil strings return nil and consume the allocated initializer
+receiver. Byte initializers copy sixteen bytes; nil bytes produce zero. Public
+reinitialization matches native behavior, and immutable copies retain the same
+object. UUIDString and description create independent autoreleased strings.
+Equality and hashing use value bytes; comparison inspects all sixteen bytes
+without stopping at the first difference. Foundation and CF collection paths
+share these semantics, and classForCoder returns NSUUID.
+
+UUID bytes live in the existing object metadata, so no sidecar or caller data
+pointer is retained. Generic retirement frees them with their object even after
+isa changes. Raw concrete caller storage is supported. Abstract or custom
+subclass construction, coding, mutable copies, nil byte output, non-UUID
+comparison, and invalid initializers that would consume caller-owned storage
+reject explicitly. Private native ivars and archive formats remain unsupported;
+reinitialization and other nonatomic access require app synchronization.
+
+All 69 programs build and 90 original generated C streams restore to recorded
+hashes. Twenty-one host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes twenty-three Objective-C and 33 Swift/loader programs. Shared UUID cases
+compare native allocation, defaults, copied buffers, canonical parsing, copy
+identity, reinitialization, comparisons and 256 distinct version-4 IDs per
+cycle. Runtime checks also cover collection equality/hash, owned descriptions,
+caller storage, 100 isa changes, eight exact rejection reasons and two shutdown
+cycles with zero live objects and blocks. Generated C verifies the UUID helpers
+allocate no scratch state; formatting creates only an owned NSString.
+
+A retained compiler trial caught the build driver's deeply nested fixture
+expression. An explicit match now preserves all mappings and compiles, with
+every mapped file checked for existence. The native C++ storage fixture was
+restored from its recorded gzip/raw hashes before validation. Guest phases run
+sequentially, and native module replay waits for the host binary to complete.
+
+Fortnite passes the NSUUID binding and exits with status 1 before entry at
+EOS's required `_OBJC_CLASS_$_NSFileManager` import. Evidence is retained under
+`build/ios/fortnite/nsuuid-checks`. Full regression remains unpassed, the five
+published runners are unchanged, and game entry, rendering and gameplay remain
+unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,435 | 725 | 79 |
-| EOSSDK | 650 | 12 | 18 |
+| Fortnite executable | 1,436 | 724 | 79 |
+| EOSSDK | 651 | 11 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,200 | 798 | 120 |
+| All images | 2,202 | 796 | 120 |
 
-The C++/GLES/Text variant reports 2,213 resolved imports, 785 unresolved strong
+The C++/GLES/Text variant reports 2,215 resolved imports, 783 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
