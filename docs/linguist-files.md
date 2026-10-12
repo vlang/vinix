@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `6c3f299816aa47194938bbdbbf2524c9a315f860`,
+at source commit `f21c1a5e5166b1feb9165ce11e7afb3524c57c5e`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 585 | 2,388,673 | 5.96% |
-| Python | 93 | 509,319 | 1.27% |
-| Shell | 739 | 1,381,349 | 3.45% |
+| C | 591 | 2,394,046 | 5.91% |
+| Python | 85 | 454,232 | 1.12% |
+| Shell | 747 | 1,380,937 | 3.41% |
 
-All `.v` files are classified as V. The resulting V share is 81.53%, with no
+All `.v` files are classified as V. The resulting V share is 81.86%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 509,319 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 454,232 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 6c3f299816aa47194938bbdbbf2524c9a315f860 --breakdown --json
+github-linguist --rev f21c1a5e5166b1feb9165ce11e7afb3524c57c5e --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -68,7 +68,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `apple-boot/tests/helper-fixture-v-abi.h` | 193 |
 | `base-files/usr/include/vinix/hypervisor.h` | 1,315 |
 | `build-support/aarch64-cc-shim/stdatomic.h` | 4,425 |
-| `build-support/android/androidhost/probe_spawn_abi.h` | 1,346 |
+| `build-support/android/androidhost/probe_spawn_abi.h` | 706 |
 | `build-support/android/atl-configuration-v-abi.h` | 1,394 |
 | `build-support/android/musl-statistics.h` | 486 |
 | `build-support/android/runtime-v-abi.h` | 1,598 |
@@ -136,6 +136,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/heap_benchmark.h` | 101 |
 | `kernel/c/heap_benchmark_v.h` | 1,399 |
 | `kernel/c/inttypes.h` | 69 |
+| `kernel/c/linuxkpi_aggregate_fixture_v_contract.h` | 1,521 |
 | `kernel/c/linuxkpi_cache_fixture_v_contract.h` | 377 |
 | `kernel/c/linuxkpi_callback_v_abi.h` | 313 |
 | `kernel/c/linuxkpi_common_v_contract.h` | 926 |
@@ -172,6 +173,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/linuxkpi_task_v_primitives.h` | 2,473 |
 | `kernel/c/linuxkpi_time_fixture_v_contract.h` | 602 |
 | `kernel/c/linuxkpi_timer_fixture_v_contract.h` | 390 |
+| `kernel/c/linuxkpi_tsc_fixture_v_contract.h` | 680 |
+| `kernel/c/linuxkpi_tsc_v_contract.h` | 493 |
 | `kernel/c/linuxkpi_uaccess_v_contract.h` | 704 |
 | `kernel/c/linuxkpi_usleep_fixture_v_contract.h` | 819 |
 | `kernel/c/linuxkpi_v_primitives.h` | 1,713 |
@@ -229,10 +232,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/asm/ioctl.h` | 79 |
 | `kernel/linuxkpi/include/asm/kmap_size.h` | 157 |
 | `kernel/linuxkpi/include/asm/mmiowb.h` | 154 |
+| `kernel/linuxkpi/include/asm/msr.h` | 419 |
 | `kernel/linuxkpi/include/asm/param.h` | 138 |
 | `kernel/linuxkpi/include/asm/percpu.h` | 921 |
 | `kernel/linuxkpi/include/asm/posix_types.h` | 450 |
-| `kernel/linuxkpi/include/asm/processor.h` | 981 |
+| `kernel/linuxkpi/include/asm/processor.h` | 1,002 |
 | `kernel/linuxkpi/include/asm/resource.h` | 161 |
 | `kernel/linuxkpi/include/asm/rwonce.h` | 80 |
 | `kernel/linuxkpi/include/asm/smp.h` | 594 |
@@ -275,7 +279,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/linuxkpi/include/vinix/format.h` | 2,001 |
 | `kernel/linuxkpi/include/vinix/gfp.h` | 503 |
 | `kernel/linuxkpi/include/vinix/printk.h` | 2,368 |
-| `kernel/linuxkpi/include/vinix/runtime.h` | 4,990 |
+| `kernel/linuxkpi/include/vinix/runtime.h` | 5,108 |
 | `kernel/linuxkpi/include/vinix/user_access_scope.h` | 1,233 |
 | `tests/aarch64-sigreturn/init.c` | 1,335 |
 | `tests/aarch64-sigreturn/probe.c` | 5,638 |
@@ -468,6 +472,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-sysvmsg/check.c` | 22,016 |
 | `tests/krandom/host_stubs.h` | 317 |
 | `tests/krandom/hosthooks/host-native-abi.h` | 755 |
+| `tests/linuxkpi/aggregatefixture/contract.h` | 2,221 |
 | `tests/linuxkpi/bitmaphost_v_contract.h` | 290 |
 | `tests/linuxkpi/cachehost_v_contract.h` | 327 |
 | `tests/linuxkpi/cpupolicyfixture/contract.h` | 1,217 |
@@ -494,6 +499,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/linuxkpi/memencryptfixture/contract.h` | 2,868 |
 | `tests/linuxkpi/policyhost_v_contract.h` | 1,469 |
 | `tests/linuxkpi/policytransport/contract.h` | 610 |
+| `tests/linuxkpi/rawtscfixture/contract.h` | 1,809 |
 | `tests/linuxkpi/rcucallfixture/rcucall_host_contract.h` | 1,840 |
 | `tests/linuxkpi/resourcefixture/resource_v_contract.h` | 783 |
 | `tests/linuxkpi/scalarfixture/scalar_host_resource.h` | 978 |
@@ -564,7 +570,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/qemu-core/corevm/abi.h` | 306 |
 | `tests/qemu-core/epollfixture/epollfixture_v_contract.h` | 943 |
 | `tests/qemu-core/epolloracle/epoll-oracle-native-abi.h` | 742 |
-| `tests/qemu-core/fixturehost/spawn_abi.h` | 1,311 |
+| `tests/qemu-core/fixturehost/spawn_abi.h` | 613 |
 | `tests/qemu-core/intfixture/intfixture_v_contract.h` | 391 |
 | `tests/qemu-core/intoracle/int-oracle-native-abi.h` | 581 |
 | `tests/qemu-core/nanosleepfixture/nanosleepfixture_v_contract.h` | 818 |
@@ -640,7 +646,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/security-audit/collector_v.h` | 2,306 |
 | `tools/security-mac/mac.h` | 526 |
 | `tools/security-mac/mac_v.h` | 759 |
-| `tools/sourcecommand/abi.h` | 859 |
+| `tools/sourcecommand/abi.h` | 288 |
 | `tools/volumes/volumecli/volume.h` | 1,060 |
 
 ## Python files
@@ -649,9 +655,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | --- | ---: |
 | `build-support/android/_boot_native.py` | 20,549 |
 | `build-support/android/_native.py` | 5,749 |
-| `build-support/android/art-bootclasspath.py` | 4,172 |
-| `build-support/android/art-runtime.py` | 10,978 |
-| `build-support/android/musl-runtime.py` | 2,803 |
 | `build-support/cpython_host.py` | 1,007 |
 | `build-support/debian-root.py` | 4,231 |
 | `build-support/dhewm3/build.py` | 1,738 |
@@ -667,8 +670,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/native_host.py` | 6,504 |
 | `build-support/opengothic/build.py` | 1,979 |
 | `build-support/qemu-system/tests/run.py` | 5,316 |
-| `build-support/roblox/_native.py` | 948 |
-| `build-support/roblox/build.py` | 5,502 |
 | `build-support/steam/lsof` | 2,979 |
 | `build-support/steam/qemu-dns.py` | 2,488 |
 | `build-support/steam/tar` | 4,328 |
@@ -692,8 +693,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/agx-fake-g17/run_encode_native.py` | 1,278 |
 | `tests/agx-fake-g17/run_vm.py` | 4,186 |
 | `tests/android/_run_native.py` | 16,117 |
-| `tests/android/interactive-test.py` | 9,881 |
-| `tests/android/run.py` | 12,350 |
 | `tests/browsers/_native.py` | 5,357 |
 | `tests/browsers/run_vm.py` | 9,438 |
 | `tests/claude/smoke.py` | 7,250 |
@@ -735,7 +734,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tests/roblox-windows/_native.py` | 5,099 |
 | `tests/roblox-windows/run.py` | 7,180 |
-| `tests/roblox/build-test.py` | 8,453 |
 | `tests/roblox/launcher-test.py` | 6,516 |
 | `tests/virtio-gpu-virgl/_native.py` | 957 |
 | `tests/virtio-gpu-virgl/run_vm.py` | 5,650 |
@@ -760,6 +758,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `base-files/etc/profile` | 1,023 |
 | `build-support/alpine-resolve` | 169 |
 | `build-support/android/art-bootclasspath` | 190 |
+| `build-support/android/art-runtime` | 177 |
 | `build-support/android/atl-dex` | 180 |
 | `build-support/android/build` | 178 |
 | `build-support/android/build-art.sh` | 5,381 |
@@ -767,6 +766,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/build-bionic.sh` | 4,726 |
 | `build-support/android/compile-v-atl-configuration` | 198 |
 | `build-support/android/compile-v-runtime` | 188 |
+| `build-support/android/musl-runtime` | 178 |
 | `build-support/android/native-tool` | 200 |
 | `build-support/android/run-android` | 4,804 |
 | `build-support/build-aarch64-iso.sh` | 4,137 |
@@ -818,6 +818,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/qemu-storage.sh` | 9,938 |
 | `build-support/qemu-system/vinix-qemu` | 1,481 |
 | `build-support/qemu-system/vinix-qemu-desktop` | 851 |
+| `build-support/roblox/build` | 178 |
 | `build-support/roblox/run-roblox` | 1,318 |
 | `build-support/roblox/run-roblox-client` | 182 |
 | `build-support/run-v-tool.sh` | 1,617 |
@@ -867,6 +868,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/compile-v-host` | 162 |
 | `build-support/xorg-server/startx` | 2,994 |
 | `desktop/tools/build_voffice` | 147 |
+| `desktop/tools/input` | 171 |
 | `desktop/tools/screenshot.sh` | 258 |
 | `desktop/tools/stage_app` | 143 |
 | `desktop/tools/stage_host_gpu` | 148 |
@@ -900,7 +902,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,588 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 94,056 |
+| `scripts/build-desktop-aarch64.sh` | 92,269 |
 | `scripts/build-desktop-amd64.sh` | 14,918 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 204 |
@@ -929,7 +931,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-qemu-input.sh` | 3,417 |
 | `scripts/build-qemu-ovmf-aarch64.sh` | 4,720 |
 | `scripts/build-qemu-system-aarch64.sh` | 5,225 |
-| `scripts/build-roblox-aarch64.sh` | 139 |
+| `scripts/build-roblox-aarch64.sh` | 128 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
 | `scripts/build-steam-aarch64.sh` | 13,694 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
@@ -1088,10 +1090,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/android/cookie-test` | 170 |
 | `tests/android/egl-queue-test` | 173 |
 | `tests/android/guest-init.sh` | 25,551 |
+| `tests/android/interactive-test` | 174 |
 | `tests/android/layout-focus-test` | 176 |
 | `tests/android/location-test` | 172 |
 | `tests/android/musl-runtime-test` | 190 |
 | `tests/android/pointer-capture-test` | 179 |
+| `tests/android/run` | 160 |
 | `tests/android/run-activity-dispatch-test.sh` | 1,212 |
 | `tests/android/run-cookie-store-test.sh` | 1,299 |
 | `tests/android/run-runtime-vm` | 178 |
@@ -1276,6 +1280,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/n64/frame` | 180 |
 | `tests/n64/rsp-budget` | 218 |
 | `tests/n64/run` | 213 |
+| `tests/native-android-run/run` | 179 |
 | `tests/native-android-tools/run` | 179 |
 | `tests/native-boundaries/run` | 104 |
 | `tests/native-campaign-tools/campaignhost/hot-init.txt` | 552 |
@@ -1374,6 +1379,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/resource-groups/run-host.sh` | 801 |
 | `tests/resource-open/run` | 186 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
+| `tests/roblox/build-test` | 169 |
 | `tests/scheduler-preemption/policy` | 152 |
 | `tests/scheduler-qos/policy` | 152 |
 | `tests/scheduler-qos/run` | 186 |
