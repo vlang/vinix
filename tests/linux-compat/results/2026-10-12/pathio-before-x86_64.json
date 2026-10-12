@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "446bc375e55382ef62df3437f7cfe55c4193e6bd7aa3ba969f803c0f2736aa10",
+    "results": [
+        {
+            "name": "pathio",
+            "source_sha256": "28a7d58e04956b559c2024bcf6a3c081a770982a357724b7f52a54c536720d16",
+            "init_sha256": "7c27300260b8997b6f9510119b6db4464aed54c2d5f15eb7d2bdd6a4d0c49cfe",
+            "iso_sha256": "ce8f43238fe9b6604e5b98ec97d680abcf0e009b75027cbde62b8466556e1584",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

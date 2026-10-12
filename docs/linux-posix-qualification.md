@@ -1616,3 +1616,57 @@ results per architecture and the emitted validation order. The isolated
 no allocation, ownership or reclamation path is added. Vectored, O_PATH,
 later usercopy faults and foreign/ELF32 read semantics remain separate.
 The three broad section-15 application acceptance gates remain open.
+
+## O_PATH and vector access errors
+
+pread/pwrite now reject O_PATH before directory/FIFO type errors, retaining
+the existing descriptor reference through the early EBADF return. Scalar
+read/write already refuse O_PATH through the native access-mode mask, which
+includes O_PATH; those paths did not require a new guard. Vector read/write
+now validate descriptor existence, O_PATH and read/write mode before importing
+iovecs, including empty/all-zero vectors. Previously an empty O_PATH vector
+could report successful zero-byte I/O, and an invalid vector could mask EBADF
+with EFAULT. This follows Linux's
+[vector access checks](https://github.com/torvalds/linux/blob/v6.12/fs/read_write.c#L950)
+and [documented O_PATH contract](https://man7.org/linux/man-pages/man2/open.2.html).
+
+The vector helper snapshots flags while its lookup reference is live, then
+releases that reference and uses only the scalar access bits. It creates no
+object and retains no pointer. The existing I/O paths continue to acquire
+their own references; descriptor identity during concurrent close/reuse across
+an entire vector remains separate work. The permission check also replaces
+the previous empty-vector descriptor lookups.
+
+The native V `pathio` fixture passes 240 checks each in root and UID/GID 1000
+children on both architectures. Tests cover O_PATH handles for a regular
+file, directory, FIFO and unfollowed symlink, and duplicate descriptors.
+Zero/one-byte scalar and positioned reads, zero writes, nonempty reads,
+empty/all-zero vectors and unreadable iovec pointers require EBADF. Metadata
+and O_PATH status flags remain usable. Ordinary opens of a root-owned
+mode-0600 file require EACCES; existing scalar I/O refusal remains intact.
+Additional controls check invalid and wrong-access descriptors before iovec
+faults, valid two-iovec regular file I/O and successful zero vectors.
+
+Both unchanged-fixture controls fail as UID 1000 at the empty O_PATH readv,
+returning `0/0` instead of `-1/EBADF(9)`. Both changed production kernels pass
+eight regression cases: O_PATH/vector access, directory reads, pipes,
+constrained opens, shared-memory metadata, runtime primitives, seccomp
+trap/verifier and futex queues. All eight host test files and the isolated
+inventory check pass. The inventory now fingerprints the resource access-mode
+constants as well, for 62 inputs.
+
+`pathio-before-*` and `pathio-after-*` in the
+[dated results directory](../tests/linux-compat/results/2026-10-12/) retain
+controls and serial verdicts. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/pathio-audit.v)
+checks frozen kernels/fixtures, all 480 outcomes per architecture and emitted
+validation/reference order. An independent lifetime review checked both
+generated kernels and the fixed fixture buffers: one transient lookup release,
+no pointer use afterward, existing deferred releases on positioned error
+returns, and stack/mapping lifetimes through synchronous calls. The isolated
+4f30c2944 worktrees change two kernel files and the inventory generator;
+no allocation or reclamation implementation is added.
+
+Other O_PATH APIs, complete positioned-vectored/error ordering, concurrent
+descriptor identity, foreign/ELF32 paths and full application acceptance
+remain unqualified. The broad section-15 gates remain open.

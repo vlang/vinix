@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -590,6 +590,18 @@ An out-of-userspace nonzero range returns EFAULT. Failed directory reads leave
 the offset intact; invalid and wrong-access descriptors retain EBADF. Regular
 zero-byte reads leave the offset intact, and valid data/EOF reads still work.
 These checks do not qualify vectored, O_PATH or later-copy-fault behavior.
+
+The `pathio` case performs 240 checks each in isolated root and UID/GID 1000
+children. O_PATH handles to a regular file, directory, FIFO and unfollowed
+symlink, plus their duplicates, refuse scalar/positioned reads and writes and
+empty/nonempty vectors with EBADF. Metadata, duplication and status flags
+remain usable. Vector descriptor/access errors precede malformed iovec faults,
+including zero vectors and wrong read/write modes. Valid two-iovec regular
+read/write and zero vectors retain their results. The ordinary child first
+requires EACCES for an ordinary open of the root-owned mode-0600 file. This
+retains the existing scalar-read refusal. Concurrent close/reuse during a
+complete vector operation and other O_PATH operations require separate
+qualification.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

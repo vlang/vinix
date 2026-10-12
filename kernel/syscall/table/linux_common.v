@@ -17,6 +17,7 @@ import krandom
 import memory
 import net
 import proc
+import resource
 import sched
 import stat
 import time
@@ -195,20 +196,32 @@ fn read_linux_iov(iov_ptr u64, index int) ?LinuxIOVec {
 	return iov
 }
 
+// Linux validates descriptor access before importing even an empty vector.
+// Snapshot only immutable access bits while the lookup reference is live.
+fn linux_iov_access_error(fdnum int, write bool) u64 {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return errno.get() }
+	flags := fd.handle.flags
+	fd.unref()
+	access := flags & resource.o_accmode
+	if flags & resource.o_path != 0 || (access != resource.o_rdwr
+		&& access != if write { resource.o_wronly } else { resource.o_rdonly }) {
+		return errno.ebadf
+	}
+	return 0
+}
+
 // Linux writev(fd, iov, iovcnt) is one write operation.  In particular, a
 // protocol header and its payload must reach a stream socket together; issuing
 // one resource write per iovec lets the peer consume an incomplete message and
 // close before the payload is written.
 fn syscall_linux_writev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+	access_error := linux_iov_access_error(fdnum, true)
+	if access_error != 0 { return errno.err, access_error }
 	total, validation_error := validate_linux_iov(iov_ptr, iovcnt)
 	if validation_error != 0 {
 		return errno.err, validation_error
 	}
 	if total == 0 {
-		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
-			return errno.err, errno.get()
-		}
-		checked_fd.unref()
 		return 0, 0
 	}
 
@@ -767,15 +780,13 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _m
 
 // readv(fd, iov, iovcnt)
 fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
+	access_error := linux_iov_access_error(fdnum, false)
+	if access_error != 0 { return errno.err, access_error }
 	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
 	if validation_error != 0 {
 		return errno.err, validation_error
 	}
 	if iovcnt == 0 {
-		mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
-			return errno.err, errno.get()
-		}
-		checked_fd.unref()
 		return 0, 0
 	}
 

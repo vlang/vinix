@@ -1142,6 +1142,7 @@ fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64)
 	}
 
 	mut handle := fd.handle
+	if handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 
 	mode := handle.resource.stat.mode
@@ -1214,6 +1215,7 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	}
 
 	mut handle := fd.handle
+	if handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 
 	mut res := handle.resource
