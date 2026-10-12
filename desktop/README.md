@@ -1180,11 +1180,11 @@ keyboard:
 
     ./scripts/run-desktop-aarch64.sh --monitor
 
-    python3 desktop/tools/input.py drag 200 90 620 480
-    python3 desktop/tools/input.py click 344 412
+    desktop/tools/input drag 200 90 620 480
+    desktop/tools/input click 344 412
     ./desktop/tools/screenshot.sh /tmp/shot.png
 
-`input.py` speaks QMP to the virtio tablet, which takes absolute coordinates,
+`input` speaks QMP to the virtio tablet, which takes absolute coordinates,
 so a click lands where it is aimed regardless of where the cursor was.
 
 First-run setup has its own boot. It types a new user into the registration

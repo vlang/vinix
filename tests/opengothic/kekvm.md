@@ -54,11 +54,11 @@ DYLD_FALLBACK_LIBRARY_PATH="$qemu_dir/lib:/usr/local/lib:/usr/lib" \
   -serial "file:$gothic_work/serial.log" -monitor none
 ```
 
-Use `kekvm-control.py` on the host to execute guest commands and copy files
+Use `kekvm-control` on the host to execute guest commands and copy files
 through the guest agent, which works without network access:
 
 ```sh
-python3 tests/opengothic/kekvm-control.py --socket "$gothic_work/qga.sock" exec 'uname -a'
+tests/opengothic/kekvm-control --socket "$gothic_work/qga.sock" exec 'uname -a'
 ```
 
 Inside the guest, mount the share and check the GPU before launching:
@@ -109,6 +109,6 @@ comparing performance. The snapshot's guest writes disappear on exit.
 Copy the capture to the host with:
 
 ```sh
-python3 tests/opengothic/kekvm-control.py --socket "$gothic_work/qga.sock" \
+tests/opengothic/kekvm-control --socket "$gothic_work/qga.sock" \
   get /root/opengothic-kekvm/gothic.png "$gothic_work/gothic.png"
 ```

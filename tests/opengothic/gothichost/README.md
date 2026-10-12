@@ -1,5 +1,9 @@
 # Native OpenGothic host and guest controller
 
+The maintained command now runs [direct native V](../../native-game-tools/README.md)
+with SDK PTY ownership and native QMP/image code. The following records the
+earlier borrowed-object implementation retained as historical source.
+
 `run.py` keeps the public Python signatures, globals and argument parser.
 The host core owns layer copying, staging, QMP key policy and preparation.
 The guest core owns boot configuration, absolute deadlines, menu/world state,

@@ -381,7 +381,7 @@ if [ "$WITH_MONITOR" -eq 1 ]; then
     rm -f "$MONITOR_SOCKET" "$QMP_SOCKET"
     export VINIX_QEMU_EXTRA="${VINIX_QEMU_EXTRA} -monitor unix:${MONITOR_SOCKET},server,nowait -qmp unix:${QMP_SOCKET},server,nowait"
     echo "==> Monitor: ${MONITOR_SOCKET}   QMP: ${QMP_SOCKET}"
-    echo "    python3 desktop/tools/input.py click X Y"
+    echo "    desktop/tools/input click X Y"
     echo "    ./desktop/tools/screenshot.sh /tmp/shot.png"
 fi
 

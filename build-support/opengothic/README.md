@@ -7,7 +7,7 @@ or Mesa Lavapipe and LLVM on the CPU on other configurations. Xvfb supplies the 
 existing desktop bridge forwards keyboard and pointer events. No Wine or x86
 translation is involved.
 
-Build on a host with Python 3, Git, curl, tar, CMake, Ninja, glslang and the
+Build on a host with V, Git, curl, tar, CMake, Ninja, glslang and the
 `aarch64-linux-musl-gcc`, `aarch64-linux-musl-g++` and
 `aarch64-linux-musl-ar` cross compilers:
 
@@ -54,7 +54,7 @@ with `VINIX_OPENGOTHIC_STAGING`; `VINIX_OPENGOTHIC_BUILD_DIR` changes the
 engine builder's output directory. `GLSLANGVALIDATOR` selects a host shader
 compiler. Optional layers and any demo assets stay in generated build output.
 
-The engine and Vulkan headers are pinned to the commits in `build.py`, which
+The engine and Vulkan headers are pinned to the commits in the [native builder](../../tests/native-game-tools/gamehost/build.v), which
 applies two patches to the pinned Tempest renderer. Both are needed before the
 first frame of the world can be drawn on Lavapipe:
 

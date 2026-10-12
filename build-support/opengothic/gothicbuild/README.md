@@ -1,5 +1,9 @@
 # Native OpenGothic builder
 
+The maintained command now invokes [direct native V](../../../tests/native-game-tools/README.md).
+The following describes the earlier borrowed-object implementation retained
+as historical source; it is no longer the command's implementation.
+
 This module owns the complete maintained OpenGothic build workflow: argument
 validation, pinned checkouts and patches, APK index/development selection,
 parallel downloads, extraction, compiler and linker arguments, runtime staging,

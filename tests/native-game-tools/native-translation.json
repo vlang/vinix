@@ -1,0 +1,58 @@
+{
+    "bytes": 20483,
+    "files": 6,
+    "lines": 518,
+    "originals": [
+        {
+            "bytes": 1979,
+            "lines": 70,
+            "path": "build-support/opengothic/build.py",
+            "sha256": "f67d450c84e6a666c3022d2eac84bc14618f3d77c30dd04e27e7c555bf9c3244"
+        },
+        {
+            "bytes": 3425,
+            "lines": 85,
+            "path": "tests/opengothic/run.py",
+            "sha256": "67fd61a5c357df6455e0fdaddf656fa92ffad1786d13e08a3e896f5ee7d087b0"
+        },
+        {
+            "bytes": 3643,
+            "lines": 65,
+            "path": "tests/opengothic/_native.py",
+            "sha256": "4bd6d1618b6c2d292bd7ff8fb866e0fc8aead4e1a39af07a44974b89540dee12"
+        },
+        {
+            "bytes": 4448,
+            "lines": 109,
+            "path": "tests/opengothic/kekvm-control.py",
+            "sha256": "f828b525239a0506209717aeaaa6dd4f90db5b2a4aa983c58cefcc40cc0f777c"
+        },
+        {
+            "bytes": 6196,
+            "lines": 170,
+            "path": "desktop/tools/input.py",
+            "sha256": "ce1a936a60558172383270c967457a2adbf27ab0470fa5343aaa75397771bfab"
+        },
+        {
+            "bytes": 792,
+            "lines": 19,
+            "path": "desktop/tools/_input_native.py",
+            "sha256": "b27f359862cb2552a8001aec745508d5f6c2e8779817b6eff017ac66736f1a08"
+        }
+    ],
+    "qualification": {
+        "actual_arm64_generators_and_cross_build": true,
+        "cold_program_profiles": 18,
+        "fresh_game_build_or_guest_claimed": false,
+        "profiles": [
+            "arm",
+            "x86",
+            "san"
+        ],
+        "public_bootstraps": 10,
+        "source_receipt_sha256": "2f63512e17cedafe2d84951f3874bf4629d88d117cb1eb35955172340b2fe092",
+        "whole_vm_cases_per_profile": 8
+    },
+    "source_commit": "3a3773b0103bf178f40867f3dd3fbe5ba7b894b6",
+    "status": "PASS"
+}

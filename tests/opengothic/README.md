@@ -1,6 +1,6 @@
 # OpenGothic in the Vinix desktop
 
-`run.py` boots ARM64 Vinix under QEMU/HVF with only what the game needs: the
+`run` boots ARM64 Vinix under QEMU/HVF with only what the game needs: the
 desktop, Xvfb, the X11 input bridge and the OpenGothic layer. The desktop
 opens its Gothic II window, the test presses Return in the game's menu to start
 a new game, and the world then has to render for `--seconds` (60 by default, after a 10-second warmup)
@@ -12,12 +12,12 @@ desktop, and `vinix.log`, the serial console with the engine's log, in
 ```sh
 ./scripts/build-opengothic-aarch64.sh --demo
 ./scripts/build-desktop-aarch64.sh --no-initramfs
-python3 tests/opengothic/run.py --work build/opengothic/test
+tests/opengothic/run --work build/opengothic/test
 ```
 
 It needs the X11 and userland layers (`build-aarch64-x11`,
 `build-aarch64-userland`), a built kernel, `aarch64-linux-musl-gcc`, and
-Pillow for the capture. `--repo` names another checkout to take the layers and
+V for the host tools. `--repo` names another checkout to take the layers and
 `scripts/run-aarch64.sh` from, `--kernel-dir` another kernel, `--build` another
 OpenGothic build directory and `--desktop` another desktop binary.
 
@@ -37,7 +37,7 @@ For native GPU validation, build the private Venus runtime and select KekVM:
 
 ```sh
 ./scripts/build-venus-aarch64.sh
-VINIX_KEKVM_DIR="$HOME/code/kekvm" python3 tests/opengothic/run.py \
+VINIX_KEKVM_DIR="$HOME/code/kekvm" tests/opengothic/run \
     --venus --work build/opengothic/venus-test
 ```
 
