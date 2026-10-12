@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `c961bf9e551cf1bbbc910ebe96eb496eb0449be9`,
-Linguist 7.27.0 reports **Python 1.06%** (78 files, 433,580 bytes) and
-**V 82.02%** (3,581 files, 33,424,024 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `109cc28b27d82d53f8a369a09e9c2942d5e31fb7`,
+Linguist 7.27.0 reports **Python 0.89%** (62 files, 365,570 bytes) and
+**V 82.25%** (3,615 files, 33,650,383 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **4,772,705 Python bytes**. All remaining
-433,580 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **4,840,715 Python bytes**. All remaining
+365,570 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -24,7 +24,7 @@ to an archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 73 stages below remove **450 Python files / 1,927,284 original bytes** and
+The 74 stages below remove **466 Python files / 1,995,294 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -105,6 +105,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Android host builders, APK probes, generated runtime and runtime fixtures | `androidtools`, native public fronts, direct SDK API and typed fixture hooks | 48,003 / 1,097 | `6c3f2998` |
 | Android app supervision, runtime APIs, Roblox staging and host fixtures | `androidrun`, native PTY/QMP owners, image codecs and direct V APIs | 55,087 / 1,215 | `f21c1a5e` |
 | OpenGothic builder, guest, KekVM agent and desktop input closure | `gamehost`, direct V APIs, PTY/QMP owners and shared native input | 20,483 / 518 | `c961bf9e` |
+| Debian, dhewm3 and Dota runtime command and fixture closure | `runtimehost`, native Debian/JSON/newc, driver and LLVM tooling, PTY owners and Vulkan fixtures | 68,010 / 1,694 | `109cc28b` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -737,9 +738,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 73 stages.
+or hidden in these 74 stages.
 
-The next thirty-five stages remove 298 Python files / 1,428,941 original bytes.
+The next thirty-six stages remove 314 Python files / 1,496,951 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -752,7 +753,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **328 Python files / 1,563,218 original bytes**. Earlier qualification
+translates **344 Python files / 1,631,228 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -3089,3 +3090,21 @@ changes Linguist classification from Python to Shell, accounting for another
 169 classified Python bytes beyond the six retired programs. No fresh upstream
 engine build, real Vinix game boot or Venus performance run is claimed. See
 [native OpenGothic qualification](../tests/native-game-tools/README.md).
+
+The runtime-tools stage retires sixteen unchanged Python files. Twenty-four
+fresh program/profile builds pass on ARM, x86 and ASan/UBSan, with all eighteen
+original Vulkan staging cases and seventeen whole mock guest PTY cases per
+profile. Native Debian index/dependency/download/archive controls, kernel
+preparation and demo extraction, benchmark and capture checks, real newc and
+gzip archive extraction, Mesa/QEMU build recipes, cache damage and failed-build
+publication controls, LLVM queries and SDK cwd/descriptor checks pass. Twenty-two
+public compiler bootstraps pass before retirement; eight more pass afterward,
+including the whole staging suite and real native Debian command extraction.
+Actual native generators produce the early-client and mmap32 x86 ELF libraries.
+Darwin rejects invalid UTF-8 filenames, so filesystem surrogateescape and WTF-8
+serialization are tested independently of the real package archives. Upstream
+Mesa/Mako and QEMU configure tooling are external prerequisites; the first-party
+frontends and LLVM helper are V and do not bootstrap an interpreter environment.
+No Python or Meson is executed during qualification, and no fresh upstream
+engine/driver build or real Vinix guest boot is claimed. See
+[native runtime qualification](../tests/native-runtime-tools/README.md).

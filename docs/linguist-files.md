@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `c961bf9e551cf1bbbc910ebe96eb496eb0449be9`,
+at source commit `109cc28b27d82d53f8a369a09e9c2942d5e31fb7`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 591 | 2,394,136 | 5.87% |
-| Python | 78 | 433,580 | 1.06% |
-| Shell | 752 | 1,381,585 | 3.39% |
+| C | 591 | 2,393,745 | 5.85% |
+| Python | 62 | 365,570 | 0.89% |
+| Shell | 764 | 1,383,695 | 3.38% |
 
-All `.v` files are classified as V. The resulting V share is 82.02%, with no
+All `.v` files are classified as V. The resulting V share is 82.25%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 433,580 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 365,570 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev c961bf9e551cf1bbbc910ebe96eb496eb0449be9 --breakdown --json
+github-linguist --rev 109cc28b27d82d53f8a369a09e9c2942d5e31fb7 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -75,11 +75,11 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/cachekey/stat_abi.h` | 700 |
 | `build-support/dota2/early-client-abi.h` | 574 |
 | `build-support/dota2/mmap32-abi.h` | 501 |
-| `build-support/dota2/qemubuild/spawn_abi.h` | 1,444 |
+| `build-support/dota2/qemubuild/spawn_abi.h` | 788 |
 | `build-support/dota2/qemubuild/stat_abi.h` | 387 |
 | `build-support/init-aarch64/syscall_abi.h` | 613 |
 | `build-support/ios/cxx-abi.h` | 456 |
-| `build-support/minecraft/minecraftnative/spawn_abi.h` | 891 |
+| `build-support/minecraft/minecraftnative/spawn_abi.h` | 1,341 |
 | `build-support/n64-homebrew/paddlecore/freestanding/inttypes.h` | 124 |
 | `build-support/n64-homebrew/paddlecore/freestanding/stdio.h` | 298 |
 | `build-support/n64-homebrew/paddlecore/native-abi.h` | 1,157 |
@@ -196,7 +196,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `kernel/c/pci_config.h` | 2,255 |
 | `kernel/c/pci_config_arm_test.h` | 172 |
 | `kernel/c/printf_v.h` | 498 |
-| `kernel/c/pthread.h` | 1,298 |
+| `kernel/c/pthread.h` | 1,113 |
 | `kernel/c/speculation.h` | 524 |
 | `kernel/c/stack_protector.h` | 762 |
 | `kernel/c/stack_slots.h` | 402 |
@@ -656,14 +656,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/_boot_native.py` | 20,549 |
 | `build-support/android/_native.py` | 5,749 |
 | `build-support/cpython_host.py` | 1,007 |
-| `build-support/debian-root.py` | 4,231 |
-| `build-support/dhewm3/build.py` | 1,738 |
-| `build-support/dota2/_vulkan_native.py` | 12,992 |
-| `build-support/dota2/compile-v-compat.py` | 393 |
-| `build-support/dota2/mesa-build.py` | 6,294 |
-| `build-support/dota2/qemu-stage.py` | 3,871 |
-| `build-support/dota2/venus-build.py` | 4,720 |
-| `build-support/dota2/vulkan-stage.py` | 7,797 |
 | `build-support/ios/build-cxx.py` | 6,554 |
 | `build-support/ios/generate-cxx-symbols.py` | 1,647 |
 | `build-support/ios/stage-gles.py` | 2,688 |
@@ -693,14 +685,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/browsers/run_vm.py` | 9,438 |
 | `tests/claude/smoke.py` | 7,250 |
 | `tests/codex/smoke.py` | 4,944 |
-| `tests/dhewm3/_guest_native.py` | 3,724 |
-| `tests/dhewm3/prepare-debian.py` | 1,073 |
-| `tests/dhewm3/run.py` | 3,664 |
-| `tests/dota2/_native.py` | 3,559 |
-| `tests/dota2/_vulkan_fixture_native.py` | 6,287 |
-| `tests/dota2/_vulkan_vm_native.py` | 830 |
-| `tests/dota2/vulkan-run.py` | 2,115 |
-| `tests/dota2/vulkan-stage-test.py` | 4,722 |
 | `tests/ext2-xattr/host.py` | 6,852 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/ios/desktop.py` | 7,962 |
@@ -771,12 +755,19 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/chromium/run-chromium` | 8,032 |
 | `build-support/compile-v-module` | 168 |
 | `build-support/content-key` | 125 |
+| `build-support/debian-root` | 132 |
 | `build-support/desktop-build-key` | 131 |
+| `build-support/dhewm3/build` | 135 |
 | `build-support/dhewm3/run-dhewm3` | 571 |
 | `build-support/dictionary/prepare` | 124 |
 | `build-support/docker/vinix-dockerd` | 1,499 |
 | `build-support/doom/run-doom` | 656 |
+| `build-support/dota2/compile-v-compat` | 120 |
+| `build-support/dota2/mesa-build` | 134 |
+| `build-support/dota2/qemu-stage` | 134 |
 | `build-support/dota2/run-dota2` | 9,142 |
+| `build-support/dota2/venus-build` | 135 |
+| `build-support/dota2/vulkan-stage` | 136 |
 | `build-support/ext2-set-root-owner` | 174 |
 | `build-support/find-v.sh` | 3,160 |
 | `build-support/firefox/run-firefox` | 4,380 |
@@ -896,13 +887,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,588 |
 | `scripts/build-claude-aarch64.sh` | 5,892 |
 | `scripts/build-codex-aarch64.sh` | 4,807 |
-| `scripts/build-desktop-aarch64.sh` | 92,269 |
-| `scripts/build-desktop-amd64.sh` | 14,918 |
+| `scripts/build-desktop-aarch64.sh` | 92,581 |
+| `scripts/build-desktop-amd64.sh` | 15,166 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
-| `scripts/build-dhewm3-aarch64.sh` | 204 |
+| `scripts/build-dhewm3-aarch64.sh` | 193 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |
 | `scripts/build-doom-aarch64.sh` | 3,151 |
-| `scripts/build-dota2-aarch64.sh` | 1,600 |
+| `scripts/build-dota2-aarch64.sh` | 1,578 |
 | `scripts/build-firefox-aarch64.sh` | 6,340 |
 | `scripts/build-firefox-amd64.sh` | 178 |
 | `scripts/build-go-aarch64.sh` | 3,038 |
@@ -928,7 +919,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-qemu-system-aarch64.sh` | 5,225 |
 | `scripts/build-roblox-aarch64.sh` | 128 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
-| `scripts/build-steam-aarch64.sh` | 13,694 |
+| `scripts/build-steam-aarch64.sh` | 13,672 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
 | `scripts/build-userland-aarch64.sh` | 24,946 |
 | `scripts/build-userland-amd64.sh` | 5,989 |
@@ -1145,6 +1136,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/developer-tools/smoke.sh` | 4,577 |
 | `tests/devicetree-string-list/run.sh` | 240 |
 | `tests/dhewm3/guest-init.sh` | 2,668 |
+| `tests/dhewm3/prepare-debian` | 129 |
+| `tests/dhewm3/run` | 124 |
 | `tests/disk-no-sync/run.sh` | 178 |
 | `tests/disk-no-sync/run_vm` | 214 |
 | `tests/disk-root/make-large-file` | 190 |
@@ -1167,6 +1160,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/dota2/steam-smoke-init.sh` | 2,498 |
 | `tests/dota2/steam-smoke-run` | 205 |
 | `tests/dota2/vulkan-init.sh` | 3,187 |
+| `tests/dota2/vulkan-run` | 125 |
+| `tests/dota2/vulkan-stage-test` | 166 |
 | `tests/dota2/wake-op-run` | 201 |
 | `tests/dumpability/run` | 182 |
 | `tests/elf-text/run` | 181 |
@@ -1283,6 +1278,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/native-campaign-tools/campaignhost/verify-v4-init.txt` | 2,156 |
 | `tests/native-campaign-tools/run` | 179 |
 | `tests/native-game-tools/run` | 135 |
+| `tests/native-runtime-tools/run` | 135 |
 | `tests/net-random/run` | 183 |
 | `tests/net-random/run.sh` | 283 |
 | `tests/network-ipv6/run-host.sh` | 124 |
