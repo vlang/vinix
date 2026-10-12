@@ -4,7 +4,7 @@ Run the native V controller in [README.md](README.md) with `--host`, then both
 guest architectures. Production kernel code and saved formats are unchanged.
 
 The host suite holds an exclusive directory lock and requires every saved-state
-writer to fail without changing bytes or creating files: mapping add/remove and
+writer to fail without changing bytes or creating files: mapping add/remove (including removal batches) and
 growth, disk enrollment/removal, physical-capacity adoption, pool membership,
 allocation, expansion/growth, batches, bounded extent allocation, direct plan
 publication and live snapshots. Batch previews, pool queries and extent queries

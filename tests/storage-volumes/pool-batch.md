@@ -53,7 +53,7 @@ pool-preview-order and pool-order,
 pool-preview-expand-batch and pool-expand-batch,
 pool-space, two-request pool-preview-batch and pool-allocate-batch,
 pool-preview-grow-batch and pool-grow-batch,
-check-bundle, two plan-remove commands, plan-enroll/forget, restore-bundle and
+check-bundle, plan-preview-remove-batch and plan-remove-batch, plan-enroll/forget, restore-bundle and
 boot-restore. This is **8800 processes**, 400 allocation previews/publications,
 800 scratch placements, 400 growth previews/publications, 800 scratch growths,
 800 member additions, 400 expansion previews/publications, 400 capacity batch

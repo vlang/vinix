@@ -58,6 +58,13 @@ desired entry. Both atomically publish a validated complete set; live mappings
 are changed only by separate runtime commands. See
 [offline configuration editing](../../docs/storage-volumes.md#offline-mapping-configuration).
 
+`plan-remove-batch BUNDLE SLOT [...]` removes 1–64 distinct desired slots across
+disks in one atomic publication. Absent slots are durable `keep` retries;
+remaining mappings, enrolled disks and pool priority are preserved.
+`plan-preview-remove-batch` reports the complete remove/keep list without
+devices, writer locking or publication. Live views survive desired omission.
+See [removal batch rules](../../docs/storage-volumes.md#atomic-desired-mapping-removal-batches).
+
 `plan-enroll BUNDLE PLAN` appends a saved single-disk plan without resnapshotting
 existing desired mappings. `plan-forget BUNDLE DISK_INDEX` removes an empty
 participant while retaining at least one disk. Both edit saved membership;

@@ -379,6 +379,51 @@ This completes add/remove editing of saved linear mappings; RAID,
 filesystem resize and encryption remain separate work. See
 [offline edit qualification](../tests/storage-volumes/edit-bundle.md).
 
+## Atomic desired mapping removal batches
+
+```sh
+vinix-volume plan-preview-remove-batch /root/layout.vset 13 12
+vinix-volume plan-remove-batch /root/layout.vset 13 12
+vinix-volume check-bundle /root/layout.vset
+```
+
+`plan-remove-batch BUNDLE SLOT [...]` removes 1–64 distinct desired mapping
+slots as one saved-state edit, across any enrolled disks. Slots are unsigned
+decimal numbers from 0 through 63. Duplicate requests, invalid counts/numbers
+and invalid source bundles fail before publication or action reporting. The
+whole request is validated before a private candidate is changed; failure
+preserves both the original set and caller action results.
+
+Present slots report `action=remove`, their saved disk, offset, length and
+read-only mode in request order. Already absent slots report `action=keep`;
+mixed present/absent requests succeed. A matching retry therefore keeps exact
+saved bytes while still writing, file-fsyncing, atomically renaming and
+directory-fsyncing the complete set. Single-slot `plan-remove` retains its
+existing behavior, including an error for an absent slot.
+
+Remaining rows keep their order, geometry, modes and pending desired edits.
+Vacated row storage is cleared. Disk identities, capacities, enrollment and
+indices are preserved even when the last row is removed. Every pool region,
+bound, alignment and allocation priority remains unchanged. Freed desired slots
+can be reused by later explicit planning operations.
+
+`plan-preview-remove-batch` uses the same complete planner and reports every
+remove/keep action without opening physical devices, taking a writer lock,
+creating a temporary or publishing. A preview does not reserve saved state.
+Publication retains the pinned directory writer lock from source read through
+report flushing and cleanup. Failure before rename retains the old file;
+after rename the complete new set may be visible with durability unconfirmed.
+Buffered output failure also returns an error. Inspect saved state or repeat
+the complete removal list to confirm durability.
+
+Removing desired rows does not detach live views, release their physical
+extents, invalidate descriptors or erase data. Replay preserves unlisted views;
+live preflight still rejects a reused slot or extent that conflicts with one.
+Live removal remains a separate explicit operation with the kernel's existing
+mounted/swap/lifetime protections. The existing checksummed V1/V2 formats and
+boot replay persist the omissions. See
+[removal batch qualification](../tests/storage-volumes/removal-batch.md).
+
 ## Offline disk membership
 
 ```sh

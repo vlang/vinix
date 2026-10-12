@@ -124,6 +124,16 @@ retries and buffered stdout failure. Guests check actual physical first fit,
 held views and explicit reordered priority across reboot. See
 [priority qualification](pool-order.md).
 
+Mapping removal batches check all 1956 nonempty ordered subsets of six slots
+under four mixed-sector/MBR/GPT and interleaved-pool layouts: 7824 independent
+stable-filtering expectations, each with an absent-slot request and retry.
+They preserve remaining rows/modes, empty enrollment and exact pool priority,
+cover full 64-slot CLIs on one or 64 disks, and reject later invalid requests
+without partial publication. Publisher faults and buffered stdout errors cover
+changed and all-absent orders. Guests verify omitted replay, retained live
+descriptors, reused-slot preflight conflicts and persistent absence across boot.
+See [removal batch qualification](removal-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -201,7 +211,7 @@ cycles, with both disks enabled. Each cycle saves the bundle, plans unchanged
 mapping capacity, previews/verifies/republishes both unchanged physical capacities,
 previews/publishes admission of two pool members and unchanged allocation priority,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
-batch, previews/publishes a two-mapping growth batch, checks/removes the scratch
+batch, previews/publishes a two-mapping growth batch, checks and previews/removes the scratch
 mappings, enrolls/forgets an empty offline
 participant, explicitly replays growth and runs boot restoration.
 A flushed phase marker

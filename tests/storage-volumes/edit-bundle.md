@@ -43,7 +43,7 @@ remaining set. Reenrolling it preserves generations. `PLAN EDIT PASSED:` is
 required before acceptance.
 
 Each repeated cycle saves, plans and verifies unchanged capacity, previews and
-publishes scratch allocation/growth batches, checks and removes both scratch
+publishes scratch allocation/growth batches, checks and previews/removes both scratch
 entries, enrolls/forgets an empty offline disk,
 explicitly restores and runs boot replay.
 The scratch mappings must never become live. After 200 warmup and 200 measured cycles,

@@ -60,6 +60,7 @@ fn usage() i32 {
 	C.printf(c'       vinix-volume save-set BUNDLE DEVICE [DEVICE ...]\n       vinix-volume plan-grow BUNDLE SLOT LENGTH_BYTES\n       vinix-volume restore-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume show-bundle BUNDLE\n       vinix-volume check-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume plan-add BUNDLE DISK_INDEX SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume plan-remove BUNDLE SLOT\n')
+	C.printf(c'       vinix-volume plan-remove-batch BUNDLE SLOT [...]\n       vinix-volume plan-preview-remove-batch BUNDLE SLOT [...]\n')
 	C.printf(c'       vinix-volume plan-enroll BUNDLE PLAN\n       vinix-volume plan-forget BUNDLE DISK_INDEX\n')
 	C.printf(c'       vinix-volume plan-space BUNDLE DISK_INDEX START_BYTES END_BYTES ALIGNMENT_BYTES\n       vinix-volume plan-allocate BUNDLE DISK_INDEX SLOT LENGTH_BYTES START_BYTES END_BYTES ALIGNMENT_BYTES [ro]\n')
 	C.printf(c'       vinix-volume plan-capacity BUNDLE DISK_INDEX DEVICE EXPECTED_BYTES\n')
@@ -76,6 +77,17 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'plan-remove-batch') == 0 || C.strcmp(argv[1], c'plan-preview-remove-batch') == 0) {
+			if argc < 4 || argc > 67 { return usage() }
+			mut batch := &MappingRemovalBatch(C.alloca(sizeof(MappingRemovalBatch)))
+			*batch = MappingRemovalBatch{count: argc - 3}
+			for i in 0 .. batch.count {
+				slot := decimal(argv[3 + i]) or { return usage() }
+				if slot >= 64 { return usage() }
+				batch.slots[i] = u32(slot)
+			}
+			return remove_batch_bundle_plan(argv[2], batch, C.strcmp(argv[1], c'plan-preview-remove-batch') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'pool-order') == 0 || C.strcmp(argv[1], c'pool-preview-order') == 0) {
 			if argc < 5 || argc > 68 { return usage() }
 			pool := decimal(argv[3]) or { return usage() }

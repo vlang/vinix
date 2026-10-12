@@ -53,7 +53,7 @@ pool-preview-order and pool-order,
 pool-preview-expand-batch, pool-expand-batch, pool-space,
 pool-preview-batch, pool-allocate-batch,
 pool-preview-grow-batch, pool-grow-batch,
-check-bundle, two plan-remove commands, plan-enroll, plan-forget, restore-bundle
+check-bundle, plan-preview-remove-batch and plan-remove-batch, plan-enroll, plan-forget, restore-bundle
 and boot-restore. This is 8800 processes, 800 member additions, 400 pool queries
 and 800 scratch placements/growths. No scratch mapping is created.
 Every slab class and the large-page total must stay flat or decrease.
