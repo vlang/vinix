@@ -22,6 +22,8 @@ fn (mut a FilesContextApp) clear_volumes() {
 fn (mut a FilesContextApp) refresh_volumes() {
 	a.clear_volumes()
 	mut inventory := DiskUtilityApp{}
+	// The raw collector expects typed backing arrays, as refresh_sources does.
+	inventory.prepare_snapshot()
 	inventory.collect_mounts('/proc/mounts')
 	defer { inventory.close_app() }
 	for mount in inventory.mounts {
