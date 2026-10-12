@@ -1,0 +1,31 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "3907b1949fce293f39a434acd278fe6fce6909ba64a01e00b002a6f66a58babc",
+    "results": [
+        {
+            "name": "securebits",
+            "source_sha256": "6c9bed07f2da73a41f6a33caf460ea22da2ff1d25786554bbd8b561dc33a1f29",
+            "init_sha256": "50d522766168f4fbe062c7abf38303db9ad9938a04807a3e134bed10901003db",
+            "iso_sha256": "188dfd86c37dadc3af8068c36c3b65517804798d781b4997fb2871b7b6b3c5f3",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "keepcaps",
+            "source_sha256": "e1e0906a97dae640da4269408f3c2f04ca321fe0e113edda83075b81337aa04c",
+            "init_sha256": "6b4fd0b753044e97563f526502e664f180557ff8b0e98cfa45d204bc9152aa4e",
+            "iso_sha256": "e62a6cbe60608fa42f5a021133d4f2904fbfad143cae150b62870eb57c5c96b7",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "nnpthread",
+            "source_sha256": "fd96c5dbbeb72a805fe2d3898760453433b99200b9b0bc447a56d866ca702f88",
+            "init_sha256": "8e452843569b2fd65218e9981692c1b64051d82bc154a78162fba2029c942e07",
+            "iso_sha256": "6c4b01513617bff60064c067dd8425b9d68e6069be2f89a6d180132653538471",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

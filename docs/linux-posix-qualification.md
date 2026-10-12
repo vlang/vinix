@@ -1010,4 +1010,53 @@ All eight host test files pass. The [assertion-enabled auditor](../tests/linux-c
 checks the negative assertion control, 53-input inventory, unchanged fixtures,
 isolated one-file kernel change and frozen artifacts. This change introduces
 no allocations or frees. Securebits locking and per-thread capability
-credentials remain unqualified; the larger compatibility gates stay open.
+credentials were not qualified by these value checks. The later securebits
+results below qualify its flags and locks; capability sets remain process-wide.
+
+## Securebits policy and task ownership
+
+PR_SET_SECUREBITS now applies Linux's four behavior/lock pairs and refuses
+unknown mask bits, changes to locked behaviors, removed locks, and callers
+without CAP_SETPCAP with EPERM. This includes uid 0 after dropping that
+capability. KEEP_CAPS is the same task-local bit exposed through
+PR_SET/GET_KEEPCAPS, whose invalid-value EINVAL precedes its locked-bit EPERM.
+The behavior follows [Linux 6.12's capability implementation](https://github.com/torvalds/linux/blob/v6.12/security/commoncap.c#L1222)
+and [securebits definitions](https://github.com/torvalds/linux/blob/v6.12/include/uapi/linux/securebits.h).
+
+NOROOT suppresses root capability magic during an exec without file
+capabilities. NO_SETUID_FIXUP retains capability sets across the tested real,
+effective and saved UID transitions. NO_CAP_AMBIENT_RAISE prevents future
+raises without deleting existing ambient capabilities; lowering and clearing
+remain permitted. A complete root-to-user transition without NO_SETUID_FIXUP
+clears ambient capabilities even when KEEP_CAPS retains permitted capabilities.
+Exec clears KEEP_CAPS and preserves its lock and every other flag.
+
+Flags belong to each Thread. Existing siblings stay independent, while clone,
+fork and exec inherit the caller's flags. Direct execs from nonleaders with
+different flags from their leader check both KEEP_CAPS clearing and retention
+of NO_CAP_AMBIENT_RAISE. Borrowed constructor/current-task reads retain no
+pointers, and a separate lifetime/concurrency review found no blocker in either
+generated kernel. The new helper paths allocate and free nothing.
+
+The unchanged V fixture detects the original placeholder success for an
+unknown mask on both native architectures:
+[AArch64 control](../tests/linux-compat/results/2026-10-12/securebits-before-aarch64.json),
+[x86-64 control](../tests/linux-compat/results/2026-10-12/securebits-before-x86_64.json).
+Both final builds pass all lock pairs in both states, five privilege/UID/ambient
+policy cases, sibling and descendant checks, and eleven exec probes. They also
+pass the existing KEEPCAPS and no_new_privs thread regressions:
+[AArch64 results](../tests/linux-compat/results/2026-10-12/securebits-after-aarch64.json),
+[x86-64 results](../tests/linux-compat/results/2026-10-12/securebits-after-x86_64.json).
+Six existing capability-exec groups pass on the same kernels:
+[AArch64](../tests/linux-compat/results/2026-10-12/securebits-cap-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/securebits-cap-x86_64.json).
+All eight host test files pass. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/securebits-audit.v)
+checks the negative assertion control, 54-input inventory, isolated sources,
+unchanged fixtures, generated helper C and frozen guest artifacts.
+
+Capability sets remain process-wide. These receipts qualify the task flags
+and the stated single-thread capability effects; concurrent per-thread
+credential isolation, file capabilities, fsuid-specific fixups, LSM behavior
+and complete application sandbox isolation remain unqualified. The three
+larger roadmap gates stay open.

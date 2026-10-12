@@ -28,6 +28,8 @@ pub mut:
 	// Movable members
 	// Linux task-local, sticky across clone/fork/exec. Atomic for procfs readers.
 	no_new_privs u32
+	// Linux task-local securebits, including the KEEP_CAPS behavior/lock pair.
+	securebits u32
 	user_page_fault bool
 	tid int
 	// The tid as the thread's pid namespace numbers it; see Process.ns_pid.

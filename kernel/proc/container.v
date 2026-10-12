@@ -86,8 +86,6 @@ pub mut:
 	inheritable u64
 	bounding    u64
 	ambient     u64
-	// SECBIT_KEEP_CAPS, from prctl(PR_SET_KEEPCAPS).
-	keep bool
 }
 
 // CAP_CHECKPOINT_RESTORE is the highest capability Linux 6.x defines.
@@ -382,7 +380,8 @@ pub fn capabilities_after_exec(mut process Process) {
 	syscall_policy_reset(mut process)
 	mut caps := process.caps
 	old_permitted := caps.permitted
-	if process.euid == 0 || process.uid == 0 {
+	bits := securebits_state(current_thread())
+	if bits & secbit_noroot == 0 && (process.euid == 0 || process.uid == 0) {
 		caps.permitted = (caps.inheritable | caps.bounding) | caps.ambient
 		caps.effective = if process.euid == 0 { caps.permitted } else { caps.ambient }
 	} else {
@@ -396,7 +395,7 @@ pub fn capabilities_after_exec(mut process Process) {
 		caps.effective &= caps.permitted
 	}
 	// SECBIT_KEEP_CAPS does not survive exec; no_new_privs does.
-	caps.keep = false
+	securebits_after_exec()
 	process.caps = caps
 }
 
@@ -405,11 +404,15 @@ pub fn capabilities_after_exec(mut process Process) {
 // alone clears only the effective set. Called after every credential change.
 pub fn capabilities_after_setuid(mut process Process, old_ruid u32, old_euid u32, old_suid u32) {
 	if process.euid != old_euid { set_dumpability(mut process, 0) }
+	bits := securebits_state(current_thread())
+	if bits & secbit_no_setuid_fixup != 0 { return }
 	had_root := old_ruid == 0 || old_euid == 0 || old_suid == 0
 	has_root := process.uid == 0 || process.euid == 0 || process.suid == 0
-	if had_root && !has_root && !process.caps.keep {
-		process.caps.permitted = 0
-		process.caps.effective = 0
+	if had_root && !has_root {
+		if bits & secbit_keep_caps == 0 {
+			process.caps.permitted = 0
+			process.caps.effective = 0
+		}
 		process.caps.ambient = 0
 	}
 	if old_euid == 0 && process.euid != 0 {

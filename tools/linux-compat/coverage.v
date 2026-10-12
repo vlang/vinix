@@ -67,6 +67,7 @@ fn coverage(root string) !Coverage {
 		'kernel/kprint/kprint_amd64.v', 'kernel/kprint/kprint_arm64.v',
 		'kernel/proc/container.v', 'kernel/proc/seccomp.v',
 		'kernel/proc/thread_attach.v',
+		'kernel/proc/securebits.v',
 		'kernel/sched/sched_arm64.v', 'kernel/sched/sched_amd64.v',
 		'kernel/userland/userland.v',
 		'kernel/kbudget/budget.v', 'kernel/proc/kernel_budget.v',

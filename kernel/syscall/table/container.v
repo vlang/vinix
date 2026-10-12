@@ -305,11 +305,11 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 		}
 		pr_set_keepcaps {
 			if arg2 > 1 { return errno.err, errno.einval }
-			process.caps.keep = arg2 != 0
+			if !proc.set_keepcaps(arg2 != 0) { return errno.err, errno.eperm }
 			return 0, 0
 		}
 		pr_get_keepcaps {
-			return if process.caps.keep { u64(1) } else { u64(0) }, 0
+			return if proc.securebits_state(proc.current_thread()) & proc.secbit_keep_caps != 0 { u64(1) } else { u64(0) }, 0
 		}
 		pr_cap_ambient {
 			// Linux ABI: 1 is_set, 2 raise, 3 lower, 4 clear_all.
@@ -324,7 +324,8 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 					}
 					bit := u64(1) << arg3
 					if arg2 == 2 {
-						if process.caps.permitted & bit == 0 || process.caps.inheritable & bit == 0 {
+						if process.caps.permitted & bit == 0 || process.caps.inheritable & bit == 0
+							|| proc.securebits_state(proc.current_thread()) & proc.secbit_no_cap_ambient_raise != 0 {
 							return errno.err, errno.eperm
 						}
 						process.caps.ambient |= bit
@@ -349,10 +350,11 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 			}
 		}
 		pr_set_securebits {
+			if !proc.set_securebits(arg2) { return errno.err, errno.eperm }
 			return 0, 0
 		}
 		pr_get_securebits {
-			return 0, 0
+			return u64(proc.securebits_state(proc.current_thread())), 0
 		}
 		pr_set_child_subreaper {
 			process.child_subreaper = arg2 != 0
