@@ -1,0 +1,88 @@
+{
+    "bytes": 55087,
+    "files": 8,
+    "lines": 1215,
+    "originals": [
+        {
+            "blob": "1f1a4c337f90d282cde80ddcbab03235ca89b69e",
+            "bytes": 10978,
+            "lines": 235,
+            "path": "build-support/android/art-runtime.py",
+            "sha256": "dd816bab11dd446d88a4d0cfa39a5b2306be8429d2dd739e378ef877b720ebd6"
+        },
+        {
+            "blob": "1ec4c0c055707cc906a969b04f5cb3cb9f4ee1b3",
+            "bytes": 2803,
+            "lines": 61,
+            "path": "build-support/android/musl-runtime.py",
+            "sha256": "00795e526c5e986674fccdb3c701a3ce7452ebc4c351b3cf8c96bb7f1ad17304"
+        },
+        {
+            "blob": "7bf460931421834ae4ac1dda371f114d2fb89de1",
+            "bytes": 4172,
+            "lines": 109,
+            "path": "build-support/android/art-bootclasspath.py",
+            "sha256": "4bd0fb052eafe0eff3773db53367c31ec8135b23a44dec44a5f1ecb864d047e6"
+        },
+        {
+            "blob": "254465a7b0af1901f0f1370d4253f98d5d485f7f",
+            "bytes": 12350,
+            "lines": 230,
+            "path": "tests/android/run.py",
+            "sha256": "cf47d720bf76daa078bfdfa2b075dd8a0e528c77b00acd30fd740d6a345b5c05"
+        },
+        {
+            "blob": "325bf663c6664bac4eeccc084222a59a840fe6d5",
+            "bytes": 9881,
+            "lines": 196,
+            "path": "tests/android/interactive-test.py",
+            "sha256": "a309f8b46a8b7d1d74b64ca356195e9a08ce5213570e6dc4f74ebd03d48a88ad"
+        },
+        {
+            "blob": "d1e46bf13b48c2783d204f6cc2b28f4d7fae8c8b",
+            "bytes": 5502,
+            "lines": 180,
+            "path": "build-support/roblox/build.py",
+            "sha256": "6367a0c829f1c7c7300c38a311646a19c8356c96ec66f6b48c36088e1d71f5b3"
+        },
+        {
+            "blob": "ebc12d38ec3b20aca318571e9d878f56e5240b94",
+            "bytes": 948,
+            "lines": 26,
+            "path": "build-support/roblox/_native.py",
+            "sha256": "367e6565773f71210a796f62dcc8d67322e4d50e6d8e5b17ddf3cd307b6b73f8"
+        },
+        {
+            "blob": "3c75865cbc3fd76f119ebd823f8f32c07fac31b6",
+            "bytes": 8453,
+            "lines": 178,
+            "path": "tests/roblox/build-test.py",
+            "sha256": "07b14cafe117e568bb061551d3d0ade4a7ea9bc6b2bc8342dac7a03203ab7ae7"
+        }
+    ],
+    "qualification": {
+        "actual_public_compiler_bootstraps": 16,
+        "cold_builds": 36,
+        "existing_runtime_cases_per_profile": 45,
+        "fresh_vinix_android_boot_claimed": false,
+        "named_native_cases_per_profile": 20,
+        "profiles": [
+            "arm",
+            "x86",
+            "san"
+        ],
+        "public_fronts": 8,
+        "public_receipt_sha256": "b4dcd25cc382517bca48cd05070bd768f75438d4e95d9aa14478927f1706d092",
+        "source_receipt_sha256": "1d338bbf1ce8a549c2091e4c1b88c9708c1700304f0731030c21f478c55af823",
+        "whole_native_mock_vm_sessions_per_profile": 4
+    },
+    "retained_legacy_bridges": [
+        "build-support/android/_native.py",
+        "build-support/android/_boot_native.py",
+        "tests/android/_run_native.py",
+        "desktop/tools/input.py",
+        "desktop/tools/_input_native.py"
+    ],
+    "source_commit": "44315b0265c229f6f3d7ec237a6a0a952ee453cf",
+    "status": "PASS"
+}

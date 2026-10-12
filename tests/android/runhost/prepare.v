@@ -194,7 +194,7 @@ fn prepare(mut args map[string]ah.Value, root string) !ah.Value {
 	command([compiler, '-O2', '-Wall', '-Wextra', '-Werror', '-static',
 		join([root, 'tests/android/memory-probe.c'])!, '-o', join([test_directory, 'memory-probe'])!])!
 	host_core := join([test_directory, 'wine-host-core.c'])!
-	command(['python3', join([root, 'build-support/xorg-server/compile-v-host.py'])!, 'winehost',
+	command([join([root, 'build-support/xorg-server/compile-v-host'])!, 'winehost',
 		host_core, '--arch', 'arm64'])!
 	command([compiler, '-O2', '-w', '-D__vinix__', '-I' + x11 + '/usr/include', host_core,
 		'-I' + root + '/build-support/xorg-server', '-L' + x11 + '/usr/lib', '-L' + x11 + '/lib',

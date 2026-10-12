@@ -21,16 +21,6 @@ fn main_policy(mut args map[string]ah.Value) !ah.Value {
 			parser_error('--interactive disables automatic screenshots; capture explicitly through QMP')!
 		}
 	}
-	if !truth(ah.field(args, 'prepare_only')) && !interactive {
-		callback('import', {
-			'name': ah.Value('PIL')
-		}) or {
-			if err is BindingError && text(err.value, 'kind') in ['ImportError', 'ModuleNotFoundError'] {
-				return failure('Python Pillow is required to save the APK screenshot')
-			}
-			return err
-		}
-	}
 	args_set(mut args, 'repo', ah.Value(resolve(text(args, 'repo'))!), 'path')!
 	args_set(mut args, 'state_dir', ah.Value(resolve(text(args, 'state_dir'))!), 'path')!
 	default_path(mut args, 'runtime', join([text(args, 'repo'), 'build-aarch64-android/aarch64/staging'])!)!

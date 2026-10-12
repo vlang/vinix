@@ -1,9 +1,24 @@
+@[has_globals]
 module runhost
 
 import androidhost as ah
 import boothost
 import json2
 import os
+
+pub type NativeCallback = fn (string, map[string]ah.Value, voidptr) !ah.Value
+
+__global (
+	native_callback NativeCallback
+	native_context voidptr
+)
+
+pub fn set_native_callback(callback NativeCallback, context voidptr) (NativeCallback, voidptr) {
+	previous, previous_context := native_callback, native_context
+	native_callback = callback
+	native_context = context
+	return previous, previous_context
+}
 
 pub struct BindingError {
 pub:
@@ -44,6 +59,7 @@ fn truth(value ah.Value) bool {
 }
 
 fn callback(operation string, arguments map[string]ah.Value) !ah.Value {
+	if native_callback != unsafe { nil } { return native_callback(operation, arguments, native_context)! }
 	println(ah.encode(boothost.pack(ah.Value({
 		'callback':  ah.Value(operation)
 		'arguments': ah.Value(arguments)

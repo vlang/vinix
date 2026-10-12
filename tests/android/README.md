@@ -15,7 +15,7 @@ then build the Android runtime and sample APK, desktop and kernel:
 ./scripts/build-android-aarch64.sh --with-calculator
 ./scripts/build-desktop-aarch64.sh --no-initramfs
 make -C kernel ARCH=aarch64 CC=clang LIMINE_MP=1
-python3 tests/android/run.py
+tests/android/run
 ```
 
 The test starts a separate Vinix QEMU guest with a private boot disk, EFI
@@ -37,14 +37,14 @@ A failed test also attempts to capture the screen.
 Useful options:
 
 ```sh
-python3 tests/android/run.py --desktop /path/to/vinix-desktop \
+tests/android/run --desktop /path/to/vinix-desktop \
     --kernel-dir /path/to/kernel --state-dir /tmp/vinix-android-test
-python3 tests/android/run.py --apk /path/to/calculator.apk \
+tests/android/run --apk /path/to/calculator.apk \
     --activity calculator/Calculator --keys '123+456' --expect 579
 ./scripts/build-desktop-aarch64.sh --compact-initramfs --with-android
-python3 tests/android/run.py --initramfs build-support/init-aarch64/initramfs-desktop.tar \
+tests/android/run --initramfs build-support/init-aarch64/initramfs-desktop.tar \
     --memory 12288
-python3 tests/android/run.py --boot-probe build/android-native-java/probe/ArtBootProbe.jar \
+tests/android/run --boot-probe build/android-native-java/probe/ArtBootProbe.jar \
     --memory 12288
 ```
 
@@ -55,7 +55,7 @@ x86_64` compiles the result observer for an x86 runtime translated by QEMU.
 `--mode direct` brings up the same APK on the X11 bridge before
 desktop integration, sends XTEST keyboard input, and displays its real pixels
 on fbdev for a QMP screenshot. The normal desktop test exercises compositor
-keyboard forwarding. The host needs `aarch64-linux-musl-gcc` and Python Pillow.
+keyboard forwarding. The host needs `aarch64-linux-musl-gcc` and the maintained V compiler; screenshots use the native image encoder.
 The default runtime is native ARM64; no CPU translator is installed or invoked.
 Before launching the APK, the test checks mapped stack bounds, the finite stack
 limit, worker stack guards and ART's memory mapping prerequisites in the real
@@ -83,7 +83,7 @@ exit status and its `ANDROID-BOOTCLASSPATH-PASS` assertion marker are required.
 Build this fixture with the pinned bootclasspath tools and a JDK on the host:
 
 ```sh
-python3 build-support/android/art-bootclasspath.py \
+build-support/android/art-bootclasspath \
     --build-dir build/android-native-java \
     --art-runtime build-aarch64-android/aarch64/art-runtime \
     --build-probe build/android-native-java/probe/ArtBootProbe.jar
@@ -93,10 +93,10 @@ For bring-up of another APK, capture its actual window and startup diagnostics
 without the calculator observer or simulated input:
 
 ```sh
-python3 tests/android/run.py --apk /path/to/application.apk \
+tests/android/run --apk /path/to/application.apk \
     --activity package/Activity --title package --observe \
     --mode direct --state-dir /tmp/vinix-apk-observation
-python3 tests/android/run.py --launcher roblox --apk /path/to/Roblox.apk \
+tests/android/run --launcher roblox --apk /path/to/Roblox.apk \
     --observe \
     --mode direct --runtime-arg=-X --runtime-arg=-verbose:jni \
     --state-dir /tmp/vinix-roblox-observation
@@ -132,7 +132,7 @@ real JNI library loaded from it. The directory contains
 `error`. Every rejection must exit with status 1 before application code runs;
 an abort or missing pass marker fails the preflight. The result records all
 fixture archive hashes and `split_probe_passed` separately from window observation.
-The fixture build script is `tests/android/split-test.py`; build it against
+The fixture build script is `tests/android/split-test`; build it against
 the same genuine ATL hax classes as the runtime under test.
 
 `--launcher roblox` validates and stages the production Roblox launchers alongside
@@ -175,10 +175,10 @@ verdicts; neither preflight establishes gameplay.
 
 `--layout-probe /path/to/android-layout-focus-probe.jar` checks the actual
 framework's inflater and default-focus dispatch before the APK. Build it on
-the native framework build host with [layout-focus-test.py](layout-focus-test.py):
+the native framework build host with [layout-focus-test](layout-focus-test):
 
 ```sh
-python3 tests/android/layout-focus-test.py \
+tests/android/layout-focus-test \
     --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
     --stub-classes /path/to/atl/output/src/gstub/gstub.jar \
     --r8 /path/to/r8-8.3.37.jar --output /path/to/android-layout-focus-probe.jar
@@ -201,10 +201,10 @@ probe hash and verdict. The test APK contains only fixture classes and its own
 manifest/resources. It leaves the application's APK and runtime providers intact.
 
 Build the fixture against the same coherently built ATL framework and resources
-using [activity-lifecycle-test.py](activity-lifecycle-test.py):
+using [activity-lifecycle-test](activity-lifecycle-test):
 
 ```sh
-python3 tests/android/activity-lifecycle-test.py \
+tests/android/activity-lifecycle-test \
     --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
     --framework-res /path/to/atl/output/res/framework-res/framework-res.apk \
     --core-classes /path/to/core-all_classes.jar \
@@ -246,7 +246,7 @@ and `ANDROID-COOKIE-RELOAD-PASS` markers.
 Build it against the coherently built production framework and resources:
 
 ```sh
-python3 tests/android/cookie-test.py \
+tests/android/cookie-test \
     --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
     --framework-res /path/to/atl/output/res/framework-res/framework-res.apk \
     --core-classes /path/to/core-all_classes.jar \
@@ -320,7 +320,7 @@ Build the fixture on the native framework host with the coherent production
 class archive and resource APK:
 
 ```sh
-python3 tests/android/autofill-test.py \
+tests/android/autofill-test \
     --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
     --framework-res /path/to/atl/output/res/framework-res/framework-res.apk \
     --core-classes /path/to/core-all_classes.jar --r8 /path/to/r8-8.3.37.jar \
@@ -348,7 +348,7 @@ continuation checks that the queries leave the event loop usable.
 Build it with the coherent production class archive and resource APK:
 
 ```sh
-python3 tests/android/location-test.py \
+tests/android/location-test \
     --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
     --framework-res /path/to/atl/output/framework-res.apk \
     --core-classes /path/to/core-all_classes.jar --r8 /path/to/r8-8.3.37.jar \
@@ -368,7 +368,7 @@ it creates no location provider or position and does not establish gameplay.
 `--pointer-probe /path/to/android-pointer-capture-probe.jar` runs
 [AndroidPointerCaptureProbe.java](AndroidPointerCaptureProbe.java) in a separate
 Vinix ART VM against the installed production framework. Build the probe on the
-native framework host with [pointer-capture-test.py](pointer-capture-test.py),
+native framework host with [pointer-capture-test](pointer-capture-test),
 using the same `--framework-classes`, `--stub-classes` and `--r8` inputs as the
 layout probe above. It checks listener ordering, fallback, exception propagation,
 relative axes, button metadata, copied event ownership and pooled event reset.
@@ -411,7 +411,7 @@ Build against the selected runtime's coherent framework classes and resources
 on native ARM64 Alpine Linux:
 
 ```sh
-python3 tests/android/egl-queue-test.py \
+tests/android/egl-queue-test \
     --framework-classes /path/to/atl/output/src/api-impl/hax.jar \
     --framework-res /path/to/atl/res/framework-res/framework-res.apk \
     --core-classes /usr/lib/java/core-all_classes.jar \
@@ -425,7 +425,7 @@ alignment, pins the DEX compiler inputs, restricts packaged classes to the test
 app, and records exact source, runtime-input and APK hashes.
 
 Pass `--egl-queue-probe /tmp/egl-queue-fixture/android-egl-queue-probe.apk` to
-`tests/android/run.py` alongside the normal native preflights. The guest uses a
+`tests/android/run` alongside the normal native preflights. The guest uses a
 private X display `:92` after the common preflights, records the numeric child
 exit in `ANDROID-EGL-QUEUE-CHILD`, and accepts the probe only after the child
 exits zero and emits an anchored `ANDROID-EGL-QUEUE-PASS` line. The host requires
@@ -440,7 +440,7 @@ After staging the native Android runtime and Roblox launcher, keep the real
 desktop window open for a local user to sign in:
 
 ```sh
-python3 tests/android/run.py --launcher roblox --apk /path/to/Roblox.apk \
+tests/android/run --launcher roblox --apk /path/to/Roblox.apk \
     --observe --mode desktop --interactive \
     --state-dir /tmp/vinix-roblox-interactive
 ```
@@ -470,29 +470,23 @@ Once the user confirms that sign-in is finished and an experience is open,
 capture a frame explicitly through the session's local QMP socket:
 
 ```sh
-python3 - <<'PY'
-import importlib.util
-from pathlib import Path
-spec = importlib.util.spec_from_file_location("android_test", "tests/android/run.py")
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
-state = Path("/tmp/vinix-roblox-interactive")
-module.screenshot(state / "qmp.sock", state / "gameplay-before.png")
-PY
+tests/native-android-run/run screenshot \
+    --socket /tmp/vinix-roblox-interactive/qmp.sock \
+    --destination /tmp/vinix-roblox-interactive/gameplay-before.png
 ```
 
-The explicit capture command needs Python Pillow. Use the actual frame size
+The explicit capture command uses the native image encoder. Use the actual frame size
 and choose control coordinates from that frame. These examples assume a
 1024×768 desktop: a left-button drag holds the mobile movement control,
 a click presses jump, and a drag on an empty part of the world moves the
 mobile camera. Replace the example coordinates with the visible controls:
 
 ```sh
-python3 desktop/tools/input.py --socket /tmp/vinix-roblox-interactive/qmp.sock \
+desktop/tools/input --socket /tmp/vinix-roblox-interactive/qmp.sock \
     --size 1024x768 --settle 1 drag 140 650 140 570
-python3 desktop/tools/input.py --socket /tmp/vinix-roblox-interactive/qmp.sock \
+desktop/tools/input --socket /tmp/vinix-roblox-interactive/qmp.sock \
     --size 1024x768 click 900 650
-python3 desktop/tools/input.py --socket /tmp/vinix-roblox-interactive/qmp.sock \
+desktop/tools/input --socket /tmp/vinix-roblox-interactive/qmp.sock \
     --size 1024x768 drag 750 350 650 350
 ```
 
@@ -508,5 +502,5 @@ therefore do not establish held WASD behavior through this bridge.
 Host lifecycle checks use a real PTY and a mock VM process, without booting:
 
 ```sh
-python3 tests/android/interactive-test.py
+tests/android/interactive-test
 ```

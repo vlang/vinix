@@ -417,11 +417,11 @@ APP_SRC="$BUILD_DIR/app-src"
     "$UI2_SOURCE/examples/calculator"
 
 # The development image carries generated artifacts alongside their V source.
-python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+"$SCRIPT_DIR/build-support/compile-v-module" \
     "$SCRIPT_DIR/desktop/execinfocore" "$BUILD_DIR/execinfo.c" --arch arm64 \
     --header "$BUILD_DIR/execinfo_compat.h"
 rm -f "$APP_SRC/gpu_present.h"
-python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+"$SCRIPT_DIR/build-support/compile-v-module" \
     "$SCRIPT_DIR/desktop/gpucore" "$BUILD_DIR/gpu-present-soft.c" --arch arm64 \
     --header "$APP_SRC/gpu_present.h"
 
@@ -430,7 +430,7 @@ python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
 # has been cleaned. Bump the command version when its V or C flags change.
 DESKTOP_CACHE_DIR="$APP_CACHE_DIR/desktop"
 mkdir -p "$DESKTOP_CACHE_DIR"
-V_REAL="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$V")"
+V_REAL="$("$SCRIPT_DIR/build-support/android/native-tool" resolve "$V")"
 LLD_FOR_CACHE="$(command -v "${LD_LLD:-ld.lld}" || true)"
 DESKTOP_CACHE_ARGS=(
     --state "$DESKTOP_CACHE_DIR/.build-key" --staging "$DESKTOP_CACHE_DIR"
@@ -521,7 +521,7 @@ if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
         echo "==> Reusing cached GPU-enabled desktop executable"
         GPU_DESKTOP_BUILT=1
     else
-        python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+        "$SCRIPT_DIR/build-support/compile-v-module" \
             "$SCRIPT_DIR/desktop/gpucore" "$BUILD_DIR/gpu-present.c" --arch arm64 \
             -d gpu_presenter_enabled
         echo "==> Compiling the GPU-enabled desktop for aarch64-linux-musl..."
@@ -722,53 +722,12 @@ if [ "$WITH_ANDROID" -eq 1 ] &&
 fi
 
 if [ "$WITH_ANDROID" -eq 1 ]; then
-    python3 - "$SCRIPT_DIR/build-support/android" "$ANDROID_STAGING" <<'PY'
-import importlib.util
-import json
-from pathlib import Path
-import sys
-
-support, staging = map(Path, sys.argv[1:])
-spec = importlib.util.spec_from_file_location("vinix_art_runtime", support / "art-runtime.py")
-assert spec and spec.loader
-art = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(art)
-spec = importlib.util.spec_from_file_location("vinix_android_musl", support / "musl-runtime.py")
-assert spec and spec.loader
-musl = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(musl)
-runtime = staging / "opt/vinix-android-aarch64"
-verified = art.read_manifest(runtime)
-bionic = art.read_bionic_manifest(runtime)
-atl = art.read_atl_manifest(runtime)
-libc = musl.read_manifest(runtime)
-art.validate_atl_art_pair(verified, atl)
-manifest = json.loads((runtime / "runtime-manifest.json").read_text())
-if (manifest.get("architecture") != "aarch64" or manifest.get("execution") != "native"
-        or manifest.get("page_size") != 16384 or manifest.get("art") != verified
-        or not verified.get("bootclasspath") or manifest.get("bionic") != bionic
-        or manifest.get("atl") != atl or manifest.get("musl") != libc):
-    raise SystemExit("--with-android requires the verified native ARM64 Android runtime")
-PY
+    "$SCRIPT_DIR/tests/native-android-run/run" desktop-check-android --staging "$ANDROID_STAGING"
 fi
 
 if [ "$WITH_ROBLOX" -eq 1 ]; then
-    python3 - "$SCRIPT_DIR/build-support/roblox/build.py" "$ROBLOX_STAGING" "$ANDROID_STAGING" <<'PYROBLOX'
-import importlib.util
-from pathlib import Path
-import sys
-
-builder, staging, android = map(Path, sys.argv[1:])
-spec = importlib.util.spec_from_file_location("vinix_roblox_builder", builder)
-assert spec and spec.loader
-roblox = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(roblox)
-try:
-    roblox.validate_stage(staging, android)
-except (OSError, ValueError, RuntimeError) as error:
-    raise SystemExit(f"--with-roblox requires a verified ATL launcher stage: {error}\n"
-                     "Run ./scripts/build-roblox-aarch64.sh first.")
-PYROBLOX
+    "$SCRIPT_DIR/tests/native-android-run/run" desktop-check-roblox \
+        --staging "$ROBLOX_STAGING" --android-staging "$ANDROID_STAGING"
 fi
 
 # `tools/m1-wifi/package` produces the supported bundle format. Its manifest binds

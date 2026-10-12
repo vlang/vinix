@@ -1,5 +1,12 @@
 # Native Roblox staging policy
 
+The maintained builder is now the extensionless `build-support/roblox/build`.
+`tests/native-android-run/androidrun/roblox.v` performs direct native receipt,
+ELF, launcher, inventory and permission validation and owns private staging,
+publication and rollback. `tests/roblox/build-test` exposes the ten named native
+fixtures. The desktop and Android runners call these V APIs directly. The
+CPython controller described below is a historical migration stage.
+
 `robloxstage/policy.v` owns native-runtime provenance, manifest construction,
 launcher inventory and permission checks, staging preparation and publication
 sequencing. `build.py` keeps the existing public functions and command line.
