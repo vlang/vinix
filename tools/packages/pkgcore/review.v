@@ -126,6 +126,11 @@ fn review_operation_locked(config Config, directory string, operation string, na
 	} else {
 		operation_plan(config, directory, current, operation, names)!
 	}
+	return review_plan(config, directory, current, operation, names, plan, target,
+		review_fingerprint(config, operation, names, current, plan, target))
+}
+
+fn review_plan(config Config, directory string, current State, operation string, names []string, plan Plan, target u64, fingerprint string) !pkgprotocol.Review {
 	mut rows := []pkgprotocol.ReviewPackage{}
 	for installed in plan.packages {
 		previous := current.packages.filter(it.package.id == installed.package.id)
@@ -158,7 +163,7 @@ fn review_operation_locked(config Config, directory string, operation string, na
 		architecture:      config.architecture.clone()
 		generation:        current.generation
 		target_generation: target
-		fingerprint:       review_fingerprint(config, operation, names, current, plan, target)
+		fingerprint:       fingerprint
 		requested:         review_strings(plan.requested)
 		rows:              rows
 		disk_needed:       needed

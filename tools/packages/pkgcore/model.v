@@ -308,16 +308,20 @@ pub fn canonical_index(index Index) !string {
 	packages.sort_with_compare(package_order)
 	mut canonical := []Package{}
 	for p in packages {
-		p.validate()!
-		mut files := p.files.clone()
-		files.sort(a.path < b.path)
-		mut deps := p.dependencies.clone()
-		deps.sort(a.id < b.id)
-		mut permissions := p.permissions.clone()
-		permissions.sort()
-		mut associations := p.associations.clone()
-		associations.sort()
-		canonical << Package{ ...p, files: files, dependencies: deps, permissions: permissions, associations: associations }
+		canonical << canonical_package(p)!
 	}
 	return json2.encode(Index{ ...index, packages: canonical }) + '\n'
+}
+
+fn canonical_package(p Package) !Package {
+	p.validate()!
+	mut files := p.files.clone()
+	files.sort(a.path < b.path)
+	mut deps := p.dependencies.clone()
+	deps.sort(a.id < b.id)
+	mut permissions := p.permissions.clone()
+	permissions.sort()
+	mut associations := p.associations.clone()
+	associations.sort()
+	return Package{ ...p, files: files, dependencies: deps, permissions: permissions, associations: associations }
 }

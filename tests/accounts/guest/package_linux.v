@@ -26,6 +26,8 @@ fn qualify_package_configuration_lock() ! {
 		['run', 'linux-probe'],
 		['policy'], ['policy-review', '/tmp/absent-policy.json'],
 		['policy-apply', '0'.repeat(64), '/tmp/absent-policy.json'],
+		['deployment-lock'], ['deployment-review', '/tmp/absent-deployment.json'],
+		['deployment-apply', '0'.repeat(64), '/tmp/absent-deployment.json'],
 	] {
 		busy := run(['/usr/bin/vinix-package', ...args], '', none, none)
 		assert busy.status != 0 && busy.output.contains('another package transaction'), busy.output
@@ -215,7 +217,18 @@ fn qualify_package_linux(mut t Test) ! {
 	}))!
 	package_success(['--root', offline_root, 'repo-enroll', 'fixture', 'file://' + mirror_path + '/fixture', key])!
 	package_success(['--root', offline_root, 'update'])!
-	package_success(['--root', offline_root, 'install', application.id])!
+	deployment_path := '/tmp/locked-deployment.json'
+	deployment_text := package_success(['deployment-lock'])!
+	deployment := json2.decode[pkgcore.DeploymentLock](deployment_text)!
+	assert deployment.format == 2 && deployment.packages == [application.id] && deployment.locked.len == 2
+	assert deployment.locked.all(it.public_key == key && it.minimum_sequence == 1)
+	os.write_file(deployment_path, deployment_text)!
+	mut deployment_review := pkgprotocol.decode_review(package_success(['--root', offline_root, 'deployment-review', deployment_path])!)!
+	defer { deployment_review.close() }
+	assert deployment_review.rows.len == 2 && deployment_review.rows.all(it.action == 'install')
+	package_success(['--root', offline_root, 'deployment-apply', deployment_review.fingerprint, deployment_path])!
+	stale_deployment := run(['/usr/bin/vinix-package', '--root', offline_root, 'deployment-apply', deployment_review.fingerprint, deployment_path], '', none, none)
+	assert stale_deployment.status != 0 && stale_deployment.output.contains('review is stale'), stale_deployment.output
 	offline_state := pkgcore.read_state(pkgcore.state_directory(offline_root), architecture)!
 	assert offline_state.requested == state.requested && offline_state.packages == state.packages
 	package_success(['--root', offline_root, '--json', 'verify'])!
@@ -273,6 +286,11 @@ fn qualify_package_linux(mut t Test) ! {
 	latest_index := os.read_file(repository + '/index.json')!
 	latest_signature := os.read_file(repository + '/index.sig')!
 	package_success(['update'])!
+	// The old lock deliberately retains the known working runtime after a new
+	// signed runtime appears. A same-version application must not pull it in.
+	mut locked_review := pkgprotocol.decode_review(package_success(['deployment-review', deployment_path])!)!
+	assert locked_review.rows.all(it.version == '1.0.0' && it.action == 'keep')
+	locked_review.close()
 	updates := json2.decode[pkgcore.SoftwareView](package_success(['view'])!)!
 	assert updates.update_error == '' && updates.rows.filter(it.updatable).map(it.id) == [runtime.id]
 	assert updates.rows.any(it.id == runtime.id && it.kind == 'runtime' && it.version == '1.1.0'
@@ -284,6 +302,18 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE UPDATES runtime-only resolved-version complete-closure PASS')
 	missing := run(['/usr/bin/vinix-package', 'run', application.id], '', none, none)
 	assert missing.status == 127 && missing.output.contains('libfixture.so.1'), missing.output
+	mut restore_lock := pkgprotocol.decode_review(package_success(['deployment-review', deployment_path])!)!
+	assert restore_lock.rows.any(it.id == runtime.id && it.version == '1.0.0' && it.action == 'update')
+	ordinary_deploy := run(['/usr/bin/vinix-package', 'deployment-apply', restore_lock.fingerprint, deployment_path], '', db, must_user(db, 'alex'))
+	assert ordinary_deploy.status != 0, ordinary_deploy.output
+	package_success(['deployment-apply', restore_lock.fingerprint, deployment_path])!
+	restore_lock.close()
+	assert pkgcore.read_state('/var/lib/vinix-packages', architecture)!.packages.all(it.package.version == '1.0.0')
+	assert package_success(['run', application.id])!.contains('PACKAGE LINUX')
+	// Rollback now restores the failed runtime; another rollback returns the
+	// locked, complete generation. Both use the normal persistent history.
+	reviewed_package_operation('rollback', [])!
+	assert run(['/usr/bin/vinix-package', 'run', application.id], '', none, none).status == 127
 	reviewed_package_operation('rollback', [])!
 	assert package_success(['run', application.id])!.contains('PACKAGE LINUX')
 	mut revocation := pkgprotocol.decode_repository_review(package_success(['repo-review', 'revoke', 'fixture'])!)!
@@ -314,6 +344,7 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE TRUST REVIEW read-only authenticated-metadata stale-confirmation reviewed-revocation PASS')
 	t.say('PACKAGE CONFIGURATION lock-scoped-policy verified-json-status busy-launch PASS')
 	t.say('PACKAGE ORGANIZATION reviewed-policy dependency-impact stale-refusal ordinary-user-denial atomic-restore PASS')
+	t.say('PACKAGE DEPLOYMENT exact-metadata complete-runtime-closure offline-reproduction stale-refusal ordinary-user-denial rollback PASS')
 	t.say('PACKAGE REPOSITORY authenticated-enrollment revocation retained-replay-floor re-enrollment PASS')
 	t.say('PACKAGE LINUX IMPORT signed-source-aliases explicit-runtime tamper-refusal missing-library rollback clean-uninstall PASS')
 }

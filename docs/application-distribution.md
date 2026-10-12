@@ -369,15 +369,55 @@ order is immaterial. Existing configurations with duplicate policy entries must
 be corrected before use. License acceptance and firmware permission are explicit
 administrator choices; no package or per-command option adds them implicitly.
 
-A deployment manifest reconciles the requested roots atomically:
+A format-1 deployment manifest reconciles the requested roots atomically and
+selects the latest satisfiable packages in the authenticated catalog:
 
 ```json
 {"format":1,"architecture":"aarch64","packages":["editor","browser"]}
 ```
 
-Use `plan deploy editor browser` first. Deployment does not change trust/policy
-or refresh repositories implicitly. Runtime updates are ordinary signed packages
-in the reviewed upgrade/deployment closure; no background updater is introduced.
+Use `deployment-review FILE` and `deployment-apply REVIEW_FINGERPRINT FILE` to
+review the complete installation/removal and disk requirements before activation.
+Review is bound to the canonical document, current configuration, installed state
+and resolved closure; edits or completed administration require another review.
+Both commands take the package lock before loading their inputs. `deploy FILE`
+remains available for administrative scripts and validates the same document.
+Documents require explicit fields/types, matching architecture and unique roots;
+missing/null/coerced fields, unknown/duplicate keys and unsafe metadata files fail.
+
+To reproduce an approved application/runtime set across machines, export a
+format-2 deployment lock rather than resolve names again on every installation:
+
+```sh
+vinix-package deployment-lock editor browser > /etc/company/deployment.json
+vinix-package deployment-review /etc/company/deployment.json
+vinix-package deployment-apply REVIEW_FINGERPRINT /etc/company/deployment.json
+```
+
+Without IDs, `deployment-lock` exports the current requested roots, preferring
+installed versions that remain authenticated. With IDs, they replace that root
+set. It records every dependency/runtime with exact version, architecture,
+repository ID, publisher key, minimum signed sequence and a digest of the complete
+package manifest. Installation requires those exact manifests in the current
+authenticated catalog; payload bytes remain checked against their signed hashes.
+Newer signed indexes may retain those manifests, but changed launch metadata,
+permissions, license or payloads under the same version are rejected. Missing
+dependencies, unrelated locked packages and publisher substitutions fail before
+downloads or cleanup. The usual policy/version/architecture/runtime checks apply;
+the lock grants no permissions, license acceptance or firmware approval.
+
+For offline deployment, export the matching payload closure with `mirror`, enroll
+the mirror with the recorded publisher ID/key, refresh its signed index, then
+review/apply the same lock. URLs are not pinned, so approved mirrors can move;
+publisher identities, metadata, expiry and anti-replay checks still apply. Keep
+the approved versions available in the signed index and mirror. Cached payloads
+alone cannot substitute for an authenticated, unexpired catalog.
+
+Deployment does not change trust/policy or refresh repositories implicitly. An
+unchanged set needs no new generation; an explicit empty set removes all roots.
+Rollback and data retention use the normal transaction history. Runtime updates
+are ordinary signed packages in a newly reviewed lock or upgrade/deployment
+closure; no background updater is introduced.
 
 ## SDK and qualification
 

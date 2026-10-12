@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import json2
 import os
 import tools.packages.pkgprotocol
 
@@ -12,12 +11,6 @@ pub struct Service {
 pub:
 	root    string
 	offline bool
-}
-
-struct Deployment {
-	format       int = 1
-	architecture string
-	packages     []string
 }
 
 fn (service Service) directory() !string {
@@ -44,18 +37,6 @@ pub fn (service Service) transact(operation string, names []string, options Tran
 	guard := acquire(directory)!
 	defer { guard.release() }
 	return transact_locked(service.configuration()!, directory, operation, names, options)
-}
-
-pub fn (service Service) deploy(manifest string) !State {
-	directory := service.directory()!
-	guard := acquire(directory)!
-	defer { guard.release() }
-	config := service.configuration()!
-	deployment := json2.decode[Deployment](read_metadata(manifest)!)!
-	if deployment.format != 1 || deployment.architecture != config.architecture {
-		return error('deployment format or architecture mismatch')
-	}
-	return transact_locked(config, directory, 'deploy', deployment.packages, TransactionOptions{})
 }
 
 pub fn (service Service) plan(operation string, names []string) !Plan {

@@ -350,6 +350,54 @@ loading configuration. Config-taking core functions remain explicit snapshot
 operations for isolated fixtures; they do not reload administrator configuration.
 Production clients should use the service or the versioned CLI protocol.
 
+`deployment-lock [ID...]` emits a format-2 `{format,architecture,packages,locked}`
+document. `packages` contains sorted explicit roots; `locked` contains the entire
+resolved dependency/runtime closure, sorted by ID. No IDs selects the current
+requested roots; explicit IDs replace them. Resolution prefers authenticated
+installed versions, otherwise the latest compatible candidates. Each locked
+record requires `id`, `version`, `architecture`, `repository`, `public_key`,
+`minimum_sequence` (positive unsigned 64-bit) and `metadata_sha256` (lowercase
+SHA-256). Roots and records are unique and bounded to 4096 each.
+
+The metadata digest is SHA-256 of SDK-1 JSON encoding of the complete `Package`
+struct, plus a terminating LF. Fields follow the order in [`model.v`](pkgcore/model.v),
+including empty/default fields; files sort by path, dependencies by ID,
+permissions and MIME associations lexically. Launch arguments retain their order.
+`package_metadata_digest` is the supported V implementation. Repository identity,
+key and minimum sequence are separate lock fields; index expiry/sequence renewal
+does not change the manifest digest. Every selected package must match exact
+ID/version/architecture/publisher/digest in the current authenticated catalog,
+whose signed sequence must meet the lock floor and persistent replay history.
+The regular resolver still checks policy, installed publisher ownership, version
+ranges, runtime entrypoints and full closure; unused/missing records fail.
+
+`deployment-review FILE` emits the existing format-1 `pkgprotocol.Review`, with
+operation `deploy`, complete target/removal rows and disk requirements. Its opaque
+fingerprint binds a deployment-specific domain, canonical document, configuration,
+installed state and exact authenticated plan. `deployment-apply FINGERPRINT FILE`
+rechecks these under the writer lock before stage cleanup, acquisition or
+activation. File-specific and generic `review/apply deploy IDs` fingerprints are
+not interchangeable. Whitespace and root/record ordering do not change identity;
+changed lock floors, format, policy, state or selected metadata require review.
+An unchanged successful proposal can reuse its fingerprint. Apply progress is
+human text, not JSON state. Authorization remains administrator access.
+
+Both file commands also accept format-1 `{format,architecture,packages}` root
+documents, which resolve the latest satisfiable closure. `deploy FILE` supports
+both formats without a review fingerprint for existing administration scripts.
+Inputs require explicit fields and JSON types, matching architecture, bounded
+regular files and unique roots/records; null, unknown/duplicate keys and malformed
+digests/versions fail. A format-2 empty roots/records set removes all applications.
+No deployment changes trust/policy or refreshes implicitly. URLs are intentionally
+unbound: approved signed mirrors work offline with the same publisher and lock,
+subject to normal expiry/replay checks and availability of every locked object.
+Rollback/data retention use the standard transaction contract.
+
+V clients use `Service.lock_deployment`, `Service.review_deployment`,
+`Service.apply_deployment`, `DeploymentLock`, `DeploymentPackage` and
+`package_metadata_digest`. Returned reviews own presentation fields and use the
+usual `Review.close()` contract. Configuration is loaded after taking the lock.
+
 `policy` emits a canonical format-1 `{format,architecture,policy}` document from
 persistent configuration. `policy-review FILE` emits
 `{format:1,architecture,generation,fingerprint,previous,proposed,rows}` without

@@ -16,6 +16,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  repo-apply REVIEW_FINGERPRINT enroll ID URL KEY | repo-apply REVIEW_FINGERPRINT revoke ID\n' +
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
 	'  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json\n' +
+	'  deployment-lock [ID...] | deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
@@ -94,6 +95,20 @@ fn checked(arguments []string) !int {
 	}
 	service := pkgcore.Service{ root: root, offline: offline }
 	match command {
+		'deployment-lock', 'deployment-review' {
+			if command == 'deployment-review' && names.len != 1 { return error('deployment-review requires a deployment document') }
+			text := if command == 'deployment-lock' {
+				json2.encode(service.lock_deployment(names)!)
+			} else {
+				json2.encode(service.review_deployment(names[0])!)
+			}
+			if text.len > pkgcore.max_metadata { return error('deployment document/review exceeds metadata limit') }
+			println(text)
+		}
+		'deployment-apply' {
+			if names.len != 2 { return error('deployment-apply requires a review fingerprint and deployment document') }
+			service.apply_deployment(names[1], names[0])!
+		}
 		'policy' {
 			if names.len != 0 { return error('policy takes no arguments') }
 			println(json2.encode(service.policy()!))

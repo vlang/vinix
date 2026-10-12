@@ -185,6 +185,12 @@ fn transact_locked(config Config, directory string, operation string, names []st
 	if options.expected_review != '' {
 		check_review(options.expected_review, review_fingerprint(config, operation, names, current, plan, 0))!
 	}
+	return activate_plan_locked(config, directory, current, plan, operation, options)
+}
+
+// Callers validate the complete plan and any review identity under the writer
+// lock before reaching this shared transactional activation boundary.
+fn activate_plan_locked(config Config, directory string, current State, plan Plan, operation string, options TransactionOptions) !State {
 	// Retire abandoned work only after a supplied review has been accepted.
 	for name in os.ls(directory + '/generations')! {
 		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }

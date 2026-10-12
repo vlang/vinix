@@ -59,6 +59,8 @@ fn qualify_busy_configuration(binary string, root string) ! {
 		['review', 'install', 'app'], ['apply', '0'.repeat(64), 'install', 'app'],
 		['install', 'app'], ['upgrade'], ['remove', 'app'], ['rollback'], ['gc'],
 		['mirror', root + '/absent-mirror', 'app'], ['deploy', root + '/absent-deployment.json'],
+		['deployment-lock', 'app'], ['deployment-review', root + '/absent-deployment.json'],
+		['deployment-apply', '0'.repeat(64), root + '/absent-deployment.json'],
 		['policy'], ['policy-review', root + '/absent-policy.json'], ['policy-apply', '0'.repeat(64), root + '/absent-policy.json'],
 	] {
 		reply := command(binary, ['--root', root, ...args])!
@@ -216,12 +218,26 @@ fn qualify(binary string) ! {
 	os.write_file(offline_root + '/etc/vinix-packages/config.json', json2.encode(offline))!
 	success(binary, ['--root', offline_root, 'repo-enroll', 'fixture', 'file://' + work + '/mirror/fixture', key])!
 	success(binary, ['--root', offline_root, 'update'])!
-	success(binary, ['--root', offline_root, 'install', 'app'])!
+	lock_path := work + '/locked-deployment.json'
+	lock_text := success(binary, [...root_args, 'deployment-lock'])!
+	lock_document := json2.decode[pkgcore.DeploymentLock](lock_text)!
+	assert lock_document.format == 2 && lock_document.packages == ['app'] && lock_document.locked.len == 1
+	os.write_file(lock_path, lock_text)!
+	mut deploy_review := pkgprotocol.decode_review(success(binary, ['--root', offline_root, 'deployment-review', lock_path])!)!
+	defer { deploy_review.close() }
+	assert deploy_review.operation == 'deploy' && deploy_review.rows[0].public_key == key
+	success(binary, ['--root', offline_root, 'deployment-apply', deploy_review.fingerprint, lock_path])!
+	stale_deployment := command(binary, ['--root', offline_root, 'deployment-apply', deploy_review.fingerprint, lock_path])!
+	assert stale_deployment.code != 0 && stale_deployment.text.contains('stale')
 	assert command(binary, ['--root', offline_root, 'install', 'other'])!.code != 0
 	assert json2.decode[pkgcore.State](success(binary, ['--root', offline_root, 'status'])!)!.packages.len == 1
 	// Deployment reconciles roots and rollback restores the previous set.
 	os.write_file(work + '/deployment.json', '{"format":1,"architecture":"aarch64","packages":["other"]}')!
-	success(binary, [...root_args, 'deploy', work + '/deployment.json'])!
+	mut roots_review := pkgprotocol.decode_review(success(binary, [...root_args, 'deployment-review', work + '/deployment.json'])!)!
+	success(binary, [...root_args, 'deployment-apply', roots_review.fingerprint, work + '/deployment.json'])!
+	roots_review.close()
+	os.write_file(work + '/invalid-deployment.json', '{"architecture":"aarch64","packages":[]}')!
+	assert command(binary, [...root_args, 'deploy', work + '/invalid-deployment.json'])!.code != 0
 	assert launchers.refresh(store, u32(os.geteuid()), 'aarch64')!
 	assert launchers.find('app') == none
 	assert (launchers.find('other') or { panic('missing application') }) == 0
@@ -263,7 +279,7 @@ fn qualify(binary string) ! {
 	os.write_file(repository + '/index.sig', latest_signature)!
 	success(binary, [...root_args, 'repo-enroll', 'fixture', 'file://' + repository, key])!
 	success(binary, [...root_args, 'update'])!
-	println('Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, deployment, rollback and revoked-publisher uninstall passed')
+	println('Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed')
 }
 
 fn main() {
