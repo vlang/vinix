@@ -36,8 +36,7 @@ fn cf_equal_depth(left u64, right u64, depth int) bool {
 		a := obj_header(left)
 		b := obj_header(right)
 		if name == 'NSNumber' {
-			if a.is_real || b.is_real { return (if a.is_real { a.real_number } else { f64(a.number) }) == (if b.is_real { b.real_number } else { f64(b.number) }) }
-			return a.number == b.number
+			return json_number_equal(a, b)
 		}
 		if name == 'NSData' {
 			length := data_length(left)
@@ -209,6 +208,8 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		return true
 	}
 	mut header := obj_header(object)
+	if header.json_immutable && selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',
+		'removeAllObjects', 'addObject:', 'removeObjectAtIndex:', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of an immutable JSON collection') }
 	if header.image_dictionary {
 		if constant_dictionary_dispatch(object, selector, mut frame) { return true }
 		if selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',
@@ -240,12 +241,15 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 	match selector {
 		'boolValue' { frame.x[0] = u64(header.number != 0 || header.real_number != 0) }
 		'integerValue', 'unsignedIntegerValue', 'intValue' { frame.x[0] = u64(if header.is_real { i64(header.real_number) } else { header.number }) }
-		'doubleValue' { frame_float_return(mut frame, 0, if header.is_real { header.real_number } else { f64(header.number) }) }
+		'doubleValue' { frame_float_return(mut frame, 0, json_number_double(header)) }
+		'objCType' { frame.x[0] = u64(if header.cf_boolean { c'c' } else if header.is_real { c'd' } else if header.unsigned_number { c'Q' } else { c'q' }) }
 		'row' { frame.x[0] = u64(header.number) }
 		'section' { frame.x[0] = u64(header.section) }
 		'stringValue' {
 			mut buffer := [64]u8{}
-			C.snprintf(unsafe { &char(&buffer[0]) }, 64, c'%lld', header.number)
+			if header.is_real { C.snprintf(unsafe { &char(&buffer[0]) }, 64, c'%.17g', header.real_number) }
+			else if header.unsigned_number { C.snprintf(unsafe { &char(&buffer[0]) }, 64, c'%llu', u64(header.number)) }
+			else { C.snprintf(unsafe { &char(&buffer[0]) }, 64, c'%lld', header.number) }
 			frame.x[0] = make_string(unsafe { &char(&buffer[0]) })
 		}
 		'count' { frame.x[0] = u64(header.items.len) }

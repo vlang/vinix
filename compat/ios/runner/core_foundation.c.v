@@ -308,7 +308,7 @@ fn cf_hash(object u64) u64 {
 	}
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {
 		header := obj_header(object)
-		value := if header.is_real { header.real_number } else { f64(header.number) }
+		value := json_number_double(header)
 		// Equal integer/floating NSNumber values must have the same hash.
 		if value == 0 { return 0 }
 		return unsafe { *(&u64(&value)) }
@@ -322,6 +322,7 @@ fn cf_copy_description(object u64) u64 {
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {
 		header := obj_header(object)
 		if header.is_real { unsafe { C.snprintf(&char(&bytes[0]), 128, c'%.17g', header.real_number) } }
+		else if header.unsigned_number { unsafe { C.snprintf(&char(&bytes[0]), 128, c'%llu', u64(header.number)) } }
 		else { unsafe { C.snprintf(&char(&bytes[0]), 128, c'%lld', header.number) } }
 	} else {
 		info := ios_runtime.classes[read64(object)] or { panic('iOS: unknown CF object') }

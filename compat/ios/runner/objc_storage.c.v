@@ -75,6 +75,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	bitmap_dispose(object)
 	cg_provider_dispose(object)
 	layout_dispose(object, mut header)
+	ns_error_dispose(object)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])

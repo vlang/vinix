@@ -2871,17 +2871,61 @@ Full regression remains unpassed after the earlier permissions, readlink and
 kernel file-time failures. The five published runners retain their last passing
 bytes, and entry, rendering and gameplay remain unverified.
 
+`NSJSONSerialization` now implements its NSData reading/writing methods and
+`isValidJSONObject:` in V. The eight-byte JSON and NSNull classes and forty-byte
+NSError record match native Foundation measurements. JSON failures return nil
+and an autoreleased Cocoa error 3840 with a debug description; successful calls
+leave the caller's existing error output untouched. Null and Boolean objects
+use owned runtime caches. NSError owns its copied domain and user-info snapshot
+and exposes code, domain, userInfo and localizedDescription getters.
+
+Shared typed native/V message tests compare immutable and mutable containers,
+first-versus-last duplicate-key handling, fragments, trailing commas, escaped
+controls and Unicode surrogate pairs, UTF-8/16/32 input, signed and unsigned
+64-bit limits, double output, malformed input, slash escaping, two-space pretty
+output and natural ASCII key sorting. Unsigned NSNumber values retain their
+exact spelling and equality, including at the double-rounding boundary. Heap
+sort leaves input dictionaries unchanged and allocates no scratch storage.
+
+This bounded data profile accepts reading options 0, 1, 4 and 5 and writing
+options 0 through 15. Input/output is limited to 16 MiB, depth to 64, and values
+to 65,536 nodes. Integer storage covers signed 64-bit and positive unsigned
+64-bit values; real tokens allow up to 17 significant mantissa digits and 128
+token bytes. Decimal-number storage, mutable leaves, streams and extended
+reading options remain unimplemented. Sorted keys are limited to ASCII letters,
+digits and underscore; ordinary unsorted JSON supports Unicode keys. Unsupported
+profiles return errors. Cycles and non-finite numbers are rejected.
+
+All 54 programs build and all 60 final original generated C streams restore to
+their recorded hashes. Six host suites pass ASAN/UBSAN in both hashing modes,
+including actual EOS constant records and four final native dyld load orders.
+Vinix passes eight Objective-C/collection/storage/layout/JSON programs and 33
+Swift/loader programs. Repeated pool drains and partial parse failures leave
+only the three singleton caches, which are freed when the runtime stops. The
+initial empty-NSData nil-string failure and its original generated C are
+retained alongside the passing checks; cached failure interfaces avoid a heap
+allocation per malformed request.
+
+The supplied IPA passes the JSON class binding and exits with status 1 before
+entry at `_OBJC_CLASS_$_NSCondition` in EOS. Native metadata shows a 128-byte
+NSObject subclass containing a Darwin mutex at offset 8, a condition at offset
+72 and a string name at offset 120. Those signatures were measured without
+constructing that class or executing app code; its behavior remains
+unimplemented. Evidence is under `build/ios/fortnite/json-serialization-checks`.
+Full regression remains unpassed and the five published runners are unchanged.
+Entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,415 | 744 | 80 |
-| EOSSDK | 628 | 34 | 18 |
+| Fortnite executable | 1,419 | 740 | 80 |
+| EOSSDK | 631 | 31 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,158 | 839 | 121 |
+| All images | 2,165 | 832 | 121 |
 
-The C++/GLES/Text variant reports 2,171 resolved imports, 826 unresolved strong
+The C++/GLES/Text variant reports 2,178 resolved imports, 819 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -95,6 +95,8 @@ mut:
 	provider_release u64
 	real_number f64
 	is_real bool
+	unsigned_number bool
+	json_immutable bool
 	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
 	font_face voidptr // Optional FreeType face, disposed before its descriptor.
 	autoresizing u64
@@ -127,6 +129,7 @@ struct ObjRuntime {
 mut:
 	classes      map[u64]&ObjClass
 	objects map[u64]&ObjHeader // Object address -> owned metadata; protected by the recursive runtime lock.
+	null_object u64
 	associations map[u64]&ObjAssociations // Object -> key/value table, under the same recursive lock.
 	monitors map[u64]&ObjMonitor
 	swift_buffers map[u64]u64 // Owned UTF-8 array allocation -> element count, under the runtime lock.
@@ -225,7 +228,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
@@ -268,6 +271,7 @@ fn objc_start() {
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
 		size := match name {
 			'NSConstantDictionary' { u32(40) }
+			'NSError' { u32(sizeof(AbiNSError)) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
 			'NSLayoutAnchor', 'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { u32(sizeof(AbiLayoutAnchor)) }
 			else { u32(8) }
@@ -281,6 +285,10 @@ fn objc_start() {
 	mut dictionary := ios_runtime.classes[ios_runtime.names['NSConstantDictionary']] or { panic('iOS: missing constant dictionary class') }
 	for i, pair in [['_options', 'Q']!, ['_count', 'Q']!, ['_keys', 'r^@']!, ['_objects', 'r^@']!]! {
 		dictionary.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: i64((i + 1) * 8), size: 8}
+	}
+	mut error_class := ios_runtime.classes[ios_runtime.names['NSError']] or { panic('iOS: missing NSError class') }
+	for i, pair in [['_reserved', '^v']!, ['_code', 'q']!, ['_domain', '@"NSString"']!, ['_userInfo', '@"NSDictionary"']!]! {
+		error_class.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: i64((i + 1) * 8), size: 8}
 	}
 }
 

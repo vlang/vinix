@@ -84,6 +84,7 @@ fn C.ios_objc_builtin()
 fn objc_builtin_types(cls u64, selector string) ?string {
 	info := ios_runtime.classes[cls] or { return none }
 	if types := layout_builtin_types(info.name, info.meta, selector) { return types }
+	if types := json_builtin_types(info.name, info.meta, selector) { return types }
 	if info.name != 'NSObject' { return none }
 	return match selector {
 		'init', 'copy', 'retain', 'autorelease', 'self' { '@16@0:8' }

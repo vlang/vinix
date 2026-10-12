@@ -23,6 +23,7 @@ fn objc_responds(object u64, selector &char) bool {
 		&& name in ['copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:', 'allKeys', 'allValues', 'getObjects:andKeys:count:'] { return true }
 	if image_selector(object, name) { return true }
 	if layout_selector(object, name) { return true }
+	if json_selector(object, name) { return true }
 	if accessibility_selector(object, name) { return true }
 	if native_method(read64(object), name) != 0 { return true }
 	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'copy', 'init', 'dealloc'] { return true }
@@ -46,7 +47,7 @@ fn objc_responds(object u64, selector &char) bool {
 		}
 	}
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {
-		return name in ['boolValue', 'integerValue', 'unsignedIntegerValue', 'intValue', 'doubleValue', 'stringValue']
+		return name in ['boolValue', 'integerValue', 'unsignedIntegerValue', 'intValue', 'doubleValue', 'stringValue', 'objCType']
 	}
 	if objc_is_kind(object, ios_runtime.names['NSString']) { return name in ['UTF8String', 'length', 'isEqualToString:', 'stringByAppendingString:', 'initWithBytes:length:encoding:'] }
 	if objc_is_kind(object, ios_runtime.names['NSAttributedString']) { return name == 'initWithString:attributes:' }
