@@ -110,6 +110,10 @@ after a filesystem failure. Mutable build inputs still require isolation.
   every CPU's CR4 and native paging geometry. SHSTK hardware does not supply CET task state or
   configured USER_SHSTK. These immutable queries allocate nothing and preserve
   IRQ/pin state; other unsupported words/bits fail explicitly.
+- Raw x86 `rdtsc` uses the native volatile RDTSC instruction and preserves
+  the original unsigned-long-long result type. The unchanged `get_cycles`
+  header retains its feature/configuration guard. This supplies no ordered
+  TSC read, cross-CPU synchronization, frequency service or MSR operation.
 - Ordinary boot-online SMP calls use the original Linux CSD records and real
   native maskable IPIs. `smp_call_function_single`, its caller-owned async
   variant, `smp_call_function_many`, `smp_call_function` and
@@ -1941,3 +1945,44 @@ Run `build-support/run-v-tool.sh tests/linuxkpi/mem_encrypt_policy.v`.
 Evidence is under `smp-oct10/mem-encrypt-*`, `sme-*-native/`,
 `sme-guest-review/` and `sme-isolated-full-audit/`. The concurrent shared-tree
 audit rejected changed inputs and published no coherent report.
+
+## Native raw TSC access
+
+The V bridge reads the existing native CPU accessor; a V facade copies all
+64 bits into the original Linux unsigned-long-long return type. Original
+MSR constants, UAPI records and shared record types remain visible through
+a bounded overlay. Ordered TSC and MSR operations have no implementation.
+
+Four strict GNU99/GNU11 sanitizer profiles execute 1,160 value patterns each,
+including every individual bit and its complement. They verify one raw read,
+the exact return ABI, both include orders and original `get_cycles` routing
+with TSC configuration absent/enabled. Four genuine x86 instruction objects
+retain only `memcpy` as an unresolved dependency. The executed host producer
+matches the separately generated production bodies; it supplies CPU reads
+through V observations rather than executing hardware instructions.
+
+Fresh worktrees at `cb9d07f2` with eleven native/tool paths build enabled/default
+x86 and default ARM. Exact enabled ELF
+`95542475f713df3dfd57f40167f97d22141450a11a8d43d220fd7d113e99793e`
+boots normal, SSE and four-level guests. Each has 46 markers and 28 strict
+existing allocation equalities. The CPU query batches now include real raw
+and guarded cycle reads with IRQs enabled/disabled and nested pins; fourth
+batches recover `387420160` bytes in normal/SSE and `387448832` in four-level,
+with unchanged live heap counts. Default Linux-ABI startup passes.
+
+Actual native body/object review distinguishes the monolithic bridge producer
+from the separately compiled module facade. The module export retains its
+existing allocation-free initialization guard, warmed during bootstrap before
+measured queries; it is not byte-identical to a standalone test export thunk.
+No asynchronous pointer ownership or per-query allocation is introduced.
+
+The coherent full audit remains **5/269**. The former TSC declaration error now
+reaches task/MM/vfork ownership, bringing that first-error group to 226 files.
+Thirty-three files still fail the aggregate exchange type witness. Hardware
+operation, full linking and GPU support remain unvalidated.
+
+Run `build-support/run-v-tool.sh tests/linuxkpi/raw_tsc.v`. Evidence is under
+`smp-oct10/raw-tsc-*`. Initial guest image preparation and default source staging
+failed with disk exhaustion and did not validate a boot; use the fresh retry
+states and saved final artifacts. The existing broad allocation baseline is
+unchanged in scope; these measurements do not establish a global gate pass.

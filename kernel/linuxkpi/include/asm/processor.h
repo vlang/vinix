@@ -8,6 +8,7 @@
  * and page-table operations require their own runtime implementations. */
 #include <linux/init.h>
 #include <asm/pgtable_types.h>
+#include <asm/msr.h>
 
 /* A native spin hint also services TLB shootdowns while IRQs are disabled.
  * Other Linux CPU and task-switch services are not supplied here. */

@@ -1661,3 +1661,47 @@ copied into the fresh architecture worktrees. Immutable v2 proofs remain.
 Next compilation/runtime work includes aggregate exchange witnesses, raw TSC,
 actual vfork rendezvous and task/MM/GFP scopes, then PCI/DMA/DRM/firmware.
 Hardware validation remains required for driver completion.
+
+## Latest native raw TSC increment
+
+Encryption-header selection is committed as `cb9d07f2`. Raw `rdtsc` now has
+a real V/native instruction bridge and the exact unsigned-long-long Linux
+facade. The original `get_cycles` guard, MSR constants/UAPI/shared types and
+both include orders are preserved. Ordered TSC, MSR operations and clock
+synchronization remain unsupported.
+
+Four strict host profiles and four native instruction object profiles pass.
+Host observations cover 1,160 values per profile, every bit/complement,
+single invocation and both original feature/configuration paths. Producer
+flags and exact generated bodies are checked before execution. Earlier test
+global-name and producer-metadata mismatches were rejected, not normalized.
+Actual module export guards are separately reviewed and warmed at bootstrap;
+do not assert whole export-thunk equality across different producers.
+
+Fresh architecture worktrees at `cb9d07f2` with eleven production/tool overlays
+build enabled/default x86 and default ARM. Enabled ELF
+`95542475f713df3dfd57f40167f97d22141450a11a8d43d220fd7d113e99793e`
+boots fresh normal/SSE/four-level states, each with 46 required markers and
+28 strict existing allocation equalities. Repeated native raw/guarded queries
+preserve IRQ/pin state and recover fourth-batch pages/live counts; normal/SSE
+free bytes are `387420160`, four-level `387448832`. Default startup passes.
+
+Use `raw-tsc-*-vm-retry/` for enabled guests and `raw-tsc-default-vm/` for the
+default guest, with the exact `raw-tsc-*-native/proof.json` records. Initial
+ISO construction/default V source staging hit disk exhaustion and establish
+no guest success. Evidence and independent reviews stay under `smp-oct10/`.
+The completed SME worktrees were retired only after exact saved artifact and
+source checks; copied runtime caches remain private to each architecture.
+
+The coherent audit remains **5/269**, with 226 task/MM/vfork and 33 aggregate
+exchange first errors. A reviewed private generic exchange witness design
+exists under `aggregate-exchange-design-oct12/`; it is not implemented. Its
+small-word record support must preserve const/float/array/width rejection,
+natural alignment and the existing separate scalar128 availability boundary.
+Actual vfork rendezvous still needs retained actor/process owners, non-last
+actor exit and abort semantics; see `vfork-native-design-oct12/design.md`.
+Neither a predicate nor dummy task fields completes MM/GFP ownership.
+
+Continue through genuine device/DMA/DRM/firmware dependencies. Tiger Lake
+identity and physical/passthrough validation are still pending; GPU support
+remains incomplete.

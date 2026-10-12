@@ -80,6 +80,8 @@ int vinix_linuxkpi_worker_native_selftest(void);
 int vinix_linuxkpi_delayed_work_native_selftest(void);
 void vinix_linuxkpi_refcount_warning(int kind);
 bool vinix_linuxkpi_cpu_has(unsigned int feature);
+/* Native LP64 bridge; the public Linux cycle result is unsigned long long. */
+uint64_t vinix_linuxkpi_raw_tsc(void);
 void vinix_linuxkpi_fpu_begin(void);
 void vinix_linuxkpi_fpu_end(void);
 bool vinix_linuxkpi_tigerlake_id(u16 vendor, u16 device, u32 class_code);
