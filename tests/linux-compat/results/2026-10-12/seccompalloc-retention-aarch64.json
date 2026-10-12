@@ -1,0 +1,412 @@
+[
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "stat",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "pipe",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "socketpair",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "inet_socket",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "eventfd",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "epoll",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "timerfd",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "poll",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "proc_read",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "proc_list",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "readdir",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "dup",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "mmap",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "thread",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "signal",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "fault",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "fork",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "memfd",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "file",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "rename",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "unlink_open",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "rename_over",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "hardlink",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "mkdir",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "symlink",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "unix_connect",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "unix_datagram",
+    "dir": "/tmp",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "file",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "rename",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "unlink_open",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "rename_over",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "hardlink",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "mkdir",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "symlink",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "unix_connect",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "ops",
+    "round": 1,
+    "report": "PERF-OPS",
+    "op": "unix_datagram",
+    "dir": "/root",
+    "count": "200",
+    "bytes_per_op": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "churn",
+    "round": 1,
+    "report": "PERF-CHURN",
+    "program": "/bin/true",
+    "runs": "300",
+    "retained_kb": "0",
+    "per_run_bytes": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "churn",
+    "round": 1,
+    "report": "PERF-CHURN",
+    "program": "/bin/sleep 0",
+    "runs": "300",
+    "retained_kb": "0",
+    "per_run_bytes": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "churn",
+    "round": 1,
+    "report": "PERF-CHURN",
+    "program": "/usr/bin/curl --version",
+    "runs": "300",
+    "retained_kb": "0",
+    "per_run_bytes": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "churn",
+    "round": 1,
+    "report": "PERF-CHURN",
+    "program": "/bin/busybox awk BEGIN{}",
+    "runs": "300",
+    "retained_kb": "0",
+    "per_run_bytes": "0"
+  },
+  {
+    "variant": "new",
+    "scenario": "cache",
+    "round": 1,
+    "report": "PERF-CACHE",
+    "written_mb": "32",
+    "used_mb": "20",
+    "cached_kb": "16384",
+    "slab_kb": "91024"
+  }
+]

@@ -1427,3 +1427,64 @@ allocation or reclamation implementation was added.
 Allocation-pressure behavior, user notifications, foreign/ELF32 execution and
 complete sandbox isolation remain unqualified. The three broad section-15
 acceptance gates remain open.
+
+## Seccomp fallible instruction storage
+
+Seccomp installation now allocates instruction bytes through the fallible
+kernel allocator and returns ENOMEM for a nil result. The previous V array
+constructor could enter its panic-on-OOM allocation path. Header, length and
+permission validation still precede allocation; instruction copying follows
+the nil check. The raw allocation is wrapped in a stack-local array header
+with `.nogrow`, explicitly clearing V's managed-array metadata flag. Failed
+copy, verification or attachment frees the raw pointer once; successful
+attachment transfers it into the existing immutable ref-counted filter chain.
+
+The unchanged V `seccompalloc` fixture records four root/UID 1000 syscall/prctl
+cohorts on each architecture. Both ordinary baseline and new production
+kernels accept its valid 4095-instruction ALLOW program. Separate test builds
+using `VFLAGS='-d seccomp_alloc_selftest'` inject a nil result at the allocation
+boundary and require ENOMEM, even with an unreadable instruction pointer.
+Failure preserves mode/no_new_privs, and a subsequent small filter and getpid
+must succeed. The injection is compiled out of production. This tests the
+allocator-nil branch; it does not simulate exhaustion of all physical memory.
+
+Each cohort warms 128 rejected copies, waits for reclamation, then repeats
+128 calls and checks unchanged large-allocation page counts. These buffers
+use the big allocator, including a metadata page: three 16 KiB AArch64 pages
+or nine 4 KiB x86-64 pages. They do not use a 32768-byte slab class. The
+3200-filter natural/forced-retirement cohorts also keep 32/64/96/128-byte
+live-object counts flat on both production and injection builds. Four-instruction
+programs now use a raw 32-byte allocation; filter headers still
+use class 96. Large-copy measurements qualify rejected-buffer cleanup; small
+filter cohorts separately qualify published-chain retirement.
+
+Both production kernels pass eight regression cases, and both injection
+kernels pass allocation handling plus task/TSYNC retirement. All eight host
+test files and the isolated generated inventory check pass. A separate
+lifetime review checked all four generated kernels and the identical V fixture
+C: stack headers/data remain live through synchronous copying, `.nogrow`
+selects raw-pointer freeing, and no hidden fixture heap allocation occurs.
+The frozen compiler reports the same 406 AArch64 and 297 x86-64 allocation
+sites before and after; its existing allowance failures remain explicit.
+
+`seccompalloc-before-*`, `seccompalloc-after-*` and `seccompalloc-fault-*` in the
+[dated results directory](../tests/linux-compat/results/2026-10-12/) retain the
+ordinary controls, production/injection receipts and serial logs. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/seccompalloc-audit.v)
+checks the outcomes independently and deliberately rejects treating a
+production-success transcript as an allocation-failure transcript. It verifies
+60 source fingerprints, frozen guest artifacts, emitted header flags/free
+paths, page/object retention and unchanged allocation-site counts. These
+isolated a11caa1b worktrees change only the kernel installation helper; the
+inventory includes the physical allocator.
+
+The broader AArch64 ops/churn/cache run also passes: all 36 syscall rows retain
+zero bytes per operation, and true, sleep, curl and BusyBox awk each retain
+zero bytes per run over 300 runs. Desktop idle/apps/drag with the same frozen
+cached binary fails before readiness on both baseline and changed kernels.
+Both empty measurement reports, raw failure logs and the binary input hash
+are retained. That existing startup failure remains an open qualification.
+
+Physical OOM recovery, exhaustive allocation/error precedence, notifications
+and foreign/ELF32 execution remain unqualified. The broad section-15 acceptance
+gates remain open.

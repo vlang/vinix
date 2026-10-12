@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "ac90625c7506275d6ddb5f111bf40808faed608e47c10b62f66ccabc4a9fd8d7",
+    "results": [
+        {
+            "name": "seccompalloc",
+            "source_sha256": "c2632a141adc75859b2a3029e5396b9724f051df92f52d576b35a60d9f8aae94",
+            "init_sha256": "0d1b7513e82c54c89cbfbc35a3b7ae612ea78c81b838c794205899619b431b4b",
+            "iso_sha256": "967c17f9ba4fce0d5a95b277c364f3d40116f893e7e513ac7f13fa9f7a8409ce",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

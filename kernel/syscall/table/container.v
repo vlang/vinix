@@ -9,6 +9,7 @@
 module table
 
 import errno
+import memory
 import proc
 import usercopy
 
@@ -239,7 +240,18 @@ fn seccomp_install(prog u64, flags u32) (u64, u64) {
 	if proc.no_new_privs_state(proc.current_thread()) == 0 && !proc.current_has_capability(proc.cap_sys_admin) {
 		return errno.err, errno.eacces
 	}
-	mut instructions := []proc.SockFilter{len: length} @[freed]
+	// A user-requested buffer must not use V's panic-on-OOM constructor.
+	// Empty construction allocates nothing; the raw allocation has no V
+	// managed-array metadata, so replace its flags before publishing/freeing.
+	buffer := seccomp_instruction_allocation(u64(length) * sizeof(proc.SockFilter)) @[freed]
+	if buffer == unsafe { nil } { return errno.err, errno.enomem }
+	mut instructions := []proc.SockFilter{} @[freed]
+	unsafe {
+		instructions.data = buffer
+		instructions.len = length
+		instructions.cap = length
+		instructions.flags = .nogrow
+	}
 	if !usercopy.copy_from_user(unsafe { voidptr(&instructions[0]) }, header[1], u64(length) * sizeof(proc.SockFilter)) {
 		unsafe { instructions.free() }
 		return errno.err, errno.efault
@@ -254,6 +266,15 @@ fn seccomp_install(prog u64, flags u32) (u64, u64) {
 		unsafe { instructions.free() }
 	}
 	return ret, err
+}
+
+fn seccomp_instruction_allocation(bytes u64) voidptr {
+	$if seccomp_alloc_selftest ? {
+		// Fault injection exists only in explicitly built test kernels. It
+		// exercises the caller's actual nil path before copying instructions.
+		if bytes == u64(4095) * sizeof(proc.SockFilter) { return unsafe { nil } }
+	}
+	return memory.malloc_packed_fallible(bytes)
 }
 
 // The extra prctl operations a container runtime uses. Anything else falls

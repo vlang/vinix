@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -543,6 +543,21 @@ instructions. Null, bad and partial-page pointers, readonly headers, exact
 instruction boundaries, unaligned headers and ignored ABI padding are tested.
 Repeated rejection preserves mode and no_new_privs; valid ALLOW filters prove
 the capability/NNP authorization paths. Each group performs 446 checked calls.
+
+The `seccompalloc` case records four root/UID 1000 syscall/prctl cohorts. A
+valid 4095-instruction ALLOW program succeeds in production; a separate kernel
+built with `VFLAGS='-d seccomp_alloc_selftest'` injects a nil instruction
+allocation and must return ENOMEM before copying the instruction pointer.
+The dated auditor independently requires these distinct outcomes and refuses
+to label ordinary success as a tested allocation failure. Header, length and
+permission errors retain their precedence; rejection preserves mode/NNP and a
+subsequent small filter must work. After warmup, 256 rejected large-copy calls
+per cohort retain flat `/proc/slabinfo` large-allocation page counts. A
+32760-byte raw buffer uses the big allocator, including its metadata: three
+pages on AArch64 and nine on x86-64. It does not belong to a 32768-byte slab
+class. The separate `seccompthread` case measures published small-buffer
+retirement. Allow 300 seconds per case. Physical OOM recovery is a separate
+qualification; the injection is absent from production kernels.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 
