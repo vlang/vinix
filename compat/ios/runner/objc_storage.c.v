@@ -30,6 +30,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.cookie_owned = objc_is_kind(object, ios_runtime.names['NSHTTPCookie'])
 	header.webview_owned = objc_is_kind(object, ios_runtime.names['WKWebView'])
 	header.request_owned = objc_is_kind(object, ios_runtime.names['NSURLRequest'])
+	header.response_owned = objc_is_kind(object, ios_runtime.names['NSURLResponse'])
 	header.value_owned = objc_is_kind(object, ios_runtime.names['NSValue']) && !objc_is_kind(object, ios_runtime.names['NSNumber'])
 	C.ios_ref_change(unsafe { &ios_runtime.live }, 1)
 	C.ios_ref_change(unsafe { &info.instances }, 1)
@@ -86,6 +87,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	webkit_dispose(mut header)
 	webview_dispose(object, mut header)
 	request_dispose(mut header)
+	response_dispose(mut header)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])

@@ -106,6 +106,9 @@ mut:
 	webview_owned bool
 	request &URLRequestState = unsafe { nil }
 	request_owned bool
+	response &URLResponseState = unsafe { nil }
+	response_owned bool
+	response_headers bool
 	value_owned bool
 	value_initialized bool
 	web_history bool
@@ -251,7 +254,7 @@ fn objc_start() {
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
-        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSUserDefaults',
+        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
@@ -277,6 +280,7 @@ fn objc_start() {
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
 			'NSMutableData' { ios_runtime.names['NSData'] }
 			'NSMutableURLRequest' { ios_runtime.names['NSURLRequest'] }
+			'NSHTTPURLResponse' { ios_runtime.names['NSURLResponse'] }
 			'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			else { ios_runtime.names['NSObject'] }
 		}
@@ -296,6 +300,8 @@ fn objc_start() {
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
 			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
 			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
+			'NSURLResponse' { u32(24) }
+			'NSHTTPURLResponse' { u32(32) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
 			'NSLayoutAnchor', 'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { u32(sizeof(AbiLayoutAnchor)) }
 			else { webkit_size(name) }
@@ -325,6 +331,12 @@ fn objc_start() {
 	for i, pair in [['_internal', '@"NSURLRequestInternal"']!, ['_cookiePartitionIdentifier', '@"NSString"']!]! {
 		request_class.ivars[pair[0]] = &ObjIvar{name:pair[0].clone(), types:pair[1].clone(), offset:i64(8 + i * 8), size:8}
 	}
+	mut response_class := ios_runtime.classes[ios_runtime.names['NSURLResponse']] or { panic('iOS: missing response class') }
+	for i, pair in [['_internal', '@"NSURLResponseInternal"']!, ['__cf_resp_data', '^{URLResponse=^^?^{__CFURL}^{__CFString}^{__CFString}qdd^{__CFDictionary}^{__CFDictionary}i^{__CFData}^{HTTPResponse}{os_unfair_lock_s=I}}']!]! {
+		response_class.ivars[pair[0]] = &ObjIvar{name:pair[0].clone(), types:pair[1].clone(), offset:i64(8 + i * 8), size:8}
+	}
+	mut http_response := ios_runtime.classes[ios_runtime.names['NSHTTPURLResponse']] or { panic('iOS: missing HTTP response class') }
+	http_response.ivars['_httpInternal'] = &ObjIvar{name:'_httpInternal'.clone(), types:'@"NSHTTPURLResponseInternal"'.clone(), offset:24, size:8}
 }
 
 fn read64(address u64) u64 { return unsafe { *(&u64(address)) } }
@@ -431,6 +443,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
+	if obj_header(object).response_owned { response_initialize(object) }
 	name := webkit_object_name(object)
 	if name == 'WKWebView' { webview_initialize(object, ObjRect{}, 0); return object }
 	if name == 'WKWebsiteDataStore' { panic('iOS: use WebKit data store factories') }

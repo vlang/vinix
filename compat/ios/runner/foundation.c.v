@@ -209,6 +209,7 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 		return true
 	}
 	mut header := obj_header(object)
+	if header.response_headers && selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:', 'removeAllObjects'] { panic('iOS: mutation of immutable response headers') }
 	if header.web_history_array && selector in ['addObject:', 'removeObjectAtIndex:', 'removeAllObjects', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of a read-only WebKit history array') }
 	if header.webkit_array && selector in ['addObject:', 'removeObjectAtIndex:', 'removeAllObjects', 'setObject:atIndexedSubscript:'] { panic('iOS: mutation of a read-only WebKit script array') }
 	if header.json_immutable && selector in ['setObject:forKeyedSubscript:', 'setObject:forKey:', 'removeObjectForKey:',

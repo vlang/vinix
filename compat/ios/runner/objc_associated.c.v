@@ -34,6 +34,10 @@ fn objc_copy_value(value u64, with_zone bool) u64 {
 		return cf_data_create(0, data_pointer(value), i64(data_length(value)))
 	}
 	if objc_is_kind(value, ios_runtime.names['NSURLRequest']) { return request_copy(value, false) }
+	if objc_is_kind(value, ios_runtime.names['NSURLResponse']) {
+		if obj_header(value).response == unsafe { nil } { panic('iOS: response is not initialized') }
+		return objc_retain(value)
+	}
 	if objc_is_kind(value, ios_runtime.names['NSValue']) && !objc_is_kind(value, ios_runtime.names['NSNumber']) {
 		if !obj_header(value).value_initialized { panic('iOS: value is not initialized') }
 		return objc_retain(value)

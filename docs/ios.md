@@ -78,7 +78,7 @@ executing a GUI app directly from a shell does not create a window. Set
 | C++ (optional) | `--with-cxx` builds LLVM libc++ with Apple ARM64 string, 128-byte `mbstate_t`, 32-bit ctype masks and eight-byte TLS keys; native strings and legacy growth/substring helpers, integer sorts, streams, regex, futures, shared/weak ownership and synchronization; V adapters for Darwin random_device and variadic abort |
 | libSystem | Memory/string/conversion/math subset, repeated 4/8/16-byte pattern fills and 32-bit wide characters; Darwin 152-byte `FILE` objects over native libc streams; ARM64 printf/scanf/asprintf and `va_list` adapters; checked formatting/copies; CPU/page-size queries, clocks, calendar time, locale categories, stack guards and C/UTF-8 Unicode rune tables; translated open/mmap flags, positional reads/writes, shared-memory aliases, 144-byte stat records and native `utime` timestamps; version-4 UUIDs from native entropy; IPv4/IPv6 TCP, UDP and Unix sockets with Darwin addresses, options, flags and errors; pthread, `dispatch_once`, main/global/serial dispatch queues, delayed work and synchronous callbacks |
 | Objective-C | Class/metaclass registration, superclass dispatch, checked absolute/relative method lists and type encodings, canonical selectors, method/ivar reflection, inherited method replacement and saved IMPs, dynamic class/ivar creation and disposal, checked `object_setClass`, nonfragile ivar adjustment, native methods, reentrant once-per-class `+initialize`, nil returns, allocation/new/class, caller-supplied instance construction and destruction, ARC ownership including 52 register-specific entry points, native `dealloc` and Objective-C++ ivar constructors/destructors, zeroing weak references and copied block properties |
-| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, immutable NSValue byte/type, pointer, range and geometry boxes, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
+| Foundation | UTF-8 and UTF-16 constant NSString, UTF-16 length, concatenation, integer/object formatting; NSNumber, immutable NSValue byte/type, pointer, range and geometry boxes, NSURLResponse/NSHTTPURLResponse metadata, NSData, file-reading NSFileHandle, main NSBundle, document paths, absolute file URLs with UTF-8 percent encoding, immutable binary/XML property lists; collections, fast enumeration, timers, synchronous notification observers, operation queue configuration and file-backed standard user defaults |
 | CoreFoundation | Owned UTF-8/ASCII strings including embedded NUL, UTF-16 ranges and partial UTF-8/ASCII conversion, arrays/dictionaries with type or NULL callbacks, dictionary add-if-absent and raw null entries, exported immutable empty dictionary, mutable data with zero-filled growth, signed integer/floating numbers, distinct Boolean IDs, equality/hash and callback tables; default allocation and absolute time |
 | UIKit | UIApplicationMain with its principal class/application/delegate objects, file launch options and scene URL contexts, single manifest window-scene connection, idle-timer state and native controller gesture/home-indicator preference callbacks, UIWindow, UIScreen, UIViewController presentation, nested UIView ownership/removal, UILabel, UIButton target/action, opaque UIColor, UIFont size, CALayer corner radius, single-touch swipe recognizers and simple alerts; accessibility labels/hints/values/identifiers, traits and absolute frames, UIAccessibilityElement with a weak container; scaled/nested per-thread image contexts, immutable UIImage snapshots, upright PNG/JPEG decode and representation |
 | Bitmap graphics | Owned RGB/gray colors with full-precision components and equality, RGB/RGBA/BGRA storage, bitmap/image dimensions and data providers, premultiplied source-over fills, clear/clip, saved state and fill color space, axis-aligned translation/scale, nearest/bilinear image drawing; independent image storage and real PNG/JPEG codecs from the V installation's existing stb library |
@@ -3229,17 +3229,73 @@ application code. Evidence is under `build/ios/fortnite/value-checks`. Full
 regression remains unpassed, the five published runners are unchanged, and
 game entry, rendering and gameplay remain unverified.
 
+`NSURLResponse` and `NSHTTPURLResponse` now implement public response metadata
+in V. EOS imports NSHTTPURLResponse strongly and uses `statusCode`,
+`allHeaderFields`, `valueForHTTPHeaderField:` and `expectedContentLength`.
+The base initializer copies its MIME and encoding strings, retains the URL
+through copying, and preserves signed content lengths. Immutable response
+copies retain the same object, including copy associations.
+
+HTTP initialization copies the header dictionary and field names while
+retaining string values. Header getters return independent snapshots which
+reject Objective-C setters, subscripts/removal and CF mutation. Native CF
+snapshots report NSMutableDictionary ancestry despite rejecting mutation;
+the implementation models this with a persistent storage flag. Fourteen
+measured standard field names canonicalize; other names preserve spelling.
+Lookups fold ASCII case. MIME and charset getters trim and lowercase their
+parsed values; the first charset wins, and its quotes remain, matching the
+native observations. Changes to retained mutable header strings affect MIME,
+charset and content length getters. The copied dictionary remains independent
+of subsequent changes to the input dictionary.
+
+Missing HTTP length is -1. Decimal prefixes accept leading whitespace and
+trailing junk, invalid digits produce zero, positive overflow saturates, and
+negative lengths become -1. Parsing uses bounded string bytes, including
+constant NSString storage. HTTP status preserves the native ten-bit storage
+rule. English status descriptions were generated in V from 600 native
+observations and checked against installed Foundation. A fresh response has
+MIME type application/octet-stream; an explicitly initialized HTTP response
+with no Content-Type has nil MIME type. Fresh HTTP responses have status 200.
+
+The measured base/HTTP records are 24/32 bytes, with private ivars at offsets
+8, 16 and 24. These are macOS Foundation measurements, not private device iOS
+ABI measurements. The private slots remain reserved zero-filled storage;
+a separate fixed state owns four references and retires after class changes
+and caller-storage destruction. The profile allows 128 fields, 256-byte ASCII
+field names and 64 KiB strings. Names differing only by case reject, and
+retained mutable values must stay within the validated string profile.
+Suggested filenames, coding, response equality/hash, private CFNetwork
+bridges, the HTTP inherited base initializer and transport remain unimplemented.
+
+All 62 programs build and 76 original generated C streams restore to their
+recorded hashes. Fourteen host suites pass ASAN/UBSAN in both hashing modes.
+Vinix passes sixteen Objective-C programs and 33 Swift/loader programs.
+Response fixtures check the measured data behavior and calling conventions,
+100 class-change release cycles, copy associations, caller storage and two
+runtime cycles. Thirteen rejection children check invalid inputs, immutable
+snapshots and unsupported APIs. Generated-code checks verify fixed state
+ownership, allocation-free retirement/length/trim parsing and canonical key
+cleanup. Native and host trials retain their sources and actual statuses;
+the premature cache-probe run is preserved and excluded from validation.
+
+Fortnite passes the response class binding and exits with status 1 before
+entry at EOS's required `_OBJC_CLASS_$_UIAlertController` import. The
+next-import probe verifies that dependency without executing application code. Evidence is
+under `build/ios/fortnite/response-checks`. Full regression remains unpassed,
+the five published runners are unchanged, and game entry, rendering and
+gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,426 | 733 | 80 |
-| EOSSDK | 643 | 19 | 18 |
+| Fortnite executable | 1,427 | 732 | 80 |
+| EOSSDK | 644 | 18 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,184 | 813 | 121 |
+| All images | 2,186 | 811 | 121 |
 
-The C++/GLES/Text variant reports 2,197 resolved imports, 800 unresolved strong
+The C++/GLES/Text variant reports 2,199 resolved imports, 798 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

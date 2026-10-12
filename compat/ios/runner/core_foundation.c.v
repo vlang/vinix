@@ -199,6 +199,7 @@ fn cf_dictionary_value(object u64, key u64) u64 {
 }
 
 fn cf_dictionary_set(object u64, key u64, value u64) {
+	if obj_header(object).response_headers { panic('iOS: mutation of immutable response headers') }
 	if !objc_is_kind(object, ios_runtime.names['NSMutableDictionary']) { panic('iOS: CFDictionarySetValue requires a mutable dictionary') }
 	mut header := obj_header(object)
 	cf_dictionary_check_entry(header, key, value)
@@ -212,6 +213,7 @@ fn cf_dictionary_set(object u64, key u64, value u64) {
 }
 
 fn cf_dictionary_add(object u64, key u64, value u64) {
+	if obj_header(object).response_headers { panic('iOS: mutation of immutable response headers') }
 	if !objc_is_kind(object, ios_runtime.names['NSMutableDictionary']) { panic('iOS: CFDictionaryAddValue requires a mutable dictionary') }
 	mut header := obj_header(object)
 	// An equal key leaves the original key/value, retains and mutation count
