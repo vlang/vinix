@@ -90,7 +90,13 @@ fn qualify_package_linux(mut t Test) ! {
 	os.mkdir_all('/etc/vinix-packages')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(config))!
 	os.chmod('/etc/vinix-packages/config.json', 0o644)!
-	package_success(['repo-enroll', 'fixture', 'file://' + repository, key])!
+	mut trust := pkgprotocol.decode_repository_review(package_success(['repo-review', 'enroll', 'fixture', 'file://' + repository, key])!)!
+	defer { trust.close() }
+	assert trust.sequence == 1 && trust.package_count == 2 && trust.public_key == key && trust.previous_public_key == ''
+	assert pkgcore.load_config('')!.repositories.len == 0
+	package_success(['repo-apply', trust.fingerprint, 'enroll', 'fixture', 'file://' + repository, key])!
+	stale_trust := run(['/usr/bin/vinix-package', 'repo-apply', trust.fingerprint, 'enroll', 'fixture', 'file://' + repository, key], '', none, none)
+	assert stale_trust.status != 0 && stale_trust.output.contains('review is stale'), stale_trust.output
 	enrolled := json2.decode[pkgcore.RepositoryStatus](package_success(['--json', 'repo-list'])!)!
 	assert enrolled.repositories.len == 1 && enrolled.repositories[0].public_key == key
 	assert enrolled.history.len == 1 && enrolled.history[0].sequence == 1
@@ -154,7 +160,10 @@ fn qualify_package_linux(mut t Test) ! {
 	assert missing.status == 127 && missing.output.contains('libfixture.so.1'), missing.output
 	reviewed_package_operation('rollback', [])!
 	assert package_success(['run', application.id])!.contains('PACKAGE LINUX')
-	package_success(['repo-revoke', 'fixture'])!
+	mut revocation := pkgprotocol.decode_repository_review(package_success(['repo-review', 'revoke', 'fixture'])!)!
+	defer { revocation.close() }
+	assert revocation.public_key == key && revocation.url == 'file://' + repository
+	package_success(['repo-apply', revocation.fingerprint, 'revoke', 'fixture'])!
 	revoked_launch := run(['/usr/bin/vinix-package', 'run', application.id], '', none, none)
 	assert revoked_launch.status != 0, revoked_launch.output
 	revoked_rollback := run(['/usr/bin/vinix-package', 'rollback'], '', none, none)
@@ -176,6 +185,7 @@ fn qualify_package_linux(mut t Test) ! {
 	package_success(['update'])!
 	assert pkgcore.read_state('/var/lib/vinix-packages', architecture)!.generation == removed.generation
 	assert os.is_file(data)
+	t.say('PACKAGE TRUST REVIEW read-only authenticated-metadata stale-confirmation reviewed-revocation PASS')
 	t.say('PACKAGE REPOSITORY authenticated-enrollment revocation retained-replay-floor re-enrollment PASS')
 	t.say('PACKAGE LINUX IMPORT signed-source-aliases explicit-runtime tamper-refusal missing-library rollback clean-uninstall PASS')
 }

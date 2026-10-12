@@ -3,7 +3,6 @@ module pkgcore
 
 import json2
 import os
-import time
 
 fn C.mkstemp(&u8) i32
 
@@ -89,29 +88,24 @@ fn save_configuration(path string, config Config) ! {
 // The administrator supplies the key through an authenticated external channel.
 // Proving possession by a live signed index never learns or substitutes a key.
 pub fn enroll_repository(root string, repository Repository, offline bool) !Config {
+	return enroll_repository_reviewed(root, repository, offline, '')
+}
+
+pub fn enroll_repository_reviewed(root string, repository Repository, offline bool, expected string) !Config {
 	directory := state_directory(root)
 	guard := acquire(directory)!
 	defer { guard.release() }
 	current := load_config(root)!
 	path := writable_configuration(root)!
-	mut repositories := current.repositories.filter(it.id != repository.id)
-	repositories << repository
-	repositories.sort(a.id < b.id)
-	next := Config{ ...current, repositories: repositories }
-	next.validate()!
+	next := enrollment_configuration(current, repository)!
 	mut history := history_with_snapshots(directory, read_snapshots(directory)!)!
 	work := directory + '/enrollment'
 	if os.exists(work) { os.rmdir_all(work)! }
 	owned_directory(work, 0o700)!
 	defer { os.rmdir_all(work) or {} }
-	fetch(repository.url.trim_right('/') + '/index.json', work + '/index.json', max_metadata, false,
-		current.policy.offline || offline)!
-	fetch(repository.url.trim_right('/') + '/index.sig', work + '/index.sig', 256, false,
-		current.policy.offline || offline)!
-	text := read_metadata(work + '/index.json')!
-	signature := read_metadata(work + '/index.sig')!
-	index := verify_index(repository, text, signature, time.now().unix())!
-	history = remember_index(history, repository, index, text)!
+	snapshot, index := enrollment_snapshot(current, repository, offline, work)!
+	check_repository_review(expected, repository_fingerprint(current, history, 'enroll', repository, index_digest(snapshot.text)))!
+	history = remember_index(history, repository, index, snapshot.text)!
 	// History becomes durable before trust is enabled. An interrupted attempt
 	// may remember a newer floor, but can never trust a replayed older index.
 	save_history(directory, history)!
@@ -122,13 +116,19 @@ pub fn enroll_repository(root string, repository Repository, offline bool) !Conf
 // Revocation needs no live repository or valid catalog. Installed payload/data
 // remain available for inspection and removal, and sequence history is retained.
 pub fn revoke_repository(root string, id string) !Config {
+	return revoke_repository_reviewed(root, id, '')
+}
+
+pub fn revoke_repository_reviewed(root string, id string, expected string) !Config {
 	if !identifier(id) { return error('invalid repository ID') }
 	directory := state_directory(root)
 	guard := acquire(directory)!
 	defer { guard.release() }
 	current := load_config(root)!
 	path := writable_configuration(root)!
-	if !current.repositories.any(it.id == id) { return error('repository is not enrolled: ${id}') }
+	matches := current.repositories.filter(it.id == id)
+	if matches.len != 1 { return error('repository is not enrolled: ${id}') }
+	check_repository_review(expected, repository_fingerprint(current, TrustHistory{}, 'revoke', matches[0], ''))!
 	next := Config{ ...current, repositories: current.repositories.filter(it.id != id) }
 	next.validate()!
 	save_configuration(path, next)!

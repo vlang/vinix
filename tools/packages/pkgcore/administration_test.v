@@ -345,3 +345,94 @@ fn test_invalid_persistent_history_fails_closed() {
 	// Invalid history cannot prevent an administrator revoking a publisher.
 	revoke_repository(root, 'fixture')!
 }
+
+fn test_repository_review_is_read_only_and_apply_binds_catalog_and_configuration() {
+	root := administration_root('review')!
+	defer { os.rmdir_all(root) or {} }
+	key, secret := ed25519.generate_key()!
+	path := root + '/repo with spaces'
+	repository := Repository{ id: 'fixture', url: 'file://' + path, public_key: key.hex() }
+	expires := time.now().unix() + 3600
+	first := administration_index(path, secret, 1, expires, '')!
+	configuration := os.read_file(root + '/etc/vinix-packages/config.json')!
+	mut review := review_repository(root, 'enroll', repository, false)!
+	defer { review.close() }
+	assert review.sequence == 1 && review.expires == expires && review.package_count == 0
+	assert review.previous_public_key == '' && review.remembered_sequence == 0
+	assert os.read_file(root + '/etc/vinix-packages/config.json')! == configuration
+	assert !os.exists(state_directory(root))
+	// Even same-sequence changed bytes cannot consume the old review.
+	administration_index(path, secret, 1, expires, ' ')!
+	mut refused := false
+	enroll_repository_reviewed(root, repository, false, review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && os.read_file(root + '/etc/vinix-packages/config.json')! == configuration
+	assert !os.exists(state_directory(root) + '/trust-history.json')
+	os.write_file(path + '/index.json', first)!
+	os.write_file(path + '/index.sig', ed25519.sign(secret, first.bytes())!.hex())!
+	enroll_repository_reviewed(root, repository, false, review.fingerprint)!
+	assert load_config(root)!.repositories == [repository]
+	assert read_state(state_directory(root), 'aarch64')!.generation == 0
+	refused = false
+	enroll_repository_reviewed(root, repository, false, review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused
+	mut revocation := review_repository(root, 'revoke', Repository{ id: repository.id }, false)!
+	defer { revocation.close() }
+	current := load_config(root)!
+	os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(Config{ ...current, launch_user: 'bob' }))!
+	refused = false
+	revoke_repository_reviewed(root, repository.id, revocation.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && load_config(root)!.repositories.len == 1
+}
+
+fn test_repository_review_floor_changes_and_intent_are_checked_before_trust_publication() {
+	root := administration_root('review-floor')!
+	defer { os.rmdir_all(root) or {} }
+	key, secret := ed25519.generate_key()!
+	repository := Repository{ id: 'fixture', url: 'file://' + root + '/repo', public_key: key.hex() }
+	expires := time.now().unix() + 3600
+	administration_index(root + '/repo', secret, 1, expires, '')!
+	config := enroll_repository(root, repository, false)!
+	refresh(config, state_directory(root))!
+	administration_index(root + '/repo', secret, 2, expires, '')!
+	mut review := review_repository(root, 'enroll', repository, false)!
+	defer { review.close() }
+	assert review.remembered_sequence == 1 && review.previous_public_key == repository.public_key
+	refresh(config, state_directory(root))!
+	history := os.read_file(state_directory(root) + '/trust-history.json')!
+	mut refused := false
+	enroll_repository_reviewed(root, repository, false, review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && os.read_file(state_directory(root) + '/trust-history.json')! == history
+	mut fresh := review_repository(root, 'enroll', repository, false)!
+	defer { fresh.close() }
+	refused = false
+	revoke_repository_reviewed(root, repository.id, fresh.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && load_config(root)!.repositories == [repository]
+	enroll_repository_reviewed(root, repository, false, fresh.fingerprint)!
+}
+
+fn test_reviewed_revocation_survives_corrupt_metadata_and_refuses_replaced_key() {
+	root := administration_root('review-revoke')!
+	defer { os.rmdir_all(root) or {} }
+	key, secret := ed25519.generate_key()!
+	new_key, new_secret := ed25519.generate_key()!
+	repository := Repository{ id: 'fixture', url: 'file://' + root + '/repo', public_key: key.hex() }
+	expires := time.now().unix() + 3600
+	administration_index(root + '/repo', secret, 1, expires, '')!
+	enroll_repository(root, repository, false)!
+	mut old := review_repository(root, 'revoke', Repository{ id: repository.id }, false)!
+	defer { old.close() }
+	administration_index(root + '/repo', new_secret, 1, expires, '')!
+	enroll_repository(root, Repository{ ...repository, public_key: new_key.hex() }, false)!
+	mut refused := false
+	revoke_repository_reviewed(root, repository.id, old.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && load_config(root)!.repositories[0].public_key == new_key.hex()
+	os.write_file(state_directory(root) + '/catalog.json', 'corrupt catalog')!
+	os.write_file(state_directory(root) + '/trust-history.json', 'corrupt history')!
+	os.rmdir_all(root + '/repo')!
+	mut fresh := review_repository(root, 'revoke', Repository{ id: repository.id }, false)!
+	defer { fresh.close() }
+	assert fresh.public_key == new_key.hex() && fresh.index_sha256 == '' && fresh.sequence == 0
+	revoke_repository_reviewed(root, repository.id, fresh.fingerprint)!
+	assert load_config(root)!.repositories.len == 0
+	assert os.read_file(state_directory(root) + '/trust-history.json')! == 'corrupt history'
+}

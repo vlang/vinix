@@ -52,6 +52,9 @@ host PT_INTERP path is bypassed. Guest assertions cover:
   usable, and an empty refresh retaining the sequence floor. Re-enrollment with
   an older signed index fails; re-enrollment with the latest exact index succeeds
   without changing installed state or personal data.
+- Read-only signed repository enrollment review, fingerprint-bound trust apply,
+  refusal of reused/stale trust confirmation, and reviewed revocation through
+  the production CLI. The `PACKAGE TRUST REVIEW` marker covers this flow.
 
 A passing retained run writes `qualification.json` with architecture, SDK,
 scenario and hashes/lengths for kernel, sandbox, dynamic payload, shared library,
@@ -110,3 +113,17 @@ not qualify arbitrary Linux libraries, upstream apps, glibc, graphics/audio
 brokers, network traffic, Wine or Apple API coverage. Use the separate
 [native enforcement](runtime-check.md) and [persistent recovery](persistence-check.md)
 checks for generation leases and ext2 transaction crash checkpoints.
+
+Reviewed repository trust changes passed on both targets on 2026-10-12 using
+those cached kernel artifacts:
+[AArch64 trust-review receipt](results/2026-10-12/repository-manager-aarch64.json),
+[AArch64 serial](results/2026-10-12/repository-manager-aarch64.serial.txt),
+[x86_64 trust-review receipt](results/2026-10-12/repository-manager-x86_64.json),
+[x86_64 serial](results/2026-10-12/repository-manager-x86_64.serial.txt).
+`PACKAGE TRUST REVIEW` covers read-only authenticated metadata disclosure,
+fingerprint-bound enrollment, stale-confirmation refusal and reviewed revocation.
+The headless Software fixture separately covers GUI editing, frozen confirmation,
+long URL review, cancellation, invalid/stale responses and saved-trust/failed-refresh
+diagnostics. Form/review redraws retained zero allocations; status/review reloads
+matched the JSON decoder baseline after retirement. These are CLI/host-UI checks;
+the ordinary-user graphical session and public display broker remain release gates.

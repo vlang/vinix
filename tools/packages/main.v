@@ -11,6 +11,8 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [A
 	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
 	'  review install|remove|upgrade|deploy|rollback [ID...]\n' +
 	'  repo-list | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID\n' +
+	'  repo-review enroll ID URL KEY | repo-review revoke ID\n' +
+	'  repo-apply REVIEW_FINGERPRINT enroll ID URL KEY | repo-apply REVIEW_FINGERPRINT revoke ID\n' +
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
@@ -101,6 +103,27 @@ fn checked(arguments []string) !int {
 	config := pkgcore.Config{ ...initial, policy: pkgcore.Policy{ ...initial.policy, offline: offline || initial.policy.offline } }
 	directory := pkgcore.state_directory(root)
 	match command {
+		'repo-review', 'repo-apply' {
+			applying := command == 'repo-apply'
+			offset := if applying { 1 } else { 0 }
+			if names.len <= offset { return error('repository review/apply requires enroll or revoke') }
+			if applying && !pkgcore.digest_valid(names[0]) { return error('repository apply requires a review fingerprint') }
+			operation := names[offset]
+			if (operation == 'enroll' && names.len != offset + 4) || (operation == 'revoke' && names.len != offset + 2)
+				|| operation !in ['enroll', 'revoke'] { return error('use repo-review/apply enroll ID URL KEY or revoke ID') }
+			repository := pkgcore.Repository{ id: names[offset + 1],
+				url: if operation == 'enroll' { names[offset + 2] } else { '' },
+				public_key: if operation == 'enroll' { names[offset + 3] } else { '' } }
+			if !applying {
+				println(json2.encode(pkgcore.review_repository(root, operation, repository, offline)!))
+			} else if operation == 'enroll' {
+				pkgcore.enroll_repository_reviewed(root, repository, offline, names[0])!
+				println('Repository enrolled. Refresh repositories to load its authenticated catalog.')
+			} else {
+				pkgcore.revoke_repository_reviewed(root, repository.id, names[0])!
+				println('Repository revoked; installed payloads, personal data and trust history were retained.')
+			}
+		}
 		'repo-list' {
 			if names.len != 0 { return error('repo-list takes no arguments') }
 			status := pkgcore.repository_status(root)!

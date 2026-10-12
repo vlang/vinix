@@ -84,7 +84,12 @@ fn qualify(binary string) ! {
 		(time.now().unix() + 3600).str()])!
 	first_index := os.read_file(repository + '/index.json')!
 	first_signature := os.read_file(repository + '/index.sig')!
-	success(binary, [...root_args, '--offline', 'repo-enroll', 'fixture', 'file://' + repository, key])!
+	mut trust := pkgprotocol.decode_repository_review(success(binary, [...root_args, '--offline', 'repo-review', 'enroll', 'fixture', 'file://' + repository, key])!)!
+	defer { trust.close() }
+	assert trust.sequence == 1 && trust.package_count == 2 && pkgcore.load_config(work + '/root')!.repositories.len == 0
+	success(binary, [...root_args, '--offline', 'repo-apply', trust.fingerprint, 'enroll', 'fixture', 'file://' + repository, key])!
+	stale_trust := command(binary, [...root_args, 'repo-apply', trust.fingerprint, 'enroll', 'fixture', 'file://' + repository, key])!
+	assert stale_trust.code != 0 && stale_trust.text.contains('stale')
 	enrolled := json2.decode[pkgcore.RepositoryStatus](success(binary, [...root_args, '--json', 'repo-list'])!)!
 	assert enrolled.repositories.len == 1 && enrolled.history.len == 1
 	assert enrolled.repositories[0].public_key == key && enrolled.history[0].sequence == 1
@@ -162,7 +167,9 @@ fn qualify(binary string) ! {
 	latest_index := os.read_file(repository + '/index.json')!
 	latest_signature := os.read_file(repository + '/index.sig')!
 	// Acquisition fails after trust revocation, but uninstall remains usable.
-	success(binary, [...root_args, 'repo-revoke', 'fixture'])!
+	mut revoke := pkgprotocol.decode_repository_review(success(binary, [...root_args, 'repo-review', 'revoke', 'fixture'])!)!
+	defer { revoke.close() }
+	success(binary, [...root_args, 'repo-apply', revoke.fingerprint, 'revoke', 'fixture'])!
 	assert command(binary, [...root_args, 'install', 'other'])!.code != 0
 	assert success(binary, [...root_args, 'plan', 'remove', 'app'])!.contains('"requested":[]')
 	remove_review := json2.decode[pkgprotocol.Review](success(binary, [...root_args, 'review', 'remove', 'app'])!)!

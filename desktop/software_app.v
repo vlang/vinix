@@ -76,6 +76,25 @@ mut:
 	launch_label    string = 'Launch'
 	service_path    string = '/usr/bin/vinix-package'
 	offline         bool
+	repository_mode bool
+	repository_status pkgprotocol.RepositoryStatus
+	repository_selected int = -1
+	repository_scroll int
+	repository_focus int
+	repository_id []u8
+	repository_url []u8
+	repository_key []u8
+	repository_operation string
+	repository_pending pkgprotocol.Repository
+	repository_review pkgprotocol.RepositoryReview
+	repository_review_ready bool
+	repository_summary string
+	repository_url_pages []string
+	repository_page_labels []string
+	repository_url_page int
+	repository_url_seen int
+	repository_result string
+	repository_worker SoftwareRepositoryWorker
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
@@ -119,6 +138,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker_view = view
 	a.worker_review = false
 	a.worker_run = false
+	a.repository_worker = .none
 	a.worker = os.new_process(a.service_path.clone())
 	mut owned := []string{cap: arguments.len}
 	for argument in arguments { owned << argument.clone() }
@@ -368,16 +388,39 @@ fn (mut a SoftwareApp) poll() bool {
 	view := a.worker_view
 	reviewing := a.worker_review
 	running := a.worker_run
+	repository_worker := a.repository_worker
 	a.retire_worker()
 	if code != 0 {
-		if reviewing { a.clear_review() }
+		if repository_worker == .review { a.clear_repository_review() }
+		if reviewing && repository_worker == .none { a.clear_review() }
 		diagnostic := software_output_tail(a.output)
+		if repository_worker == .refresh {
+			unsafe { a.repository_result.free() }
+			a.repository_result = 'Repository trust was saved, but catalog refresh failed: ' + diagnostic
+			a.read_repositories()
+			unsafe { diagnostic.free() }
+			return true
+		}
 		a.set_status(if diagnostic.len > 0 {
 			diagnostic
 		} else {
 			'The package service failed. Check administrator access, repository configuration and disk space.'
 		})
 		unsafe { diagnostic.free() }
+	} else if repository_worker == .list {
+		if !a.worker_failed { a.load_repositories() }
+	} else if repository_worker == .review {
+		if a.worker_failed { a.clear_repository_review() } else { a.load_repository_review() }
+	} else if repository_worker == .enroll {
+		a.start(['update'], false)
+		if a.worker != unsafe { nil } { a.repository_worker = .refresh }
+		a.set_status('Repository trust was saved. Refreshing authenticated catalogs…')
+	} else if repository_worker in [.revoke, .refresh] {
+		unsafe { a.repository_result.free() }
+		a.repository_result = if repository_worker == .revoke {
+			'Repository revoked. Installed payloads, personal data and trust history were retained.'.clone()
+		} else { 'Repository trusted and authenticated catalogs refreshed.'.clone() }
+		a.read_repositories()
 	} else if view {
 		if !a.worker_failed { a.load_view() }
 	} else if reviewing {
@@ -414,6 +457,8 @@ fn (mut a SoftwareApp) run_requested() {
 		return
 	}
 	a.clear_review()
+	a.clear_repository_review()
+	a.repository_mode = false
 	a.start(if request.document.len > 0 {
 		['run', request.id, request.document]
 	} else {
@@ -445,6 +490,14 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		return
 	}
 	if a.worker != unsafe { nil } { return }
+	if event_id == 'software.repositories' {
+		a.clear_review()
+		a.repository_mode = true
+		a.repository_focus = 0
+		a.read_repositories()
+		return
+	}
+	if a.repository_mode { a.handle_repositories(event_id); return }
 	for row, action in software_row_actions {
 		if event_id == action {
 			if a.review_ready && a.review_scroll + row < a.review_snapshot.rows.len {
@@ -555,6 +608,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 }
 
 fn (mut a SoftwareApp) key_input(input string) {
+	if a.repository_mode { a.repository_key_input(input); return }
 	if !a.focus { return }
 	match input {
 		'\x01' { a.select_all = true }
@@ -572,7 +626,9 @@ fn (mut a SoftwareApp) key_input(input string) {
 	}
 }
 
-fn (mut a SoftwareApp) paste_input(input string) { if a.focus { a.key_input(input) } }
+fn (mut a SoftwareApp) paste_input(input string) {
+	if a.repository_mode { a.repository_key_input(input) } else if a.focus { a.key_input(input) }
+}
 
 fn software_label(text string, x int, y int, width int, height int, owned bool) ui2.Element {
 	return ui2.Element{
@@ -619,6 +675,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.page_rows = if height > 400 { (height - 236) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+	if a.repository_mode { return a.build_repositories(width, height) }
 	mut children := frame_elements(48)
 	reviewing := a.review.len > 0
 	children << software_label('Software', 14, 8, 150, 28, false)
@@ -632,6 +689,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		children << software_button('software.installed', 'Installed', 112, 46, 90)
 		children << software_button('software.updates', 'Updates', 210, 46, 90)
 		children << software_button('software.reload', 'Reload', 308, 46, 90)
+		children << software_button('software.repositories', 'Repositories', 406, 46, 142)
 	}
 	for slot in 0 .. a.page_rows {
 		if reviewing {
@@ -753,6 +811,8 @@ fn (mut a SoftwareApp) close_app() {
 	}
 	for row in a.rows { software_free_row(row) }
 	a.clear_review()
+	a.clear_repository_review()
+	a.repository_status.close()
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()
@@ -764,6 +824,10 @@ fn (mut a SoftwareApp) close_app() {
 		a.status.free()
 		a.catalog_error.free()
 		a.update_error.free()
+		a.repository_id.free()
+		a.repository_url.free()
+		a.repository_key.free()
+		a.repository_result.free()
 	}
 	a = SoftwareApp{}
 }

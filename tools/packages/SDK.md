@@ -220,6 +220,33 @@ Repositories contain `{id,url,public_key}`; history contains
 Listing takes a shared lock once a package store exists; an active writer gives
 a busy diagnostic. A fresh image can be listed without initializing its store.
 
+`repo-review enroll ID URL KEY` and `repo-review revoke ID` emit a read-only
+format-1 `RepositoryReview`: `operation`, `architecture`, `id`, `url`,
+`public_key`, `previous_url`, `previous_public_key`, `fingerprint`,
+`index_sha256`, `sequence`, `expires`, `package_count` and `remembered_sequence`.
+Enrollment verifies a current signed index with the supplied key and checks
+retained replay/equivocation floors. No objects are downloaded and neither trust
+nor persistent package state changes. A private metadata workspace is removed
+on ordinary completion. Revocation needs only current configuration; its index
+digest, sequence, expiry, count and remembered-sequence fields are empty/zero.
+Its previous/current URL and key identify the exact configuration to disable.
+
+Call `repo-apply FINGERPRINT enroll ID URL KEY` or
+`repo-apply FINGERPRINT revoke ID` with the reviewed operation/arguments. Under
+the writer lock, the service reloads configuration and compares the complete
+intent; enrollment also re-verifies the signed index and sequence history.
+Changed metadata, policy, launch account, repository/key or remembered floors
+fail as stale before publishing trust/history. Review again. The fingerprint is
+an opaque freshness check and grants no administrator authority. After successful
+enrollment call `update` to load the combined catalog; a refresh failure does not
+undo the trust change. Revocation retains payloads, personal data and history.
+
+The lightweight [`pkgprotocol` repository module](pkgprotocol/repositories.v)
+provides bounded `decode_repositories`, `decode_repository_review`, input/response
+validation and explicit `close()` methods for consumers with manual memory
+management. Status has at most 4096 repository/history records and encoded
+responses are bounded to 8 MiB. Unknown formats and incomplete intents fail closed.
+
 History is keyed by ID/key, independent of mirror URL, and records exact signed
 index bytes. Reject lower sequences and changed bytes at an existing sequence;
 increase sequence for expiry renewals too. Revocation and empty refreshes retain

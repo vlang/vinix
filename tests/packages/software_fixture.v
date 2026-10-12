@@ -141,6 +141,7 @@ fn main() {
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if os.args.len > 1 {
+		if software_repository_service_fixture() or { panic(err) } { return }
 		if os.args[1] == 'view' {
 			println(json2.encode(SoftwareView{ format: 1, architecture: 'aarch64' }))
 			return
@@ -266,7 +267,176 @@ fn main() {
 	assert C.waitpid(pid, &child_status, 0) == pid
 	check_package_review()
 	check_resolved_updates() or { panic(err) }
-	println('Software UI: catalog, complete dependency review, literal confirmation, stale-plan failure, paging, diagnostics and close guard passed')
+	check_repository_management() or { panic(err) }
+	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
+}
+
+const repository_fixture_url = 'file:///private/tmp/repository with spaces; $literal'
+
+fn repository_fixture_status() !pkgprotocol.RepositoryStatus {
+	path := os.getenv('VINIX_SOFTWARE_REPOSITORY_FIXTURE')
+	if path != '' && os.exists(path) { return json2.decode[pkgprotocol.RepositoryStatus](os.read_file(path)!)! }
+	return pkgprotocol.RepositoryStatus{ format: 1, architecture: 'aarch64',
+		repositories: [pkgprotocol.Repository{ id: 'fixture', url: repository_fixture_url, public_key: 'a'.repeat(64) }],
+		history: [pkgprotocol.RepositoryFloor{ id: 'fixture', public_key: 'a'.repeat(64), sequence: 7, index_sha256: 'c'.repeat(64) }] }
+}
+
+fn repository_fixture_review(operation string, id string, url string, key string) !pkgprotocol.RepositoryReview {
+	status := repository_fixture_status()!
+	previous := status.repositories.filter(it.id == id)
+	old_url := if previous.len == 0 { '' } else { previous[0].url }
+	old_key := if previous.len == 0 { '' } else { previous[0].public_key }
+	return pkgprotocol.RepositoryReview{ format: 1, architecture: 'aarch64', operation: operation, id: id,
+		url: if operation == 'enroll' { url } else { old_url },
+		public_key: if operation == 'enroll' { key } else { old_key }, previous_url: old_url, previous_public_key: old_key,
+		fingerprint: if id == 'stale' { 'e'.repeat(64) } else { 'd'.repeat(64) },
+		index_sha256: if operation == 'enroll' { 'c'.repeat(64) } else { '' },
+		sequence: if operation == 'enroll' { u64(7) } else { u64(0) },
+		expires: if operation == 'enroll' { i64(2000000000) } else { i64(0) },
+		package_count: if operation == 'enroll' { 3 } else { 0 } }
+}
+
+fn software_repository_service_fixture() !bool {
+	if os.args[1] == '--json' {
+		assert os.args[2..] == ['repo-list']
+		println(json2.encode(repository_fixture_status()!))
+		return true
+	}
+	if os.args[1] == 'repo-review' {
+		operation := os.args[2]
+		id := os.args[3]
+		if id == 'bad-signature' { eprintln('fixture: repository signature verification failed'); exit(31) }
+		review := repository_fixture_review(operation, id,
+			if operation == 'enroll' { os.args[4] } else { '' },
+			if operation == 'enroll' { os.args[5] } else { '' })!
+		println(json2.encode(if id == 'wrong-format' {
+			pkgprotocol.RepositoryReview{ ...review, format: 2 }
+		} else if id == 'wrong-intent' { pkgprotocol.RepositoryReview{ ...review, id: 'other' } } else { review }))
+		return true
+	}
+	if os.args[1] == 'repo-apply' {
+		if os.args[2] == 'e'.repeat(64) { eprintln('fixture: repository review is stale; review again'); exit(32) }
+		assert os.args[2] == 'd'.repeat(64)
+		path := os.getenv('VINIX_SOFTWARE_REPOSITORY_FIXTURE')
+		assert path != ''
+		current := repository_fixture_status()!
+		operation := os.args[3]
+		id := os.args[4]
+		assert id == 'fixture'
+		if operation == 'enroll' {
+			assert os.args.len == 7 && os.args[5].starts_with(repository_fixture_url)
+			assert os.args[6] == 'b'.repeat(64)
+			next := pkgprotocol.RepositoryStatus{ ...current, repositories: [pkgprotocol.Repository{ id: id, url: os.args[5], public_key: os.args[6] }] }
+			os.write_file(path, json2.encode(next))!
+		} else {
+			assert operation == 'revoke' && os.args.len == 5
+			os.write_file(path, json2.encode(pkgprotocol.RepositoryStatus{ ...current, repositories: [] }))!
+		}
+		println('fixture: repository trust change saved')
+		return true
+	}
+	if os.args[1] == 'update' {
+		if repository_fixture_status()!.repositories.any(it.url.contains('refresh-fails')) {
+			eprintln('fixture: catalog refresh failed: publisher unreachable')
+			exit(33)
+		}
+		println('fixture: catalogs refreshed')
+		return true
+	}
+	return false
+}
+
+fn check_repository_management() ! {
+	path := os.temp_dir() + '/vinix-software-repositories-' + os.getpid().str()
+	previous := os.getenv_opt('VINIX_SOFTWARE_REPOSITORY_FIXTURE')
+	os.setenv('VINIX_SOFTWARE_REPOSITORY_FIXTURE', path, true)
+	defer {
+		os.rm(path) or {}
+		if value := previous { os.setenv('VINIX_SOFTWARE_REPOSITORY_FIXTURE', value, true) } else { os.unsetenv('VINIX_SOFTWARE_REPOSITORY_FIXTURE') }
+	}
+	mut app := SoftwareApp{ service_path: os.executable(), query: []u8{cap: 256}, output: []u8{cap: 8192} }
+	app.handle('software.repositories')!
+	assert app.worker_view && app.prepare_close()
+	wait_for_software(mut app)
+	assert app.repository_mode && app.repository_status.repositories.len == 1
+	app.handle('software.row.0')!
+	assert editor_bytes_text(app.repository_id) == 'fixture'
+	assert editor_bytes_text(app.repository_url) == repository_fixture_url
+	app.handle('software.repository.key')!
+	app.key_input('\x01')
+	app.paste_input('b'.repeat(64))
+	app.paste_input('0')
+	assert editor_bytes_text(app.repository_key) == 'b'.repeat(64) && app.status.contains('not truncated')
+	app.key_input('\t')
+	assert app.repository_focus == 1
+	app.key_input('\x1b[Z')
+	assert app.repository_focus == 3
+	app.handle('software.repository.enroll')!
+	assert app.worker_review && !app.repository_review_ready
+	app.handle('software.repository.confirm')!
+	assert app.worker_review
+	wait_for_software(mut app)
+	assert app.repository_review_ready && app.repository_review.public_key == 'b'.repeat(64)
+	tree := app.build(ui2.rect(0, 0, 900, 660))!
+	assert tree.children.any(it.id == 'software.repository.confirm')
+	assert tree.children.any(it.text.contains('Previous key:') && it.text.contains('a'.repeat(64)))
+	assert tree.children.any(it.text.contains('3 signed catalog entries'))
+	assert !os.exists(path), 'review changed repository trust'
+	// Confirmation uses the reviewed intent despite unrelated form-buffer edits.
+	software_repository_text(mut app.repository_id, 'other')
+	app.handle('software.repository.confirm')!
+	assert !app.prepare_close()
+	wait_for_software(mut app)
+	assert repository_fixture_status()!.repositories[0].id == 'fixture'
+	assert app.status.contains('trusted') && app.status.contains('refreshed')
+	app.handle('software.row.0')!
+	app.handle('software.repository.revoke')!
+	wait_for_software(mut app)
+	assert app.repository_review_ready && app.repository_review.operation == 'revoke'
+	app.handle('software.repository.cancel')!
+	assert repository_fixture_status()!.repositories.len == 1
+	app.handle('software.repository.revoke')!
+	wait_for_software(mut app)
+	app.handle('software.repository.confirm')!
+	wait_for_software(mut app)
+	assert app.repository_status.repositories.len == 0 && app.status.contains('revoked')
+	assert repository_fixture_status()!.history.len == 1
+	// Invalid input, invalid response and changed intent never enable confirmation.
+	for id in ['bad-signature', 'wrong-format', 'wrong-intent', 'stale'] {
+		software_repository_text(mut app.repository_id, id)
+		app.begin_repository_review('enroll')
+		wait_for_software(mut app)
+		if id == 'stale' {
+			assert app.repository_review_ready
+			app.handle('software.repository.confirm')!
+			wait_for_software(mut app)
+			assert app.status.contains('stale')
+		} else {
+			assert !app.repository_review_ready && app.repository_operation == ''
+		}
+		assert repository_fixture_status()!.repositories.len == 0
+	}
+	software_repository_text(mut app.repository_key, 'not a key')
+	app.begin_repository_review('enroll')
+	assert app.worker == unsafe { nil } && app.status.contains('publisher key')
+	software_repository_text(mut app.repository_id, 'fixture')
+	software_repository_text(mut app.repository_key, 'b'.repeat(64))
+	software_repository_text(mut app.repository_url, repository_fixture_url + '/' + 'long-source-'.repeat(30) + '/refresh-fails')
+	app.begin_repository_review('enroll')
+	wait_for_software(mut app)
+	assert app.repository_url_pages.len > 1
+	assert !app.build(ui2.rect(0, 0, 640, 610))!.children.any(it.id == 'software.repository.confirm')
+	app.handle('software.repository.confirm')!
+	assert app.worker == unsafe { nil }
+	for app.repository_url_page + 1 < app.repository_url_pages.len { app.handle('software.repository.url-next')! }
+	app.handle('software.repository.confirm')!
+	wait_for_software(mut app)
+	assert app.repository_status.repositories.len == 1
+	assert app.status.contains('trust was saved') && app.status.contains('refresh failed')
+	app.handle('software.repository.back')!
+	wait_for_software(mut app)
+	assert !app.repository_mode
+	app.close_app()
 }
 
 fn check_resolved_updates() ! {

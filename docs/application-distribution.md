@@ -46,6 +46,32 @@ vinix-package --json repo-list
 vinix-package repo-revoke company
 ```
 
+Software's **Repositories** screen offers the same administration workflow.
+Select an existing repository or enter its ID, HTTPS/local source URL and public
+key. **Review trust** verifies the signed catalog without enabling trust, then
+shows its publisher key, previous key/source when replacing one, architecture,
+sequence, expiry and catalog entry count. Compare the key through your trusted
+channel. Long source URLs are paged; each part must be displayed before
+confirmation becomes available. **Confirm trust** applies that exact review and
+refreshes authenticated catalogs. Applications still require installation review.
+
+**Review revocation** and **Confirm revocation** disable an existing publisher
+without downloading metadata. If the repository list cannot be loaded, enter its
+ID to review revocation directly. Signature, expiry, stale-review and access
+failures reach the window. A refresh failure after successful enrollment clearly
+reports that trust was saved while the catalog remains unavailable; reload or
+refresh after correcting the failure. Organization policy and the launch account
+are preserved; there is no implicit privilege escalation or license acceptance.
+
+Trust reviews bind the configuration, operation and exact repository identity.
+Enrollment additionally binds retained sequence history and the exact verified
+index digest. Apply re-reads those inputs under the writer lock and rejects a
+stale confirmation before publishing configuration/history. Revocation review
+does not need valid/reachable catalog or history data. Script clients can use
+`repo-review enroll ID URL KEY` / `repo-review revoke ID`, followed by
+`repo-apply FINGERPRINT enroll ID URL KEY` / `repo-apply FINGERPRINT revoke ID`.
+The ordinary enrollment/revocation commands remain available.
+
 `repo-enroll` verifies a current signed index against that exact ID/key and
 retained sequence history before atomically enabling trust. It downloads only
 metadata; `update` then publishes the combined catalog. Invalid signatures,
@@ -294,6 +320,13 @@ revocation with corrupt metadata, key rotation, mirror changes, legacy expiry
 migration, retained replay/equivocation floors after empty refresh, and recovery
 from history published ahead of the catalog. Unsafe configuration and predictable
 temporary-file symlinks are also covered.
+Trust-review fixtures check read-only previews, exact signed-metadata and policy
+binding, sequence-floor changes, changed operation/intent, replaced-key revocation
+refusal and reviewed revocation with corrupt/unreachable metadata. Repository UI
+fixtures check key editing, frozen intent, URL paging, cancel/confirm, stale and
+invalid responses, successful revocation and saved-trust/failed-refresh diagnostics.
+Allocator checks measure repository form/review redraw, status/review replacement
+and retirement against the independent JSON decoder baseline.
 Software view fixtures additionally check dependency-only upgrades, new/removed
 dependencies, constrained version selection, policy/key changes, blocked plans
 and retained publisher ownership. UI checks exercise complete upgrade review
