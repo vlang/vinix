@@ -19,6 +19,7 @@ mut:
 struct ModuleRuntime {
 mut:
 	modules  []&LoadedModule
+	lookup_order []ModuleProvider
 	paths    map[string]int
 	order    []int
 	binding  int
@@ -96,9 +97,11 @@ fn module_image_free(image macho.Image) {
 fn modules_start(image macho.Image, layout macho.Layout, base u64, path string, auditing bool) {
 	module_runtime = &ModuleRuntime{ auditing: auditing }
 	module_runtime.modules.flags |= .noslices
+	module_runtime.lookup_order.flags |= .noslices
 	module_runtime.order.flags |= .noslices
 	main_module := &LoadedModule{ image: image, layout: layout, base: base, path: path.clone() }
 	module_runtime.modules << main_module
+	module_runtime.lookup_order << ModuleProvider{index: 0}
 	module_runtime.paths[path] = 0
 	module_runtime.bytes = layout.size
 }
@@ -111,7 +114,7 @@ fn module_dependencies(index int, depth int) ! {
 	}
 	owner.visiting = true
 	for library in owner.image.libraries {
-		if module_builtin(library.name) { continue }
+		if module_builtin(library.name) { module_lookup_builtin_add(library.name); continue }
 		path := module_path(library.name, owner) or {
 			if library.weak {
 				owner.dependencies[library.name] = -1
@@ -149,6 +152,7 @@ fn module_dependencies(index int, depth int) ! {
 			}
 			target = module_runtime.modules.len
 			module_runtime.modules << &LoadedModule{ image: image, layout: layout, base: u64(mapping), path: path.clone() }
+			module_runtime.lookup_order << ModuleProvider{index: target}
 			module_runtime.paths[path] = target
 			module_runtime.bytes += layout.size
 			transferred = true
@@ -164,18 +168,21 @@ fn module_dependencies(index int, depth int) ! {
 
 fn module_symbol(owner_index int, library string, symbol string) !u64 {
 	if module_runtime == unsafe { nil } { return runtime_symbol(library, symbol) }
+	if library in ['<flat lookup>', '<weak lookup>'] {
+		return module_lookup(symbol, library == '<weak lookup>')
+	}
 	owner := module_runtime.modules[owner_index]
 	if library in ['<self>', '<main executable>'] {
 		target := module_runtime.modules[if library == '<self>' { owner_index } else { 0 }]
-		address := target.image.exported_address(symbol, target.layout, target.base)!
-		if address != 0 { return address }
+		definition := target.image.exported_symbol(symbol, target.layout, target.base)!
+		if definition.found { return definition.address }
 		return error('iOS: image does not export ${symbol}')
 	}
 	if target_index := owner.dependencies[library] {
 		if target_index < 0 { return error('iOS: weak library is absent: ${library}') }
 		target := module_runtime.modules[target_index]
-		address := target.image.exported_address(symbol, target.layout, target.base)!
-		if address != 0 { return address }
+		definition := target.image.exported_symbol(symbol, target.layout, target.base)!
+		if definition.found { return definition.address }
 		return error('iOS: bundled library does not export ${symbol}: ${library}')
 	}
 	return runtime_symbol(library, symbol)
@@ -242,6 +249,7 @@ fn modules_stop() {
 	}
 	unsafe {
 		module_runtime.modules.free()
+		module_runtime.lookup_order.free()
 		module_runtime.paths.free()
 		module_runtime.order.free()
 		free(module_runtime)

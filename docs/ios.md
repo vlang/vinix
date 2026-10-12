@@ -2722,8 +2722,8 @@ The supplied IPA resolves the getter in both bundled frameworks and still exits
 with status 1 before entry. Its next blocker is a chained Mach-O weak-lookup
 binding: ordinal `-3` for EOS's `__ZTISt12length_error`. The installed SDK names
 this ordinal `BIND_SPECIAL_DYLIB_WEAK_LOOKUP`, and Mac libc++ exports the RTTI
-data. The existing V C++ bridge contains this exact symbol, but the chained
-resolver rejects special ordinals and the module resolver lacks process-wide
+data. At that point the V C++ bridge contained this exact symbol, but the chained
+resolver rejected special ordinals and the module resolver lacked process-wide
 weak lookup. The Marketplace wrapper also imports operator new/delete through
 this scope. These imports and native data bytes are retained for the resolver
 work without treating RTTI as callable code.
@@ -2734,17 +2734,51 @@ Full regression remains unpassed, candidates stay in the evidence directory,
 and the five published runners keep their last passing bytes. Entry, rendering
 and gameplay remain unverified.
 
+The subsequent Mach-O loader increment implements self, main executable, flat
+and weak lookup scopes for chained imports. Weak lookup selects a canonical
+definition across the loaded images and the measured C++ bridge: the first weak
+definition wins unless a strong definition overrides it. Legacy weak bindings
+also use this scope when rewriting pointers to their own weak definitions.
+Export-trie and nlist lookup preserve definition strength and distinguish a
+missing export from an absolute zero. Required imports still fail when missing;
+missing optional imports stay null even with pointer addends. Named-library
+lookup keeps its library scope, and malformed export metadata fails explicitly.
+Other built-in libraries' weak exports require an ABI description before joining
+coalescing; export re-exports and resolvers remain unsupported.
+
+`build-support/ios/generate-cxx-weak.v` records the seven implemented weak C++
+exports from the installed SDK stub. `tests/ios/weak-lookup-native.v` generates
+Mach-O objects in V and links them with the Mac's installed linker. Four actual
+dyld processes confirm first-weak and strong-override behavior; the resulting
+client contains a required chained weak-lookup import. The same client binds to
+the canonical definition in the V loader on both the host and Vinix. Host tests
+cover all three chained import formats, legacy streams, nlist strengths,
+absolute zero, symbol scopes, missing imports, unchanged input on failure and
+teardown. Both host suites pass Clang O1 ASAN/UBSAN. All 51 native programs build,
+53 original generated C streams restore to their recorded hashes, and Vinix
+passes the loader program plus all 32 Swift programs. The loader program also
+checks the real C++ RTTI, operator new and operator delete exports.
+
+The supplied IPA now passes the weak-lookup bindings and stops before entry at
+EOS's required `_$sBi64_WV` import, the Swift `Builtin.Int64` value-witness table.
+The installed Swift runtime exports that data table: size and stride are eight,
+flags are seven (POD, inline, alignment eight), and extra inhabitants are zero.
+The 88-byte table is captured as data without invoking its function pointers.
+Evidence is under `build/ios/fortnite/weak-lookup-checks`. Full regression remains
+unpassed and the five published runners retain their last passing bytes. Entry,
+rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,411 | 748 | 80 |
-| EOSSDK | 621 | 41 | 18 |
-| MarketplaceKitWrapper | 110 | 66 | 23 |
-| All images | 2,142 | 855 | 121 |
+| Fortnite executable | 1,413 | 746 | 80 |
+| EOSSDK | 624 | 38 | 18 |
+| MarketplaceKitWrapper | 113 | 63 | 23 |
+| All images | 2,150 | 847 | 121 |
 
-The C++/GLES/Text variant reports 2,155 resolved imports, 842 unresolved strong
+The C++/GLES/Text variant reports 2,163 resolved imports, 834 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

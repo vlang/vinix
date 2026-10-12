@@ -128,12 +128,24 @@ pub fn (image Image) imported_symbols() ![]ImportedSymbol {
 	return result
 }
 
-fn resolve_import(image Image, imported Import, resolver Resolver) !u64 {
-	if imported.ordinal <= 0 || imported.ordinal > image.libraries.len {
+fn resolve_import(image Image, imported Import, layout Layout, base u64, resolver Resolver) !u64 {
+	if imported.ordinal < -3 || imported.ordinal > image.libraries.len {
 		return error('Mach-O: unsupported library ordinal ${imported.ordinal} for ${imported.name}')
 	}
-	library := image.libraries[imported.ordinal - 1]
-	return resolver(library.name, imported.name) or {
+	if imported.ordinal == 0 {
+		own := image.exported_symbol(imported.name, layout, base)!
+		if own.found { return own.address }
+	}
+	library := if imported.ordinal > 0 { image.libraries[imported.ordinal - 1].name } else {
+		match imported.ordinal {
+			0 { '<self>' }
+			-1 { '<main executable>' }
+			-2 { '<flat lookup>' }
+			else { '<weak lookup>' }
+		}
+	}
+	// Weak lookup coalesces definitions; it does not make an import optional.
+	return resolver(library, imported.name) or {
 		if imported.weak { return 0 }
 		return err
 	}
@@ -164,7 +176,7 @@ pub fn (image Image) plan_fixups_with_lazy(layout Layout, runtime_base u64, reso
 	imported := imports(r)!
 	mut resolved := []u64{cap: imported.len}
 	for item in imported {
-		resolved << resolve_import(image, item, resolver)!
+		resolved << resolve_import(image, item, layout, runtime_base, resolver)!
 	}
 	starts := u64(r.u32(4)!)
 	if starts < 28 { return error('Mach-O: invalid chained starts offset') }
@@ -230,7 +242,9 @@ pub fn (image Image) plan_fixups_with_lazy(layout Layout, runtime_base u64, reso
 					}
 					// The inline 8-bit addend of PTR_64 is unsigned; the import
 					// table addend is signed (see dyld's fixup-chains.h).
-					value = u64(i64(resolved[ordinal]) + imported[ordinal].addend + i64((word >> 24) & 0xff))
+					value = if resolved[ordinal] == 0 && imported[ordinal].weak { u64(0) } else {
+						resolved[ordinal] + u64(imported[ordinal].addend) + ((word >> 24) & 0xff)
+					}
 				} else {
 					if word & 0x7f00000000000 != 0 {
 						return error('Mach-O: reserved chained rebase bits are not supported')

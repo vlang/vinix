@@ -558,13 +558,100 @@ fn test_export_trie_and_weak_coalescing_override_rebase() {
 	layout := image.layout(4096)!
 	assert image.exported_address('_local', layout, 0x900000000)! == 0x900000200
 	assert image.exported_address('_absent', layout, 0x900000000)! == 0
-	plan := image.plan_fixups(layout, 0x900000000, fixture_resolver)!
+	plan := image.plan_fixups(layout, 0x900000000, local_weak_resolver)!
 	assert plan.len == 2
 	assert plan[0] == plan[1]
 	mut cycle := exports.clone()
 	cycle[9] = 0
 	bad := parse(legacy_fixture([], [], [], [], cycle))!
 	if _ := bad.exported_address('_local', layout, 0x900000000) { assert false }
+}
+
+fn local_weak_resolver(library string, name string) !u64 {
+	assert library == '<weak lookup>' && name == '_local'
+	return 0x900000200
+}
+
+fn special_scope_resolver(library string, name string) !u64 {
+	assert name == '_puts'
+	return match library {
+		'<self>' { u64(0x1010) }
+		'<main executable>' { u64(0x2020) }
+		'<flat lookup>' { u64(0x3030) }
+		'<weak lookup>' { u64(0x4040) }
+		else { return error('unexpected scope') }
+	}
+}
+
+fn test_chained_special_scopes_all_import_formats_and_weak_addends() {
+	for format in 1 .. 4 {
+		for ordinal in [0, -1, -2, -3] {
+			mut data := fixture_image()
+			put(mut data, 0x7014, u64(format), 4)
+			put(mut data, 0x700c, 0x60, 4)
+			put_string(mut data, 0x7060, '_puts')
+			put(mut data, 0x7044, u64(ordinal & if format == 3 { 0xffff } else { 0xff }), if format == 3 { 8 } else { 4 })
+			if format == 2 { put(mut data, 0x7048, 7, 4) }
+			if format == 3 { put(mut data, 0x704c, 7, 8) }
+			image := parse(data)!
+			original := image.data.clone()
+			layout := image.layout(4096)!
+			expected := [u64(0x1010), 0x2020, 0x3030, 0x4040][-ordinal]
+			assert image.plan_fixups(layout, 0x900000000, special_scope_resolver)![1].value == expected + if format == 1 { 0 } else { 7 }
+			if _ := image.plan_fixups(layout, 0x900000000, reject_resolver) { assert false }
+			assert image.data == original
+			put(mut data, 0x7044, u64(ordinal & if format == 3 { 0xffff } else { 0xff }) | if format == 3 { 0x10000 } else { 0x100 }, if format == 3 { 8 } else { 4 })
+			put(mut data, 0x4008, (u64(1) << 63) | (u64(19) << 24), 8)
+			weak := parse(data)!
+			assert weak.plan_fixups(layout, 0x900000000, reject_resolver)![1].value == 0
+		}
+	}
+	for ordinal in [-4, 2] {
+		mut data := fixture_image()
+		put(mut data, 0x7044, u64(ordinal & 0xff), 4)
+		expect_fixup_failure(data)
+	}
+}
+
+fn test_legacy_scopes_do_not_prefer_self_or_null_required_weak_lookup() {
+	exports := [u8(0), 1, `_`, `p`, `u`, `t`, `s`, 0, 9, 3, 4, 0x80, 4, 0]
+	for ordinal in [0, -1, -2, -3] {
+		mut bind := [u8(0x30 | u8(ordinal & 0xf)), 0x40]
+		bind << '_puts'.bytes()
+		bind << [u8(0), 0x72, 0, 0x90, 0]
+		image := parse(legacy_fixture([], bind, [], [], exports))!
+		layout := image.layout(4096)!
+		value := image.plan_fixups(layout, 0x900000000, special_scope_resolver)![0].value
+		assert value == if ordinal == 0 { u64(0x900000200) } else { [u64(0), 0x2020, 0x3030, 0x4040][-ordinal] }
+		if ordinal == -3 {
+			if _ := image.plan_fixups(layout, 0x900000000, reject_resolver) { assert false }
+			weak_stream := parse(legacy_fixture([], [], bind, [], exports))!
+			assert weak_stream.plan_fixups(layout, 0x900000000, special_scope_resolver)![0].value == 0x4040
+		}
+	}
+	image := parse(legacy_fixture([], [], [], [], [u8(0), 1, `_`, `z`, 0, 6, 2, 6, 0, 0]))!
+	export := image.exported_symbol('_z', image.layout(4096)!, 0x900000000)!
+	assert export.found && export.weak && export.address == 0
+}
+
+fn test_nlist_export_strength_absolute_zero_and_private_visibility() {
+	mut data := []u8{len: 64}
+	put(mut data, 0, 1, 4)
+	put(mut data, 4, 0xf, 1)
+	put(mut data, 6, 0x80, 2)
+	put(mut data, 8, 0x100000020, 8)
+	put_string(mut data, 17, '_nlist')
+	mut image := Image{data: data, symbol_count: 1, string_offset: 16, string_size: 48,
+		segments: [Segment{address: 0x100000000, size: 64}]}
+	layout := Layout{base: 0x100000000, size: 64}
+	assert image.exported_symbol('_nlist', layout, 0x900000000)! == ExportedSymbol{true, 0x900000020, true}
+	data[6] = 0
+	assert !image.exported_symbol('_nlist', layout, 0x900000000)!.weak
+	data[4] = 3 // N_ABS | N_EXT
+	put(mut data, 8, 0, 8)
+	assert image.exported_symbol('_nlist', layout, 0x900000000)! == ExportedSymbol{true, 0, false}
+	data[4] = 0x1f // N_PEXT | N_SECT | N_EXT
+	assert !image.exported_symbol('_nlist', layout, 0x900000000)!.found
 }
 
 fn test_legacy_rejects_bad_ranges_types_counts_and_opcodes() {

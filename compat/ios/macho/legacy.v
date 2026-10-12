@@ -58,15 +58,30 @@ fn (image Image) dyld_cursor(info FileRange) !DyldCursor {
 
 // Export lookup follows only the requested path. Limits and cycle detection
 // apply even to a malicious trie with nodes pointing back to their parents.
+pub struct ExportedSymbol {
+pub:
+	found   bool
+	address u64
+	weak    bool
+}
+
 pub fn (image Image) exported_address(name string, layout Layout, base u64) !u64 {
-	if image.export_info.size == 0 { return image.defined_address(name, layout, base) }
+	return image.exported_symbol(name, layout, base)!.address
+}
+
+// Keep presence separate from address: an absolute export can legitimately be
+// zero. Weakness belongs to the definition, independently of the import flags.
+pub fn (image Image) exported_symbol(name string, layout Layout, base u64) !ExportedSymbol {
+	if image.export_info.size == 0 { return image.defined_symbol(name, layout, base) }
 	mut c := image.dyld_cursor(image.export_info)!
 	mut node := u64(0)
 	mut prefix := 0
-	mut visited := map[u64]bool{}
-	for _ in 0 .. 1024 {
-		if node in visited { return error('Mach-O: cycle in export trie') }
-		visited[node] = true
+	mut visited := [1024]u64{}
+	for depth in 0 .. 1024 {
+		for previous in 0 .. depth {
+			if visited[previous] == node { return error('Mach-O: cycle in export trie') }
+		}
+		visited[depth] = node
 		c.offset = node
 		terminal_size := c.uleb()!
 		terminal_end := checked_end(c.offset, terminal_size)!
@@ -80,11 +95,11 @@ pub fn (image Image) exported_address(name string, layout Layout, base u64) !u64
 				return error('Mach-O: re-export/resolver export is not implemented: ${name}')
 			}
 			address := terminal.uleb()!
-			if flags & 3 == 2 { return address } // Absolute symbol, no slide.
+			if flags & 3 == 2 { return ExportedSymbol{true, address, flags & 4 != 0} }
 			if flags & 3 != 0 { return error('Mach-O: thread-local export lookup is not implemented') }
 			vm_address := checked_end(layout.base, address)!
 			if !image.contains_address(vm_address) { return error('Mach-O: export points outside image') }
-			return checked_end(base, address)!
+			return ExportedSymbol{true, checked_end(base, address)!, flags & 4 != 0}
 		}
 		c.offset = terminal_end
 		children := c.byte()!
@@ -92,6 +107,7 @@ pub fn (image Image) exported_address(name string, layout Layout, base u64) !u64
 		mut matched := 0
 		for _ in 0 .. children {
 			edge := c.name()!
+			defer { unsafe { edge.free() } }
 			child := c.uleb()!
 			if child >= u64(c.data.len) || edge == '' { return error('Mach-O: invalid export trie edge') }
 			if name[prefix..].starts_with(edge) {
@@ -100,28 +116,31 @@ pub fn (image Image) exported_address(name string, layout Layout, base u64) !u64
 				matched = edge.len
 			}
 		}
-		if next == ~u64(0) { return 0 }
+		if next == ~u64(0) { return ExportedSymbol{} }
 		node = next
 		prefix += matched
 	}
 	return error('Mach-O: export trie exceeds depth limit')
 }
 
-fn (image Image) defined_address(name string, layout Layout, base u64) !u64 {
+fn (image Image) defined_symbol(name string, layout Layout, base u64) !ExportedSymbol {
 	r := Reader{image.data}
 	for i in 0 .. image.symbol_count {
 		off := image.symbol_offset + u64(i) * 16
 		kind := u8(r.u16(off + 4)! & 0xff)
-		if kind & 0xe0 != 0 || kind & 1 == 0 || kind & 0x0e !in [u8(0xe), 2] { continue }
+		if kind & 0xf0 != 0 || kind & 1 == 0 || kind & 0x0e !in [u8(0xe), 2] { continue }
 		nameoff := u64(r.u32(off)!)
 		if nameoff >= image.string_size { return error('Mach-O: defined name exceeds string table') }
-		if r.string_at(image.string_offset + nameoff, image.string_size - nameoff)! != name { continue }
+		candidate := r.string_at(image.string_offset + nameoff, image.string_size - nameoff)!
+		defer { unsafe { candidate.free() } }
+		if candidate != name { continue }
 		address := r.u64(off + 8)!
-		if kind & 0x0e == 2 { return address }
+		weak := r.u16(off + 6)! & 0x80 != 0 // N_WEAK_DEF
+		if kind & 0x0e == 2 { return ExportedSymbol{true, address, weak} }
 		if !image.contains_address(address) { return error('Mach-O: defined symbol points outside image') }
-		return checked_end(base, address - layout.base)!
+		return ExportedSymbol{true, checked_end(base, address - layout.base)!, weak}
 	}
-	return 0
+	return ExportedSymbol{}
 }
 
 fn (image Image) legacy_pointer(layout Layout, segment_index int, within u64) !(u64, u64) {
@@ -183,35 +202,13 @@ fn (image Image) legacy_rebases(layout Layout, base u64) ![]Fixup {
 
 fn (image Image) legacy_resolve(imported Import, weak_stream bool, layout Layout, base u64, resolver Resolver) !u64 {
 	if imported.name == '' { return error('Mach-O: bind opcode has no symbol') }
-	if imported.ordinal <= 0 || weak_stream {
-		own := image.exported_address(imported.name, layout, base)!
-		if own != 0 { return own }
-	}
 	if weak_stream {
-		// Undefined weak-coalesced symbols retain the library ordinal from
-		// nlist_64; the weak binding stream itself does not carry one.
-		for item in image.imported_symbols()! {
-			if item.name == imported.name {
-				return resolver(item.library, imported.name) or {
-					if item.weak { return 0 }
-					return err
-				}
-			}
-		}
-		return error('Mach-O: weak binding has no definition: ${imported.name}')
+		// This stream also rewrites pointers to an image's own weak definitions.
+		// Resolve globally first so a later strong definition can override them.
+		return resolve_import(image, Import{ordinal: -3, name: imported.name,
+			weak: imported.weak}, layout, base, resolver)
 	}
-	if imported.ordinal > 0 { return resolve_import(image, imported, resolver) }
-	if imported.ordinal !in [0, -1, -2, -3] { return error('Mach-O: invalid special bind ordinal') }
-	library := match imported.ordinal {
-		0 { '<self>' }
-		-1 { '<main executable>' }
-		-2 { '<flat lookup>' }
-		else { '<weak lookup>' }
-	}
-	return resolver(library, imported.name) or {
-		if imported.weak || imported.ordinal == -3 { return 0 }
-		return err
-	}
+	return resolve_import(image, imported, layout, base, resolver)
 }
 
 fn (image Image) legacy_bindings(info FileRange, lazy bool, weak_stream bool, layout Layout, base u64, resolver Resolver, lazy_resolver Resolver) ![]Fixup {
