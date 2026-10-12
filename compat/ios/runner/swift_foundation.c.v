@@ -60,6 +60,10 @@ fn swift_foundation_arena() u64 {
 	write32(base + 64, 0xa9400680); write32(base + 68, 0x58000070)
 	write32(base + 72, 0xd61f0200)
 	unsafe { *(&u64(base + 80)) = u64(voidptr(swift_foundation_string_encoding)) }
+	// Generic Error getter: x0 metadata, x1 table, indirect borrowed Self x20.
+	write32(base + 96, 0xaa1403e2); write32(base + 100, 0x58000070)
+	write32(base + 104, 0xd61f0200)
+	unsafe { *(&u64(base + 112)) = u64(voidptr(swift_error_description)) }
 	// A concrete specialization of Foundation's retroactive String conformance.
 	// The installed descriptor uses a generic witness cache; this implementation
 	// supplies its already-specialized table, accepted by normal witness lookup.
@@ -74,7 +78,7 @@ fn swift_foundation_arena() u64 {
 	swift_protocol_relative(conformance + 16, module_descriptor)
 	swift_protocol_relative(module_descriptor + 8, data + 80)
 	C.memcpy(unsafe { voidptr(data + 80) }, c'Foundation', 11)
-	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 88) })
+	C.__builtin___clear_cache(unsafe { voidptr(base) }, unsafe { voidptr(base + 120) })
 	if C.mprotect(unsafe { voidptr(base) }, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {
 		C.munmap(unsafe { voidptr(base) }, usize(page * 2)); panic('iOS: cannot seal Swift Foundation entries')
@@ -224,6 +228,7 @@ fn swift_foundation_symbol(symbol string) !u64 {
 		'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF' { u64(voidptr(swift_foundation_bridge)) }
 		'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ' { u64(voidptr(swift_foundation_unbridge)) }
 		'_$sSSs7CVarArg10FoundationMc' { swift_foundation_arena() + u64(C.getpagesize()) + 32 }
+		'_$ss5ErrorP10FoundationE20localizedDescriptionSSvg' { swift_foundation_arena() + 96 }
 		else { return error('iOS: Swift Foundation symbol is not implemented: ${symbol}') }
 	}
 }

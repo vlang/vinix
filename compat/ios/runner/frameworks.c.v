@@ -9,12 +9,12 @@ fn framework_symbol(library string, symbol string) ?u64 {
 	if !library.starts_with('/System/Library/Frameworks/') { return none }
 	// Foundation.framework reexports these Swift overlay entries. The main
 	// executable uses this install name, while its bundled frameworks use the
-	// dylib; installed native addresses are identical for all four exports.
+	// dylib; installed native addresses are identical for these exports.
 	if library == '/System/Library/Frameworks/Foundation.framework/Foundation'
 		&& symbol in ['_$s10Foundation5NSLogyySS_s7CVarArg_pdtF',
 			'_$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF',
 			'_$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ',
-			'_$sSSs7CVarArg10FoundationMc'] {
+			'_$sSSs7CVarArg10FoundationMc', '_$ss5ErrorP10FoundationE20localizedDescriptionSSvg'] {
 		return swift_foundation_symbol(symbol) or { return none }
 	}
 	if library == '/System/Library/Frameworks/CFNetwork.framework/CFNetwork' {

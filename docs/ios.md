@@ -2680,6 +2680,60 @@ audit exposed the missing framework aliases. Full regression remains unpassed;
 the candidates stay in the evidence directory and the five published runners
 retain their last passing bytes. Entry, rendering and gameplay remain unverified.
 
+V resolves Swift `Error.localizedDescription` through both Foundation install
+names for the concrete CFError conformance already supported by error
+extraction. Native measurements establish metadata in `x0`, the Error witness
+table in `x1`, and borrowed indirect Self in `x20`. A sealed adapter forwards
+these to V; the owned two-word String returns in `x0/x1`, preserving `x20/x21`.
+The installed getter agrees with CFError's description for the measured inputs,
+and both library names reexport the same native address.
+
+The implementation validates the canonical metadata and witness table before
+reading Self, then validates the live CFError registry entry before fields.
+Stored NSString text stays borrowed under the recursive lock until copied
+into independent Swift String storage. No input ARC changes, guest callbacks,
+temporary NSError objects or hidden successful V allocations are needed.
+Fixed stack views and decimal scratch preserve embedded NULs, Unicode and
+the complete signed 64-bit code range; the existing String reservation and
+appender own any large result.
+
+Explicit description, failure, failure reason and detail fields follow the
+measured native priority, including explicit empty strings. Generic domain/code,
+abbreviated OSStatus and existing C-locale Darwin POSIX messages are supported;
+POSIX codes narrow to 32 bits as on the measured Mac. The existing concrete
+CFError conformance is required: native Swift error boxes, arbitrary value
+Error conformances and NSError subclasses remain unsupported. Fields require
+registered NSString storage and owned dictionary callbacks, with at most
+1 MiB of output. Cocoa and Mach requests needing implicit platform catalogs
+fail explicitly instead of generating unverified descriptions.
+
+All eight final native/V sanitizer processes pass in both hash modes, all
+fifty programs build, and all thirty-two Swift checks pass in Vinix. Tests
+cover both source/result destruction orders, repeated and concurrent calls,
+preserved context registers, explicit empty/Unicode/NUL fields, field priority,
+POSIX narrowing, signed code limits, invalid metadata/owners and bounded text.
+All fifty-four final C streams are retained with verified lossless compression.
+The native invalid-field measurement, which supplied NSNumber as a description
+and raised an Objective-C exception, retains its exact V/C/binary and joined
+status 134; a guarded measurement and full merged-output reproduction document
+the unsupported type.
+
+The supplied IPA resolves the getter in both bundled frameworks and still exits
+with status 1 before entry. Its next blocker is a chained Mach-O weak-lookup
+binding: ordinal `-3` for EOS's `__ZTISt12length_error`. The installed SDK names
+this ordinal `BIND_SPECIAL_DYLIB_WEAK_LOOKUP`, and Mac libc++ exports the RTTI
+data. The existing V C++ bridge contains this exact symbol, but the chained
+resolver rejects special ordinals and the module resolver lacks process-wide
+weak lookup. The Marketplace wrapper also imports operator new/delete through
+this scope. These imports and native data bytes are retained for the resolver
+work without treating RTTI as callable code.
+
+Evidence is under `build/ios/fortnite/swift-error-description-checks`. Both
+audits resolve two more strong imports than the preceding String-bridge cohort.
+Full regression remains unpassed, candidates stay in the evidence directory,
+and the five published runners keep their last passing bytes. Entry, rendering
+and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
