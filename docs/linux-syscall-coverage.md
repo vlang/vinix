@@ -699,7 +699,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | --- | --- |
 | `kernel/c/pthread.h` | `349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2` |
 | `kernel/event/event.v` | `a92daf2add03c5304742ad1b112ca04635b94f49e4279e8316f2bee57da6b708` |
-| `kernel/file/file.v` | `4013b0fb868bf7fc3a0b0f7294c2623219995c75e26e4bc3913ea44568ec0e47` |
+| `kernel/file/file.v` | `f0c65174b6e0b7b1ea576c592d0c8a7af3865e7a9ecdb62d8ea5015a02544cd5` |
 | `kernel/fs/mount.v` | `e3af25d33e1fdfc40bde8c1a397b58de1df607e66629b813757f7834035d70a3` |
 | `kernel/fs/mount_policy.v` | `6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a` |
 | `kernel/fs/procfs.v` | `2f55b33b127e0a02ccd563df76934875167049e459b61cb3dfaa4a78cd41a532` |

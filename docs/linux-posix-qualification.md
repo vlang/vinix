@@ -1574,3 +1574,45 @@ isolated ee6a8aae worktrees change four scalar/control-flow kernel files and
 introduce no allocation or reclamation. These native ELF64 checks do not
 qualify native ELF32/x32 or translated ABI entry. The three broad section-15
 acceptance gates remain open.
+
+## Scalar directory read errors
+
+Scalar read(2) now rejects directory handles with EISDIR at zero and nonzero
+counts. The old tmpfs-backed directory path reported an empty successful
+read. Directory handles now fail after descriptor/access/native MAC checks
+without reading backing bytes or advancing the offset. Nonzero user ranges
+are validated before the directory type, while destination probing and
+scratch allocation follow it. Thus a valid-range unmapped or protected
+destination still gets EISDIR without being accessed, and a range outside
+userspace gets EFAULT. This follows Linux's
+[VFS validation](https://github.com/torvalds/linux/blob/v6.12/fs/read_write.c#L518)
+and [directory read operation](https://github.com/torvalds/linux/blob/v6.12/fs/libfs.c#L209).
+The kernel-buffer read path also refuses directory byte reads; directory
+enumeration continues to use getdents.
+
+The native V `readerror` fixture passes 64 checks each as root and UID/GID
+1000 on both architectures. Root, tmpfs, procfs and sysfs directories are
+read with zero, one and 4096 bytes using valid, unmapped and PROT_NONE
+buffers, plus a null zero-length destination and an invalid nonzero range.
+Failed reads leave directory offsets intact. Invalid and wrong-access
+descriptors retain EBADF. Ordinary regular files retain zero-read offsets,
+byte contents and EOF behavior. Root prepares a writable test directory,
+and each credential phase creates its own file.
+
+Both unchanged-fixture controls on the previous production kernel fail the
+first zero-length directory read with `0/0` instead of `-1/EISDIR(21)`.
+Both changed production kernels pass eight regression cases: directory
+reads, pipes, syscall selectors, descriptor access, constrained opens,
+runtime primitives, seccomp trap/verifier and futex queues. All eight host
+test files and the isolated generated inventory check pass.
+
+`readerror-before-*` and `readerror-after-*` in the
+[dated results directory](../tests/linux-compat/results/2026-10-12/) retain
+negative controls, artifacts and serial verdicts. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/readerror-audit.v)
+verifies all 61 fingerprints, frozen fixture/kernel hashes, 128 checked
+results per architecture and the emitted validation order. The isolated
+08316b06 worktrees change only two directory guards in the handle layer;
+no allocation, ownership or reclamation path is added. Vectored, O_PATH,
+later usercopy faults and foreign/ELF32 read semantics remain separate.
+The three broad section-15 application acceptance gates remain open.

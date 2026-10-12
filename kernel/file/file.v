@@ -460,6 +460,12 @@ pub fn (mut this Handle) mac_check(access u32) ? {
 
 pub fn (mut this Handle) read(buf voidptr, count u64) ?i64 {
 	this.mac_check(proc.mac_read)?
+	// Directories are enumerated with getdents, never exposed as byte files.
+	// This also applies to zero-count and kernel-buffer reads.
+	if stat.isdir(this.resource.stat.mode) {
+		errno.set(errno.eisdir)
+		return none
+	}
 	if stream_mode(this.resource.stat.mode) {
 		ret := this.resource.read(voidptr(this), buf, 0, count)?
 		// A read of the keyboard may have waited across a change of seat.
@@ -529,6 +535,13 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 		return none
 	}
 	mode := this.resource.stat.mode
+	// Reject the type before probing a destination or allocating scratch:
+	// Linux's directory read operation never touches the user buffer.
+	if stat.isdir(mode) {
+		this.mac_check(proc.mac_read)?
+		errno.set(errno.eisdir)
+		return none
+	}
 	// What a pipe, a socket or a device gives up is gone from it: find out
 	// that there is nowhere to put it before taking it.
 	if !stat.isreg(mode) && !usercopy.writable(address) {

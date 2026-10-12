@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -582,6 +582,14 @@ invalid/closed/wrong-access descriptors retain EBADF. A non-restarting alarm
 bounds each child and must never fire in a passing group. Root only prepares
 a writable test directory before the fixture drops credentials. Directory
 read type errors are a separate regression.
+
+The `readerror` case performs 64 checks each as root and UID/GID 1000. Scalar
+read(2) must return EISDIR for root, tmpfs, procfs and sysfs directories at zero,
+one and 4096 bytes without touching valid, unmapped or PROT_NONE destinations.
+An out-of-userspace nonzero range returns EFAULT. Failed directory reads leave
+the offset intact; invalid and wrong-access descriptors retain EBADF. Regular
+zero-byte reads leave the offset intact, and valid data/EOF reads still work.
+These checks do not qualify vectored, O_PATH or later-copy-fault behavior.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

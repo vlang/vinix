@@ -1,0 +1,71 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "eafd5a3ac5954cb44047ec7014fc36ebef71d9a01e8eb9996c8ceeb50ec3c0d8",
+    "results": [
+        {
+            "name": "readerror",
+            "source_sha256": "f9d31a081f68f7de6f75651da8b10389202b2457e2bda232a45141ac1369ea64",
+            "init_sha256": "effe25b84eb5a0d81f390dd413f7271bd0b5eb088dffb361ce55b1899f221d11",
+            "iso_sha256": "f5563175b44f9b66bb3d5a0471041e6ca9e55af7725c3f8895ebda84262fe164",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pipezero",
+            "source_sha256": "45e03f2ebcc0806aba964d20b1e9ba0f89910264ad92f0c991687e1e41d34c96",
+            "init_sha256": "b28904aa9745a499fafc34d8b05c83500b13bac595c2385fe629a8c7dd65e675",
+            "iso_sha256": "b4aba500129d4fbf000b91c340ceb4b4777c43c446700c2d76923c0115c7796f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sysnr",
+            "source_sha256": "0cd9ffa8523166bcd1ce0117ebd71416036cd96abb8986f3998f95d8c52f4c43",
+            "init_sha256": "94ae0a35483f7c6f7649c507ffeecdc7771b236d8e874799c3ab6dce19ee8706",
+            "iso_sha256": "98d8190c54336855609406c81958c7621ce396837ded5b78f8175e6793e56992",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "access",
+            "source_sha256": "0beb5ce37d58a5dff50b24f5ce87bd479bc39718d39b29490e72076183b2c1db",
+            "init_sha256": "a828228da509bfd306fe2b3636e131aa5e5f1bb750042b26d2ffbe558fb1dbf9",
+            "iso_sha256": "6225e535853d261fad2e9e19b5deae29b37002106e86ab9a88b3cfd0a52aa770",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "6cbb1ed5b4254831d4f78d4f775395a1664b38d849b485d586e638563a239b4b",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "27292992f5b2ddc9bc02573d24abec5b6054394b6024645a7cc9aecaa23f62bd",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccomp",
+            "source_sha256": "fa786d3dbf56b7a0ad48273a8f2ac09984d6c22a9e9930bda91b8f7711d25dc3",
+            "init_sha256": "2ae611cb0aa90bdc3b55c8af460cbe3c588a31afc6bbf5af07db4904ef018c98",
+            "iso_sha256": "8f0d1b3c7a9c6cc237633b2883ef51b2cda3de643f392e060539960167ad391e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexqueue",
+            "source_sha256": "9c881bb3bad609ab72d2161a39a994486e0b222b6c053709c16754c5d3c1d9cf",
+            "init_sha256": "5b32b91c590bc5f83285435a354e9f47a1aaa1be693ddb57a355ecd3ec7aab42",
+            "iso_sha256": "4fa0f813a888b7d3edb197f9102806061859c477e75bf7ea99e334172607a3be",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
