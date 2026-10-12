@@ -75,6 +75,13 @@ roll back the complete set. `plan-preview-grow-batch` reports every action witho
 physical probes, writer locking or publication. Explicit live growth replay stays
 separate. See [explicit growth rules](../../docs/storage-volumes.md#atomic-explicit-mapping-growth).
 
+`pool-contract-batch BUNDLE POOL IDENTITY END_BYTES [...]` releases the unused
+tails of 1–64 saved pool windows, protecting every desired occupied intersection.
+Disk identities survive index compaction. Starts, alignment, mappings and priority
+stay exact; equal ends are durable keep retries. `pool-preview-contract-batch`
+reports all actions without device probes, writer locking or publication. Live
+views remain intact. See [contraction rules](../../docs/storage-volumes.md#atomic-pool-eligibility-contraction).
+
 `plan-remove-batch BUNDLE SLOT [...]` removes 1–64 distinct desired slots across
 disks in one atomic publication. Absent slots are durable `keep` retries;
 remaining mappings, enrolled disks and pool priority are preserved.

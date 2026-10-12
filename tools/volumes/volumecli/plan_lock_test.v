@@ -62,6 +62,9 @@ fn test_directory_lock_excludes_all_saved_state_writers_but_preserves_readonly_i
 	mut growths := MappingGrowthBatch{count: 1}; growths.keys[0] = set.plans[0].key; growths.slots[0] = 2; growths.lengths[0] = 8192
 	assert grow_batch_bundle_plan(path.str, &growths, false) == 1
 	assert grow_batch_bundle_plan(path.str, &growths, true) == 0
+	mut contractions := PoolContractionBatch{count: 1}; contractions.keys[0] = set.plans[0].key; contractions.ends[0] = 12288
+	assert contract_batch_pool_plan(path.str, 3, &contractions, false) == 1
+	assert contract_batch_pool_plan(path.str, 3, &contractions, true) == 0
 	assert grow_bundle_plan(path.str, 2, 8192) == 1
 	assert enroll_bundle_disk(path.str, c'/unused') == 1
 	unsafe {

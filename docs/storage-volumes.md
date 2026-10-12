@@ -485,6 +485,58 @@ desired rows does not remove live views. Boot restoration persists desired
 lengths in the unchanged V1/V2 formats. See
 [explicit growth qualification](../tests/storage-volumes/explicit-growth-batch.md).
 
+## Atomic pool eligibility contraction
+
+```sh
+vinix-volume pool-space /root/layout.vset 5
+vinix-volume pool-preview-contract-batch /root/layout.vset 5 \
+  mbr:12345678 12591104 mbr:12345679 12591104
+vinix-volume pool-contract-batch /root/layout.vset 5 \
+  mbr:12345678 12591104 mbr:12345679 12591104
+```
+
+`pool-contract-batch BUNDLE POOL IDENTITY END_BYTES [...]` releases the unused
+tail of 1–64 existing allocation windows in one atomic edit. Choose enrolled
+MBR/GPT identities from `show-bundle` and inspect current bounds with `pool-space`.
+Each identity must be a member of the selected pool. Duplicate normalized
+identities, ambiguous saved identities, missing disks/members and invalid counts
+reject the whole batch. Selection ignores shifting indices and selector geometry;
+the current saved sector size validates each requested decimal end.
+
+The end is exclusive, sector-aligned, strictly greater than the unchanged start
+and no greater than the old end. Equal ends are durable `keep` retries; a smaller
+end reports `contract`. Allocation alignment stays unchanged, and an end need
+not align to that larger allocation alignment. Contraction preserves the complete
+occupied intersection of every desired mapping with its original window. A row
+crossing either window boundary is protected where it overlaps; rows entirely
+outside the window do not prevent releasing its free tail. Cutting occupied
+bytes, an empty window, expansion, invalid alignment or overflow rejects the
+complete edit without keeping earlier contractions or reporting partial actions.
+
+All desired rows, offsets, modes, pending lengths, global slots, disk order and
+geometry stay exact. Starts, allocation alignment, region count, other pools and
+allocation priority remain unchanged. Identity retries follow unrelated empty-
+disk compaction. Future pool queries/allocation/growth use the retained windows;
+explicit mapping placement remains independent of pool eligibility.
+
+`pool-preview-contract-batch` uses the same complete planner, reporting each
+identity, current disk index, start, previous/requested end, alignment and action
+without physical-device probes, writer locking, temporaries or publication.
+Publication holds the pinned directory writer lock through source read, atomic
+replacement, report flushing and cleanup. All-keep retries still write, file-
+fsync, rename and directory-fsync the entire bundle. Before rename failures keep
+old bytes; afterward only the whole new set may be visible with durability
+unconfirmed. Buffered stdout failure also returns an error. Inspect or retry the
+complete request under serialized administration to confirm durability.
+
+This changes saved eligibility without shrinking disks, mappings or filesystems,
+moving/erasing data or detaching live views. Unlisted live mappings are not part
+of offline occupation checks; their descriptors/data survive even when a window
+excludes them. Complete live preflight and the kernel's ordinary protections still
+govern later application. Existing V1/V2 formats and boot restoration persist
+contracted windows. See
+[contraction qualification](../tests/storage-volumes/pool-contract-batch.md).
+
 ## Atomic desired mapping removal batches
 
 ```sh

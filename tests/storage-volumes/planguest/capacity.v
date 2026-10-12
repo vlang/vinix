@@ -33,6 +33,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 		phase := C.open(c'/capacity-boot', C.O_RDONLY)
 		if phase >= 0 {
 			check(C.close(phase) == 0, c'close capacity reboot phase')
+			contraction_boot_check()
 			grown_view_data()
 			edited_view_data()
 			capacity_view_data()
@@ -155,6 +156,7 @@ fn physical_capacity_phase(parent &char, other &char) {
 		forget_boot_prepare()
 		addition_boot_prepare()
 		explicit_growth_boot_prepare()
+		contraction_boot_prepare()
 		copy_plan(c'/root/saved.vset', c'/etc/vinix/volumes.vset')
 		check(C.unlink(c'/dev/volume-plan-alias') == 0 && C.unlink(c'/dev/volume-plan-link') == 0,
 			c'capacity aliases cleanup')

@@ -1222,3 +1222,60 @@ fn test_explicit_growth_preview_and_publication_detect_buffered_stdout_failure()
 		if preview { assert decoded == set } else { assert decoded == expected }
 	}
 }
+
+fn contraction_io_fixture(mut set PlanSet, mut batch PoolContractionBatch, mut expected PlanSet) {
+	for member in [1, 2, 3]! {
+		mut plan := Plan{key: DiskKey{bytes: 65536, sector: if member == 2 { u64(4096) } else { u64(512) }, kind: if member == 2 { u32(2) } else { u32(1) }}, count: 1}
+		plan.key.id[0] = u8(member); plan.rows[0] = Request{slot: u32(member), offset: 8192, length: 4096, flags: u64(member & 1)}
+		assert append_plan(mut set, &plan)
+	}
+	for disk in [u32(2), 0, 1]! {
+		region := PoolRegion{pool: 3, disk: disk, window: SpaceWindow{start: 8192, end: 32768, alignment: 4096}}; assert bundle_pool_add(mut set, &region)
+		other := PoolRegion{pool: 4, disk: disk, window: SpaceWindow{start: 32768, end: 49152, alignment: 4096}}; assert bundle_pool_add(mut set, &other)
+	}
+	batch.count = 3; batch.keys[0] = set.plans[2].key; batch.ends[0] = 32768
+	batch.keys[1] = set.plans[1].key; batch.ends[1] = 24576; batch.keys[2] = set.plans[0].key; batch.ends[2] = 16384
+	unsafe { expected = *(&set) }
+	for disk in [1, 0]! {
+		for at in 0 .. expected.regions {
+			row := expected.windows[at]; if row.pool != 3 || row.disk != u32(disk) { continue }
+			expected.windows[at] = PoolRegion{pool: 3, disk: row.disk, window: SpaceWindow{start: row.window.start, end: if disk == 1 { u64(24576) } else { u64(16384) }, alignment: row.window.alignment}}
+		}
+	}
+}
+
+fn test_pool_contraction_and_equal_end_retries_publish_complete_sets_under_every_fault() {
+	work := os.join_path(os.temp_dir(), 'vinix-contraction-publish-${os.getpid()}'); os.mkdir(work)!; defer { os.rmdir_all(work) or {} }; path := work + '/saved.vset'
+	for retry in [false, true] {
+		for mode in 1 .. 7 {
+			mut set := PlanSet{}; mut batch := PoolContractionBatch{}; mut expected := PlanSet{}
+			contraction_io_fixture(mut set, mut batch, mut expected); bundle_io = BundleIO{}; assert publish_bundle(path.str, &set)
+			if retry { assert contract_batch_pool_plan(path.str, 3, &batch, false) == 0 }
+			original := os.read_bytes(path)!; bundle_io = BundleIO{mode: mode}
+			assert contract_batch_pool_plan(path.str, 3, &batch, false) == if mode == 1 { 0 } else { 1 }
+			assert bundle_io.closes == 2 && bundle_io.writes > 0 && os.ls(work)!.len == 1
+			current := os.read_bytes(path)!; mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded)
+			if mode == 1 || mode == 4 { assert decoded == expected && (current == original) == retry && bundle_io.renames == 1 && bundle_io.flushes == 2 } else { assert current == original }
+			bundle_io = BundleIO{}; assert contract_batch_pool_plan(path.str, 3, &batch, false) == 0 && bundle_io.renames == 1 && bundle_io.flushes == 2
+			completed := os.read_bytes(path)!; bundle_io = BundleIO{mode: mode}
+			assert contract_batch_pool_plan(path.str, 3, &batch, true) == 0 && os.read_bytes(path)! == completed && bundle_io == BundleIO{mode: mode}
+		}
+	}
+}
+
+fn test_pool_contraction_preview_and_publication_detect_buffered_stdout_failure() {
+	work := os.join_path(os.temp_dir(), 'vinix-contraction-output-${os.getpid()}'); os.mkdir(work)!; defer { os.rmdir_all(work) or {} }; path := work + '/saved.vset'
+	for preview in [false, true] {
+		mut set := PlanSet{}; mut batch := PoolContractionBatch{}; mut expected := PlanSet{}
+		contraction_io_fixture(mut set, mut batch, mut expected); bundle_io = BundleIO{}; assert publish_bundle(path.str, &set) && C.fflush(C.stdout) == 0
+		original := os.read_bytes(path)!; child := C.fork(); assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY); if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }; C.close(fd)
+			mut buffer := [4096]char{}; if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }
+			C._exit(if contract_batch_pool_plan(path.str, 3, &batch, preview) == 1 { 0 } else { 4 })
+		}
+		mut code := i32(-1); assert C.waitpid(child, &code, 0) == child && code == 0
+		current := os.read_bytes(path)!; assert (current == original) == preview
+		mut decoded := PlanSet{}; assert decode_bundle(current.data, current.len, mut decoded); if preview { assert decoded == set } else { assert decoded == expected }
+	}
+}

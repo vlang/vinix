@@ -181,6 +181,8 @@ fn cycles(parent &char, count int) {
 			c'mbr:12345678', c'14', c'6291456', c'8192', c'ro', true, 0, unsafe { nil })
 		mapping_additions(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'15', c'6291456', c'12288', c'rw',
 			c'mbr:12345678', c'14', c'6291456', c'8192', c'ro', false, 0, unsafe { nil })
+		pool_contractions(c'/etc/vinix/volumes.vset', c'3', c'mbr:12345679', c'6303744', c'mbr:12345678', c'6299648', true, 0, unsafe { nil })
+		pool_contractions(c'/etc/vinix/volumes.vset', c'3', c'mbr:12345679', c'6303744', c'mbr:12345678', c'6299648', false, 0, unsafe { nil })
 		tool(c'check-bundle', c'/etc/vinix/volumes.vset', c'grow', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
 		mapping_removals(c'/etc/vinix/volumes.vset', c'15', c'14', unsafe { nil }, true, 0, unsafe { nil })
 		mapping_removals(c'/etc/vinix/volumes.vset', c'15', c'14', unsafe { nil }, false, 0, unsafe { nil })
@@ -458,6 +460,7 @@ fn first_boot(parent &char) {
 		planned_forget_batch()
 		planned_addition_batch(parent, wrong)
 		planned_explicit_growth_batch(parent, wrong)
+		planned_pool_contractions(parent)
 		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)

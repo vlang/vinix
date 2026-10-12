@@ -174,6 +174,16 @@ Guests verify mixed actions, complete live-extension preflight, held descriptors
 and exact desired-length reconstitution across persistent boot replay. See
 [explicit growth qualification](explicit-growth-batch.md).
 
+Pool contraction batches check 1024 existing/requested subsets against independent
+end/action oracles, preserving mappings, inactive storage, interleaved other pools
+and priority. Boundary-crossing desired rows protect their occupied intersections;
+sector-aligned ends need not match allocation alignment. Identity retries follow
+compaction. Maximum 64-request/132-argument CLIs preserve the full V2 set near u64
+bounds. Later member/identity/bounds/occupation failures roll back every field.
+Publisher/output faults cover changed/all-keep batches. Guests verify retained
+views, bounded future allocation and actual contracted metadata across reboot.
+See [pool contraction qualification](pool-contract-batch.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -200,8 +210,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 10800 utility processes across 200 warmup
-and 200 measured twenty-seven-command cycles, with pool membership, query, batch
+its own process. The allowance includes 11600 utility processes across 200 warmup
+and 200 measured twenty-nine-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention
@@ -251,7 +261,7 @@ cycles, with both disks enabled. Each cycle saves the bundle, previews/publishes
 two-disk mapping capacity, previews/verifies/republishes both unchanged physical capacities,
 previews/publishes admission of two pool members and unchanged allocation priority,
 previews/publishes a mixed expand/keep batch, queries the pool and previews/allocates a two-mapping
-batch, previews/publishes a two-mapping growth batch and explicit identity retries, checks and previews/removes the scratch
+batch, previews/publishes a two-mapping growth batch, explicit identity retries and contraction previews/publications, checks and previews/removes the scratch
 mappings, previews/enrolls two empty offline participants and previews/forgets
 both by identity,
 explicitly replays growth and runs boot restoration.
