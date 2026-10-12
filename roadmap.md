@@ -641,6 +641,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   before I/O, including invalid zero tails; enforce page-size transfer-count
   clamping and qualify EOF boundaries, unchanged file/pipe/socket data and
   flat error-path retention on both architectures. See [the range/count receipts](docs/linux-posix-qualification.md#native-vector-ranges-and-transfer-counts).
+- [x] Preserve native 64-bit positioned-vector offsets, ignore pos_h, reject
+  negative v1 offsets and reserve the current-position -1 sentinel for v2;
+  qualify sparse data above 4 GiB/across 8 GiB, negative error precedence,
+  file/pipe cursor behavior and flat retention on both architectures.
+  See [the positioned-offset receipts](docs/linux-posix-qualification.md#native-positioned-vector-offsets).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

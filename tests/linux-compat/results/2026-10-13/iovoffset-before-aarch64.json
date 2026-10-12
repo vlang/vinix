@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "0a2947a3a4e44625ef837f1362d5331a2e2617ac5e1f68dc725a3a5386855fd6",
+    "results": [
+        {
+            "name": "iovoffset",
+            "source_sha256": "1c3c52db711f413f511e41355b1ebfc2e4b376949af10fe106cab3afcc5560f7",
+            "init_sha256": "d26ee3a8501337aef1fd8b5e30af24caedcba27fe6d7f1d56e9300c073342373",
+            "iso_sha256": "f313a8d39acafbfca576deb5aba098fd4222a01352648ded5ea04e79747cf7c7",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

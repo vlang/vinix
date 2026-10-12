@@ -16,21 +16,29 @@ import resource
 import time
 import usercopy
 
-fn split_offset(low u64, high u64) i64 {
-	return i64((low & 0xffffffff) | (high << 32))
+// Native arm64/x86-64 pass the complete loff_t in pos_l. Linux's pos_from_hilo
+// shifts pos_h by BITS_PER_LONG, so that argument contributes nothing here.
+// Splitting two 32-bit halves is the compat ABI, not either native ABI.
+fn native_vector_offset(low u64, _high u64) i64 {
+	return i64(low)
 }
 
 fn syscall_linux_preadv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, pos_low u64, pos_high u64) (u64, u64) {
+	// Only v2 gives -1 the current-position meaning.
+	if native_vector_offset(pos_low, pos_high) < 0 { return errno.err, errno.einval }
 	return syscall_linux_preadv2(gpr_state, fdnum, iov_ptr, iovcnt, pos_low, pos_high,
 		0)
 }
 
 fn syscall_linux_pwritev(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, pos_low u64, pos_high u64) (u64, u64) {
+	if native_vector_offset(pos_low, pos_high) < 0 { return errno.err, errno.einval }
 	return syscall_linux_pwritev2(gpr_state, fdnum, iov_ptr, iovcnt, pos_low, pos_high,
 		0)
 }
 
 fn syscall_linux_preadv2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, pos_low u64, pos_high u64, flags u32) (u64, u64) {
+	offset := native_vector_offset(pos_low, pos_high)
+	if offset < -1 { return errno.err, errno.einval }
 	if flags != 0 {
 		return errno.err, errno.eopnotsupp
 	}
@@ -40,12 +48,8 @@ fn syscall_linux_preadv2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, 
 		return errno.err, validation_error
 	}
 
-	offset := split_offset(pos_low, pos_high)
 	if offset == -1 {
 		return syscall_linux_readv(gpr_state, fdnum, iov_ptr, iovcnt)
-	}
-	if offset < 0 {
-		return errno.err, errno.einval
 	}
 
 	// Even a zero-length vector validates the descriptor.
@@ -81,6 +85,8 @@ fn syscall_linux_preadv2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, 
 }
 
 fn syscall_linux_pwritev2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, pos_low u64, pos_high u64, flags u32) (u64, u64) {
+	offset := native_vector_offset(pos_low, pos_high)
+	if offset < -1 { return errno.err, errno.einval }
 	if flags != 0 {
 		return errno.err, errno.eopnotsupp
 	}
@@ -90,12 +96,8 @@ fn syscall_linux_pwritev2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int,
 		return errno.err, validation_error
 	}
 
-	offset := split_offset(pos_low, pos_high)
 	if offset == -1 {
 		return syscall_linux_writev(gpr_state, fdnum, iov_ptr, iovcnt)
-	}
-	if offset < 0 {
-		return errno.err, errno.einval
 	}
 
 	mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {

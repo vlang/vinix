@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -104,6 +104,18 @@ class and big-page count after warmup. No 2 GiB payload is allocated or
 transferred. Positioned vectors, tagged ARM pointers, four-level x86 runs,
 shared-offset atomicity, stream message conformance and foreign ABIs remain
 separate work. See the [qualification and receipts](../../docs/linux-posix-qualification.md#native-vector-ranges-and-transfer-counts).
+
+The `iovoffset` case checks 348 native positioned-vector cases in each root and
+UID/GID 1000 child. Raw preadv/pwritev/preadv2/pwritev2 calls vary pos_h while
+preserving full pos_l at 4 GiB + 123, 8 GiB - 1 and 8 GiB + 17. Scalar I/O
+verifies original sparse bytes, lower 32-bit aliases, file size/blocks and
+unchanged explicit-I/O cursors; public musl wrappers are preservation controls.
+Negative offsets require EINVAL before malformed headers/counts/descriptors.
+Only v2 -1 uses and updates the current position, including nonblocking pipes.
+Two 200-cycle valid/error/sentinel cohorts require flat slab and big-page
+counts while reusing the sparse file. GNU wrappers, ELF32/translated paths,
+positioned header/descriptor lifetime, other flags/errors, count limits and
+shared-offset atomicity remain separate. See the [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-offsets).
 
 The `sharedmem` case drops to UID 1000/GID 2000 and checks memfd creator
 ownership, mode 0777 independent of umask, zero links, owner chmod and a

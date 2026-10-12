@@ -1871,3 +1871,64 @@ Actual transfers at the 2 GiB cap, positioned vectors, tagged ARM pointers,
 four-level x86 runs, partial header-copy precedence, shared-offset atomicity,
 stream message conformance, allocator exhaustion and translated/ELF32 paths
 remain separate qualification work. The three broad section-15 gates stay open.
+
+## Native positioned-vector offsets
+
+Native AArch64/x86-64 preadv, pwritev, preadv2 and pwritev2 now use the complete
+signed 64-bit offset in pos_l and ignore pos_h. The old helper combined two
+32-bit halves, although that is the compat layout. A native caller's high
+offset bits could be discarded, or unrelated pos_h bits could redirect I/O
+or create a false negative offset. See [Linux 6.12's native and compat
+decoders](https://github.com/torvalds/linux/blob/v6.12/fs/read_write.c#L1060).
+
+v1 now rejects all negative offsets before header/descriptor handling. v2
+rejects offsets below -1 before that handling; only its -1 case uses the
+current file position through the existing readv/writev path. Previously v1
+shared v2's sentinel behavior, while a native v2 -1 with pos_h zero became
+the positive offset 4 GiB - 1. No new kernel allocation or lifetime is added.
+
+The V `iovoffset` fixture runs 348 cases in each root and UID/GID 1000 child:
+78 explicit-position cases, 252 negative-offset cases and 18 sentinel cases.
+Raw calls vary all four syscall numbers and six pos_h values at 4 GiB + 123,
+8 GiB - 1 (two iovecs cross the boundary), and 8 GiB + 17. Scalar pread/pwrite
+seed and verify distinct bytes at each requested offset and its lower 32-bit
+alias. Results must preserve file size, allocated blocks and the shared cursor.
+Public musl preadv/pwritev wrappers exercise the same data checks.
+
+Negative cases cover -1, -2, INT64_MIN and INT64_MIN + 123, bad headers/counts
+and invalid descriptors; v2 -1 is tested separately. It must read/write at the
+current regular-file offset and advance it, and work on nonblocking pipes.
+v1 -1 must retain EINVAL without consuming or queuing pipe bytes. Every fixture
+borrow is synchronous, and acquired descriptors close on all returns.
+
+Both unchanged kernels fail 60 raw offset cases, 144 negative cases and 14
+sentinel cases per credential group. Reads return lower-alias bytes, writes
+overwrite those aliases, ignored high-word bits cause EOF or EINVAL, and
+sentinel pipe calls return ESPIPE or incorrectly perform v1 I/O. The six public
+musl cases already pass on these controls; they are preservation checks, not
+evidence of a previously failing musl wrapper. Both fixed kernels pass all
+696 cases per architecture.
+
+Each credential group runs 32 warmup and 200 measured cycles through valid
+raw/public calls, negative refusals and file/pipe sentinels. Every slab class
+and big-page count stays flat: 321/321 on ARM and 4,258/4,258 on x86. The reused
+sparse file's page-slot metadata stays live during measurement; this is not
+an allocation of the entire 8 GiB payload. The native range fixture also stays
+flat. Both architectures pass eight guest regression cases and all eight
+compatibility host test files. Allocation-site audits still fail the same
+existing allowances, with 406 ARM and 295 x86 sites and identical failure rows;
+no allowance is increased.
+
+The [dated results](../tests/linux-compat/results/2026-10-13/) publish
+`iovoffset-before-*`, `iovoffset-after-*`, host checks and both allocation-audit
+logs. The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/iovoffset-audit.v)
+verifies frozen inputs, kernels, emitted C and init/ISO artifacts, actual
+control failures and passing regressions, retention, and rejection of passing
+output as a negative control. Independent lifetime review approved both
+generated kernels and the synchronous stack/descriptor paths. The inventory
+retains 62 input fingerprints.
+
+GNU libc wrappers and ELF32/translated variants need separate qualification.
+Positioned header/descriptor lifetime, positive-offset error ordering, flags,
+MAX_RW_COUNT, shared-offset atomicity, disk-backed files and allocator
+exhaustion remain open. The three broad section-15 gates stay open.
