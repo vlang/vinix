@@ -2,6 +2,8 @@ module main
 
 import os
 
+#include <sys/mount.h>
+
 fn C.mount(source charptr, target charptr, filesystem charptr, flags u64, data voidptr) int
 
 fn main() {
