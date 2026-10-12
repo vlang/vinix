@@ -401,6 +401,19 @@ remains available for administrative scripts and validates the same document.
 Documents require explicit fields/types, matching architecture and unique roots;
 missing/null/coerced fields, unknown/duplicate keys and unsafe metadata files fail.
 
+In **Software**, select **Deployment**, enter the absolute file path and choose
+**Review deployment**. The review shows the entire resulting set, including
+dependencies, runtime updates, retained packages and removals, with publisher
+keys, permissions, licenses, firmware flags and disk requirements. Confirm uses
+the reviewed file path and deployment fingerprint through `deployment-apply`;
+editing the form cannot redirect a confirmation. Changed document contents,
+trust, policy or installed state require another review. A successful transaction
+returns to the catalog; failures retain the file path and show service diagnostics
+for retry. Cancel only discards a review, before changes begin. An empty deployment
+explicitly removes the complete installed package set while retaining personal
+data. The workflow also accepts approved offline deployment locks after their
+repositories and policy have been configured.
+
 To reproduce an approved application/runtime set across machines, export a
 format-2 deployment lock rather than resolve names again on every installation:
 

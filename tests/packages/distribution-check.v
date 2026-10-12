@@ -40,16 +40,19 @@ fn check() ! {
 	work := temporary + '/vinix-distribution-check-' + os.getpid().str()
 	os.mkdir_all(work + '/software')!
 	defer { os.rmdir_all(work) or {} }
-	check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
-	check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
-	check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/desktop/packagecore', work)!
-	run(v, [...helper_flags, '-gc', 'none', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
-	run(work + '/vinix-package', ['--help'])!
-	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', work + '/cli-check', repository + '/tests/packages/distribution-cli.v'])!
-	run(work + '/cli-check', [work + '/vinix-package'])!
+	if '--software-only' !in os.args {
+		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
+		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
+		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/desktop/packagecore', work)!
+		run(v, [...helper_flags, '-gc', 'none', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
+		run(work + '/vinix-package', ['--help'])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', work + '/cli-check', repository + '/tests/packages/distribution-cli.v'])!
+		run(work + '/cli-check', [work + '/vinix-package'])!
+	}
 	os.cp(repository + '/desktop/software_app.v', work + '/software/software_app.v')!
 	os.cp(repository + '/desktop/software_repositories.v', work + '/software/software_repositories.v')!
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
+	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
 	modules := os.getenv_opt('VINIX_PACKAGE_TEST_UI2') or { repository + '/build/vmodules' }
 	if !os.is_file(modules + '/ui2/v.mod') {
@@ -97,7 +100,7 @@ fn check() ! {
 			'-o', work + '/launcher-check', repository + '/tests/packages/launcher-check.v'])!
 		run(work + '/launcher-check', [work])!
 	}
-	println('Package distribution checks passed')
+	println(if '--software-only' in os.args { 'Software distribution checks passed' } else { 'Package distribution checks passed' })
 }
 
 fn main() {

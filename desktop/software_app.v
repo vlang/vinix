@@ -99,6 +99,9 @@ mut:
 	repository_url_seen int
 	repository_result string
 	repository_worker SoftwareRepositoryWorker
+	deployment_mode bool
+	deployment_path []u8
+	deployment_pending string // frozen file path for deployment-review/apply
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
@@ -198,6 +201,7 @@ fn (mut a SoftwareApp) filter_rows() {
 
 fn (mut a SoftwareApp) load_view() {
 	a.clear_review()
+	a.deployment_mode = false
 	text := editor_bytes_text(a.output)
 	view := json2.decode[SoftwareView](text) or {
 		a.set_status('Invalid response from the package service. Reload the catalog or check its configuration.')
@@ -254,10 +258,12 @@ fn (mut a SoftwareApp) clear_review() {
 		for name in a.review_names { name.free() }
 		(&array(&a.review_names)).free()
 		a.review_summary.free()
+		a.deployment_pending.free()
 	}
 	a.review = ''
 	a.review_names = []string{}
 	a.review_summary = ''
+	a.deployment_pending = ''
 	a.review_ready = false
 	a.review_selected = -1
 	a.review_scroll = 0
@@ -287,7 +293,7 @@ fn (mut a SoftwareApp) load_review() {
 		a.set_status('Unsupported or incomplete package review. Review the operation again.')
 		return
 	}
-	if review.operation != a.review || review.names != a.review_names {
+	if review.operation != a.review || (a.deployment_pending == '' && review.names != a.review_names) {
 		review.close()
 		a.clear_review()
 		a.set_status('The service returned a different package operation. Review it again.')
@@ -314,7 +320,13 @@ fn (mut a SoftwareApp) load_review() {
 		available.free()
 		reserve.free()
 	}
-	a.set_status('Review every application and dependency, including retained packages and removals. Personal data stays on disk. Confirm applies this exact package set.')
+	if a.deployment_pending != '' {
+		message := 'Deployment file: ' + a.deployment_pending + '\nReview all dependencies and removals. This replaces the installed application set; personal data stays on disk.'
+		a.set_status(message)
+		unsafe { message.free() }
+	} else {
+		a.set_status('Review every application and dependency, including retained packages and removals. Personal data stays on disk. Confirm applies this exact package set.')
+	}
 }
 
 fn software_output_tail(bytes []u8) string {
@@ -460,6 +472,7 @@ fn (mut a SoftwareApp) run_requested() {
 	a.clear_review()
 	a.clear_repository_review()
 	a.repository_mode = false
+	a.deployment_mode = false
 	a.start(if request.document.len > 0 {
 		['run', request.id, request.document]
 	} else {
@@ -486,19 +499,30 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.run_requested()
 		return
 	}
-	if event_id == 'software.search' {
+	if event_id == 'software.search' && !a.deployment_mode {
 		a.focus = true
 		return
 	}
 	if a.worker != unsafe { nil } { return }
 	if event_id == 'software.repositories' {
 		a.clear_review()
+		a.deployment_mode = false
 		a.repository_mode = true
 		a.repository_focus = 0
 		a.read_repositories()
 		return
 	}
 	if a.repository_mode { a.handle_repositories(event_id); return }
+	if event_id == 'software.deployment' {
+		a.clear_review()
+		a.deployment_mode = true
+		a.initialize_deployment_field()
+		a.focus = false
+		a.select_all = false
+		a.set_status('Enter an absolute deployment file path. Review the complete application set and removals before applying it.')
+		return
+	}
+	if a.deployment_mode && a.review == '' { a.handle_deployment(event_id); return }
 	for row, action in software_row_actions {
 		if event_id == action {
 			if a.review_ready && a.review_scroll + row < a.review_snapshot.rows.len {
@@ -595,9 +619,13 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 		'software.confirm' {
 			if a.review_ready {
-				a.start(['apply', a.review_snapshot.fingerprint, a.review_snapshot.operation,
-					...a.review_snapshot.names], false)
-				a.clear_review()
+				a.start(if a.deployment_pending != '' {
+					['deployment-apply', a.review_snapshot.fingerprint, a.deployment_pending]
+				} else {
+					['apply', a.review_snapshot.fingerprint, a.review_snapshot.operation,
+						...a.review_snapshot.names]
+				}, false)
+				if a.worker != unsafe { nil } { a.clear_review() }
 			}
 		}
 		'software.cancel' {
@@ -610,6 +638,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 
 fn (mut a SoftwareApp) key_input(input string) {
 	if a.repository_mode { a.repository_key_input(input); return }
+	if a.deployment_mode { a.deployment_key_input(input); return }
 	if !a.focus { return }
 	match input {
 		'\x01' { a.select_all = true }
@@ -628,7 +657,9 @@ fn (mut a SoftwareApp) key_input(input string) {
 }
 
 fn (mut a SoftwareApp) paste_input(input string) {
-	if a.repository_mode { a.repository_key_input(input) } else if a.focus { a.key_input(input) }
+	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {
+		a.deployment_key_input(input)
+	} else if a.focus { a.key_input(input) }
 }
 
 fn software_label(text string, x int, y int, width int, height int, owned bool) ui2.Element {
@@ -677,15 +708,19 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	a.page_rows = if height > 400 { (height - 236) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.repository_mode { return a.build_repositories(width, height) }
+	if a.deployment_mode && a.review == '' { return a.build_deployment(width, height) }
 	mut children := frame_elements(48)
 	reviewing := a.review.len > 0
 	children << software_label('Software', 14, 8, 150, 28, false)
 	if reviewing {
-		children << software_label('Review ${a.review}', 170, 8, width - 188, 28, true)
+		children << software_label(if a.deployment_pending != '' { 'Review deployment'.clone() } else {
+			'Review ${a.review}'
+		}, 170, 8, width - 188, 28, true)
 		children << software_label(a.review_summary, 14, 40, width - 28, 44, false)
 	} else {
-		children << console_field('software.search', editor_bytes_text(a.query), 170, 8, width - 370, a.focus)
-		children << software_button('software.refresh', 'Refresh repositories', width - 188, 8, 174)
+		children << console_field('software.search', editor_bytes_text(a.query), 170, 8, width - 386, a.focus)
+		children << software_button('software.deployment', 'Deployment', width - 202, 8, 96)
+		children << software_button('software.refresh', 'Refresh', width - 98, 8, 84)
 		children << software_button('software.catalog', 'Catalog', 14, 46, 90)
 		children << software_button('software.installed', 'Installed', 112, 46, 90)
 		children << software_button('software.updates', 'Updates', 210, 46, 90)
@@ -832,6 +867,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.repository_url.free()
 		a.repository_key.free()
 		a.repository_result.free()
+		a.deployment_path.free()
 	}
 	a = SoftwareApp{}
 }

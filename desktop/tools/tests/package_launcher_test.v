@@ -302,6 +302,47 @@ fn test_software_review_redraw_cancel_and_decoded_storage_are_released() {
 	assert C.vinix_heap_end() == baseline
 }
 
+fn test_software_deployment_form_review_and_retirement_release_storage() {
+	mut app := SoftwareApp{ deployment_mode: true, output: []u8{cap: 8192} }
+	app.initialize_deployment_field()
+	software_repository_text(mut app.deployment_path, '/etc/company/deployment with spaces.json')
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+	}
+	package_assert_heap_flat('Software deployment form redraw')
+	app.output = software_review_fixture.replace('"operation":"install"', '"operation":"deploy"').bytes()
+	app.review = 'deploy'.clone()
+	app.deployment_pending = '/etc/company/deployment.json'.clone()
+	app.load_review()
+	assert app.review_ready
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+	}
+	package_assert_heap_flat('Software deployment review redraw')
+	app.clear_review()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
+	baseline := C.vinix_heap_end()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		app.review = 'deploy'.clone()
+		app.deployment_pending = '/etc/company/deployment.json'.clone()
+		app.load_review()
+		assert app.review_ready
+		app.clear_review()
+	}
+	app.close_app()
+	assert C.vinix_heap_end() == baseline
+}
+
 fn test_software_progress_redraw_and_stream_storage_are_released() {
 	text := '{"format":1,"phase":"download","package":"app","repository":"trusted","path":"bin/app","current":64,"total":128}'
 	frame := pkgprotocol.progress_prefix + text + '\n'

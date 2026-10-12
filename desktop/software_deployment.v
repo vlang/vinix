@@ -1,0 +1,116 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import ui2
+import encoding.utf8
+
+const software_deployment_path_limit = 4096
+
+fn software_deployment_text_valid(text string) bool {
+	if !utf8.validate_str(text) { return false }
+	for i, byte in text {
+		if byte < 32 || byte == 127 || (byte == 0xc2 && i + 1 < text.len && text[i + 1] <= 0x9f) {
+			return false
+		}
+	}
+	return true
+}
+
+fn software_deployment_path_valid(path string) bool {
+	return path.len > 0 && path.len <= software_deployment_path_limit && path[0] == `/`
+		&& software_deployment_text_valid(path)
+}
+
+fn (mut a SoftwareApp) initialize_deployment_field() {
+	if a.deployment_path.cap == 0 {
+		a.deployment_path = []u8{cap: software_deployment_path_limit}
+	}
+	unsafe { a.deployment_path.flags |= .noslices }
+}
+
+fn (mut a SoftwareApp) begin_deployment_review() {
+	a.initialize_deployment_field()
+	a.clear_review()
+	path := editor_bytes_text(a.deployment_path)
+	if !software_deployment_path_valid(path) {
+		a.set_status('Enter an absolute deployment file path without control characters (at most 4096 bytes).')
+		return
+	}
+	a.review = 'deploy'.clone()
+	a.deployment_pending = path.clone()
+	a.focus = false
+	a.select_all = false
+	a.start(['deployment-review', a.deployment_pending], false)
+	if a.worker != unsafe { nil } {
+		a.worker_review = true
+		a.set_status('Checking the deployment file, trusted publishers, dependencies, policy and disk space…')
+	} else {
+		a.clear_review()
+	}
+}
+
+fn (mut a SoftwareApp) handle_deployment(event_id string) {
+	match event_id {
+		'software.deployment.path' {
+			a.focus = true
+			a.select_all = false
+		}
+		'software.deployment.review' { a.begin_deployment_review() }
+		'software.deployment.back' {
+			a.deployment_mode = false
+			a.focus = false
+			a.select_all = false
+			a.set_status('Select an application to review its publisher, license and permissions.')
+		}
+		else {}
+	}
+}
+
+fn (mut a SoftwareApp) deployment_key_input(input string) {
+	// A pending review or transaction owns its literal path. Editing is only
+	// possible in the form, after cancellation/failure or before review.
+	if !a.focus || a.review != '' || a.worker != unsafe { nil } { return }
+	match input {
+		'\x01' { a.select_all = true }
+		'\x7f', '\x08' {
+			console_backspace(mut a.deployment_path, a.select_all)
+			a.select_all = false
+		}
+		'\x1b', '\r', '\n' { a.focus = false }
+		else {
+			length := if a.select_all { 0 } else { a.deployment_path.len }
+			if input.len > software_deployment_path_limit - length {
+				a.set_status('The deployment file path exceeds 4096 bytes. The field was kept intact.')
+				return
+			}
+			// Preserve the literal filename. The shared search-field paste helper
+			// drops invalid UTF-8/control characters, which could name another file.
+			if !software_deployment_text_valid(input) {
+				a.set_status('The deployment file path contains control characters or invalid UTF-8. The field was kept intact.')
+				return
+			}
+			if a.select_all { a.deployment_path.clear() }
+			for byte in input { a.deployment_path << byte }
+			a.select_all = false
+		}
+	}
+}
+
+fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
+	a.initialize_deployment_field()
+	mut children := frame_elements(10)
+	children << software_label('Software · Deployment', 14, 8, width - 188, 28, false)
+	if a.worker == unsafe { nil } {
+		children << software_button('software.deployment.back', 'Back to catalog', width - 174, 8, 160)
+	}
+	children << software_label('Deployment file (absolute path)', 14, 52, width - 28, 28, false)
+	children << console_field('software.deployment.path', editor_bytes_text(a.deployment_path), 14, 86, width - 28, a.focus)
+	children << software_label('Apply a deployment supplied by your organization or exported with deployment-lock. Locked files preserve exact application and runtime versions.', 14, 128, width - 28, 60, false)
+	children << software_label('The review includes installs, retained packages, updates and removals, with publisher keys, permissions, licenses and disk requirements. Empty deployments remove all packages. Personal data stays on disk.', 14, 204, width - 28, 60, false)
+	if a.worker == unsafe { nil } {
+		children << software_button('software.deployment.review', 'Review deployment', 14, 286, 180)
+	}
+	if a.progress_seen { children << a.progress_bar(width, height) }
+	children << software_label(a.status, 14, height - if a.progress_seen { 88 } else { 98 }, width - 28, if a.progress_seen { 80 } else { 90 }, false)
+	return ui2.screen(app_surface, children)
+}

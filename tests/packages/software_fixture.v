@@ -143,6 +143,7 @@ fn main() {
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if software_deployment_service_fixture(args) or { panic(err) } { return }
 		if software_repository_service_fixture(args) or { panic(err) } { return }
 		if args[1] == 'view' {
 			println(json2.encode(SoftwareView{ format: 1, architecture: 'aarch64' }))
@@ -282,7 +283,127 @@ fn main() {
 	check_resolved_updates() or { panic(err) }
 	check_repository_management() or { panic(err) }
 	check_software_progress() or { panic(err) }
+	check_software_deployment() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
+}
+
+const deployment_fixture_path = '/private/tmp/deployment with spaces; \$literal.json'
+
+fn software_deployment_service_fixture(args []string) !bool {
+	if args[1] == 'deployment-review' {
+		assert args.len == 3
+		path := args[2]
+		if path == '/missing.json' { eprintln('fixture: deployment file unavailable'); exit(18) }
+		review := fixture_review('deploy', ['editor'])
+		println(json2.encode(if path == '/wrong-format.json' {
+			pkgprotocol.Review{ ...review, format: 2 }
+		} else if path == '/wrong-operation.json' {
+			pkgprotocol.Review{ ...review, operation: 'upgrade', names: [] }
+		} else if path == '/empty.json' {
+			pkgprotocol.Review{ ...review, names: [], requested: [], rows: [
+				pkgprotocol.ReviewPackage{ ...review.rows[0], requested: false, action: 'remove' },
+				pkgprotocol.ReviewPackage{ ...review.rows[1], action: 'remove' },
+			] }
+		} else { review }))
+		return true
+	}
+	if args[1] == 'deployment-apply' {
+		assert os.args[1] == '--progress', 'deployment transactions request live progress'
+		assert args.len == 4 && args[2] == 'c'.repeat(64)
+		if args[3] == '/stale.json' { eprintln('fixture: deployment review is stale; review again'); exit(23) }
+		assert args[3] in [deployment_fixture_path, '/empty.json']
+		os.write_file(os.getenv('VINIX_SOFTWARE_DEPLOYMENT_FIXTURE'), json2.encode(args[2..]))!
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete' }))
+		return true
+	}
+	return false
+}
+
+fn check_software_deployment() ! {
+	receipt := os.temp_dir() + '/vinix-software-deployment-' + os.getpid().str()
+	os.setenv('VINIX_SOFTWARE_DEPLOYMENT_FIXTURE', receipt, true)
+	defer { os.rm(receipt) or {}; os.unsetenv('VINIX_SOFTWARE_DEPLOYMENT_FIXTURE') }
+	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192}, query: []u8{cap: 256} }
+	defer { app.close_app() }
+	app.handle('software.deployment')!
+	assert app.deployment_mode && app.worker == unsafe { nil }
+	form := app.build(ui2.rect(0, 0, 640, 610))!
+	assert form.children.any(it.id == 'software.deployment.review')
+	assert form.children.any(it.text.contains('Empty deployments remove all packages'))
+	app.handle('software.deployment.path')!
+	app.paste_input('relative.json')
+	app.handle('software.deployment.review')!
+	assert app.worker == unsafe { nil } && app.status.contains('absolute')
+	app.key_input('\x01')
+	app.paste_input(deployment_fixture_path)
+	app.key_input('\x01')
+	app.paste_input('/' + 'x'.repeat(4096))
+	assert editor_bytes_text(app.deployment_path) == deployment_fixture_path
+	app.paste_input('/two\nlines.json')
+	assert editor_bytes_text(app.deployment_path) == deployment_fixture_path
+	app.paste_input('/invalid\xff.json')
+	assert editor_bytes_text(app.deployment_path) == deployment_fixture_path
+	app.paste_input('/control\xc2\x85.json')
+	assert editor_bytes_text(app.deployment_path) == deployment_fixture_path
+	app.paste_input('/部署/пакеты.json')
+	assert editor_bytes_text(app.deployment_path) == '/部署/пакеты.json'
+	app.key_input('\x01')
+	app.paste_input(deployment_fixture_path)
+	app.handle('software.deployment.review')!
+	assert app.worker_review && !app.review_ready && app.prepare_close()
+	app.handle('software.confirm')!
+	assert !os.exists(receipt)
+	wait_for_software(mut app)
+	assert app.review_ready && app.review_snapshot.names == ['editor']
+	assert app.review_snapshot.rows.len == 2 && app.status.contains(deployment_fixture_path)
+	app.handle('software.row.1')!
+	tree := app.build(ui2.rect(0, 0, 900, 660))!
+	assert tree.children.any(it.text.contains('Permissions: network, process'))
+	assert tree.children.any(it.text.contains('Vendor-EULA (proprietary)'))
+	assert tree.children.any(it.id == 'software.confirm')
+	// A form edit cannot alter the reviewed literal argv. Normal typing is frozen.
+	app.focus = true
+	app.paste_input('/other.json')
+	assert editor_bytes_text(app.deployment_path) == deployment_fixture_path
+	software_repository_text(mut app.deployment_path, '/other.json')
+	app.handle('software.confirm')!
+	assert !app.prepare_close() && app.deployment_pending == ''
+	wait_for_software(mut app)
+	assert json2.decode[[]string](os.read_file(receipt)!)! == ['c'.repeat(64), deployment_fixture_path]
+	assert !app.deployment_mode && app.review == ''
+	os.rm(receipt)!
+	for path in ['/missing.json', '/wrong-format.json', '/wrong-operation.json', '/stale.json', '/empty.json'] {
+		app.handle('software.deployment')!
+		software_repository_text(mut app.deployment_path, path)
+		app.handle('software.deployment.review')!
+		wait_for_software(mut app)
+		if path == '/missing.json' {
+			assert !app.review_ready && app.status.contains('unavailable')
+		} else if path == '/wrong-format.json' || path == '/wrong-operation.json' {
+			assert !app.review_ready && app.review == '' && app.deployment_pending == ''
+		} else if path == '/stale.json' {
+			assert app.review_ready
+			app.handle('software.confirm')!
+			wait_for_software(mut app)
+			assert app.deployment_mode && !app.review_ready && app.status.contains('stale')
+		} else {
+			assert app.review_ready && app.review_snapshot.requested.len == 0
+			assert app.review_snapshot.rows.all(it.action == 'remove')
+			app.handle('software.cancel')!
+			assert !os.exists(receipt) && app.deployment_mode && app.deployment_pending == ''
+			app.handle('software.deployment.review')!
+			wait_for_software(mut app)
+			app.handle('software.confirm')!
+			wait_for_software(mut app)
+			assert json2.decode[[]string](os.read_file(receipt)!)![1] == '/empty.json'
+			os.rm(receipt)!
+		}
+		assert !os.exists(receipt)
+	}
+	app.handle('software.deployment')!
+	app.handle('software.deployment.back')!
+	assert !app.deployment_mode && app.worker == unsafe { nil }
+	println('Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed')
 }
 
 fn check_software_progress() ! {

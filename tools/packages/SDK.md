@@ -418,7 +418,8 @@ activation. File-specific and generic `review/apply deploy IDs` fingerprints are
 not interchangeable. Whitespace and root/record ordering do not change identity;
 changed lock floors, format, policy, state or selected metadata require review.
 An unchanged successful proposal can reuse its fingerprint. Apply progress is
-human text, not JSON state. Authorization remains administrator access.
+human text by default; `--progress` adds the bounded presentation events described
+above. Authorization remains administrator access.
 
 Both file commands also accept format-1 `{format,architecture,packages}` root
 documents, which resolve the latest satisfiable closure. `deploy FILE` supports
@@ -435,6 +436,16 @@ V clients use `Service.lock_deployment`, `Service.review_deployment`,
 `Service.apply_deployment`, `DeploymentLock`, `DeploymentPackage` and
 `package_metadata_digest`. Returned reviews own presentation fields and use the
 usual `Review.close()` contract. Configuration is loaded after taking the lock.
+
+Software's Deployment form uses these file-specific review/apply commands. It
+retains the complete decoded review, freezes the literal file path, and closes the
+snapshot on cancellation, failed review or handoff to apply. Other SDK clients
+should preserve that same intent: the returned `names` describe roots read from
+the document and must not replace the reviewed file in a generic `apply deploy`
+call. Keep the path available for retry and preserve the nonzero service exit and
+diagnostic tail separately from progress events.
+The [Software deployment checks](../../tests/packages/deployment-ui-check.md)
+cover this workflow and snapshot retirement independently of the service tests.
 
 `policy` emits a canonical format-1 `{format,architecture,policy}` document from
 persistent configuration. `policy-review FILE` emits
