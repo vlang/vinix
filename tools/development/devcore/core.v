@@ -21,10 +21,11 @@ pub fn file_hash(path string) !string {
 	defer { file.close() }
 	mut digest := sha256.new()
 	mut buffer := []u8{len: 65536}
+	defer { unsafe { buffer.free() } }
 	for {
 		count := file.read(mut buffer) or {
 			if err is os.Eof { break }
-			return err
+			return error('hash read failed: ${path}: ${err.msg()} (code ${err.code()})')
 		}
 		if count == 0 { break }
 		digest.write(buffer[..count])!

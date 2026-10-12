@@ -56,6 +56,8 @@ The build runs on a copy and rechecks the source, tools and additional SDK input
 after completion. It performs no downloads or installation. Run it as the
 developer's account with the permissions that account
 already has. A build plan is executable code supplied by that developer.
+File hashing releases each stream buffer after use, including in `-gc none`
+builds, so scanning large SDKs does not retain a buffer per file.
 
 A plan has this shape (replace paths and hashes with actual values):
 
@@ -122,4 +124,7 @@ of the kernel, desktop and all Alpine packages remains unqualified.
 Host integration tests run with `v -cc cc test tools/development/devcore`.
 They build and execute a real V project, reject changed pins and escaped links,
 preserve modes, retain failure receipts and enforce command deadlines. These
-host checks do not establish Vinix guest qualification.
+checks also compile a `-gc none` hash probe and bound peak-memory growth across
+1,000 full-buffer hashes. The stream-buffer regression measured approximately
+79 MiB of growth before the fix and 1 MiB after it on the Darwin ARM host.
+These host checks do not establish Vinix guest qualification.

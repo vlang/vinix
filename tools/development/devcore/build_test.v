@@ -136,3 +136,19 @@ fn test_deadline_stops_a_command() {
 	}
 	assert false
 }
+
+fn test_gc_none_hashing_keeps_stream_buffers_bounded() {
+	root := sourcecommand.temporary('vinix-hash-memory')!
+	defer { os.rmdir_all(root) or {} }
+	os.write_file(root + '/input', 'x'.repeat(65536))!
+	repository := os.dir(os.dir(os.dir(os.dir(@FILE))))
+	v := os.real_path(@VEXE)
+	cc := os.find_abs_path_of_executable('cc')!
+	assert run([v, '-gc', 'none', '-cc', cc, '-path', '@vlib|' + repository + '|' +
+		repository + '/tools/development', '-o', root + '/hash-memory', repository +
+		'/tools/development/devcore/fixtures/hash-memory.v'],
+		root, environment(0), 120, root + '/compile.log')! == 0, os.read_file(root + '/compile.log')!
+	assert run([root + '/hash-memory', root + '/input'], root, environment(0), 120, root + '/run.log')! == 0,
+		os.read_file(root + '/run.log')!
+	assert os.read_file(root + '/run.log')!.contains('HASH-MEMORY:')
+}
