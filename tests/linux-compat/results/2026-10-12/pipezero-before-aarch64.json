@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "eaa23c3c85b74477cd2c4b2db24d254acc9983b0d2b23abb5a5142f42673c1fd",
+    "results": [
+        {
+            "name": "pipezero",
+            "source_sha256": "45e03f2ebcc0806aba964d20b1e9ba0f89910264ad92f0c991687e1e41d34c96",
+            "init_sha256": "b28904aa9745a499fafc34d8b05c83500b13bac595c2385fe629a8c7dd65e675",
+            "iso_sha256": "3d903dab28d829571aa44f1067de4867a954e7dc5848b143f872228bfb7ecb45",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

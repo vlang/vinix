@@ -252,6 +252,9 @@ fn (mut this Pipe) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 }
 
 fn (mut this Pipe) read(_handle voidptr, buf voidptr, _loc u64, _count u64) ?i64 {
+	// A zero-byte read neither waits for data nor changes readiness. The
+	// descriptor layer has already checked the access mode and MAC policy.
+	if _count == 0 { return 0 }
 	mut count := _count
 
 	this.l.acquire()

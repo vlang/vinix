@@ -1221,6 +1221,45 @@ Nested PID-namespace workflows and per-thread credential isolation remain
 unqualified. Capability sets still belong to the process; the broad roadmap
 acceptance gates remain open.
 
+## Zero-length pipe and FIFO reads
+
+The pipe resource now returns zero for a zero-byte read before acquiring its
+queue lock or checking whether data is present. Previously an empty blocking
+pipe waited for input, while a nonblocking pipe returned EAGAIN. This follows
+Linux's [pipe reader](https://github.com/torvalds/linux/blob/v6.12/fs/pipe.c#L263),
+which handles zero length before locking. Descriptor/access-mode and native
+MAC checks still precede the resource call. The early return changes no queue,
+poll state or event generation and allocates nothing.
+
+The native V `pipezero` fixture passes seven isolated UID/GID 1000 groups on
+AArch64 and x86-64. Tests cover blocking/nonblocking empty anonymous pipes,
+populated/full pipes, buffered and drained writer hangup, zero writes after
+reader close, and a named FIFO with both ends open. Three buffer forms—null,
+unmapped address 1 and a PROT_NONE page—prove that zero-byte calls copy nothing.
+Repeated calls preserve FIONREAD and poll readiness. Nonzero reads retain the
+queued byte; empty nonblocking reads and full writes retain EAGAIN, EOF returns
+zero, and invalid/closed/wrong-access descriptors return EBADF. Each child has
+a five-second non-restarting alarm, which must not fire on a passing path.
+Root prepares a writable fixture directory before dropping credentials.
+
+Both unchanged-fixture controls on the prior production kernel wait until
+the alarm and return `-1/EINTR(4)` for an empty zero-byte read. Both changed
+production kernels pass eight cases: pipe I/O, syscall selectors, descriptor
+access, constrained opens, runtime primitives, fatal seccomp actions,
+seccomp trap/verifier and futex queues. All eight host test files and the
+isolated generated inventory check pass.
+
+`pipezero-before-*` and `pipezero-after-*` in the
+[dated results directory](../tests/linux-compat/results/2026-10-12/) retain
+controls, frozen fixture/kernel hashes and serial verdicts. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/pipezero-audit.v)
+checks the negative controls, every artifact and all seven groups. The source
+inventory now includes the pipe implementation, with 61 fingerprints.
+The isolated e13e66b1 worktrees change only three lines in the pipe reader;
+the coverage generator also records that source. No ownership or reclamation
+path changes. Directory read errors, native ELF32/translated pipe entry and
+complete section-15 application acceptance remain separate.
+
 ## Capability ABI discovery and data format
 
 capget/capset validate the four-byte version word before reading PID or

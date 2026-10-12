@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -570,6 +570,18 @@ handler changes the result. Strict read/write/exit calls with high bits pass
 using a primed pipe. A caught SA_RESTART signal restarts a blocked read while
 its signal frame preserves the full original selector. These are native ELF64
 checks; native ELF32/x32 and translated syscall entry remain separate.
+
+The `pipezero` case runs seven isolated UID/GID 1000 groups. Zero-byte reads
+must return immediately on blocking and nonblocking empty anonymous pipes and
+named FIFOs, populated/full pipes and after writer close. Zero-byte writes
+also succeed on full pipes and after reader close, without SIGPIPE. Null,
+unmapped and PROT_NONE buffers are accepted because no byte is transferred.
+Repeated calls preserve FIONREAD and poll readiness; real reads retain data,
+empty nonblocking reads and full writes retain EAGAIN, EOF returns zero, and
+invalid/closed/wrong-access descriptors retain EBADF. A non-restarting alarm
+bounds each child and must never fire in a passing group. Root only prepares
+a writable test directory before the fixture drops credentials. Directory
+read type errors are a separate regression.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

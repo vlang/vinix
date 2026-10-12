@@ -27,6 +27,7 @@
         "kernel/memory/table_budget.v": "72becfcd2e1dff2c510efd3af47d2cb99effca487e8e9643e0c247e261729ed6",
         "kernel/memory/virtual_amd64.v": "483bb2e7ac7a1248c6f09e182a8f27b8a250f4b3e4aeba2642b4be300b00bb9d",
         "kernel/memory/virtual_arm64.v": "71602c4c637ebfaad8b85d1af34ca9a3d4e1afd4ebf85fdb433fa992871693c0",
+        "kernel/pipe/pipe.v": "2732feedcc69c576b9b6211f6b436f4fe2be01f906fd3ebe4fb06908d270c5a6",
         "kernel/proc/container.v": "db3558d2cea2aeb8c5a483cd9cbade7ba37e2d9d13f5d3047874a9ce2319449a",
         "kernel/proc/kernel_budget.v": "763ca9bea7d11825b8abc293e350a3afabe911bab8e718853626d52fd2201553",
         "kernel/proc/pidns.v": "10a1bbd4b6201113d89302b4ad1da9df937a03494279beec02f7e29889b01be5",
@@ -58,7 +59,7 @@
         "kernel/userland/userland.v": "a8bffd3e58bf07333ca0d18980dab9a2746811d9d0ccb6a114584b461cd39d69",
         "kernel/userland/userland_arm64.v": "0e234395d8764d6a80a3f76d9d34e3ded33407b477af5de86d54b407b8f654e2",
         "kernel/vmstorage/storage.v": "df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d",
-        "tools/linux-compat/coverage.v": "36e7725f1b754a5117503f3badab4ba4039b0978bf0a4db20a031a24a09b7508",
+        "tools/linux-compat/coverage.v": "af75f2cda478d14ec5b3036c812904f527cd0a90d2f458a7b3625a36fc5e92bf",
         "tools/linux-compat/reference/aarch64-syscall.h": "7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816",
         "tools/linux-compat/reference/x86_64-syscall.h": "c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd"
     },
