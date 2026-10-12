@@ -344,7 +344,13 @@ fn tick_deadlines() {
 
 @[export: 'vinix_linuxkpi_cpu_has']
 fn cpu_has(feature u32) bool {
+	if feature == feature_hw_shstk || feature == feature_active_la57 {
+		return cpu_infrastructure_has(feature)
+	}
 	if feature / 32 == 16 { return directstore_has(feature) }
+	if feature / 32 != 0 && feature / 32 != 4 {
+		lib.kpanic(unsafe { nil }, c'linuxkpi: unsupported CPU feature word')
+	}
 	// Linux's feature word 0 is leaf 1 EDX; word 4 is leaf 1 ECX.
 	ok, _, _, ecx, edx := cpu.cpuid(1, 0)
 	if !ok {
@@ -463,6 +469,7 @@ fn selftest_free_baseline() u64 {
 pub fn initialise() {
 	$if linuxkpi ? {
 		initialise_cpu_features()
+		initialise_cpu_infrastructure_features()
 		initialise_cpu_masks()
 		if !cpu_features_native_selftest() {
 			lib.kpanic(unsafe { nil }, c'Linux CPU feature policy self-test failed')

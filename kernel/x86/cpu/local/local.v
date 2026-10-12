@@ -96,6 +96,11 @@ pub mut:
 	// Boot LinuxKPI intersects these immutable scalars across every online CPU;
 	// an instruction test must remain valid after a task migrates.
 	directstore_ecx u32
+	// Opt-in compatibility policy samples, written before online publication.
+	// Hardware SHSTK is distinct from configured shadow-stack services; LA57
+	// records this CPU's installed CR4 mode rather than a capability bit.
+	linuxkpi_shstk_supported bool
+	linuxkpi_la57_active     bool
 }
 
 __global (

@@ -1570,3 +1570,64 @@ Run helper tests through V, with a new proof directory when keeping outputs:
 ```sh
 build-support/run-v-tool.sh tests/linuxkpi/scalar_helpers.v --keep-dir /tmp/vinix-scalar-helpers-fresh
 ```
+
+## Latest configured CPU policy and V full audit
+
+Original `cpu_feature_enabled` and the 22-word mask selection are preserved.
+Configured-disabled literals do not query a native capability; dynamic inputs
+follow the original raw path and unsupported bits still fail explicitly.
+Native SHSTK is the common hardware capability with XSAVES, XSAVE, FXSR and
+FPU prerequisites, distinct from configured USER_SHSTK and CET state. LA57 is actual CR4 paging
+mode, checked on every CPU against native geometry. Both are immutable boot
+policies, with samples written before each online acknowledgement.
+
+Fresh worktrees at **`86090210`** with six production paths build enabled/default
+x86 and default ARM. Exact enabled ELF
+`0d52878a83cdaf82a9ebd44751beef39fca725a72d9c9d6de381c012e92e1bea`
+passes normal/SSE/four-level guests, all 46 markers and all 28 strict existing
+lifetime equalities. Native query fourth batches recover `387440640` bytes in
+normal five-level, `387444736` in SSE five-level and `387473408` in four-level,
+with unchanged live counts.
+Actual witnesses show LA57=1/geometry `1<<56` and LA57=0/geometry `1<<47`.
+Native SHSTK is zero in QEMU; do not claim CET execution or positive native
+SHSTK validation from host capability tests.
+
+Independent actual C/object review confirms unchanged Local size (1,424 bytes)
+and existing offsets, with new booleans in old padding. Successful constructor
+and query paths allocate nothing; exceptional compiler bounds-check panic
+formatting remains in the generated kernel object. Default x86 setup is
+unchanged; ARM's entire generated C matches after substituting only isolated
+assertion path prefixes.
+Default Linux-ABI startup passes with compatibility symbols/markers excluded.
+
+The corrected full prerequisite chain has six GNU99/GNU11 sanitizer profiles
+and six freestanding object checks, including 513 cases executing the unchanged
+native sampler block. Every missing prerequisite or leaf acknowledgement is
+covered independently. Fixed-domain, publication, configured-mask and
+concurrent-query checks pass. Earlier sampler and guest artifacts predate the
+explicit FXSR/FPU checks; use the `v2` native/guest and sampler-prerequisites-v3
+receipts for the final feature.
+
+The new maintained V audit derives object metadata through pinned Kbuild,
+uses private ABI/bounds outputs, records all diagnostics and source states,
+joins every job, rejects source changes and atomically publishes complete
+reports. Its correct final profile is **5/269**. First errors now include
+225 task/MM/vfork units and 33 encryption-header units; the old module-name
+invocation defect is fixed. Use a fresh state directory:
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/audit_full.v --jobs 4 --keep-dir /tmp/vinix-i915-audit-fresh
+```
+
+Evidence is under `smp-oct10/cpu-policy-v2-*`,
+`cpu-policy-independent-oct12/sampler-prerequisites-v3/`, `scalar-cpu-policy-*-native-v2/` and
+`cpu-policy-v2-full-audit/`. Disk-full preparatory runs and
+partial extraction/audit attempts remain labeled and unpublished; fresh
+retries pass. Four older root-owned completed worktrees were removed, with
+source patches and immutable proofs preserved; do not reuse their paths.
+Seventeen older supervisor-control ISOs are `.gz` archives verified against
+their original hashes in `archived-control-isos-oct12.json`.
+
+Remaining work includes actual task/MM/vfork rendezvous and retained owners,
+encryption/TSC include closure, Linux PCI/devres, DMA/pages/TTM/GEM, IRQs,
+DRM/firmware/display and real Tiger Lake validation. GPU support is incomplete.

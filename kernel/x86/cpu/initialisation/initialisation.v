@@ -63,6 +63,18 @@ pub fn initialise(smp_info &limine.LimineSMPInfo) {
 	cpu_local.directstore_ecx = if directstore_available {
 		directstore_ecx & ((u32(1) << 27) | (u32(1) << 28))
 	} else { u32(0) }
+	$if linuxkpi ? {
+		// Original dependencies: SHSTK -> XSAVES -> XSAVE -> FXSR -> FPU.
+		// This does not enable CET or provide shadow-stack task state.
+		xsave_available, _, _, xsave_ecx, xsave_edx := cpu.cpuid(1, 0)
+		xsaves_available, xsaves_eax, _, _, _ := cpu.cpuid(0xd, 1)
+		cpu_local.linuxkpi_shstk_supported = directstore_available
+			&& directstore_ecx & (u32(1) << 7) != 0
+			&& xsave_available && xsave_ecx & (u32(1) << 26) != 0
+			&& xsave_edx & ((u32(1) << 24) | u32(1)) == ((u32(1) << 24) | u32(1))
+			&& xsaves_available && xsaves_eax & (u32(1) << 3) != 0
+		cpu_local.linuxkpi_la57_active = cpu.read_cr4() & (u64(1) << 12) != 0
+	}
 
 	C.kprintf(c'smp: CPU %llu online!\n', u64(cpu_local.cpu_number))
 

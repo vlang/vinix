@@ -99,6 +99,14 @@ after a filesystem failure. Mutable build inputs still require isolation.
   permanent; hotplug, concurrent initialization, firmware-disabled CPU inventory
   and `total_cpus` remain unsupported. This supplies no remote callback dispatch
   or extension of the scheduler's 64-bit worker-affinity masks.
+- Original `cpu_feature_enabled` applies the pinned 22-word configured masks
+  to constant arguments. Disabled constants avoid the native query entirely;
+  nonconstant arguments retain the original capability-query path. The bounded
+  native policy also publishes the common hardware SHSTK capability, with its
+  XSAVES, XSAVE, FXSR and FPU prerequisites, and validates active LA57 against
+  every CPU's CR4 and native paging geometry. SHSTK hardware does not supply CET task state or
+  configured USER_SHSTK. These immutable queries allocate nothing and preserve
+  IRQ/pin state; other unsupported words/bits fail explicitly.
 - Ordinary boot-online SMP calls use the original Linux CSD records and real
   native maskable IPIs. `smp_call_function_single`, its caller-owned async
   variant, `smp_call_function_many`, `smp_call_function` and
@@ -1854,3 +1862,52 @@ host checks with `build-support/run-v-tool.sh tests/linuxkpi/scalar_helpers.v`.
 Evidence is under `smp-oct10/scalar-helper-*` and `scalar-audit-oct12/` in the
 cache root above; the independent helper receipt is
 `scalar-helper-independent-review/review-result.json`.
+
+## Configured CPU features and complete V audit tooling
+
+The configured-mask and native SHSTK/LA57 policy above builds in fresh
+architecture worktrees at **`86090210`**, with six owned production paths.
+Enabled/default x86 and default ARM compile and link. The saved enabled ELF
+`0d52878a83cdaf82a9ebd44751beef39fca725a72d9c9d6de381c012e92e1bea`
+passes normal, hypervisor-off SSE and `max,la57=off` guests, each with 46
+markers and 28 exact PMM/all-live-heap equalities. Native query batches recover
+`387440640 -> 387440640` bytes in the normal five-level guest,
+`387444736 -> 387444736` in its SSE counterpart, and
+`387473408 -> 387473408` in the four-level guest. Actual witnesses report
+LA57=1 with geometry `1 << 56`, or LA57=0 with geometry `1 << 47`.
+QEMU reports SHSTK=0; these runs establish no CET operation.
+
+Six strict GNU99/GNU11 sanitizer profiles and six freestanding object checks
+pass. The V fixture runs the unchanged sampler block through 513 cases covering
+every prerequisite flag and leaf acknowledgement, both CR4 modes and the
+independent SSE branch. It also covers fixed-domain membership, immutable
+publication, original constant/dynamic mask behavior and concurrent queries.
+
+Independent generated-C/object checks preserve every existing Local field
+offset and its 1,424-byte size: two new booleans use prior padding. The sampler
+runs on each CPU before online publication. Default x86's setup is unchanged;
+default ARM's generated C matches after replacing only assertion path prefixes.
+The default guest passes Linux-ABI startup without compatibility markers.
+The successful constructor and query paths allocate nothing; the generated
+kernel object retains exceptional compiler bounds-check panic formatting.
+
+The maintained full V audit now obtains per-object module metadata from the
+exact original Kbuild scripts. It keeps compiler/generated inputs and full
+diagnostics in a private directory, joins its jobs before cleanup, rejects
+changed inputs and publishes an explicit output atomically. The latest correct
+profile remains **5/269**. Its largest first-error groups are task/MM/vfork
+ownership (225 files), missing encryption-header closure (33), and remaining
+timer/entry/IRQ/TSC/lock interfaces. Syntax counts supply no link or GPU proof.
+
+```sh
+build-support/run-v-tool.sh tests/linuxkpi/audit_full.v --jobs 4 --keep-dir /tmp/vinix-i915-audit-fresh
+```
+
+The corrected saved-ELF guest and review evidence is under
+`smp-oct10/cpu-policy-v2-*`, `cpu-policy-independent-oct12/` and
+`scalar-cpu-policy-*-native-v2/`. The corrected full report is under
+`cpu-policy-v2-full-audit/`. Disk-full preparation/extraction
+failures remain separate; fresh retries pass. Four completed owned build
+worktrees were removed after saving source patches and immutable proofs, and
+old supervisor-control ISOs were losslessly compressed with hash receipts.
+Other sessions' files and the verified import remain unchanged.
