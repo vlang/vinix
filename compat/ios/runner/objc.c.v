@@ -97,6 +97,11 @@ mut:
 	is_real bool
 	unsigned_number bool
 	json_immutable bool
+	set_owned bool
+	set_initialized bool
+	set_mutable bool
+	set_reading int // Reject mutation while membership callbacks inspect storage.
+	set_mutating bool
 	condition_owned bool
 	condition_initialized bool
 	cookie_owned bool
@@ -259,7 +264,7 @@ fn objc_start() {
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
         'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSUserDefaults',
-        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
+        'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
 		'UIAccessibilityElement',
@@ -280,6 +285,7 @@ fn objc_start() {
 			'UIButton' { ios_runtime.names['UIControl'] }
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray', 'WKNSArray' { ios_runtime.names['NSArray'] }
+			'NSMutableSet' { ios_runtime.names['NSSet'] }
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
 			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
 			'NSMutableData' { ios_runtime.names['NSData'] }
@@ -450,6 +456,7 @@ fn objc_new(cls u64) u64 {
 	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	if objc_is_kind(object, ios_runtime.names['NSURLRequest']) { request_initialize(object, 0, 0, 60) }
 	if obj_header(object).response_owned { response_initialize(object) }
+	if obj_header(object).set_owned { ns_set_initialize(object, 0) }
 	if obj_header(object).alert_owned { alert_initialize(object, 0, 0, if objc_is_kind(object, ios_runtime.names['UIAlertController']) { i64(1) } else { i64(0) }, 0, false) }
 	name := webkit_object_name(object)
 	if name == 'WKWebView' { webview_initialize(object, ObjRect{}, 0); return object }

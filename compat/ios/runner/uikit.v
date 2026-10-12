@@ -101,6 +101,7 @@ fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool
 	if request_dispatch(object, selector, mut frame) { return true }
 	if response_dispatch(object, selector, mut frame) { return true }
 	if alert_dispatch(object, selector, mut frame) { return true }
+	if ns_set_dispatch(object, selector, mut frame) { return true }
 	if value_dispatch(object, selector, mut frame) { return true }
 	if image_dispatch(object, selector, mut frame) { return true }
 	if accessibility_dispatch(object, selector, mut frame) { return true }

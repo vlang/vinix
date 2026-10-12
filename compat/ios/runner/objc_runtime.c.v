@@ -92,6 +92,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := request_types(info.name, info.meta, selector) { return types }
 	if types := response_types(info.name, info.meta, selector) { return types }
 	if types := alert_types(info.name, info.meta, selector) { return types }
+	if types := ns_set_types(info.name, info.meta, selector) { return types }
 	if types := value_types(info.name, info.meta, selector) { return types }
 	if info.name == 'NSMutableDictionary' && !info.meta && selector == 'setObject:forKey:' { return 'v32@0:8@16@24' }
 	if info.name != 'NSObject' { return none }

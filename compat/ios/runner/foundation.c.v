@@ -28,6 +28,7 @@ fn cf_equal_depth(left u64, right u64, depth int) bool {
 	if left == right { return true }
 	if left == 0 || right == 0 { return false }
 	if depth > 64 { panic('iOS: cyclic or excessively nested CF equality') }
+	if objc_is_kind(left, ios_runtime.names['NSSet']) { return ns_set_equal(left, right, depth) }
 	for name in ['NSArray', 'NSDictionary', 'NSData', 'NSString', 'NSNumber']! {
 		cls := ios_runtime.names[name]
 		if !objc_is_kind(left, cls) { continue }

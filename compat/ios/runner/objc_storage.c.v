@@ -31,6 +31,8 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.webview_owned = objc_is_kind(object, ios_runtime.names['WKWebView'])
 	header.request_owned = objc_is_kind(object, ios_runtime.names['NSURLRequest'])
 	header.response_owned = objc_is_kind(object, ios_runtime.names['NSURLResponse'])
+	header.set_owned = objc_is_kind(object, ios_runtime.names['NSSet'])
+	header.set_mutable = objc_is_kind(object, ios_runtime.names['NSMutableSet'])
 	header.alert_owned = objc_is_kind(object, ios_runtime.names['UIAlertController']) || objc_is_kind(object, ios_runtime.names['UIAlertAction'])
 	header.value_owned = objc_is_kind(object, ios_runtime.names['NSValue']) && !objc_is_kind(object, ios_runtime.names['NSNumber'])
 	C.ios_ref_change(unsafe { &ios_runtime.live }, 1)

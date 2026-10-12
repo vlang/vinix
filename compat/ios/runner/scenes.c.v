@@ -29,6 +29,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if request_selector(object, name) { return true }
 	if response_selector(object, name) { return true }
 	if alert_selector(object, name) { return true }
+	if ns_set_selector(object, name) { return true }
 	if value_selector(object, name) { return true }
 	webkit := webkit_object_name(object)
 	if native_method(read64(object), name) != 0 { return true }
@@ -194,12 +195,12 @@ fn ui_connect_scene(launch_options u64) !u64 {
 	defer { objc_release(session) }
 	options := objc_allocate(ios_runtime.names['UISceneConnectionOptions'])
 	defer { objc_release(options) }
-	contexts := objc_allocate(ios_runtime.names['NSSet'])
+	contexts := objc_new(ios_runtime.names['NSSet'])
 	if launch_options != 0 {
 		url := obj_header(launch_options).items[0]
 		context := objc_allocate(ios_runtime.names['UIOpenURLContext'])
 		store_field(context, 0, url)
-		array_append(mut obj_header(contexts), context)
+		ns_set_insert(contexts, context)
 		objc_release(context)
 	}
 	store_field(options, 0, contexts)
