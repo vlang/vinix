@@ -5,8 +5,9 @@ import json2
 import os
 import strconv
 import tools.packages.pkgcore
+import tools.packages.pkgprotocol
 
-const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] COMMAND [ARGS]\n' +
+const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  update | search [QUERY] | info ID | list | status | updates | view\n' +
 	'  install ID... | remove ID... | upgrade | rollback | gc | verify\n' +
 	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
@@ -28,6 +29,7 @@ fn checked(arguments []string) !int {
 	mut root := ''
 	mut offline := false
 	mut as_json := false
+	mut progress := false
 	for args.len > 0 && args[0].starts_with('--') {
 		match args[0] {
 			'--root' {
@@ -45,6 +47,7 @@ fn checked(arguments []string) !int {
 				as_json = true
 				args = args[1..].clone()
 			}
+			'--progress' { progress = true; args = args[1..].clone() }
 			'--help' {
 				print(usage)
 				return 0
@@ -57,6 +60,9 @@ fn checked(arguments []string) !int {
 		return 2
 	}
 	command := args[0]
+	if progress && (as_json || command !in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback']) {
+		return error('--progress supports update, install/remove/upgrade, apply, deploy/deployment-apply and rollback without --json')
+	}
 	names := args[1..].clone()
 	match command {
 		'keygen' {
@@ -93,7 +99,8 @@ fn checked(arguments []string) !int {
 		}
 		else {}
 	}
-	service := pkgcore.Service{ root: root, offline: offline }
+	service := pkgcore.Service{ root: root, offline: offline,
+		progress: if progress { print_progress } else { ignore_progress } }
 	match command {
 		'deployment-lock', 'deployment-review' {
 			if command == 'deployment-review' && names.len != 1 { return error('deployment-review requires a deployment document') }
@@ -279,6 +286,17 @@ fn checked(arguments []string) !int {
 		else { return error('unknown command: ${command}\n${usage}') }
 	}
 	return 0
+}
+
+fn ignore_progress(_ pkgprotocol.Progress) {}
+
+fn print_progress(event pkgprotocol.Progress) {
+	event.validate() or { return }
+	text := json2.encode(event)
+	frame := pkgprotocol.progress_prefix + text
+	println(frame)
+	flush_stdout()
+	unsafe { text.free(); frame.free() }
 }
 
 fn main() {

@@ -6,6 +6,7 @@ import encoding.hex
 import json2
 import os
 import time
+import tools.packages.pkgprotocol
 
 pub struct Snapshot {
 pub:
@@ -82,6 +83,10 @@ pub fn refresh(config Config, directory string) !Catalog {
 }
 
 fn refresh_locked(config Config, directory string) !Catalog {
+	return refresh_progress(config, directory, no_progress)
+}
+
+fn refresh_progress(config Config, directory string, report fn (pkgprotocol.Progress)) !Catalog {
 	previous := read_snapshots(directory)!
 	mut history := history_with_snapshots(directory, previous)!
 	mut snapshots := []Snapshot{}
@@ -93,10 +98,13 @@ fn refresh_locked(config Config, directory string) !Catalog {
 		println('Updating trusted repository ${repository.id}')
 		index_path := work + '/index.json'
 		sig_path := work + '/index.sig'
-		fetch(repository.url.trim_right('/') + '/index.json', index_path, max_metadata, false, config.policy.offline)!
-		fetch(repository.url.trim_right('/') + '/index.sig', sig_path, 256, false, config.policy.offline)!
+		fetch_progress(repository.url.trim_right('/') + '/index.json', index_path, max_metadata, false, config.policy.offline,
+			pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.json' }, report)!
+		fetch_progress(repository.url.trim_right('/') + '/index.sig', sig_path, 256, false, config.policy.offline,
+			pkgprotocol.Progress{ phase: 'metadata', repository: repository.id, path: 'index.sig' }, report)!
 		text := read_metadata(index_path)!
 		signature := read_metadata(sig_path)!.trim_space()
+		report(pkgprotocol.Progress{ phase: 'verify', repository: repository.id, path: 'index.json' })
 		index := verify_index(repository, text, signature, time.now().unix())!
 		history = remember_index(history, repository, index, text)!
 		snapshots << Snapshot{ repository: repository, text: text, signature: signature }
@@ -110,5 +118,6 @@ fn refresh_locked(config Config, directory string) !Catalog {
 	// Revocation and empty refreshes never discard identities from this history.
 	save_history(directory, history)!
 	atomic_write(directory + '/catalog.json', encoded)!
+	report(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 	return catalog
 }

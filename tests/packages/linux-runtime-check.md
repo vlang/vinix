@@ -258,3 +258,29 @@ These guest checks are initramfs/sandbox qualification runs. The ext2 crash suit
 qualifies the shared transaction engine
 separately; locked deployment through a graphical administration flow and
 persistent-device power-cut behavior remain separate release gates.
+
+Structured operation progress and verification of staged copies passed on both
+targets on 2026-10-13 using the same cached kernels and pinned compiler:
+[AArch64 progress receipt](results/2026-10-13/progress-aarch64.json),
+[AArch64 serial](results/2026-10-13/progress-aarch64.serial.txt),
+[x86_64 progress receipt](results/2026-10-13/progress-x86_64.json),
+[x86_64 serial](results/2026-10-13/progress-x86_64.serial.txt).
+`PACKAGE PROGRESS` checks bounded byte counters, download/copy/verification
+phases, completion after activation and the real signed offline app/runtime
+closure. All nine artifact hashes and lengths were checked before retention.
+Host fixtures additionally cover resumed partial bytes, a failing child with
+retained data, killing/reaping an oversized transfer child, staged-copy corruption
+before publication, stale review before acquisition, strict protocol bounds and
+fragmented GUI pipe frames. The controlled child tests exercise transfer
+monitoring without replacing curl or claiming a live HTTPS server qualification.
+The [compiler/source record](results/2026-10-13/progress-toolchain.json) retains
+the pinned toolchain identity and qualification-log/source hashes.
+
+The UI fixture verifies an observable progress bar while a worker runs, bounded
+incomplete lines, ignored invalid records, useful failure diagnostics and reset
+on worker replacement. Allocator checks cover repeated progress redraws and
+decoded-event retirement. Qualification uses private generated UI assets and
+the documented compiler/include-path settings. A host build first hit exhausted
+disk space; retained earlier package-run artifacts were cleaned without changing
+source or evidence. These tests qualify progress and the shared package engine;
+graphical session/display-broker and application catalog release gates remain.

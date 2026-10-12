@@ -138,35 +138,48 @@ fn check_package_review() {
 }
 
 fn main() {
+	mut args := os.args.clone()
+	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
-	if os.args.len > 1 {
-		if software_repository_service_fixture() or { panic(err) } { return }
-		if os.args[1] == 'view' {
+	if args.len > 1 {
+		if software_repository_service_fixture(args) or { panic(err) } { return }
+		if args[1] == 'view' {
 			println(json2.encode(SoftwareView{ format: 1, architecture: 'aarch64' }))
 			return
 		}
-		if os.args[1] == 'run' {
-			assert os.args[2..] == ['editor', '/private/tmp/document with spaces; \$literal.txt']
+		if args[1] == 'run' {
+			assert args[2..] == ['editor', '/private/tmp/document with spaces; \$literal.txt']
 			eprintln('fixture: ordinary user session required')
 			exit(19)
 		}
-		if os.args[1] == 'review' {
-			if os.args.len > 3 && os.args[3] == 'broken' { eprintln('fixture: dependency unavailable'); exit(17) }
-			review := fixture_review(os.args[2], os.args[3..])
-			println(json2.encode(if os.args.len > 3 && os.args[3] == 'wrong-format' {
+		if args[1] == 'install' && args[2] == 'progress-app' {
+			assert os.args[1] == '--progress'
+			frame := pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'download',
+				package: 'progress-app', repository: 'trusted', path: 'bin/app', current: 128, total: 256 }) + '\n'
+			print(frame[..7]); flush_stdout()
+			time.sleep(20 * time.millisecond)
+			print(frame[7..]); flush_stdout()
+			time.sleep(200 * time.millisecond)
+			eprintln('fixture: transfer interrupted; retained partial data for retry')
+			exit(27)
+		}
+		if args[1] == 'review' {
+			if args.len > 3 && args[3] == 'broken' { eprintln('fixture: dependency unavailable'); exit(17) }
+			review := fixture_review(args[2], args[3..])
+			println(json2.encode(if args.len > 3 && args[3] == 'wrong-format' {
 				pkgprotocol.Review{ ...review, format: 2 }
-			} else if os.args.len > 3 && os.args[3] == 'wrong-intent' {
+			} else if args.len > 3 && args[3] == 'wrong-intent' {
 				pkgprotocol.Review{ ...review, names: ['other'] }
 			} else { review }))
 			return
 		}
-		if os.args[1] == 'apply' {
-			assert os.args[2..] == ['c'.repeat(64), 'install', 'editor']
+		if args[1] == 'apply' {
+			assert args[2..] == ['c'.repeat(64), 'install', 'editor']
 			eprintln('fixture: package review is stale; review again')
 			exit(23)
 		}
-		if os.args[1] == 'lease-hold' { time.sleep(200 * time.millisecond); return }
+		if args[1] == 'lease-hold' { time.sleep(200 * time.millisecond); return }
 		panic('unexpected fixture service command')
 	}
 	mut app := SoftwareApp{ query: []u8{cap: 256}, output: []u8{cap: 8192} }
@@ -268,7 +281,50 @@ fn main() {
 	check_package_review()
 	check_resolved_updates() or { panic(err) }
 	check_repository_management() or { panic(err) }
+	check_software_progress() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
+}
+
+fn check_software_progress() ! {
+	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192}, query: []u8{cap: 256} }
+	defer { app.close_app() }
+	app.operation_output('\n\n')
+	frame := pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'download',
+		package: 'app', path: 'bin/app', current: 64, total: 128 }) + '\n'
+	for byte in frame {
+		value := byte.ascii_str()
+		app.operation_output(value)
+		unsafe { value.free() }
+	}
+	assert app.progress_seen && app.progress_snapshot.current == 64 && app.output.len == 0
+	assert app.status.contains('64 / 128 bytes')
+	tree := app.build(ui2.rect(0, 0, 900, 660))!
+	bar := tree.children.filter(it.id == 'software.progress')[0]
+	assert bar.accessibility_role == 'progressbar' && bar.children[0].frame.width == 436
+	app.operation_output(pkgprotocol.progress_prefix + '{"format":2}\n')
+	assert app.progress_snapshot.current == 64
+	app.operation_output('x'.repeat(pkgprotocol.progress_limit + 32) + '\n')
+	assert app.progress_pending.len == 0 && !app.progress_skip
+	app.operation_output('checksum mismatch; retry from trusted repository')
+	app.finish_operation_output()
+	assert app.status.contains('checksum mismatch') && !app.status.contains(pkgprotocol.progress_prefix)
+	// The real worker emits a fragmented frame before exiting with a diagnostic.
+	app.start(['install', 'progress-app'], false)
+	assert !app.prepare_close()
+	for _ in 0 .. 500 {
+		app.poll()
+		if app.progress_seen { break }
+		time.sleep(time.millisecond)
+	}
+	assert app.worker != unsafe { nil } && app.progress_snapshot.current == 128
+	wait_for_software(mut app)
+	assert app.status.contains('transfer interrupted') && app.status.contains('partial data')
+	assert !app.status.contains(pkgprotocol.progress_prefix) && app.progress_snapshot.phase != 'complete'
+	assert app.prepare_close()
+	app.start(['view'], true)
+	assert !app.progress_seen && app.progress_snapshot.phase == ''
+	wait_for_software(mut app)
+	println('Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed')
 }
 
 const repository_fixture_url = 'file:///private/tmp/repository with spaces; $literal'
@@ -296,46 +352,46 @@ fn repository_fixture_review(operation string, id string, url string, key string
 		package_count: if operation == 'enroll' { 3 } else { 0 } }
 }
 
-fn software_repository_service_fixture() !bool {
-	if os.args[1] == '--json' {
-		assert os.args[2..] == ['repo-list']
+fn software_repository_service_fixture(args []string) !bool {
+	if args[1] == '--json' {
+		assert args[2..] == ['repo-list']
 		println(json2.encode(repository_fixture_status()!))
 		return true
 	}
-	if os.args[1] == 'repo-review' {
-		operation := os.args[2]
-		id := os.args[3]
+	if args[1] == 'repo-review' {
+		operation := args[2]
+		id := args[3]
 		if id == 'bad-signature' { eprintln('fixture: repository signature verification failed'); exit(31) }
 		review := repository_fixture_review(operation, id,
-			if operation == 'enroll' { os.args[4] } else { '' },
-			if operation == 'enroll' { os.args[5] } else { '' })!
+			if operation == 'enroll' { args[4] } else { '' },
+			if operation == 'enroll' { args[5] } else { '' })!
 		println(json2.encode(if id == 'wrong-format' {
 			pkgprotocol.RepositoryReview{ ...review, format: 2 }
 		} else if id == 'wrong-intent' { pkgprotocol.RepositoryReview{ ...review, id: 'other' } } else { review }))
 		return true
 	}
-	if os.args[1] == 'repo-apply' {
-		if os.args[2] == 'e'.repeat(64) { eprintln('fixture: repository review is stale; review again'); exit(32) }
-		assert os.args[2] == 'd'.repeat(64)
+	if args[1] == 'repo-apply' {
+		if args[2] == 'e'.repeat(64) { eprintln('fixture: repository review is stale; review again'); exit(32) }
+		assert args[2] == 'd'.repeat(64)
 		path := os.getenv('VINIX_SOFTWARE_REPOSITORY_FIXTURE')
 		assert path != ''
 		current := repository_fixture_status()!
-		operation := os.args[3]
-		id := os.args[4]
+		operation := args[3]
+		id := args[4]
 		assert id == 'fixture'
 		if operation == 'enroll' {
-			assert os.args.len == 7 && os.args[5].starts_with(repository_fixture_url)
-			assert os.args[6] == 'b'.repeat(64)
-			next := pkgprotocol.RepositoryStatus{ ...current, repositories: [pkgprotocol.Repository{ id: id, url: os.args[5], public_key: os.args[6] }] }
+			assert args.len == 7 && args[5].starts_with(repository_fixture_url)
+			assert args[6] == 'b'.repeat(64)
+			next := pkgprotocol.RepositoryStatus{ ...current, repositories: [pkgprotocol.Repository{ id: id, url: args[5], public_key: args[6] }] }
 			os.write_file(path, json2.encode(next))!
 		} else {
-			assert operation == 'revoke' && os.args.len == 5
+			assert operation == 'revoke' && args.len == 5
 			os.write_file(path, json2.encode(pkgprotocol.RepositoryStatus{ ...current, repositories: [] }))!
 		}
 		println('fixture: repository trust change saved')
 		return true
 	}
-	if os.args[1] == 'update' {
+	if args[1] == 'update' {
 		if repository_fixture_status()!.repositories.any(it.url.contains('refresh-fails')) {
 			eprintln('fixture: catalog refresh failed: publisher unreachable')
 			exit(33)

@@ -145,6 +145,17 @@ complete hash. Complete partial files are promoted without network access. Hash
 failures discard the partial file. Network/storage failure leaves activation
 unchanged.
 
+`--progress` adds bounded, versioned progress frames to maintenance output for
+refresh, install/remove/upgrade, reviewed apply, deployment and rollback. Software
+uses them automatically: downloads and staged copies show byte counts, staging
+shows package counts, and verification/activation remain distinct phases.
+Counters describe the current phase; a finished download does not imply a
+completed installation. Completion is reported only after successful publication
+and activation flushes. Copied installation payloads are hashed again before the
+generation can be published. HTTPS transfer monitoring reaps failed/oversized
+children, retains bounded partial downloads for retry, and enforces authenticated
+size bounds while the child runs.
+
 The command service loads configuration after acquiring that lock, so a completed
 repository revocation, key replacement or policy change cannot be followed by a
 transaction using the command's earlier configuration. Refresh, deployment,
@@ -185,6 +196,11 @@ publisher/permission/license review, install/uninstall confirmation, repository
 refresh, update-all, rollback, launch, progress and recent failure output. A running
 mutation prevents normal window close. Mutations require administrator access;
 there is no setuid service or automatic privilege escalation.
+
+The progress display accepts fragmented frames, bounds incomplete lines and
+ignores unsupported/malformed presentation events. It keeps human failure output
+separately, so transfer updates cannot hide checksum, disk-space or authorization
+diagnostics. Read-only JSON catalog/review replies use their existing protocol.
 
 The Updates filter and `vinix-package updates` use the same complete dependency
 resolution as `review upgrade`. They show runtime/data changes even when the

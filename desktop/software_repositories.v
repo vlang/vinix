@@ -410,6 +410,7 @@ fn (mut a SoftwareApp) build_repositories(width int, height int) ui2.Element {
 	if reviewing {
 		children << software_button('software.repository.cancel', 'Cancel', width - 174, height - 138, 160)
 	}
-	children << software_label(a.status, 14, height - 98, width - 28, 90, false)
+	if a.progress_seen { children << a.progress_bar(width, height) }
+	children << software_label(a.status, 14, height - if a.progress_seen { 88 } else { 98 }, width - 28, if a.progress_seen { 80 } else { 90 }, false)
 	return ui2.screen(app_surface, children)
 }

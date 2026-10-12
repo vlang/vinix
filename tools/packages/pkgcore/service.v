@@ -4,13 +4,15 @@ module pkgcore
 import os
 import tools.packages.pkgprotocol
 
-// An administrative client stores only a root and a per-command offline flag.
+// An administrative client stores a root, an offline flag and an optional
+// presentation observer, with no configuration or trust snapshot.
 // Configuration, policy and trust are always loaded after acquiring the lock.
 // The Config-taking APIs remain available for explicit snapshot-based fixtures.
 pub struct Service {
 pub:
 	root    string
 	offline bool
+	progress fn (pkgprotocol.Progress) = no_progress
 }
 
 fn (service Service) directory() !string {
@@ -29,14 +31,15 @@ pub fn (service Service) refresh() !Catalog {
 	directory := service.directory()!
 	guard := acquire(directory)!
 	defer { guard.release() }
-	return refresh_locked(service.configuration()!, directory)
+	return refresh_progress(service.configuration()!, directory, service.progress)
 }
 
 pub fn (service Service) transact(operation string, names []string, options TransactionOptions) !State {
 	directory := service.directory()!
 	guard := acquire(directory)!
 	defer { guard.release() }
-	return transact_locked(service.configuration()!, directory, operation, names, options)
+	return transact_locked(service.configuration()!, directory, operation, names,
+		TransactionOptions{ ...options, progress: service.progress })
 }
 
 pub fn (service Service) plan(operation string, names []string) !Plan {
@@ -57,7 +60,7 @@ pub fn (service Service) rollback(expected string) !State {
 	directory := service.directory()!
 	guard := acquire(directory)!
 	defer { guard.release() }
-	return rollback_locked(service.configuration()!, directory, expected)
+	return rollback_progress(service.configuration()!, directory, expected, service.progress)
 }
 
 pub fn (service Service) collect() ! {

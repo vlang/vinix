@@ -49,6 +49,7 @@ fn check() ! {
 	run(work + '/cli-check', [work + '/vinix-package'])!
 	os.cp(repository + '/desktop/software_app.v', work + '/software/software_app.v')!
 	os.cp(repository + '/desktop/software_repositories.v', work + '/software/software_repositories.v')!
+	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
 	modules := os.getenv_opt('VINIX_PACKAGE_TEST_UI2') or { repository + '/build/vmodules' }
 	if !os.is_file(modules + '/ui2/v.mod') {

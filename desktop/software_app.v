@@ -72,6 +72,10 @@ mut:
 	worker_review   bool
 	worker_run      bool
 	worker_failed   bool
+	progress_snapshot pkgprotocol.Progress
+	progress_pending []u8
+	progress_seen bool
+	progress_skip bool
 	launch_request  string
 	launch_label    string = 'Launch'
 	service_path    string = '/usr/bin/vinix-package'
@@ -134,13 +138,15 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 		return
 	}
 	a.output.clear()
+	a.clear_progress()
 	a.worker_failed = false
 	a.worker_view = view
 	a.worker_review = false
 	a.worker_run = false
 	a.repository_worker = .none
 	a.worker = os.new_process(a.service_path.clone())
-	mut owned := []string{cap: arguments.len}
+	mut owned := []string{cap: arguments.len + 1}
+	if software_progress_command(arguments) { owned << '--progress'.clone() }
 	for argument in arguments { owned << argument.clone() }
 	a.worker.set_args(owned)
 	a.worker.set_redirect_stdio_merged()
@@ -356,12 +362,7 @@ fn (mut a SoftwareApp) poll() bool {
 				a.set_status('Package response exceeds the supported size.')
 			}
 		} else {
-			// Keep recent progress and diagnostics, without growing indefinitely.
-			if a.output.len + chunk.len > 8192 { a.output.clear() }
-			for byte in chunk { a.output << byte }
-			tail := software_output_tail(a.output)
-			a.set_status(tail)
-			unsafe { tail.free() }
+			a.operation_output(chunk)
 		}
 		unsafe { chunk.free() }
 	}
@@ -373,8 +374,7 @@ fn (mut a SoftwareApp) poll() bool {
 				if (a.worker_view || a.worker_review) && a.output.len + chunk.len <= software_output_limit {
 					for byte in chunk { a.output << byte }
 				} else if !a.worker_view && !a.worker_review {
-					if a.output.len + chunk.len > 8192 { a.output.clear() }
-					for byte in chunk { a.output << byte }
+					a.operation_output(chunk)
 				} else {
 					a.worker_failed = true
 					a.set_status('Package response exceeds the supported size.')
@@ -385,6 +385,7 @@ fn (mut a SoftwareApp) poll() bool {
 		}
 	}
 	code := a.worker.code
+	if !a.worker_view && !a.worker_review { a.finish_operation_output() }
 	view := a.worker_view
 	reviewing := a.worker_review
 	running := a.worker_run
@@ -783,7 +784,8 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		children << software_button('software.upgrade', 'Update all', 274, height - 138, 130)
 		children << software_button('software.rollback', 'Rollback', 416, height - 138, 130)
 	}
-	children << software_label(a.status, 14, height - 98, width - 28, 90, false)
+	if a.progress_seen { children << a.progress_bar(width, height) }
+	children << software_label(a.status, 14, height - if a.progress_seen { 88 } else { 98 }, width - 28, if a.progress_seen { 80 } else { 90 }, false)
 	return ui2.screen(app_surface, children)
 }
 
@@ -813,6 +815,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_review()
 	a.clear_repository_review()
 	a.repository_status.close()
+	a.clear_progress()
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()
@@ -821,6 +824,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.matching.free()
 		a.query.free()
 		a.output.free()
+		a.progress_pending.free()
 		a.status.free()
 		a.catalog_error.free()
 		a.update_error.free()

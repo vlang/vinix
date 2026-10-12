@@ -301,3 +301,29 @@ fn test_software_review_redraw_cancel_and_decoded_storage_are_released() {
 	app.close_app() // retire the final persistent status message before measuring
 	assert C.vinix_heap_end() == baseline
 }
+
+fn test_software_progress_redraw_and_stream_storage_are_released() {
+	text := '{"format":1,"phase":"download","package":"app","repository":"trusted","path":"bin/app","current":64,"total":128}'
+	frame := pkgprotocol.progress_prefix + text + '\n'
+	mut app := SoftwareApp{ output: []u8{cap: 8192}, query: []u8{cap: 256} }
+	app.operation_output(frame)
+	assert app.progress_seen
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+	}
+	package_assert_heap_flat('Software progress redraw')
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		mut event := pkgprotocol.decode_progress(text)!
+		event.close()
+	}
+	baseline := C.vinix_heap_end()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 { app.operation_output(frame) }
+	app.close_app()
+	assert C.vinix_heap_end() == baseline
+}

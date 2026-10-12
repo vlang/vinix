@@ -13,6 +13,14 @@ fn reviewed_package_operation(operation string, names []string) !string {
 	return package_success(['apply', review.fingerprint, operation, ...names])
 }
 
+fn package_progress_events(text string) ![]pkgprotocol.Progress {
+	mut events := []pkgprotocol.Progress{}
+	for line in text.split_into_lines() {
+		if line.starts_with(pkgprotocol.progress_prefix) { events << pkgprotocol.decode_progress(line[pkgprotocol.progress_prefix.len..])! }
+	}
+	return events
+}
+
 fn qualify_package_configuration_lock() ! {
 	guard := pkgcore.acquire('/var/lib/vinix-packages')!
 	defer { guard.release() }
@@ -226,7 +234,10 @@ fn qualify_package_linux(mut t Test) ! {
 	mut deployment_review := pkgprotocol.decode_review(package_success(['--root', offline_root, 'deployment-review', deployment_path])!)!
 	defer { deployment_review.close() }
 	assert deployment_review.rows.len == 2 && deployment_review.rows.all(it.action == 'install')
-	package_success(['--root', offline_root, 'deployment-apply', deployment_review.fingerprint, deployment_path])!
+	installation_progress := package_progress_events(package_success(['--root', offline_root, '--progress', 'deployment-apply', deployment_review.fingerprint, deployment_path])!)!
+	assert installation_progress.any(it.phase == 'download' && it.current == it.total)
+	assert installation_progress.any(it.phase == 'copy') && installation_progress.any(it.phase == 'verify')
+	assert installation_progress[installation_progress.len - 2].phase == 'activate' && installation_progress.last().phase == 'complete'
 	stale_deployment := run(['/usr/bin/vinix-package', '--root', offline_root, 'deployment-apply', deployment_review.fingerprint, deployment_path], '', none, none)
 	assert stale_deployment.status != 0 && stale_deployment.output.contains('review is stale'), stale_deployment.output
 	offline_state := pkgcore.read_state(pkgcore.state_directory(offline_root), architecture)!
@@ -345,6 +356,7 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE CONFIGURATION lock-scoped-policy verified-json-status busy-launch PASS')
 	t.say('PACKAGE ORGANIZATION reviewed-policy dependency-impact stale-refusal ordinary-user-denial atomic-restore PASS')
 	t.say('PACKAGE DEPLOYMENT exact-metadata complete-runtime-closure offline-reproduction stale-refusal ordinary-user-denial rollback PASS')
+	t.say('PACKAGE PROGRESS bounded-byte-counters verified-copy activation-completion offline-runtime-closure PASS')
 	t.say('PACKAGE REPOSITORY authenticated-enrollment revocation retained-replay-floor re-enrollment PASS')
 	t.say('PACKAGE LINUX IMPORT signed-source-aliases explicit-runtime tamper-refusal missing-library rollback clean-uninstall PASS')
 }

@@ -3,6 +3,7 @@ module pkgcore
 
 import json2
 import os
+import tools.packages.pkgprotocol
 
 pub fn state_directory(root string) string {
 	return root.trim_right('/') + '/var/lib/vinix-packages'
@@ -110,6 +111,10 @@ pub fn estimate_space(plan Plan, directory string) !u64 {
 }
 
 fn cached_payload(config Config, installed Installed, payload Payload, directory string) !string {
+	return cached_payload_progress(config, installed, payload, directory, no_progress)
+}
+
+fn cached_payload_progress(config Config, installed Installed, payload Payload, directory string, report fn (pkgprotocol.Progress)) !string {
 	path := directory + '/objects/' + payload.sha256
 	if verified_file(path, payload) { return path }
 	if os.exists(path) { os.rm(path)! }
@@ -122,8 +127,11 @@ fn cached_payload(config Config, installed Installed, payload Payload, directory
 	url := repositories[0].url.trim_right('/') + '/objects/' + payload.sha256
 	if !verified_file(part, payload) {
 		println('Downloading ${installed.package.id}/${payload.path} (${payload.bytes} bytes)')
-		fetch(url, part, payload.bytes, true, config.policy.offline)!
+		fetch_progress(url, part, payload.bytes, true, config.policy.offline,
+			pkgprotocol.Progress{ phase: 'download', package: installed.package.id,
+				repository: installed.repository, path: payload.path, total: payload.bytes }, report)!
 	}
+	report(pkgprotocol.Progress{ phase: 'verify', package: installed.package.id, repository: installed.repository, path: payload.path })
 	if !verified_file(part, payload) {
 		os.rm(part)!
 		return error('${installed.package.id}: payload checksum or size mismatch; partial data discarded, retry from the trusted repository')
@@ -168,6 +176,7 @@ pub:
 	stop_before_activation bool
 	// In-process qualification hook; no CLI option/environment enables it.
 	checkpoint fn (string) = transaction_no_checkpoint
+	progress fn (pkgprotocol.Progress) = no_progress
 }
 
 fn transaction_no_checkpoint(_ string) {}
@@ -185,6 +194,7 @@ fn transact_locked(config Config, directory string, operation string, names []st
 	if options.expected_review != '' {
 		check_review(options.expected_review, review_fingerprint(config, operation, names, current, plan, 0))!
 	}
+	options.progress(pkgprotocol.Progress{ phase: 'resolve' })
 	return activate_plan_locked(config, directory, current, plan, operation, options)
 }
 
@@ -195,7 +205,10 @@ fn activate_plan_locked(config Config, directory string, current State, plan Pla
 	for name in os.ls(directory + '/generations')! {
 		if name.starts_with('.stage-') { os.rmdir_all(directory + '/generations/' + name)! }
 	}
-	if current.requested == plan.requested && current.packages == plan.packages { return current }
+	if current.requested == plan.requested && current.packages == plan.packages {
+		options.progress(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
+		return current
+	}
 	disk_check(free_bytes(directory)!, estimate_space(plan, directory)!, config.policy.reserve_bytes)!
 	generation := next_generation(directory)!
 	stage := directory + '/generations/.stage-' + generation.str()
@@ -210,6 +223,7 @@ fn activate_plan_locked(config Config, directory string, current State, plan Pla
 		if !completed { os.rmdir_all(stage) or {} }
 	}
 	mut done := 0
+	options.progress(pkgprotocol.Progress{ phase: 'stage', total: u64(plan.packages.len) })
 	for installed in plan.packages {
 		p := installed.package
 		println('Installing ${p.name} ${p.version} (${done + 1}/${plan.packages.len}) from ${installed.repository}')
@@ -218,11 +232,15 @@ fn activate_plan_locked(config Config, directory string, current State, plan Pla
 			source := if operation == 'remove' && verified_file(retained, file) {
 				retained
 			} else {
-				cached_payload(config, installed, file, directory)!
+				cached_payload_progress(config, installed, file, directory, options.progress)!
 			}
 			target := stage + '/apps/' + p.id + '/' + file.path
 			os.mkdir_all(os.dir(target))!
-			copy_file(source, target, 0, file.bytes)!
+			copy_file_progress(source, target, 0, file.bytes,
+				pkgprotocol.Progress{ phase: 'copy', package: p.id, repository: installed.repository,
+					path: file.path, total: file.bytes }, options.progress)!
+			options.progress(pkgprotocol.Progress{ phase: 'verify', package: p.id, repository: installed.repository, path: file.path })
+			if !verified_file(target, file) { return error('${p.id}: staged payload verification failed: ${file.path}') }
 			os.chmod(target, if file.executable { 0o755 } else { 0o644 })!
 			sync_file(target)!
 		}
@@ -232,6 +250,7 @@ fn activate_plan_locked(config Config, directory string, current State, plan Pla
 			sync_file(entry)!
 		}
 		done++
+		options.progress(pkgprotocol.Progress{ phase: 'stage', package: p.id, current: u64(done), total: u64(plan.packages.len) })
 	}
 	state := State{
 		generation:   generation
@@ -256,9 +275,11 @@ fn activate_plan_locked(config Config, directory string, current State, plan Pla
 	completed = true
 	sync_directory(directory + '/generations')!
 	options.checkpoint('published')
+	options.progress(pkgprotocol.Progress{ phase: 'activate' })
 	activate(directory, generation)!
 	options.checkpoint('activated')
 	println('Activated package generation ${generation}')
+	options.progress(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 	return state
 }
 
@@ -293,14 +314,20 @@ pub fn rollback_reviewed(config Config, directory string, expected string) !Stat
 }
 
 fn rollback_locked(config Config, directory string, expected string) !State {
+	return rollback_progress(config, directory, expected, no_progress)
+}
+
+fn rollback_progress(config Config, directory string, expected string, report fn (pkgprotocol.Progress)) !State {
 	current := read_state(directory, config.architecture)!
 	old := rollback_target(config, directory, current)!
 	if expected != '' {
 		check_review(expected, review_fingerprint(config, 'rollback', [], current,
 			Plan{ requested: old.requested, packages: old.packages }, old.generation))!
 	}
+	report(pkgprotocol.Progress{ phase: 'activate' })
 	activate(directory, old.generation)!
 	println('Rolled back to generation ${old.generation}; application data was retained')
+	report(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 	return old
 }
 

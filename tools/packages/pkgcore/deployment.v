@@ -214,7 +214,8 @@ fn (service Service) deploy_document(path string, expected string) !State {
 	document := read_deployment(path, config.architecture)!
 	plan := deployment_plan(config, directory, current, document)!
 	check_review(expected, deployment_fingerprint(config, current, document, plan))!
-	return activate_plan_locked(config, directory, current, plan, 'deploy', TransactionOptions{})
+	service.progress(pkgprotocol.Progress{ phase: 'resolve' })
+	return activate_plan_locked(config, directory, current, plan, 'deploy', TransactionOptions{ progress: service.progress })
 }
 
 pub fn (service Service) deploy(path string) !State {

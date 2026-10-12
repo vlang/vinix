@@ -333,6 +333,44 @@ row per line. Consumers ignore additional fields and reject unknown formats.
 Success is exit 0; failures are nonzero with stderr diagnostics. Human progress
 text is not a machine protocol.
 
+For live operation progress, pass `--progress` to `update`, `install`, `remove`,
+`upgrade`, `apply`, `deploy`, `deployment-apply` or `rollback`. It is refused with
+`--json` and other commands. Ordinary human output/diagnostics are retained;
+presentation records occupy complete stdout lines prefixed by
+`VINIX-PACKAGE-PROGRESS ` followed by a format-1 JSON object. The producer flushes
+each frame. Readers must handle frames split across pipe reads and multiple
+frames in one read. These events neither authorize changes nor replace exit
+status, payload verification or the installed-state protocol.
+
+Every record explicitly contains `format`, `phase`, `package`, `repository`,
+`path`, `current` and `total`. Phases are `resolve` (resolved reviewed inputs),
+`metadata` (signed catalog transfer), `download`, `verify`, `copy` (staged payload),
+`stage` (staged package count), `activate` and `complete`. Package/repository IDs
+may be empty when a phase covers the entire operation. Paths are safe relative
+payload/metadata paths. Download/copy counters use bytes; stage counters use
+packages. A zero total is indeterminate. A byte counter reaching its total
+does not mean the transaction completed. `resolve`, `verify` and `activate`
+have zero counters; `complete` has `current:1,total:1` and is emitted only after
+the relevant durable publication/activation succeeded, including unchanged
+transactions. Failures may leave a partial phase and emit no completion event.
+
+Frames are bounded to 8192 bytes. Identifiers/paths, phase-specific counter
+limits, JSON field types and formats are validated by
+[`pkgprotocol.decode_progress`](pkgprotocol/progress.v). Decoded events own their
+strings; `.close()` releases them under manual memory management. Consumers
+ignore unsupported/malformed frames and continue to report human diagnostics
+and process exit status. Counter progress is sampled approximately every 200 ms
+during HTTPS transfers and local copies, plus initial/final transfer counters;
+package and verification boundaries may emit additional frames.
+
+V administrative clients set `Service.progress` to an optional observer.
+Config-taking transaction fixtures use `TransactionOptions.progress`; the service
+uses its own configured observer when forwarding transaction options. Callbacks
+receive borrowed event strings valid for the call: clone any retained fields,
+and do not close borrowed events. Observers are presentation hooks, outside the
+review identity; current trust, policy and resolved inputs are still checked
+under the package lock. No observer enables an installation cancellation mode.
+
 Maintenance commands load configuration under the package writer lock; read-only
 review/plan/status/verification use its reader lock. The command's startup cannot
 retain an older policy or publisher after a completed administration change.

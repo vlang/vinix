@@ -3,6 +3,8 @@ module pkgcore
 
 import crypto.sha256
 import os
+import time
+import tools.packages.pkgprotocol
 
 #include <sys/file.h>
 #include <sys/statvfs.h>
@@ -126,6 +128,10 @@ pub fn verified_file(path string, payload Payload) bool {
 }
 
 pub fn copy_file(source string, target string, offset u64, maximum u64) ! {
+	copy_file_progress(source, target, offset, maximum, pkgprotocol.Progress{}, no_progress)!
+}
+
+fn copy_file_progress(source string, target string, offset u64, maximum u64, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) ! {
 	mut input := os.open(source)!
 	defer { input.close() }
 	input.seek(i64(offset), .start)!
@@ -135,6 +141,8 @@ pub fn copy_file(source string, target string, offset u64, maximum u64) ! {
 	mut buffer := []u8{len: 64 * 1024}
 	defer { unsafe { buffer.free() } }
 	mut bytes := offset
+	mut last := time.sys_mono_now()
+	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: bytes }) }
 	for {
 		count := input.read(mut buffer) or {
 			if err is os.Eof { break }
@@ -149,12 +157,21 @@ pub fn copy_file(source string, target string, offset u64, maximum u64) ! {
 			if written == 0 { return error('short payload write (check disk space): ${target}') }
 			sent += written
 		}
+		if event.phase != '' && time.sys_mono_now() - last >= 200_000_000 {
+			report(pkgprotocol.Progress{ ...event, current: bytes })
+			last = time.sys_mono_now()
+		}
 	}
 	output.flush()
 	if C.fsync(output.fd) != 0 { return error('cannot flush payload: ${target}') }
+	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: bytes }) }
 }
 
 pub fn fetch(url string, destination string, maximum u64, resume bool, offline bool) ! {
+	fetch_progress(url, destination, maximum, resume, offline, pkgprotocol.Progress{}, no_progress)!
+}
+
+fn fetch_progress(url string, destination string, maximum u64, resume bool, offline bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) ! {
 	if url.starts_with('file:///') {
 		source := url[7..]
 		if os.is_link(source) || !os.is_file(source) {
@@ -170,7 +187,7 @@ pub fn fetch(url string, destination string, maximum u64, resume bool, offline b
 			os.rm(destination)!
 			offset = 0
 		}
-		copy_file(source, destination, offset, maximum)!
+		copy_file_progress(source, destination, offset, maximum, event, report)!
 		return
 	}
 	if offline { return error('offline mode: verified payload is missing from cache: ${url}') }
@@ -183,12 +200,14 @@ pub fn fetch(url string, destination string, maximum u64, resume bool, offline b
 	if resume { args << ['--continue-at', '-'] }
 	args << ['--', url]
 	mut process := os.new_process('/usr/bin/curl')
+	defer { process.close() }
 	process.set_args(args)
-	process.wait()
-	code := process.code
-	process.close()
-	if code != 0 {
-		return error('download failed (${code}); retained partial data for retry: ${url}')
+	if event.phase == '' {
+		process.wait()
+		if process.code != 0 { return error('download failed (${process.code}); retained partial data for retry: ${url}') }
+	} else {
+		process.run()
+		monitor_transfer(mut process, destination, maximum, event, report) or { return error('${err}: ${url}') }
 	}
 	if os.file_size(destination) > maximum {
 		os.rm(destination)!

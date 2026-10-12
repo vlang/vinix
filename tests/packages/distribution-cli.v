@@ -150,7 +150,19 @@ fn qualify(binary string) ! {
 	review.validate()!
 	assert review.rows.len == 1 && review.rows[0].permissions == ['files']
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!.generation == 0
-	success(binary, [...root_args, 'apply', review.fingerprint, 'install', 'app'])!
+	progress_text := success(binary, [...root_args, '--progress', 'apply', review.fingerprint, 'install', 'app'])!
+	mut progress_events := []pkgprotocol.Progress{}
+	for line in progress_text.split_into_lines() {
+		if line.starts_with(pkgprotocol.progress_prefix) {
+			progress_events << pkgprotocol.decode_progress(line[pkgprotocol.progress_prefix.len..])!
+		}
+	}
+	assert progress_events.any(it.phase == 'download' && it.current == it.total && it.package == 'app')
+	assert progress_events.any(it.phase == 'verify') && progress_events.any(it.phase == 'copy')
+	assert progress_events[progress_events.len - 2].phase == 'activate' && progress_events.last().phase == 'complete'
+	for args in [['--progress', 'view'], ['--json', '--progress', 'verify'], ['--progress', 'run', 'app']] {
+		assert command(binary, [...root_args, ...args])!.code != 0
+	}
 	stale := command(binary, [...root_args, 'apply', review.fingerprint, 'install', 'app'])!
 	assert stale.code != 0 && stale.text.contains('stale')
 	installed := json2.decode[pkgcore.State](success(binary, [...root_args, 'status'])!)!
