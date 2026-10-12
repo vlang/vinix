@@ -131,17 +131,21 @@ fn syscall_linux_capset(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 		inheritable |= u64(data[1].inheritable) << 32
 	}
 	mut caps := process.caps
-	// The rules Linux enforces: no capability may be added to permitted that
-	// was not already there, effective must stay within permitted, and
-	// inheritable may not exceed permitted plus the bounding set. Root already
-	// holds every capability, so a runtime dropping some always satisfies them.
+	// New inheritable bits must be bounded unless already inherited. Without
+	// effective CAP_SETPCAP they must also come from the old permitted set.
+	// Authorization uses the caller's old effective set, not the proposed one.
+	if inheritable & ~(caps.inheritable | caps.bounding) != 0 {
+		return errno.err, errno.eperm
+	}
+	if !proc.has_capability(process, proc.cap_setpcap)
+		&& inheritable & ~(caps.inheritable | caps.permitted) != 0 {
+		return errno.err, errno.eperm
+	}
+	// Permitted cannot grow and effective must remain within new permitted.
 	if permitted & ~caps.permitted != 0 {
 		return errno.err, errno.eperm
 	}
 	if effective & ~permitted != 0 {
-		return errno.err, errno.eperm
-	}
-	if inheritable & ~(caps.inheritable | caps.permitted) != 0 {
 		return errno.err, errno.eperm
 	}
 	caps.effective = effective

@@ -1,0 +1,55 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "4feea6a18f54bd04ce1f172f39d8194cdb82f354bc6d2f19b45261741e172d25",
+    "results": [
+        {
+            "name": "capset",
+            "source_sha256": "ef93cfe6bdf2e25051da390b736ad9c0458e610f59bb4a593e6e815e4a81d8e4",
+            "init_sha256": "552bdae7badd845769afc10fe53f3a1d5c348b4625fa806802520e09a80d0418",
+            "iso_sha256": "3b0004804329b2f028cdf1f65e7023a52cec16d78f885d1b029ec39ca69c8088",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "capbset",
+            "source_sha256": "c149e8ceb7938ace60e5d100500236d0a23aa10bd1e929fd1db2afc0cad30203",
+            "init_sha256": "202bf3a85112654bba436040bd9e457fcbcae6b51cf0e5a4d308f45445d70f4d",
+            "iso_sha256": "23ca031ca5d92988638662d76d752e6fab92610ee633ae87aa84fc5184418221",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "ambient",
+            "source_sha256": "4158995567812d297b1cc5e3e3503600f5423fc1266627beb2930aea4646382f",
+            "init_sha256": "e54c9f6335467eac53c7c5e68c63056de00d66effe4c0bc9db82b8ccaaee423e",
+            "iso_sha256": "4edb437194fa4e761eaf3d18ae1e58aedf8e49b3b2d35106e261f61eac053a25",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "securebits",
+            "source_sha256": "6c9bed07f2da73a41f6a33caf460ea22da2ff1d25786554bbd8b561dc33a1f29",
+            "init_sha256": "80797fb2482e90764c2ff32020c00f98da757447c65aafa3c114001a45253231",
+            "iso_sha256": "18ca10f3044f212c1732662dd139b65db628faf461cadd62430f3a8c0e2a36af",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "keepcaps",
+            "source_sha256": "e1e0906a97dae640da4269408f3c2f04ca321fe0e113edda83075b81337aa04c",
+            "init_sha256": "c9d3cf18c66f8ad1d8695806bdeb01c259f3f1a256ee1dc43216aae095b52240",
+            "iso_sha256": "3bb898985a2d7d16594042f78604715968cf5c2ea72bff0f57a7ee9b92667147",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "nnpthread",
+            "source_sha256": "fd96c5dbbeb72a805fe2d3898760453433b99200b9b0bc447a56d866ca702f88",
+            "init_sha256": "9cd6e69eb4be7093d01fe222022e0ea33fa323df749f657e18d5318293143918",
+            "iso_sha256": "46e7100bbca5501522f6c868de982c017b1e0f0c28e60bd4e8abf4e44d70105a",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

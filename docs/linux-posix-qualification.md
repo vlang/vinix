@@ -1133,3 +1133,46 @@ generated kernel. The reordered checks allocate and free nothing.
 Capability sets remain process-wide. These selected error/transition checks
 do not qualify per-thread credentials, file capabilities or full sandbox
 isolation; the broader roadmap acceptance gates remain open.
+
+## Capset inheritable bounds and privilege
+
+New capset inheritable bits must belong to the bounding set. Bits already
+inherited may survive a later bounding drop. A caller with effective
+CAP_SETPCAP may add bounded inheritable bits outside its old permitted set;
+without that capability, additions must also come from old permitted.
+Authorization uses the old effective set, including when the successful
+request itself drops CAP_SETPCAP. The behavior follows
+[Linux 6.12's cap_capset](https://github.com/torvalds/linux/blob/v6.12/security/commoncap.c#L228).
+The earlier implementation omitted the bounding restriction and applied the
+old-permitted restriction even to callers with CAP_SETPCAP.
+
+The V fixture runs six isolated root cases for each of CAP_CHOWN and
+CAP_CHECKPOINT_RESTORE, plus an ordinary-user case. It checks bounding
+exclusions with and without effective CAP_SETPCAP, bounded additions outside
+old permitted, authorization before dropping CAP_SETPCAP, and preservation
+of existing inherited bits after bounding/permitted drops. Failed requests
+preserve the effective, permitted and inheritable sets, permitted cannot
+regrow, and effective cannot exceed permitted. Removing permitted bits clears
+their ambient counterparts. The parent's capability/bounding/ambient state
+remains intact after each root case.
+
+The unchanged fixture exposes six mismatches on each earlier kernel,
+including acceptance of new inheritable bits excluded by the bounding set:
+[AArch64 control](../tests/linux-compat/results/2026-10-12/capset-before-aarch64.json),
+[x86-64 control](../tests/linux-compat/results/2026-10-12/capset-before-x86_64.json).
+Both fixed kernels pass all 13 cases and the bounding-set, ambient, securebits,
+KEEPCAPS and task-local no_new_privs regressions:
+[AArch64 results](../tests/linux-compat/results/2026-10-12/capset-after-aarch64.json),
+[x86-64 results](../tests/linux-compat/results/2026-10-12/capset-after-x86_64.json).
+Capability-exec also passes:
+[AArch64](../tests/linux-compat/results/2026-10-12/capset-cap-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/capset-cap-x86_64.json).
+All eight host test files pass. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/capset-audit.v)
+checks both controls, 54 source fingerprints, isolated sources, generated
+guards, frozen guest artifacts and stack-only fixture helpers.
+
+The additional scalar checks allocate and free nothing. Capability sets
+remain process-wide; these rules do not qualify concurrent per-thread
+credentials, file capabilities or complete sandbox isolation. The broad
+roadmap acceptance gates remain open.

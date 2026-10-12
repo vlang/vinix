@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -477,6 +477,16 @@ must receive the exact 42 errors without changes to the bounding set. Valid,
 repeated low/high drops leave current capability sets unchanged; fork inherits
 the bounding set, a child's drop stays private, and exec retains the drops.
 Per-thread capability credentials remain outside this case's qualification.
+
+The `capset` case runs 13 isolated children covering low/high inheritable
+bits and an ordinary user. New bits must belong to the bounding set, while
+existing inheritable bits may survive a later bounding drop. Effective
+CAP_SETPCAP allows bounded additions outside the old permitted set; without
+it, additions must also come from old permitted. Authorization uses the old
+effective set even if the same update drops CAP_SETPCAP. Rejected updates
+leave capability sets unchanged, and dropping permitted clears ambient bits.
+The parent verifies that child changes do not alter its state. Fixture helpers
+use stack storage and compile without V allocation or indexing runtime calls.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 
