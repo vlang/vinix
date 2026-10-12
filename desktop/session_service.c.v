@@ -76,7 +76,8 @@ mut:
 fn session_runtime_directory() string {
 	base := os.getenv_opt('VINIX_SESSION_RUNTIME') or { '/run' }
 	defer { unsafe { base.free() } }
-	mut writer := sessioncore.Writer{}
+	mut writer := &sessioncore.Writer{}
+	defer { unsafe { free(writer) } }
 	writer.add(base)
 	writer.add('/vinix-session.')
 	writer.number(C.getuid())
@@ -99,8 +100,9 @@ fn session_address(path string) ?SessionAddress {
 
 fn session_private_directory(directory string) bool {
 	if C.mkdir(&char(directory.str), u32(0o700)) != 0 && C.errno != C.EEXIST { return false }
-	mut info := C.stat{}
-	return unsafe { C.lstat(&char(directory.str), &info) } == 0 && u32(info.st_mode) & C.S_IFMT == C.S_IFDIR
+	mut info := &C.stat{}
+	defer { unsafe { free(info) } }
+	return unsafe { C.lstat(&char(directory.str), info) } == 0 && u32(info.st_mode) & C.S_IFMT == C.S_IFDIR
 		&& u32(info.st_uid) == C.getuid() && u32(info.st_mode) & 0o077 == 0
 }
 
@@ -311,7 +313,10 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		return 'ok'
 	}
 	if f.count > 24 { return error('too many session arguments') }
-	mut message := SessionMessage{ pid: peer.pid, count: f.count }
+	// Text.str() borrows message storage. Keep it alive for this request and
+	// copy queued records before releasing it on every return path.
+	mut message := &SessionMessage{ pid: peer.pid, count: f.count }
+	defer { unsafe { free(message) } }
 	message.fields[0].set(f.values[0])!
 	for i in 1 .. f.count { message.fields[i] = sessioncore.unfield(f.values[i])! }
 	command := message.fields[0].str()
@@ -332,7 +337,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		message.fields[0].set('action')!
 		message.fields[1].set('clipboard.request')!
 		message.count = 2
-		daemon.queue[daemon.queue_count] = message
+		daemon.queue[daemon.queue_count] = *message
 		daemon.queue_count++
 		return 'ok'
 	}
@@ -375,7 +380,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		message.fields[0].set('action')!
 		message.fields[1].set('dialog')!
 		message.count = 8
-		daemon.queue[daemon.queue_count] = message
+		daemon.queue[daemon.queue_count] = *message
 		daemon.queue_count++
 		return 'ok'
 	}
@@ -445,7 +450,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 	}
 	if command == 'action' && f.count >= 2 {
 		if daemon.queue_count == daemon.queue.len { return error('session action queue full') }
-		daemon.queue[daemon.queue_count] = message
+		daemon.queue[daemon.queue_count] = *message
 		daemon.queue_count++
 		return 'ok'
 	}
@@ -515,7 +520,7 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 		return error('dialog request expired')
 	}
 	if command == 'settings.set' && f.count >= 2 {
-		daemon.settings_apply(message) or {
+		daemon.settings_apply(*message) or {
 			daemon.settings_result.set(err.msg()) or {}
 			return err
 		}
@@ -537,17 +542,21 @@ fn (mut daemon SessionDaemon) handle(peer SessionCredentials, request string) !s
 	}
 	if command == 'take' && f.count == 1 {
 		if daemon.queue_count == 0 { return 'empty' }
-		a := daemon.queue[0]
-		for i in 1 .. daemon.queue_count { daemon.queue[i - 1] = daemon.queue[i] }
-		daemon.queue_count--
-		mut w := sessioncore.Writer{}
+		a := unsafe { &daemon.queue[0] }
+		mut w := &sessioncore.Writer{}
+		defer { unsafe { free(w) } }
 		w.add('action\t')
 		w.number(a.pid)
 		for i in 1 .. a.count {
 			w.add('\t')
 			w.field(a.fields[i].str())
 		}
-		return w.finish()
+		// Encode while the first slot is still intact. The reply owns its bytes
+		// before shifting the queue can overwrite the borrowed record.
+		reply := w.finish()
+		for i in 1 .. daemon.queue_count { daemon.queue[i - 1] = daemon.queue[i] }
+		daemon.queue_count--
+		return reply
 	}
 	if command == 'quiet' && f.count == 3 {
 		daemon.notifications.mode = unsafe { sessioncore.Focus(sessioncore.number(message.fields[1].str(), 0, 2)!) }

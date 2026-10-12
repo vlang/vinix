@@ -38,7 +38,8 @@ pub fn (mut p Policy) bind(key string, action string) ! {
 }
 
 pub fn (p &Policy) encode() string {
-	mut w := Writer{}
+	mut w := &Writer{}
+	defer { unsafe { free(w) } }
 	w.add('vinix-shell-policy\t2')
 	for value in [int(p.gestures), int(p.clipboard_history), int(p.clipboard_apps),
 		int(p.allow_capture), p.timezone_minutes]! {
@@ -66,7 +67,10 @@ pub fn (p &Policy) encode() string {
 }
 
 pub fn decode_policy(record string) !Policy {
-	mut p := Policy{}
+	// bind() borrows inline records. Release the parser's explicit scratch
+	// allocation after the snapshot is copied into the result.
+	mut p := &Policy{}
+	defer { unsafe { free(p) } }
 	mut start := 0
 	mut header := false
 	mut corners := u8(0)
@@ -76,7 +80,7 @@ pub fn decode_policy(record string) !Policy {
 			start = end + 1
 			continue
 		}
-		f := fields(unsafe { tos(&record.str[start], end - start) })!
+		f := fields(unsafe { tos(record.str + start, end - start) })!
 		start = end + 1
 		if !header {
 			if f.values[0] != 'vinix-shell-policy' || (f.values[1] == '1' && f.count != 7) || (f.values[1] == '2' && f.count != 8) || f.values[1] !in [
@@ -98,12 +102,13 @@ pub fn decode_policy(record string) !Policy {
 			}
 			header = true
 		} else if f.values[0] == 'key' && f.count == 3 {
-			key := unfield(f.values[1])!
-			action := unfield(f.values[2])!
+			if p.count == p.bindings.len { return error('too many shortcuts') }
+			p.bindings[p.count] = Binding{ key: unfield(f.values[1])!, action: unfield(f.values[2])! }
+			binding := unsafe { &p.bindings[p.count] }
 			for i in 0 .. p.count {
-				if p.bindings[i].action == action { return error('duplicate shortcut action') }
+				if p.bindings[i].action == binding.action { return error('duplicate shortcut action') }
 			}
-			p.bind(key.str(), action.str())!
+			p.bind(binding.key.str(), binding.action.str())!
 		} else if f.values[0] == 'corner' && f.count == 3 {
 			i := int(number(f.values[1], 0, 3)!)
 			if corners & (u8(1) << i) != 0 { return error('duplicate hot corner') }
@@ -117,7 +122,7 @@ pub fn decode_policy(record string) !Policy {
 		}
 	}
 	if !header || corners != 15 { return error('incomplete shell policy') }
-	return p
+	return *p
 }
 
 pub fn timezone_name(name string) bool {

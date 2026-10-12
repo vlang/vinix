@@ -126,7 +126,7 @@ pub fn (mut n Notifications) tick(epoch i64, monotonic i64) bool {
 		changed = true
 	}
 	for i in 0 .. n.alarm_count {
-		a := n.alarms[i]
+		a := unsafe { &n.alarms[i] }
 		if !a.active || (if a.due_monotonic > 0 {
 			monotonic < a.due_monotonic
 		} else {
@@ -164,7 +164,8 @@ pub fn (mut n Notifications) dismiss(id i64) bool {
 }
 
 pub fn (n &Notifications) encode() string {
-	mut w := Writer{}
+	mut w := &Writer{}
+	defer { unsafe { free(w) } }
 	w.add('vinix-notifications\t1\t')
 	w.number(n.next_id)
 	w.add('\t')
@@ -175,10 +176,10 @@ pub fn (n &Notifications) encode() string {
 	w.number(int(n.allow_critical))
 	w.add('\n')
 	for i in 0 .. n.count {
-		a := n.items[i]
+		a := unsafe { &n.items[i] }
 		w.add('notice\t')
 		w.number(a.id)
-		for t in [a.owner, a.key, a.title, a.body, a.action]! {
+		for t in [&a.owner, &a.key, &a.title, &a.body, &a.action]! {
 			w.add('\t')
 			w.field(t.str())
 		}
@@ -190,9 +191,9 @@ pub fn (n &Notifications) encode() string {
 		w.add('\n')
 	}
 	for i in 0 .. n.alarm_count {
-		a := n.alarms[i]
+		a := unsafe { &n.alarms[i] }
 		w.add('alarm')
-		for t in [a.owner, a.key, a.title]! {
+		for t in [&a.owner, &a.key, &a.title]! {
 			w.add('\t')
 			w.field(t.str())
 		}
@@ -211,7 +212,10 @@ pub fn decode_notifications(record string) !Notifications {
 	if record.len == 0 || record.len > 256 * 1024 {
 		return error('invalid notification record size')
 	}
-	mut n := Notifications{}
+	// References into inline records can make V move a value local onto the
+	// heap. Own the parser's scratch storage until the result is copied out.
+	mut n := &Notifications{}
+	defer { unsafe { free(n) } }
 	mut start := 0
 	mut header := false
 	for end in 0 .. record.len + 1 {
@@ -220,7 +224,7 @@ pub fn decode_notifications(record string) !Notifications {
 			start = end + 1
 			continue
 		}
-		f := fields(unsafe { tos(&record.str[start], end - start) })!
+		f := fields(unsafe { tos(record.str + start, end - start) })!
 		start = end + 1
 		if !header {
 			if f.count != 6 || f.values[0] != 'vinix-notifications' || f.values[1] != '1' {
@@ -237,7 +241,8 @@ pub fn decode_notifications(record string) !Notifications {
 			if f.count != 12 || n.count == max_notifications {
 				return error('invalid notification record')
 			}
-			mut a := Notification{ id: number(f.values[1], 1, n.next_id - 1)!, owner: unfield(f.values[2])!, key: unfield(f.values[3])!, title: unfield(f.values[4])!, body: unfield(f.values[5])!, action: unfield(f.values[6])! }
+			n.items[n.count] = Notification{ id: number(f.values[1], 1, n.next_id - 1)!, owner: unfield(f.values[2])!, key: unfield(f.values[3])!, title: unfield(f.values[4])!, body: unfield(f.values[5])!, action: unfield(f.values[6])! }
+			mut a := unsafe { &n.items[n.count] }
 			if !identifier(a.owner.str()) || a.title.len == 0 || a.title.len > 128 {
 				return error('invalid notification owner/title')
 			}
@@ -249,27 +254,26 @@ pub fn decode_notifications(record string) !Notifications {
 			for i in 0 .. n.count {
 				if n.items[i].id == a.id { return error('duplicate notification') }
 			}
-			n.items[n.count] = a
 			n.count++
 		} else if f.values[0] == 'alarm' {
 			if f.count != 7 || n.alarm_count == max_alarms { return error('invalid alarm record') }
-			owner := unfield(f.values[1])!
-			key := unfield(f.values[2])!
-			title := unfield(f.values[3])!
+			n.alarms[n.alarm_count] = Alarm{ owner: unfield(f.values[1])!, key: unfield(f.values[2])!, title: unfield(f.values[3])! }
+			mut a := unsafe { &n.alarms[n.alarm_count] }
+			if !identifier(a.owner.str()) || a.key.len == 0 || a.key.len > 128
+				|| a.title.len == 0 || a.title.len > 128 { return error('invalid alarm') }
 			for i in 0 .. n.alarm_count {
-				if n.alarms[i].owner.str() == owner.str() && n.alarms[i].key.str() == key.str() {
+				if n.alarms[i].owner.str() == a.owner.str() && n.alarms[i].key.str() == a.key.str() {
 					return error('duplicate alarm')
 				}
 			}
-			mut checked := Notifications{}
-			checked.schedule(owner.str(), key.str(), title.str(), number(f.values[4], 1, 9223372036854775)!, 0, int(number(f.values[5], 0, 31536000)!))!
-			checked.alarms[0].active = number(f.values[6], 0, 1)! != 0
-			n.alarms[n.alarm_count] = checked.alarms[0]
+			a.due_epoch = number(f.values[4], 1, 9223372036854775)!
+			a.repeat_seconds = int(number(f.values[5], 0, 31536000)!)
+			a.active = number(f.values[6], 0, 1)! != 0
 			n.alarm_count++
 		} else {
 			return error('unknown notification record')
 		}
 	}
 	if !header { return error('missing notification header') }
-	return n
+	return *n
 }
