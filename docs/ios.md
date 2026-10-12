@@ -2915,17 +2915,56 @@ unimplemented. Evidence is under `build/ios/fortnite/json-serialization-checks`.
 Full regression remains unpassed and the five published runners are unchanged.
 Entry, rendering and gameplay remain unverified.
 
+`NSCondition` now implements initialization, lock/unlock, wait, signal,
+broadcast, deadline waits and copied names in V. Its 128-byte record and
+mutex/condition/name ivars match the native layout. Initialized opaque records
+carry the measured `MUTZ` and `COND` signatures, while the existing pthread
+adapters own the real native synchronization objects. Allocation and
+`objc_constructInstance` leave synchronization uninitialized; `init` and `new`
+initialize it. Disposal removes both pthread entries and frees the owned name,
+including after a change of isa or destruction of caller-owned storage.
+
+Typed message calls into Mac Foundation and the V trampoline compare twenty
+mutex handoffs, eight simultaneous waiters awakened by broadcast, signaled
+deadline waits, past/nil deadlines and mutex reacquisition under contention.
+A separate native measurement confirms that changing a mutable source string
+does not change the copied name. Repeated creation/release and two drained
+runtimes leave zero live objects and zero condition/mutex registry entries.
+Captured invalid-input children verify explicit rejection of uninitialized
+synchronization, non-string names, foreign dates and oversized deadlines.
+Deadline objects use the existing CFDate profile and finite, representable
+clock values; general NSDate factories remain unimplemented. Callers keep
+objects alive while synchronization is in use and release them when quiescent.
+
+All 55 programs build and all 62 final original generated C streams restore
+to their recorded hashes. Seven host suites pass ASAN/UBSAN in both hashing
+modes, with final native dyld and EOS dictionary fixtures. Vinix passes nine
+Objective-C/collection/storage/layout/JSON/condition programs and 33
+Swift/loader programs. Generated-code checks confirm stack-only deadline
+conversion and no temporary allocation during condition disposal. A Clang
+temporary-file failure caused by host disk exhaustion is recorded; compiler
+scratch files moved to the private RAM volume and subsequent builds passed.
+
+Fortnite passes the NSCondition binding and still exits with status 1 before
+entry at Foundation's `_OBJC_CLASS_$_NSHTTPCookie` in EOS. Native metadata shows
+a sixteen-byte NSObject subclass with an `NSHTTPCookieInternal` object at offset
+8; its getters and cookie/header factories are recorded without constructing
+that class or executing app code. Evidence is under
+`build/ios/fortnite/condition-checks`. Full regression remains unpassed, the
+five published runners are unchanged, and entry/rendering/gameplay remain
+unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,419 | 740 | 80 |
-| EOSSDK | 631 | 31 | 18 |
+| EOSSDK | 632 | 30 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,165 | 832 | 121 |
+| All images | 2,166 | 831 | 121 |
 
-The C++/GLES/Text variant reports 2,178 resolved imports, 819 unresolved strong
+The C++/GLES/Text variant reports 2,179 resolved imports, 818 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

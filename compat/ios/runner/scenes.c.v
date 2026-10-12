@@ -24,6 +24,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if image_selector(object, name) { return true }
 	if layout_selector(object, name) { return true }
 	if json_selector(object, name) { return true }
+	if ns_condition_selector(object, name) { return true }
 	if accessibility_selector(object, name) { return true }
 	if native_method(read64(object), name) != 0 { return true }
 	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'copy', 'init', 'dealloc'] { return true }

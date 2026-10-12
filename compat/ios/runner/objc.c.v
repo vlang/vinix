@@ -97,6 +97,8 @@ mut:
 	is_real bool
 	unsigned_number bool
 	json_immutable bool
+	condition_owned bool
+	condition_initialized bool
 	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
 	font_face voidptr // Optional FreeType face, disposed before its descriptor.
 	autoresizing u64
@@ -228,7 +230,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
@@ -272,6 +274,7 @@ fn objc_start() {
 		size := match name {
 			'NSConstantDictionary' { u32(40) }
 			'NSError' { u32(sizeof(AbiNSError)) }
+			'NSCondition' { u32(sizeof(AbiNSCondition)) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
 			'NSLayoutAnchor', 'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { u32(sizeof(AbiLayoutAnchor)) }
 			else { u32(8) }
@@ -289,6 +292,10 @@ fn objc_start() {
 	mut error_class := ios_runtime.classes[ios_runtime.names['NSError']] or { panic('iOS: missing NSError class') }
 	for i, pair in [['_reserved', '^v']!, ['_code', 'q']!, ['_domain', '@"NSString"']!, ['_userInfo', '@"NSDictionary"']!]! {
 		error_class.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: i64((i + 1) * 8), size: 8}
+	}
+	mut condition_class := ios_runtime.classes[ios_runtime.names['NSCondition']] or { panic('iOS: missing NSCondition class') }
+	for i, pair in [['m', '{_opaque_pthread_mutex_t="__sig"q"__opaque"[56c]}']!, ['c', '{_opaque_pthread_cond_t="__sig"q"__opaque"[40c]}']!, ['n', '@"NSString"']!]! {
+		condition_class.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: [i64(8), 72, 120]![i], size: [u64(64), 48, 8]![i]}
 	}
 }
 
@@ -393,6 +400,7 @@ fn objc_new(cls u64) u64 {
 	object := objc_allocate(cls)
 	imp := native_method(cls, 'init')
 	if imp != 0 { return unsafe { ObjInit(voidptr(imp))(object, c'init') } }
+	if objc_is_kind(object, ios_runtime.names['NSCondition']) { ns_condition_initialize(object) }
 	return object
 }
 

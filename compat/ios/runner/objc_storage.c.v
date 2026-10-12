@@ -26,6 +26,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	unsafe { *(&u64(object)) = cls }
 	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { header.number = -1 }
 	if objc_is_kind(object, ios_runtime.names['NSLayoutConstraint']) { layout_constraint_initialize(object) }
+	header.condition_owned = objc_is_kind(object, ios_runtime.names['NSCondition'])
 	C.ios_ref_change(unsafe { &ios_runtime.live }, 1)
 	C.ios_ref_change(unsafe { &info.instances }, 1)
 }
@@ -76,6 +77,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	cg_provider_dispose(object)
 	layout_dispose(object, mut header)
 	ns_error_dispose(object)
+	ns_condition_dispose(object, mut header)
 	for field in header.fields { objc_release(field) }
 	for i in 0 .. header.child_count {
 		mut child := obj_header(header.children[i])
