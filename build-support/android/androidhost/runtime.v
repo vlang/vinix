@@ -45,6 +45,38 @@ fn runtime_policy(bionic bool, atl bool) RuntimePolicy {
 	return RuntimePolicy{'ART', 'e78bf68917bcaaf58fef3960cd88793b3b7f39cc', '2efcaf77d1c3e08dc738b7d1d38ad789b0a0fc729612fb67169d0b2c250b61d7', '75ef56d63dfc7661a7928191441d4672d612b6a8d27c3957764d324e4f622a42c132c34540f6a89556b1971964df8be2eced0b8a599d5a793ab3039cfb9c48a2', 'art16k.patch', '-DART_PAGE_SIZE=16384'}
 }
 
+// Native public callers share the same policy constants as validation.
+pub fn runtime_constants(support string) map[string]Value {
+	mut result := map[string]Value{
+		'MANIFEST': Value('art-runtime-manifest.json')
+		'PAGE_SIZE': Value(16384)
+		'LIBART': Value('usr/lib/art/libart.so')
+		'ART_ELFS': Value(art_elfs.map(Value(it)))
+		'ART_HEADERS': Value(art_headers.map(Value(it)))
+		'ART_BOOT_JARS': Value(art_boot_jars.map(Value(it)))
+		'ANDROIDFW_HEADER': Value(art_headers[0])
+		'ANDROIDFW_LIBRARY': Value('usr/lib/art/libandroidfw.so')
+		'BIONIC_MANIFEST': Value('bionic-runtime-manifest.json')
+		'BIONIC_LIBRARIES': Value(bionic_libraries.map(Value(it)))
+		'ATL_MANIFEST': Value('atl-runtime-manifest.json')
+		'ATL_DEX_DIRECTORY': Value('usr/lib/java/dex/android_translation_layer')
+		'ATL_ELFS': Value(atl_elfs.map(Value(it)))
+		'ATL_JARS': Value(atl_jars.map(Value(it)))
+		'ATL_RESOURCES': Value(atl_resources)
+		'ATL_FONTS': Value(atl_fonts)
+		'ATL_REQUIRED': Value([...atl_elfs, ...atl_jars, atl_resources, atl_fonts].map(Value(it)))
+		'ATL_CORE_CLASSES_SHA256': Value('f47736d9d410766a20ae1f60d679607d8e85241e8cdeb5a0c040ab260ba68f42')
+	}
+	for prefix in ['', 'BIONIC_', 'ATL_'] {
+		policy := runtime_policy(prefix == 'BIONIC_', prefix == 'ATL_')
+		result[prefix + 'SOURCE_COMMIT'] = policy.commit
+		result[prefix + 'SOURCE_SHA256'] = policy.sha256
+		result[prefix + 'SOURCE_SHA512'] = policy.sha512
+		result[prefix + 'PATCH'] = path_join(support, policy.patch)
+	}
+	return result
+}
+
 fn same_text(row map[string]Value, name string, expected string) bool {
 	value := field(row, name)
 	return value is string && value == expected
@@ -198,7 +230,7 @@ fn atl_metadata_matches(support string, row map[string]Value) !bool {
 	if !same_text(row, 'builder_sha256', digest(path_join(support, 'build-atl.sh'))!) {
 		return false
 	}
-	if !same_text(row, 'dex_adapter_sha256', digest(path_join(support, 'atl-dex.py'))!) {
+	if !same_text(row, 'dex_adapter_sha256', dex_adapter_digest(support)!) {
 		return false
 	}
 	if !same_text(row, 'dex_compiler_sha256', '900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0190b8d61b1199')

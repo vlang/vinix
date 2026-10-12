@@ -1,0 +1,170 @@
+{
+    "originals": [
+        {
+            "blob": "82208f977733daf255499de17339b5fa428b2eee",
+            "bytes": 3456,
+            "lines": 73,
+            "path": "build-support/android/atl-dex.py",
+            "sha256": "eab33e7fae12d0655a1375ec603a64cf3983a6c6c93a5c0091225943a7abd408"
+        },
+        {
+            "blob": "72c4e853a78e20263986fd434d45c6beb7c12d26",
+            "bytes": 5273,
+            "lines": 119,
+            "path": "build-support/android/build.py",
+            "sha256": "349dadc94be32f8596a683d0e3f142a9aa15b18c5d0ad915ba452ba6ef62bcdb"
+        },
+        {
+            "blob": "06c41077adb80e195770692d3f28e8a9b02fbbae",
+            "bytes": 622,
+            "lines": 13,
+            "path": "build-support/android/compile-v-atl-configuration.py",
+            "sha256": "c33b1176f1402c80af8706387cc4cce99a0c514e20eb3179d400ba13440d96ae"
+        },
+        {
+            "blob": "e126f95e68dc9e399e0c4d0800f15a81759538e9",
+            "bytes": 3918,
+            "lines": 74,
+            "path": "build-support/android/compile-v-runtime.py",
+            "sha256": "7accd64b36e2b3a14743f623e279db82060e2c4fd5f5e291402e992095c1796c"
+        },
+        {
+            "blob": "21167c37d17a3fb1ab183c94412f5eb96ae92ef1",
+            "bytes": 1750,
+            "lines": 39,
+            "path": "tests/android/activity-lifecycle-test.py",
+            "sha256": "3ba5cef1a09626048b3bc4794fcc6cfd8de1332dee4429cde127d6b06afabdba"
+        },
+        {
+            "blob": "33fa13f0b06ed1c72acde77dfe3d47bb10605ef8",
+            "bytes": 2297,
+            "lines": 71,
+            "path": "tests/android/art-runtime-test.py",
+            "sha256": "0f11c26c6f65688fc500e7e0c185eb88d1d677eeabe2eaa91e426d21c0bc2f02"
+        },
+        {
+            "blob": "d2377070b455e619bd3ca5e5f46e022922623038",
+            "bytes": 2821,
+            "lines": 90,
+            "path": "tests/android/atl-configuration.py",
+            "sha256": "c3ec5582c2c1b7207c43826c065e7d420aca0f6b1e8b4fbae22ebad7d18a33cf"
+        },
+        {
+            "blob": "319290ecbb74708781a0058f6e6b3975feb01221",
+            "bytes": 1731,
+            "lines": 39,
+            "path": "tests/android/autofill-test.py",
+            "sha256": "6cc5d30f60cc400119667e9db2ff12a23e49f8c35f85873a0cdc327457ca809f"
+        },
+        {
+            "blob": "9361ed02bcf078eb09f75473aeae238ea9dbd3e4",
+            "bytes": 701,
+            "lines": 24,
+            "path": "tests/android/bootclasspath-test.py",
+            "sha256": "f528a756f91c55c3c896f82e07867b1b8e26a2221d6a0bdef13a01670168cfa3"
+        },
+        {
+            "blob": "404020fb5909481082256b5bc80a79ef1906c76b",
+            "bytes": 1725,
+            "lines": 39,
+            "path": "tests/android/cookie-test.py",
+            "sha256": "98282a8836fd3b4ffeb238b52d67df3f523a8363069441f847cad6324d0a9f02"
+        },
+        {
+            "blob": "39e9b9b7cab6ba3c62e66af64270fccc070e1406",
+            "bytes": 2261,
+            "lines": 55,
+            "path": "tests/android/egl-queue-test.py",
+            "sha256": "dd76f04096ad00ff32d6dc68dd596c5cff5f391bb79f5f00bfabac2675ee67dd"
+        },
+        {
+            "blob": "4010cf340576f701167e55e4133ae8ff07ab3eab",
+            "bytes": 2097,
+            "lines": 46,
+            "path": "tests/android/layout-focus-test.py",
+            "sha256": "6d6ac423627c97e2a2fa61b1ed7945aa21133488ed6bcba982ee70127af95449"
+        },
+        {
+            "blob": "136abf9fffb7149864d4fb01cb0c7bde1892a2a1",
+            "bytes": 1731,
+            "lines": 39,
+            "path": "tests/android/location-test.py",
+            "sha256": "6488b6be36bb00a6ef26425fc81fe5448fcde76b0eb157e9498d02585cd23ce6"
+        },
+        {
+            "blob": "5f8f43d1a433004c74bf7cf0239ee8438b0050f0",
+            "bytes": 723,
+            "lines": 24,
+            "path": "tests/android/musl-runtime-test.py",
+            "sha256": "2deb2ef98815187f6885ec8ef91cbc6ca5929f07d713c33c1e9463c2b48d6d7e"
+        },
+        {
+            "blob": "adf149a53469a6f5a0514f4b3a47ad6ae85d8031",
+            "bytes": 1879,
+            "lines": 41,
+            "path": "tests/android/pointer-capture-test.py",
+            "sha256": "e2fc84d16d6c573549dd1b5ccaa1df77b7f92b480ba243998a557a4062d9a2a9"
+        },
+        {
+            "blob": "58dab86da1f22f1ee899b6ee454c734ec00b1135",
+            "bytes": 2728,
+            "lines": 77,
+            "path": "tests/android/run-runtime-vm.py",
+            "sha256": "90294eb1800c35e2dd0687e6fbca2140c1e6a4367d05042e764ca310032278c9"
+        },
+        {
+            "blob": "578dbdd1b07e92de3459b3f509f53fb910762541",
+            "bytes": 5461,
+            "lines": 114,
+            "path": "tests/android/runtime-binding.py",
+            "sha256": "ba04c4ccff0dcdb711be9d1efd5491a2af322edcb756f17ffa83dd10d30d8ee4"
+        },
+        {
+            "blob": "8b67da27d13e3988c854bd0118553557288cd2e6",
+            "bytes": 2283,
+            "lines": 52,
+            "path": "tests/android/split-test.py",
+            "sha256": "beeebe0da2c358fe2c26ad442095183f6e64d685f18d2bd2d4af4c02ccda664c"
+        },
+        {
+            "blob": "8d4013746e184cfb3620251e95705082e06d261c",
+            "bytes": 4546,
+            "lines": 68,
+            "path": "tests/android/test-runtime-v.py",
+            "sha256": "5947e5f0f10f89e631fc12563ef3f076c586c0030490fe19d652ebbb52ce7e3f"
+        }
+    ],
+    "qualification": {
+        "actual_public_cold_builds": 3,
+        "cold_builds": 36,
+        "fixture_cases_per_profile": 45,
+        "fresh_android_guest_boot_claimed": false,
+        "frozen_c_host_asan_comparison": true,
+        "gnu_runtime_architectures": [
+            "aarch64",
+            "x86_64"
+        ],
+        "profiles": [
+            "arm",
+            "x86",
+            "san"
+        ],
+        "public_fronts": 20
+    },
+    "qualified": true,
+    "retained_android_files": [
+        "build-support/android/_native.py",
+        "build-support/android/_boot_native.py",
+        "build-support/android/art-runtime.py",
+        "build-support/android/musl-runtime.py",
+        "build-support/android/art-bootclasspath.py",
+        "tests/android/_run_native.py",
+        "tests/android/run.py",
+        "tests/android/interactive-test.py"
+    ],
+    "retired_bytes": 48003,
+    "retired_files": 19,
+    "retired_lines": 1097,
+    "source_commit": "deffd7fbbcc4841e576588f715c1fd3984b87cc4",
+    "status": "PASS"
+}

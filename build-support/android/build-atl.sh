@@ -39,7 +39,7 @@ case "$(uname -s):$(uname -m)" in
     Linux:aarch64|Linux:arm64) ;;
     *) echo "build-atl: this build requires a native ARM64 Linux host" >&2; exit 2 ;;
 esac
-for command in python3 curl gcc g++ strip tar patch meson java javac; do
+for command in curl gcc g++ strip tar patch meson java javac; do
     command -v "$command" >/dev/null || { echo "build-atl: missing tool: $command" >&2; exit 2; }
 done
 case "$(gcc -dumpmachine)" in
@@ -68,38 +68,16 @@ if [ -z "$R8_ARCHIVE" ]; then
         mv "$R8_ARCHIVE.part" "$R8_ARCHIVE"
     fi
 fi
-SOURCE_ARCHIVE=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$SOURCE_ARCHIVE")
-R8_ARCHIVE=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$R8_ARCHIVE")
-CORE_CLASSES=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$CORE_CLASSES")
-ART_RUNTIME=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$ART_RUNTIME")
-python3 - "$SCRIPT_DIR/art-runtime.py" "$ART_RUNTIME" <<'PY'
-import importlib.util, pathlib, sys
-spec = importlib.util.spec_from_file_location("art_runtime", sys.argv[1])
-art = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(art)
-art.read_manifest(pathlib.Path(sys.argv[2]))
-PY
-python3 - "$SOURCE_ARCHIVE" "$SOURCE_SHA512" "$R8_ARCHIVE" "$CORE_CLASSES" <<'PY'
-import hashlib, pathlib, sys
-archive, expected, r8, core = sys.argv[1:]
-if hashlib.sha512(pathlib.Path(archive).read_bytes()).hexdigest() != expected:
-    raise SystemExit("build-atl: pinned source checksum mismatch")
-for name, expected in ((r8, "900dfbc649519969fc5a4c7520d6b7355338e565fa1249874e0190b8d61b1199"),
-                       (core, "f47736d9d410766a20ae1f60d679607d8e85241e8cdeb5a0c040ab260ba68f42")):
-    if hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() != expected:
-        raise SystemExit(f"build-atl: pinned compiler input checksum mismatch: {name}")
-PY
+SOURCE_ARCHIVE=$("$SCRIPT_DIR/native-tool" resolve "$SOURCE_ARCHIVE")
+R8_ARCHIVE=$("$SCRIPT_DIR/native-tool" resolve "$R8_ARCHIVE")
+CORE_CLASSES=$("$SCRIPT_DIR/native-tool" resolve "$CORE_CLASSES")
+ART_RUNTIME=$("$SCRIPT_DIR/native-tool" resolve "$ART_RUNTIME")
+"$SCRIPT_DIR/native-tool" verify-source atl "$SOURCE_ARCHIVE" "$SOURCE_SHA512"
+"$SCRIPT_DIR/native-tool" verify-atl-inputs "$ART_RUNTIME" "$R8_ARCHIVE" "$CORE_CLASSES"
+
 SOURCE_DIR="$BUILD_DIR/android_translation_layer-$COMMIT"
-INPUT_KEY=$(python3 - "$SOURCE_SHA512" "$ART_RUNTIME" "$0" "$SCRIPT_DIR/atl-dex.py" "$SCRIPT_DIR/atl-configuration.patch" "$SCRIPT_DIR/atlconfiguration/core.v" "$SCRIPT_DIR/atl-configuration-v-abi.h" "$SCRIPT_DIR/compile-v-atl-configuration.py" "$SCRIPT_DIR/../compile-v-module.py" "$SCRIPT_DIR/../find-v.sh" "$ART_RUNTIME/art-runtime-manifest.json" <<'PY'
-import hashlib, pathlib, sys
-digest = hashlib.sha256(sys.argv[1].encode())
-# Meson records absolute include/provider paths as well as their contents.
-digest.update(sys.argv[2].encode())
-for filename in sys.argv[3:]:
-    digest.update(pathlib.Path(filename).read_bytes())
-print(digest.hexdigest())
-PY
-)
+INPUT_KEY=$("$SCRIPT_DIR/native-tool" source-key "$SOURCE_SHA512" "$ART_RUNTIME" "$0" "$SCRIPT_DIR/atl-configuration.patch" "$SCRIPT_DIR/atlconfiguration/core.v" "$SCRIPT_DIR/atl-configuration-v-abi.h" "$SCRIPT_DIR/../compile-v-module" "$SCRIPT_DIR/../find-v.sh" "$ART_RUNTIME/art-runtime-manifest.json")
+
 if [ ! -f "$SOURCE_DIR/.vinix-atl-inputs" ] || [ "$(cat "$SOURCE_DIR/.vinix-atl-inputs")" != "$INPUT_KEY" ]; then
     rm -rf "$SOURCE_DIR"
     tar -xzf "$SOURCE_ARCHIVE" -C "$BUILD_DIR"
@@ -112,13 +90,15 @@ export VINIX_ATL_R8="$R8_ARCHIVE" VINIX_ATL_CORE_CLASSES="$CORE_CLASSES" VINIX_A
 # Meson calls dx for DEX generation; the local adapter uses pinned D8 for
 # all framework jars, lowering Java lambdas for ART's implemented boot APIs.
 mkdir -p "$BUILD_DIR/tools"
-printf '%s\n' '#!/bin/sh' 'exec python3 "'"$SCRIPT_DIR"'/atl-dex.py" "$@"' > "$BUILD_DIR/tools/dx"
+printf '%s\n' '#!/bin/sh' 'exec "'"$SCRIPT_DIR"'/atl-dex" "$@"' > "$BUILD_DIR/tools/dx"
+
 chmod +x "$BUILD_DIR/tools/dx"
 export PATH="$BUILD_DIR/tools:$PATH"
 BUILD_OUTPUT="$SOURCE_DIR/output"
 if [ ! -f "$BUILD_OUTPUT/build.ninja" ]; then
-    COMPILE_ARGS=$(python3 -c 'import json,sys; print(json.dumps(["-I" + sys.argv[1] + "/usr/include"]))' "$ART_RUNTIME")
-    LINK_ARGS=$(python3 -c 'import json,sys; print(json.dumps(["-Wl,-z,max-page-size=65536", "-L" + sys.argv[1] + "/usr/lib/art", "-Wl,-rpath-link," + sys.argv[1] + "/usr/lib/art", "-landroidfw"]))' "$ART_RUNTIME")
+    COMPILE_ARGS=$("$SCRIPT_DIR/native-tool" compile-args "$ART_RUNTIME")
+    LINK_ARGS=$("$SCRIPT_DIR/native-tool" link-args "$ART_RUNTIME")
+
     meson setup "$BUILD_OUTPUT" "$SOURCE_DIR" --prefix /usr --libdir lib --buildtype release \
         "-Dc_args=$COMPILE_ARGS" "-Dc_link_args=$LINK_ARGS"
 fi
@@ -135,21 +115,14 @@ meson install -C "$BUILD_OUTPUT" --no-rebuild --destdir "$INSTALL_ROOT"
 NEXT_OUTPUT="$OUTPUT_DIR.next"
 rm -rf "$NEXT_OUTPUT"
 mkdir -p "$NEXT_OUTPUT"
-python3 - "$INSTALL_ROOT" "$NEXT_OUTPUT" <<'PY'
-import pathlib, shutil, sys
-source, output = map(pathlib.Path, sys.argv[1:])
-for path in sorted((source / "usr").rglob("*")):
-    if path.is_file():
-        target = output / path.relative_to(source)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(path, target, follow_symlinks=True)
-PY
+"$SCRIPT_DIR/native-tool" copy-installed "$INSTALL_ROOT" "$NEXT_OUTPUT"
+
 # Verify the production configuration object against the real selected
 # androidfw provider. Loading all of libandroid requires launcher globals and
 # a desktop; its freshly compiled configuration object needs neither.
 CONFIGURATION_TEST="$NEXT_OUTPUT/usr/libexec/vinix-android/atl-configuration-test"
 mkdir -p "$(dirname -- "$CONFIGURATION_TEST")"
-python3 "$SCRIPT_DIR/compile-v-atl-configuration.py" "$BUILD_DIR/atl-configuration-probe.c"
+"$SCRIPT_DIR/compile-v-atl-configuration" "$BUILD_DIR/atl-configuration-probe.c"
 gcc -O2 -Wall -Wextra -Werror -Wno-unused-function -Wno-unused-parameter \
     -I"$ART_RUNTIME/usr/include" -I"$SCRIPT_DIR" \
     -c "$BUILD_DIR/atl-configuration-probe.c" -o "$BUILD_DIR/atl-configuration-probe.o"
@@ -159,102 +132,10 @@ gcc -O2 -Wall -Wextra -Werror -Wl,-z,max-page-size=65536 \
     -L"$ART_RUNTIME/usr/lib/art" -landroidfw -lpng -Wl,-rpath-link,"$ART_RUNTIME/usr/lib/art"
 LD_LIBRARY_PATH="$ART_RUNTIME/usr/lib/art${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
     "$CONFIGURATION_TEST"
-CONFIGURATION_PROBE_KEY=$(python3 - "$SCRIPT_DIR/art-runtime.py" <<'PY'
-import runpy, sys
-print(runpy.run_path(sys.argv[1])["configuration_probe_digest"]())
-PY
-)
-python3 - "$NEXT_OUTPUT" "$COMMIT" "$SOURCE_URL" "$SOURCE_ARCHIVE" "$R8_ARCHIVE" \
-    "$CORE_CLASSES" "$SCRIPT_DIR/atl-dex.py" "$0" "$DEPENDENCY_CACHE" \
-    "$SCRIPT_DIR/atl-configuration.patch" "$SCRIPT_DIR/art16k.patch" \
-    "$ART_RUNTIME" "$CONFIGURATION_PROBE_KEY" <<'PY'
-import hashlib, json, os, pathlib, struct, subprocess, sys, zipfile
-output, commit, url, archive, r8, core, adapter, builder, cache, patch, art_patch, art_runtime, probe = sys.argv[1:]
-root = pathlib.Path(output)
-files = []
-for path in sorted((root / "usr").rglob("*")):
-    if not path.is_file():
-        continue
-    data = path.read_bytes()
-    kind = "data"
-    if data.startswith(b"\x7fELF"):
-        kind = "elf"
-        subprocess.run(["strip", "--strip-unneeded", str(path)], check=True)
-        data = path.read_bytes()
-        if data[:6] != b"\x7fELF\x02\x01" or struct.unpack_from("<H", data, 18)[0] != 183:
-            raise SystemExit(f"build-atl: output is not an ARM64 ELF: {path}")
-        offset = struct.unpack_from("<Q", data, 32)[0]
-        entry_size, count = struct.unpack_from("<HH", data, 54)
-        if entry_size != 56 or count == 0 or offset > len(data) or count * entry_size > len(data) - offset:
-            raise SystemExit(f"build-atl: invalid ELF headers: {path}")
-        loads = 0
-        for index in range(count):
-            ptype, _, file_offset, address, _, file_size, memory_size, _ = struct.unpack_from(
-                "<IIQQQQQQ", data, offset + index * entry_size)
-            if ptype != 1:
-                continue
-            loads += 1
-            if (file_size > memory_size or file_offset > len(data) or file_size > len(data) - file_offset
-                    or memory_size > (1 << 64) - 1 - address or address % 16384 != file_offset % 16384):
-                raise SystemExit(f"build-atl: output cannot load with 16 KiB pages: {path}")
-        if not loads:
-            raise SystemExit(f"build-atl: no loadable segments: {path}")
-    record = {"path": str(path.relative_to(root)), "kind": kind, "size": len(data),
-              "sha256": hashlib.sha256(data).hexdigest()}
-    if path.suffix == ".jar":
-        record["kind"] = "dex"
-        classes = 0
-        callsites = 0
-        with zipfile.ZipFile(path) as jar:
-            for name in jar.namelist():
-                if not name.endswith(".dex"):
-                    continue
-                dex = jar.read(name)
-                if not dex.startswith(b"dex\n") or len(dex) < 112:
-                    raise SystemExit(f"build-atl: invalid framework DEX: {path}")
-                classes += struct.unpack_from("<I", dex, 96)[0]
-                offset = struct.unpack_from("<I", dex, 52)[0]
-                if offset > len(dex) - 4:
-                    raise SystemExit(f"build-atl: invalid DEX map: {path}")
-                count = struct.unpack_from("<I", dex, offset)[0]
-                if count * 12 > len(dex) - offset - 4:
-                    raise SystemExit(f"build-atl: truncated DEX map: {path}")
-                for index in range(count):
-                    item_type, _, size, _ = struct.unpack_from("<HHII", dex, offset + 4 + index * 12)
-                    if item_type == 7:
-                        callsites += size
-        if not classes or callsites:
-            raise SystemExit(f"build-atl: framework has missing classes or Java bootstrap calls: {path}")
-        record["class_count"] = classes
-        record["bootstrap_callsites"] = callsites
-    files.append(record)
-digest = lambda name: hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()
-source = pathlib.Path(archive).read_bytes()
-manifest = {"format": 1, "architecture": "aarch64", "page_size": 16384,
-            "source_commit": commit, "source_url": url,
-            "source_sha512": hashlib.sha512(source).hexdigest(),
-            "source_sha256": hashlib.sha256(source).hexdigest(),
-            "patch_sha256": digest(patch), "androidfw_patch_sha256": digest(art_patch),
-            "androidfw_configuration_api": 1,
-            "androidfw_header_sha256": digest(pathlib.Path(art_runtime) / "usr/include/androidfw/androidfw_c_api.h"),
-            "androidfw_library_sha256": digest(pathlib.Path(art_runtime) / "usr/lib/art/libandroidfw.so"),
-            "configuration_probe_sha256": probe,
-            "build_flags": ["--buildtype=release", "-Wl,-z,max-page-size=65536"],
-            "builder_sha256": digest(builder), "dex_adapter_sha256": digest(adapter),
-            "dex_compiler_sha256": digest(r8), "java_core_classes_sha256": digest(core),
-            "dex_compiler_arguments": ["--release", "--min-api", "26", "--android-platform-build",
-                                       "--force-passthrough-assertions"],
-            "dex_compiler": subprocess.check_output([os.environ["VINIX_ATL_JAVA_D8"], "-cp", r8, "com.android.tools.r8.D8", "--version"], text=True).strip(),
-            "compiler": subprocess.check_output(["gcc", "--version"], text=True).splitlines()[0],
-            "compiler_target": subprocess.check_output(["gcc", "-dumpmachine"], text=True).strip(),
-            "source_date_epoch": 1790718764,
-            "build_packages": subprocess.check_output(["apk", "list", "--installed"], text=True).splitlines(),
-            "dependency_archives": [{"filename": path.name, "sha256": digest(path)}
-                                    for path in sorted(pathlib.Path(cache).glob("*.apk"))],
-            "files": files}
-(root / "atl-runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-print(f"Verified {len(files)} coherent native ATL outputs")
-PY
+CONFIGURATION_PROBE_KEY=$("$SCRIPT_DIR/native-tool" configuration-probe-key)
+
+"$SCRIPT_DIR/native-tool" atl-build-manifest "$NEXT_OUTPUT" "$COMMIT" "$SOURCE_URL" "$SOURCE_ARCHIVE" "$R8_ARCHIVE" "$CORE_CLASSES" "$SCRIPT_DIR/atl-dex" "$0" "$DEPENDENCY_CACHE" "$SCRIPT_DIR/atl-configuration.patch" "$SCRIPT_DIR/art16k.patch" "$ART_RUNTIME" "$CONFIGURATION_PROBE_KEY"
+
 rm -rf "$OUTPUT_DIR"
 mv "$NEXT_OUTPUT" "$OUTPUT_DIR"
 echo "Staged native ATL overlay in $OUTPUT_DIR"

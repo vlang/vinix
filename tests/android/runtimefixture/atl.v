@@ -1,5 +1,7 @@
 module runtimefixture
 
+import androidtools
+import androidhost as ah
 import crypto.sha256
 import json2
 import os
@@ -47,7 +49,7 @@ fn atl_context() !AtlContext {
 		'configuration_probe_sha256':  probe
 		'build_flags':                 json2.Any(['--buildtype=release', '-Wl,-z,max-page-size=65536'].map(json2.Any(it)))
 		'builder_sha256':              json2.Any(sha256.sum(os.read_bytes(support + '/build-atl.sh')!).hex())
-		'dex_adapter_sha256':          json2.Any(sha256.sum(os.read_bytes(support + '/atl-dex.py')!).hex())
+		'dex_adapter_sha256':          native_call('dex_adapter_digest', []string{}, []json2.Any{})!
 		'dex_compiler_sha256':         map_field(map_field(boot, 'INPUTS').as_array()[2].as_map(), 'sha256')
 		'java_core_classes_sha256':    map_field(constants, 'ATL_CORE_CLASSES_SHA256')
 		'dex_compiler_arguments':      map_field(boot, 'COMPILER_ARGUMENTS')
@@ -232,27 +234,29 @@ fn atl_rejects_incomplete_resource_apk_and_font_map(mut c AtlContext) ! {
 	}
 }
 
-fn binding_value(value json2.Any) json2.Any {
-	return json2.Any({
-		'kind':  json2.Any('value')
-		'value': value
-	})
+fn stage_read(kind string, path string, data ah.Value) !ah.Value {
+	if kind == 'art' { return ah.Value({'bootclasspath': ah.Value({'verified': ah.Value(true)})}) }
+	if kind in ['musl', 'bionic'] { return ah.Value({'verified': ah.Value(true)}) }
+	return androidtools.read_overlay(path, kind)!
 }
 
-fn binding_return(value json2.Any) json2.Any {
-	return json2.Any({
-		'kind':  json2.Any('return')
-		'value': value
-	})
+fn stage_pair(art ah.Value, atl ah.Value, data ah.Value) ! {}
+
+fn stage_apply(kind string, overlay string, runtime string, manifest ah.Value, data ah.Value) ! {
+	if kind == 'art' {
+		for name in ['lib/ld-musl-aarch64.so.1', 'usr/lib/art/libart.so'] {
+			path := runtime + '/' + name
+			os.mkdir_all(os.dir(path))!
+			os.write_file_array(path, elf(183, 0))!
+		}
+	} else if kind == 'atl' { androidtools.apply_runtime(overlay, runtime, manifest, kind)! }
 }
 
-fn binding_public(operation string, keywords map[string]json2.Any) json2.Any {
-	return json2.Any({
-		'kind':      json2.Any('public')
-		'module':    json2.Any('art-runtime.py')
-		'operation': json2.Any(operation)
-		'keywords':  json2.Any(keywords)
-	})
+fn stage_command(command []string, environment map[string]string, data ah.Value) ! {
+	if command[0].ends_with('/compile-v-runtime') { os.write_file_array(command[1], elf(183, 0))! }
+	mut log := os.open_append(ah.field(data.object(), 'log').text())!
+	defer { log.close() }
+	log.writeln(json2.encode(command))!
 }
 
 fn (c AtlContext) stage_android() !map[string]json2.Any {
@@ -262,74 +266,13 @@ fn (c AtlContext) stage_android() !map[string]json2.Any {
 	for directory in [build, art, bionic] { os.mkdir_all(directory)! }
 	log := c.root + '/build-calls.jsonl'
 	os.write_file(log, '')!
-	mut attributes := map[string]json2.Any{}
-	for name in ['MANIFEST', 'BIONIC_MANIFEST', 'ATL_MANIFEST'] {
-		attributes[name] = binding_value(map_field(c.constants, name))
+	options := androidtools.RuntimeOptions{build_dir: build, art_runtime: art, bionic_runtime: bionic, atl_runtime: c.overlay,
+		hooks: androidtools.StageHooks{context: ah.Value({'log': ah.Value(log)}), read: stage_read, pair: stage_pair, apply: stage_apply, command: stage_command, compiler: 'isolated-test-compiler'}}
+	package_lock := ah.Value({'architecture': ah.Value('aarch64'), 'mirror': ah.Value('https://example.invalid'), 'packages': ah.Value([]ah.Value{})})
+	staging := androidtools.stage_runtime(options, package_lock, build + '/downloads') or {
+		return {'kind': json2.Any('RuntimeError'), 'message': json2.Any(err.msg()), 'run_calls': json2.Any(os.read_file(log)!.split_into_lines().len)}
 	}
-	attributes['read_manifest'] = binding_return(binding_value(json2.Any({
-		'bootclasspath': json2.Any({
-			'verified': json2.Any(true)
-		})
-	})))
-	attributes['read_bionic_manifest'] = binding_return(binding_value(json2.Any({
-		'verified': json2.Any(true)
-	})))
-	attributes['read_atl_manifest'] = binding_public('_read_manifest', {
-		'atl': json2.Any(true)
-	})
-	attributes['validate_atl_art_pair'] = binding_return(binding_value(json2.Any(json2.Null{})))
-	attributes['apply'] = json2.Any({
-		'kind':      json2.Any('callback')
-		'operation': json2.Any('install_art')
-		'context':   json2.Any(c.constants)
-	})
-	attributes['apply_bionic'] = binding_return(binding_value(json2.Any(json2.Null{})))
-	attributes['apply_atl'] = binding_public('apply_atl', map[string]json2.Any{})
-	namespace := json2.Any({
-		'kind':       json2.Any('namespace')
-		'attributes': json2.Any(attributes)
-	})
-	musl := json2.Any({
-		'kind':       json2.Any('namespace')
-		'attributes': json2.Any({
-			'read_manifest': binding_return(binding_value(json2.Any({
-				'verified': json2.Any(true)
-			})))
-		})
-	})
-	patches := [json2.Any([json2.Any('art_tools'), binding_return(namespace)]),
-		json2.Any([json2.Any('musl_tools'), binding_return(musl)]),
-		json2.Any([json2.Any('shutil.which'),
-			binding_return(binding_value(json2.Any('isolated-test-compiler')))]),
-		json2.Any([json2.Any('subprocess.run'),
-			json2.Any({
-				'kind':      json2.Any('callback')
-				'operation': json2.Any('run')
-				'completed': json2.Any(true)
-				'context':   json2.Any({
-					'log': json2.Any(log)
-				})
-			})])]
-	arguments := [boot_arg('namespace', json2.Any({
-		'build_dir':       boot_path(build)
-		'art_runtime':     boot_path(art)
-		'bionic_runtime':  boot_path(bionic)
-		'atl_runtime':     boot_path(c.overlay)
-		'with_calculator': boot_arg('value', json2.Any(false))
-	})),
-		boot_arg('value', json2.Any({
-			'architecture': json2.Any('aarch64')
-			'mirror':       json2.Any('https://example.invalid')
-			'packages':     json2.Any([]json2.Any{})
-		})), boot_path(build + '/downloads')]
-	return call({
-		'module':          json2.Any('builder')
-		'operation':       json2.Any('stage')
-		'arguments':       json2.Any(arguments)
-		'patches':         json2.Any(patches)
-		'callback_binary': json2.Any(os.executable())
-		'record_patch':    json2.Any(log)
-	})!
+	return {'result': json2.Any(staging), 'run_calls': json2.Any(os.read_file(log)!.split_into_lines().len)}
 }
 
 fn (c AtlContext) staged() !map[string]json2.Any {

@@ -32,7 +32,7 @@ case "$(uname -s):$(uname -m)" in
     Linux:aarch64|Linux:arm64) ;;
     *) echo "build-bionic: this build requires a native ARM64 Linux host" >&2; exit 2 ;;
 esac
-for command in python3 curl patch gcc g++ strip tar meson; do
+for command in curl patch gcc g++ strip tar meson; do
     command -v "$command" >/dev/null || { echo "build-bionic: missing tool: $command" >&2; exit 2; }
 done
 case "$(gcc -dumpmachine)" in
@@ -54,22 +54,12 @@ if [ -z "$SOURCE_ARCHIVE" ]; then
         mv "$SOURCE_ARCHIVE.part" "$SOURCE_ARCHIVE"
     fi
 fi
-SOURCE_ARCHIVE=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$SOURCE_ARCHIVE")
-python3 - "$SOURCE_ARCHIVE" "$SOURCE_SHA512" <<'PY'
-import hashlib, pathlib, sys
-archive = pathlib.Path(sys.argv[1])
-if hashlib.sha512(archive.read_bytes()).hexdigest() != sys.argv[2]:
-    raise SystemExit(f"build-bionic: pinned source checksum mismatch: {archive}")
-PY
+SOURCE_ARCHIVE=$("$SCRIPT_DIR/native-tool" resolve "$SOURCE_ARCHIVE")
+"$SCRIPT_DIR/native-tool" verify-source bionic "$SOURCE_ARCHIVE" "$SOURCE_SHA512"
+
 SOURCE_DIR="$BUILD_DIR/bionic_translation-$COMMIT"
-INPUT_KEY=$(python3 - "$SOURCE_SHA512" "$SCRIPT_DIR/bionic16k.patch" "$0" <<'PY'
-import hashlib, pathlib, sys
-digest = hashlib.sha256(sys.argv[1].encode())
-for filename in sys.argv[2:]:
-    digest.update(pathlib.Path(filename).read_bytes())
-print(digest.hexdigest())
-PY
-)
+INPUT_KEY=$("$SCRIPT_DIR/native-tool" source-key "$SOURCE_SHA512" "" "$SCRIPT_DIR/bionic16k.patch" "$0")
+
 if [ ! -f "$SOURCE_DIR/.vinix-bionic-inputs" ] || \
    [ "$(cat "$SOURCE_DIR/.vinix-bionic-inputs")" != "$INPUT_KEY" ]; then
     rm -rf "$SOURCE_DIR"
@@ -101,56 +91,8 @@ for library in "$INSTALL_ROOT"/usr/lib/libc_bio.so* "$INSTALL_ROOT"/usr/lib/libd
     cp -L "$library" "$NEXT_OUTPUT/usr/lib/"
 done
 find "$NEXT_OUTPUT/usr" -type f -exec strip --strip-unneeded '{}' \;
-python3 - "$NEXT_OUTPUT" "$COMMIT" "$SOURCE_URL" "$SOURCE_ARCHIVE" \
-    "$SCRIPT_DIR/bionic16k.patch" "$DEPENDENCY_CACHE" <<'PY'
-import hashlib, json, pathlib, struct, subprocess, sys
-output, commit, url, archive, patch, cache = sys.argv[1:]
-root = pathlib.Path(output)
-files = []
-for path in sorted((root / "usr").rglob("*")):
-    if not path.is_file():
-        continue
-    data = path.read_bytes()
-    if data[:6] != b"\x7fELF\x02\x01" or struct.unpack_from("<H", data, 18)[0] != 183:
-        raise SystemExit(f"build-bionic: output is not an ARM64 ELF: {path}")
-    offset = struct.unpack_from("<Q", data, 32)[0]
-    entry_size, count = struct.unpack_from("<HH", data, 54)
-    if (entry_size != 56 or count == 0 or offset > len(data)
-            or count * entry_size > len(data) - offset):
-        raise SystemExit(f"build-bionic: invalid ELF program headers: {path}")
-    loads = 0
-    for index in range(count):
-        kind, _, file_offset, address, _, file_size, memory_size, _ = struct.unpack_from(
-            "<IIQQQQQQ", data, offset + index * entry_size)
-        if kind != 1:
-            continue
-        loads += 1
-        if (file_size > memory_size or file_offset > len(data)
-                or file_size > len(data) - file_offset
-                or memory_size > (1 << 64) - 1 - address
-                or address % 16384 != file_offset % 16384):
-            raise SystemExit(f"build-bionic: output cannot load with 16 KiB pages: {path}")
-    if loads == 0:
-        raise SystemExit(f"build-bionic: output has no loadable segments: {path}")
-    files.append({"path": str(path.relative_to(root)), "size": len(data),
-                  "sha256": hashlib.sha256(data).hexdigest()})
-packages = subprocess.check_output(["apk", "list", "--installed"], text=True).splitlines()
-archives = [{"filename": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
-            for path in sorted(pathlib.Path(cache).glob("*.apk"))]
-source = pathlib.Path(archive).read_bytes()
-manifest = {"format": 1, "architecture": "aarch64", "page_size": 16384,
-            "source_commit": commit, "source_url": url,
-            "source_sha512": hashlib.sha512(source).hexdigest(),
-            "source_sha256": hashlib.sha256(source).hexdigest(),
-            "patch_sha256": hashlib.sha256(pathlib.Path(patch).read_bytes()).hexdigest(),
-            "build_flags": ["-DBIONIC_PAGE_SIZE=16384", "-Wl,-z,max-page-size=65536"],
-            "compiler": subprocess.check_output(["gcc", "--version"], text=True).splitlines()[0],
-            "compiler_target": subprocess.check_output(["gcc", "-dumpmachine"], text=True).strip(),
-            "source_date_epoch": 1773705600, "build_packages": packages,
-            "dependency_archives": archives, "files": files}
-(root / "bionic-runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-print(f"Verified {len(files)} native ARM64 bionic ELF outputs")
-PY
+"$SCRIPT_DIR/native-tool" bionic-build-manifest "$NEXT_OUTPUT" "$COMMIT" "$SOURCE_URL" "$SOURCE_ARCHIVE" "$SCRIPT_DIR/bionic16k.patch" "$DEPENDENCY_CACHE"
+
 rm -rf "$OUTPUT_DIR"
 mv "$NEXT_OUTPUT" "$OUTPUT_DIR"
 echo "Staged native 16 KiB bionic overlay in $OUTPUT_DIR"

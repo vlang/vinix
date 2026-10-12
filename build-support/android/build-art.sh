@@ -32,7 +32,7 @@ case "$(uname -s):$(uname -m)" in
     Linux:aarch64|Linux:arm64) ;;
     *) echo "build-art: this build requires a native ARM64 Linux host" >&2; exit 2 ;;
 esac
-for command in python3 curl make patch gcc g++ strip tar; do
+for command in curl make patch gcc g++ strip tar; do
     command -v "$command" >/dev/null || { echo "build-art: missing tool: $command" >&2; exit 2; }
 done
 case "$(gcc -dumpmachine)" in
@@ -57,23 +57,12 @@ if [ -z "$SOURCE_ARCHIVE" ]; then
         mv "$SOURCE_ARCHIVE.part" "$SOURCE_ARCHIVE"
     fi
 fi
-SOURCE_ARCHIVE=$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).resolve())' "$SOURCE_ARCHIVE")
-python3 - "$SOURCE_ARCHIVE" "$SOURCE_SHA512" <<'PY'
-import hashlib, pathlib, sys
-archive = pathlib.Path(sys.argv[1])
-if hashlib.sha512(archive.read_bytes()).hexdigest() != sys.argv[2]:
-    raise SystemExit(f"build-art: pinned ART source checksum mismatch: {archive}")
-PY
+SOURCE_ARCHIVE=$("$SCRIPT_DIR/native-tool" resolve "$SOURCE_ARCHIVE")
+"$SCRIPT_DIR/native-tool" verify-source art "$SOURCE_ARCHIVE" "$SOURCE_SHA512"
 
 SOURCE_DIR="$BUILD_DIR/art_standalone-$COMMIT"
-INPUT_KEY=$(python3 - "$SOURCE_SHA512" "$SCRIPT_DIR/art16k.patch" "$0" <<'PY'
-import hashlib, pathlib, sys
-digest = hashlib.sha256(sys.argv[1].encode())
-for filename in sys.argv[2:]:
-    digest.update(pathlib.Path(filename).read_bytes())
-print(digest.hexdigest())
-PY
-)
+INPUT_KEY=$("$SCRIPT_DIR/native-tool" source-key "$SOURCE_SHA512" "" "$SCRIPT_DIR/art16k.patch" "$0")
+
 if [ ! -f "$SOURCE_DIR/.vinix-art-inputs" ] || \
    [ "$(cat "$SOURCE_DIR/.vinix-art-inputs")" != "$INPUT_KEY" ]; then
     rm -rf "$SOURCE_DIR"
@@ -114,67 +103,8 @@ cp "$SOURCE_DIR/out/host/linux-x86/bin/dex2oat" "$NEXT_OUTPUT/usr/bin/"
 find "$NEXT_OUTPUT/usr/bin" "$NEXT_OUTPUT/usr/lib" -type f -exec strip --strip-unneeded '{}' \;
 mkdir -p "$NEXT_OUTPUT/usr/include/androidfw"
 cp "$SOURCE_DIR/libandroidfw/include/androidfw/androidfw_c_api.h" "$NEXT_OUTPUT/usr/include/androidfw/"
-python3 - "$NEXT_OUTPUT" "$COMMIT" "$SOURCE_URL" "$SOURCE_ARCHIVE" \
-    "$SCRIPT_DIR/art16k.patch" "$DEPENDENCY_CACHE" <<'PY'
-import hashlib, json, pathlib, struct, subprocess, sys
-output, commit, url, archive, patch, cache = sys.argv[1:]
-root = pathlib.Path(output)
-files = []
-for path in sorted((root / "usr").rglob("*")):
-    if not path.is_file():
-        continue
-    data = path.read_bytes()
-    if path.relative_to(root).as_posix() == "usr/include/androidfw/androidfw_c_api.h":
-        files.append({"path": str(path.relative_to(root)), "size": len(data),
-                      "sha256": hashlib.sha256(data).hexdigest()})
-        continue
-    if data[:6] != b"\x7fELF\x02\x01" or struct.unpack_from("<H", data, 18)[0] != 183:
-        raise SystemExit(f"build-art: output is not an ARM64 ELF: {path}")
-    offset = struct.unpack_from("<Q", data, 32)[0]
-    entry_size, count = struct.unpack_from("<HH", data, 54)
-    if (entry_size != 56 or count == 0 or offset > len(data)
-            or count * entry_size > len(data) - offset):
-        raise SystemExit(f"build-art: invalid ELF program headers: {path}")
-    loads = 0
-    for index in range(count):
-        kind, _, file_offset, address, _, file_size, memory_size, _ = struct.unpack_from(
-            "<IIQQQQQQ", data, offset + index * entry_size)
-        if kind != 1:
-            continue
-        loads += 1
-        if (file_size > memory_size or file_offset > len(data)
-                or file_size > len(data) - file_offset
-                or memory_size > (1 << 64) - 1 - address
-                or address % 16384 != file_offset % 16384):
-            raise SystemExit(f"build-art: output cannot load with 16 KiB pages: {path}")
-    if loads == 0:
-        raise SystemExit(f"build-art: output has no loadable segments: {path}")
-    files.append({"path": str(path.relative_to(root)), "size": len(data),
-                  "sha256": hashlib.sha256(data).hexdigest()})
-package_versions = []
-try:
-    package_versions = subprocess.check_output(["apk", "list", "--installed"], text=True).splitlines()
-except (OSError, subprocess.CalledProcessError):
-    pass
-dependency_archives = []
-for path in sorted(pathlib.Path(cache).glob("*.apk")):
-    dependency_archives.append({"filename": path.name,
-                                "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
-source = pathlib.Path(archive).read_bytes()
-manifest = {"format": 1, "architecture": "aarch64", "page_size": 16384,
-            "source_commit": commit, "source_url": url,
-            "source_sha512": hashlib.sha512(source).hexdigest(),
-            "source_sha256": hashlib.sha256(source).hexdigest(),
-            "patch_sha256": hashlib.sha256(pathlib.Path(patch).read_bytes()).hexdigest(),
-            "androidfw_configuration_api": 1,
-            "build_flags": ["-DART_PAGE_SIZE=16384", "ART_BUILD_HOST_DEBUG=false"],
-            "compiler": subprocess.check_output(["gcc", "--version"], text=True).splitlines()[0],
-            "compiler_target": subprocess.check_output(["gcc", "-dumpmachine"], text=True).strip(),
-            "source_date_epoch": 1759985629, "build_packages": package_versions,
-            "dependency_archives": dependency_archives, "files": files}
-(root / "art-runtime-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
-print(f"Verified {len(files)} native ARM64 ELF outputs")
-PY
+"$SCRIPT_DIR/native-tool" art-build-manifest "$NEXT_OUTPUT" "$COMMIT" "$SOURCE_URL" "$SOURCE_ARCHIVE" "$SCRIPT_DIR/art16k.patch" "$DEPENDENCY_CACHE"
+
 rm -rf "$OUTPUT_DIR"
 mv "$NEXT_OUTPUT" "$OUTPUT_DIR"
 echo "Staged native 16 KiB ART overlay in $OUTPUT_DIR"

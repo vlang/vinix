@@ -123,12 +123,37 @@ fn append_source(mut hash sha256.Digest, path string) ! {
 }
 
 pub fn configuration_probe_digest(support string) !string {
+	return native_producer_digest(support, ['build-support/android/atlconfiguration/core.v', 'build-support/android/atl-configuration-v-abi.h', 'build-support/compile-v-module', 'tests/linuxkpi/generate_module.v', 'build-support/find-v.sh'], ['tests/native-generators/generators', 'tests/native-android-tools/androidtools', 'tools/sourcecommand', 'build-support/cachecli', 'build-support/cachekey', 'tests/linuxkpi/hosttest'])!
+}
+
+pub fn dex_adapter_digest(support string) !string {
+	return native_producer_digest(support, ['tests/native-android-tools/main.v'], ['tests/native-android-tools/androidtools', 'build-support/android/androidhost', 'build-support/android/boothost', 'tools/sourcecommand', 'build-support/cachecli', 'build-support/cachekey', 'tests/linuxkpi/hosttest', 'build-support/tarcore', 'build-support/tarstream'])!
+}
+
+fn producer_sources(root string, relative string, mut paths []string) ! {
+	mut names := os.ls(path_join(root, relative))!
+	names.sort()
+	for name in names {
+		path := relative + '/' + name
+		actual := path_join(root, path)
+		if os.is_link(actual) { continue }
+		if os.is_dir(actual) { producer_sources(root, path, mut paths)! }
+		else if (name.ends_with('.v') || name.ends_with('.h')) && !name.ends_with('_test.v') { paths << path }
+	}
+}
+
+fn native_producer_digest(support string, inputs []string, directories []string) !string {
+	root := path_parent(path_parent(support))
+	mut paths := inputs.clone()
+	for directory in directories { producer_sources(root, directory, mut paths)! }
+	paths.sort()
 	mut hash := sha256.new()
-	for name in ['android/atlconfiguration/core.v', 'android/atl-configuration-v-abi.h',
-		'android/compile-v-atl-configuration.py', 'compile-v-module.py', 'find-v.sh'] {
+	hash.write('vinix-native-android-producer-v1\x00'.bytes())!
+	for name in paths {
 		hash.write(name.bytes())!
 		hash.write([u8(0)])!
-		append_source(mut hash, path_join(path_parent(support), name))!
+		append_source(mut hash, path_join(root, name))!
+		hash.write([u8(0)])!
 	}
 	return hash.sum([]u8{}).hex()
 }

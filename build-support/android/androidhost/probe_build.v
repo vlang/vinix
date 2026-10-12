@@ -71,6 +71,7 @@ fn probe_command_output(arguments []string, capture bool) !string {
 }
 
 fn probe_command_output_preferred(arguments []string, capture bool, host_arch string) !string {
+	if native_command_runner != unsafe { nil } { return native_command_runner(arguments, capture, host_arch)! }
 	mut pipes := [2]i32{}
 	mut read_open := false
 	mut write_open := false

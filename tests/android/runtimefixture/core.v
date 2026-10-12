@@ -19,13 +19,13 @@ fn repository() string {
 }
 
 fn call(row map[string]json2.Any) !map[string]json2.Any {
-	python := if os.getenv('VINIX_RUNTIME_FIXTURE_PYTHON') != '' {
-		os.getenv('VINIX_RUNTIME_FIXTURE_PYTHON')
+	binary := os.getenv('VINIX_RUNTIME_FIXTURE_NATIVE')
+	command := if binary != '' {
+		[binary, 'binding', repository() + '/tests/android/runtime-binding', json2.encode(row)]
 	} else {
-		'python3'
+		[repository() + '/tests/native-android-tools/run', 'binding', repository() + '/tests/android/runtime-binding', json2.encode(row)]
 	}
-	output := fixturehost.capture_preferred([python,
-		repository() + '/tests/android/runtime-binding.py', json2.encode(row)], '', os.environ(), false, os.uname().machine)!
+	output := fixturehost.capture_preferred(command, '', os.environ(), false, os.uname().machine)!
 	return json2.decode[map[string]json2.Any](output)!
 }
 

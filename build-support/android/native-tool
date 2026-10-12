@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+command=$1
+shift
+exec "$here/../../tests/native-android-tools/run" "$command" "$0" "$@"
