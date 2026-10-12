@@ -452,6 +452,10 @@ fn kill_sibling_threads(mut current_process proc.Process, current_thread &proc.T
 			continue
 		}
 		stop_claimed_thread(mut victim)
+		// A forcibly stopped task retains its Thread for possible event pins;
+		// it will execute no more syscalls. Release its filter head now rather
+		// than retaining the immutable chain with that diagnostic corpse.
+		proc.seccomp_release(mut victim)
 		proc.unpin_thread(victim)
 	}
 

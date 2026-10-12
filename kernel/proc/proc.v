@@ -409,10 +409,10 @@ pub mut:
 	// Who logged in, and which login this is; see login.v.
 	login_uid       u32 = 0xffffffff
 	login_session   u32
-	// The seccomp programs a process has installed, newest first, and
-	// whether it is in strict mode instead; see seccomp.v.
-	seccomp_mode    int
-	seccomp         &SeccompFilter = unsafe { nil }
+	// Diagnostic leader state retained after its Thread retires. These scalar
+	// snapshots own no filter; live enforcement/inheritance uses Thread state.
+	leader_seccomp_mode u32
+	leader_seccomp_filters int
 	child_subreaper bool
 	pdeathsig       int
 	cgroup          voidptr
@@ -784,7 +784,7 @@ pub fn pin_next_group_member(pgid int, sid int, after int) &Process {
 
 // free_process_memory frees a reaped process and what only it owned. Its
 // descriptors, address space, unveil set, namespaces and pid went at exit and
-// reap; its seccomp filters and cgroup are shared and stay.
+// reap; each Thread releases its seccomp reference at final reclamation.
 fn free_process_memory(p &Process) {
 	mut process := unsafe { p }
 	syscall_policy_reset(mut process)
@@ -1549,6 +1549,7 @@ pub fn process_status_text(pid int, tid int, viewer &Namespace) string {
 	nnp := if target == unsafe { nil } || voidptr(target.process) != voidptr(process) {
 		katomic.load(&process.leader_no_new_privs)
 	} else { no_new_privs_state(target) }
+	seccomp_state, seccomp_filters := seccomp_status(process, target)
 	state := match process_state(process) { `Z` { 'Z (zombie)' } `T` { 'T (stopped)' } `S` { 'S (sleeping)' } else { 'R (running)' } }
 	shown_pid := pid_in(process, viewer)
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
@@ -1599,9 +1600,9 @@ pub fn process_status_text(pid int, tid int, viewer &Namespace) string {
 	text.add('\nNoNewPrivs:\t')
 	text.add_decimal(int(nnp))
 	text.add('\nSeccomp:\t')
-	text.add_decimal(process.seccomp_mode)
+	text.add_decimal(int(seccomp_state))
 	text.add('\nSeccomp_filters:\t')
-	text.add_decimal(seccomp_filter_count(process))
+	text.add_decimal(seccomp_filters)
 	text.add_byte(`\n`)
 	return lib.finish_text(*text)
 }

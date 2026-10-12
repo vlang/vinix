@@ -174,9 +174,7 @@ const seccomp_filter_flag_log = u32(2)
 const seccomp_filter_flag_spec_allow = u32(4)
 const seccomp_filter_flag_tsync_esrch = u32(16)
 
-// seccomp(operation, flags, args); see proc/seccomp.v. Programs currently
-// belong to the process; Linux per-thread ownership and TSYNC need separate
-// qualification. There are no listeners to hand user
+// seccomp(operation, flags, args); see proc/seccomp.v. There are no listeners to hand user
 // notifications to, so SECCOMP_FILTER_FLAG_NEW_LISTENER, like every flag
 // Linux does not know, is refused: libseccomp probes each flag this way and
 // leaves out what the kernel refuses.
@@ -193,7 +191,7 @@ fn syscall_linux_seccomp(_ voidptr, operation u32, flags u32, args u64) (u64, u6
 			if flags & ~known != 0 {
 				return errno.err, errno.einval
 			}
-			return seccomp_install(args)
+			return seccomp_install(args, flags)
 		}
 		seccomp_get_action_avail {
 			if flags != 0 {
@@ -221,19 +219,13 @@ fn syscall_linux_seccomp(_ voidptr, operation u32, flags u32, args u64) (u64, u6
 }
 
 fn seccomp_set_strict() (u64, u64) {
-	mut process := proc.current_thread().process
-	if process.seccomp_mode != proc.seccomp_mode_disabled {
-		return errno.err, errno.einval
-	}
-	process.seccomp_mode = proc.seccomp_mode_strict
-	return 0, 0
+	return proc.seccomp_set_strict()
 }
 
 // Install the program struct sock_fprog at `prog` describes. Only a process
 // that cannot gain privileges by exec, or one that holds CAP_SYS_ADMIN, may.
-fn seccomp_install(prog u64) (u64, u64) {
-	mut process := proc.current_thread().process
-	if process.seccomp_mode == proc.seccomp_mode_strict {
+fn seccomp_install(prog u64, flags u32) (u64, u64) {
+	if proc.seccomp_mode(proc.current_thread()) == proc.seccomp_mode_strict {
 		return errno.err, errno.einval
 	}
 	if proc.no_new_privs_state(proc.current_thread()) == 0 && !proc.current_has_capability(proc.cap_sys_admin) {
@@ -248,7 +240,7 @@ fn seccomp_install(prog u64) (u64, u64) {
 	if length == 0 || length > proc.bpf_max_instructions {
 		return errno.err, errno.einval
 	}
-	mut instructions := []proc.SockFilter{len: length}
+	mut instructions := []proc.SockFilter{len: length} @[freed]
 	if !usercopy.copy_from_user(unsafe { voidptr(&instructions[0]) }, header[1], u64(length) * sizeof(proc.SockFilter)) {
 		unsafe { instructions.free() }
 		return errno.err, errno.efault
@@ -257,11 +249,12 @@ fn seccomp_install(prog u64) (u64, u64) {
 		unsafe { instructions.free() }
 		return errno.err, errno.einval
 	}
-	if !proc.seccomp_attach(mut process, instructions) {
+	ret, err := proc.seccomp_attach(instructions, flags & seccomp_filter_flag_tsync != 0,
+		flags & seccomp_filter_flag_tsync_esrch != 0)
+	if ret != 0 || err != 0 {
 		unsafe { instructions.free() }
-		return errno.err, errno.enomem
 	}
-	return 0, 0
+	return ret, err
 }
 
 // The extra prctl operations a container runtime uses. Anything else falls
@@ -284,7 +277,7 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 	option := int(i32(_option))
 	match option {
 		pr_get_seccomp {
-			return u64(process.seccomp_mode), 0
+			return u64(proc.seccomp_mode(proc.current_thread())), 0
 		}
 		pr_set_seccomp {
 			match int(arg2) {
@@ -292,7 +285,7 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 					return seccomp_set_strict()
 				}
 				proc.seccomp_mode_filter {
-					return seccomp_install(arg3)
+					return seccomp_install(arg3, 0)
 				}
 				else {
 					return errno.err, errno.einval

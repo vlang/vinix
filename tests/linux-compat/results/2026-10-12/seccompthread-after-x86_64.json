@@ -1,0 +1,71 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "4b13b83d0a89c3f6ffbbe3f5d21fcaa9d6016c5057344944e478a81d6c852260",
+    "results": [
+        {
+            "name": "seccompthread",
+            "source_sha256": "f877c5ccb80eaec01745f6a83c6b837cd7bf3a53c8e367bbe8c7745ee353181d",
+            "init_sha256": "36ccf5361ba7c25aae28f773df594f57f7ff7d55de8e6904d42ffd52aec6fc04",
+            "iso_sha256": "4382bd6b1a000fbc2bd3070b555b8d36b95679086e119314cb260a4f172be8e6",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccomp",
+            "source_sha256": "fa786d3dbf56b7a0ad48273a8f2ac09984d6c22a9e9930bda91b8f7711d25dc3",
+            "init_sha256": "594490a182b4abe3c8f52a1e9dd61a2f62fd333aecea2103f02d833e8cf737de",
+            "iso_sha256": "f3f06c633ec25e868c1edcf3f7e97f175e5fb8ddbeefdd6c40d55e41663a4a9e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccompquery",
+            "source_sha256": "5637d2c445b75ada6741004a59b184b339020378c7bfd6427b47cec5455dbc77",
+            "init_sha256": "c94c6b6c102ddd6508cece5e1b3a7ebe2627ffa0f128bd0df3f06d8e8e40a434",
+            "iso_sha256": "4495473deb923210163fed5fad54379f7011da7804a05e499712ea06affb55b2",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "nnpthread",
+            "source_sha256": "fd96c5dbbeb72a805fe2d3898760453433b99200b9b0bc447a56d866ca702f88",
+            "init_sha256": "9cd6e69eb4be7093d01fe222022e0ea33fa323df749f657e18d5318293143918",
+            "iso_sha256": "d8190f4b1bb4d5fda906a6f4b36f0cd11a9dcfdc566a3278ad6b7cc5ab6690ca",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "securebits",
+            "source_sha256": "6c9bed07f2da73a41f6a33caf460ea22da2ff1d25786554bbd8b561dc33a1f29",
+            "init_sha256": "80797fb2482e90764c2ff32020c00f98da757447c65aafa3c114001a45253231",
+            "iso_sha256": "7aee21bb47b88e4b083467d3546380e2d9f31b19ecf3fadac260dc20cc4c4be7",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "capabi",
+            "source_sha256": "dc2d0d444577ddd95ef0b46510fc643d210f78729853a944cdb9ef861defd5da",
+            "init_sha256": "bfb02564195ad4dcbbaac7b87c0084dd4bf0c33f478700d10c29322144fddf0f",
+            "iso_sha256": "91a1312642459b56e5f8b27bb36d88aed8c17f6db365c426e77c6b6a6256be24",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "059581612867baace3319f024869697b8decc015d835f21d6e42c600f8c2945e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "futexqueue",
+            "source_sha256": "9c881bb3bad609ab72d2161a39a994486e0b222b6c053709c16754c5d3c1d9cf",
+            "init_sha256": "d78c405f6f78b731850e1d1dce70e365e87d4a16fdc6b5feefc3b1ec3c5a0db4",
+            "iso_sha256": "7752d772d3baa9a16ecac6457415d1693a3cb7579e730821bf7a6f363899b89d",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

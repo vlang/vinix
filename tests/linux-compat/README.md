@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -502,6 +502,22 @@ their version word accessible. All three versions use exact data sizes at
 protected page boundaries; version 1 clears the unrepresented high word in
 isolated children. Reserved high bits are ignored for root and UID 1000 while
 valid bits and capability state remain intact. Native page sizes are recorded.
+
+The `seccompthread` case checks task-local filters, independent siblings and
+caller-based clone/fork/exec inheritance, including nonleader exec while a
+differently filtered leader spins in userspace. TSYNC must accept disabled or
+ancestral siblings, refuse diverged or independently installed identical
+programs with the offending TID or ESRCH, and preserve all state on failure.
+Successful sync propagates the caller's no_new_privs without clearing an
+existing sibling flag. Procfs reports each live task and retains zombie leader
+scalars. A full 32768-instruction path is accepted; another filter gets ENOMEM.
+Concurrent clone/sync and two storage cohorts check thread publication and
+3200 filter installations with natural exits and 200 forced nonleader execs.
+The 32/64/96/128-byte slab classes must remain flat after grace periods; this
+includes the actual filter-header and instruction-buffer classes. Storage
+cohorts use raw queries to keep the existing retained procfs trees out of the
+filter measurement. Signal kill scope, notifications and full sandbox support
+remain separate. Allow at least 300 seconds for each native guest.
 
 Host verification of the report generator and timeout/nonzero-exit handling:
 

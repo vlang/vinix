@@ -48,7 +48,7 @@ pub fn syscall_trace(frame &cpulocal.GPRState) u64 {
 	if !proc.syscall_origin_allowed(mut process, nr, frame.rip - 2) {
 		userland.exit_with_fatal_signal(u8(6))
 	}
-	if process.seccomp_mode != proc.seccomp_mode_disabled {
+	if proc.seccomp_mode(t) != proc.seccomp_mode_disabled {
 		slot := seccomp_entry(mut t, frame, nr)
 		if slot != nr {
 			return slot
@@ -74,8 +74,7 @@ pub fn syscall_trace_ret(ret u64, err u64) {
 // call itself, or the stand-in returning their verdict.
 fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 	t.seccomp_return = 0
-	process := t.process
-	if process.seccomp_mode == proc.seccomp_mode_strict {
+	if proc.seccomp_mode(t) == proc.seccomp_mode_strict {
 		// read, write, exit and rt_sigreturn are all strict mode allows.
 		if nr == 0 || nr == 1 || nr == 60 || nr == 15 {
 			return nr
@@ -84,7 +83,7 @@ fn seccomp_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 		userland.exit_with_fatal_signal(u8(9))
 	}
 	// The instruction after the syscall is what Linux reports as its address.
-	verdict := proc.seccomp_verdict(process.seccomp, nr, frame.rip, [frame.rdi, frame.rsi,
+	verdict := proc.seccomp_verdict(t, nr, frame.rip, [frame.rdi, frame.rsi,
 		frame.rdx, frame.r10, frame.r8, frame.r9]!)
 	if verdict & proc.seccomp_ret_action_full != proc.seccomp_ret_allow {
 		t.audit_sequence = security.audit_seccomp(nr, frame.rip, verdict)

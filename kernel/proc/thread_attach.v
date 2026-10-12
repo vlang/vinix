@@ -20,7 +20,6 @@ pub fn attach_thread(mut process Process, mut t Thread) ?int {
 		t.tid = process.pid
 		if !bind_tid_locked(t.tid, t) { errno.set(errno.eagain); return none }
 		number_thread_locked(mut t, true)
-		katomic.store(mut &process.leader_no_new_privs, no_new_privs_state(t))
 	} else {
 		t.tid = allocate_tid_locked(t) or { errno.set(errno.eagain); return none }
 		number_thread_locked(mut t, false)
@@ -29,6 +28,10 @@ pub fn attach_thread(mut process Process, mut t Thread) ?int {
 		// handler installed by another CPU cannot be lost during creation.
 		t.sigactions = process.threads[0].sigactions
 	}
+	// Snapshot the caller at publication, serialized with TSYNC. The caller's
+	// task state remains intact while exec replaces its Process association.
+	seccomp_inherit(mut t, current_thread())
+	if t.tid == process.pid { katomic.store(mut &process.leader_no_new_privs, no_new_privs_state(t)) }
 
 	// Readers hold threads_lock and never retain slices of this owned buffer.
 	// Free its previous capacity when the thread list grows.

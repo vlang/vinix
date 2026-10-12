@@ -324,8 +324,6 @@ pub fn inherit_container_state(mut child Process, parent &Process) {
 	child.login_session = parent.login_session
 	child.stack_policy_mode = katomic.load(&parent.stack_policy_mode)
 	syscall_policy_inherit(mut child, parent)
-	child.seccomp_mode = parent.seccomp_mode
-	child.seccomp = parent.seccomp
 	if !child.constructing {
 		child.cgroup = parent.cgroup
 		child.cgroup_account = parent.cgroup_account

@@ -85,8 +85,7 @@ fn syscall_seccomp_verdict(_ voidptr) (u64, u64) {
 // here with SIGSYS when that is the verdict.
 fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 	t.seccomp_return = 0
-	process := t.process
-	if process.seccomp_mode == proc.seccomp_mode_strict {
+	if proc.seccomp_mode(t) == proc.seccomp_mode_strict {
 		// read, write, exit and rt_sigreturn are all strict mode allows.
 		if nr == 63 || nr == 64 || nr == 93 || nr == 139 {
 			return nr
@@ -95,7 +94,7 @@ fn seccomp_entry(mut t proc.Thread, gpr &cpulocal.GPRState, nr u64) u64 {
 		userland.exit_with_fatal_signal(u8(9))
 		return seccomp_verdict_nr
 	}
-	verdict := proc.seccomp_verdict(process.seccomp, nr, gpr.pc, [gpr.x0, gpr.x1, gpr.x2, gpr.x3,
+	verdict := proc.seccomp_verdict(t, nr, gpr.pc, [gpr.x0, gpr.x1, gpr.x2, gpr.x3,
 		gpr.x4, gpr.x5]!)
 	if verdict & proc.seccomp_ret_action_full != proc.seccomp_ret_allow {
 		t.audit_sequence = security.audit_seccomp(nr, gpr.pc, verdict)
@@ -182,7 +181,7 @@ pub fn syscall_trace(gpr_state voidptr) u64 {
 	sc_ring[idx].pid = pid
 	sc_trace_gpr_state = u64(gpr_state)
 	sc_trace_active = true
-	if current_thread.process.seccomp_mode != proc.seccomp_mode_disabled {
+	if proc.seccomp_mode(current_thread) != proc.seccomp_mode_disabled {
 		slot := seccomp_entry(mut current_thread, gpr, nr)
 		if slot != nr {
 			return slot

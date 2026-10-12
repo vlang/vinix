@@ -30,6 +30,9 @@ pub mut:
 	no_new_privs u32
 	// Linux task-local securebits, including the KEEP_CAPS behavior/lock pair.
 	securebits u32
+	// Task-owned immutable filter head; publication and refs use seccomp_lock.
+	seccomp_mode u32
+	seccomp &SeccompFilter = unsafe { nil }
 	user_page_fault bool
 	tid int
 	// The tid as the thread's pid namespace numbers it; see Process.ns_pid.

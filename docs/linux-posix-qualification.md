@@ -1257,3 +1257,71 @@ version word on the stack and allocates/frees nothing on either architecture.
 These are native ELF64 tests of the three capability data formats. They do
 not qualify a 32-bit application runtime, per-thread capability storage or
 file capabilities. The broad roadmap acceptance gates remain open.
+
+## Task-local seccomp and TSYNC
+
+The native musl ELF64 `seccompthread` fixture passes on AArch64 and x86-64.
+Filters belong to each task; clone, fork and exec inherit the caller's chain.
+A nonleader exec preserves its own chain while retiring a differently filtered
+leader. Procfs selects the requested live task and keeps scalar leader state
+after its Thread is reclaimed. Eleven isolated cases cover these transitions,
+concurrent thread creation/synchronization, and the exact 32768-instruction
+path bound (four extra instructions per predecessor, none for the new leaf).
+
+TSYNC validates every live sibling before publishing anything. Disabled tasks
+and ancestors of the caller's chain can synchronize; a descendant, divergent
+chain or independently installed identical program cannot. A failure returns
+the offending namespace-visible TID, or ESRCH with TSYNC_ESRCH, and leaves
+filters and no_new_privs unchanged. Successful synchronization propagates a
+set caller flag and preserves existing sibling flags when the privileged
+caller has not set its own. This follows
+[Linux's reference, ancestry and synchronization implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/seccomp.c#L438).
+
+Both baseline kernels fail the same unchanged V fixture because a peer's
+filter incorrectly changes an unfiltered caller's mode and getpid result.
+`seccompthread-before-*` and `seccompthread-after-*` in the
+[dated results directory](../tests/linux-compat/results/2026-10-12/) retain
+controls, receipts and serial logs. Final production kernels pass eight cases:
+task seccomp, trap/verifier, action discovery, no_new_privs, securebits,
+capability ABI, TLS/atomics/SIMD/JIT/page sizes and futex queues. The existing
+capability-exec suite and all eight host test files also pass.
+
+Each immutable filter holds a reference to its predecessor; each task holds
+its head. Evaluation takes the filter lock through the bounded interpreter
+and creates no heap object. Attachment allocates outside publication locks;
+failed attachment leaves instruction ownership with the syscall caller.
+Natural final reaping and quiescent forced sibling retirement release heads,
+including exec's stopped leader. A separate lifetime review checked the V
+sources and generated C on both architectures. The assertion-enabled
+[auditor](../tests/linux-compat/results/2026-10-12/seccompthread-audit.v) checks
+60 source fingerprints, frozen artifacts, generated stack storage, exact
+errors, both storage cohorts and the preexisting validation failures.
+Kernel fingerprints and the generated inventory describe isolated 71d666c4
+worktrees with the twelve seccomp changes; concurrent shared-checkout procfs
+net/dev edits were excluded from these builds and receipts.
+
+Two cohorts create 400 naturally exiting threads with 1600 filters and 200
+forced nonleader exec groups with another 1600 filters. After warmup and grace
+periods, all 32/64/96/128-byte live-object counts stay flat on both native
+architectures; the 80-byte header uses class 96 and the four-instruction
+buffer uses class 64. An additional ALLOC_TRACK=1 AArch64 run also passes both
+cohorts. The broader AArch64 ops/churn/cache run passes: all 36 syscall rows
+retain zero bytes per operation, and true, sleep, curl and BusyBox awk each
+retain zero bytes per run over 300 runs.
+
+Two limits surfaced during verification and remain explicit. Procfs pruning
+removes task/process names but retains backing trees; the storage cohorts
+therefore use raw mode/syscall queries and a fixed executable path after the
+functional procfs cases. This qualifies filter storage, not procfs reclamation.
+The frozen V f6358ec compiler's allocation-allowance check fails on both the
+unmodified baseline and changed sources; the changed inventory adds no sites
+and removes two reported sites per architecture. Baseline/current logs are
+retained, and the existing allowance failure is not reported as passing.
+Desktop idle/apps/drag validation with the cached live desktop fails before
+readiness on both kernels with the same startup error. Those receipts remain
+failed; this change does not qualify desktop readiness.
+
+Strict-mode and KILL_THREAD signal scope, installation error ordering, user
+notifications, full sandbox isolation, nested PID-namespace TSYNC failures and
+procfs tree reclamation remain separate work. The three broad section-15
+acceptance gates remain open.

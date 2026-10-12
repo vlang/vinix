@@ -986,6 +986,7 @@ fn free_thread_stacks(mut t proc.Thread) {
 // the tid table, its process and every event it waited on before it died.
 fn free_thread_memory(t &proc.Thread) {
 	mut thr := unsafe { t }
+	proc.seccomp_release(mut thr)
 	$if linuxkpi ? {
 		if thr.linuxkpi_iowait_cpu_plus_one != 0 {
 			lib.kpanic(unsafe { nil }, c'linuxkpi: reclaiming counted I/O task')

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (c) 2026 Alexander Medvednikov
 //
-// seccomp: a process's system calls passed through the classic BPF programs it
+// seccomp: a task's system calls passed through the classic BPF programs it
 // has installed, as Linux's seccomp(2) passes them. Every program sees the
 // call's number, the architecture, the address it was made from and its six
 // arguments, laid out as struct seccomp_data, and answers with an action: let
@@ -11,10 +11,25 @@
 // away the calls a container has no business making.
 //
 // Programs are checked when installed as Linux checks them, never change
-// afterwards, and are kept by a process's children after fork and exec.
-// They belong to the process here, not to one thread, which is what
-// SECCOMP_FILTER_FLAG_TSYNC asks Linux for.
+// afterwards, and are inherited from the calling task at clone/fork/exec.
+// TSYNC may replace siblings' heads only when each is disabled or holds an
+// ancestor of the caller's chain. Identical independently installed programs
+// do not constitute the same ancestor.
+@[has_globals]
 module proc
+
+import errno
+import katomic
+import klock
+import memory
+
+// Lock order: process table -> thread list -> seccomp. Evaluation, diagnostic
+// snapshots and final thread reclamation take only seccomp_lock. A bounded
+// evaluator retains the lock through its immutable chain, so no reader can
+// observe a reclaimed node and no per-syscall reference/allocation is needed.
+__global (
+	seccomp_lock klock.Lock
+)
 
 pub const seccomp_mode_disabled = 0
 pub const seccomp_mode_strict = 1
@@ -61,6 +76,9 @@ pub mut:
 
 pub struct SeccompFilter {
 pub mut:
+	// Direct task heads and child filters' prev links each own one reference.
+	// Protected by seccomp_lock, including the final release.
+	refs u64
 	instructions []SockFilter
 	// The program installed before this one, which runs too.
 	prev &SeccompFilter = unsafe { nil }
@@ -240,7 +258,11 @@ fn seccomp_run(instructions []SockFilter, data [16]u32) u32 {
 
 // What the programs ending in `filter` answer for a call: the most
 // restrictive answer, compared as Linux compares them.
-pub fn seccomp_verdict(filter &SeccompFilter, nr u64, ip u64, args [6]u64) u32 {
+pub fn seccomp_verdict(task &Thread, nr u64, ip u64, args [6]u64) u32 {
+	seccomp_lock.acquire()
+	defer { seccomp_lock.release() }
+	filter := task.seccomp
+	if filter == unsafe { nil } { return seccomp_ret_kill_process }
 	mut data := [16]u32{}
 	data[0] = u32(nr)
 	data[1] = seccomp_audit_arch
@@ -264,32 +286,158 @@ pub fn seccomp_verdict(filter &SeccompFilter, nr u64, ip u64, args [6]u64) u32 {
 	return verdict
 }
 
-// Add a checked program to the ones `process` has. False when the chain
-// would grow past what Linux lets one call run through.
-pub fn seccomp_attach(mut process Process, instructions []SockFilter) bool {
-	mut count := 1
-	mut path_total := instructions.len + 4
-	if process.seccomp != unsafe { nil } {
-		count += process.seccomp.count
-		path_total += process.seccomp.path_total
-	}
-	if path_total > seccomp_max_path_instructions {
-		return false
-	}
-	process.seccomp = &SeccompFilter{
-		instructions: instructions
-		prev:         process.seccomp
-		count:        count
-		path_total:   path_total
-	}
-	process.seccomp_mode = seccomp_mode_filter
-	return true
+pub fn seccomp_mode(task &Thread) u32 {
+	if task == unsafe { nil } { return 0 }
+	return katomic.load(&task.seccomp_mode)
 }
 
-// How many programs a process has installed, for /proc/<pid>/status.
-pub fn seccomp_filter_count(process &Process) int {
-	if process.seccomp == unsafe { nil } {
-		return 0
+// Called while attaching under table/list locks, before the new task is
+// published. This also refreshes NNP: TSYNC may have set it on the source
+// after the scheduler constructor copied its earlier scalar state.
+pub fn seccomp_inherit(mut task Thread, source &Thread) {
+	seccomp_lock.acquire()
+	defer { seccomp_lock.release() }
+	if source == unsafe { nil } { return }
+	task.seccomp_mode = source.seccomp_mode
+	task.seccomp = source.seccomp
+	task.no_new_privs = no_new_privs_state(source)
+	if task.seccomp != unsafe { nil } { task.seccomp.refs++ }
+	seccomp_record_leader(task)
+}
+
+fn seccomp_record_leader(task &Thread) {
+	if task.process == unsafe { nil } || task.tid != task.process.pid { return }
+	mut process := task.process
+	process.leader_seccomp_mode = task.seccomp_mode
+	process.leader_seccomp_filters = if task.seccomp == unsafe { nil } { 0 } else { task.seccomp.count }
+}
+
+// Scalar snapshots survive leader retirement; they own no filter reference.
+// The caller pins target through the process table lock while taking this.
+pub fn seccomp_status(process &Process, target &Thread) (u32, int) {
+	seccomp_lock.acquire()
+	defer { seccomp_lock.release() }
+	if target == unsafe { nil } || voidptr(target.process) != voidptr(process) {
+		return process.leader_seccomp_mode, process.leader_seccomp_filters
 	}
-	return process.seccomp.count
+	return target.seccomp_mode, if target.seccomp == unsafe { nil } { 0 } else { target.seccomp.count }
+}
+
+pub fn seccomp_set_strict() (u64, u64) {
+	mut task := current_thread()
+	seccomp_lock.acquire()
+	defer { seccomp_lock.release() }
+	if task.seccomp_mode != seccomp_mode_disabled && task.seccomp_mode != seccomp_mode_strict {
+		return errno.err, errno.einval
+	}
+	katomic.store(mut &task.seccomp_mode, u32(seccomp_mode_strict))
+	seccomp_record_leader(task)
+	return 0, 0
+}
+
+// A node owns its predecessor. Releasing the last direct reference releases
+// that link iteratively; shared branches remain alive. All readers hold the
+// same lock, so no grace period or retained pointer exists after the free.
+fn seccomp_put(filter &SeccompFilter) {
+	mut head := unsafe { filter }
+	for head != unsafe { nil } {
+		head.refs--
+		if head.refs != 0 { break }
+		previous := head.prev
+		unsafe {
+			head.instructions.free()
+			free(head)
+		}
+		head = previous
+	}
+}
+
+// Scheduler final reclamation (or unpublished-constructor rollback) occurs
+// after the task is off its CPU and its last Thread pin has gone.
+pub fn seccomp_release(mut task Thread) {
+	seccomp_lock.acquire()
+	defer { seccomp_lock.release() }
+	old := task.seccomp
+	task.seccomp = unsafe { nil }
+	katomic.store(mut &task.seccomp_mode, u32(0))
+	seccomp_put(old)
+}
+
+fn seccomp_ancestor(ancestor &SeccompFilter, child &SeccompFilter) bool {
+	if ancestor == unsafe { nil } { return true }
+	mut head := unsafe { child }
+	for head != unsafe { nil } {
+		if voidptr(head) == voidptr(ancestor) { return true }
+		head = head.prev
+	}
+	return false
+}
+
+// Takes ownership of instructions only on success. User copies/verification
+// precede the locks. Publication and TSYNC validation share the thread attach
+// locks, excluding concurrent clone and exec's sibling teardown.
+pub fn seccomp_attach(instructions []SockFilter, sync bool, sync_esrch bool) (u64, u64) {
+	mut task := current_thread()
+	mut process := task.process
+	// A fallible allocator may reclaim pages; do not enter it under any of
+	// the publication locks. Failed validation frees only this unpublished
+	// header: the syscall caller still owns and frees the instruction buffer.
+	mut filter := unsafe { &SeccompFilter(memory.malloc_packed_fallible(sizeof(SeccompFilter))) } @[freed]
+	if filter == unsafe { nil } { return errno.err, errno.enomem }
+	mut published := false
+	defer { if !published { unsafe { free(filter) } } }
+	pid_lock.acquire()
+	defer { pid_lock.release() }
+	process.threads_lock.acquire()
+	defer { process.threads_lock.release() }
+	seccomp_lock.acquire()
+	defer { seccomp_lock.release() }
+	if task.seccomp_mode == seccomp_mode_strict { return errno.err, errno.einval }
+	mut count := 1
+	mut path_total := instructions.len
+	if task.seccomp != unsafe { nil } {
+		count += task.seccomp.count
+		path_total += task.seccomp.path_total + 4
+	}
+	if path_total > seccomp_max_path_instructions {
+		return errno.err, errno.enomem
+	}
+	if sync {
+		for peer in process.threads {
+			if voidptr(peer) == voidptr(task) || katomic.load(&peer.exit_claimed) != 0 { continue }
+			if peer.seccomp_mode == seccomp_mode_disabled
+				|| (peer.seccomp_mode == seccomp_mode_filter && seccomp_ancestor(peer.seccomp, task.seccomp)) { continue }
+			tid := tid_in(peer, process.numbered_in)
+			if sync_esrch || tid == 0 { return errno.err, errno.esrch }
+			return u64(tid), 0
+		}
+	}
+	unsafe { *filter = SeccompFilter{
+		refs:         1
+		instructions: instructions
+		prev:         task.seccomp
+		count:        count
+		path_total:   path_total
+	} }
+	// Transfer the caller's old head reference into the new prev link.
+	task.seccomp = filter
+	published = true
+	katomic.store(mut &task.seccomp_mode, u32(seccomp_mode_filter))
+	seccomp_record_leader(task)
+	if sync {
+		for mut peer in process.threads {
+			if voidptr(peer) == voidptr(task) || katomic.load(&peer.exit_claimed) != 0 { continue }
+			filter.refs++
+			old := peer.seccomp
+			peer.seccomp = filter
+			seccomp_put(old)
+			if no_new_privs_state(task) != 0 {
+				katomic.store(mut &peer.no_new_privs, u32(1))
+				if peer.tid == process.pid { katomic.store(mut &process.leader_no_new_privs, u32(1)) }
+			}
+			katomic.store(mut &peer.seccomp_mode, u32(seccomp_mode_filter))
+			seccomp_record_leader(peer)
+		}
+	}
+	return 0, 0
 }

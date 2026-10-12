@@ -1135,6 +1135,7 @@ fn hand_over_to_reaper(cpu_number u64, t &proc.Thread) {
 }
 
 fn free_thread_memory(t &proc.Thread) {
+	proc.seccomp_release(mut unsafe { t })
 	if t.kernel_stack != 0 {
 		memory.kernel_stack_free(t.kernel_stack - kernel_stack_size)
 	}
