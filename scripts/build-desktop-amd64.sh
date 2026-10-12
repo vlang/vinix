@@ -125,13 +125,14 @@ APP_SRC="$BUILD_DIR/app-src"
 "$SCRIPT_DIR/desktop/tools/stage_app" "$APP_SRC" "$SCRIPT_DIR/desktop" \
     "$UI2_SOURCE/examples/calculator"
 
-python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+"$SCRIPT_DIR/build-support/compile-v-module" \
     "$SCRIPT_DIR/desktop/execinfocore" "$BUILD_DIR/execinfo.c" --arch amd64 \
     --header "$BUILD_DIR/execinfo_compat.h"
 rm -f "$APP_SRC/gpu_present.h"
-python3 "$SCRIPT_DIR/build-support/compile-v-module.py" \
+"$SCRIPT_DIR/build-support/compile-v-module" \
     "$SCRIPT_DIR/desktop/gpucore" "$BUILD_DIR/gpu-present-soft.c" --arch amd64 \
     --header "$APP_SRC/gpu_present.h"
+"$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/stage-v-runtime.v" "$BUILD_DIR/v-runtime"
 
 echo "==> Translating the amd64 desktop to C..."
 BUILD_STAMP="${VINIX_BUILD_STAMP:-$(date '+%m-%d %H:%M')}"
@@ -149,6 +150,7 @@ echo "==> Compiling for x86_64-linux-musl..."
     -D_GNU_SOURCE -O2 -fno-stack-protector -w \
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
     "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
+    "$BUILD_DIR/v-runtime/segfault_handler_nix.c" \
     -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
     "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -o "$BUILD_DIR/vinix-desktop"
