@@ -334,8 +334,9 @@ const pr_get_timerslack = 30
 
 const task_comm_len = 16
 
-fn syscall_linux_prctl(gpr_state voidptr, option int, arg2 u64, _arg3 u64, _arg4 u64, _arg5 u64) (u64, u64) {
+fn syscall_linux_prctl(gpr_state voidptr, _option int, arg2 u64, _arg3 u64, _arg4 u64, _arg5 u64) (u64, u64) {
 	mut process := proc.current_thread().process
+	option := int(i32(_option))
 
 	match option {
 		proc.mac_prctl {
@@ -417,13 +418,16 @@ fn syscall_linux_prctl(gpr_state voidptr, option int, arg2 u64, _arg3 u64, _arg4
 			return 0, 0
 		}
 		pr_set_no_new_privs {
-			if arg2 != 1 {
+			if arg2 != 1 || _arg3 != 0 || _arg4 != 0 || _arg5 != 0 {
 				return errno.err, errno.einval
 			}
 			process.no_new_privs = true
 			return 0, 0
 		}
 		pr_get_no_new_privs {
+			if arg2 != 0 || _arg3 != 0 || _arg4 != 0 || _arg5 != 0 {
+				return errno.err, errno.einval
+			}
 			return if process.no_new_privs { u64(1) } else { u64(0) }, 0
 		}
 		else {

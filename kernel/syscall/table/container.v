@@ -266,8 +266,10 @@ const pr_get_child_subreaper = 37
 const pr_get_seccomp = 21
 const pr_set_seccomp = 22
 
-fn syscall_container_prctl(gpr_state voidptr, option int, arg2 u64, arg3 u64, arg4 u64, arg5 u64) (u64, u64) {
+fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, arg4 u64, arg5 u64) (u64, u64) {
 	mut process := proc.current_thread().process
+	// Linux's option is a C int; reserved NNP arguments remain unsigned long.
+	option := int(i32(_option))
 	match option {
 		pr_get_seccomp {
 			return u64(process.seccomp_mode), 0

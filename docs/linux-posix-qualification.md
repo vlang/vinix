@@ -921,3 +921,23 @@ artifact volume disappeared. The surviving native kernel and driver were
 verified against their existing published receipts. The driver's original
 generated C is unavailable locally; its prior audited build receipt is reused
 and that limitation is recorded explicitly in the new evidence.
+
+## prctl option width and no_new_privs argument validation
+
+PR_GET_NO_NEW_PRIVS now rejects every nonzero argument with EINVAL;
+PR_SET_NO_NEW_PRIVS requires value 1 and zero reserved arguments before
+changing state. The prctl selector is narrowed to a C int in both the extended
+and base handlers, while these arguments retain their full native width.
+This follows [Linux 6.12's prctl implementation](https://github.com/torvalds/linux/blob/v6.12/kernel/sys.c#L2478).
+The native V fixture checks 34 exact refusals, high argument bits, high selector
+bits, preserved state after invalid requests, and idempotent valid setting.
+It does not qualify Linux's per-thread ownership of no_new_privs or seccomp.
+
+The before-controls on [AArch64](../tests/linux-compat/results/2026-10-12/nnp-before-aarch64.json)
+and [x86-64](../tests/linux-compat/results/2026-10-12/nnp-before-x86_64.json)
+return success for an invalid query. Both rebuilt kernels pass the unchanged
+fixture plus seccomp queries/trap delivery and approved JIT permission checks:
+[AArch64 results](../tests/linux-compat/results/2026-10-12/nnp-after-aarch64.json),
+[x86-64 results](../tests/linux-compat/results/2026-10-12/nnp-after-x86_64.json).
+The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/nnp-audit.v)
+checks source/inventory hashes, the isolated builds and frozen guest artifacts.

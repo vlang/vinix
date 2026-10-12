@@ -1,0 +1,39 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "bf6e1b6c5e6e7873205754e01ce4ca4d8ee9f0f9f3a04fdc073607dfaac4058c",
+    "results": [
+        {
+            "name": "nnp",
+            "source_sha256": "cd67b27111c566d5436917990542c66212044f2d189cd9f7ad81b6652a706dca",
+            "init_sha256": "c03efabfe4f77b3ab79329d7487b737043dc05456e30225b473406f8b10c4329",
+            "iso_sha256": "c22cbeda7d6d9ce72f8a085d47c12ae53f8331cf45e3fbac76b6c51593b5893c",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccompquery",
+            "source_sha256": "5637d2c445b75ada6741004a59b184b339020378c7bfd6427b47cec5455dbc77",
+            "init_sha256": "03c41879948e1f6de14a49ecea365cdd0b3046d83d8d6da350c7900ed7086b71",
+            "iso_sha256": "48c098b816afa7d5f718d2c3d30e7de172220f881a9bd991de3607c6271c2323",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seccomp",
+            "source_sha256": "fa786d3dbf56b7a0ad48273a8f2ac09984d6c22a9e9930bda91b8f7711d25dc3",
+            "init_sha256": "2ae611cb0aa90bdc3b55c8af460cbe3c588a31afc6bbf5af07db4904ef018c98",
+            "iso_sha256": "4bfe4d4c1e8f43a37c870b40dd425ac64108ca7905940df2a8d7e5be1458b502",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "jit",
+            "source_sha256": "29ddd368f2ceedd0346f0a850faa6a911d85c532d2099bb463bbc720d4886210",
+            "init_sha256": "6dee2aefc92c4a894b736131aa2080a5588bac086e7549916d054911a407fc7c",
+            "iso_sha256": "68befc0ff83cbc982e4ac9464bd951b8fb5e9fe7ff5d92c29056cfc94f3cc21f",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
