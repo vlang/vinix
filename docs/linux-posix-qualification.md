@@ -1257,8 +1257,23 @@ checks the negative controls, every artifact and all seven groups. The source
 inventory now includes the pipe implementation, with 61 fingerprints.
 The isolated e13e66b1 worktrees change only three lines in the pipe reader;
 the coverage generator also records that source. No ownership or reclamation
-path changes. Directory read errors, native ELF32/translated pipe entry and
-complete section-15 application acceptance remain separate.
+path changes.
+
+The broader AArch64 ops/churn/cache sweep passes on this same frozen pipe
+kernel. All 36 syscall rows retain zero bytes per operation over 200 calls;
+true, sleep, curl and BusyBox awk each retain zero bytes per run across 300
+executions. The 32 MiB cache workload also completes. The initial two-round
+600-second run timed out with only 21 operation rows. Its incomplete report
+and raw log are retained alongside the complete one-round run with a
+2400-second deadline. The
+[storage auditor](../tests/linux-compat/results/2026-10-12/pipezero-storage-audit.v)
+requires the complete set of operations, churn and cache results and
+deliberately rejects the timed-out report as qualification. Frozen kernel,
+generated C, controller, input and report hashes are recorded. These
+scenarios run without the desktop; they do not qualify desktop readiness.
+
+Directory read errors, native ELF32/translated pipe entry and complete
+section-15 application acceptance remain separate.
 
 ## Capability ABI discovery and data format
 
