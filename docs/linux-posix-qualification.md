@@ -985,3 +985,29 @@ These results qualify task-local flag behavior and the stated capability
 checks. Seccomp filters remain process-wide; TSYNC, setuid/file-capability
 execution, LSM transition behavior and complete application sandbox isolation
 remain unqualified. The larger roadmap gates stay open.
+
+## KEEPCAPS value validation
+
+PR_SET_KEEPCAPS now accepts only unsigned-long values 0 and 1, returning
+EINVAL before changing the flag for any other value. This follows
+[Linux 6.12's capability prctl implementation](https://github.com/torvalds/linux/blob/v6.12/security/commoncap.c#L1253).
+The V fixture checks 24 exact errors as root and UID/GID 1000, including
+upper register bits and all bits set, with the flag both clear and set.
+Valid setting/clearing is reversible and idempotent. Four child execs check
+fork inheritance, exec reset and the parent's retained state.
+
+The unchanged fixture detects placeholder acceptance of value 2 on both
+previous kernels: [AArch64 control](../tests/linux-compat/results/2026-10-12/keepcaps-before-aarch64.json),
+[x86-64 control](../tests/linux-compat/results/2026-10-12/keepcaps-before-x86_64.json).
+Both isolated builds pass it plus the no_new_privs argument and thread checks:
+[AArch64 results](../tests/linux-compat/results/2026-10-12/keepcaps-after-aarch64.json),
+[x86-64 results](../tests/linux-compat/results/2026-10-12/keepcaps-after-x86_64.json).
+The six existing capability-exec groups also pass on the same kernels:
+[AArch64](../tests/linux-compat/results/2026-10-12/keepcaps-cap-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/keepcaps-cap-x86_64.json).
+
+All eight host test files pass. The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/keepcaps-audit.v)
+checks the negative assertion control, 53-input inventory, unchanged fixtures,
+isolated one-file kernel change and frozen artifacts. This change introduces
+no allocations or frees. Securebits locking and per-thread capability
+credentials remain unqualified; the larger compatibility gates stay open.

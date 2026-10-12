@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -186,6 +186,13 @@ thread's flag. WNOWAIT permits checking status after child exit before reaping.
 The capability-exec suite separately checks retained privilege ceilings.
 Seccomp filter ownership, TSYNC, setuid/file-capability execution and complete
 sandbox isolation remain separate qualifications.
+
+The `keepcaps` case checks PR_SET_KEEPCAPS values 0 and 1 as root and UID/GID
+1000. Six invalid unsigned-long values, including high bits and all bits set,
+must return EINVAL in both flag states without changing them: 24 exact errors.
+Valid requests remain reversible and idempotent. Fork inherits the flag, exec
+clears it, and the parent's state remains unchanged. Securebits locks and
+per-thread capability credentials remain separate qualifications.
 
 The disk-backed mount conformance controller creates its own fresh 128 MiB ext2
 volume and owns QEMU directly. It checks exact missing/non-block/type errors,

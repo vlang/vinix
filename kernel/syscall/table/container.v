@@ -304,6 +304,7 @@ fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, a
 			return 0, 0
 		}
 		pr_set_keepcaps {
+			if arg2 > 1 { return errno.err, errno.einval }
 			process.caps.keep = arg2 != 0
 			return 0, 0
 		}
