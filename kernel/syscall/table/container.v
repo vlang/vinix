@@ -42,9 +42,8 @@ fn cap_target(local_pid int) &proc.Process {
 	if target != unsafe { nil } {
 		return target
 	}
-	// capget/capset name a thread, not a thread group: their "pid" is really a
-	// tid. A runtime applying its own caps passes gettid(), which is not the
-	// group leader's, so resolve it through the thread as well.
+	// capget names a thread, not only a thread group. Resolve a nonleader's
+	// tid to its process for the currently process-wide capability sets.
 	thr := proc.get_thread(pid)
 	if thr != unsafe { nil } {
 		owner := thr.process
@@ -105,18 +104,12 @@ fn syscall_linux_capset(_ voidptr, header_ptr u64, data_ptr u64) (u64, u64) {
 		&& header.version != linux_capability_version_3 {
 		return errno.err, errno.einval
 	}
-	// capset(2) only ever changes the caller. Its "pid" is a tid, though, and a
-	// runtime applying its own caps passes gettid() rather than 0, so accept any
-	// thread of this process and refuse only a genuinely different one.
-	mut process := proc.current_thread().process
-	if header.pid != 0 {
-		target := cap_target(int(header.pid))
-		if target == unsafe { nil } {
-			return errno.err, errno.esrch
-		}
-		if voidptr(target) != voidptr(process) {
-			return errno.err, errno.eperm
-		}
+	// capset only names the caller: zero or its namespace-visible tid.
+	// Reject every other pid before reading data, without a target lookup.
+	caller := proc.current_thread()
+	mut process := caller.process
+	if header.pid != 0 && int(header.pid) != proc.own_tid(caller) {
+		return errno.err, errno.eperm
 	}
 	mut data := [2]CapUserData{}
 	if !usercopy.copy_from_user(voidptr(&data[0]), data_ptr, u64(entries) * sizeof(CapUserData)) {

@@ -1176,3 +1176,41 @@ The additional scalar checks allocate and free nothing. Capability sets
 remain process-wide; these rules do not qualify concurrent per-thread
 credentials, file capabilities or complete sandbox isolation. The broad
 roadmap acceptance gates remain open.
+
+## Capset caller PID validation
+
+capset accepts header.pid equal to zero or the caller's namespace-visible
+thread ID. Other IDs return EPERM before reading capability data, including
+negative IDs, missing IDs and siblings in the same process. This follows
+[Linux 6.12's capset syscall](https://github.com/torvalds/linux/blob/v6.12/kernel/capability.c#L221).
+The earlier implementation looked up targets, returned ESRCH for missing
+IDs and accepted any thread belonging to the caller's process.
+
+The V fixture checks all three capability versions with readable, null and
+bad data pointers. It exercises root and UID 1000 leaders and siblings,
+including a sibling's use of its group leader's ID. Valid zero/self requests
+accept unchanged version-3 data; valid IDs with bad data and unreadable
+headers return EFAULT. All 236 errors preserve the effective, permitted and
+inheritable sets. Release/acquire stage notifications and pthread_join keep
+borrowed fixture stack contexts alive until the worker finishes.
+
+The unchanged fixture detects ESRCH in place of EPERM on both earlier kernels:
+[AArch64 control](../tests/linux-compat/results/2026-10-12/cappid-before-aarch64.json),
+[x86-64 control](../tests/linux-compat/results/2026-10-12/cappid-before-x86_64.json).
+The fixed kernels pass this case and the capset, bounding-set, ambient,
+securebits, KEEPCAPS and task-local no_new_privs regressions:
+[AArch64 results](../tests/linux-compat/results/2026-10-12/cappid-after-aarch64.json),
+[x86-64 results](../tests/linux-compat/results/2026-10-12/cappid-after-x86_64.json).
+Capability-exec also passes:
+[AArch64](../tests/linux-compat/results/2026-10-12/cappid-cap-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-12/cappid-cap-x86_64.json).
+All eight host test files pass. The
+[assertion-enabled auditor](../tests/linux-compat/results/2026-10-12/cappid-audit.v)
+checks the controls, 55 source fingerprints, isolated sources, frozen guest
+artifacts, and generated PID validation before data access with no target
+lookup. The new guard allocates and frees nothing.
+
+These receipts qualify argument validation in the initial PID namespace.
+Nested PID-namespace workflows and per-thread credential isolation remain
+unqualified. Capability sets still belong to the process; the broad roadmap
+acceptance gates remain open.

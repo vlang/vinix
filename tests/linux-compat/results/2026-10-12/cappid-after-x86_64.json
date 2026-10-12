@@ -1,0 +1,63 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "34000305ee7267e5bb5f99a74736c0da88f68c4956abecebfd28679ceb2c7f2b",
+    "results": [
+        {
+            "name": "cappid",
+            "source_sha256": "54938fe48d4cfb7ff0d336730e35f288a9490565024cabf702bc25b507e7a006",
+            "init_sha256": "e0f50e3d6b062c2f07c1af181e5e98b154385f57781e53fa0a0f8c4e46651ec2",
+            "iso_sha256": "02e600efcec24e0cbcd0ef140ed9be211c66571fb4decad807fd4d42164bcfd1",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "capset",
+            "source_sha256": "ef93cfe6bdf2e25051da390b736ad9c0458e610f59bb4a593e6e815e4a81d8e4",
+            "init_sha256": "552bdae7badd845769afc10fe53f3a1d5c348b4625fa806802520e09a80d0418",
+            "iso_sha256": "03b8f316e7bbf6a3c3c953775e88d34e9463956ab217462683f60cb30eac19f7",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "capbset",
+            "source_sha256": "c149e8ceb7938ace60e5d100500236d0a23aa10bd1e929fd1db2afc0cad30203",
+            "init_sha256": "202bf3a85112654bba436040bd9e457fcbcae6b51cf0e5a4d308f45445d70f4d",
+            "iso_sha256": "a7de697abab3d622ecd85f0a09d09ec353d4109e92e8fa9cb45191f864996d3f",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "ambient",
+            "source_sha256": "4158995567812d297b1cc5e3e3503600f5423fc1266627beb2930aea4646382f",
+            "init_sha256": "e54c9f6335467eac53c7c5e68c63056de00d66effe4c0bc9db82b8ccaaee423e",
+            "iso_sha256": "4fad2eecf9b4000ba4ff0f3658b525028ce97e712dc740292c5584ccfe9432a4",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "securebits",
+            "source_sha256": "6c9bed07f2da73a41f6a33caf460ea22da2ff1d25786554bbd8b561dc33a1f29",
+            "init_sha256": "80797fb2482e90764c2ff32020c00f98da757447c65aafa3c114001a45253231",
+            "iso_sha256": "54f82a20eea47dc0cd9cb901dabdfb0d297d07b5a5c2267709be04ab29b9075d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "keepcaps",
+            "source_sha256": "e1e0906a97dae640da4269408f3c2f04ca321fe0e113edda83075b81337aa04c",
+            "init_sha256": "c9d3cf18c66f8ad1d8695806bdeb01c259f3f1a256ee1dc43216aae095b52240",
+            "iso_sha256": "b4501bd459618df9bf864aa46efb9f48b9e1d5bb9a9bbffaeaddaaf5719003f0",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "nnpthread",
+            "source_sha256": "fd96c5dbbeb72a805fe2d3898760453433b99200b9b0bc447a56d866ca702f88",
+            "init_sha256": "9cd6e69eb4be7093d01fe222022e0ea33fa323df749f657e18d5318293143918",
+            "iso_sha256": "867bc1e1316e50a370f61bf82aca0f3b4ba42e026eec08de732abfa0d64fea1f",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
