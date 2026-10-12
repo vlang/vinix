@@ -87,6 +87,49 @@ fn test_streaming_digest_and_skip_around_chunk_boundaries() {
 	assert reader.digest()! == 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
 }
 
+fn test_concatenated_tar_streams_continue_beyond_end_markers() {
+	work := temporary_directory()!
+	defer { os.rmdir_all(work) or { panic(err) } }
+	mut bytes := []u8{}
+	for name in ['signature', 'control', 'payload'] {
+		path := work + '/' + name + '.tar'
+		mut writer := tarcore.create(path)!
+		writer.add(tarcore.Member{name: name, size: name.len}, name.bytes())!
+		writer.finish()!
+		writer.close()
+		bytes << os.read_bytes(path)!
+	}
+	path := work + '/concatenated.tar'
+	os.write_file_array(path, bytes)!
+	mut normal := open(path)!
+	defer { normal.close() }
+	assert normal.next()!.name == 'signature'
+	mut normal_ended := false
+	normal.next() or { assert err is End; normal_ended = true }
+	assert normal_ended
+	mut reader := open_concatenated(path)!
+	defer { reader.close() }
+	assert reader.next()!.name == 'signature'
+	// Leave this member unread, and partially read the next member.
+	assert reader.next()!.name == 'control'
+	mut buffer := []u8{len: 2}
+	assert reader.read(mut buffer)! == 2 && buffer.bytestr() == 'co'
+	assert reader.next()!.name == 'payload'
+	assert reader.digest()! == sha256.hexhash('payload')
+	mut ended := false
+	reader.next() or { assert err is End; ended = true }
+	assert ended
+	// A physical short header after an otherwise complete stream is invalid.
+	bytes << [u8(1), 2, 3]
+	os.write_file_array(work + '/truncated.tar', bytes)!
+	mut broken := open_concatenated(work + '/truncated.tar')!
+	defer { broken.close() }
+	for _ in 0 .. 3 { broken.next()! }
+	mut refused := false
+	broken.next() or { assert err !is End; refused = true }
+	assert refused
+}
+
 fn test_numeric_fields_and_header_errors() {
 	mut data := []u8{len: 12, init: 255}
 	assert number(data, 0, 12)! == -1

@@ -36,6 +36,7 @@ mut:
 	padding   int
 	started   bool
 	ended     bool
+	ignore_zeros bool
 	globals   map[string]string
 	metadata_limit i64 = 0x7fffffff
 }
@@ -50,6 +51,14 @@ fn filter_error(stream &C.archive) IError {
 // exact UTF-8 bytes, including decomposed names on macOS.
 pub fn open(path string) !Reader {
 	return open_filtered(path, true)
+}
+
+// APK v2 concatenates signature, control and payload gzip/tar streams. Its
+// reader must continue beyond tar end markers to the physical stream EOF.
+pub fn open_concatenated(path string) !Reader {
+	mut reader := open_filtered(path, true)!
+	reader.ignore_zeros = true
+	return reader
 }
 
 // Boot module inputs are deliberately uncompressed, matching tar's r: mode.
@@ -235,6 +244,7 @@ pub fn (mut reader Reader) next() !tarcore.Member {
 		reader.started = true
 		if data.all(it == 0) {
 			if extensions { return error('missing subsequent archive header') }
+			if reader.ignore_zeros { continue }
 			reader.ended = true
 			return End{}
 		}
