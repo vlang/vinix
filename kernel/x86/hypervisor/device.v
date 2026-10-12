@@ -4,14 +4,16 @@
 module hypervisor
 
 import errno
+import dev.serial
 import event.eventstruct
 import fs
 import katomic
 import klock
-import memory
+import memory.mmap
 import resource
 import stat
 import usercopy
+import x86.cpu
 
 pub const api_version = 1
 pub const ioctl_get_api_version = u64(0x48560000)
@@ -63,6 +65,8 @@ mut:
 	status   int
 	can_mmap bool
 	vm       &Vm = unsafe { nil }
+	creating bool
+	deferred bool
 	// The interface box its descriptors share, freed with the session.
 	box &resource.Resource = unsafe { nil }
 }
@@ -84,7 +88,7 @@ fn reject_write(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
 fn (mut device HypervisorDevice) open(_flags int) ?&resource.Resource {
 	mut session := &HypervisorSession{
 		can_mmap: true
-	}
+	} @[freed]
 	// The opened session behaves like a seekable block of guest memory even
 	// though the factory node itself is a character device.
 	session.stat.mode = stat.ifblk | 0o600
@@ -132,38 +136,44 @@ fn (mut device HypervisorDevice) unlink(_handle voidptr) ? {
 	katomic.dec(mut &device.stat.nlink)
 }
 
+// The syscall's handle or mapping retains this session until the operation
+// completes. Acquire publication under the same lock used by CREATE_VM.
+fn (mut session HypervisorSession) guest_vm() &Vm {
+	session.l.acquire()
+	vm := session.vm
+	session.l.release()
+	return vm
+}
+
 fn (mut session HypervisorSession) read(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	if session.vm == unsafe { nil } || loc >= session.vm.memory_size() {
+	vm := session.guest_vm()
+	if vm == unsafe { nil } || loc >= vm.memory_size() {
 		return 0
 	}
-	remaining := session.vm.memory_size() - loc
+	remaining := vm.memory_size() - loc
 	actual := if count < remaining { count } else { remaining }
-	source := voidptr(u64(session.vm.guest_page(loc / page_size)) + memory_page_offset(loc) + memory_hhdm())
-	unsafe { C.memcpy(buf, source, actual) }
+	if !vm.copy_from_guest(buf, loc, actual) {
+		errno.set(errno.eio)
+		return none
+	}
 	return i64(actual)
 }
 
 fn (mut session HypervisorSession) write(_handle voidptr, buf voidptr, loc u64, count u64) ?i64 {
-	if session.vm == unsafe { nil } || loc > session.vm.memory_size()
-		|| count > session.vm.memory_size() - loc {
+	vm := session.guest_vm()
+	if vm == unsafe { nil } || loc > vm.memory_size()
+		|| count > vm.memory_size() - loc {
 		errno.set(errno.efbig)
 		return none
 	}
 	if count == 0 {
 		return 0
 	}
-	destination := voidptr(u64(session.vm.guest_page(loc / page_size)) + memory_page_offset(loc) + memory_hhdm())
-	unsafe { C.memcpy(destination, buf, count) }
+	if !vm.copy_to_guest(loc, buf, count) {
+		errno.set(errno.eio)
+		return none
+	}
 	return i64(count)
-}
-
-// Kept as tiny helpers so device.v does not expose the VM's physical base.
-fn memory_page_offset(address u64) u64 {
-	return address & (page_size - 1)
-}
-
-fn memory_hhdm() u64 {
-	return memory.get_hhdm_offset()
 }
 
 fn copy_in[T](argp voidptr, mut value T) bool {
@@ -181,10 +191,6 @@ fn (mut session HypervisorSession) ioctl(_handle voidptr, request u64, argp void
 		return api_version
 	}
 	if request == ioctl_create_vm {
-		if session.vm != unsafe { nil } {
-			errno.set(errno.ebusy)
-			return none
-		}
 		mut create_request := CreateRequest{}
 		if !copy_in(argp, mut create_request) {
 			errno.set(errno.efault)
@@ -194,14 +200,32 @@ fn (mut session HypervisorSession) ioctl(_handle voidptr, request u64, argp void
 			errno.set(errno.einval)
 			return none
 		}
-		session.vm = create(create_request.memory_size) or {
+		// Reserve the one creation slot briefly. Holding a spinlock while
+		// allocating up to 1 GiB would disable interrupts for that whole time.
+		session.l.acquire()
+		if session.vm != unsafe { nil } || session.creating {
+			session.l.release()
+			errno.set(errno.ebusy)
+			return none
+		}
+		session.creating = true
+		session.l.release()
+		mut vm := create(create_request.memory_size) or {
+			session.l.acquire()
+			session.creating = false
+			session.l.release()
 			errno.set(errno.enomem)
 			return none
 		}
-		session.stat.size = session.vm.memory_size()
+		session.l.acquire()
+		session.stat.size = vm.memory_size()
+		session.vm = vm
+		session.creating = false
+		session.l.release()
 		return 0
 	}
-	if session.vm == unsafe { nil } {
+	mut vm := session.guest_vm()
+	if vm == unsafe { nil } {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -213,14 +237,14 @@ fn (mut session HypervisorSession) ioctl(_handle voidptr, request u64, argp void
 				errno.set(errno.efault)
 				return none
 			}
-			if !session.vm.set_registers(registers) {
+			if !vm.set_registers(registers) {
 				errno.set(errno.eio)
 				return none
 			}
 			return 0
 		}
 		ioctl_get_registers {
-			registers := session.vm.get_registers() or {
+			registers := vm.get_registers() or {
 				errno.set(errno.eio)
 				return none
 			}
@@ -236,14 +260,14 @@ fn (mut session HypervisorSession) ioctl(_handle voidptr, request u64, argp void
 				errno.set(errno.efault)
 				return none
 			}
-			if !session.vm.set_entry(entry.rip, entry.rsp, entry.rflags) {
+			if !vm.set_entry(entry.rip, entry.rsp, entry.rflags) {
 				errno.set(errno.einval)
 				return none
 			}
 			return 0
 		}
 		ioctl_get_entry {
-			rip, rsp, rflags := session.vm.get_entry() or {
+			rip, rsp, rflags := vm.get_entry() or {
 				errno.set(errno.eio)
 				return none
 			}
@@ -255,15 +279,15 @@ fn (mut session HypervisorSession) ioctl(_handle voidptr, request u64, argp void
 			return 0
 		}
 		ioctl_run {
-			exit := session.vm.run() or {
+			exit := vm.run() or {
 				errno.set(errno.eio)
 				return none
 			}
 			result := RunResult{
-				reason: exit.reason
+				reason:             exit.reason
 				instruction_length: exit.instruction_length
-				qualification: exit.qualification
-				interruption_info: exit.interruption_info
+				qualification:      exit.qualification
+				interruption_info:  exit.interruption_info
 			}
 			if !copy_out(argp, &result) {
 				errno.set(errno.efault)
@@ -277,7 +301,7 @@ fn (mut session HypervisorSession) ioctl(_handle voidptr, request u64, argp void
 				errno.set(errno.efault)
 				return none
 			}
-			if !session.vm.advance_rip(length) {
+			if !vm.advance_rip(length) {
 				errno.set(errno.eio)
 				return none
 			}
@@ -291,11 +315,27 @@ fn (mut session HypervisorSession) ioctl(_handle voidptr, request u64, argp void
 }
 
 fn (mut session HypervisorSession) mmap(_handle voidptr, page u64, _flags int) voidptr {
-	if session.vm == unsafe { nil } {
+	vm := session.guest_vm()
+	if vm == unsafe { nil } {
 		return unsafe { nil }
 	}
-	return session.vm.guest_page(page)
+	return vm.guest_page(page)
 }
+
+// Guest RAM is shared device memory, without private COW-page ownership.
+// Reject private mappings rather than letting fork retain frames for which
+// this resource has no private-page release callback.
+fn (mut session HypervisorSession) retain_mapping_range(_handle voidptr, offset u64, length u64, flags int) bool {
+	vm := session.guest_vm()
+	if vm == unsafe { nil } || flags & (mmap.map_shared | mmap.map_private) != mmap.map_shared
+		|| offset > vm.memory_size() || length > vm.memory_size() - offset {
+		errno.set(errno.einval)
+		return false
+	}
+	return true
+}
+
+fn (mut session HypervisorSession) release_mapping_range(_handle voidptr, _offset u64, _length u64, _flags int) {}
 
 fn (mut session HypervisorSession) grow(_handle voidptr, _size u64) ? {
 	errno.set(errno.eperm)
@@ -304,6 +344,15 @@ fn (mut session HypervisorSession) grow(_handle voidptr, _size u64) ? {
 
 fn (mut session HypervisorSession) unref(_handle voidptr) ? {
 	if katomic.dec(mut &session.refcount) {
+		return
+	}
+	// Final unmap/close may hold a pagemap or descriptor spinlock. Hand one
+	// reference to the existing maintenance reaper so poisoning/freeing a
+	// large RAM tree runs outside those locks. Queueing never invokes unref.
+	if !session.deferred && !cpu.interrupt_state() {
+		session.deferred = true
+		katomic.inc(mut &session.refcount)
+		fs.release_resource_after_grace(session.box)
 		return
 	}
 	if session.vm != unsafe { nil } {
@@ -356,12 +405,18 @@ fn smoke_test() bool {
 // initialise validates one complete guest entry/exit before publishing the
 // device. A faulty or incomplete VMX implementation is never exposed to EL0.
 pub fn initialise() {
-	if hypervisor_device != unsafe { nil } || !available() {
+	if hypervisor_device != unsafe { nil } {
 		return
 	}
-	if !smoke_test() {
-		println('hypervisor: VMX self-test failed; device not registered')
-		return
+	$if hv_memory_fixture ? {
+		println('hypervisor: memory fixture; VM entry disabled')
+		for byte in 'hypervisor: memory fixture; VM entry disabled\n' { serial.out(byte) }
+	} $else {
+		if !available() { return }
+		if !smoke_test() {
+			println('hypervisor: VMX self-test failed; device not registered')
+			return
+		}
 	}
 	mut device := &HypervisorDevice{}
 	device.stat.mode = stat.ifchr | 0o600

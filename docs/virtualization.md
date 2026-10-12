@@ -7,7 +7,7 @@ native Intel VT-x hypervisor. These use different userspace APIs:
 | --- | --- |
 | Run amd64 Vinix under QEMU/KVM on an x86_64 Linux host | Supported by the desktop launcher and ISO boot checks. |
 | Run arm64 Vinix under QEMU/KVM on an AArch64 Linux host | Supported by the ISO boot checks. |
-| Create small hardware-accelerated VMs inside amd64 Vinix | Intel VT-x through `/dev/hypervisor`; one vCPU and at most 2 MiB per VM. |
+| Create hardware-accelerated VMs inside amd64 Vinix | Intel VT-x through `/dev/hypervisor`; one vCPU and at most 1 GiB RAM per VM. Larger-memory allocation and mappings are tested separately from physical VM entry. |
 | Use Linux's `/dev/kvm` API inside Vinix | Not implemented on either architecture. |
 | Run another arm64 Vinix instance through QEMU inside Vinix | TCG software emulation through `vinix-qemu`. |
 
@@ -82,7 +82,7 @@ it does not automatically select Linux KVM.
 
 ## Host VMs inside Vinix
 
-The native backend requires Intel VMX, EPT, and unrestricted-guest support
+The native backend requires Intel VMX, EPT with INVEPT, and unrestricted-guest support
 available to the amd64 Vinix kernel. When Vinix itself runs in a VM, the outer
 hypervisor must expose nested VT-x for `/dev/hypervisor` to become available.
 Running Vinix as an ordinary KVM guest does not require nested VT-x.

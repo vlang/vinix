@@ -7,12 +7,14 @@ fn instruction_fixture() (string, string) {
 	mut assembly := ''
 	mut text := ''
 	for pair in [['on', 'vmxon'], ['off', 'vmxoff'], ['clear', 'vmclear'], ['load', 'vmptrld'],
-		['write', 'vmwriteq'], ['read', 'vmreadq']] {
+		['write', 'vmwriteq'], ['read', 'vmreadq'], ['invept', 'invept']] {
 		assembly += '<vinix_vmx_${pair[0]}>:\n  0:\t${pair[1]} %rax\n  3:\tsetbe %al\n\n'
 		opcode := if pair[0] == 'write' {
 			'vmwrite %[value], %[field]'
 		} else if pair[0] == 'read' {
 			'vmread %[field], %[result]'
+		} else if pair[0] == 'invept' {
+			'invept %[operand], %[extent]'
 		} else {
 			pair[1]
 		}
@@ -29,14 +31,15 @@ fn refused(assembly string, text string, message string) {
 	assert false, 'accepted invalid instruction evidence: ${message}'
 }
 
-fn test_cf_zf_immediacy_operand_order_clobbers_and_all_six_controls() {
+fn test_cf_zf_immediacy_operand_order_clobbers_and_ept_invalidation() {
 	assembly, text := instruction_fixture()
 	check_instructions(assembly, text)!
-	for opcode in ['vmxon', 'vmxoff', 'vmclear', 'vmptrld', 'vmwriteq', 'vmreadq'] {
+	for opcode in ['vmxon', 'vmxoff', 'vmclear', 'vmptrld', 'vmwriteq', 'vmreadq', 'invept'] {
 		refused(assembly.replace('${opcode} %rax\n  3:\tsetbe', '${opcode} %rax\n  2:\tnop\n  3:\tsetbe'), text, '${opcode} must immediately capture CF/ZF')
 	}
 	refused(assembly, text.replace('vmwrite %[value], %[field]', 'vmwrite %[field], %[value]'), 'VMWRITE operand order changed')
 	refused(assembly, text.replace('vmread %[field], %[result]', 'vmread %[result], %[field]'), 'VMREAD operand order changed')
+	refused(assembly, text.replace('invept %[operand], %[extent]', 'invept %[extent], %[operand]'), 'INVEPT operand order changed')
 	for field in ['"cc"', '"memory"'] {
 		refused(assembly, text.replace(field, '"other"'), 'VMX flags/memory clobbers changed')
 	}
@@ -58,22 +61,28 @@ fn test_allocator_boundaries_unicode_lines_and_objdump_search() {
 		'\u2029'] {
 		assert text_lines('one${separator}two${separator}') == ['one', 'two']
 	}
-	c := Config{ env: {
-		'PATH': ''
-	} }
+	c := Config{
+		env: {
+			'PATH': ''
+		}
+	}
 	assert c.objdump_path() == '/opt/homebrew/opt/llvm/bin/llvm-objdump'
 	work := os.getenv('VINIX_VMX_OBJDUMP_TEST_DIR')
 	if work != '' {
 		executable := join(work, 'llvm-objdump')
 		os.write_file(executable, '')!
 		os.chmod(executable, 0o700)!
-		assert Config{ env: {
-			'PATH': work + ':' + work
-		} }.objdump_path() == executable
+		assert Config{
+			env: {
+				'PATH': work + ':' + work
+			}
+		}.objdump_path() == executable
 		os.chmod(executable, 0o600)!
-		assert Config{ env: {
-			'PATH': work
-		} }.objdump_path() == '/opt/homebrew/opt/llvm/bin/llvm-objdump'
+		assert Config{
+			env: {
+				'PATH': work
+			}
+		}.objdump_path() == '/opt/homebrew/opt/llvm/bin/llvm-objdump'
 		os.rm(executable)!
 	}
 }

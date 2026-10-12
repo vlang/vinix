@@ -166,7 +166,7 @@ fn (c Config) host() ! {
 		]))!
 		c.inherited([binary])!
 	}
-	c.generate('privileged', ['vmx.v', 'vmx_controls_amd64.v', 'vmx_state_amd64.v'], 'amd64', false)!
+	c.generate('privileged', ['vmx.v', 'vmx_controls_amd64.v', 'vmx_state_amd64.v', 'vmx_invept_amd64.v'], 'amd64', false)!
 }
 
 fn text_lines(text string) []string {
@@ -200,7 +200,7 @@ fn control_blocks(text string) []string {
 		remaining = remaining[begin + '__asm__ volatile ('.len..]
 		end := remaining.index(');') or { break }
 		block := remaining[..end]
-		for prefix in ['"vmxon', '"vmxoff', '"vmclear', '"vmptrld', '"vmwrite', '"vmread'] {
+		for prefix in ['"vmxon', '"vmxoff', '"vmclear', '"vmptrld', '"vmwrite', '"vmread', '"invept'] {
 			if block.contains(prefix) {
 				result << block
 				break
@@ -213,7 +213,7 @@ fn control_blocks(text string) []string {
 
 fn check_instructions(assembly string, text string) ! {
 	for pair in [['on', 'vmxon'], ['off', 'vmxoff'], ['clear', 'vmclear'], ['load', 'vmptrld'],
-		['write', 'vmwriteq'], ['read', 'vmreadq']] {
+		['write', 'vmwriteq'], ['read', 'vmreadq'], ['invept', 'invept']] {
 		marker := '<vinix_vmx_' + pair[0] + '>:'
 		offset := assembly.index(marker) or { return CheckError{ kind: 'IndexError', message: 'list index out of range' } }
 		suffix := assembly[offset + marker.len..]
@@ -243,8 +243,11 @@ fn check_instructions(assembly string, text string) ! {
 	if !text.contains('"vmread %[field], %[result]') {
 		return CheckError{ message: 'VMREAD operand order changed' }
 	}
+	if !text.contains('"invept %[operand], %[extent]') {
+		return CheckError{ message: 'INVEPT operand order changed' }
+	}
 	controls := control_blocks(text)
-	if controls.len != 6 { return CheckError{ message: 'VMX flags/memory clobbers changed' } }
+	if controls.len != 7 { return CheckError{ message: 'VMX flags/memory clobbers changed' } }
 	for block in controls {
 		if !block.contains('"cc"') || !block.contains('"memory"') {
 			return CheckError{ message: 'VMX flags/memory clobbers changed' }

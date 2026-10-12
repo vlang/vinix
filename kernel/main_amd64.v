@@ -274,6 +274,9 @@ fn kmain() {
 	_ := stubs.toupper(0)
 
 	memory.vmm_init()
+	$if hv_memory_selftest ? {
+		hypervisor.memory_selftest()
+	}
 	// The real-mode entry a suspend to RAM comes back through, in its page.
 	wake.install()
 

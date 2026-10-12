@@ -32,6 +32,7 @@ int vinix_vmx_clear(uint64_t physical_address);
 int vinix_vmx_load(uint64_t physical_address);
 int vinix_vmx_write(uint64_t field, uint64_t value);
 int vinix_vmx_read(uint64_t field, uint64_t *value);
+int vinix_vmx_invept(uint64_t kind, uint64_t eptp);
 int vinix_vmx_enter(struct vinix_vmx_registers *registers);
 void vinix_vmx_fxsave(void *state);
 /* V emits unqualified pointers; ordinary C callers keep the const contract. */

@@ -26,6 +26,8 @@ fn C.vinix_vmx_write(field u64, value u64) i32
 
 fn C.vinix_vmx_read(field u64, value &u64) i32
 
+fn C.vinix_vmx_invept(kind u64, eptp u64) i32
+
 fn C.vinix_vmx_enter(registers &C.vinix_vmx_registers) i32
 
 fn C.vinix_vmx_fxsave(state voidptr)
@@ -167,8 +169,6 @@ const secondary_enable_ept = u32(1) << 1
 const secondary_unrestricted_guest = u32(1) << 7
 const exit_host_address_space_size = u32(1) << 9
 
-pub const max_guest_memory = u64(2 * 1024 * 1024)
-
 __global (
 	vmx_regions      [256]u64
 	vmx_revision     u32
@@ -210,12 +210,7 @@ pub struct Vm {
 mut:
 	l         klock.Lock
 	vmcs      u64
-	ept_pml4  u64
-	ept_pdpt  u64
-	ept_pd    u64
-	ept_pt    u64
-	ram       u64
-	ram_pages u64
+	ram       GuestMemory
 	guest_fpu u64
 	host_fpu  u64
 	destroyed bool
@@ -344,36 +339,23 @@ pub fn enabled_cpu_count() u64 {
 }
 
 fn alloc_page() ?u64 {
-	page := memory.pmm_alloc_fallible(1)
-	if page == unsafe { nil } || !physical_address_valid(u64(page)) {
-		if page != unsafe { nil } {
-			memory.pmm_free(page, 1)
-		}
+	page := guest_memory_alloc_page() or { return none }
+	if !physical_address_valid(page) {
+		memory.pmm_free(voidptr(page), 1)
 		return none
 	}
-	unsafe {
-		C.memset(voidptr(u64(page) + memory.get_hhdm_offset()), 0, page_size)
-	}
-	return u64(page)
+	return page
+}
+
+fn ept_invalidation_kind(cap u64) ?u64 {
+	if cap & (u64(1) << 20) == 0 { return none }
+	if cap & (u64(1) << 25) != 0 { return u64(1) }
+	if cap & (u64(1) << 26) != 0 { return u64(2) }
+	return none
 }
 
 fn (mut vm Vm) free_pages() {
-	if vm.ram != 0 {
-		memory.pmm_free(voidptr(vm.ram), vm.ram_pages)
-		vm.ram = 0
-	}
-	if vm.ept_pt != 0 {
-		memory.pmm_free(voidptr(vm.ept_pt), 1)
-	}
-	if vm.ept_pd != 0 {
-		memory.pmm_free(voidptr(vm.ept_pd), 1)
-	}
-	if vm.ept_pdpt != 0 {
-		memory.pmm_free(voidptr(vm.ept_pdpt), 1)
-	}
-	if vm.ept_pml4 != 0 {
-		memory.pmm_free(voidptr(vm.ept_pml4), 1)
-	}
+	vm.ram.release()
 	if vm.host_fpu != 0 {
 		memory.pmm_free(voidptr(vm.host_fpu), 1)
 	}
@@ -383,32 +365,9 @@ fn (mut vm Vm) free_pages() {
 	if vm.vmcs != 0 {
 		memory.pmm_free(voidptr(vm.vmcs), 1)
 	}
-	vm.ept_pt = 0
-	vm.ept_pd = 0
-	vm.ept_pdpt = 0
-	vm.ept_pml4 = 0
 	vm.host_fpu = 0
 	vm.guest_fpu = 0
 	vm.vmcs = 0
-}
-
-fn set_table_entry(table u64, index u64, value u64) {
-	unsafe {
-		mut entries := &u64(table + memory.get_hhdm_offset())
-		entries[index] = value
-	}
-}
-
-fn (mut vm Vm) build_ept() bool {
-	// EPTP uses WB memory (6), a four-level walk (3), and no accessed/dirty
-	// tracking. Each guest page is independently mapped RWX.
-	set_table_entry(vm.ept_pml4, 0, vm.ept_pdpt | 0x7)
-	set_table_entry(vm.ept_pdpt, 0, vm.ept_pd | 0x7)
-	set_table_entry(vm.ept_pd, 0, vm.ept_pt | 0x7)
-	for i := u64(0); i < vm.ram_pages; i++ {
-		set_table_entry(vm.ept_pt, i, vm.ram + i * page_size | 0x37)
-	}
-	return true
 }
 
 fn control_msrs() (u32, u32, u32, u32) {
@@ -440,6 +399,7 @@ fn (mut vm Vm) configure_vmcs() bool {
 	if ept_cap & (u64(1) << 6) == 0 || ept_cap & (u64(1) << 14) == 0 {
 		return false
 	}
+	ept_invalidation_kind(ept_cap) or { return false }
 
 	mut ok := true
 	ok = ok && vmwrite(vmcs_pinbased_controls, pin)
@@ -452,7 +412,7 @@ fn (mut vm Vm) configure_vmcs() bool {
 	ok = ok && vmwrite(vmcs_pagefault_error_match, 0)
 	ok = ok && vmwrite(vmcs_cr3_target_count, 0)
 	ok = ok && vmwrite(vmcs_entry_interruption_info, 0)
-	ok = ok && vmwrite(vmcs_ept_pointer, vm.ept_pml4 | 0x1e)
+	ok = ok && vmwrite(vmcs_ept_pointer, vm.ram.pml4 | 0x1e)
 	ok = ok && vmwrite(vmcs_guest_vmcs_link_pointer, ~u64(0))
 
 	// A flat real-mode guest is the smallest useful VMX execution environment.
@@ -505,73 +465,54 @@ fn (mut vm Vm) configure_vmcs() bool {
 	return ok
 }
 
-// create allocates a VM with up to 2 MiB of identity-mapped guest-physical
-// memory. The limit keeps the first implementation's EPT compact and makes
-// every allocation and cleanup path deterministic.
-pub fn create(memory_size u64) ?&Vm {
-	if !available() || memory_size == 0 || memory_size > max_guest_memory {
+// Allocate a complete ownership tree before publishing the VM. The opt-in
+// memory fixture uses this same allocator without entering VMX operation.
+fn allocate_vm(memory_size u64) ?&Vm {
+	if !guest_memory_size_valid(memory_size) {
 		return none
 	}
-	ram_pages := (memory_size + page_size - 1) / page_size
-	mut vm := &Vm{
-		ram_pages: ram_pages
-	}
+	mut vm := &Vm{} @[freed]
 	vm.vmcs = alloc_page() or {
 		unsafe { free(vm) }
 		return none
 	}
-	vm.ept_pml4 = alloc_page() or {
+	if !vm.ram.initialise(memory_size) {
 		vm.free_pages()
 		unsafe { free(vm) }
 		return none
 	}
-	vm.ept_pdpt = alloc_page() or {
+	// FXSAVE/FXRSTOR take mapped virtual addresses, not VMX physical
+	// operands. VMX_BASIC's low-4-GiB restriction applies only to the VMCS.
+	vm.guest_fpu = guest_memory_alloc_page() or {
 		vm.free_pages()
 		unsafe { free(vm) }
 		return none
 	}
-	vm.ept_pd = alloc_page() or {
+	vm.host_fpu = guest_memory_alloc_page() or {
 		vm.free_pages()
 		unsafe { free(vm) }
 		return none
 	}
-	vm.ept_pt = alloc_page() or {
-		vm.free_pages()
-		unsafe { free(vm) }
-		return none
-	}
-	vm.guest_fpu = alloc_page() or {
-		vm.free_pages()
-		unsafe { free(vm) }
-		return none
-	}
-	vm.host_fpu = alloc_page() or {
-		vm.free_pages()
-		unsafe { free(vm) }
-		return none
-	}
-	ram := memory.pmm_alloc_fallible(ram_pages)
-	if ram == unsafe { nil } || !physical_address_valid(u64(ram) + (ram_pages - 1) * page_size) {
-		if ram != unsafe { nil } {
-			memory.pmm_free(ram, ram_pages)
-		}
-		vm.free_pages()
-		unsafe { free(vm) }
-		return none
-	}
-	vm.ram = u64(ram)
 	unsafe {
-		C.memset(voidptr(vm.ram + memory.get_hhdm_offset()), 0, ram_pages * page_size)
 		// Initial x87 control word and MXCSR reset values in an FXSAVE image.
 		*(&u16(vm.guest_fpu + memory.get_hhdm_offset())) = 0x037f
 		*(&u32(vm.guest_fpu + memory.get_hhdm_offset() + 24)) = 0x1f80
 		*(&u32(vm.vmcs + memory.get_hhdm_offset())) = vmx_revision
 	}
+	return vm
+}
+
+pub fn create(memory_size u64) ?&Vm {
+	$if hv_memory_fixture ? {
+		return allocate_vm(memory_size)
+	}
+	if !available() { return none }
+	mut vm := allocate_vm(memory_size) or { return none }
 	vm.l.acquire()
 	current := cpulocal.current()
 	can_configure := current.cpu_number < u64(vmx_regions.len)
 		&& vmx_regions[current.cpu_number] != 0
-	configured := can_configure && vm.build_ept() && vm.configure_vmcs()
+	configured := can_configure && vm.configure_vmcs()
 	vm.l.release()
 	if !configured {
 		vm.free_pages()
@@ -582,36 +523,22 @@ pub fn create(memory_size u64) ?&Vm {
 }
 
 pub fn (vm &Vm) memory_size() u64 {
-	return vm.ram_pages * page_size
+	return vm.ram.size()
 }
 
 pub fn (vm &Vm) guest_page(page u64) voidptr {
-	if vm.destroyed || page >= vm.ram_pages {
+	if vm.destroyed {
 		return unsafe { nil }
 	}
-	return voidptr(vm.ram + page * page_size)
+	return vm.ram.page(page)
 }
 
 pub fn (vm &Vm) copy_to_guest(guest_address u64, source voidptr, length u64) bool {
-	if vm.destroyed || source == unsafe { nil } || guest_address > vm.memory_size()
-		|| length > vm.memory_size() - guest_address {
-		return false
-	}
-	unsafe {
-		C.memcpy(voidptr(vm.ram + memory.get_hhdm_offset() + guest_address), source, length)
-	}
-	return true
+	return !vm.destroyed && vm.ram.copy(guest_address, source, length, true)
 }
 
 pub fn (vm &Vm) copy_from_guest(destination voidptr, guest_address u64, length u64) bool {
-	if vm.destroyed || destination == unsafe { nil } || guest_address > vm.memory_size()
-		|| length > vm.memory_size() - guest_address {
-		return false
-	}
-	unsafe {
-		C.memcpy(destination, voidptr(vm.ram + memory.get_hhdm_offset() + guest_address), length)
-	}
-	return true
+	return !vm.destroyed && vm.ram.copy(guest_address, destination, length, false)
 }
 
 pub fn (mut vm Vm) set_registers(registers Registers) bool {
@@ -745,6 +672,9 @@ pub fn (mut vm Vm) get_entry() ?(u64, u64, u64) {
 // run enters the guest until the next VM exit. The VMCS is cleared after each
 // run so a later call may safely execute on another scheduler CPU.
 pub fn (mut vm Vm) run() ?VmExit {
+	$if hv_memory_fixture ? {
+		return none
+	}
 	vm.l.acquire()
 	defer { vm.l.release() }
 	if vm.destroyed {
@@ -754,6 +684,10 @@ pub fn (mut vm Vm) run() ?VmExit {
 	if current.cpu_number >= u64(vmx_regions.len) || vmx_regions[current.cpu_number] == 0 {
 		return none
 	}
+	// An EPT root's physical page can be recycled after destruction. Flush
+	// before every entry on this CPU, including migration to another CPU.
+	kind := ept_invalidation_kind(msr.rdmsr(ia32_vmx_ept_vpid_cap)) or { return none }
+	if C.vinix_vmx_invept(kind, vm.ram.pml4 | 0x1e) != 0 { return none }
 	if C.vinix_vmx_load(vm.vmcs) != 0 {
 		return none
 	}
@@ -802,18 +736,23 @@ pub fn (mut vm Vm) run() ?VmExit {
 		return none
 	}
 	return VmExit{
-		reason: u32(reason & 0xffff)
-		qualification: qualification
+		reason:             u32(reason & 0xffff)
+		qualification:      qualification
 		instruction_length: u32(instruction_length)
-		interruption_info: u32(interruption_info)
+		interruption_info:  u32(interruption_info)
 	}
 }
 
 pub fn (mut vm Vm) destroy() {
 	vm.l.acquire()
-	if !vm.destroyed {
-		vm.destroyed = true
-		vm.free_pages()
+	if vm.destroyed {
+		vm.l.release()
+		return
 	}
+	vm.destroyed = true
 	vm.l.release()
+	// Only the final session reference calls destroy. Session unref defers
+	// cleanup when an outer spinlock has interrupts disabled; do not add a VM
+	// spinlock around releasing hundreds of thousands of pages here.
+	vm.free_pages()
 }

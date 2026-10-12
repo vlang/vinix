@@ -11,8 +11,10 @@ continues booting normally. On supported systems an EPT-backed real-mode guest
 is run as a boot-time self-test before `/dev/hypervisor` is registered.
 
 The initial interface intentionally targets small firmware, boot-loader, and
-device-model experiments. Each VM has one vCPU and up to 2 MiB of contiguous,
-identity-mapped guest-physical memory. Guest execution stops for `HLT`, I/O,
+device-model experiments. Each VM has one vCPU and up to 1 GiB of guest RAM,
+backed by separate 4 KiB physical pages and a four-level EPT. Sizes are rounded
+up to a page; creation fails with `ENOMEM` if the complete allocation cannot
+be made. Guest execution stops for `HLT`, I/O,
 CPUID, external interrupts, EPT faults, and the other architectural VM exits;
 userspace decides how to emulate each exit.
 
@@ -29,9 +31,24 @@ Include `<vinix/hypervisor.h>`, open `/dev/hypervisor` once per VM, then:
 7. For an emulated instruction, pass its reported length to
    `VINIX_HV_ADVANCE_RIP` before running again.
 
-The VM and all pinned pages are released after the final descriptor or mapping
-is closed. VMCS ownership is cleared after every exit, so a vCPU may resume on
-a different Vinix scheduler CPU.
+Guest memory supports unaligned reads/writes across physical-page boundaries.
+Only shared mappings within the rounded RAM size are accepted; private mappings
+return `EINVAL`. A mapping retains the VM after its last descriptor is closed,
+including across fork. Concurrent creation on one session returns `EBUSY`.
+
+The VM and its pages are released after the final descriptor or mapping is
+closed. When that release occurs under a kernel spinlock, the existing
+maintenance reaper owns cleanup after its five-second retirement grace; a
+large RAM tree is not freed under the caller's pagemap lock. VMCS ownership is
+cleared after every exit, so a vCPU may resume on a different scheduler CPU.
+The backend requires INVEPT support and flushes EPT translations before each
+entry, including migration and reuse of an old EPT root's physical page.
+
+The [memory checks](../tests/hypervisor/README.md) boot the production allocator
+with a test-only device that disables VM entry. They qualify 1 GiB allocation,
+rollback, I/O and mapping lifetimes; real VM entry still requires Intel VMX
+hardware or a host exposing nested VT-x. This larger memory limit does not
+provide additional vCPUs, AMD/ARM hardware backends or a complete device model.
 
 This example executes an `OUT 0xe9, AL` followed by `HLT`:
 

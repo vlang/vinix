@@ -18,7 +18,7 @@
 #define VINIX_HV_EXIT_HLT               12
 #define VINIX_HV_EXIT_CPUID             10
 #define VINIX_HV_EXIT_IO                30
-#define VINIX_HV_MAX_GUEST_MEMORY (2UL * 1024 * 1024)
+#define VINIX_HV_MAX_GUEST_MEMORY (1024UL * 1024 * 1024)
 
 struct vinix_hv_create {
     uint64_t memory_size;
