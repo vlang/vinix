@@ -1733,6 +1733,8 @@ CONTENT_KEY_INPUTS=(
     "$SCRIPT_DIR/desktop"
     "$SCRIPT_DIR/build-support/security-tools"
     "$SCRIPT_DIR/build-support/stage-uname.sh"
+    "$SCRIPT_DIR/build-support/stage-identity.v"
+    "$SCRIPT_DIR/build-support/identitycore"
     "$SCRIPT_DIR/build-support/uname"
     "$SCRIPT_DIR/build-support/security-audit"
     "$SCRIPT_DIR/tools/security-audit"

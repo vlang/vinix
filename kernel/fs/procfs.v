@@ -45,6 +45,10 @@ const uname_release = '0.1.0'
 
 const uname_release_line = uname_release + '\n'
 
+const linux_compat_release = '5.15.0-vinix'
+
+const linux_compat_release_line = linux_compat_release + '\n'
+
 // What a node under /proc describes. Directories are rebuilt on access; the
 // files generate their contents when they are read.
 enum ProcFSKind {
@@ -64,6 +68,8 @@ enum ProcFSKind {
 	allocsites
 	uptime
 	version
+	ostype
+	osrelease
 	text
 	cpuinfo
 	machine_stat
@@ -311,8 +317,8 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 	add_procfs_text(mut inotify, 'max_user_instances', '128\n')
 	add_procfs_text(mut inotify, 'max_queued_events', '16384\n')
 	mut sys_kernel := add_procfs_directory(mut sys, 'kernel')
-	add_procfs_text(mut sys_kernel, 'ostype', 'Linux\n')
-	add_procfs_text(mut sys_kernel, 'osrelease', uname_release_line)
+	add_procfs_file(mut sys_kernel, 'ostype', .ostype)
+	add_procfs_file(mut sys_kernel, 'osrelease', .osrelease)
 	add_procfs_text(mut sys_kernel, 'pid_max', decimal_line(proc.max_pid))
 	add_procfs_text(mut sys_kernel, 'threads-max', decimal_line(proc.max_pid))
 	// Writable, so root can raise it; see security.set_securelevel.
@@ -671,10 +677,18 @@ fn (this &ProcFSResource) contents() string {
 		}
 		.version {
 			// Match uname's host identity and Linux-compatible UTS namespaces.
-			sysname := if utsnet.in_own_uts_namespace() { 'Linux' } else { 'Vinix' }
+			in_container := utsnet.in_own_uts_namespace()
+			sysname := if in_container { 'Linux' } else { 'Vinix' }
+			release := if in_container { linux_compat_release } else { uname_release }
 			// Freed by read(), as every generated text is.
-			text := '${sysname} version ${uname_release} (vinix) #1 SMP\n' @[freed]
+			text := '${sysname} version ${release} (vinix) #1 SMP\n' @[freed]
 			return text
+		}
+		.ostype {
+			return if utsnet.in_own_uts_namespace() { 'Linux\n' } else { 'Vinix\n' }
+		}
+		.osrelease {
+			return if utsnet.in_own_uts_namespace() { linux_compat_release_line } else { uname_release_line }
 		}
 		.cmdline {
 			return proc.process_command_line(this.pid)
