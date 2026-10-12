@@ -25,6 +25,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if layout_selector(object, name) { return true }
 	if json_selector(object, name) { return true }
 	if ns_condition_selector(object, name) { return true }
+	if cookie_selector(object, name) { return true }
 	if accessibility_selector(object, name) { return true }
 	if native_method(read64(object), name) != 0 { return true }
 	if name in ['class', 'isKindOfClass:', 'respondsToSelector:', 'copy', 'init', 'dealloc'] { return true }
@@ -40,7 +41,7 @@ fn objc_responds(object u64, selector &char) bool {
 			'NSNotificationCenter' { name == 'defaultCenter' }
 			'NSNotification' { name == 'notificationWithName:object:userInfo:' }
 			'NSBundle' { name == 'mainBundle' }
-			'NSURL' { name == 'fileURLWithPath:' }
+			'NSURL' { name in ['fileURLWithPath:', 'URLWithString:'] }
 			'NSLocale' { name == 'currentLocale' }
 			'UIDevice' { name == 'currentDevice' }
 			'UIApplication' { name == 'sharedApplication' }
@@ -53,9 +54,10 @@ fn objc_responds(object u64, selector &char) bool {
 	if objc_is_kind(object, ios_runtime.names['NSString']) { return name in ['UTF8String', 'length', 'isEqualToString:', 'stringByAppendingString:', 'initWithBytes:length:encoding:'] }
 	if objc_is_kind(object, ios_runtime.names['NSAttributedString']) { return name == 'initWithString:attributes:' }
 	if objc_is_kind(object, ios_runtime.names['NSArray']) { return name in ['count', 'firstObject', 'objectAtIndex:', 'objectAtIndexedSubscript:', 'countByEnumeratingWithState:objects:count:'] }
+	if objc_is_kind(object, ios_runtime.names['NSMutableDictionary']) && name == 'setObject:forKey:' { return true }
 	if objc_is_kind(object, ios_runtime.names['NSDictionary']) { return name in ['count', 'objectForKey:', 'objectForKeyedSubscript:', 'countByEnumeratingWithState:objects:count:'] }
 	if objc_is_kind(object, ios_runtime.names['NSData']) { return name in ['bytes', 'length'] }
-	if objc_is_kind(object, ios_runtime.names['NSURL']) { return name in ['path', 'absoluteString', 'isFileURL', 'scheme'] }
+	if objc_is_kind(object, ios_runtime.names['NSURL']) { return http_url_builtin_types('NSURL', false, name) != none }
 	if objc_is_kind(object, ios_runtime.names['NSLocale']) { return name in ['objectForKey:', 'localeIdentifier'] }
 	if objc_is_kind(object, ios_runtime.names['NSOperationQueue']) { return name in ['name', 'setName:', 'maxConcurrentOperationCount', 'setMaxConcurrentOperationCount:'] }
 	if objc_is_kind(object, ios_runtime.names['CLLocationManager']) { return name in ['delegate', 'setDelegate:'] }

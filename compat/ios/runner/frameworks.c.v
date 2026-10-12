@@ -186,6 +186,14 @@ fn framework_constant(symbol string) ?u64 {
 		'_NSHTTPCookieOriginURL' { 'OriginURL' }
 		'_NSHTTPCookiePath' { 'Path' }
 		'_NSHTTPCookieValue' { 'Value' }
+		'_NSHTTPCookieDomain' { 'Domain' }
+		'_NSHTTPCookieVersion' { 'Version' }
+		'_NSHTTPCookieSecure' { 'Secure' }
+		'_NSHTTPCookieDiscard' { 'Discard' }
+		'_NSHTTPCookieMaximumAge' { 'Max-Age' }
+		'_NSHTTPCookieComment' { 'Comment' }
+		'_NSHTTPCookieCommentURL' { 'CommentURL' }
+		'_NSHTTPCookiePort' { 'Port' }
 		'_NSURLAuthenticationMethodServerTrust' { 'NSURLAuthenticationMethodServerTrust' }
 		'_NSURLErrorFailingURLPeerTrustErrorKey' { 'NSURLErrorFailingURLPeerTrustErrorKey' }
 		'_NSURLErrorFailingURLStringErrorKey' { 'NSErrorFailingURLStringKey' }

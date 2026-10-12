@@ -2954,17 +2954,70 @@ that class or executing app code. Evidence is under
 five published runners are unchanged, and entry/rendering/gameplay remain
 unverified.
 
+`NSHTTPCookie` now implements property construction, its public getters,
+mutable property snapshots, equality and request/response header factories in
+V. The 16-byte cookie record owns an 8-byte `NSHTTPCookieInternal` object through
+the measured `_cookiePrivate` ivar. That object owns copied strings, a canonical
+dictionary, a port array and the parsed comment URL. Disposal releases them
+after class changes and caller-storage destruction too. The ordinary mutable
+dictionary setter is implemented for editing property snapshots.
+
+Typed calls into the installed Foundation library verify domain normalization,
+empty values, presence-based Secure/HttpOnly flags, Discard removing expiry,
+SameSite normalization, version/port conversion and comment URL getters. A
+supplied integer creation timestamp survives a property round trip, while zero
+removes it; equality ignores creation time and Max-Age uses the current clock.
+Request headers preserve array order and duplicate names. Response checks cover
+combined cookies, quoted values, default paths, domain attributes and RFC1123
+GMT expiry dates. Cookie hash values preserve equal-object consistency without
+matching Cocoa's numeric hash values.
+
+The URL profile constructs absolute HTTP/HTTPS URLs without making network
+requests. It owns scheme, host, decoded path, query, fragment, port and absolute
+string components. Initialization retains an argument borrowed from that same
+URL until the old components have been replaced. File URLs retain their existing
+behavior; file handles and font loading reject HTTP URLs.
+
+Properties and response headers are bounded to 128 keys and 64 KiB per string;
+request headers are bounded to 1 MiB and cookie arrays to 1,024 entries. Creation
+timestamps use nonnegative integers, other numeric cookie properties use signed
+32-bit prefixes, and versions are limited to 0..255. Expiry objects use the
+existing CFDate profile. Relative URLs, user information, IPv6 authorities,
+Unicode domains, quoted semicolons and other expiry date formats remain outside
+the implemented profile. General NSDate factories and cookie coding/description
+APIs remain unimplemented. ASCII attribute folding avoids the V library's
+unfreed Unicode lowercase scratch array.
+
+All 56 final programs build and 64 final generated C streams restore to their
+recorded hashes. Eight host suites pass ASAN/UBSAN in both hashing modes, and
+Vinix passes ten Objective-C programs and 33 Swift/loader programs. Repeated
+cookie release, class changes, caller-storage destruction and URL argument
+aliasing leave zero live objects. Generated-code checks cover token/buffer
+cleanup and allocation-free disposal. Earlier failed native assumptions and
+sanitizer trials are retained with their sources and actual statuses.
+
+Fortnite passes cookie binding and exits with status 1 before entry at EOS's
+required WebKit import `_OBJC_CLASS_$_WKWebViewConfiguration`. Native metadata
+shows a 592-byte NSObject subclass, including 576 bytes of page configuration
+storage at offset 8 and a navigation-limit flag at offset 584; no WebKit objects
+were constructed. The metadata helper was corrected to recognize this
+unsupported-library error after all five guest phases passed; its original
+failed parsing attempt is retained.
+Evidence is under `build/ios/fortnite/cookie-checks`. Full regression remains
+unpassed, five published runners are unchanged, and entry/rendering/gameplay
+remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,419 | 740 | 80 |
-| EOSSDK | 632 | 30 | 18 |
+| EOSSDK | 633 | 29 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,166 | 831 | 121 |
+| All images | 2,167 | 830 | 121 |
 
-The C++/GLES/Text variant reports 2,179 resolved imports, 818 unresolved strong
+The C++/GLES/Text variant reports 2,180 resolved imports, 817 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

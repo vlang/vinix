@@ -54,7 +54,7 @@ fn text_dispose(object u64) {
 }
 
 fn ct_descriptors(url u64) u64 {
-	if url == 0 || !objc_is_kind(url, ios_runtime.names['NSURL']) { return 0 }
+	if url == 0 || !objc_is_kind(url, ios_runtime.names['NSURL']) || obj_header(url).number == 1 { return 0 }
 	path := string_text(obj_header(url).fields[0])
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }

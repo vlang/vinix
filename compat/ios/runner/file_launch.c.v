@@ -20,6 +20,7 @@ fn ui_file_url(path string) u64 {
 
 fn ui_file_url_string(url u64) u64 {
 	mut header := obj_header(url)
+	if header.number == 1 { return header.fields[1] }
 	if header.fields[1] == 0 {
 		mut bytes := []u8{cap: 16 + string_text(header.fields[0]).len * 3}
 		bytes.flags |= .noslices

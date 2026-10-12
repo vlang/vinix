@@ -99,6 +99,7 @@ mut:
 	json_immutable bool
 	condition_owned bool
 	condition_initialized bool
+	cookie_owned bool
 	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
 	font_face voidptr // Optional FreeType face, disposed before its descriptor.
 	autoresizing u64
@@ -230,7 +231,7 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
@@ -275,6 +276,7 @@ fn objc_start() {
 			'NSConstantDictionary' { u32(40) }
 			'NSError' { u32(sizeof(AbiNSError)) }
 			'NSCondition' { u32(sizeof(AbiNSCondition)) }
+			'NSHTTPCookie' { u32(sizeof(AbiHTTPCookie)) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
 			'NSLayoutAnchor', 'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { u32(sizeof(AbiLayoutAnchor)) }
 			else { u32(8) }
@@ -297,6 +299,8 @@ fn objc_start() {
 	for i, pair in [['m', '{_opaque_pthread_mutex_t="__sig"q"__opaque"[56c]}']!, ['c', '{_opaque_pthread_cond_t="__sig"q"__opaque"[40c]}']!, ['n', '@"NSString"']!]! {
 		condition_class.ivars[pair[0]] = &ObjIvar{name: pair[0].clone(), types: pair[1].clone(), offset: [i64(8), 72, 120]![i], size: [u64(64), 48, 8]![i]}
 	}
+	mut cookie_class := ios_runtime.classes[ios_runtime.names['NSHTTPCookie']] or { panic('iOS: missing cookie class') }
+	cookie_class.ivars['_cookiePrivate'] = &ObjIvar{name:'_cookiePrivate'.clone(), types:'@"NSHTTPCookieInternal"'.clone(), offset:8, size:8}
 }
 
 fn read64(address u64) u64 { return unsafe { *(&u64(address)) } }

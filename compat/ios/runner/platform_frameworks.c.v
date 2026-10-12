@@ -82,6 +82,9 @@ fn platform_framework_dispatch(object u64, selector string, mut frame RegisterFr
 			}
 			'NSFileHandle' {
 				if selector != 'fileHandleForReadingFromURL:error:' { return false }
+				if frame.x[2] == 0 || !objc_is_kind(frame.x[2], ios_runtime.names['NSURL']) || obj_header(frame.x[2]).number == 1 {
+					panic('iOS: file handle requires a file URL')
+				}
 				path := string_text(obj_header(frame.x[2]).fields[0])
 				native := C.fopen(unsafe { &char(path.str) }, c'rb')
 				if native == unsafe { nil } { frame.x[0] = 0; return true }

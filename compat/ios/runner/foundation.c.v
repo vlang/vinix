@@ -270,7 +270,12 @@ fn foundation_dispatch(object u64, selector string, mut frame RegisterFrame) boo
 			index := dictionary_index(header, frame.x[2])
 			frame.x[0] = if index < 0 { u64(0) } else { header.items[index] }
 		}
-		'setObject:forKeyedSubscript:' {
+		'setObject:forKeyedSubscript:', 'setObject:forKey:' {
+			if selector == 'setObject:forKey:' &&
+				(!objc_is_kind(object, ios_runtime.names['NSMutableDictionary']) || frame.x[2] == 0) {
+				panic('iOS: dictionary setter requires a mutable dictionary and non-nil value')
+			}
+			if frame.x[3] == 0 { panic('iOS: dictionary setter requires a non-nil key') }
 			index := dictionary_index(header, frame.x[3])
 			if frame.x[2] == 0 {
 				if index >= 0 { collection_remove(mut header, index) }
