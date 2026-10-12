@@ -111,7 +111,13 @@ the shared Open With chooser. Documents are appended as literal arguments;
 install/upgrade never changes user defaults. Uninstall removes active handlers,
 with user preferences retained for rollback/reinstall. Desktop launches use a
 Software output/diagnostic window and the same `run` contract; terminal input
-requires CLI execution. Execution requires an ordinary user session.
+requires CLI execution. Execution requires an ordinary user identity with no
+supplementary groups. An administrator may configure `launch_user` for the root
+desktop: the session runner drops credentials before re-executing the service,
+and the ordinary service rechecks trust and acquires its own generation lease.
+The chosen account cannot come from a package, an argument or an environment
+variable. This profile does not acquire the hardware seat; display/audio runtimes
+still require broker qualification. An ordinary caller uses its own identity.
 
 The built-in `NativeApp` V interface and VAPP version 11 remain internal desktop
 contracts. Third-party ui2 clients need compositor adapter qualification. Importing

@@ -125,8 +125,21 @@ fn run_unlock_helper(unlock Unlock, environment []string) {
 // (and is told of in VINIX_SESSION_FD): its line to whoever started it.
 // Returns once the child has become a login, before it has become the user.
 pub fn start(db accountcore.Database, user accountcore.User, argv []string, at_seat bool, control int, unlock Unlock) !Started {
+	return start_profile(db, user, argv, at_seat, control, unlock, false)
+}
+
+// The same login attribution and checked identity transition, without any
+// supplementary account groups. This profile does not take the display seat.
+pub fn start_isolated(db accountcore.Database, user accountcore.User, argv []string) !Started {
+	return start_profile(db, user, argv, false, -1, Unlock{}, true)
+}
+
+fn start_profile(db accountcore.Database, user accountcore.User, argv []string, at_seat bool, control int, unlock Unlock, isolated bool) !Started {
 	if !accountcore.is_person(user) && user.name != 'greeter' {
 		return error('${user.name} is not an account sessions are for')
+	}
+	if isolated && (!accountcore.is_person(user) || user.gid == 0) {
+		return error('an isolated session requires an ordinary account and group')
 	}
 	make_runtime_directory(user)!
 	mut inherited := []string{}
@@ -166,9 +179,16 @@ pub fn start(db accountcore.Database, user accountcore.User, argv []string, at_s
 		if control >= 0 && control != 3 {
 			C.dup2(control, 3)
 		}
-		become(db, user) or {
-			eprintln('vinix-session: ${err.msg()}')
-			C._exit(126)
+		if isolated {
+			become_isolated(user) or {
+				eprintln('vinix-session: ${err.msg()}')
+				C._exit(126)
+			}
+		} else {
+			become(db, user) or {
+				eprintln('vinix-session: ${err.msg()}')
+				C._exit(126)
+			}
 		}
 		// As the account, and before its first program: the store is open
 		// by the time anything asks it.

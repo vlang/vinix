@@ -550,8 +550,10 @@ The [native V application store and Software manager](docs/application-distribut
 implement signed repositories, dependency planning, staged generations, rollback,
 download recovery, offline mirrors, organization policy and
 [package/launch SDK 1](tools/packages/SDK.md). The original Alpine frontend still
-manages system ports. Release publisher enrollment, catalog migration,
-ordinary-session/dynamic-launcher integration and guest/runtime qualification
+manages system ports. Installed apps integrate with Start, Quick Launch and
+shared MIME choices; an administrator-selected `launch_user` runs them through
+an isolated ordinary account session. Release publisher enrollment, catalog migration,
+graphical login/display-broker integration and broader guest/runtime qualification
 remain required before this acceptance gate is complete. Host lifecycle/UI
 fixtures and both target builds are available in
 [the V qualification driver](tests/packages/distribution-check.v).

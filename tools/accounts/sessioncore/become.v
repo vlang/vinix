@@ -94,10 +94,23 @@ pub fn make_runtime_directory(user accountcore.User) ! {
 // Become `user`. Does not return an error for the caller to ignore: the
 // string is why the caller must not go on.
 pub fn become(db accountcore.Database, user accountcore.User) ! {
+	groups := db.supplementary_gids(user)
+	become_with_groups(user, groups)!
+}
+
+// Drop account memberships while still privileged: the application's later
+// sandbox cannot clear supplementary groups once the session has become a user.
+pub fn become_isolated(user accountcore.User) ! {
+	if !accountcore.is_person(user) || user.gid == 0 {
+		return error('an isolated session requires an ordinary account and group')
+	}
+	become_with_groups(user, []u32{})!
+}
+
+fn become_with_groups(user accountcore.User, groups []u32) ! {
 	if user.uid == accountcore.uid_root {
 		return error('a session is never root\'s')
 	}
-	groups := db.supplementary_gids(user)
 	// Capabilities that could come back through exec go first, while the
 	// process may still drop them: the bounding set, then ambient.
 	for capability in 0 .. 64 {

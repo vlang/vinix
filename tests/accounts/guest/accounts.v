@@ -115,6 +115,15 @@ fn scenario_accounts(mut t Test) {
 		'', none, none)
 	t.check(admin_session.output.contains('uid=${alex.uid} ') && admin_session.output.contains(' groups=10,100 ')
 		&& admin_session.output.contains(' caps=0000000000000000 '), 'a session as alex: ${admin_session.output.trim_space()}')
+	// Application sessions discard all account memberships before the user
+	// loses permission to clear them. Normal login sessions retain theirs.
+	isolated := run(['/usr/sbin/vinix-session', 'run', '--isolated', 'alex', '/sbin/init', 'probe', 'ids'], '', none, none)
+	t.check(isolated.status == 0 && isolated.output.contains('uid=${alex.uid} euid=${alex.uid} gid=${alex.gid} groups= caps=0000000000000000 permitted=0000000000000000 bounding=0000000000000000 nnp=1')
+		&& isolated.output.contains('home=/home/alex') && isolated.output.contains('login=${alex.uid}/'), 'isolated application session: ${isolated.status} ${isolated.output.trim_space()}')
+	isolated_root := run(['/usr/sbin/vinix-session', 'run', '--isolated', 'root', '/sbin/init', 'probe', 'ids'], '', none, none)
+	t.check(isolated_root.status == 126 && !isolated_root.output.contains('uid=0'), 'isolated root session was accepted')
+	isolated_by_sam := run(['/usr/sbin/vinix-session', 'run', '--isolated', 'alex', '/sbin/init', 'probe', 'ids'], '', db, sam)
+	t.check(isolated_by_sam.status == 1 && !isolated_by_sam.output.contains('uid='), 'an ordinary user created an isolated session')
 	// Never root's, never the login screen's by this door, and only root
 	// opens it.
 	as_root := run(['/usr/sbin/vinix-session', 'run', 'root', '/sbin/init', 'probe', 'ids'],

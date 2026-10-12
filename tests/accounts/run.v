@@ -14,6 +14,10 @@ import os
 
 const programs = [
 	hwhost.Program{
+		source: 'tools/packages/main.v'
+		path: 'usr/bin/vinix-package'
+	},
+	hwhost.Program{
 		source: 'tools/accounts/authd.v'
 		path:   'usr/sbin/vinix-authd'
 	},
@@ -111,12 +115,13 @@ scrypt_ln = 10
 	suite := hwhost.Suite{
 		name:        'accounts'
 		guest:       'tests/accounts/guest'
-		module_paths: ['tools/accounts', 'tools/security-events', 'tools/keyring']
+		module_paths: ['.', 'tools/accounts', 'tools/security-events', 'tools/keyring']
 		programs:    programs
 		files:       files
 		directories: ['run', 'home', 'var/log', 'usr/share/vinix/actions', 'tmp:1777']
 		scenarios:   [
 			scenario('accounts', 'the account database, homes nobody else can read, and sessions that are not root'),
+			scenario('packages', 'signed application installation and an isolated account handoff from the root package frontend'),
 			scenario('elevation', 'the authentication service: passwords, throttling, actions and who may run them'),
 			hwhost.Scenario{
 				...scenario('unprivileged', 'what an ordinary account is refused by the kernel')

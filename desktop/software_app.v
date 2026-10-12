@@ -38,6 +38,7 @@ struct SoftwareView {
 	offline       bool
 	catalog_error string
 	rows          []SoftwareRow
+	launch_user   string
 }
 
 struct SoftwareApp {
@@ -60,6 +61,7 @@ mut:
 	worker_run     bool
 	worker_failed  bool
 	launch_request string
+	launch_label   string = 'Launch'
 	service_path   string = '/usr/bin/vinix-package'
 	offline        bool
 }
@@ -159,6 +161,7 @@ fn (mut a SoftwareApp) load_view() {
 			view.rows.free()
 			view.architecture.free()
 			view.catalog_error.free()
+			view.launch_user.free()
 		}
 		a.set_status('Unsupported package service response')
 		return
@@ -174,6 +177,9 @@ fn (mut a SoftwareApp) load_view() {
 		a.catalog_error.free()
 	}
 	a.catalog_error = view.catalog_error
+	unsafe { a.launch_label.free() }
+	a.launch_label = if view.launch_user == '' { 'Launch' } else { 'Launch as ' + view.launch_user }
+	unsafe { view.launch_user.free() }
 	a.offline = view.offline
 	a.selected = -1
 	a.filter_rows()
@@ -503,7 +509,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		if row.installed_version != '' {
 			children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
 			if row.kind !in ['runtime', 'data'] {
-				children << software_button('software.run', 'Launch', width - 110, 46, 96)
+				children << software_button('software.run', a.launch_label, width - 174, 46, 160)
 			}
 		}
 	}
@@ -544,6 +550,7 @@ fn (mut a SoftwareApp) close_app() {
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()
+		a.launch_label.free()
 		a.rows.free()
 		a.matching.free()
 		a.query.free()

@@ -40,6 +40,13 @@ stand-in for starting programs, and the shipped action files.
 [`tests/accounts`](../../tests/accounts/README.md) boots a kernel and runs
 the real programs as real accounts.
 
+`vinix-session run --isolated USER COMMAND [ARGUMENT...]` is a root-only
+application profile. It creates a login attributed to that ordinary account,
+drops all supplementary memberships before dropping privileges, verifies the
+same IDs/capabilities as a normal session, and waits for the command. It does
+not acquire the hardware seat. Normal sessions retain their account groups.
+The package service uses this profile for its configured `launch_user`.
+
 ## Adding an action
 
 Write a file in `actions/` (the format is at the top of

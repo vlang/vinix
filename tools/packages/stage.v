@@ -48,22 +48,32 @@ fn stage() ! {
 	work := os.join_path(os.temp_dir(), 'vinix-package-stage-' + os.getpid().str())
 	os.mkdir_all(work)!
 	defer { os.rmdir_all(work) or {} }
-	source := work + '/package.c'
-	invoke(v, ['-path', '@vlib|@vmodules|' + repository, '-gc', 'none', '-d', 'no_backtrace', '-os',
-		'linux', '-arch', if architecture == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', source,
-		repository + '/tools/packages/main.v'])!
-	binary := work + '/vinix-package'
-	invoke(cc, [...compiler_args[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source,
-		'-o', binary, '-lm', '-lpthread'])!
-	data := os.read_bytes(binary)!
-	if data.len < 20 || data[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
-		|| int(data[18]) + (int(data[19]) << 8) != if architecture == 'aarch64' { 183 } else { 62 } {
-		return error('package service compiler produced the wrong target architecture')
+	for tool, input in {
+		'usr/bin/vinix-package':  'tools/packages/main.v'
+		'usr/sbin/vinix-session': 'tools/accounts/session.v'
+	} {
+		source := work + '/' + os.file_name(tool) + '.c'
+		invoke(v, ['-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts',
+			'-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-os', 'linux', '-arch',
+			if architecture == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', source,
+			repository + '/' + input])!
+		binary := work + '/' + os.file_name(tool)
+		invoke(cc, [...compiler_args[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source,
+			'-o', binary, '-lm', '-lpthread'])!
+		data := os.read_bytes(binary)!
+		if data.len < 20 || data[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
+			|| int(data[18]) + (int(data[19]) << 8) != if architecture == 'aarch64' {
+				183
+			} else {
+				62
+			} {
+			return error('${tool} compiler produced the wrong target architecture')
+		}
+		os.mkdir_all(os.dir(staging + '/' + tool))!
+		os.cp(binary, staging + '/' + tool + '.new')!
+		os.chmod(staging + '/' + tool + '.new', 0o755)!
+		os.rename(staging + '/' + tool + '.new', staging + '/' + tool)!
 	}
-	os.mkdir_all(staging + '/usr/bin')!
-	os.cp(binary, staging + '/usr/bin/vinix-package.new')!
-	os.chmod(staging + '/usr/bin/vinix-package.new', 0o755)!
-	os.rename(staging + '/usr/bin/vinix-package.new', staging + '/usr/bin/vinix-package')!
 	software := staging + '/usr/bin/vinix-software'
 	if os.exists(software) || os.is_link(software) { os.rm(software)! }
 	os.symlink('/usr/bin/vinix-desktop', software)!

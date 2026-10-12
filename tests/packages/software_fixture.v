@@ -68,6 +68,7 @@ fn main() {
 	view := SoftwareView{
 		format:       1
 		architecture: 'aarch64'
+		launch_user: 'alex'
 		rows:         [
 			SoftwareRow{ id: 'editor', name: 'Editor', description: 'Write text documents', version: '2.0.0', installed_version: '1.0.0', requested: true, updatable: true, repository: 'trusted', public_key: 'a'.repeat(64), permissions: ['files'] },
 			SoftwareRow{ id: 'browser', name: 'Browser', description: 'Browse websites', version: '1.0.0' },
@@ -116,6 +117,7 @@ fn main() {
 	assert tree.children.any(it.id == 'software.remove')
 	assert tree.children.any(it.id == 'software.refresh')
 	assert tree.children.any(it.id == 'software.run')
+	assert tree.children.any(it.id == 'software.run' && it.text == 'Launch as alex')
 	compact := app.build(ui2.rect(0, 0, 480, 300)) or { panic(err) }
 	assert compact.children.len == 2
 	assert !compact.children.any(it.id == 'software.install')

@@ -19,6 +19,7 @@ An administrator creates `/etc/vinix-packages/config.json`:
 {
   "format": 1,
   "architecture": "aarch64",
+  "launch_user": "",
   "repositories": [{
     "id": "company",
     "url": "https://software.example.org/vinix",
@@ -117,9 +118,32 @@ there is no setuid service or automatic privilege escalation.
 data, temporary directories and Wine prefixes. Package/runtime paths come from
 one immutable generation, with no implicit host Wine/Linux/Apple installation.
 The environment is explicit and arguments are literal. `files` authorizes only
-supplied documents. Display/audio paths are granted only when declared. Today's
-root desktop cannot launch through this command. See
+supplied documents. Display/audio paths are granted only when declared. See
 [the sandbox's enforcement boundaries](../tools/sandbox/README.md).
+
+For today's root desktop, an administrator can set `launch_user` to an existing
+ordinary account in the root-owned configuration. Software shows **Launch as
+NAME**. The service starts `vinix-session run --isolated NAME` and re-executes
+itself after the session tool has verified all user/group IDs, cleared account
+memberships and capabilities, and set `no_new_privs`. The ordinary service then
+re-reads current trust/policy, acquires the generation lease, verifies payloads
+and creates private data as that user. Root never creates or changes files in
+the application data directory. The child's exit status and output reach Software.
+
+An empty `launch_user` requires the caller to be an ordinary user already.
+Root/system/greeter accounts cannot be selected, and an ordinary caller cannot
+use the setting to change identity. Create the account with the account tools
+first; staging installs the session runner but does not invent an account or
+enroll a publisher. Direct unprivileged launches need empty supplementary groups;
+`vinix-session run --isolated USER /usr/bin/vinix-package run ID` supplies that
+profile when invoked by an administrator. Documents must be accessible to that
+account, including their parent directories.
+
+This application session does not take the hardware seat or authenticate a
+desktop login. Direct display/input/audio device access remains denied without
+the seat, even when a package declares those permissions. Graphical runtimes
+need a separately qualified display/audio broker. Full ordinary-user desktop
+sessions and a public native GUI protocol remain release work.
 
 Installed applications appear in Start's All Programs/search and Quick Launch.
 Search includes package IDs and descriptions. Both use one bounded registry read
@@ -138,7 +162,7 @@ built-in fallback while retaining that preference for rollback or reinstall.
 Each package launch opens a Software window and passes literal arguments to
 `vinix-package run`; the service rechecks the current package/dependency closure,
 publisher policy and payloads before sandbox execution. The window shows output
-and launch failures, including the requirement for an ordinary user identity.
+and launch failures, including missing or invalid launch-account configuration.
 Closing it while the application runs is prevented to retain the generation
 lease. This monitor is suitable for noninteractive programs and apps using their
 declared display runtime; interactive terminal input still requires the CLI.
@@ -189,6 +213,10 @@ associations, plus both package target builds and desktop configurations.
 Allocator fixtures check menu redraws and cached reads for zero retained storage,
 and registration retirement against the standard JSON decoder's measured
 one-byte EOF-marker allocation per decode under `-manualfree`.
+The [accounts guest suite](../tests/accounts/README.md) adds a `packages` scenario
+for signed installation, the root-to-account handoff, literal documents,
+user-owned data, publisher revocation and uninstall. Its sandbox substitute
+observes the exec boundary; it does not qualify pledge/unveil or GUI runtimes.
 
 The release gate remains open: enroll a release publisher, migrate/qualify the
 advertised native/Linux/Wine/Apple catalog, integrate ordinary-user graphical

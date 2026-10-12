@@ -1,8 +1,9 @@
 # Native V application packages
 
 Build with `v -o /tmp/vinix-package tools/packages/main.v`. Install/state commands
-support a disposable `--root /absolute/root`. Launch requires the real root and an
-ordinary user session.
+support a disposable `--root /absolute/root`. Launch uses the real root and an
+ordinary identity. The root desktop can hand off to an administrator-configured
+`launch_user` through the isolated account session runner.
 
 Both desktop builders use the existing native security-tools staging path.
 Standalone staging and qualification are also available:

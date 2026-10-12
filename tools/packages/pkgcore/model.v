@@ -77,6 +77,7 @@ pub:
 	architecture string
 	repositories []Repository
 	policy       Policy
+	launch_user  string // administrator-selected account for root desktop launches
 }
 
 pub struct Installed {
@@ -233,6 +234,9 @@ pub fn (p Package) validate() ! {
 pub fn (c Config) validate() ! {
 	if c.format != 1 || c.architecture !in ['aarch64', 'x86_64'] {
 		return error('unsupported package configuration')
+	}
+	if c.launch_user != '' && (!launch_account_name(c.launch_user) || c.launch_user in ['root', 'greeter', 'nobody']) {
+		return error('package launch_user must name an ordinary account')
 	}
 	mut ids := map[string]bool{}
 	for repository in c.repositories {

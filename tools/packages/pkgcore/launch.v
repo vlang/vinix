@@ -86,6 +86,11 @@ pub fn launch_plan(config Config, directory string, state State, id string, data
 }
 
 pub fn run_application(config Config, directory string, id string, documents []string) !int {
+	if int(C.geteuid()) == 0 {
+		// The ordinary child re-reads policy, verifies the current generation and
+		// owns its lease. Root never creates or chmods files in a user's home.
+		return run_in_session(config, id, documents)
+	}
 	// A reader locks the activation pointer until its generation lease is held.
 	fd := C.open((directory + '/lock').str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if fd < 0 || C.flock(fd, C.LOCK_SH) != 0 {

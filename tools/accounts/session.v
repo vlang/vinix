@@ -5,7 +5,7 @@
 // something init started -- it is the only place a process stops being
 // root and becomes a person's.
 //
-//	vinix-session run [--seat] USER COMMAND [ARGUMENT...]
+//	vinix-session run [--seat|--isolated] USER COMMAND [ARGUMENT...]
 //	    become USER and run COMMAND, in a login session of its own. With
 //	    --seat the session is the one at the machine: it is given the
 //	    display and the input devices, and is who the authentication
@@ -65,10 +65,17 @@ fn load() accountcore.Database {
 // `at_seat` the session is the one at the machine: it holds the display and
 // the input devices, and is who the authentication service takes for the
 // person at the machine, until it ends.
-fn run_as(db accountcore.Database, user accountcore.User, argv []string, at_seat bool) int {
-	started := sessioncore.start(db, user, argv, at_seat, -1, sessioncore.Unlock{}) or {
-		eprintln('vinix-session: ${err.msg()}')
-		return 126
+fn run_as(db accountcore.Database, user accountcore.User, argv []string, at_seat bool, isolated bool) int {
+	started := if isolated {
+		sessioncore.start_isolated(db, user, argv) or {
+			eprintln('vinix-session: ${err.msg()}')
+			return 126
+		}
+	} else {
+		sessioncore.start(db, user, argv, at_seat, -1, sessioncore.Unlock{}) or {
+			eprintln('vinix-session: ${err.msg()}')
+			return 126
+		}
 	}
 	if at_seat {
 		sessioncore.mark_active(user.uid.str())
@@ -147,7 +154,7 @@ fn console() {
 			continue
 		}
 		shell := if user.shell == '' { '/bin/sh' } else { user.shell }
-		run_as(db, user, [shell, '-l'], true)
+		run_as(db, user, [shell, '-l'], true, false)
 	}
 }
 
@@ -187,12 +194,16 @@ fn main() {
 	}
 	mut rest := args.clone()
 	mut at_seat := false
+	mut isolated := false
 	if rest.len >= 2 && rest[0] == 'run' && rest[1] == '--seat' {
 		at_seat = true
 		rest.delete(1)
+	} else if rest.len >= 2 && rest[0] == 'run' && rest[1] == '--isolated' {
+		isolated = true
+		rest.delete(1)
 	}
-	if rest.len < 3 || rest[0] != 'run' {
-		eprintln('usage: vinix-session run [--seat] USER COMMAND [ARGUMENT...] | console | manager [--greeter COMMAND...] [--desktop COMMAND...]')
+	if rest.len < 3 || rest[0] != 'run' || rest[1].starts_with('--') {
+		eprintln('usage: vinix-session run [--seat|--isolated] USER COMMAND [ARGUMENT...] | console | manager [--greeter COMMAND...] [--desktop COMMAND...]')
 		exit(2)
 	}
 	db := load()
@@ -200,5 +211,5 @@ fn main() {
 		fail('no user ${rest[1]}')
 		return
 	}
-	exit(run_as(db, user, rest[2..].clone(), at_seat))
+	exit(run_as(db, user, rest[2..].clone(), at_seat, isolated))
 }

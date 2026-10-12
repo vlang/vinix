@@ -27,7 +27,8 @@ pub fn build_program(host Host, source string, directory string, name string, mo
 	v_arch := if host.arch == 'aarch64' { 'arm64' } else { 'amd64' }
 	// No collector and no backtraces: PID 1 of a test kernel should need as
 	// little of that kernel as it can, and what it allocates dies with it.
-	mut compile := [host.v, '-os', 'linux', '-arch', v_arch, '-gc', 'none', '-d', 'no_backtrace']
+	// Keep native C signal-handler glue out of these plain static fixtures too.
+	mut compile := [host.v, '-os', 'linux', '-arch', v_arch, '-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler']
 	if module_paths.len > 0 {
 		// Modules a suite's programs share with the tools they test.
 		mut lookup := ['@vlib', '@vmodules']

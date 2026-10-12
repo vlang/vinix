@@ -39,6 +39,7 @@ struct SoftwareView {
 	offline       bool
 	catalog_error string
 	rows          []SoftwareRow
+	launch_user   string
 }
 
 struct Deployment {
@@ -106,6 +107,7 @@ fn software_view(config pkgcore.Config, directory string) !SoftwareView {
 		offline:       config.policy.offline
 		catalog_error: catalog_error
 		rows:          rows
+		launch_user:   if os.geteuid() == 0 { config.launch_user } else { '' }
 	}
 }
 

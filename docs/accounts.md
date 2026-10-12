@@ -301,8 +301,10 @@ Five things it found were open and are closed:
 
 ## What is not done
 
-- **The desktop is still root's.** Init starts the compositor as root, and
-  the compositor starts every application as root. The session manager
+- **The desktop is still root's.** Init starts the compositor and built-in
+  applications as root. [Managed packages](application-distribution.md) can
+  instead use an administrator-selected ordinary account through the isolated
+  application session profile; this does not create a graphical login. The session manager
   exists and is tested, but nothing starts it: the desktop has no login
   screen, no lock screen, and has not been taught to live without root
   (it turns the machine off by signalling init, writes to `/sys` and
@@ -344,3 +346,9 @@ the commit that added this page:
 
 and the host tests of `accountcore`, `authproto` and `authcore`. Nothing was
 run on a physical machine, and nothing was run with the desktop.
+
+On 12 October the ordinary/isolated account profiles and signed package handoff
+were also exercised in QEMU on both targets. The package scenario checks private
+data ownership, literal document arguments, missing launch identity, publisher
+revocation and uninstall. Its sandbox substitute observes the exec boundary;
+it does not extend the GUI/runtime or pledge/unveil qualification above.
