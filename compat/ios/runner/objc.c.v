@@ -98,6 +98,7 @@ mut:
 	graphics voidptr // Optional Mesa backend; never a native Objective-C ivar.
 	font_face voidptr // Optional FreeType face, disposed before its descriptor.
 	autoresizing u64
+	layout_anchors &LayoutAnchors = unsafe { nil }
 	multiple_touch bool
 	content_scale f64 = 1
 	deferred_system_edges u64
@@ -224,7 +225,8 @@ fn objc_start() {
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
 	for name in ['NSObject', 'NSString', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
-		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
+		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSLayoutConstraint', 'NSLayoutAnchor',
+		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
 		'UIApplication', 'UIView', 'UILabel', 'UIControl', 'UIButton', 'UIWindow', 'UIViewController',
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView',
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
@@ -250,6 +252,7 @@ fn objc_start() {
 			'UIAccessibilityElement' { ios_runtime.names['UIResponder'] }
 			'NSMutableArray' { ios_runtime.names['NSArray'] }
 			'NSMutableDictionary', 'NSConstantDictionary' { ios_runtime.names['NSDictionary'] }
+			'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { ios_runtime.names['NSLayoutAnchor'] }
 			'NSMutableData' { ios_runtime.names['NSData'] }
 			'UISwipeGestureRecognizer' { ios_runtime.names['UIGestureRecognizer'] }
 			else { ios_runtime.names['NSObject'] }
@@ -263,7 +266,13 @@ fn objc_start() {
 		mut metaclass := unsafe { &AbiClass(meta) }
 		metaclass.isa = if parent == 0 { meta } else { read64(parent) }
 		metaclass.parent = if parent == 0 { u64(cls) } else { read64(parent) }
-		ios_runtime.classes[u64(cls)] = &ObjClass{ name: name, parent: parent, size: if name == 'NSConstantDictionary' { u32(40) } else { u32(8) }, owned: true }
+		size := match name {
+			'NSConstantDictionary' { u32(40) }
+			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
+			'NSLayoutAnchor', 'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension' { u32(sizeof(AbiLayoutAnchor)) }
+			else { u32(8) }
+		}
+		ios_runtime.classes[u64(cls)] = &ObjClass{ name: name, parent: parent, size: size, owned: true }
 		ios_runtime.classes[meta] = &ObjClass{ name: name, parent: metaclass.parent, size: 40, meta: true }
 		ios_runtime.names[name] = u64(cls)
 	}

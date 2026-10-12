@@ -2830,11 +2830,46 @@ hashes, and four host suites pass ASAN/UBSAN in both hashing modes. Vinix passes
 33 Swift/loader programs and six Objective-C collection/storage programs. The
 IPA passes the dictionary class binding and exits with status 1 before entry at
 Foundation's `_OBJC_CLASS_$_NSLayoutConstraint`. Native runtime metadata for
-that eighty-byte NSObject subclass and its method signatures is captured;
-constraint construction and layout remain unimplemented. Evidence is under
+that eighty-byte NSObject subclass and its method signatures was captured;
+constraint construction and layout were unimplemented at that checkpoint.
+Evidence is under
 `build/ios/fortnite/constant-dictionary-checks`. Full regression remains
 unpassed, the five published runners retain their last passing bytes, and entry,
 rendering and gameplay remain unverified.
+
+`NSLayoutConstraint` now provides item and anchor factories, scalar properties,
+identifiers and archive flags. Its eighty-byte record and the sixty-four-byte
+`NSLayoutAnchor`, `NSLayoutXAxisAnchor`, `NSLayoutYAxisAnchor` and
+`NSLayoutDimension` records match the measured native instance sizes. UIView
+anchors are cached lazily. Constraints own their anchors; anchors borrow their
+views. Vinix zeros those borrowed references when a view dies, so retained
+constraints preserve attributes without returning freed view storage.
+
+Typed V calls into this Mac's Foundation and AppKit compare twelve attributes,
+three relations, anchor identity, defaults and mutations. Multipliers round to
+float before returning a double, constants remain doubles, and priority uses
+the float message ABI. A missing second item normalizes the multiplier to one.
+The native rejection of priority zero is retained: valid priorities are greater
+than zero through 1000. Repeated drained runtimes and captured invalid-input
+children verify ownership and cleanup. Constraint activation raises an explicit
+missing-solver error; layout solving, layout guides and visual-format parsing
+remain unimplemented.
+
+All 53 programs build and 58 final original generated C streams restore to
+their recorded hashes. Five host suites pass ASAN/UBSAN in both hashing modes,
+including replays against four native dyld load orders. Vinix passes seven
+Objective-C collection/storage/layout programs and 33 Swift/loader programs.
+The initial generated-code audit spelling mismatch retains its joined failed
+cohorts and exact inputs; the corrected audit verifies one fixed anchor cache
+per touched view and allocation-free disposal.
+
+The IPA passes the constraint class binding and exits with status 1 before
+entry at Foundation's `_OBJC_CLASS_$_NSJSONSerialization` in EOS. That native
+eight-byte NSObject subclass's method signatures are captured without app code
+execution. Evidence is under `build/ios/fortnite/layout-constraint-checks`.
+Full regression remains unpassed after the earlier permissions, readlink and
+kernel file-time failures. The five published runners retain their last passing
+bytes, and entry, rendering and gameplay remain unverified.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
@@ -2842,11 +2877,11 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,415 | 744 | 80 |
-| EOSSDK | 627 | 35 | 18 |
+| EOSSDK | 628 | 34 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,157 | 840 | 121 |
+| All images | 2,158 | 839 | 121 |
 
-The C++/GLES/Text variant reports 2,170 resolved imports, 827 unresolved strong
+The C++/GLES/Text variant reports 2,171 resolved imports, 826 unresolved strong
 imports and 121 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

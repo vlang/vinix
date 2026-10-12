@@ -92,6 +92,7 @@ fn objc_dispatch(mut frame RegisterFrame, super_call u64) u64 {
 }
 
 fn framework_dispatch(object u64, selector string, mut frame RegisterFrame) bool {
+	if layout_dispatch(object, selector, mut frame) { return true }
 	if image_dispatch(object, selector, mut frame) { return true }
 	if accessibility_dispatch(object, selector, mut frame) { return true }
 	if selector == 'self' { return true }
