@@ -1356,7 +1356,12 @@ pub fn vinix_net_attach(mac &u8, driver i32) i32 {
 			// while()
 			break
 		}
-		C.netif_set_link_up(&net_physical_netif)
+		// A physical Realtek PHY is still negotiating after MAC startup. Keep
+		// DHCP in INIT until the driver reports carrier; hypervisor and Wi-Fi
+		// drivers retain their existing attach behavior.
+		if driver != driver_rtl8169 {
+			C.netif_set_link_up(&net_physical_netif)
+		}
 		C.netif_set_up(&net_physical_netif)
 		net_link_attached = 1
 		if i32(C.dhcp_start(&net_physical_netif)) != Err_enum_t.err_ok {
@@ -1366,6 +1371,27 @@ pub fn vinix_net_attach(mac &u8, driver i32) i32 {
 		C.printf(c'net: attached %c%c%u, DHCP started\n', i32(net_physical_netif.name[0]), i32(net_physical_netif.name[1]), i32(net_physical_netif.num))
 		return 0
 	}
+}
+
+// Link events belong to the active driver. A delayed event from a removed
+// card must not change an interface subsequently attached by another driver.
+@[export: 'vinix_net_set_link']
+pub fn vinix_net_set_link(driver i32, up i32) {
+	unsafe {
+		if !net_link_attached || driver != net_active_driver { return }
+		if up != 0 {
+			// lwIP's link-up event starts a waiting DHCP client immediately and
+			// revalidates an existing lease after a disconnect or resume.
+			C.netif_set_link_up(&net_physical_netif)
+		} else {
+			C.netif_set_link_down(&net_physical_netif)
+		}
+	}
+}
+
+@[export: 'vinix_net_carrier']
+pub fn vinix_net_carrier() i32 {
+	return if net_link_attached != 0 && net_physical_netif.flags & 4 != 0 { i32(1) } else { i32(0) }
 }
 
 @[export: 'vinix_net_detach']

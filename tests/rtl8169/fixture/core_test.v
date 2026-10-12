@@ -18,12 +18,18 @@ fn setup(version int) {
 	inet.attached = false
 	inet.accept_attach = true
 	inet.received = 0
+	inet.carrier_up = false
+	inet.active_driver = 0
+	inet.dhcp_starts = 0
+	inet.has_lease = false
+	inet.link_up_hook = unsafe { nil }
 	phy_writes = 0
 	regs[0] = 2
 	regs[5] = 1
 	regs[0xd3] = 0x82 // firmware OOB receiver, FIFO ready
 	regs[0x6c] = 2
 	regs[0x54] = 0x86 // inherited L2/L3 and jumbo enable; preserve other bits
+	write16(0xe0, 0x2063)
 	raw_write32(0x40, if version == 40 { u32(0x4c000000) } else { u32(0x50900000) })
 }
 
@@ -55,7 +61,10 @@ fn test_both_revisions_boot_transmit_receive_wrap_reset_and_remove() {
 		assert regs[0x54] == 0x80
 		assert ephy[0x0c] == 0x0820
 		assert read32(0) == 2 && read16(4) == 0x100
-		if version == 40 { assert eri[0x1a8 / 4] & 0xfc000000 == 0xfc000000 }
+		assert read16(0xe0) == 0x2003
+		if version == 40 {
+			assert eri[0x1a8 / 4] & 0xfc000000 == 0xfc000000
+		}
 		assert phy_writes > 80 // actual bundled microcode executed
 		assert phy[0xa400 / 2] == 0x1200
 		assert read32(0x20) == u32(rtl_tx_ring.bus)
@@ -90,6 +99,51 @@ fn test_both_revisions_boot_transmit_receive_wrap_reset_and_remove() {
 		assert dma.live == 0 && !rtl_ready && !inet.attached
 		poll() // no access to freed rings
 	}
+}
+
+fn transmit_dhcp_on_carrier() {
+	frame := [342]u8{}
+	assert send(unsafe { &frame[0] }, u64(frame.len)) == 0
+}
+
+fn test_dhcp_waits_for_carrier_and_restarts_after_reconnect_and_resume() {
+	setup(42)
+	regs[0x6c] = 0 // still negotiating when the PCI driver attaches
+	inet.link_up_hook = transmit_dhcp_on_carrier
+	mut dev := devcore.Device{}
+	assert card_probe(mut dev)
+	assert rtl_ready && inet.attached && !inet.carrier_up
+	assert inet.dhcp_starts == 0 && rtl_tx_pending == 0
+	frame := [60]u8{}
+	assert send(unsafe { &frame[0] }, u64(frame.len)) == -1
+	regs[0x6c] = 0x13 // carrier, 1000 Mbps, full duplex
+	devcore.sleep_ms(101)
+	poll()
+	assert inet.carrier_up && inet.dhcp_starts == 1
+	assert rtl_tx_queued == 1 && rtl_tx_pending == 1
+	devcore.sleep_ms(101)
+	poll()
+	assert inet.dhcp_starts == 1 // repeated polls cannot restart the lease
+	regs[0x6c] = 0
+	devcore.sleep_ms(101)
+	poll()
+	assert !inet.carrier_up
+	assert send(unsafe { &frame[0] }, u64(frame.len)) == -1
+	regs[0x6c] = 0x13
+	devcore.sleep_ms(101)
+	poll()
+	assert inet.carrier_up && inet.dhcp_starts == 2
+	assert card_suspend(mut dev)
+	assert !inet.carrier_up
+	regs[0x6c] = 0
+	assert card_resume(mut dev)
+	assert !inet.carrier_up && inet.dhcp_starts == 2
+	regs[0x6c] = 0x13
+	devcore.sleep_ms(101)
+	poll()
+	assert inet.carrier_up && inet.dhcp_starts == 3
+	card_remove(mut dev)
+	assert dma.live == 0 && !inet.attached
 }
 
 fn test_failed_probe_releases_dma_and_stops_bus_mastering() {

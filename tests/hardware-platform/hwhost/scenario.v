@@ -385,6 +385,16 @@ const ec_selftest_actions = [
 
 pub const scenarios = [
 	Scenario{
+		name:     'net-carrier'
+		about:    'production Realtek carrier/DHCP state transitions, then a real lease and packet exchange'
+		arches:   ['x86_64']
+		qemu:     ['-nic', 'user,model=e1000,tftp={state}/tftp']
+		files:    [tftp_probe]
+		required: ['NET-CARRIER PASS:', 'HWTEST START net-carrier', 'HWTEST PASS net-carrier']
+		ending:   .poweroff
+		pending:  'requires a kernel built with -d net_carrier_selftest'
+	},
+	Scenario{
 		name:         'bootlog'
 		about:        'kernel diagnostics readable without Settings; stable bounded snapshots'
 		arches:       ['aarch64', 'x86_64']

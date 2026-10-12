@@ -38,6 +38,7 @@ fn run_scenario(name string, mut t Test) bool {
 		'cpu-power-simulated' { scenario_cpu_power_simulated(mut t) }
 		'devices' { scenario_devices(mut t) }
 		'bootlog' { scenario_bootlog(mut t) }
+		'net-carrier' { scenario_net_carrier(mut t) }
 		'drivers-sleep' { scenario_drivers_sleep(mut t) }
 		'nvme-sleep' { scenario_nvme_sleep(mut t) }
 		'firmware' { scenario_firmware(mut t) }

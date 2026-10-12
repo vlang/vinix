@@ -96,7 +96,7 @@ pub fn interfaces() []Interface {
 			index:   2
 			name:    'eth0'
 			kind:    arphrd_ether
-			flags:   ether_flags
+			flags:   if carrier() { ether_flags } else { ether_flags & ~u32(0x10040) }
 			mtu:     mtu
 			txqlen:  1000
 			mac:     mac

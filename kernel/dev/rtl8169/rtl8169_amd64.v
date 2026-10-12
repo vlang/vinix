@@ -10,22 +10,28 @@ import klock
 import socket.inet
 
 __global (
-	rtl_regs        u64
-	rtl_ready       bool
-	rtl_device      &devcore.Device = unsafe { nil }
-	rtl_mac         [6]u8
-	rtl_rx_ring     dma.Buffer
-	rtl_rx_buffers  dma.Buffer
-	rtl_tx_ring     dma.Buffer
-	rtl_tx_buffers  dma.Buffer
-	rtl_rx_next     u32
-	rtl_tx_next     u32
-	rtl_tx_clean    u32
-	rtl_tx_pending  u32
-	rtl_rx_lock     klock.Lock
-	rtl_tx_lock     klock.Lock
-	rtl_link        bool
-	rtl_link_sample u64
+	rtl_regs              u64
+	rtl_ready             bool
+	rtl_device            &devcore.Device = unsafe { nil }
+	rtl_mac               [6]u8
+	rtl_rx_ring           dma.Buffer
+	rtl_rx_buffers        dma.Buffer
+	rtl_tx_ring           dma.Buffer
+	rtl_tx_buffers        dma.Buffer
+	rtl_rx_next           u32
+	rtl_tx_next           u32
+	rtl_tx_clean          u32
+	rtl_tx_pending        u32
+	rtl_rx_lock           klock.Lock
+	rtl_tx_lock           klock.Lock
+	rtl_link              bool
+	rtl_link_sample       u64
+	rtl_tx_queued         u64
+	rtl_tx_completed      u64
+	rtl_rx_packets        u64
+	rtl_rx_dropped        u64
+	rtl_interrupt_errors  u16
+	rtl_diagnostic_sample u64
 )
 
 fn pause_ms(ms u64) { devcore.sleep_ms(ms) }
@@ -152,8 +158,16 @@ fn card_probe(mut dev devcore.Device) bool {
 		free_rings(mut dev)
 		return false
 	}
-	dev.pci.update_command(0, 4)
+	hardware_enable(mut dev)
 	rtl_device = unsafe { dev }
+	rtl_link = read8(0x6c) != 0xff && read8(0x6c) & 2 != 0
+	rtl_link_sample = devcore.now_ns()
+	rtl_tx_queued = 0
+	rtl_tx_completed = 0
+	rtl_rx_packets = 0
+	rtl_rx_dropped = 0
+	rtl_interrupt_errors = 0
+	rtl_diagnostic_sample = rtl_link_sample
 	rtl_ready = true
 	if !inet.attach(&rtl_mac, inet.driver_rtl8169) {
 		fence()
@@ -163,11 +177,14 @@ fn card_probe(mut dev devcore.Device) bool {
 		print('rtl8169: IP stack attach failed\n')
 		return false
 	}
-	rtl_link = read8(0x6c) & 2 != 0
-	rtl_link_sample = devcore.now_ns()
-	C.kprintf(c'rtl8169: MAC %02llx:%02llx:%02llx:%02llx:%02llx:%02llx, link %s; ready, DHCP requested\n',
+	inet.set_link(inet.driver_rtl8169, rtl_link)
+	C.kprintf(c'rtl8169: MAC %02llx:%02llx:%02llx:%02llx:%02llx:%02llx, link %s; %s\n',
 		u64(rtl_mac[0]), u64(rtl_mac[1]), u64(rtl_mac[2]), u64(rtl_mac[3]), u64(rtl_mac[4]), u64(rtl_mac[5]),
-		if rtl_link { c'up' } else { c'down' })
+		if rtl_link { c'up' } else { c'down' }, if rtl_link {
+			c'DHCP requested'
+		} else {
+			c'waiting for carrier before DHCP'
+		})
 	return true
 }
 
@@ -232,7 +249,9 @@ fn hardware_start() bool {
 	}
 	write32(8, 0xffffffff)
 	write32(12, 0xffffffff)
-	write16(0xe0, 0) // legacy descriptors; no checksum/VLAN offload
+	// Preserve the chip's normal-mode/timer bits; disable checksum and VLAN
+	// offload without clearing the entire inherited C+ command register.
+	write16(0xe0, read16(0xe0) & 0x2003)
 	write16(0xe2, 0) // interrupt mitigation off (we poll)
 	write8(0xec, 0x27)
 	write16(0xda, u16(buffer_bytes))
@@ -242,10 +261,19 @@ fn hardware_start() bool {
 	write32(0xe8, u32(rtl_rx_ring.bus >> 32))
 	write32(0xe4, u32(rtl_rx_ring.bus))
 	dma_barrier()
+	return true
+}
+
+fn hardware_enable(mut dev devcore.Device) {
+	// All DMA addresses are programmed before mastering is allowed. Permit
+	// mastering before enabling RX/TX, so their first descriptor fetch can
+	// succeed on physical PCIe controllers.
+	dev.pci.update_command(0, 4)
+	_ := dev.pci.read[u16](4)
 	write8(0x37, 0x0c)
 	write32(0x40, (u32(3) << 24) | (u32(7) << 8) | 0x80)
 	write32(0x44, 0xc800 | (u32(7) << 8) | 0x0e)
-	return true
+	_ := read8(0x37)
 }
 
 fn initialise_rings() {
@@ -283,6 +311,8 @@ fn fence() {
 	rtl_rx_lock.release()
 	rtl_tx_lock.acquire()
 	rtl_tx_lock.release()
+	rtl_link = false
+	inet.set_link(inet.driver_rtl8169, false)
 }
 
 fn card_remove(mut dev devcore.Device) {
@@ -310,8 +340,11 @@ fn card_resume(mut dev devcore.Device) bool {
 		hardware_stop(mut dev)
 		return false
 	}
-	dev.pci.update_command(0, 4)
+	hardware_enable(mut dev)
+	rtl_link = read8(0x6c) != 0xff && read8(0x6c) & 2 != 0
+	rtl_link_sample = devcore.now_ns()
 	rtl_ready = true
+	inet.set_link(inet.driver_rtl8169, rtl_link)
 	return true
 }
 
@@ -327,15 +360,18 @@ fn reclaim_tx() {
 		dma_barrier()
 		rtl_tx_clean = (rtl_tx_clean + 1) % descriptors
 		rtl_tx_pending--
+		rtl_tx_completed++
 	}
 }
 
 @[export: 'vinix_rtl8169_send']
 pub fn send(frame voidptr, length u64) int {
-	if !rtl_ready || frame == unsafe { nil } || length < 14 || length > 1518 { return -1 }
+	if !rtl_ready || !rtl_link || frame == unsafe { nil } || length < 14 || length > 1518 {
+		return -1
+	}
 	rtl_tx_lock.acquire()
 	defer { rtl_tx_lock.release() }
-	if !rtl_ready { return -1 }
+	if !rtl_ready || !rtl_link { return -1 }
 	reclaim_tx()
 	if rtl_tx_pending == descriptors { return -1 }
 	index := rtl_tx_next
@@ -353,6 +389,7 @@ pub fn send(frame voidptr, length u64) int {
 	set_descriptor_status(descriptor, desc_owned | desc_first | desc_last | ring_end(index) | u32(padded))
 	dma_barrier()
 	rtl_tx_pending++
+	rtl_tx_queued++
 	rtl_tx_next = (index + 1) % descriptors
 	write8(0x38, 0x40)
 	return 0
@@ -362,6 +399,19 @@ pub fn poll() {
 	if !rtl_ready || !rtl_rx_lock.test_and_acquire() { return }
 	defer { rtl_rx_lock.release() }
 	if !rtl_ready { return }
+	now := devcore.now_ns()
+	if now - rtl_link_sample >= 100 * devcore.millisecond {
+		rtl_link_sample = now
+		status := read8(0x6c)
+		link := status != 0xff && status & 2 != 0
+		if link != rtl_link {
+			rtl_link = link
+			// Publish carrier before DHCP's synchronous transmit callback.
+			inet.set_link(inet.driver_rtl8169, link)
+			C.kprintf(c'rtl8169: link %s, PHY status=%02llx\n', if link { c'up' } else { c'down' }, u64(status))
+			if link { write8(0x38, 0x40) }
+		}
+	}
 	// Ring addresses are only read under the lock: remove waits before free.
 	for drained := u32(0); drained < descriptors; drained++ {
 		index := rtl_rx_next
@@ -371,21 +421,44 @@ pub fn poll() {
 		dma_barrier()
 		length := received_length(status)
 		if length != 0 {
-			inet.receive(voidptr(rtl_rx_buffers.virt + u64(index) * buffer_bytes), length)
+			if inet.receive(voidptr(rtl_rx_buffers.virt + u64(index) * buffer_bytes), length) {
+				rtl_rx_packets++
+			} else {
+				rtl_rx_dropped++
+			}
+		} else {
+			rtl_rx_dropped++
 		}
 		unsafe { *&u32(descriptor + 4) = 0 }
 		dma_barrier()
 		set_descriptor_status(descriptor, desc_owned | ring_end(index) | u32(buffer_bytes))
 		rtl_rx_next = (index + 1) % descriptors
 	}
+	rtl_interrupt_errors |= read16(0x3e) & 0x805a
 	write16(0x3e, 0xffff)
-	now := devcore.now_ns()
-	if now - rtl_link_sample >= devcore.second {
-		rtl_link_sample = now
-		link := read8(0x6c) & 2 != 0
-		if link != rtl_link {
-			rtl_link = link
-			C.kprintf(c'rtl8169: link %s\n', if link { c'up' } else { c'down' })
-		}
+	if now - rtl_diagnostic_sample >= 5 * devcore.second {
+		rtl_diagnostic_sample = now
+		diagnose_lease()
 	}
+}
+
+fn diagnose_lease() {
+	mut address := u32(0)
+	mut netmask := u32(0)
+	mut gateway := u32(0)
+	mut dns := [3]u32{}
+	if inet.configuration(unsafe { &address }, unsafe { &netmask }, unsafe { &gateway }, unsafe { &dns }) {
+		return
+	}
+	if !rtl_tx_lock.test_and_acquire() { return }
+	reclaim_tx()
+	queued := rtl_tx_queued
+	completed := rtl_tx_completed
+	pending := rtl_tx_pending
+	mut oldest := u32(0)
+	if pending != 0 { oldest = descriptor_status(rtl_tx_ring.virt + u64(rtl_tx_clean) * 16) }
+	rtl_tx_lock.release()
+	C.kprintf(c'rtl8169: awaiting DHCP: PHY=%02llx CMD=%02llx errors=%04llx TX queued=%llu completed=%llu pending=%llu oldest=%08llx RX packets=%llu dropped=%llu next=%08llx\n',
+		u64(read8(0x6c)), u64(read8(0x37)), u64(rtl_interrupt_errors), queued, completed, u64(pending), u64(oldest),
+		rtl_rx_packets, rtl_rx_dropped, u64(descriptor_status(rtl_rx_ring.virt + u64(rtl_rx_next) * 16)))
 }

@@ -8,10 +8,12 @@ The launcher stages the production driver with simulated MMIO, PCI,
 DMA and stack boundaries. It executes both revision-specific startup paths
 and their bundled firmware. Tests cover descriptor ownership and ring wrap,
 CRC removal and invalid RX frames, short TX padding, allocation rollback,
-indirect-access/reset/OOB timeouts, resume/reset/removal, failed stack
+indirect-access/reset/OOB timeouts, resume/reset/removal, delayed carrier,
+DHCP discovery on carrier and reconnect/resume, failed stack
 attachment and malformed/unbounded firmware programs. DMA addresses differ
 from CPU addresses, and the allocator refuses to free while bus mastering
-is enabled. No physical Realtek adapter or RTL8168 QEMU model is used.
+is enabled; RX/TX enable also requires mastering and programmed DMA addresses.
+No physical Realtek adapter or RTL8168 QEMU model is used.
 
 Startup and firmware semantics are adapted from the primary Linux v6.6
 sources [r8169_main.c](https://github.com/torvalds/linux/blob/v6.6/drivers/net/ethernet/realtek/r8169_main.c),

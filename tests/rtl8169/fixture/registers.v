@@ -1,6 +1,8 @@
 @[has_globals]
 module rtl8169
 
+import devcore
+
 #include <stdio.h>
 #flag -Dkprintf=printf
 
@@ -26,10 +28,19 @@ fn read16(port u64) u16 { return u16(read8(port)) | u16(read8(port + 1)) << 8 }
 fn read32(port u64) u32 { return u32(read16(port)) | u32(read16(port + 2)) << 16 }
 
 fn write8(port u64, value u8) {
+	if port == 0x37 && value == 0x0c {
+		assert devcore.last_command & 4 != 0
+		assert read32(0xe4) != 0 && read32(0x20) != 0
+	}
 	regs[port] = if port == 0x37 && value & 0x10 != 0 && !stuck_reset { u8(0) } else { value }
 }
 
 fn write16(port u64, value u16) {
+	if port == 0x3e {
+		regs[port] &= ~u8(value)
+		regs[port + 1] &= ~u8(value >> 8)
+		return
+	}
 	regs[port] = u8(value)
 	regs[port + 1] = u8(value >> 8)
 }

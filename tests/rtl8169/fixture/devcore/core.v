@@ -6,8 +6,9 @@ pub const millisecond = u64(1000000)
 pub const second = u64(1000000000)
 
 __global (
-	clock u64
-	bound Driver
+	clock            u64
+	bound            Driver
+	pub last_command u16
 )
 
 pub enum Bus {
@@ -34,9 +35,15 @@ pub fn (p &PCI) capability(kind u8) u16 { return 0 }
 
 pub fn (p &PCI) read[T](offset u32) T { return T(p.command) }
 
-pub fn (mut p PCI) write[T](offset u32, value T) { p.command = u16(value) }
+pub fn (mut p PCI) write[T](offset u32, value T) {
+	p.command = u16(value)
+	last_command = p.command
+}
 
-pub fn (mut p PCI) update_command(clear u16, set u16) { p.command = (p.command & ~clear) | set }
+pub fn (mut p PCI) update_command(clear u16, set u16) {
+	p.command = (p.command & ~clear) | set
+	last_command = p.command
+}
 
 pub fn (p &PCI) get_bar(index u8) Bar { return Bar{} }
 

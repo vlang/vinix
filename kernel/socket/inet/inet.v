@@ -28,6 +28,8 @@ fn C.vinix_net_init()
 fn C.vinix_net_poll(now_ms u32)
 fn C.vinix_net_attach(mac &u8, driver i32) i32
 fn C.vinix_net_link(mac &u8, mtu &u32) i32
+fn C.vinix_net_set_link(driver i32, up i32)
+fn C.vinix_net_carrier() i32
 fn C.vinix_net_detach()
 fn C.vinix_net_input(frame voidptr, length u64) i32
 fn C.vinix_net_config(address &u32, netmask &u32, gateway &u32, dns &u32) i32
@@ -451,6 +453,20 @@ pub fn attach(mac &[6]u8, driver int) bool {
 	ret := unsafe { C.vinix_net_attach(&mac[0], driver) }
 	net_lock.release()
 	return ret == 0
+}
+
+// Drivers call this outside send(), which already runs under net_lock.
+pub fn set_link(driver int, up bool) {
+	net_lock.acquire()
+	C.vinix_net_set_link(driver, if up { 1 } else { 0 })
+	net_lock.release()
+}
+
+pub fn carrier() bool {
+	net_lock.acquire()
+	up := C.vinix_net_carrier() != 0
+	net_lock.release()
+	return up
 }
 
 pub fn detach() {

@@ -104,6 +104,7 @@ fn kmain_thread() {
 	// slot, and with none the poll costs a test of a flag.
 	e1000.initialise()
 	rtl8169.initialise()
+	$if net_carrier_selftest ? { inet.carrier_selftest() }
 	sched.set_device_poll_callback(voidptr(poll_network))
 	pipe.initialise()
 	futex.initialise()
