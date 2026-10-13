@@ -2,13 +2,14 @@ The maintained application runner is now `tests/android/run`, implemented by
 `tests/native-android-run/androidrun`. It reuses this module's preparation,
 VM-plan, main and result policies through native V filesystem and archive
 callbacks. Its PTY, serial/input workers, QMP and image encoder have direct
-native owners. The following CPython-controller qualification records describe
-the earlier migration stages and the legacy bridge still imported by other
-consumers.
+native owners. The former `_run_native.py` adapter is retired after its maintained
+callers closed over those native contexts. The following CPython-controller
+records describe the earlier migration stages and their historical object ABI.
 
 The Android runner's image preparation and post-argument validation policy is
-implemented here. `run-query.v` drives the synchronous stdlib bindings in
-`_run_native.py`; `run.py` retains its public functions and argparse interface.
+implemented here. The maintained extensionless `run` uses these policies
+through V callbacks. The historical `run-query.v` object transport is no longer
+the application's command entry point.
 
 V owns overlay traversal and hardlink tracking, inherited library closure,
 USTAR payload deduplication and streaming SHA-256, optional probe staging and

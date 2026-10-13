@@ -35,7 +35,8 @@ GNU cross-compiler qualification records both runtime ELF targets and allocation
 imports. This qualification does not claim a fresh Android application or VM
 boot, or a full native Alpine ART/ATL source build.
 
-The remaining Python Android application supervisor, interactive fixtures and
-shared legacy bridges are the next migration work. Legacy bridges remain while
-other unported consumers still import them; their files receive no retirement
-credit here.
+The application supervisor and interactive fixtures now live in
+`tests/native-android-run`. The unused Android `_native.py` and application
+`_run_native.py` adapters are retired after fresh native dispatcher and suite
+qualification. The generic `_boot_native.py` bridge remains for unported
+consumers; its file receives no retirement credit here.

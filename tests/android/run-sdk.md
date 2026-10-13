@@ -1,5 +1,11 @@
 # Android runner object bindings
 
+The maintained runner is now [`run`](run), with direct V effects and ownership
+in `tests/native-android-run/androidrun`. Its former `_run_native.py` adapter is
+retired after fresh native dispatcher, preparation, primitive, PTY/QMP and
+interactive qualification. The rest of this document records the historical
+CPython binding; the maintained command does not require that object ABI.
+
 `_run_native.py` binds the runner's V policy to actual CPython objects. Its
 encoded argument conversion, provider selection, and
 36 value/callback operations live in `cpythonhost/run_d_cpython_android_run.c.v`.

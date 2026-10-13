@@ -32,9 +32,12 @@ uses native Android and Roblox preflights. ART/musl receipt APIs are also expose
 through the extensionless `build-support/android` commands and `androidtools`.
 
 `desktop/tools/input` exposes the native pointer, text and Cmd-Tab commands.
-The legacy Python input entry remains until OpenGothic's importing consumer is
-ported. Shared Android interpreter bridges also remain for other consumers;
-their presence receives no retirement credit in this stage.
+OpenGothic now uses that V API directly. The former application supervisor
+binding `_run_native.py` has no maintained callers and is retired, as is the
+Android host `_native.py` adapter. Their filesystem, archive, process, QMP,
+thread, image, argument and error effects already use the native contexts in
+`androidrun` and `androidtools`. The generic `_boot_native.py` transport remains
+for other unported consumers and receives no retirement credit here.
 
 Host qualification uses cold ARM, x86 and ASan/UBSan builds, the ported
 interactive and staging fixtures, complete preparation fixtures, actual Unix
@@ -44,3 +47,11 @@ checks calculator acknowledgements and shifted keys while more than 1.2 MB of
 serial drains, generic observation, screenshots and I/O failure cleanup. This
 qualification does not establish a fresh Vinix Android or Roblox application
 boot.
+
+`qualify-closure.v COMPILER NEW_EVIDENCE arm|x86|san` cold-builds both public
+dispatchers and six native suites. It checks preparation, primitives, four
+actual PTY/QMP sessions, all ten interactive cases, APK metadata/link/path
+fixtures and ten help paths. `--recheck-cold-builds` reruns those cases only
+when every executable matches its recorded cold-build hash. Evidence paths
+are canonical and Unix socket paths remain short. No Python or Vinix guest
+is executed in this closure qualification.

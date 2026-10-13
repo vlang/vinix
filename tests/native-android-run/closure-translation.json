@@ -1,0 +1,138 @@
+{
+    "bytes": 21866,
+    "evidence": "~/.cache/vinix-android-bridge-closure-20261013",
+    "files": 2,
+    "lines": 537,
+    "originals": [
+        {
+            "bytes": 5749,
+            "lines": 144,
+            "path": "build-support/android/_native.py",
+            "sha256": "70e8d992597ef98cd8ed36c1dfd3a2d2ce11a9e7bb76012eb153c515e02fbcc7"
+        },
+        {
+            "bytes": 16117,
+            "lines": 393,
+            "path": "tests/android/_run_native.py",
+            "sha256": "59d17b4c0f64bd12058519aeff15927b1babcb0bff185b33f5cf0d6703adf201"
+        }
+    ],
+    "profiles": [
+        {
+            "profile": "arm",
+            "programs": [
+                {
+                    "name": "runner",
+                    "sha256": "e633fdd5c2a38df4645eba79fab23ba1a04d0a1365a5b04a0c5325ae6ca6d455"
+                },
+                {
+                    "name": "primitives",
+                    "sha256": "c31e8e6c57ca2b926097ec57e92e5b71c97fa467e35e88cdbd180faa41d73145"
+                },
+                {
+                    "name": "prepare",
+                    "sha256": "23e441de76d76ebd160d2399b90c27b428c16be158237434c4f12c6ae1189c30"
+                },
+                {
+                    "name": "session",
+                    "sha256": "2ed4db5a735360c19d9480a6644cde3a3e4c6bb98de421907e0a20325729e36d"
+                },
+                {
+                    "name": "interactive",
+                    "sha256": "f004ad337f65c7997a5b6019ddb963ff11904b736786eb26a2cf6f37af3e9bc4"
+                },
+                {
+                    "name": "tools",
+                    "sha256": "26ae73532b5ba0362d12be8ae4ca250ec7e76356ecb85ee15ea4cfea67543d46"
+                },
+                {
+                    "name": "files",
+                    "sha256": "e2df3605300c451fc9868c0598d2565699cded9e2cd1f39cf2b872c3c32ec424"
+                },
+                {
+                    "name": "metadata",
+                    "sha256": "2ab66ba8337fa28081c00e767dfde7101e8d3c14ef68db4ed20db5ca207372b8"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "x86",
+            "programs": [
+                {
+                    "name": "runner",
+                    "sha256": "b508d5ad9ed8c6215147c5539ca3f95cee0524f0c1a6237dcc252fcc1a544b32"
+                },
+                {
+                    "name": "primitives",
+                    "sha256": "f05f60b5c922cbbda3ef1387c8c53b43c8b511c8b826af63f22bc2e1683804ab"
+                },
+                {
+                    "name": "prepare",
+                    "sha256": "1beddee9f2549160c5dc271fa24848adb410f42eafc3d9d0eec55910be340166"
+                },
+                {
+                    "name": "session",
+                    "sha256": "e7f5a81419be4ab8ea78bcdba7f61990f1abf5e87ceb64d82b472574bed45e24"
+                },
+                {
+                    "name": "interactive",
+                    "sha256": "ea09ce5397a135b287c363a7cd2daf78f474586cd2d552a6ce19f029b2f71034"
+                },
+                {
+                    "name": "tools",
+                    "sha256": "72166f807acf5cc337c3b65fbbfa0ea0f1bf6a62d63bf46c9e39b9dc457eea5d"
+                },
+                {
+                    "name": "files",
+                    "sha256": "0b6be3da768c65b7297f15938cf0e059cdc7b4acb6db565c61c0b11d42fce5f0"
+                },
+                {
+                    "name": "metadata",
+                    "sha256": "11f2e8e09c6221d6d3a508ab4d25b3c22b5024ad3a381f61f20344f2b23230dc"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "san",
+            "programs": [
+                {
+                    "name": "runner",
+                    "sha256": "04744005cb6816a3fb7fe05a934f3ad614703158c9f430ede3eb328e26d643e4"
+                },
+                {
+                    "name": "primitives",
+                    "sha256": "8c0b24ea044f9d767767bbc7f79afb8b69c8d2afa6d66e9652ad8bbc72aeb22b"
+                },
+                {
+                    "name": "prepare",
+                    "sha256": "775ab901555de72548fb9efad1eb936bbc2ee592413a6681bc0c9acdc0ca11e3"
+                },
+                {
+                    "name": "session",
+                    "sha256": "6c02cae219e867307cef7cad72ce4fb8d0ff27ad4307832b71aaf009b037ccac"
+                },
+                {
+                    "name": "interactive",
+                    "sha256": "dd74c925f790c44043a9e71f016dcc7d47ab8b2b589c41952240b72189c4b378"
+                },
+                {
+                    "name": "tools",
+                    "sha256": "2c4cd35b265a90d0fcc8731f6970de1637fea4fe1332ab28a878f38c2634f967"
+                },
+                {
+                    "name": "files",
+                    "sha256": "d83dbe0eefba9e1ccdf33ae409310a34a748ebeddd5143e1228f1154bbb1ef1a"
+                },
+                {
+                    "name": "metadata",
+                    "sha256": "8d3565183dbaf5dcda2369254aa1db6a4f447d15a892e4ff54ca7c200df9f23b"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "qualification": "Unused bindings retired after all maintained callers use native androidrun/androidtools contexts; 24 cold ARM/x86/ASanUBSan builds, five native suites, actual PTY/QMP sessions, ten interactive cases and ten dispatcher help paths per profile; canonical short socket paths; hash-verified cold executable replay; no Python or Vinix guest",
+    "source_commit": "0f5e1cdca71f69b798d5451e86223002e067f86b"
+}
