@@ -1,12 +1,13 @@
 # Native Roblox Windows runner
 
-`host_query.v` compiles the maintained V download, manifest, ZIP staging,
-layer preparation, XWD/PNG, upload handler and report policies. The public
-Python module retains its caller ABI, parser and stdlib objects, and performs
-synchronous borrowed library calls through the existing package-store binding.
-`robloxguest` owns PTY serial/FIFO, deadline and retirement policy using the
-shared isolated-guest transport. Managers and entered values remain separately
-owned until explicit exit or post-controller fallback.
+The maintained entry point is now [`../run`](../run). Its implementation in
+`tests/native-vm-tools/vmhost/roblox_*.v` owns downloads, manifests, ZIP staging,
+layers, XWD/PNG conversion, concurrent uploads, reports and PTY/FIFO retirement
+directly. It requires no Python object binding.
+
+The older `host_query.v`, `robloxhost` and `robloxguest` files record the prior
+borrowed-object policy port. The maintained command no longer invokes those
+queries or their former interpreter adapters.
 
 The independent frozen original controls cover both host ABIs and ARM
 address/undefined-behavior sanitizers, local HTTP exchanges, real PTY/FIFO
@@ -16,6 +17,6 @@ Completed legacy public-stop/close failures retain the original master/FIFO
 cleanup boundary; the shared transport recovers unreaped children. Broken
 transport and newly guarded post-fork setup retire their acquired owners.
 
-Override only the native executable with `VINIX_ROBLOX_HOST_QUERY` and
-`VINIX_ROBLOX_GUEST_QUERY`; the default compiler path follows
-`build-support/find-v.sh` through `run-v-tool.sh`.
+The compiler path follows `build-support/find-v.sh` through `run-v-tool.sh`.
+See [native qualification](../../native-vm-tools/README.md) for the direct
+controller's current checks.

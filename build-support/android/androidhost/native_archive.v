@@ -64,6 +64,10 @@ pub fn (archive Archive) names() []string { return archive.archive.entries.map(i
 
 pub fn (archive Archive) read(name string) ![]u8 { return archive.archive.read_name(name)! }
 
+// ZIP consumers that open an individual central-directory record must retain
+// its identity even when later records have the same filename.
+pub fn (archive Archive) read_index(index int) ![]u8 { return archive.archive.read_index(index)! }
+
 pub fn write_archive(path string, items []ArchiveItem) ! {
 	mut writer := archive_writer(path)!
 	defer { writer.close() or {} }

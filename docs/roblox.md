@@ -185,7 +185,7 @@ Host launcher and shared-runtime validation checks are in `tests/roblox/launcher
 ## The Windows client and Wine
 
 The Windows Player does not run on Vinix through [Wine](wine.md), and the
-APK above is the client to use. `tests/roblox-windows/run.py` fetches the
+APK above is the client to use. `tests/roblox-windows/run` fetches the
 current Windows deployment, starts it under Wine and shows where it stops.
 
 `RobloxPlayerBeta.exe` imports a single library, `RobloxPlayerBeta.dll`:

@@ -44,3 +44,17 @@ retirement. Existing QMP and archive/decoder regressions also run.
 Qualification executes no Python or Vinix guest. It checks native host control,
 protocol, build and lifetime behavior; the application and kernel verdicts need
 their actual guest workloads.
+
+`tests/roblox-windows/run` also invokes this native controller. Its complete
+download, manifest, ZIP, layer, PTY/FIFO, upload, XWD/PNG and verdict path is in
+`vmhost/roblox_*.v`. `qualify-roblox.v COMPILER NEW_EVIDENCE arm|x86|san`
+checks two cold builds, frozen original package/XML data, duplicate ZIP entry
+identity, Unicode/path/cache/error fixtures, twenty concurrent real uploads,
+an unfinished request, actual streamed curl responses and twelve real owned
+PTY/FIFO cases including EOF, timeout, escalation, descendants and signals.
+Three complete controlled CLI runs check preparation, refresh, native USTAR,
+upload/frame/report output, empty timeout failure and exact child retirement. The native ZIP reader
+supports the stored/deflated formats used by deployment packages; unsupported
+methods fail explicitly. HTTP connection and stalled-transfer limits remain
+60/120 seconds through curl. No Python, proprietary client or Vinix guest runs
+during qualification.

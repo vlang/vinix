@@ -213,7 +213,12 @@ fn (z ProbeZip) read_name(name string) ![]u8 {
 	mut selected := -1
 	for i, entry in z.entries { if entry.name == name { selected = i } }
 	if selected < 0 { return error('Missing ZIP entry ' + name) }
-	entry := z.entries[selected]
+	return z.read_index(selected)!
+}
+
+fn (z ProbeZip) read_index(index int) ![]u8 {
+	if index < 0 || index >= z.entries.len { return error('Missing ZIP entry index') }
+	entry := z.entries[index]
 	if !zip_bounds(z.bytes, entry.offset, 30) { return zip_error('Truncated file header') }
 	offset := int(entry.offset)
 	if elf_u32(z.bytes, offset) != 0x04034b50 {
@@ -228,7 +233,7 @@ fn (z ProbeZip) read_name(name string) ![]u8 {
 		8 { zip_inflate(compressed, entry.size)! }
 		else { return error('Unsupported ZIP compression method') }
 	}
-	if crc32.sum(data) != entry.checksum { return zip_error("Bad CRC-32 for file '${name}'") }
+	if crc32.sum(data) != entry.checksum { return zip_error("Bad CRC-32 for file '${entry.name}'") }
 	return data
 }
 

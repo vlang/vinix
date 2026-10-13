@@ -1,0 +1,67 @@
+{
+    "bytes": 12279,
+    "evidence": "~/.cache/vinix-roblox-windows-native-20261013",
+    "files": 2,
+    "limits": "Native deployment ZIP reader accepts stored/deflated archives up to 2 GiB; other methods fail explicitly. Downloads use curl connection/stall limits rather than urllib socket-read timeouts. Error diagnostics use native errors.",
+    "lines": 278,
+    "originals": [
+        {
+            "bytes": 7180,
+            "lines": 177,
+            "path": "tests/roblox-windows/run.py",
+            "sha256": "2050ef22f231b6ce274ace3fe1f42b05beae561f862d9d14b7bb6f461cdbba70"
+        },
+        {
+            "bytes": 5099,
+            "lines": 101,
+            "path": "tests/roblox-windows/_native.py",
+            "sha256": "5f63e03e18ce9484248493469f258b9524a12e578bdb839110f52083c0d773b0"
+        }
+    ],
+    "profiles": [
+        {
+            "profile": "arm",
+            "programs": [
+                {
+                    "name": "main",
+                    "sha256": "05df72eb683328a47ba8662ee069c598e55d9cc2b0115e0b2b000884e2637ff0"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "64f0574e46833b90c814477718db00d8671f2f44525f80bf82838556270a64e1"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "x86",
+            "programs": [
+                {
+                    "name": "main",
+                    "sha256": "8c4a7c6c57d6bf8feed4e2fc08c6dfd7555479686c6ab3e804526a09a7987b26"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "530bdb9d26694b7154e2d70d7043b139ab3ed0a5d09c458d04e428db42b80276"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "san",
+            "programs": [
+                {
+                    "name": "main",
+                    "sha256": "38efeca6328b7df527ccdf47b8a056eab1398c339aa8049c5d9efa5150c9763e"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "d4f3b3c5337c746597566caee8975f2909a2ff22219472fe39d0d7199974f193"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "qualification": "Six cold native builds, original package/XML goldens, Unicode/path/cache/duplicate ZIP and pixel fixtures, real streamed curl responses, twenty concurrent uploads and unfinished-request retirement, twelve PTY/FIFO cases and three complete controlled CLI runs per profile; native archive regressions; no Python, proprietary client or Vinix guest executed",
+    "source_commit": "b50b75998487b42ff5b7eea57e9b11db9475eb20"
+}

@@ -1,6 +1,6 @@
 # Roblox's Windows Player under Wine
 
-`run.py` starts the unchanged Windows client on ARM64 Vinix and records how
+`run` starts the unchanged Windows client on ARM64 Vinix and records how
 far it gets. It fetches the current deployment from Roblox's own CDN, checks
 every package against the deployment's manifest, unpacks them into the layout
 the Windows installer produces, and boots Vinix under QEMU/HVF with only what
@@ -10,8 +10,8 @@ private display, and watches it for `--seconds`.
 
 ```sh
 ./scripts/build-x86-translation-aarch64.sh
-python3 tests/roblox-windows/run.py
-python3 tests/roblox-windows/run.py --strace
+tests/roblox-windows/run
+tests/roblox-windows/run --strace
 ```
 
 It needs the X11 and userland layers (`build-aarch64-x11`,
@@ -41,3 +41,16 @@ run. `/opt/roblox-test/config.sh` holds the client's path.
 A translation stage older than its build script fails before the client is
 reached: Wine's smoke test segfaults when the stage lacks the links the
 script now makes inside the x86-64 root. Rebuild the stage in that case.
+
+The command compiles the native V controller in `tests/native-vm-tools`. V
+owns manifest/MD5 checks, ZIP placement, layer preparation, USTAR production,
+PTY/FIFO control, loopback uploads, PNG conversion and the final verdict.
+Downloads use an owned curl process, retain interrupted `.partial` files and
+publish only completed responses. The upload server runs in a private native
+process so closing it also retires unfinished concurrent requests.
+
+`tests/native-vm-tools/qualify-roblox.v` cold-builds and qualifies ARM, Rosetta
+x86 and ASan/UBSan profiles. It checks frozen package/XML data, real local
+downloads and concurrent uploads, twelve PTY/FIFO cases, pixel-accurate XWD/PNG
+fixtures, descriptor/PID retirement and three complete controlled CLI runs.
+These checks execute neither Python nor the proprietary client or Vinix guest.

@@ -1,0 +1,26 @@
+{
+    "app_settings": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Settings>\n\t<ContentFolder>content</ContentFolder>\n\t<BaseUrl>http://www.roblox.com</BaseUrl>\n</Settings>\n",
+    "packages": {
+        "RobloxApp.zip": "",
+        "WebView2.zip": "",
+        "content-avatar.zip": "content/avatar",
+        "content-configs.zip": "content/configs",
+        "content-fonts.zip": "content/fonts",
+        "content-models.zip": "content/models",
+        "content-platform-dictionaries.zip": "PlatformContent/pc/shared_compression_dictionaries",
+        "content-platform-fonts.zip": "PlatformContent/pc/fonts",
+        "content-sky.zip": "content/sky",
+        "content-sounds.zip": "content/sounds",
+        "content-terrain.zip": "PlatformContent/pc/terrain",
+        "content-textures2.zip": "content/textures",
+        "content-textures3.zip": "PlatformContent/pc/textures",
+        "extracontent-luapackages.zip": "ExtraContent/LuaPackages",
+        "extracontent-models.zip": "ExtraContent/models",
+        "extracontent-places.zip": "ExtraContent/places",
+        "extracontent-textures.zip": "ExtraContent/textures",
+        "extracontent-translations.zip": "ExtraContent/translations",
+        "shaders.zip": "shaders",
+        "ssl.zip": "ssl"
+    },
+    "source_sha256": "2050ef22f231b6ce274ace3fe1f42b05beae561f862d9d14b7bb6f461cdbba70"
+}
