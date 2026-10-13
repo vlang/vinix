@@ -2,6 +2,32 @@ module kbudget
 
 import cgcontrol
 
+fn test_metadata_ceiling_scales_for_development_machines_and_stays_bounded() {
+	assert budget_limit(0) == 2 * 1024 * 1024
+	assert budget_limit(16 * 1024 * 1024) == 2 * 1024 * 1024
+	for gib in [1, 2, 4, 8, 16] {
+		ram := u64(gib) * 1024 * 1024 * 1024
+		assert budget_limit(ram) == ram / 8
+		assert budget_limit(ram) / 2 == ram / 16
+	}
+	assert budget_limit(u64(32) * 1024 * 1024 * 1024) == u64(2) * 1024 * 1024 * 1024
+	assert budget_limit(~u64(0)) == u64(2) * 1024 * 1024 * 1024
+}
+
+fn test_configuration_cannot_change_limits_of_live_accounts() {
+	configure(64 * 1024 * 1024)
+	before := snapshot()
+	owner := open_owner() or { panic('account') }
+	charge := reserve(owner, .mapping, 64) or { panic('reservation') }
+	configure(u64(16) * 1024 * 1024 * 1024)
+	after := snapshot()
+	assert after.limit == before.limit && after.owner_limit == before.owner_limit
+	assert owned_bytes(owner) == charge.bytes
+	release(charge)
+	close_owner(owner)
+	assert snapshot().bytes == before.bytes && snapshot().accounts == before.accounts
+}
+
 fn test_budget_and_surviving_owner() {
 	configure(64 * 1024 * 1024)
 	initial := snapshot()

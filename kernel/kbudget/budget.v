@@ -82,15 +82,24 @@ __global (
 	resource_budget_generation u64
 )
 
+fn budget_limit(total u64) u64 {
+	mut limit := total / 8
+	if limit < 2 * 1024 * 1024 { limit = 2 * 1024 * 1024 }
+	// Retain the RAM fraction on development machines above 4 GiB. A fixed
+	// 512 MiB ceiling left an 8 GiB machine's compiler with only 256 MiB of
+	// mapping metadata even while most physical memory remained available.
+	maximum := u64(2) * 1024 * 1024 * 1024
+	if limit > maximum { limit = maximum }
+	return limit
+}
+
 // Called before publishing the first user process. Subsequent calls preserve
 // live reservations. No dynamically allocated accounting object is needed.
 pub fn configure(total u64) {
 	resource_budget_lock.acquire()
 	defer { resource_budget_lock.release() }
 	if resource_budget_stats.limit != 0 { return }
-	mut limit := total / 8
-	if limit < 2 * 1024 * 1024 { limit = 2 * 1024 * 1024 }
-	if limit > 512 * 1024 * 1024 { limit = 512 * 1024 * 1024 }
+	limit := budget_limit(total)
 	resource_budget_stats.limit = limit
 	resource_budget_stats.owner_limit = limit / 2
 	if resource_budget_stats.denials == 0 { resource_budget_stats.last_reason = -1 }

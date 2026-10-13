@@ -6,7 +6,7 @@ error and leaves close, unmap, IPC removal and exit able to finish. This extends
 the existing physical-memory reserve and OOM recovery to resources that can grow
 without a large user RSS.
 
-The global reservation limit is one eighth of RAM, clamped to 2–512 MiB. Each
+The global reservation limit is one eighth of RAM, clamped to 2 MiB–2 GiB. Each
 creator account can hold half that limit. Fixed account slots carry generations;
 objects retain the account independently of the Process lifetime. A shared map,
 queued SCM_RIGHTS description, removed-but-attached shared segment or accepted
@@ -14,6 +14,14 @@ socket therefore keeps its creator's identity after that creator exits. Fork
 charges the child's private metadata and descriptors; it retains shared backing
 without copying its reservation. This is creator accounting, not a cgroup charge
 migration policy.
+
+The fraction continues above 4 GiB: an 8 GiB system allows 1 GiB globally and
+512 MiB per creator, and a 16 GiB system reaches the 2 GiB global maximum.
+Smaller systems retain their previous limits. This supports large native
+compiler/assembler workloads whose page-table metadata exceeded the former
+fixed 256 MiB creator ceiling. Object bounds, cgroup `memory.max`, physical
+admission and cleanup reserves remain enforced; limits are chosen once before
+the first user process and cannot be raised by reconfiguring a live account.
 
 `/proc/kernel-resources` reports the limits, total reservations, live accounts,
 admission denials and object/byte totals for files, descriptors, sockets, IPC,
@@ -73,6 +81,17 @@ not implement resource-group ownership or eliminate every historical retention
 site; those remain separate roadmap items.
 
 See [acceptance tests](../tests/kernel-resources/README.md).
+
+The 13 October 2026 development-machine ceiling change passed the host
+accounting/rollback suite and both isolated architecture builds. The native V
+budget fixture exhausted an ordinary user's mapping allowance, checked the
+exact owner-denial evidence and recovered on AArch64 and x86_64, with receipts
+in `build/development17-20261013/budget-arm-native` and `budget-x86-native`.
+An 8 GiB AArch64 guest then compiled and executed V itself without the former
+256 MiB metadata denial. The larger C resource fixture still reports
+`mapping bound reached` on both unchanged and updated kernels; its fixed-array
+bound does not establish quota exhaustion for these lazy mappings. That
+separate fixture gate remains failing and was not waived.
 
 Validation includes both architecture builds and native exhaustion fixtures,
 concurrent host accounting tests, paging and mapped-writeback pressure regressions,
