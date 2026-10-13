@@ -119,6 +119,7 @@ fn native_fixture_source(item string) string {
 		'swift-describing-checks' { 'swift_describing_test.v' }
 		'swift-cstring-checks' { 'swift_cstring_test.v' }
 		'swift-foreign-count-checks' { 'swift_foreign_count_test.v' }
+		'swift-foreign-index-checks' { 'swift_foreign_index_test.v' }
 		'swift-metadata-checks' { 'swift_metadata_test.v' }
 		'swift-protocol-checks' { 'swift_protocol_test.v' }
 		'swift-hash-checks' { 'swift_hash_test.v' }
@@ -157,7 +158,7 @@ fn native_fixture_source(item string) string {
 
 fn build(root string, out string, only string) {
 	for item in ['run-ios', 'run-ios-gles', 'objc-constant-dictionary-checks', 'layout-constraint-checks', 'json-serialization-checks', 'condition-checks', 'cookie-checks', 'webkit-configuration-checks', 'user-script-checks', 'webview-checks', 'request-checks', 'value-checks', 'response-checks', 'alert-checks', 'set-checks', 'thread-checks', 'auth-session-checks', 'image-view-checks', 'keyboard-checks', 'nsuuid-checks', 'filemanager-checks', 'autopool-checks', 'processinfo-checks', 'date-checks', 'inputstream-checks', 'connection-checks', 'type-encoding-checks', 'oslog-checks', 'secure-memory-checks', 'select-checks', 'semaphore-checks', 'signal-checks',
-		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-unknown-value-checks', 'swift-string-checks', 'swift-empty-string-checks', 'swift-describing-checks', 'swift-cstring-checks', 'swift-foreign-count-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'swift-array-storage-checks', 'swift-vararg-checks', 'swift-void-checks', 'swift-version-checks', 'swift-initializer-checks', 'swift-heap-checks', 'swift-error-checks', 'swift-error-value-checks', 'swift-object-type-checks', 'swift-mangled-checks', 'swift-witness-checks', 'swift-once-checks', 'swift-objc-bool-checks', 'swift-actor-executor-checks', 'swift-task-priority-checks', 'swift-task-alloc-checks', 'swift-task-create-checks', 'swift-task-switch-checks', 'swift-nslog-checks', 'swift-string-unbridge-checks', 'swift-error-description-checks', 'module-lookup-checks', 'native-init'] {
+		'error-checks', 'sysctl-checks', 'terminal-checks', 'thread-policy-checks', 'file-time-checks', 'uuid-checks', 'audio-session-checks', 'cf-dictionary-checks', 'objc-storage-checks', 'objc-associated-checks', 'objc-property-checks', 'objc-sync-checks', 'swift-unknown-value-checks', 'swift-string-checks', 'swift-empty-string-checks', 'swift-describing-checks', 'swift-cstring-checks', 'swift-foreign-count-checks', 'swift-foreign-index-checks', 'swift-metadata-checks', 'swift-protocol-checks', 'swift-hash-checks', 'swift-hasher-checks', 'swift-raw-representable-checks', 'swift-array-checks', 'swift-integer-checks', 'swift-integer-hash-checks', 'swift-fatal-checks', 'swift-interpolation-checks', 'swift-array-storage-checks', 'swift-vararg-checks', 'swift-void-checks', 'swift-version-checks', 'swift-initializer-checks', 'swift-heap-checks', 'swift-error-checks', 'swift-error-value-checks', 'swift-object-type-checks', 'swift-mangled-checks', 'swift-witness-checks', 'swift-once-checks', 'swift-objc-bool-checks', 'swift-actor-executor-checks', 'swift-task-priority-checks', 'swift-task-alloc-checks', 'swift-task-create-checks', 'swift-task-switch-checks', 'swift-nslog-checks', 'swift-string-unbridge-checks', 'swift-error-description-checks', 'module-lookup-checks', 'native-init'] {
 		if only != '' && item != only { continue }
 		generated := out + '/' + item + '.c'
 		if item == 'native-init' {
@@ -316,6 +317,7 @@ fn regression_root(root string, out string, fs string) {
 	copy_file(out + '/swift-describing-checks', fs + '/opt/ios/swift-describing-checks')
 	copy_file(out + '/swift-cstring-checks', fs + '/opt/ios/swift-cstring-checks')
 	copy_file(out + '/swift-foreign-count-checks', fs + '/opt/ios/swift-foreign-count-checks')
+	copy_file(out + '/swift-foreign-index-checks', fs + '/opt/ios/swift-foreign-index-checks')
 	copy_file(out + '/swift-metadata-checks', fs + '/opt/ios/swift-metadata-checks')
 	copy_file(out + '/swift-protocol-checks', fs + '/opt/ios/swift-protocol-checks')
 	copy_file(out + '/swift-hash-checks', fs + '/opt/ios/swift-hash-checks')
@@ -424,7 +426,7 @@ fn vm(root string, out string, mode string) {
 		for directory in ['sbin', 'proc', 'sys', 'dev', 'tmp', 'opt/ios'] {
 			os.mkdir_all(fs + '/' + directory) or { panic(err) }
 		}
-		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'foreign-count', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
+		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'foreign-count', 'foreign-index', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
 			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
 			copy_file(out + '/swift-' + name + '-checks', fs + '/opt/ios/swift-' + name + '-checks')
 		}
@@ -495,7 +497,7 @@ fn vm(root string, out string, mode string) {
 
 fn main() {
 	if os.args.len < 2 {
-		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-objc-constant-dictionary|build-layout-constraint|build-json-serialization|build-condition|build-cookie|build-webkit-configuration|build-user-script|build-webview|build-request|build-value|build-response|build-alert|build-set|build-thread|build-auth-session|build-image-view|build-keyboard|build-nsuuid|build-filemanager|build-autopool|build-processinfo|build-date|build-inputstream|build-connection|build-type-encoding|build-oslog|build-secure-memory|build-swift-unknown-value|build-swift-string|build-swift-empty-string|build-swift-describing|build-swift-cstring|build-swift-foreign-count|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|build-swift-void|build-swift-version|build-swift-initializer|build-swift-heap|build-swift-error|build-swift-error-value|build-swift-object-type|build-swift-mangled|build-swift-witness|build-swift-once|build-swift-objc-bool|build-swift-actor-executor|build-swift-task-priority|build-swift-task-alloc|build-swift-task-create|build-swift-task-switch|build-swift-nslog|build-swift-string-unbridge|build-swift-error-description|build-module-lookup|verify-monitor|regression|swift|objc|probe|audit|static-audit|hash FILE')
+		panic('usage: native-checks build|build-init|build-select|build-semaphore|build-signal|build-error|build-sysctl|build-terminal|build-thread-policy|build-file-time|build-uuid|build-audio-session|build-cf-dictionary|build-objc-storage|build-objc-associated|build-objc-property|build-objc-sync|build-objc-constant-dictionary|build-layout-constraint|build-json-serialization|build-condition|build-cookie|build-webkit-configuration|build-user-script|build-webview|build-request|build-value|build-response|build-alert|build-set|build-thread|build-auth-session|build-image-view|build-keyboard|build-nsuuid|build-filemanager|build-autopool|build-processinfo|build-date|build-inputstream|build-connection|build-type-encoding|build-oslog|build-secure-memory|build-swift-unknown-value|build-swift-string|build-swift-empty-string|build-swift-describing|build-swift-cstring|build-swift-foreign-count|build-swift-foreign-index|build-swift-metadata|build-swift-protocol|build-swift-hash|build-swift-hasher|build-swift-raw-representable|build-swift-array|build-swift-integer|build-swift-integer-hash|build-swift-fatal|build-swift-interpolation|build-swift-array-storage|build-swift-vararg|build-swift-void|build-swift-version|build-swift-initializer|build-swift-heap|build-swift-error|build-swift-error-value|build-swift-object-type|build-swift-mangled|build-swift-witness|build-swift-once|build-swift-objc-bool|build-swift-actor-executor|build-swift-task-priority|build-swift-task-alloc|build-swift-task-create|build-swift-task-switch|build-swift-nslog|build-swift-string-unbridge|build-swift-error-description|build-module-lookup|verify-monitor|regression|swift|objc|probe|audit|static-audit|hash FILE')
 	}
 	root := os.real_path(os.getwd())
 	requested := os.getenv('VINIX_IOS_CHECK_NAME')
@@ -601,6 +603,8 @@ fn main() {
 		build(root, out, 'condition-checks')
 	} else if mode == 'build-swift-unknown-value' {
 		build(root, out, 'swift-unknown-value-checks')
+	} else if mode == 'build-swift-foreign-index' {
+		build(root, out, 'swift-foreign-index-checks')
 	} else if mode == 'build-swift-foreign-count' {
 		build(root, out, 'swift-foreign-count-checks')
 	} else if mode == 'build-swift-cstring' {
