@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `8d358c7a2c432da93a053c273a5818ab52d91f99`,
+at source commit `b9443a236beb31a8770ac5ac71938b67d9dd3fce`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,555 | 5.66% |
-| Python | 15 | 123,734 | 0.29% |
-| Shell | 813 | 1,373,764 | 3.25% |
+| C | 599 | 2,396,874 | 5.65% |
+| Python | 12 | 106,699 | 0.25% |
+| Shell | 816 | 1,374,252 | 3.24% |
 
-All `.v` files are classified as V. The resulting V share is 83.42%, with no
+All `.v` files are classified as V. The resulting V share is 83.52%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 123,734 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 106,699 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 8d358c7a2c432da93a053c273a5818ab52d91f99 --breakdown --json
+github-linguist --rev b9443a236beb31a8770ac5ac71938b67d9dd3fce --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -655,7 +655,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tools/security-mac/mac.h` | 526 |
 | `tools/security-mac/mac_v.h` | 759 |
 | `tools/sourcecommand/abi.h` | 288 |
-| `tools/volumes/volumecli/volume.h` | 1,060 |
+| `tools/volumes/volumecli/volume.h` | 1,379 |
 
 ## Python files
 
@@ -666,10 +666,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/native_host.py` | 6,504 |
 | `installer/macos/vinix_auto.py` | 8,147 |
 | `tests/ext2-xattr/run.py` | 11,512 |
-| `tests/ios/desktop.py` | 7,962 |
-| `tests/ios/game2048.py` | 3,080 |
 | `tests/ios/run.py` | 20,826 |
-| `tests/ios/uikit.py` | 5,993 |
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/run.py` | 3,048 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,384 |
@@ -1185,10 +1182,13 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/build-fixture.sh` | 11,694 |
 | `tests/ios/build-gles-fixture.sh` | 2,735 |
 | `tests/ios/build-modules-fixture.sh` | 2,174 |
+| `tests/ios/desktop` | 163 |
 | `tests/ios/frame` | 180 |
+| `tests/ios/game2048` | 164 |
 | `tests/ios/reference-frameworks.sh` | 10,486 |
 | `tests/ios/reference-modules.sh` | 1,436 |
 | `tests/ios/run-objc-calculator.sh` | 674 |
+| `tests/ios/uikit` | 161 |
 | `tests/ipv6-multicast/check-generated` | 146 |
 | `tests/ipv6-multicast/run-host.sh` | 126 |
 | `tests/ipv6-multicast/run.sh` | 180 |
