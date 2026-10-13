@@ -74,7 +74,7 @@ pub fn (service Service) mirror(destination string, names []string) ! {
 	directory := service.directory()!
 	guard := acquire(directory)!
 	defer { guard.release() }
-	mirror_locked(service.configuration()!, directory, destination, names)!
+	mirror_export(service.configuration()!, directory, destination, names, MirrorOptions{ progress: service.progress })!
 }
 
 fn (service Service) installed_locked(directory string, verify bool) !State {

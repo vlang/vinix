@@ -109,6 +109,8 @@ fn qualify_busy_configuration(binary string, root string) ! {
 		['review', 'install', 'app'], ['apply', '0'.repeat(64), 'install', 'app'],
 		['install', 'app'], ['upgrade'], ['remove', 'app'], ['rollback'], ['gc'],
 		['mirror', root + '/absent-mirror', 'app'], ['deploy', root + '/absent-deployment.json'],
+		['mirror-review', root + '/absent-mirror', 'app'],
+		['mirror-apply', '0'.repeat(64), root + '/absent-mirror', 'app'],
 		['deployment-lock', 'app'], ['deployment-review', root + '/absent-deployment.json'],
 		['deployment-apply', '0'.repeat(64), root + '/absent-deployment.json'],
 		['policy'], ['policy-review', root + '/absent-policy.json'], ['policy-apply', '0'.repeat(64), root + '/absent-policy.json'],
@@ -282,7 +284,14 @@ fn qualify(binary string) ! {
 	os.write_file(installed_file, original_payload)!
 	assert json2.decode[pkgcore.State](success(binary, [...root_args, '--json', 'verify'])!)!.generation == installed.generation
 	// A mirror is used by another completely clean installation, offline.
-	success(binary, [...root_args, 'mirror', work + '/mirror', 'app'])!
+	mut mirror_review := pkgprotocol.decode_mirror_review(success(binary, [...root_args, 'mirror-review', work + '/mirror', 'app'])!)!
+	defer { mirror_review.close() }
+	assert mirror_review.review.rows.len == 1 && mirror_review.review.rows[0].action == 'export'
+	assert !os.exists(work + '/mirror')
+	changed_mirror := command(binary, [...root_args, 'mirror-apply', mirror_review.review.fingerprint, work + '/other-mirror', 'app'])!
+	assert changed_mirror.code != 0 && changed_mirror.text.contains('stale') && !os.exists(work + '/other-mirror')
+	mirror_text := success(binary, [...root_args, '--progress', 'mirror-apply', mirror_review.review.fingerprint, work + '/mirror', 'app'])!
+	assert mirror_text.contains('"phase":"copy"') && mirror_text.contains('"phase":"complete"')
 	assert os.ls(work)!.all(!it.starts_with('.vinix-mirror-'))
 	for object in os.ls(work + '/mirror/fixture/objects')! {
 		assert os.stat(work + '/mirror/fixture/objects/' + object)!.mode & 0o777 == 0o644

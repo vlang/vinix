@@ -77,3 +77,11 @@ with installed app/runtime versions, publisher provenance, admitted generation,
 private data paths and declared permissions. All launch modes receive the same
 versioned environment contract. See [the SDK interface](SDK.md#application-context-interface)
 and [native guest qualification](../../tests/packages/sdk-context-check.md).
+
+Software's **Export offline** action reviews current catalog versions and their
+dependency closure, publisher provenance, licenses, permissions, destination and
+cache disk requirements before exporting to new local media. The equivalent
+`mirror-review` / `mirror-apply` commands bind confirmation to signed metadata,
+policy and destination filesystem identity. Both direct and reviewed exports
+support `--progress`. See [offline administration](../../docs/application-distribution.md#offline-and-organization-deployment)
+and [qualification](../../tests/packages/offline-export-check.md).

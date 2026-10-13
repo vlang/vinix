@@ -105,6 +105,17 @@ mut:
 	deployment_mode bool
 	deployment_path []u8
 	deployment_pending string // frozen file path for deployment-review/apply
+	mirror_mode bool
+	mirror_path []u8
+	mirror_all bool
+	mirror_pending string
+	mirror_snapshot pkgprotocol.MirrorReview // review rows are owned by review_snapshot
+	mirror_details bool
+	mirror_pages []string
+	mirror_page int
+	mirror_seen int
+	mirror_summary string
+	worker_mirror bool
 	terminal_app &TerminalApp = unsafe { nil }
 	launch_mode bool
 	launch_id string
@@ -161,6 +172,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker_view = view
 	a.worker_review = false
 	a.worker_run = false
+	a.worker_mirror = false
 	a.repository_worker = .none
 	a.worker = os.new_process(a.service_path.clone())
 	mut owned := []string{cap: arguments.len + 1}
@@ -222,6 +234,7 @@ fn (mut a SoftwareApp) load_view() {
 	a.clear_launch_options()
 	a.clear_review()
 	a.deployment_mode = false
+	a.mirror_mode = false
 	text := editor_bytes_text(a.output)
 	view := json2.decode[SoftwareView](text) or {
 		a.set_status('Invalid response from the package service. Reload the catalog or check its configuration.')
@@ -272,6 +285,7 @@ fn (mut a SoftwareApp) load_view() {
 }
 
 fn (mut a SoftwareApp) clear_review() {
+	a.clear_mirror_review()
 	a.review_snapshot.close()
 	unsafe {
 		a.review.free()
@@ -302,11 +316,18 @@ fn (mut a SoftwareApp) begin_review(operation string, names []string) {
 }
 
 fn (mut a SoftwareApp) load_review() {
-	mut review := pkgprotocol.decode_review(editor_bytes_text(a.output)) or {
+	mut review := if a.mirror_pending != '' {
+		a.decode_mirror_output() or {
+			unsafe { err.free() }
+			a.clear_review()
+			a.set_status('Unsupported or different offline export review. Review the export again.')
+			return
+		}
+	} else { pkgprotocol.decode_review(editor_bytes_text(a.output)) or {
 		a.clear_review()
 		a.set_status('Unsupported or invalid package review response. Review the operation again.')
 		return
-	}
+	} }
 	review.validate() or {
 		review.close()
 		a.clear_review()
@@ -340,7 +361,9 @@ fn (mut a SoftwareApp) load_review() {
 		available.free()
 		reserve.free()
 	}
-	if a.deployment_pending != '' {
+	if a.mirror_pending != '' {
+		a.set_status('Review the destination and every application and dependency. Export uses the authenticated catalog versions; it preserves the installed application set.')
+	} else if a.deployment_pending != '' {
 		message := 'Deployment file: ' + a.deployment_pending + '\nReview all dependencies and removals. This replaces the installed application set; personal data stays on disk.'
 		a.set_status(message)
 		unsafe { message.free() }
@@ -423,6 +446,7 @@ fn (mut a SoftwareApp) poll() bool {
 	reviewing := a.worker_review
 	running := a.worker_run
 	repository_worker := a.repository_worker
+	mirroring := a.worker_mirror
 	a.retire_worker()
 	if code != 0 {
 		if repository_worker == .review { a.clear_repository_review() }
@@ -463,6 +487,10 @@ fn (mut a SoftwareApp) poll() bool {
 		tail := software_output_tail(a.output)
 		a.set_status(if tail.len > 0 { tail } else { 'Application finished successfully.' })
 		unsafe { tail.free() }
+	} else if mirroring {
+		tail := software_output_tail(a.output)
+		a.set_status(if tail.len > 0 { tail } else { 'Offline repository export completed.' })
+		unsafe { tail.free() }
 	} else {
 		a.start(['view'], true)
 	}
@@ -494,6 +522,7 @@ fn (mut a SoftwareApp) run_requested() {
 	a.clear_repository_review()
 	a.repository_mode = false
 	a.deployment_mode = false
+	a.mirror_mode = false
 	a.start(if request.document.len > 0 {
 		['run', request.id, request.document]
 	} else {
@@ -531,12 +560,24 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.run_requested()
 		return
 	}
-	if event_id == 'software.search' && !a.deployment_mode {
+	if event_id == 'software.search' && !a.deployment_mode && !a.mirror_mode {
 		a.focus = true
 		return
 	}
 	if a.worker != unsafe { nil } { return }
 	if a.launch_mode { a.handle_launch_options(event_id); return }
+	if event_id == 'software.mirror' {
+		a.clear_review()
+		a.repository_mode = false
+		a.deployment_mode = false
+		a.mirror_mode = true
+		a.initialize_mirror_field()
+		a.focus = false
+		a.select_all = false
+		a.set_status('Choose the selected catalog application or all installed application roots, then enter a new export directory.')
+		return
+	}
+	if a.mirror_mode && (a.review == '' || a.mirror_details) { a.handle_mirror(event_id); return }
 	if event_id == 'software.repositories' {
 		a.clear_review()
 		a.deployment_mode = false
@@ -659,15 +700,22 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 		'software.confirm' {
 			if a.review_ready {
-				a.start(if a.deployment_pending != '' {
+				mirroring := a.mirror_pending != ''
+				a.start(if mirroring {
+					['mirror-apply', a.review_snapshot.fingerprint, a.mirror_pending, ...a.review_snapshot.names]
+				} else if a.deployment_pending != '' {
 					['deployment-apply', a.review_snapshot.fingerprint, a.deployment_pending]
 				} else {
 					['apply', a.review_snapshot.fingerprint, a.review_snapshot.operation,
 						...a.review_snapshot.names]
 				}, false)
-				if a.worker != unsafe { nil } { a.clear_review() }
+				if a.worker != unsafe { nil } {
+					a.worker_mirror = mirroring
+					a.clear_review()
+				}
 			}
 		}
+		'software.mirror.details' { a.mirror_details = true }
 		'software.cancel' {
 			a.clear_review()
 			a.set_status('Operation cancelled before making changes.')
@@ -680,6 +728,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input); return }
+	if a.mirror_mode { a.mirror_key_input(input); return }
 	if a.deployment_mode { a.deployment_key_input(input); return }
 	if !a.focus { return }
 	match input {
@@ -703,6 +752,8 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {
 		a.deployment_key_input(input)
+	} else if a.mirror_mode {
+		a.mirror_key_input(input)
 	} else if a.focus { a.key_input(input) }
 }
 
@@ -754,6 +805,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
 	if a.launch_mode { return a.build_launch_options(width, height) }
 	if a.repository_mode { return a.build_repositories(width, height) }
+	if a.mirror_mode && (a.review == '' || a.mirror_details) { return a.build_mirror(width, height) }
 	if a.deployment_mode && a.review == '' { return a.build_deployment(width, height) }
 	mut children := frame_elements(48)
 	reviewing := a.review.len > 0
@@ -761,10 +813,11 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if reviewing {
 		children << software_label(if a.deployment_pending != '' { 'Review deployment'.clone() } else {
 			'Review ${a.review}'
-		}, 170, 8, width - 188, 28, true)
+		}, 170, 8, if a.mirror_pending != '' { width - 340 } else { width - 188 }, 28, true)
 		children << software_label(a.review_summary, 14, 40, width - 28, 44, false)
 	} else {
-		children << console_field('software.search', editor_bytes_text(a.query), 170, 8, width - 386, a.focus)
+		children << console_field('software.search', editor_bytes_text(a.query), 170, 8, width - 492, a.focus)
+		children << software_button('software.mirror', 'Export offline', width - 308, 8, 98)
 		children << software_button('software.deployment', 'Deployment', width - 202, 8, 96)
 		children << software_button('software.refresh', 'Refresh', width - 98, 8, 84)
 		children << software_button('software.catalog', 'Catalog', 14, 46, 90)
@@ -863,6 +916,9 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			children << software_button('software.confirm', 'Confirm', 274, height - 138, 130)
 		}
 		children << software_button('software.cancel', 'Cancel', 416, height - 138, 110)
+		if a.mirror_pending != '' {
+			children << software_button('software.mirror.details', 'Destination', width - 150, 8, 136)
+		}
 	} else {
 		children << software_button('software.upgrade', 'Update all', 274, height - 138, 130)
 		children << software_button('software.rollback', 'Rollback', 416, height - 138, 130)
@@ -922,6 +978,7 @@ fn (mut a SoftwareApp) close_app() {
 		a.repository_key.free()
 		a.repository_result.free()
 		a.deployment_path.free()
+		a.mirror_path.free()
 	}
 	a = SoftwareApp{}
 }

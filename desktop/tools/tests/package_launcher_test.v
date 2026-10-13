@@ -544,3 +544,60 @@ fn test_software_progress_redraw_and_stream_storage_are_released() {
 	app.close_app()
 	assert C.vinix_heap_end() == baseline
 }
+
+fn test_software_mirror_form_destination_pages_closure_and_cancel_release_storage() {
+	path := '/media/' + 'offline-export-'.repeat(24)
+	mut app := SoftwareApp{ mirror_mode: true, mirror_pending: path.clone(), review: 'mirror'.clone(),
+		review_names: ['editor'.clone()] }
+	app.initialize_mirror_field()
+	software_repository_text(mut app.mirror_path, path)
+	row_text := software_review_fixture.replace('"operation":"install"', '"operation":"mirror"')
+		.replace('"generation":1', '"generation":0').replace('"action":"update"', '"action":"export"')
+	text := '{"format":1,"input_destination":"${path}","destination":"${path}","cache_needed":1024,"cache_available":65536,"shared_disk":true,"review":${row_text}}'
+	app.output = text.bytes()
+	unsafe { row_text.free(); text.free(); path.free() }
+	app.load_review()
+	assert app.review_ready && app.mirror_details && app.mirror_pages.len > 1
+	begin_frame_elements()
+	free_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+		app.handle('software.mirror.next')!
+		app.handle('software.mirror.previous')!
+	}
+	package_assert_heap_flat('Software mirror destination redraw and paging')
+	for app.mirror_seen + 1 < app.mirror_pages.len { app.handle('software.mirror.next')! }
+	app.handle('software.mirror.packages')!
+	assert !app.mirror_details
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 900, 660))!)
+	}
+	package_assert_heap_flat('Software mirror closure redraw')
+	app.clear_review()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		begin_frame_elements()
+		free_tree(app.build(ui2.rect(0, 0, 640, 610))!)
+	}
+	package_assert_heap_flat('Software mirror form redraw')
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
+	baseline := C.vinix_heap_end()
+	C.vinix_heap_begin()
+	for _ in 0 .. 100 {
+		app.review = 'mirror'.clone()
+		app.review_names = ['editor'.clone()]
+		app.mirror_pending = editor_bytes_text(app.mirror_path).clone()
+		app.load_review()
+		assert app.review_ready
+		app.clear_review()
+	}
+	app.close_app()
+	retained := C.vinix_heap_end()
+	assert retained == baseline
+	println('Software offline export memory: redraw/paging=0; review retirement=${retained} bytes (decoder baseline ${baseline})')
+}

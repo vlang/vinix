@@ -85,7 +85,7 @@ fn linux_suite(work string, repository string) !hwhost.Suite {
 			name:     'packages-linux'
 			arches:   ['aarch64', 'x86_64']
 			about:    'prepared-root import and signed musl loader/library execution under real sandbox enforcement'
-			required: ['HWTEST START packages-linux', 'PACKAGE SIGNING', 'PACKAGE CATALOG', 'PACKAGE RELEASE', 'PACKAGE REVIEW', 'PACKAGE TRUST REVIEW', 'PACKAGE CONFIGURATION', 'PACKAGE ORGANIZATION', 'PACKAGE DOCUMENTS', 'PACKAGE DEPLOYMENT', 'PACKAGE PROGRESS', 'PACKAGE OFFLINE', 'PACKAGE REPOSITORY', 'PACKAGE UPDATES', 'PACKAGE LINUX IMPORT',
+			required: ['HWTEST START packages-linux', 'PACKAGE SIGNING', 'PACKAGE CATALOG', 'PACKAGE RELEASE', 'PACKAGE REVIEW', 'PACKAGE TRUST REVIEW', 'PACKAGE CONFIGURATION', 'PACKAGE ORGANIZATION', 'PACKAGE DOCUMENTS', 'PACKAGE DEPLOYMENT', 'PACKAGE PROGRESS', 'PACKAGE OFFLINE', 'PACKAGE MIRROR REVIEW', 'PACKAGE REPOSITORY', 'PACKAGE UPDATES', 'PACKAGE LINUX IMPORT',
 				'HWTEST PASS packages-linux']
 			ending:   .poweroff
 			timeout:  180
@@ -149,8 +149,14 @@ fn stage_linux(repository string, work string, architecture string) ! {
 		return error('target musl compiler has no dynamic libc.so: ${loader}')
 	}
 	os.cp(loader, work + '/musl')!
-	invoke([repository + '/build-support/security-tools/stage', '--arch', architecture, '--staging',
-		work])!
+	if sandbox := os.getenv_opt('VINIX_LINUX_SANDBOX') {
+		// RootBinary admission checks ELF class and target before guest boot.
+		if !os.is_file(sandbox) { return error('VINIX_LINUX_SANDBOX must select an existing native sandbox') }
+		os.mkdir_all(work + '/usr/bin')!
+		os.cp(sandbox, work + '/usr/bin/vinix-sandbox')!
+	} else {
+		invoke([repository + '/build-support/security-tools/stage', '--arch', architecture, '--staging', work])!
+	}
 }
 
 fn check() !int {
@@ -181,6 +187,8 @@ fn check() !int {
 				artifact('musl-loader', work + '/musl')!,
 				artifact('static-linux-runner', work + '/linux-runner')!,
 				artifact('package-service', root + '/usr/bin/vinix-package')!,
+				artifact('guest-init', options.state_dir + '/guest/init')!,
+				artifact('account-manager', root + '/usr/sbin/vinix-account')!,
 				artifact('session-runner', root + '/usr/sbin/vinix-session')!,
 				artifact('serial-log', options.state_dir + '/packages-linux/serial.log')!,
 			]

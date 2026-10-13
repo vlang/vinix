@@ -35,7 +35,7 @@ fn export_target(destination string, kind string) !string {
 	os.mkdir_all(path, mode: 0o755)!
 	parent := os.real_path(path)
 	check_export_parent(parent, kind)!
-	target := parent + '/' + name
+	target := parent.trim_right('/') + '/' + name
 	if os.exists(target) || os.is_link(target) { return error('${kind} destination must be new') }
 	return target
 }

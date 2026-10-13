@@ -21,7 +21,7 @@ pub:
 	firmware          bool
 	permissions       []string
 	requested         bool
-	action            string // install, update, keep, remove
+	action            string // install, update, keep, remove, export (mirror only)
 }
 
 pub struct Review {
@@ -99,11 +99,11 @@ fn version(value string) bool {
 }
 
 pub fn (review &Review) validate() ! {
-	if review.format != 1 || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'rollback']
+	if review.format != 1 || review.operation !in ['install', 'remove', 'upgrade', 'deploy', 'rollback', 'mirror']
 		|| review.architecture !in ['aarch64', 'x86_64'] || !digest(review.fingerprint)
 		|| review.rows.len > 8192 || review.names.len > 4096 || review.requested.len > 4096
 		|| review.names.any(!identifier(it)) || review.requested.any(!identifier(it))
-		|| (review.operation in ['install', 'remove'] && review.names.len == 0)
+		|| (review.operation in ['install', 'remove', 'mirror'] && review.names.len == 0)
 		|| (review.operation in ['upgrade', 'rollback'] && review.names.len != 0)
 		|| (review.operation == 'rollback' && review.target_generation == 0)
 		|| (review.operation != 'rollback' && review.target_generation != 0) {
@@ -119,7 +119,8 @@ pub fn (review &Review) validate() ! {
 			|| (row.architecture == 'all' && row.kind != 'data')
 			|| (row.kind in ['linux', 'windows', 'apple'] && row.runtime == '')
 			|| (row.runtime != '' && !identifier(row.runtime)) || !identifier(row.repository)
-			|| !digest(row.public_key) || row.action !in ['install', 'update', 'keep', 'remove']
+			|| !digest(row.public_key) || row.action !in ['install', 'update', 'keep', 'remove', 'export']
+			|| ((row.action == 'export') != (review.operation == 'mirror'))
 			|| row.permissions.len > 5 || row.permissions.any(it !in ['files', 'network', 'process',
 			'display', 'audio'])
 			|| row.requested != (row.id in review.requested) || (row.action == 'remove' && row.requested) {

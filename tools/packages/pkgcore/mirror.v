@@ -2,11 +2,17 @@
 module pkgcore
 
 import os
+import crypto.sha256
+import json2
+import tools.packages.pkgprotocol
 
-// Only in-process qualification uses this hook; it has no CLI/environment switch.
+// Checkpoint and space overrides are in-process qualification hooks, without a
+// CLI/environment switch. Production callers supply progress and review intent.
 struct MirrorOptions {
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 	available_space fn (string) !u64 = free_bytes
+	progress fn (pkgprotocol.Progress) = no_progress
+	expected_review string
 }
 
 fn mirror_no_checkpoint(_ string, _ string) ! {}
@@ -20,6 +26,111 @@ pub fn mirror(config Config, directory string, destination string, names []strin
 
 fn mirror_locked(config Config, directory string, destination string, names []string) ! {
 	mirror_export(config, directory, destination, names, MirrorOptions{})!
+}
+
+struct MirrorIdentity {
+	domain string = 'vinix-mirror-review-1'
+	config Config
+	names []string
+	plan Plan
+	snapshots []Snapshot
+	destination string
+	target string
+	ancestor string
+	device u64
+	inode u64
+}
+
+struct PreparedMirror {
+	target string
+	ancestor string
+	plan Plan
+	snapshots []Snapshot
+	exported u64
+	acquired u64
+	shared_disk bool
+	fingerprint string
+}
+
+// Resolve missing parents without creating them. The review binds the existing
+// ancestor's inode and filesystem so swapping removable media invalidates it.
+fn mirror_location(destination string) !(string, string) {
+	if destination == '' || !printable(destination, 4096) || destination.contains('\\') {
+		return error('offline mirror requires a valid destination path')
+	}
+	path := os.abs_path(destination).trim_right('/')
+	if path == '' || os.exists(path) || os.is_link(path) {
+		return error('offline mirror destination must be new')
+	}
+	mut ancestor := os.dir(path)
+	for !os.exists(ancestor) && !os.is_link(ancestor) { ancestor = os.dir(ancestor) }
+	if !os.is_dir(ancestor) { return error('offline mirror parent must be a directory') }
+	real := os.real_path(ancestor)
+	check_export_parent(real, 'offline mirror')!
+	suffix := path[ancestor.len..]
+	target := real.trim_right('/') + if ancestor == '/' { '/' + suffix } else { suffix }
+	if os.exists(target) || os.is_link(target) { return error('offline mirror destination must be new') }
+	return target, real
+}
+
+fn prepare_mirror(config Config, directory string, destination string, names []string) !PreparedMirror {
+	if names.len == 0 || names.len > 4096 { return error('offline mirror requires 1 to 4096 package IDs') }
+	target, ancestor := mirror_location(destination)!
+	catalog := load_catalog(config, directory)!
+	plan := resolve(catalog, config, State{}, names, true)!
+	mut snapshots := []Snapshot{}
+	for snapshot in read_snapshots(directory)! {
+		if config.repositories.any(it == snapshot.repository) { snapshots << snapshot }
+	}
+	exported, acquired := mirror_space(plan, snapshots, directory)!
+	info := os.stat(ancestor)!
+	text := json2.encode(MirrorIdentity{ config: config, names: names, plan: plan, snapshots: snapshots,
+		destination: destination, target: target, ancestor: ancestor, device: info.dev, inode: info.inode })
+	bytes := text.bytes()
+	fingerprint := sha256.sum(bytes).hex()
+	unsafe { bytes.free(); text.free() }
+	return PreparedMirror{ target: target, ancestor: ancestor, plan: plan, snapshots: snapshots,
+		exported: exported, acquired: acquired, shared_disk: info.dev == os.stat(directory)!.dev,
+		fingerprint: fingerprint }
+}
+
+fn mirror_destination_cost(prepared PreparedMirror) !u64 {
+	if !prepared.shared_disk { return prepared.exported }
+	if prepared.exported > ~u64(0) - prepared.acquired { return error('offline mirror disk requirement overflow') }
+	return prepared.exported + prepared.acquired
+}
+
+pub fn (service Service) review_mirror(destination string, names []string) !pkgprotocol.MirrorReview {
+	directory := service.directory()!
+	guard := acquire_reader(directory)!
+	defer { guard.release() }
+	config := service.configuration()!
+	prepared := prepare_mirror(config, directory, destination, names)!
+	mut rows := []pkgprotocol.ReviewPackage{cap: prepared.plan.packages.len}
+	for installed in prepared.plan.packages {
+		rows << review_row(installed, '', installed.package.id in prepared.plan.requested, 'export')
+	}
+	rows.sort(a.id < b.id)
+	mut result := pkgprotocol.MirrorReview{
+		format: 1, destination: prepared.target.clone(), input_destination: destination.clone(),
+		cache_needed: prepared.acquired, cache_available: free_bytes(directory)!, shared_disk: prepared.shared_disk,
+		review: pkgprotocol.Review{ format: 1, operation: 'mirror'.clone(), names: review_strings(names),
+			architecture: config.architecture.clone(), fingerprint: prepared.fingerprint,
+			requested: review_strings(prepared.plan.requested), rows: rows,
+			disk_needed: mirror_destination_cost(prepared)!, disk_available: free_bytes(prepared.ancestor)!,
+			disk_reserve: config.policy.reserve_bytes }
+	}
+	result.validate() or { result.close(); return err }
+	return result
+}
+
+pub fn (service Service) apply_mirror(destination string, names []string, expected string) ! {
+	if !digest_valid(expected) { return error('offline mirror apply requires a review fingerprint') }
+	directory := service.directory()!
+	guard := acquire(directory)!
+	defer { guard.release() }
+	mirror_export(service.configuration()!, directory, destination, names,
+		MirrorOptions{ progress: service.progress, expected_review: expected })!
 }
 
 fn mirror_cost(total u64, bytes u64) !u64 {
@@ -58,45 +169,43 @@ fn mirror_space(plan Plan, snapshots []Snapshot, directory string) !(u64, u64) {
 }
 
 fn mirror_export(config Config, directory string, destination string, names []string, options MirrorOptions) ! {
-	// Create missing parent directories, then place the private tree on the
-	// destination filesystem. No signed index is exposed at the final name yet.
+	prepared := prepare_mirror(config, directory, destination, names)!
+	if options.expected_review != '' && options.expected_review != prepared.fingerprint {
+		return error('offline mirror review is stale: destination, publisher metadata, policy or resolved packages changed; review the export again')
+	}
+	disk_check(options.available_space(prepared.ancestor)!, mirror_destination_cost(prepared)!, config.policy.reserve_bytes)!
+	if !prepared.shared_disk && prepared.acquired > 0 {
+		disk_check(options.available_space(directory)!, prepared.acquired, config.policy.reserve_bytes)!
+	}
+	options.progress(pkgprotocol.Progress{ phase: 'resolve' })
 	target := export_target(destination, 'offline mirror')!
+	if target != prepared.target { return error('offline mirror destination changed; review the export again') }
 	parent := os.dir(target)
-	catalog := load_catalog(config, directory)!
-	plan := resolve(catalog, config, State{}, names, true)!
-	mut snapshots := []Snapshot{}
-	for snapshot in read_snapshots(directory)! {
-		if config.repositories.any(it == snapshot.repository) { snapshots << snapshot }
-	}
-	exported, acquired := mirror_space(plan, snapshots, directory)!
-	if os.stat(parent)!.dev == os.stat(directory)!.dev {
-		if exported > ~u64(0) - acquired { return error('offline mirror disk requirement overflow') }
-		disk_check(options.available_space(parent)!, exported + acquired, config.policy.reserve_bytes)!
-	} else {
-		disk_check(options.available_space(parent)!, exported, config.policy.reserve_bytes)!
-		if acquired > 0 { disk_check(options.available_space(directory)!, acquired, config.policy.reserve_bytes)! }
-	}
 	stage := export_stage(parent, '.vinix-mirror')!
 	mut published := false
 	defer {
 		if !published { os.rmdir_all(stage) or {} }
 	}
 	options.checkpoint('created', stage)!
-	for snapshot in snapshots {
+	for snapshot in prepared.snapshots {
 		path := stage + '/' + snapshot.repository.id
 		os.mkdir_all(path + '/objects')!
 		atomic_write(path + '/index.json', snapshot.text)!
 		atomic_write(path + '/index.sig', snapshot.signature + '\n')!
 	}
 	mut copied := map[string]bool{}
-	for installed in plan.packages {
+	for installed in prepared.plan.packages {
 		for payload in installed.package.files {
 			key := installed.repository + '/' + payload.sha256
 			if key in copied { continue }
-			cached := cached_payload(config, installed, payload, directory)!
+			cached := cached_payload_progress(config, installed, payload, directory, options.progress)!
 			path := stage + '/' + installed.repository + '/objects/' + payload.sha256
-			copy_file(cached, path, 0, payload.bytes)!
+			copy_file_progress(cached, path, 0, payload.bytes,
+				pkgprotocol.Progress{ phase: 'copy', package: installed.package.id, repository: installed.repository,
+					path: payload.path, total: payload.bytes }, options.progress)!
 			options.checkpoint('copied', path)!
+			options.progress(pkgprotocol.Progress{ phase: 'verify', package: installed.package.id,
+				repository: installed.repository, path: payload.path })
 			if !verified_file(path, payload) {
 				return error('offline mirror payload verification failed: ${installed.package.id}/${payload.path}')
 			}
@@ -115,5 +224,6 @@ fn mirror_export(config Config, directory string, destination string, names []st
 	sync_directory(parent) or {
 		return error('offline mirror published at ${target}, but its directory flush failed; check storage and verify the export: ${err}')
 	}
+	options.progress(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 })
 	println('Offline mirror ready: ${target}; enroll its file:// repository paths with the same public keys')
 }

@@ -407,6 +407,29 @@ with the same ID/key, then `update`. Expiry and sequence checks still apply;
 publishers must plan suitable expiry for offline use. Indexes may advertise apps
 outside the exported closure; those requests report missing payloads.
 
+Software's **Export offline** action exports either the selected catalog package
+or all explicitly installed application roots, with their dependencies. It
+resolves current authenticated catalog versions under organization policy;
+installed versions and personal data remain unchanged. Enter a new absolute
+directory on local disk or mounted media, review the complete destination path
+(long paths are paged), then review every package's publisher, permissions,
+license and runtime before confirming. Destination requirements include missing
+cache objects when both paths share a filesystem. A separate cache filesystem
+has its own requirement and the same reserved-space policy. Export progress and
+failure diagnostics stay visible, and the window remains open during export.
+
+Administrative clients use `mirror-review NEW_DIRECTORY ID...`, then
+`mirror-apply FINGERPRINT NEW_DIRECTORY ID...`. Review reads authenticated cached
+metadata without creating destination parents, fetching payloads or altering
+installed state. Confirmation binds the original destination argument, resolved
+path, existing ancestor inode/filesystem, requested IDs, complete resolved set,
+configuration and exact signed indexes. Changed media, catalog renewal, publisher
+trust or policy requires a new review before acquisition or staging. Free space
+and verified cache availability are checked again when applying; a failed export
+can reuse the same review if those bound inputs still match. `--progress` also
+works with `mirror` and `mirror-apply`. The direct `mirror` command remains useful
+for authorized automation.
+
 Export requires a new destination. The service checks space for unique objects,
 metadata and policy reserves on the destination disk and for missing source-cache
 objects; when both paths share a disk it budgets both copies together. It builds

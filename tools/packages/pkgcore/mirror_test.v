@@ -5,6 +5,7 @@ import crypto.sha256
 import json2
 import os
 import time
+import tools.packages.pkgprotocol
 
 fn C.fork() int
 fn C.waitpid(int, &int, int) int
@@ -168,4 +169,112 @@ fn test_mirror_space_preflight_and_abrupt_exit_leave_final_name_retryable() {
 	refused = false
 	mirror_cost(~u64(0), 1) or { refused = true }
 	assert refused
+}
+
+fn mirror_service() !(string, Service, Config, []Package) {
+	work, config, packages := mirror_fixture()!
+	root := work + '/client'
+	os.mkdir_all(root + '/etc/vinix-packages')!
+	os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(config))!
+	os.mkdir_all(os.dir(state_directory(root)))!
+	os.rename(work + '/store', state_directory(root))!
+	return work, Service{ root: root }, config, packages
+}
+
+fn test_mirror_review_is_read_only_and_binds_destination_policy_and_signed_metadata() {
+	work, service, config, _ := mirror_service()!
+	defer { os.rmdir_all(work) or {} }
+	store := state_directory(service.root)
+	destination := work + '/missing/media/export; $literal'
+	mut review := service.review_mirror(destination, ['app'])!
+	defer { review.close() }
+	assert review.review.operation == 'mirror' && review.review.rows.map(it.action) == ['export', 'export']
+	assert review.review.rows.map(it.id) == ['app', 'data'] && review.review.requested == ['app']
+	assert review.review.rows.all(it.public_key == config.repositories[0].public_key)
+	assert review.destination == destination && review.input_destination == destination
+	assert review.shared_disk && review.cache_needed > 0 && review.review.disk_needed > review.cache_needed
+	assert !os.exists(work + '/missing') && os.ls(store + '/objects')!.len == 0
+	assert read_state(store, 'aarch64')!.generation == 0
+	for target in [work + '/different/export', destination] {
+		mut refused := false
+		service.apply_mirror(target, ['data'], review.review.fingerprint) or { refused = err.msg().contains('stale') }
+		assert refused && !os.exists(os.dir(target)) && os.ls(store + '/objects')!.len == 0
+	}
+	changed := Config{ ...config, policy: Policy{ ...config.policy, reserve_bytes: 1 } }
+	os.write_file(service.root + '/etc/vinix-packages/config.json', json2.encode(changed))!
+	mut refused := false
+	service.apply_mirror(destination, ['app'], review.review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && !os.exists(work + '/missing')
+	os.write_file(service.root + '/etc/vinix-packages/config.json', json2.encode(config))!
+	publish(work + '/repository', 'fixture', work + '/seed', 2, time.now().unix() + 3600)!
+	service.refresh()!
+	refused = false
+	service.apply_mirror(destination, ['app'], review.review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && !os.exists(work + '/missing') && os.ls(store + '/objects')!.len == 0
+	mut fresh := service.review_mirror(destination, ['app'])!
+	defer { fresh.close() }
+	service.apply_mirror(destination, ['app'], fresh.review.fingerprint)!
+	assert os.ls(destination + '/fixture/objects')!.len == 2 && read_state(store, 'aarch64')!.generation == 0
+}
+
+fn test_mirror_review_refuses_replaced_media_and_cross_command_fingerprints() {
+	work, service, _, _ := mirror_service()!
+	defer { os.rmdir_all(work) or {} }
+	os.mkdir(work + '/media')!
+	mut review := service.review_mirror(work + '/media/export', ['app'])!
+	defer { review.close() }
+	os.rename(work + '/media', work + '/old-media')!
+	os.mkdir(work + '/media')!
+	mut refused := false
+	service.apply_mirror(work + '/media/export', ['app'], review.review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && os.ls(work + '/media')!.len == 0
+	mut ordinary := service.review('install', ['app'])!
+	defer { ordinary.close() }
+	refused = false
+	service.apply_mirror(work + '/media/export', ['app'], ordinary.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && os.ls(state_directory(service.root) + '/objects')!.len == 0
+	guard := acquire(state_directory(service.root))!
+	defer { guard.release() }
+	refused = false
+	service.review_mirror(work + '/never/create/export', ['app']) or { refused = err.msg().contains('another package transaction') }
+	assert refused && !os.exists(work + '/never')
+}
+
+fn mirror_report(event pkgprotocol.Progress) {
+	event.validate() or { panic(err) }
+	path := os.getenv('VINIX_MIRROR_PROGRESS_TEST')
+	defer { unsafe { path.free() } }
+	mut file := os.open_file(path, 'a') or { panic(err) }
+	defer { file.close() }
+	file.writeln(json2.encode(event)) or { panic(err) }
+}
+
+fn test_mirror_progress_and_cache_recovery_do_not_invalidate_review_or_complete_on_failure() {
+	work, service, config, packages := mirror_service()!
+	defer { os.unsetenv('VINIX_MIRROR_PROGRESS_TEST'); os.rmdir_all(work) or {} }
+	os.write_file(work + '/events', '')!
+	os.setenv('VINIX_MIRROR_PROGRESS_TEST', work + '/events', true)
+	mut review := service.review_mirror(work + '/export', ['app'])!
+	defer { review.close() }
+	missing := work + '/repository/objects/' + packages[1].files[0].sha256
+	data := os.read_file(missing)!
+	os.rm(missing)!
+	observed := Service{ ...service, progress: mirror_report }
+	mut failed := false
+	observed.apply_mirror(work + '/export', ['app'], review.review.fingerprint) or { failed = true }
+	assert failed && !os.exists(work + '/export') && mirror_stages(work)!.len == 0
+	for line in os.read_file(work + '/events')!.split_into_lines() {
+		assert pkgprotocol.decode_progress(line)!.phase != 'complete'
+	}
+	os.write_file(missing, data)!
+	os.rm(work + '/repository/objects/' + packages[0].files[0].sha256)!
+	os.write_file(work + '/events', '')!
+	observed.apply_mirror(work + '/export', ['app'], review.review.fingerprint)!
+	mut events := []pkgprotocol.Progress{}
+	for line in os.read_file(work + '/events')!.split_into_lines() { events << pkgprotocol.decode_progress(line)! }
+	assert events.first().phase == 'resolve' && events.last().phase == 'complete'
+	assert events.any(it.phase == 'copy' && it.current == it.total)
+	assert events.any(it.phase == 'verify') && events.any(it.phase == 'download' && it.package == 'data')
+	assert events.all(it.phase != 'activate')
+	assert read_state(state_directory(service.root), config.architecture)!.generation == 0
 }

@@ -763,7 +763,8 @@ Success is exit 0; failures are nonzero with stderr diagnostics. Human progress
 text is not a machine protocol.
 
 For live operation progress, pass `--progress` to `update`, `install`, `remove`,
-`upgrade`, `apply`, `deploy`, `deployment-apply` or `rollback`. It is refused with
+`upgrade`, `apply`, `deploy`, `deployment-apply`, `rollback`, `mirror` or
+`mirror-apply`. It is refused with
 `--json` and other commands. Ordinary human output/diagnostics are retained;
 presentation records occupy complete stdout lines prefixed by
 `VINIX-PACKAGE-PROGRESS ` followed by a format-1 JSON object. The producer flushes
@@ -812,7 +813,7 @@ operations; arbitrary root filesystem writes are outside this contract.
 V administrative clients can use [`pkgcore.Service`](pkgcore/service.v) with
 `root` and a per-command `offline` flag. It retains no configuration snapshot.
 Its `refresh`, `transact`, `deploy`, `plan`, `review`, `rollback`, `collect`,
-`mirror`, `state`, `verify` and `run` methods acquire the appropriate lock before
+`mirror`, `review_mirror`, `apply_mirror`, `state`, `verify` and `run` methods acquire the appropriate lock before
 loading configuration. Config-taking core functions remain explicit snapshot
 operations for isolated fixtures; they do not reload administrator configuration.
 Production clients should use the service or the versioned CLI protocol.
@@ -915,6 +916,39 @@ reviews own their presentation fields; call `.close()` after use under manual
 memory management. Unknown/duplicate keys in review roots, policies, pins and
 installed rows are refused; formats other than 1 are
 refused. See [organization administration](../../docs/application-distribution.md#offline-and-organization-deployment).
+
+`mirror-review NEW_DIRECTORY ID...` emits a format-1
+[`pkgprotocol.MirrorReview`](pkgprotocol/mirror.v) envelope. Every envelope field
+is required: `format`, the literal `input_destination`, canonical absolute
+`destination`, nested `review`, `cache_needed`, `cache_available`, and
+`shared_disk`. Its nested format-1 `Review` has `operation:"mirror"`,
+`generation:0`, `target_generation:0`, the requested names, resolved roots,
+complete sorted closure and `action:"export"` on every row. Rows include the
+same descriptions, publisher keys, permissions, license and explicit runtime
+information as maintenance reviews. `disk_needed`/`disk_available` refer to the
+destination filesystem; when `shared_disk:true`, the requirement includes
+missing source-cache objects. Otherwise `cache_needed`/`cache_available` describe
+the separate source disk. The nested `disk_reserve` applies to each affected
+filesystem. These counters are conservative budgets and may change before apply.
+
+Call `mirror-apply FINGERPRINT NEW_DIRECTORY ID...` with the original literal
+destination and names. Its fingerprint has a separate domain from maintenance
+reviews and binds configuration, exact signed indexes, resolved closure,
+destination argument/canonical path and existing ancestor inode/device. Review
+does not create destination parents or transfer payloads. Apply checks freshness
+under the writer lock before destination creation/acquisition, then rechecks
+space, verifies every exported object and publishes the new directory atomically.
+Cache recovery and free-space changes do not stale a review; altered media,
+catalog metadata, policy or trust does. Progress emits `resolve`, transfer/copy
+and verification phases, then `complete` after durable publication; it does not
+emit installed-generation activation. The installed state is preserved.
+
+V clients use `Service.review_mirror`, `Service.apply_mirror` and
+`pkgprotocol.decode_mirror_review`. Service-produced and decoded envelopes own
+their presentation fields; `MirrorReview.close()` also retires the nested review.
+Use the direct `Service.mirror`/`mirror` command for authorized automation that
+does not need a presentation review. Mirror media retains the original signed
+catalogs and expiry, and supplies payloads only for the exported closure.
 
 `review install|remove|upgrade|deploy|rollback [ID...]` emits a format-1 review
 without downloading payloads or changing installed state. It includes the active

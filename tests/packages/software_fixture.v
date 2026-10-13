@@ -150,6 +150,7 @@ fn main() {
 			exit(27)
 		}
 		if software_deployment_service_fixture(args) or { panic(err) } { return }
+		if software_mirror_service_fixture(args) or { panic(err) } { return }
 		if software_repository_service_fixture(args) or { panic(err) } { return }
 		if args[1] == 'view' {
 			println(json2.encode(SoftwareView{ format: 1, architecture: 'aarch64' }))
@@ -303,8 +304,121 @@ fn main() {
 	check_repository_management() or { panic(err) }
 	check_software_progress() or { panic(err) }
 	check_software_deployment() or { panic(err) }
+	check_software_mirror() or { panic(err) }
 	check_software_launch_options() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
+}
+
+const mirror_fixture_destination = '/private/tmp/offline export; $literal'
+
+fn software_mirror_service_fixture(args []string) !bool {
+	if args[1] == 'mirror-review' {
+		assert args.len >= 4
+		if args[2] == '/missing' { eprintln('fixture: signed payload is unavailable'); exit(18) }
+		base := fixture_review('mirror', args[3..])
+		review := pkgprotocol.Review{ ...base, generation: 0, rows: base.rows.map(pkgprotocol.ReviewPackage{ ...it, action: 'export' }) }
+		println(json2.encode(pkgprotocol.MirrorReview{ format: 1,
+			input_destination: if args[2] == '/wrong-intent' { '/other' } else { args[2] },
+			destination: args[2], review: review, cache_needed: 1024, cache_available: 65536, shared_disk: true }))
+		return true
+	}
+	if args[1] == 'mirror-apply' {
+		assert os.args[1] == '--progress'
+		assert args.len == 5 && args[2] == 'c'.repeat(64) && args[4] == 'editor'
+		if args[3] == '/stale' { eprintln('fixture: offline mirror review is stale; review again'); exit(23) }
+		assert args[3] == mirror_fixture_destination || args[3].len > 200
+		os.write_file(os.getenv('VINIX_SOFTWARE_MIRROR_FIXTURE'), json2.encode(args[2..]))!
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'copy', package: 'editor', repository: 'trusted', path: 'bin/app', current: 4096, total: 4096 }))
+		println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
+		println('Offline mirror ready: ' + args[3])
+		return true
+	}
+	return false
+}
+
+fn check_software_mirror() ! {
+	receipt := os.temp_dir() + '/vinix-software-mirror-' + os.getpid().str()
+	os.setenv('VINIX_SOFTWARE_MIRROR_FIXTURE', receipt, true)
+	defer { os.rm(receipt) or {}; os.unsetenv('VINIX_SOFTWARE_MIRROR_FIXTURE') }
+	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192},
+		rows: [SoftwareRow{ id: 'editor', name: 'Editor', requested: true, installed_version: '1.0.0' }], selected: 0 }
+	defer { app.close_app() }
+	app.handle('software.mirror')!
+	assert app.mirror_mode && !app.deployment_mode && !app.repository_mode
+	assert app.build(ui2.rect(0, 0, 640, 610))!.children.any(it.id == 'software.mirror.review')
+	app.handle('software.mirror.path')!
+	app.paste_input('relative')
+	app.handle('software.mirror.review')!
+	assert app.worker == unsafe { nil } && app.status.contains('absolute')
+	app.key_input('\x01')
+	app.paste_input(mirror_fixture_destination)
+	app.key_input('\x01')
+	app.paste_input('/' + 'x'.repeat(4096))
+	assert editor_bytes_text(app.mirror_path) == mirror_fixture_destination
+	app.paste_input('/bad\npath')
+	assert editor_bytes_text(app.mirror_path) == mirror_fixture_destination
+	app.handle('software.mirror.review')!
+	assert app.worker_review && app.prepare_close()
+	app.handle('software.confirm')!
+	assert !os.exists(receipt)
+	wait_for_software(mut app)
+	assert app.review_ready && app.mirror_details && app.mirror_snapshot.destination == mirror_fixture_destination
+	assert app.review_snapshot.rows.len == 2 && app.review_snapshot.rows.all(it.action == 'export')
+	assert !app.build(ui2.rect(0, 0, 640, 610))!.children.any(it.id == 'software.confirm')
+	app.handle('software.mirror.packages')!
+	app.handle('software.row.1')!
+	tree := app.build(ui2.rect(0, 0, 900, 660))!
+	assert tree.children.any(it.id == 'software.confirm')
+	assert tree.children.any(it.text.contains('runtime-publisher'))
+	assert tree.children.any(it.text.contains('Vendor-EULA (proprietary)') && it.text.contains('firmware'))
+	assert tree.children.any(it.text.contains('Permissions: network, process'))
+	app.selected = -1
+	software_repository_text(mut app.mirror_path, '/other')
+	app.handle('software.confirm')!
+	assert app.worker_mirror && !app.prepare_close()
+	wait_for_software(mut app)
+	assert app.mirror_mode && app.status.contains('Offline mirror ready') && app.progress_seen
+	assert json2.decode[[]string](os.read_file(receipt)!)! == ['c'.repeat(64), mirror_fixture_destination, 'editor']
+	os.rm(receipt)!
+	app.handle('software.mirror.scope')!
+	assert app.mirror_all
+	for path in ['/missing', '/wrong-intent', '/stale', '/media/' + 'long-path-'.repeat(35)] {
+		software_repository_text(mut app.mirror_path, path)
+		app.handle('software.mirror.review')!
+		wait_for_software(mut app)
+		if path == '/missing' {
+			assert !app.review_ready && app.status.contains('unavailable')
+		} else if path == '/wrong-intent' {
+			assert !app.review_ready && app.mirror_pending == ''
+		} else {
+			assert app.review_ready && app.mirror_details
+			if path.len > 200 {
+				assert app.mirror_pages.len > 1
+				app.handle('software.mirror.packages')!
+				assert app.mirror_details
+				for app.mirror_seen + 1 < app.mirror_pages.len { app.handle('software.mirror.next')! }
+			}
+			app.handle('software.mirror.packages')!
+			app.handle('software.confirm')!
+			wait_for_software(mut app)
+			if path == '/stale' { assert app.status.contains('stale') && !os.exists(receipt) }
+		}
+	}
+	app.handle('software.mirror.review')!
+	wait_for_software(mut app)
+	app.handle('software.cancel')!
+	assert app.review_snapshot.rows.len == 0 && app.mirror_pages.len == 0 && app.mirror_snapshot.destination == ''
+	app.handle('software.mirror.back')!
+	assert !app.mirror_mode
+	mut malformed := SoftwareApp{ mirror_pages: []string{cap: 128} }
+	bytes := '\x80'.repeat(160)
+	malformed.mirror_path_parts(bytes)
+	assert malformed.mirror_pages.len == 2
+	joined := malformed.mirror_pages.join('')
+	assert joined == bytes
+	unsafe { bytes.free(); joined.free() }
+	malformed.close_app()
+	println('Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed')
 }
 
 fn check_software_launch_options() ! {

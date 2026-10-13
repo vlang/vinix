@@ -36,6 +36,8 @@ fn qualify_package_configuration_lock() ! {
 		['policy-apply', '0'.repeat(64), '/tmp/absent-policy.json'],
 		['deployment-lock'], ['deployment-review', '/tmp/absent-deployment.json'],
 		['deployment-apply', '0'.repeat(64), '/tmp/absent-deployment.json'],
+		['mirror-review', '/tmp/missing-media/export', 'linux-probe'],
+		['mirror-apply', '0'.repeat(64), '/tmp/missing-media/export', 'linux-probe'],
 	] {
 		busy := run(['/usr/bin/vinix-package', ...args], '', none, none)
 		assert busy.status != 0 && busy.output.contains('another package transaction'), busy.output
@@ -227,15 +229,32 @@ fn qualify_package_linux(mut t Test) ! {
 	os.rm(missing_object)!
 	defer { os.write_file_array(missing_object, missing_bytes) or {} }
 	mirror_path := '/tmp/offline-mirror'
-	failed_export := run(['/usr/bin/vinix-package', '--root', exporter, 'mirror', mirror_path, application.id], '', none, none)
+	mut mirror_review := pkgprotocol.decode_mirror_review(package_success(['--root', exporter, 'mirror-review', mirror_path, application.id])!)!
+	defer { mirror_review.close() }
+	assert mirror_review.review.rows.len == 2 && mirror_review.review.rows.all(it.action == 'export')
+	assert mirror_review.review.rows.all(it.public_key == key) && mirror_review.review.generation == 0
+	assert mirror_review.cache_needed > 0 && mirror_review.shared_disk
+	assert !os.exists(mirror_path) && os.ls(pkgcore.state_directory(exporter) + '/objects')!.len == 0
+	wrong_destination := '/tmp/not-created/export'
+	stale_mirror := run(['/usr/bin/vinix-package', '--root', exporter, 'mirror-apply', mirror_review.review.fingerprint,
+		wrong_destination, application.id], '', none, none)
+	assert stale_mirror.status != 0 && stale_mirror.output.contains('stale') && !os.exists('/tmp/not-created'), stale_mirror.output
+	failed_export := run(['/usr/bin/vinix-package', '--root', exporter, '--progress', 'mirror-apply', mirror_review.review.fingerprint,
+		mirror_path, application.id], '', none, none)
 	assert failed_export.status != 0 && failed_export.output.contains('unavailable'), failed_export.output
+	assert package_progress_events(failed_export.output)!.all(it.phase != 'complete')
 	assert !os.exists(mirror_path) && os.ls('/tmp')!.all(!it.starts_with('.vinix-mirror-'))
 	probe_object := repository + '/objects/' + probe_package.files.filter(it.path == 'bin/probe')[0].sha256
 	probe_bytes := os.read_bytes(probe_object)!
 	os.rm(probe_object)!
 	defer { os.write_file_array(probe_object, probe_bytes) or {} }
 	os.write_file_array(missing_object, missing_bytes)!
-	package_success(['--root', exporter, 'mirror', mirror_path, application.id])!
+	mirror_progress := package_progress_events(package_success(['--root', exporter, '--progress', 'mirror-apply',
+		mirror_review.review.fingerprint, mirror_path, application.id])!)!
+	assert mirror_progress.first().phase == 'resolve' && mirror_progress.last().phase == 'complete'
+	assert mirror_progress.any(it.phase == 'copy' && it.current == it.total) && mirror_progress.any(it.phase == 'verify')
+	assert mirror_progress.all(it.phase != 'activate')
+	t.say('PACKAGE MIRROR REVIEW read-only closure destination-binding progress interrupted-retry PASS')
 	os.write_file_array(probe_object, probe_bytes)!
 	assert pkgcore.read_state(pkgcore.state_directory(exporter), architecture)!.generation == 0
 	assert os.ls('/tmp')!.all(!it.starts_with('.vinix-mirror-'))
