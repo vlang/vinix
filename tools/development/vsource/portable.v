@@ -1,0 +1,40 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module vsource
+
+fn replace_one(source string, anchor string, replacement string) !string {
+	if source.count(anchor) != 1 {
+		return error('unsupported V source layout for portable bootstrap')
+	}
+	return source.replace_once(anchor, replacement)
+}
+
+// Exported installations have no .git and move away from their build path.
+// Keep these adaptations in V source, before compiler translation, and record
+// the original and resulting source hashes in the staging receipt.
+pub fn portable_pref(source string) !string {
+	anchor := 'fn detect_vroot() string {\n\tbaked_root := @VMODROOT\n\tif baked_root.len > 0 {\n\t\treturn baked_root\n\t}'
+	replacement := 'fn detect_vroot() string {\n' +
+		'\texecutable_root := detect_vroot_from(os.real_path(os.executable()))\n' +
+		'\tif executable_root.len > 0 { return executable_root }\n' +
+		'\tbaked_root := @VMODROOT\n' +
+		"\tif baked_root.len > 0 && os.is_dir(os.join_path(baked_root, 'vlib', 'builtin')) {\n" +
+		'\t\treturn baked_root\n\t}'
+	return replace_one(source, anchor, replacement)
+}
+
+pub fn stamped_builtin(source string, revision string) !string {
+	if revision.len !in [40, 64] || !revision.bytes().all(it.is_hex_digit()) {
+		return error('V bootstrap needs a full Git revision')
+	}
+	return replace_one(source, 'pub fn vcurrent_hash() string {\n\treturn @VCURRENTHASH\n}',
+		"pub fn vcurrent_hash() string {\n\treturn '${revision[..7]}'\n}")
+}
+
+pub fn stamped_cli(source string, revision string) !string {
+	if revision.len !in [40, 64] || !revision.bytes().all(it.is_hex_digit()) {
+		return error('V bootstrap needs a full Git revision')
+	}
+	anchor := "println('V \${v_version} \${@VCURRENTHASH}')"
+	if source.count(anchor) != 1 { return error('unsupported V CLI version source') }
+	return source.replace('\${@VCURRENTHASH}', revision[..7])
+}

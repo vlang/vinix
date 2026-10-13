@@ -3,27 +3,41 @@ module main
 
 import devcore
 import sourcecore
+import vsource
 import json2
 import os
 
 struct VStage {
-	schema          int = 1
-	architecture    string
-	source_revision string
-	source_sha256   string
-	host_compiler   devcore.Pin
-	cc              devcore.Pin
-	cc_argv         []string
-	translate_argv  []string
-	compile_argv    []string
-	link_argv       []string
-	helper_argv     [][]string
+	schema                int = 1
+	architecture          string
+	source_revision       string
+	source_sha256         string
+	patched_source_sha256 string
+	patches               map[string]SourcePatch
+	host_compiler         devcore.Pin
+	cc                    devcore.Pin
+	cc_argv               []string
+	translate_argv        []string
+	compile_argv          []string
+	link_argv             []string
+	helper_argv           [][]string
 mut:
 	complete            bool
 	generated_c_sha256  string
 	compiler_sha256     string
 	installation_sha256 string
 	helper_sha256       map[string]string
+}
+
+struct SourcePatch {
+	before_sha256 string
+	after_sha256  string
+}
+
+fn patch_source(path string, contents string) !SourcePatch {
+	before := devcore.file_hash(path)!
+	os.write_file(path, contents)!
+	return SourcePatch{before, devcore.file_hash(path)!}
 }
 
 // Include library/compiler production sources and headers without copying
@@ -44,12 +58,15 @@ fn stage_v() ! {
 	args := os.args[1..]
 	if args == ['--help'] || args.len == 0 {
 		println('Usage: v run stage-v.v aarch64|x86_64 V-SOURCE-CHECKOUT FRESH-STAGING [CC-ARGV-JSON]')
+		println('VINIX_V_COPT selects -O0, -O1 (default) or -O2 for the bootstrap compiler')
 		return
 	}
 	if args.len !in [3, 4] || args[0] !in ['aarch64', 'x86_64'] {
 		return error('invalid arguments; use --help')
 	}
 	arch := args[0]
+	optimization := os.getenv_opt('VINIX_V_COPT') or { '-O1' }
+	if optimization !in ['-O0', '-O1', '-O2'] { return error('invalid VINIX_V_COPT') }
 	source := os.real_path(args[1])
 	commit := sourcecore.revision(source)!
 	mut cc := if args.len == 4 {
@@ -66,6 +83,17 @@ fn stage_v() ! {
 	os.mkdir(root, mode: 0o755)!
 	sourcecore.export(source, commit, ['cmd', 'vlib', 'thirdparty', 'LICENSE', 'v.mod'], root, production_source)!
 	input_hash := devcore.tree_hash(root)!
+	mut patches := map[string]SourcePatch{}
+	pref_source := 'vlib/v/pref/pref.v'
+	patches[pref_source] = patch_source(root + '/' + pref_source,
+		vsource.portable_pref(os.read_file(root + '/' + pref_source)!)!)!
+	builtin_source := 'vlib/builtin/builtin.c.v'
+	patches[builtin_source] = patch_source(root + '/' + builtin_source,
+		vsource.stamped_builtin(os.read_file(root + '/' + builtin_source)!, commit)!)!
+	cli_source := 'cmd/v/v.v'
+	patches[cli_source] = patch_source(root + '/' + cli_source,
+		vsource.stamped_cli(os.read_file(root + '/' + cli_source)!, commit)!)!
+	patched_hash := devcore.tree_hash(root)!
 	os.write_file(root + '/VERSION', commit + '\n')!
 	work := output + '/.build'
 	os.mkdir(work, mode: 0o700)!
@@ -85,20 +113,22 @@ fn stage_v() ! {
 	translate := [v, '-nocache', '-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler',
 		'-path', root + '/vlib|' + root, '-os', 'linux', '-arch',
 		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', c, root + '/cmd/v']
-	compile := [...cc, '-O1', '-std=gnu11', '-D_GNU_SOURCE', '-DV_COMMIT_HASH="' + commit + '"',
+	compile := [...cc, optimization, '-std=gnu11', '-D_GNU_SOURCE', '-DV_COMMIT_HASH="' + commit + '"',
 		'-include', root + '/vlib/v/pthread_helper.h', '-c', c, '-o', object]
 	link := [...cc, '-static', object, ...helper_objects, '-o', root + '/v', '-lm', '-lpthread']
 	mut receipt := VStage{
-		architecture:    arch
-		source_revision: commit
-		source_sha256:   input_hash
-		host_compiler:   devcore.Pin{v, devcore.file_hash(v)!}
-		cc:              devcore.Pin{cc[0], devcore.file_hash(cc[0])!}
-		cc_argv:         cc
-		translate_argv:  translate
-		compile_argv:    compile
-		link_argv:       link
-		helper_argv:     helper_commands
+		architecture:          arch
+		source_revision:       commit
+		source_sha256:         input_hash
+		patched_source_sha256: patched_hash
+		patches:               patches
+		host_compiler:         devcore.Pin{v, devcore.file_hash(v)!}
+		cc:                    devcore.Pin{cc[0], devcore.file_hash(cc[0])!}
+		cc_argv:               cc
+		translate_argv:        translate
+		compile_argv:          compile
+		link_argv:             link
+		helper_argv:           helper_commands
 	}
 	manifest := output + '/native-v.json'
 	mut environment := devcore.environment(1700000000)

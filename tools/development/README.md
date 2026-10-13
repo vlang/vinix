@@ -39,6 +39,13 @@ are excluded before their blobs are read. The checkout needs Git objects for
 the selected commit; no network fetch runs. `vlang/VERSION` records the commit.
 Committed help-topic text files are retained for the native compiler's help CLI.
 
+Before translation, two V source adaptations make the exported installation
+portable: standard-library discovery prefers the running executable's resolved
+installation root, and the compiler revision is stamped from the pinned commit
+because the export has no `.git` directory. The receipt records each source
+file's original/resulting SHA-256 and the complete patched-source tree hash.
+An unfamiliar or ambiguous source layout is refused rather than partly patched.
+
 The host V compiler translates that committed compiler source, then the selected
 musl C compiler builds a static native compiler and the adjacent runtime objects
 needed by the reference projects. These include process capture, pthreads,
@@ -47,6 +54,9 @@ compiler reports the source commit. `native-v.json` records the source-tree,
 generated-C, helper-object, executable and complete-installation hashes, host
 compiler pins and every translation/compile/link argv. The fourth argument can
 override the C compiler with a JSON argv, using the same default as `stage.v`.
+`VINIX_V_COPT` selects `-O0`, `-O1` (default) or `-O2` for the compiler object;
+the chosen option is retained in its compile argv. Automatic V compiler bug
+uploads are disabled in the staging command environment.
 Only `complete: true` represents a completed installation. After source export,
 the receipt remains at the staging root and command logs/generated files remain
 under `.build`, including on failure. Compiler commands have deadlines;
@@ -68,6 +78,14 @@ Receipts, generated sources and static ELF installations are retained in
 `build/development17-20261013/native-v-arm-final` and
 `build/development17-20261013/native-v-x86-final`. Native execution/compilation
 acceptance is recorded separately by the guest controller.
+
+The portable stages with all three source-file adaptations and `VINIX_V_COPT=-O0`
+completed in `build/development17-20261013/native-v-arm-qualified` and
+`build/development17-20261013/native-v-x86-qualified`. Their patched-source pin is
+`918bec26b18f9205f63b3498d90c2df3d57fdd02e17b87caf92e3d63b62233f1`.
+The x86 UID 1000 version/help gate passed in
+`build/development17-20261013/guest-x86-v-smoke-b`, reporting
+`V 0.5.2 f6358ec`; compiler-project acceptance still requires a native GCC SDK.
 
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links
