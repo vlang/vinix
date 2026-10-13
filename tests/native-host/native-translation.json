@@ -1,0 +1,87 @@
+{
+    "bytes": 3995,
+    "evidence": "~/.cache/vinix-stdio-native-20261013",
+    "files": 1,
+    "lines": 126,
+    "originals": [
+        {
+            "bytes": 3995,
+            "lines": 126,
+            "path": "tests/native-host/stdio-test.py",
+            "sha256": "78e6097881a0336103aff5398a06cec7400c2574ea03058a36f52d52b273b445"
+        }
+    ],
+    "profiles": [
+        {
+            "profile": "arm",
+            "programs": [
+                {
+                    "name": "query",
+                    "sha256": "af46ca3e425b6f0d2cbe608314b8fc4d680364b5878294d40bcfeb9820b18363"
+                },
+                {
+                    "name": "values",
+                    "sha256": "9dffde68898ea2c8ce76a9948f83ea3fd5924e2dc2a3f27009bf170d45611cd4"
+                },
+                {
+                    "name": "reader",
+                    "sha256": "af26c4da8ab70ebbdacc66e9e09292e6c41d59f7a07300dc68896d6dce8960bf"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "962a5b2d37bf2174f7eaf6be494720975a1e91cb98f28ea3026643b7d63087a9"
+                }
+            ],
+            "status": "PASS",
+            "unchanged_support_proofs": "q2-arm"
+        },
+        {
+            "profile": "x86",
+            "programs": [
+                {
+                    "name": "query",
+                    "sha256": "c161df188900d059530a4f8e23a8319e791468f6b54d884cc7ba6a875f1aa407"
+                },
+                {
+                    "name": "values",
+                    "sha256": "851079100567cc7e60f9be68d3807e0c45fcbdb7d5ef95240532312060be4d34"
+                },
+                {
+                    "name": "reader",
+                    "sha256": "375bada82c55c1801d2dee547d3d885797ebd1c9b397d903a2c12b143c99187d"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "525af02f981529c76e0e3eefc0b1542256bee1c222ce38810b4d7e3038e9cc07"
+                }
+            ],
+            "status": "PASS",
+            "unchanged_support_proofs": "q2-x86"
+        },
+        {
+            "profile": "san",
+            "programs": [
+                {
+                    "name": "query",
+                    "sha256": "268363535d89048f053705627df61b69592547692c59f367539cf95004af2e50"
+                },
+                {
+                    "name": "values",
+                    "sha256": "cc83d54bf88d754e8d925b4890f4f4f4e05ceb238f76a89d7dd1ef79996710b0"
+                },
+                {
+                    "name": "reader",
+                    "sha256": "b430203dbb1bf541e0935211bfd457ee5a54197cf9349fe90fc6593eae875cbf"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "bb20baa65c0a09e456b2f7252e5696a8004ee8404bad73800747a895b3687db1"
+                }
+            ],
+            "status": "PASS",
+            "unchanged_support_proofs": "q2-san"
+        }
+    ],
+    "qualification": "ARM/x86/ASanUBSan cold test/query/numeric/reader builds and current stdio requalification; 27 descriptor states, nested callbacks, exact saved error identity, EOF, 100 failed spawns, 500 calls, 4x100 concurrent calls, actual SIGINT and every exact PID retirement; raw numeric token/index tests and existing streamed reader/archive regressions; public native bootstrap; no Python or Vinix guest",
+    "source_commit": "10f3492eecd60a79ab8daddfb557b0163ed398b0"
+}

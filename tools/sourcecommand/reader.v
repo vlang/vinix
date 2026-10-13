@@ -19,6 +19,17 @@ pub fn spawn_reader(argv []string, environment map[string]string) !ReaderChild {
 }
 
 pub fn spawn_reader_at(argv []string, environment map[string]string, directory string, merged bool) !ReaderChild {
+	return spawn_reader_config(argv, environment, directory, merged, -1)!
+}
+
+// A caller-owned input descriptor is duplicated into the child's stdin and
+// closed there after duplication. The caller's standard slots stay untouched.
+pub fn spawn_reader_input(argv []string, environment map[string]string, input i32) !ReaderChild {
+	if input < 3 { return error('reader input must be a private descriptor') }
+	return spawn_reader_config(argv, environment, '', false, input)!
+}
+
+fn spawn_reader_config(argv []string, environment map[string]string, directory string, merged bool, input i32) !ReaderChild {
 	if argv.len == 0 || argv.any(it.contains('\x00')) || directory.contains('\x00') { return error('invalid reader command') }
 	mut pipes := [i32(-1), -1]!
 	if C.pipe(&pipes[0]) != 0 { return os.error_posix() }
@@ -39,6 +50,9 @@ pub fn spawn_reader_at(argv []string, environment map[string]string, directory s
 		return error('cannot initialize reader actions')
 	}
 	defer { C.posix_spawn_file_actions_destroy(&actions) }
+	if input >= 3 {
+		if C.posix_spawn_file_actions_adddup2(&actions, input, 0) != 0 || C.posix_spawn_file_actions_addclose(&actions, input) != 0 { return error('cannot configure reader input') }
+	}
 	if directory!=''&&C.posix_spawn_file_actions_addchdir_np(&actions,directory.str)!=0{return error('cannot set reader working directory')}
 	if merged&&C.posix_spawn_file_actions_adddup2(&actions,pipes[1],2)!=0{return error('cannot merge reader stderr')}
 	for status in [C.posix_spawn_file_actions_adddup2(&actions, pipes[1], 1),
@@ -65,6 +79,7 @@ pub fn spawn_reader_at(argv []string, environment map[string]string, directory s
 	$if macos {
 		flags |= i16(C.POSIX_SPAWN_CLOEXEC_DEFAULT)
 		for fd in [0, 2] {
+			if input >= 3 && fd == 0 { continue }
 			if merged&&fd==2{continue}
 			if C.fcntl(fd, C.F_GETFD) >= 0 && C.posix_spawn_file_actions_addinherit_np(&actions, fd) != 0 {
 				return error('cannot preserve reader standard descriptors')
