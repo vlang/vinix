@@ -88,6 +88,8 @@ done < "$BUILD_DIR/packages"
 mkdir -p "$STAGING/root"
 install -m755 "$SCRIPT_DIR/tests/developer-tools/smoke.sh" \
     "$STAGING/root/developer-tools-smoke.sh"
+"$SCRIPT_DIR/build-support/python-smoke" --arch aarch64 \
+    --output "$STAGING/root/python3-smoke"
 
 # Several GNU packages still install compatibility commands in /bin. The base
 # image has BusyBox applet symlinks there, and a plain overlay copy would follow

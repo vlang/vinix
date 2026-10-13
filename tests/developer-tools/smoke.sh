@@ -21,7 +21,7 @@ pkg-config --version
 autoconf --version
 automake --version
 file --version
-python3 -c 'import fcntl; print("Python fcntl module available")'
+/root/python3-smoke --fcntl-only
 
 test "$(printf '%s\n' vinix | sed 's/vinix/pipe-ok/')" = pipe-ok
 echo "PASS shell pipeline EOF"

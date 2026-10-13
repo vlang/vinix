@@ -1,0 +1,120 @@
+{
+    "embedded_python_body": {
+        "bytes": 52,
+        "lines": 1,
+        "path": "tests/developer-tools/smoke.sh",
+        "sha256": "30ce51e36413cb51857a1ae6cffcc4c8246b272df85fdfd8ee27d8b15080a42d"
+    },
+    "evidence": "~/.cache/vinix-generator-sdk-native-20261013",
+    "limits": "No interpreter, upstream generator, target ELF or Vinix guest executed. Metadata validates declared prerequisites, not actual importability. Missing external SDK requires separate provisioning. No Python-file retirement credit; concurrent legacy source/index edits remain untouched.",
+    "original_sha256": {
+        "build-support/virglrenderer/build-host.sh": "9bc75e59803754f309bb43dc1496005ab60433cf9d9dc70e38f4ad8303ca15a7",
+        "scripts/build-qemu-input.sh": "5d3806a29a415bfe51048ec17b7446051563ef02d94b98ad8f3bd065ecdbbda5",
+        "tests/developer-tools/smoke.sh": "12f1e618c56f763dbdeffa0de7496097f1f20676c6062d852f24f7fb89af2d72"
+    },
+    "profiles": [
+        {
+            "inputs": {
+                "build-support/generator-sdk": "48bc19f6a17215b0a68da61fd0d25d33c7ad1e4529daa9bb37d3ec15dcef3ecb",
+                "build-support/generator-sdk.v": "04f7a004599d887cb16813e2372c1e71b9d42a690e897b1f88e0a4320c3df57f",
+                "build-support/generatorsdk/core.v": "850405a555735755071ca82cc3f76d66d16e58e43ac82cd94bb1395d0389d922",
+                "build-support/generatorsdk/core_test.v": "1ec972116810d85a104ace88d7b9a389e00af64d3943c0562c0e853f224d83a1",
+                "build-support/qualify-generator-sdk.v": "6282aca2c8c10f4ab007e1e8cd1ec9d0e465d4525166f08f1803ec5d116ac853",
+                "build-support/virglrenderer/build-host.sh": "9aa0ee4875e1f1baf39524fbdd06884806b5178b43880ff0a2299837b6cf36c1",
+                "scripts/build-developer-tools-aarch64.sh": "549a7e0c215c5b12c30b94061522c5930c2aa2655311ccdc3b7c0ff7561163bf",
+                "scripts/build-qemu-input.sh": "775bf01db24702d50eae3e353f752c8e9601483e8f309f5331a34c3dd746693e",
+                "tests/developer-tools/smoke.sh": "321d2b2ef87a4578eaebe29ec9740d215e9e584441f0b0ecc7122a3fa01a692e",
+                "tests/native-python-smoke/pysmoke/callback_test.v": "9d17a262525ac0869e98a57957aeab2f011aa7873f85ab8a8dae657546c6dd0e",
+                "tests/native-python-smoke/pysmoke/entry.v": "d83c5f4c01a50dfe52dea37e10a8f62b90290885ba66bb88774962a707584aba",
+                "tests/native-python-smoke/qualify.v": "9d195b6458871b07d28bfb41a8c0528a01a2051a5d7950f43a9b99d22f4312bd"
+            },
+            "limits": "Native SDK metadata/layout and CPython reference/lifecycle models; cold host builds and real ARM/x86 musl guest ELF builds/export checks. No interpreter, upstream generator, target ELF or Vinix guest executed. SDK metadata declares prerequisites; it does not establish runtime importability.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "checker",
+                    "sha256": "a479015545ecf7966f7319ff2a2d9788552b417938943573ba91e115e2980a4a"
+                },
+                {
+                    "name": "model",
+                    "sha256": "405a53d5e80f71471338ac9274a545e8cc574ce532d938ba23564fa98ce78e2c"
+                },
+                {
+                    "name": "smoke-qualifier",
+                    "sha256": "00ef26186cf63c8fcd873b8c68863c079f6cca56498bc6d17e399bc17a9b3844"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "inputs": {
+                "build-support/generator-sdk": "48bc19f6a17215b0a68da61fd0d25d33c7ad1e4529daa9bb37d3ec15dcef3ecb",
+                "build-support/generator-sdk.v": "04f7a004599d887cb16813e2372c1e71b9d42a690e897b1f88e0a4320c3df57f",
+                "build-support/generatorsdk/core.v": "850405a555735755071ca82cc3f76d66d16e58e43ac82cd94bb1395d0389d922",
+                "build-support/generatorsdk/core_test.v": "1ec972116810d85a104ace88d7b9a389e00af64d3943c0562c0e853f224d83a1",
+                "build-support/qualify-generator-sdk.v": "6282aca2c8c10f4ab007e1e8cd1ec9d0e465d4525166f08f1803ec5d116ac853",
+                "build-support/virglrenderer/build-host.sh": "9aa0ee4875e1f1baf39524fbdd06884806b5178b43880ff0a2299837b6cf36c1",
+                "scripts/build-developer-tools-aarch64.sh": "549a7e0c215c5b12c30b94061522c5930c2aa2655311ccdc3b7c0ff7561163bf",
+                "scripts/build-qemu-input.sh": "775bf01db24702d50eae3e353f752c8e9601483e8f309f5331a34c3dd746693e",
+                "tests/developer-tools/smoke.sh": "321d2b2ef87a4578eaebe29ec9740d215e9e584441f0b0ecc7122a3fa01a692e",
+                "tests/native-python-smoke/pysmoke/callback_test.v": "9d17a262525ac0869e98a57957aeab2f011aa7873f85ab8a8dae657546c6dd0e",
+                "tests/native-python-smoke/pysmoke/entry.v": "d83c5f4c01a50dfe52dea37e10a8f62b90290885ba66bb88774962a707584aba",
+                "tests/native-python-smoke/qualify.v": "9d195b6458871b07d28bfb41a8c0528a01a2051a5d7950f43a9b99d22f4312bd"
+            },
+            "limits": "Native SDK metadata/layout and CPython reference/lifecycle models; cold host builds and real ARM/x86 musl guest ELF builds/export checks. No interpreter, upstream generator, target ELF or Vinix guest executed. SDK metadata declares prerequisites; it does not establish runtime importability.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "checker",
+                    "sha256": "ca9715a0ce793d0bc7d47b2e38d94c1d99e05ab5772a9f0eb4cf56c0d97a9420"
+                },
+                {
+                    "name": "model",
+                    "sha256": "330165f23ad2eb1f1168fd2a507702fa25a4386e0c58b1c27328ff8037376292"
+                },
+                {
+                    "name": "smoke-qualifier",
+                    "sha256": "e74b9bb36286159eb54821b0e53022f4fcc46a22a59f9b6de6e0c2e0f1383b13"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "inputs": {
+                "build-support/generator-sdk": "48bc19f6a17215b0a68da61fd0d25d33c7ad1e4529daa9bb37d3ec15dcef3ecb",
+                "build-support/generator-sdk.v": "04f7a004599d887cb16813e2372c1e71b9d42a690e897b1f88e0a4320c3df57f",
+                "build-support/generatorsdk/core.v": "850405a555735755071ca82cc3f76d66d16e58e43ac82cd94bb1395d0389d922",
+                "build-support/generatorsdk/core_test.v": "1ec972116810d85a104ace88d7b9a389e00af64d3943c0562c0e853f224d83a1",
+                "build-support/qualify-generator-sdk.v": "6282aca2c8c10f4ab007e1e8cd1ec9d0e465d4525166f08f1803ec5d116ac853",
+                "build-support/virglrenderer/build-host.sh": "9aa0ee4875e1f1baf39524fbdd06884806b5178b43880ff0a2299837b6cf36c1",
+                "scripts/build-developer-tools-aarch64.sh": "549a7e0c215c5b12c30b94061522c5930c2aa2655311ccdc3b7c0ff7561163bf",
+                "scripts/build-qemu-input.sh": "775bf01db24702d50eae3e353f752c8e9601483e8f309f5331a34c3dd746693e",
+                "tests/developer-tools/smoke.sh": "321d2b2ef87a4578eaebe29ec9740d215e9e584441f0b0ecc7122a3fa01a692e",
+                "tests/native-python-smoke/pysmoke/callback_test.v": "9d17a262525ac0869e98a57957aeab2f011aa7873f85ab8a8dae657546c6dd0e",
+                "tests/native-python-smoke/pysmoke/entry.v": "d83c5f4c01a50dfe52dea37e10a8f62b90290885ba66bb88774962a707584aba",
+                "tests/native-python-smoke/qualify.v": "9d195b6458871b07d28bfb41a8c0528a01a2051a5d7950f43a9b99d22f4312bd"
+            },
+            "limits": "Native SDK metadata/layout and CPython reference/lifecycle models; cold host builds and real ARM/x86 musl guest ELF builds/export checks. No interpreter, upstream generator, target ELF or Vinix guest executed. SDK metadata declares prerequisites; it does not establish runtime importability.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "checker",
+                    "sha256": "51e5144e41aba7717bc0db55a222801f09338a5d3258115d1da8cc7fd0eebc0c"
+                },
+                {
+                    "name": "model",
+                    "sha256": "7e4e0715a06e1d2ece86e104b71853d2e5dd38de65eaab25e8a664646084aac4"
+                },
+                {
+                    "name": "smoke-qualifier",
+                    "sha256": "398c9c70c4965153390d725948034535db498d286243623fb992dcb76ae08ff0"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirement_credit": 0,
+    "qualification": "18 final cold host builds: checker, SDK model, smoke qualifier, smoke CLI, ownership/lifecycle model and guest producer per ARM/x86/ASanUBSan profile; six real musl guest ELF builds, all required staged SDK exports and compiler-failure destination preservation. Six fcntl import/finalization lifecycle cases and SDK layout/metadata/version/UTF-8/duplicate/missing-module guards.",
+    "source_commit": "71c2c1f8bd0fead834c474d4321f5a2664f1d89c",
+    "workflow_changes": "QEMU tomli import/bootstrap and VirGL venv/pip installation become V prerequisite checks for separately provisioned upstream generator SDKs. QEMU tomli==2.2.1 pin and original upstream build flags retained; VirGL original unpinned requirements retained."
+}

@@ -19,10 +19,16 @@ fi
 build_id=$(cat "$formula" "$tap_dir"/patches/virglrenderer-*.patch \
     "$kekvm_dir/scripts/build-virglrenderer.sh" \
     "$kekvm_dir"/scripts/patches/virglrenderer-*.patch \
-    "$script_dir/macos-buffer-textures.patch" "$0" | shasum -a 256 | cut -d' ' -f1)
+    "$script_dir/macos-buffer-textures.patch" "$0" \
+    "$repo_dir/build-support/generator-sdk.v" "$repo_dir/build-support/generatorsdk/core.v" \
+    | shasum -a 256 | cut -d' ' -f1)
 if [ -f "$library" ] && [ "$(cat "$prefix/.vinix-build-id" 2>/dev/null)" = "$build_id" ]; then
     exit 0
 fi
+# The upstream Meson/PyYAML generator SDK is provisioned separately. The V
+# prerequisite check reads its metadata and never runs the interpreter.
+meson=$("$repo_dir/build-support/generator-sdk" virgl \
+    "${VINIX_VIRGLRENDERER_MESON:-$repo_dir/build/virglrenderer-tools/bin/meson}")
 
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/vinix-virglrenderer.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
@@ -46,18 +52,16 @@ for kekvm_patch in "$kekvm_dir"/scripts/patches/virglrenderer-*.patch; do
 done
 patch -d "$work_dir/src" -p1 --batch --silent -i "$script_dir/macos-buffer-textures.patch"
 
-python3 -m venv "$work_dir/venv"
-"$work_dir/venv/bin/pip" install --quiet --disable-pip-version-check meson pyyaml
 angle=$(brew --prefix angle)
 libepoxy=$(brew --prefix libepoxy)
-PATH="$work_dir/venv/bin:$PATH" meson setup "$work_dir/build" "$work_dir/src" \
+PATH="$(dirname -- "$meson"):$PATH" "$meson" setup "$work_dir/build" "$work_dir/src" \
     --prefix="$prefix" --libdir=lib --buildtype=debugoptimized --wrap-mode=nofallback \
     "-Dc_args=-I$angle/include" "-Dcpp_args=-I$angle/include" \
     "--pkg-config-path=$angle/lib/pkgconfig:$libepoxy/lib/pkgconfig" \
     "-Ddrm-renderers=[]" -Dvenus=true -Drender-server-worker=thread \
     -Dtests=false -Dvideo=false -Dtracing=none
-PATH="$work_dir/venv/bin:$PATH" meson compile -C "$work_dir/build"
-PATH="$work_dir/venv/bin:$PATH" meson install -C "$work_dir/build" --destdir "$work_dir/stage"
+PATH="$(dirname -- "$meson"):$PATH" "$meson" compile -C "$work_dir/build"
+PATH="$(dirname -- "$meson"):$PATH" "$meson" install -C "$work_dir/build" --destdir "$work_dir/stage"
 
 staged="$work_dir/stage$prefix"
 install_name_tool -add_rpath "$(brew --prefix)/lib" "$staged/lib/libvirglrenderer.1.dylib"

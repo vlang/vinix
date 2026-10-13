@@ -28,7 +28,30 @@ __global (
 	model_fail_capsule  bool
 	model_fail_function bool
 	model_events        []string
+	model_import_error  string
+	model_finalize_code i32
 )
+
+fn model_initialize(signals i32) {
+	assert signals == 1 && model_live == 1
+	model_events << 'initialize'
+}
+
+fn model_import(name &char) py.Ref {
+	assert unsafe { name.vstring() } == 'fcntl'
+	model_events << 'import'
+	if model_import_error != '' {
+		model_error = model_import_error
+		return py.Ref(unsafe { nil })
+	}
+	return object('module')
+}
+
+fn model_finalize() i32 {
+	assert model_live == 1 && model_error == ''
+	model_events << 'finalize'
+	return model_finalize_code
+}
 
 fn object(kind string) py.Ref {
 	model_live++
@@ -232,6 +255,9 @@ fn api_model() py.Api {
 	model_none = object('none')
 	model_events = []string{}
 	return py.Api{
+		initialize:      model_initialize
+		finalize:        model_finalize
+		import_module:   model_import
 		inc:             model_inc
 		dec:             model_dec
 		integer:         model_int
@@ -260,6 +286,22 @@ fn api_model() py.Api {
 		none:            model_none
 		runtime_error:   model_none
 	}
+}
+
+fn test_fcntl_success_errors_and_finalization_release_every_reference() {
+	for failure in ['', 'ModuleNotFoundError', 'KeyboardInterrupt'] {
+		for finalization in [i32(0), -1] {
+			api := api_model()
+			model_import_error = failure
+			model_finalize_code = finalization
+			status := fcntl_probe(&api)
+			assert status == if finalization != 0 { 120 } else if failure == '' { 0 } else if failure == 'KeyboardInterrupt' { 130 } else { 1 }
+			assert model_events == ['initialize', 'import', 'finalize']
+			release_model()
+		}
+	}
+	model_import_error = ''
+	model_finalize_code = 0
 }
 
 fn release_model() {

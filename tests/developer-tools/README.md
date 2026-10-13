@@ -12,6 +12,12 @@ resolves a local `.pc` file, applies and verifies a patch, and starts a
 detached tmux session. The tmux check verifies its control socket, server
 lifecycle, and PTY-backed pane.
 
+The overlay also stages `/root/python3-smoke`, the native V CPython C-API
+controller. `smoke.sh` runs it with `--fcntl-only` to retain the original module
+availability check and success label. The module and error references retire
+before interpreter finalization. The existing CPython package remains the
+third-party runtime being checked; no first-party evaluation string is used.
+
 Build the package overlay with:
 
 ```sh

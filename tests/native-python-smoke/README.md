@@ -51,6 +51,14 @@ an existing output. These checks execute no interpreter, SDK Python modules or
 Vinix guest. They establish build and ownership contracts; a new full guest
 runtime result is still required separately.
 
+The developer-tools overlay stages the same controller. `--fcntl-only` imports
+`fcntl` and prints the original `Python fcntl module available` label. Import
+failure returns 1, `KeyboardInterrupt` returns 130, and failed finalization
+returns 120. The module/error references close before finalization, and the
+library closes afterward. The native model covers all six import/finalization
+combinations without initializing an interpreter. `--abi-only` remains a
+symbol-resolution check. Neither mode runs the full smoke suite.
+
 ```sh
 build-support/run-v-tool.sh tests/native-python-smoke/qualify.v \
   /path/to/qualified/v /fresh/evidence arm # also x86 or san

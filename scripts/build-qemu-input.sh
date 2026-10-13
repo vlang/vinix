@@ -10,10 +10,16 @@ SOURCE="$WORK/qemu-$VERSION"
 PATCH="$ROOT/patches/qemu/virtio-horizontal-wheel.patch"
 OUTPUT="$WORK/bin/qemu-system-aarch64"
 STAMP="$WORK/patch.sha256"
-patch_digest=$(cat "$PATCH" "$ROOT/scripts/build-qemu-input.sh" | shasum -a 256 | awk '{print $1}')
+patch_digest=$(cat "$PATCH" "$ROOT/scripts/build-qemu-input.sh" \
+    "$ROOT/build-support/generator-sdk.v" "$ROOT/build-support/generatorsdk/core.v" \
+    | shasum -a 256 | awk '{print $1}')
 if [ -x "$OUTPUT" ] && [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$patch_digest" ]; then
     exit 0
 fi
+# Provision QEMU's upstream generator SDK separately. V verifies its declared
+# tomli dependency without launching an interpreter or package installer.
+python=$("$ROOT/build-support/generator-sdk" qemu \
+    "${VINIX_QEMU_BUILD_PYTHON:-$WORK/python/bin/python3}")
 mkdir -p "$WORK/downloads" "$WORK/obj" "$WORK/bin"
 LOCK="$WORK/.lock"
 while ! ln -s "$$" "$LOCK" 2>/dev/null; do
@@ -40,18 +46,8 @@ fi
 if [ "$(uname -s)" = Darwin ]; then
     # Homebrew's pkg-config resolves GLib, Pixman and libslirp.
     display_flags=(--enable-cocoa --enable-hvf)
-    python=${VINIX_QEMU_BUILD_PYTHON:-/opt/homebrew/bin/python3}
-    if [ ! -x "$python" ]; then python=$(command -v python3); fi
 else
     display_flags=()
-    python=${VINIX_QEMU_BUILD_PYTHON:-$(command -v python3)}
-fi
-# macOS's system Python lacks tomli, which QEMU needs before it can bootstrap
-# its remaining build tools. Keep that dependency inside this build directory.
-if [ ! -x "$WORK/python/bin/python3" ]; then "$python" -m venv "$WORK/python"; fi
-python="$WORK/python/bin/python3"
-if ! "$python" -c 'import tomli' 2>/dev/null; then
-    "$python" -m pip install --disable-pip-version-check 'tomli==2.2.1'
 fi
 echo "==> Building QEMU $VERSION with horizontal VirtIO scrolling (first run only)"
 (

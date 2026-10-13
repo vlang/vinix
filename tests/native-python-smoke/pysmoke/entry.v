@@ -7,18 +7,19 @@ import os
 
 pub fn execute(arguments []string) !int {
 	if arguments == ['--help'] {
-		println('Usage: python3-smoke [--abi-only]\nRun the original CPython runtime checks from V through its C API. VINIX_CPYTHON_LIBRARY selects the target SDK. --abi-only resolves symbols without initializing the interpreter.')
+		println('Usage: python3-smoke [--abi-only|--fcntl-only]\nRun the original CPython runtime checks from V through its C API. VINIX_CPYTHON_LIBRARY selects the target SDK. --abi-only resolves symbols without initializing the interpreter; --fcntl-only checks the developer-tools module import.')
 		return 0
 	}
-	if arguments.len > 1 || (arguments.len == 1 && arguments[0] != '--abi-only') {
+	if arguments.len > 1 || (arguments.len == 1 && arguments[0] !in ['--abi-only', '--fcntl-only']) {
 		return error_with_code('unknown argument', 2)
 	}
 	mut api := cpythonapi.open(os.getenv_opt('VINIX_CPYTHON_LIBRARY') or { 'libpython3.12.so.1.0' })!
 	defer { api.close_library() }
-	if arguments.len == 1 {
+	if arguments == ['--abi-only'] {
 		println('Resolved ${cpythonapi.symbols.len} CPython ABI symbols without initializing the interpreter')
 		return 0
 	}
+	if arguments == ['--fcntl-only'] { return fcntl_probe(&api) }
 	api.initialize(1)
 	callback_api = &api
 	mut smoke := Smoke{}
@@ -35,5 +36,24 @@ pub fn execute(arguments []string) !int {
 	flush_stdout()
 	if api.finalize() != 0 { status = 120 }
 	callback_api = unsafe { nil }
+	return status
+}
+
+// The arena retires its module/error references before interpreter finalization;
+// the caller retains the library until both have completed.
+fn fcntl_probe(api &cpythonapi.Api) int {
+	api.initialize(1)
+	mut status := 0
+	{
+		mut arena := cpythonapi.Arena{ api: api }
+		defer { arena.close() }
+		arena.load('fcntl') or {
+			eprintln('CPython fcntl import failed: ' + err.msg())
+			status = if err.msg() == 'KeyboardInterrupt' { 130 } else { 1 }
+		}
+	}
+	if status == 0 { println('Python fcntl module available') }
+	flush_stdout()
+	if api.finalize() != 0 { return 120 }
 	return status
 }

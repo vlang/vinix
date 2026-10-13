@@ -66,7 +66,7 @@ fn run() ! {
 	checked([work + '/main', '--help'], os.environ(), work + '/help.log')!
 	mut environment := os.environ()
 	environment['VINIX_CPYTHON_LIBRARY'] = '/nonexistent/vinix-cpython-sdk'
-	for argv in [['--abi-only'], ['--unknown']] {
+	for argv in [['--abi-only'], ['--fcntl-only'], ['--unknown']] {
 		result := sourcecommand.capture_full([work + '/main', ...argv], environment, -1, 1024 * 1024, cachecli.cancelled)!
 		assert result.status == if argv[0] == '--unknown' { 2 } else { 1 }, result.str()
 		os.write_file(work + '/guard-' + argv[0].trim_left('-') + '.log', result.stdout + result.stderr)!
@@ -117,7 +117,9 @@ fn run() ! {
 		result := sourcecommand.capture_full([work + '/builder', ...argv], os.environ(), -1, 1024 * 1024, cachecli.cancelled)!
 		assert result.status in [1, 2] && !os.exists(work + '/invalid')
 	}
-	checked(['/bin/bash', '-n', root + '/scripts/build-python-aarch64.sh'], os.environ(), work + '/syntax.log')!
+	for path in ['scripts/build-python-aarch64.sh', 'scripts/build-developer-tools-aarch64.sh', 'tests/developer-tools/smoke.sh'] {
+		checked(['/bin/bash', '-n', root + '/' + path], os.environ(), work + '/syntax-' + os.file_name(path) + '.log')!
+	}
 	os.write_file(work + '/qualification.json', json2.encode(json2.Any({
 		'status':   json2.Any('PASS')
 		'profile':  json2.Any(profile)
