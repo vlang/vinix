@@ -13,6 +13,19 @@ fn (mut a SoftwareApp) open_terminal_request(request packagecore.Request) ! {
 		unsafe { free(terminal) }
 		return err
 	}
+	a.adopt_terminal(terminal)
+}
+
+fn (mut a SoftwareApp) open_terminal_command(id string, arguments []string, documents []string, data_cwd bool) ! {
+	if a.worker != unsafe { nil } || a.terminal_app != unsafe { nil } { return error('a software operation is already running') }
+	mut terminal := &TerminalApp{ read_buf: []u8{len: terminal_read_chunk} }
+	terminal.configure_package_command(id, arguments, documents, data_cwd, a.service_path) or {
+		terminal.close_app(); unsafe { free(terminal) }; return err
+	}
+	a.adopt_terminal(terminal)
+}
+
+fn (mut a SoftwareApp) adopt_terminal(terminal &TerminalApp) {
 	a.clear_review()
 	a.clear_repository_review()
 	a.terminal_app = terminal

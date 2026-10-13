@@ -6,6 +6,7 @@ import os
 import time
 import tools.packages.pkgcore
 import desktop.ptycore
+import tools.packages.pkgprotocol
 
 fn media_command(id string, argv []string, documents []string) Ran {
 	mut arguments := ['/usr/bin/vinix-package', 'run-args', id]
@@ -71,6 +72,19 @@ fn qualify_package_ffmpeg(mut t Test) ! {
 	assert terminal_finished && terminal_status == 0
 	t.say('PACKAGE FFMPEG terminal argument banner PASS')
 	data := '/home/alex/.local/share/vinix-apps/' + pkgcore.ffmpeg_application_id
+	mut relative_words := pkgprotocol.command_words('-v error -f lavfi -i testsrc2=size=64x48:duration=0.1 -c:v mpeg4 -threads 2 -y "relative output; $literal.avi"')!
+	defer { pkgprotocol.free_command_values(mut relative_words) }
+	mut relative_vector := pkgprotocol.command_vector(pkgcore.ffmpeg_application_id, relative_words, [], true, false)!
+	defer { pkgprotocol.free_command_values(mut relative_vector) }
+	relative_reply := run(['/usr/bin/vinix-package', ...relative_vector], '', none, none)
+	assert relative_reply.status == 0, relative_reply.output
+	relative_path := data + '/relative output; $literal.avi'
+	assert os.file_size(relative_path) > 0 && os.stat(relative_path)!.uid == 1000
+	assert media_probe(relative_path, true).status == 0
+	assert media_probe(relative_path, false).status != 0
+	installed_folder := '/var/lib/vinix-packages/generations/' + installed.generation.str() + '/apps/' + pkgcore.ffmpeg_application_id
+	assert !os.exists(installed_folder + '/relative output; $literal.avi')
+	t.say('PACKAGE COMMAND private-working-folder quoted-arguments relative-output ordinary-owner explicit-grants PASS')
 	video := data + '/a space; $literal.avi'
 	encoded := media_command(pkgcore.ffmpeg_application_id, ['-hide_banner', '-loglevel', 'error',
 		'-f', 'lavfi', '-i', 'testsrc2=size=64x48:rate=10:duration=1', '-c:v', 'mpeg4', '-threads', '2', '-y', video], [])
@@ -111,6 +125,7 @@ fn qualify_package_ffmpeg(mut t Test) ! {
 	assert media_probe(video, true).status == 0 && os.stat(video)!.uid == 1000
 	package_success(['--offline', 'remove', pkgcore.ffmpeg_application_id, pkgcore.ffprobe_application_id])!
 	assert pkgcore.read_state('/var/lib/vinix-packages', architecture)!.packages.len == 0 && os.is_file(video)
+	assert os.is_file(relative_path) && os.stat(relative_path)!.uid == 1000
 	t.say('PACKAGE FFMPEG signed-canonical-catalog shared-runtime removal rollback offline-cache-reinstall retained-media PASS')
 }
 

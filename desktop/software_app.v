@@ -19,6 +19,9 @@ struct SoftwareRow {
 	description       string
 	version           string
 	installed_version string
+	installed_name    string
+	installed_kind    string
+	installed_permissions []string
 	architecture      string
 	kind              string
 	runtime           string
@@ -103,6 +106,17 @@ mut:
 	deployment_path []u8
 	deployment_pending string // frozen file path for deployment-review/apply
 	terminal_app &TerminalApp = unsafe { nil }
+	launch_mode bool
+	launch_id string
+	launch_name string
+	launch_arguments []u8
+	launch_file []u8
+	launch_documents []string
+	launch_focus int
+	launch_file_selected int = -1
+	launch_file_scroll int
+	launch_data_cwd bool = true
+	launch_files_allowed bool
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
@@ -169,6 +183,10 @@ fn software_free_row(row SoftwareRow) {
 		row.description.free()
 		row.version.free()
 		row.installed_version.free()
+		row.installed_name.free()
+		row.installed_kind.free()
+		for permission in row.installed_permissions { permission.free() }
+		(&array(&row.installed_permissions)).free()
 		row.architecture.free()
 		row.kind.free()
 		row.runtime.free()
@@ -201,6 +219,7 @@ fn (mut a SoftwareApp) filter_rows() {
 }
 
 fn (mut a SoftwareApp) load_view() {
+	a.clear_launch_options()
 	a.clear_review()
 	a.deployment_mode = false
 	text := editor_bytes_text(a.output)
@@ -500,6 +519,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		return
 	}
 	if event_id.starts_with(packagecore.request_prefix) {
+		if a.launch_mode { a.set_status('Close launch options before opening another application.'); return }
 		if a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
 			a.set_status('An operation is already running in this window.')
 			return
@@ -516,6 +536,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		return
 	}
 	if a.worker != unsafe { nil } { return }
+	if a.launch_mode { a.handle_launch_options(event_id); return }
 	if event_id == 'software.repositories' {
 		a.clear_review()
 		a.deployment_mode = false
@@ -547,10 +568,11 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 	}
 	match event_id {
+		'software.run-options' { a.open_launch_options() }
 		'software.run-terminal' {
 			if a.selected < 0 || a.selected >= a.rows.len { return }
 			row := a.rows[a.selected]
-			if row.installed_version == '' || row.kind in ['runtime', 'data'] { return }
+			if row.installed_version == '' || software_launch_kind(row) in ['runtime', 'data'] { return }
 			a.open_terminal_request(packagecore.Request{ id: row.id })!
 		}
 		'software.run' {
@@ -656,6 +678,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 
 fn (mut a SoftwareApp) key_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
+	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input); return }
 	if a.deployment_mode { a.deployment_key_input(input); return }
 	if !a.focus { return }
@@ -677,6 +700,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 
 fn (mut a SoftwareApp) paste_input(input string) {
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
+	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {
 		a.deployment_key_input(input)
 	} else if a.focus { a.key_input(input) }
@@ -728,6 +752,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.page_rows = if height > 400 { (height - 236) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+	if a.launch_mode { return a.build_launch_options(width, height) }
 	if a.repository_mode { return a.build_repositories(width, height) }
 	if a.deployment_mode && a.review == '' { return a.build_deployment(width, height) }
 	mut children := frame_elements(48)
@@ -788,8 +813,8 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		} else {
 			a.rows[a.selected]
 		}
-		children << software_label(row.name, 274, 90, if !reviewing && row.installed_version != '' && row.kind !in ['runtime', 'data'] { width - 466 } else { width - 288 }, 28, false)
-		children << software_label(row.description, 274, 124, width - 288, 72, false)
+		children << software_label(row.name, 274, 90, if !reviewing && row.installed_version != '' && software_launch_kind(row) !in ['runtime', 'data'] { width - 466 } else { width - 288 }, 28, false)
+		children << software_label(row.description, 274, 124, if !reviewing && row.installed_version != '' && software_launch_kind(row) !in ['runtime', 'data'] { width - 466 } else { width - 288 }, 72, false)
 		children << software_label(if !reviewing && row.update_action == 'remove' {
 			'Installed: ${row.installed_version}    Removed by Update all'
 		} else if !reviewing && row.updatable {
@@ -825,9 +850,10 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			}
 			if row.installed_version != '' {
 				children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
-				if row.kind !in ['runtime', 'data'] {
+				if software_launch_kind(row) !in ['runtime', 'data'] {
 					children << software_button('software.run', a.launch_label, width - 174, 46, 160)
 					children << software_button('software.run-terminal', 'Launch in Terminal', width - 174, 78, 160)
+					children << software_button('software.run-options', 'Launch options…', width - 174, 110, 160)
 				}
 			}
 		}
@@ -863,6 +889,7 @@ fn (mut a SoftwareApp) prepare_close() bool {
 }
 
 fn (mut a SoftwareApp) close_app() {
+	a.clear_launch_options()
 	a.close_terminal()
 	if a.worker != unsafe { nil } {
 		// Forced desktop retirement must not kill the lease holder while its

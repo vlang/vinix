@@ -170,6 +170,24 @@ handoff and do not expand `@APP@`, `@DATA@` or `@RUNTIME@`. Outputs belong in th
 application's private data directory or an explicitly granted existing file.
 See the [SDK command contract](../tools/packages/SDK.md#literal-command-arguments).
 
+Software's **Launch options…** opens a form for an installed application. Enter
+arguments with quotes around values containing spaces. Add each existing input
+or output file under **Allowed files** and use its path explicitly in the
+arguments. Files can be removed or paged, and an entered file must be added or
+cleared before running. The ordinary service checks the actual file access;
+the desktop's administrator identity grants no additional access.
+
+The form defaults to **Working folder: private app data**, where relative output
+names are saved in the ordinary account's `~/.local/share/vinix-apps/ID`.
+Switch to **installed app** when an application needs packaged assets relative
+to its working folder. **Run** captures diagnostics, while **Run in Terminal**
+opens the same command in Software's terminal. Input freezes during execution;
+failed batch commands keep the draft for correction. Cancellation, reload and
+close discard it. Launch controls use installed name/kind/permissions even when
+the catalog presents a pending update with different metadata. The service
+continues to enforce the current installed state, trust and organization policy.
+See [qualification](../tests/packages/launch-options-check.md).
+
 Search covers names, IDs and descriptions. Info shows publisher, repository,
 license, permissions, target and installed version. Dependency ranges have
 inclusive minimum/exclusive upper versions. Resolution backtracks across all

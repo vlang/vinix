@@ -38,7 +38,7 @@ pub fn terminal_launch_plan(config Config, directory string, state State, id str
 pub fn command_launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, input CommandLaunch, terminal bool) !Launch {
 	validate_command(input)!
 	return application_launch_plan(config, directory, state, id, data, uid, gid, LaunchInput{
-		documents: input.documents, arguments: input.arguments, terminal: terminal, command: true })
+		documents: input.documents, arguments: input.arguments, terminal: terminal, command: true, data_cwd: input.data_cwd })
 }
 
 fn application_launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, input LaunchInput) !Launch {
@@ -102,7 +102,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	}
 	args << input.arguments
 	if !input.command { args << input.documents }
-	return Launch{ program: '/usr/bin/vinix-sandbox', arguments: args, directory: app }
+	return Launch{ program: '/usr/bin/vinix-sandbox', arguments: args, directory: if input.command && input.data_cwd { data } else { app } }
 }
 
 pub fn run_application(config Config, directory string, id string, documents []string) !int {

@@ -20,7 +20,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  deployment-lock [ID...] | deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
-	'  run-args|run-terminal-args ID [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]\n' +
+	'  run-args|run-terminal-args ID [--data-cwd] [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +

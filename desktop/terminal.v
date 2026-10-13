@@ -14,6 +14,7 @@ module main
 
 import ui2
 import desktop.packagecore
+import tools.packages.pkgprotocol
 
 // KeyboardApp is an application that takes typed input. The desktop routes
 // keystrokes to the focused window's application when it is one of these, and
@@ -1377,6 +1378,19 @@ fn (mut a TerminalApp) configure_package(request packagecore.Request, service st
 	a.package_argv = [service.clone(), 'run-terminal'.clone(), request.id.clone()]
 	unsafe { a.package_argv.flags |= .noslices }
 	if request.document.len > 0 { a.package_argv << request.document.clone() }
+	a.package_session = true
+}
+
+fn (mut a TerminalApp) configure_package_command(id string, arguments []string, documents []string, data_cwd bool, service string) ! {
+	if a.started || a.package_argv.len > 0 || !service.starts_with('/') || service.contains('\x00') {
+		return error('package terminal must be configured before it starts')
+	}
+	mut vector := pkgprotocol.command_vector(id, arguments, documents, data_cwd, true)!
+	defer { pkgprotocol.free_command_values(mut vector) }
+	a.package_argv = []string{cap: vector.len + 1}
+	unsafe { a.package_argv.flags |= .noslices }
+	a.package_argv << service.clone()
+	for argument in vector { a.package_argv << argument.clone() }
 	a.package_session = true
 }
 

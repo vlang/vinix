@@ -48,7 +48,7 @@ fn package_template(id string, version string) pkgcore.Package {
 }
 
 fn qualify_catalog_cli(binary string, work string) ! {
-	for args in [['run-args', 'catalog-app'], ['run-args', 'catalog-app', '--file'], ['run-args', 'catalog-app', '--file', 'relative', '--'], ['ffmpeg-catalog', '1.0.0']] {
+	for args in [['run-args', 'catalog-app'], ['run-args', 'catalog-app', '--data-cwd', '--data-cwd', '--'], ['run-args', 'catalog-app', '--file'], ['run-args', 'catalog-app', '--file', 'relative', '--'], ['ffmpeg-catalog', '1.0.0']] {
 		assert command(binary, args)!.code != 0
 	}
 	assert command(binary, ['run-terminal-args', 'catalog-app', '--', '-version'])!.text.contains('terminal standard input and output')

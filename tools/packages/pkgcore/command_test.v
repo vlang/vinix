@@ -9,7 +9,9 @@ fn test_command_parser_requires_separator_and_preserves_literal_values() {
 	assert input.documents == ['/home/user/a space; $literal']
 	assert input.arguments == ['', '-i', '@APP@/unchanged', '--file', '--', 'a\nb']
 	assert command_launch(['--'])!.arguments.len == 0
-	for arguments in [ []string{}, ['-version'], ['--file'], ['--file', 'relative', '--'], ['--file', '/tmp/new\nline', '--'], ['--', 'nul\x00'], ['--', 'x'.repeat(4097)]] {
+	assert command_launch(['--data-cwd', '--file', '/home/user/a', '--', '--data-cwd'])!
+		== CommandLaunch{ data_cwd: true, documents: ['/home/user/a'], arguments: ['--data-cwd'] }
+	for arguments in [ []string{}, ['-version'], ['--file'], ['--data-cwd', '--data-cwd', '--'], ['--file', 'relative', '--'], ['--file', '/tmp/new\nline', '--'], ['--', 'nul\x00'], ['--', 'x'.repeat(4097)]] {
 		mut refused := false
 		command_launch(arguments) or { refused = true }
 		assert refused, arguments.str()
@@ -39,6 +41,10 @@ fn test_command_launch_grants_only_documents_and_does_not_append_or_expand_them(
 	assert launch.arguments[..boundary].filter(it == path).len == 1
 	assert launch.arguments[..boundary].filter(it == '/etc/passwd').len == 0
 	assert launch.arguments.last() == '0'
+	assert launch.directory == '/var/lib/vinix-packages/generations/1/apps/app'
+	private := command_launch_plan(config, '/var/lib/vinix-packages', state, 'app', '/home/user/data', 1000, 1000,
+		CommandLaunch{ arguments: literal, documents: [path], data_cwd: true }, false)!
+	assert private.arguments == launch.arguments && private.directory == '/home/user/data'
 	assert 'tty' !in launch.arguments[launch.arguments.index('--promises') + 1].split(' ')
 	terminal := command_launch_plan(config, '/var/lib/vinix-packages', state, 'app', '/home/user/data', 1000, 1000,
 		CommandLaunch{ arguments: ['/etc/passwd'] }, true)!
@@ -58,6 +64,8 @@ fn test_command_session_reconstructs_literal_prefix_and_rechecks_limits() {
 	input := LaunchInput{ documents: ['/home/alex/a space'], arguments: ['', '--file', '$(literal)', '@DATA@/literal'], command: true, terminal: true }
 	launch := launch_session_request(Config{ architecture: 'aarch64', launch_user: 'alex' }, '/usr/bin/vinix-package', 'app', input)!
 	assert launch.arguments == ['run', '--isolated', 'alex', '/usr/bin/vinix-package', 'run-terminal-args', 'app', '--file', '/home/alex/a space', '--', '', '--file', '$(literal)', '@DATA@/literal']
+	private := launch_session_request(Config{ architecture: 'aarch64', launch_user: 'alex' }, '/usr/bin/vinix-package', 'app', LaunchInput{ ...input, data_cwd: true })!
+	assert private.arguments == ['run', '--isolated', 'alex', '/usr/bin/vinix-package', 'run-terminal-args', 'app', '--data-cwd', '--file', '/home/alex/a space', '--', '', '--file', '$(literal)', '@DATA@/literal']
 	mut refused := false
 	launch_session_request(Config{ architecture: 'aarch64', launch_user: 'alex' }, '/usr/bin/vinix-package', 'app', LaunchInput{ command: true, arguments: ['nul\x00'] }) or { refused = true }
 	assert refused

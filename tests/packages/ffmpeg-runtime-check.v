@@ -63,6 +63,7 @@ fn suite(sandbox string) hwhost.Suite {
 			arches: ['aarch64', 'x86_64']
 			about: 'real FFmpeg encode/decode/probe, separate file grants, shared runtime removal, rollback and offline reinstall'
 			required: ['HWTEST START packages-ffmpeg',
+				'PACKAGE COMMAND private-working-folder quoted-arguments relative-output ordinary-owner explicit-grants PASS',
 				'PACKAGE FFMPEG real-video-encode decode probe audio-pcm literal-arguments terminal-arguments ordinary-owner explicit-file-grant outside-path-refusal PASS',
 				'PACKAGE FFMPEG signed-canonical-catalog shared-runtime removal rollback offline-cache-reinstall retained-media PASS',
 				'HWTEST PASS packages-ffmpeg']

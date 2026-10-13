@@ -57,6 +57,7 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
 	os.cp(repository + '/desktop/software_terminal.v', work + '/software/software_terminal.v')!
+	os.cp(repository + '/desktop/software_launch.v', work + '/software/software_launch.v')!
 	os.cp(repository + '/tests/packages/software_terminal_fixture.v', work + '/software/terminal_fixture.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
 	modules := os.getenv_opt('VINIX_PACKAGE_TEST_UI2') or { repository + '/build/vmodules' }

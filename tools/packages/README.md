@@ -59,3 +59,9 @@ or output. See [terminal execution](SDK.md#interactive-terminal-execution) and
 `run-args` and `run-terminal-args` accept literal command arguments after `--`.
 Use `--file ABSOLUTE_FILE` before the separator for each explicit document grant;
 these grants do not append arguments. See [command execution](SDK.md#literal-command-arguments).
+
+Software's **Launch options…** offers quoted arguments, explicit file grants,
+private-data/installed-app working folders, batch diagnostics and PTY execution.
+The form defaults to private data for relative outputs; CLI clients select that
+folder with the additive `--data-cwd` flag. See the
+[launch-options qualification](../../tests/packages/launch-options-check.md).

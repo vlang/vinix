@@ -82,9 +82,20 @@ fn test_updates_expose_resolved_runtime_data_and_new_dependencies() {
 	row := view_row(view, 'runtime')
 	assert row.updatable && row.update_action == 'update' && row.version == '1.1.0'
 	assert row.installed_version == '1.0.0' && row.kind == 'runtime' && row.permissions == ['process']
+	assert row.installed_kind == 'runtime' && row.installed_permissions.len == 0
 	assert view_row(view, 'assets').updatable && view_row(view, 'assets').architecture == 'all'
 	extra := view_row(view, 'extras')
 	assert extra.updatable && extra.update_action == 'install' && extra.installed_version == '' && !extra.requested
+}
+
+fn test_launch_presentation_retains_installed_metadata_when_an_update_changes_kind_name_and_permissions() {
+	old := Package{ ...view_package('app', '1.0.0', 'native'), name: 'Installed app', permissions: [] }
+	new := Package{ ...view_package('app', '2.0.0', 'data'), name: 'Planned assets', permissions: ['files'] }
+	current := State{ architecture: 'aarch64', generation: 1, requested: ['app'], packages: [view_installed(old)] }
+	view := catalog_view(view_configuration(), Catalog{ packages: [view_installed(old), view_installed(new)] }, current, '')!
+	row := view_row(view, 'app')
+	assert row.updatable && row.name == 'Planned assets' && row.kind == 'data' && row.permissions == ['files']
+	assert row.installed_name == 'Installed app' && row.installed_kind == 'native' && row.installed_permissions.len == 0
 }
 
 fn test_updates_disclose_dependency_removals_and_retain_explicit_roots() {

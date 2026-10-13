@@ -48,6 +48,7 @@ fn launch_session_request(config Config, executable string, id string, input Lau
 		else { if input.terminal { 'run-terminal' } else { 'run' } }
 	mut argv := ['run', '--isolated', config.launch_user, executable, command, id]
 	if input.command {
+		if input.data_cwd { argv << '--data-cwd' }
 		for document in input.documents { argv << ['--file', document] }
 		argv << '--'
 		argv << input.arguments

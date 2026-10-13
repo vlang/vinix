@@ -92,6 +92,93 @@ fn test_package_terminal_spawn_retires_parent_argv_and_environment_storage() {
 	package_assert_heap_flat('package terminal spawn parent storage')
 }
 
+fn test_software_launch_options_render_parse_refuse_and_terminal_retirement_keep_heap_flat() {
+	expected := ['/missing-fixture-package-service', 'run-terminal-args', 'org.ffmpeg.cli', '--data-cwd', '--file', '/home/alex/a space; $literal.avi', '--', '-i', '/home/alex/a space; $literal.avi', '-f', 'null', '-', '', '$(literal)']
+	defer { unsafe { (&array(&expected)).free() } }
+	for warmup in 0 .. 2 {
+		if warmup == 1 { C.vinix_heap_begin() }
+		for _ in 0 .. 30 {
+			mut app := &SoftwareApp{ service_path: '/missing-fixture-package-service'.clone(),
+				rows: [SoftwareRow{ id: 'org.ffmpeg.cli'.clone(), name: 'FFmpeg'.clone(), kind: 'linux'.clone(),
+					installed_version: '8.0.1'.clone(), permissions: ['files'.clone()] }], selected: 0 }
+			app.handle('software.run-options')!
+			assert app.launch_mode && app.launch_data_cwd
+			app.handle('software.launch.arguments')!
+			app.paste_input('"unterminated')
+			app.handle('software.launch.run')!
+			assert app.worker == unsafe { nil } && app.status.contains('quoted argument')
+			app.key_input('\x01')
+			app.paste_input('-i "/home/alex/a space; $literal.avi" -f null - "" $(literal)')
+			app.paste_input('\x00')
+			assert editor_bytes_text(app.launch_arguments).ends_with('$(literal)')
+			app.handle('software.launch.file')!
+			for _ in 0 .. 2 {
+				app.paste_input('/home/alex/a space; $literal.avi')
+				app.handle('software.launch.add-file')!
+			}
+			assert app.launch_documents.len == 1 && app.status.contains('already allowed')
+			app.key_input('\x01'); app.key_input('\x7f')
+			for _ in 0 .. 3 {
+				begin_frame_elements()
+				tree := app.build(ui2.rect(0, 0, 900, 660))!
+				assert package_tree_has(tree, 'software.launch.file.0') && package_tree_has(tree, 'software.launch.terminal')
+				free_tree(tree)
+			}
+			app.handle('software.launch.terminal')!
+			assert app.terminal_app != unsafe { nil } && !app.launch_mode
+			assert app.terminal_app.package_argv == expected
+			app.terminal_app.started = true; app.terminal_app.exited = true
+			app.handle('software.terminal-back')!
+			app.close_app(); unsafe { free(app) }
+		}
+	}
+	package_assert_heap_flat('Software launch options, parser errors and terminal handoff')
+}
+
+fn test_software_launch_options_page_remove_bound_and_cancel_explicit_file_grants() {
+	mut app := &SoftwareApp{ rows: [SoftwareRow{ id: 'editor'.clone(), name: 'Editor'.clone(), kind: 'native'.clone(),
+		installed_version: '1.0.0'.clone(), permissions: ['files'.clone()] }], selected: 0 }
+	app.handle('software.run-options')!
+	app.handle('software.launch.file')!
+	for i in 0 .. 8 {
+		path := '/home/alex/' + i.str()
+		app.paste_input(path); unsafe { path.free() }
+		app.handle('software.launch.add-file')!
+	}
+	assert app.launch_documents.len == 8 && app.launch_file_scroll == 3
+	app.handle('software.launch.up')!
+	assert app.launch_file_scroll == 0
+	app.handle('software.launch.down')!
+	assert app.launch_file_scroll == 5
+	app.handle('software.launch.file.0')!
+	app.handle('software.launch.remove-file')!
+	assert app.launch_documents.len == 7 && '/home/alex/5' !in app.launch_documents
+	app.handle('software.launch.arguments')!
+	app.paste_input('kept')
+	app.key_input('\x01')
+	too_large := 'x'.repeat(4097)
+	app.paste_input(too_large); unsafe { too_large.free() }
+	assert editor_bytes_text(app.launch_arguments) == 'kept'
+	app.handle('software.launch.data-cwd')!
+	assert !app.launch_data_cwd
+	app.handle('software.launch.back')!
+	assert !app.launch_mode && app.launch_documents.len == 0 && app.launch_arguments.len == 0
+	app.close_app(); unsafe { free(app) }
+}
+
+fn test_software_launch_options_use_installed_permissions_and_kind_instead_of_the_pending_update() {
+	mut app := &SoftwareApp{ rows: [SoftwareRow{ id: 'editor'.clone(), name: 'Future assets'.clone(), kind: 'data'.clone(),
+		installed_name: 'Installed editor'.clone(), installed_kind: 'native'.clone(), installed_version: '1.0.0'.clone(),
+		permissions: ['files'.clone()], installed_permissions: [] }], selected: 0 }
+	app.handle('software.run-options')!
+	assert app.launch_mode && app.launch_name == 'Installed editor' && !app.launch_files_allowed
+	app.handle('software.launch.file')!
+	app.paste_input('/home/alex/a.txt')
+	app.handle('software.launch.add-file')!
+	assert app.launch_documents.len == 0 && app.status.contains('does not declare')
+	app.close_app(); unsafe { free(app) }
+}
+
 fn test_package_terminal_exit_poll_retires_its_output_buffers() {
 	if !os.is_file('/usr/bin/true') { return }
 	for warmup in 0 .. 2 {

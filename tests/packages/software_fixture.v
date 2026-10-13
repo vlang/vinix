@@ -143,6 +143,12 @@ fn main() {
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if args[1] == 'run-args' {
+			assert args[2..] == ['editor', '--data-cwd', '--file', '/private/tmp/a space; $literal.txt', '--', '-i', '/private/tmp/a space; $literal.txt', '', '$(literal)']
+			time.sleep(30 * time.millisecond)
+			eprintln('fixture: granted file is unavailable to the ordinary account')
+			exit(27)
+		}
 		if software_deployment_service_fixture(args) or { panic(err) } { return }
 		if software_repository_service_fixture(args) or { panic(err) } { return }
 		if args[1] == 'view' {
@@ -297,7 +303,41 @@ fn main() {
 	check_repository_management() or { panic(err) }
 	check_software_progress() or { panic(err) }
 	check_software_deployment() or { panic(err) }
+	check_software_launch_options() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
+}
+
+fn check_software_launch_options() ! {
+	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192}, query: []u8{cap: 256},
+		rows: [SoftwareRow{ id: 'editor', name: 'Editor', kind: 'linux', installed_version: '1.0.0', permissions: ['files'] }], selected: 0 }
+	app.handle('software.run-options')!
+	assert app.launch_mode && app.launch_id == 'editor' && app.launch_data_cwd
+	app.handle('software.launch.arguments')!
+	app.paste_input('-i "/private/tmp/a space; $literal.txt" "" $(literal)')
+	app.handle('software.launch.file')!
+	app.paste_input('/private/tmp/a space; $literal.txt')
+	app.handle('software.launch.add-file')!
+	assert app.launch_documents == ['/private/tmp/a space; $literal.txt'] && app.launch_file.len == 0
+	view := app.build(ui2.rect(0, 0, 900, 660))!
+	assert view.children.any(it.id == 'software.launch.run') && view.children.any(it.id == 'software.launch.terminal')
+	app.handle('software.launch.run')!
+	assert app.worker != unsafe { nil } && app.worker_run
+	assert !app.prepare_close()
+	app.handle('software.launch.back')!
+	app.handle('software.launch.arguments')!
+	app.paste_input('changed')
+	assert app.launch_mode && editor_bytes_text(app.launch_arguments).starts_with('-i ')
+	wait_for_software(mut app)
+	assert app.status.contains('ordinary account') && app.worker == unsafe { nil }
+	assert app.launch_documents == ['/private/tmp/a space; $literal.txt']
+	app.handle('software.launch.terminal')!
+	assert !app.launch_mode && app.terminal_app != unsafe { nil }
+	assert app.terminal_app.argv == [app.service_path, 'run-terminal-args', 'editor', '--data-cwd', '--file', '/private/tmp/a space; $literal.txt', '--', '-i', '/private/tmp/a space; $literal.txt', '', '$(literal)']
+	app.terminal_app.exited = true
+	app.handle('software.terminal-back')!
+	wait_for_software(mut app)
+	app.close_app()
+	println('Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed')
 }
 
 const deployment_fixture_path = '/private/tmp/deployment with spaces; \$literal.json'

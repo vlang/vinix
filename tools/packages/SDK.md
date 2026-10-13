@@ -482,8 +482,8 @@ See [qualification](../../tests/packages/terminal-check.md).
 ### Literal command arguments
 
 ```text
-vinix-package run-args ID [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]
-vinix-package run-terminal-args ID [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]
+vinix-package run-args ID [--data-cwd] [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]
+vinix-package run-terminal-args ID [--data-cwd] [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]
 ```
 
 These additive SDK 1 commands keep the signed entrypoint and fixed manifest
@@ -500,10 +500,15 @@ must be an existing absolute regular file and the application must declare
 automatically appended in this mode. A path appearing in an argument grants
 no access by itself. New output files can be created in private application
 data; outside that directory, an existing file requires an explicit grant.
+`--data-cwd` selects that private data directory as the working folder, so
+relative outputs are retained there. It adds no paths, permissions or argument
+substitutions. Without the flag, the working folder remains the installed app.
+The ordinary child validates the request again after the credential handoff.
 For example, after installing the FFmpeg profile as an administrator:
 
 ```sh
 vinix-package run-args org.ffmpeg.cli -- -version
+vinix-package run-args org.ffmpeg.cli --data-cwd -- -f lavfi -i testsrc2=size=64x48:duration=1 -c:v mpeg4 -threads 2 "example with spaces.avi"
 vinix-package run-args org.ffmpeg.cli -- -f lavfi -i testsrc2=size=64x48:rate=10:duration=1 -c:v mpeg4 -threads 2 /home/alex/.local/share/vinix-apps/org.ffmpeg.cli/example.avi
 vinix-package run-args org.ffmpeg.probe --file /home/alex/.local/share/vinix-apps/org.ffmpeg.cli/example.avi -- -v error -show_streams /home/alex/.local/share/vinix-apps/org.ffmpeg.cli/example.avi
 ```
@@ -520,6 +525,31 @@ and digest encoding are unchanged.
 V SDK callers use `command_launch(argv) !CommandLaunch` to parse the service
 prefix and `Service.run_command(id, input, terminal) !int` to execute it;
 `command_launch_plan` exposes the same validated sandbox plan for inspection.
+
+Software's **Launch options…** form exposes these commands for installed apps.
+Enter arguments using single/double quotes to group values and backslash to
+escape the following character outside single quotes. Empty quoted arguments
+are preserved. Variables, wildcards, substitutions, redirection and pipelines
+remain literal; incomplete quotes/escapes fail before starting the service.
+The fields retain UTF-8 text exactly and reject invalid/control-character pastes
+and edits beyond 4,096 bytes instead of silently truncating them.
+
+Add each document's absolute path to **Allowed files**, then use its path
+explicitly among the app arguments. Duplicate paths are refused, files can be
+paged and removed, and an unfinished file entry must be added or cleared before
+launch. **Working folder: private app data** is the default in this form; its
+relative outputs are saved under the ordinary account's
+`~/.local/share/vinix-apps/ID`. Choose **installed app** for apps needing their
+packaged assets as the working folder. **Run** shows captured diagnostics;
+**Run in Terminal** transfers the exact vector to Software's PTY. Input, grants
+and working-folder choice cannot change while a worker is active. Cancelling,
+reloading or closing clears the draft; failed batch execution retains it for
+correction. The service performs the actual file/access/trust/policy checks.
+
+`pkgprotocol.command_words(text)` implements this bounded quoting grammar and
+returns owned strings; `command_vector` validates and builds owned CLI arguments.
+Release either with `free_command_values`. SDK vectors accepted by `run-args`
+remain literal and never pass through this editor grammar again.
 
 ## Repository and JSON interfaces
 
@@ -586,7 +616,12 @@ it is not a hardware trust anchor. See the
 `view` emits one `{format:1,generation,architecture,offline,catalog_error,update_error,rows}`
 JSON object. Rows include ID/name/description, available/installed version, target,
 kind, repository/key, license/proprietary/firmware flags, permissions, explicit
-install/update flags and policy diagnostic. Pending rows include `update_action`
+install/update flags and policy diagnostic. Additive `installed_name`,
+`installed_kind` and `installed_permissions` fields describe the actual installed
+manifest for launch controls; an explicitly empty installed permission set must
+not inherit the planned candidate's permissions. Older consumers may ignore
+these fields; older services retain the previous presentation fallback.
+Pending rows include `update_action`
 (`install`, `update`, `remove`; otherwise empty), with `updatable:true`. They
 come from one complete `upgrade` resolution and include runtime/data additions,
 updates and removals, even if no application version increases. `version` is the
