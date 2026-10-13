@@ -209,6 +209,18 @@ scratch buffers and thread-command Text remove three allocation sites. Related
 x86 cases blocked by host disk exhaustion pass through same-input recovery
 receipts; original failures remain visible. See [the name receipts and limits](../../docs/linux-posix-qualification.md#selected-procfs-task-names).
 
+The `execnames` case observes comm/stat/status/exe through three procfs mounts
+while a child performs 200 real execs, as root and UID/GID1000. Each record
+must match the exact initial or replacement name/path; files need not show
+one atomic generation. Dumpability is established before the first gate.
+Both candidates pass, with x86 baseline invalid-name evidence and an ARM
+baseline that does not expose the timing race. A final gate keeps the child
+alive after exec while 200 observer cycles retain flat slabs and 79 ARM/205
+x86 pages. This measures observer retention after exec, not whole-exec
+allocation retention. Procself/runtime regressions pass across final and
+completion captures; host disk failures and partial receipts remain visible.
+See [the exec receipts and limits](../../docs/linux-posix-qualification.md#procfs-metadata-publication-during-exec).
+
 The `readlinkempty` case checks 3,648 raw/musl calls per root/UID1000 child
 on both architectures. Empty paths name the retained symlink description,
 including O_PATH handles after unlink or private-directory search denial.

@@ -1,0 +1,2 @@
+arm: entire generated kernel C differs only in exec loader body and unused loop source offsets
+x86: entire generated kernel C differs only in exec loader body and unused loop source offsets

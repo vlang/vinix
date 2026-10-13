@@ -3559,5 +3559,89 @@ separately from the isolated semantic build inputs.
 
 Concurrent rename observation timing, exec/retirement races, named zombies,
 leader-only exit, writable proc comm, GNU/translated/ELF32 paths and application
-installation/sandbox/portal acceptance remain separate. Exec still replaces
-process.name outside the table lock. The three broad section 15 gates remain open.
+installation/sandbox/portal acceptance remain separate. That baseline replaces
+process.name outside the table lock; the later exec publication qualification
+below covers synchronized replacement. The three broad section 15 gates remain open.
+
+## Procfs metadata publication during exec
+
+Both native exec loaders now replace the owned process name and executable
+path under the process table lock used by procfs readers. The new name is
+constructed before locking; both old strings are reclaimed and both fields
+published before unlocking. Readers finish borrowing the old bytes before
+reclamation. Command-line and executable-filesystem installation retain their
+existing separate synchronization.
+
+The V `execnames` fixture observes a child through three procfs mounts while
+it performs 200 actual exec replacements, alternating two copied native init
+ELFs. Root and UID/GID1000 parents read numeric-child comm, stat, status and
+exe. Exact allowlists contain the initial name/path and either replacement.
+Each read may independently see an old or new generation; multiple files do
+not form an atomic snapshot. Dumpability is established after UID changes
+and before the initial gate, authorizing same-UID exe reads throughout.
+
+| Architecture / reader | Baseline reads per kind | Candidate reads per kind | Baseline invalid comm/stat/status/exe | Candidate invalid records |
+| --- | ---: | ---: | --- | ---: |
+| AArch64 UID1000 | 597 | 603 | 0/0/0/0 | 0 |
+| AArch64 root | 603 | 603 | 0/0/0/0 | 0 |
+| x86-64 UID1000 | 7848 | 8175 | 9/4/3/0 | 0 |
+| x86-64 root | 7017 | 7593 | 3/5/3/0 | 0 |
+
+The x86 baseline reproduces 27 invalid-name observations, including empty
+comm values. ARM baseline timing did not expose the race; its passing capture
+is retained. Scheduling determines read counts. Both candidates require
+positive concurrent observations, zero invalid records and a successful child
+exit. The same fixture source, generated C and native init ELF run before
+and after each architecture's kernel change.
+
+After exec completes, a final pipe gate holds the child alive while the parent
+warms up 32 observer cycles and measures another 200. Each cycle reads all
+four records through all three mounts. All 18 ARM and 14 x86 live slab classes
+remain exact in both credential cohorts; large allocation pages stay 79/79
+on ARM and 205/205 on x86. This qualifies observer retention after exec
+completes; it does not measure retention across the whole exec sequence.
+
+Both candidates retain procself's 524 name/API checks, 156 selected-state
+records, 1620 self/thread-self link calls and 84 stat identity/accounting
+records. Native atomics, SIMD, TLS, JIT, page sizes, wide offsets and time64
+runtime controls pass. ARM's final suite passes all three cases. The x86
+exec receipt passes, but host disk exhaustion prevents writing the procself
+receipt after its guest prints PASS. The partial receipt and aggregate error
+remain published; a fresh same-kernel/source
+[completion suite](../tests/linux-compat/results/2026-10-13/procexec-completion-x86_64.json)
+passes procself and runtime. Earlier errno-macro compiler and pre-dumpability
+permission-refusal fixture drafts remain in private artifacts. The earlier
+ARM runtime ENOSPC [receipt](../tests/linux-compat/results/2026-10-13/procexec-draft-after-aarch64.json)
+and [error log](../tests/linux-compat/results/2026-10-13/procexec-draft-after-aarch64.log)
+remain separate from the successful final suite.
+
+Kernels build in isolated worktrees at
+`23dbc7b5d02c30bbe549fd5ecf29783c79c308af`, changing only two loader sources.
+Replacing the candidate exec-loader body with the baseline body reproduces
+the entire baseline kernel C, normalizing only unused-loop source-offset
+identifiers. The allocation scanner retains 657/653 source files and 403/292
+allocation sites for ARM/x86, with identical existing allowance refusals.
+No allowances change. Eight host test files and the inventory check pass.
+
+The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/procexec-audit.v)
+checks receipt integrity, record outcomes, flat observer storage, existing
+procself/runtime controls, source isolation, whole-kernel C scope and
+independent [lifetime review](../tests/linux-compat/results/2026-10-13/procexec-lifetime-review.md).
+Both failing assertion controls execute, including rejection of a passing
+candidate log as baseline failure evidence.
+[ARM evidence](../tests/linux-compat/results/2026-10-13/procexec-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/procexec-evidence-x86_64.json)
+bind all 63 isolated inputs and compiler/controller/build/kernel/C/fixture/
+source/ELF/ISO/capture/audit/review hashes. Captures include
+[ARM baseline](../tests/linux-compat/results/2026-10-13/procexec-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/procexec-after-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/procexec-before-x86_64.log),
+[x86 interrupted candidate](../tests/linux-compat/results/2026-10-13/procexec-after-x86_64.log)
+and [x86 completion](../tests/linux-compat/results/2026-10-13/procexec-completion-x86_64.log).
+Public inventory fingerprints use the committed parent plus this fix,
+separately from the isolated semantic build inputs.
+
+Sibling exec/exit, retirement races, full procfs ownership, complete exec
+allocation retention, GNU/translated/ELF32 paths and application installation,
+sandbox and portal requirements remain separate. The three broad section 15
+acceptance gates remain open.

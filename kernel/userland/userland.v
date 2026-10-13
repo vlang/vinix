@@ -542,15 +542,20 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		sched.drop_ldt(mut process)
 
 		// The copies fork made are replaced, not kept alongside.
+		new_name := proc.process_name(path, process.pid) @[freed]
+		// Procfs readers borrow either string while holding the table lock.
+		// Publish and reclaim the pair only after those readers finish.
+		proc.lock_table()
 		unsafe {
 			process.name.free()
 			process.executable_path.free()
 		}
-		process.name = proc.process_name(path, process.pid)
+		process.name = new_name
 		// /proc/self/exe leads to the program's node, as on arm64, so that it
 		// names the file wherever the exec found it -- by a relative path, or
 		// through a descriptor.
 		process.executable_path = program_path
+		proc.unlock_table()
 		proc.install_command_line(mut process, command)
   command_transferred = true
 		proc.set_executable_fs(mut process, voidptr(prog_node), prog_mount)

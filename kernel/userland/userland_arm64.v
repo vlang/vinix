@@ -1306,12 +1306,17 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		proc.unlock_table()
 
 		// The copies fork made are replaced, not kept alongside.
+		new_name := proc.process_name(path, curr_process.pid) @[freed]
+		// Procfs readers borrow either string while holding the table lock.
+		// Publish and reclaim the pair only after those readers finish.
+		proc.lock_table()
 		unsafe {
 			curr_process.name.free()
 			curr_process.executable_path.free()
 		}
-		curr_process.name = proc.process_name(path, curr_process.pid)
+		curr_process.name = new_name
 		curr_process.executable_path = program_path
+		proc.unlock_table()
 		proc.install_command_line(mut curr_process, command)
   command_transferred = true
 		proc.set_executable_fs(mut curr_process, voidptr(prog_node), prog_mount)

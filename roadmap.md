@@ -734,6 +734,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Report selected task names, including empty names and status escapes;
   implement bounded prctl name copies and qualify fork/exec inheritance,
   exact native bytes/errors and flat storage. See [the name receipts](docs/linux-posix-qualification.md#selected-procfs-task-names).
+- [x] Serialize native exec name/path replacement with procfs readers;
+  qualify concurrent old/new records, real child execs and flat observer
+  retention on both architectures. See [the exec receipts](docs/linux-posix-qualification.md#procfs-metadata-publication-during-exec).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

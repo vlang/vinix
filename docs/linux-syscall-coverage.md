@@ -704,7 +704,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/mount_policy.v` | `6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a` |
 | `kernel/fs/procfs.v` | `af0227fabd79200a4731b4835d9e09a01bddd12ae8f7198230fc0d083911fcc9` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
-| `kernel/fs/vfs.v` | `43581613ef91874651ba58399bad8aa88eaa4e53cbb9239239b45b2c547c7060` |
+| `kernel/fs/vfs.v` | `05c0e17466635cf2d9157e967fcc723604c05fbbad44a9cad2a2cc77896f95e3` |
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/kbudget/budget.v` | `980b9ae894bda6376f920e22bbca0aa953e02bd0349977bfe054a24580869b06` |
@@ -754,8 +754,8 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/exit.v` | `f7788611aed2a790a60cde0789b089c5771a3dcd91c086cb1ee01932216ea635` |
 | `kernel/userland/linux_signal_amd64.v` | `cd84d3265e38cd99189a1c0c27f30b5db6c01f7dd23208daef1bdbcd51f37077` |
 | `kernel/userland/seccomp_signal.v` | `b6fb6b23e10c8663d88b6d3fd6794eae1d906e162797b0c298e9bc674182f1f4` |
-| `kernel/userland/userland.v` | `a8bffd3e58bf07333ca0d18980dab9a2746811d9d0ccb6a114584b461cd39d69` |
-| `kernel/userland/userland_arm64.v` | `0e234395d8764d6a80a3f76d9d34e3ded33407b477af5de86d54b407b8f654e2` |
+| `kernel/userland/userland.v` | `1cceebb504d423ba7e6c7b91d1391deae12f2a8f9bd0edbe06183a2abb010bc8` |
+| `kernel/userland/userland_arm64.v` | `da6881ff21cf825b5c0e07804cd0f8209df2862557116c608498e668cb3870b9` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
 | `tools/linux-compat/coverage.v` | `4ceb584b16f54105ef4e4e2404fd49f0a02ba2d7e11246bde23aa8cb67e1930b` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |

@@ -1,0 +1,23 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "6a1087439207fba926292e462925b930d6d498d582c4da89bc4c1490fec25d8d",
+    "results": [
+        {
+            "name": "procself",
+            "source_sha256": "e0030a8dd3dab54604514b5be6c542a0d968bdde678d6ccd41ede5084e15d516",
+            "init_sha256": "44c652a8e4aeb6b3869d7fe356ce307cb82591a6eb35932cb4632b16293d5fbb",
+            "iso_sha256": "55cd5cd991b1c99940dcd7c385afed2a1c5c7a20dd9ed7f8f51d65209e44f0b6",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "87ff97e011742fd608f2a2f7dba65f16e0ed30aafb8a8ae7ef6737bbad081d32",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
