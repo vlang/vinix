@@ -2,9 +2,9 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `b59d1939dddedf512ab2211dac393bbcc06a4de1`,
+not been reached. At source `02c1eda7d2fbd45c1e8aa9bae193ff9050e38935`,
 Linguist 7.27.0 reports **Python 0.20%** (10 files, 89,440 bytes) and
-**V 84.12%** (4,055 files, 36,890,169 bytes). The complete committed-blob inventory and reproduction
+**V 84.20%** (4,087 files, 37,114,222 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
@@ -3448,3 +3448,23 @@ disposable M1 deployment. The committed Luna suite addition remains intact.
 No Python, full desktop UI suite, GUI application, live ESP or Vinix guest
 executes; no kernel implementation or lifetime changes. These Shell blocks
 receive zero Python-file credit. See [native source tools](../build-support/source-tools/README.md).
+
+Supplement `02c1eda7` replaces nine embedded Python helpers, totaling
+3,135 original body bytes and 61 lines across five Shell callers. Four native
+Darwin signal validators retain all thirteen modes, negative exit values, stderr
+markers and labels. The iOS example builders use a native plist/resource merge
+and ZIP encoder with sorted members, file-link bytes, local DOS timestamps,
+Unix modes, CRCs and Unicode names. CPython include/version queries read SDK
+headers, executable links and venv configuration without launching an interpreter;
+Apple system launchers select the active developer SDK. Eighteen final cold V
+builds and twelve native ARM C/C++ reference builds pass across ARM, Rosetta x86
+and ARM ASanUBSan controllers. Original source checks, SDK/error/ambiguity/venv,
+pinned plist/resource and archive policies pass. Actual signed Calculator and
+2048 Mach-O bundles and both IPA archives build and verify on ARM. The x86
+Darwin overflow reference separately raises SIGILL and fails the original
+SIGTRAP oracle; the oracle stays unchanged, and the x86 controller qualifies
+against native ARM reference children. Classic ZIP limits are explicit, with
+no ZIP64 claim. No Python, interpreter initialization, Security/Keychain or
+credential fixture, Blender build, UI app or Vinix guest executes. Pending
+Python/index edits remain untouched; these Shell blocks receive zero Python-file
+credit. See [native host helpers](../build-support/source-tools/README.md).

@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `b59d1939dddedf512ab2211dac393bbcc06a4de1`,
+at source commit `02c1eda7d2fbd45c1e8aa9bae193ff9050e38935`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,874 | 5.47% |
+| C | 600 | 2,397,145 | 5.44% |
 | Python | 10 | 89,440 | 0.20% |
-| Shell | 823 | 1,358,869 | 3.10% |
+| Shell | 823 | 1,357,139 | 3.08% |
 
-All `.v` files are classified as V. The resulting V share is 84.12%, with no
+All `.v` files are classified as V. The resulting V share is 84.20%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev b59d1939dddedf512ab2211dac393bbcc06a4de1 --breakdown --json
+github-linguist --rev 02c1eda7d2fbd45c1e8aa9bae193ff9050e38935 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -632,6 +632,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/verified-boot/bootfixture/boot-native-abi.h` | 476 |
 | `tests/verified-root/guest.c` | 7,771 |
 | `tests/verified-root/host.c` | 11,399 |
+| `tests/vfs-rename/renamefixture/native-abi.h` | 271 |
 | `tests/virtio-gpu-venus/abi.c` | 2,352 |
 | `tests/virtio-gpu-venus/measure.h` | 705 |
 | `tests/virtio-gpu-venus/smoke.c` | 6,502 |
@@ -705,7 +706,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/build-aarch64-iso.sh` | 4,137 |
 | `build-support/build-amd64-iso.sh` | 5,502 |
 | `build-support/build-amd64-uefi-disk.sh` | 3,064 |
-| `build-support/build-v-host-library.sh` | 1,559 |
+| `build-support/build-v-host-library.sh` | 1,280 |
 | `build-support/build-validation-guest` | 155 |
 | `build-support/check-m1-gpu-image.sh` | 6,312 |
 | `build-support/check-screenshot` | 171 |
@@ -863,7 +864,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-amd64.sh` | 3,259 |
 | `scripts/build-android-aarch64.sh` | 196 |
 | `scripts/build-asahi-aarch64.sh` | 11,564 |
-| `scripts/build-blender-native-aarch64.sh` | 7,179 |
+| `scripts/build-blender-native-aarch64.sh` | 7,187 |
 | `scripts/build-chromium-aarch64.sh` | 5,580 |
 | `scripts/build-claude-aarch64.sh` | 5,923 |
 | `scripts/build-codex-aarch64.sh` | 4,845 |
@@ -1188,7 +1189,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/desktop` | 163 |
 | `tests/ios/frame` | 180 |
 | `tests/ios/game2048` | 164 |
-| `tests/ios/reference-frameworks.sh` | 10,486 |
+| `tests/ios/reference-frameworks.sh` | 9,027 |
 | `tests/ios/reference-modules.sh` | 1,436 |
 | `tests/ios/run` | 200 |
 | `tests/ios/run-objc-calculator.sh` | 674 |
