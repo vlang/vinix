@@ -141,6 +141,7 @@ struct Receipt {
 	reference_sdk_sha256 string
 	reference_runtime_sha256 string
 	reference_profiles []string
+	reference_jit bool
 	reference_tools map[string]Pin
 	native_source_sha256 string
 	native_source_revision string
@@ -222,6 +223,10 @@ fn run() !int {
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
 	reference := referencecore.options(os.getenv('VINIX_DEVELOPMENT_REFERENCE_SDK'),
 		os.getenv('VINIX_DEVELOPMENT_REFERENCE_PROFILES'), arch)!
+	jit_value := os.getenv('VINIX_DEVELOPMENT_REFERENCE_JIT')
+	if jit_value !in ['', '0', '1'] { return error('VINIX_DEVELOPMENT_REFERENCE_JIT must be 0 or 1') }
+	reference_jit := jit_value == '1'
+	if reference_jit && reference.profiles != ['java'] { return error('reference JIT mode requires only the prepared Java profile') }
 	if reference.root != '' && os.args.len != 5 {
 		return error('reference SDK mode uses only the base arguments; prepare one complete reference SDK instead of mixing runtimes')
 	}
@@ -380,7 +385,7 @@ fn run() !int {
 			if name == 'sh' {
 				os.mkdir_all(root + '/bin')!
 				os.symlink('/opt/reference/bin/sh', root + '/bin/sh')!
-			} else {
+			} else if name !in ['java', 'javac', 'jar'] {
 				steps << BuildStep{ name: 'version-' + name, argv: ['{' + name + '}', ...referencecore.version_arguments(name)], artifacts: []string{} }
 			}
 		}
@@ -392,11 +397,16 @@ fn run() !int {
 			artifacts: referencecore.artifacts(reference.profiles) }
 		mut tools := reference_tools.clone()
 		tools['qualifier'] = Pin{'/usr/bin/vinix-qualify', hashes['vinix-qualify']}
+		mut environment := { 'PATH': '/opt/reference/bin:/usr/bin:/bin', 'VINIX_QUALIFY_TIMEOUT_SECONDS': '600' }
+		if reference_jit {
+			environment['VINIX_QUALIFY_JIT'] = '1'
+			os.write_file(root + '/home/developer/reference-jit', 'java\n')!
+		}
 		reference_plan = BuildPlan{
 			source: Pin{'/home/developer/reference-source', devcore.tree_hash(source)!}
 			inputs: [Pin{'/opt/reference', reference_hash}, Pin{'/lib', reference_runtime_hash}]
 			tools: tools
-			environment: { 'PATH': '/opt/reference/bin:/usr/bin:/bin', 'VINIX_QUALIFY_TIMEOUT_SECONDS': '600' }
+			environment: environment
 			timeout_seconds: 1800
 			steps: steps
 		}
@@ -593,6 +603,7 @@ fn run() !int {
 	if v_root_hash != '' { expected << 'DEVELOPMENT PACKAGES PASS:' }
 	if selfhost_v { expected << 'DEVELOPMENT SELFHOST PASS:' }
 	if reference_hash != '' { expected << 'DEVELOPMENT REFERENCE PASS:' }
+	if reference_jit { expected << ['DEVELOPMENT JIT APPROVAL PASS:', 'DEVELOPMENT JIT REVOCATION PASS:'] }
 	if 'lscpu-smoke' in hashes { expected << 'DEVELOPMENT CPU PASS:' }
 	if 'v-smoke' in hashes { expected << 'DEVELOPMENT V SMOKE PASS:' }
 	result := guesthost.boot(command, launch.env, state, expected,
@@ -655,8 +666,8 @@ fn run() !int {
 						}
 					}
 				}
-				referencecore.verify_report(receipts[work + '/qualification/report.json'], arch, reference.profiles,
-					hashes['vinix-qualify'], tool_pins, work, receipt.steps.last().artifacts)!
+				referencecore.verify_report_jit(receipts[work + '/qualification/report.json'], arch, reference.profiles,
+					hashes['vinix-qualify'], tool_pins, work, receipt.steps.last().artifacts, reference_jit)!
 			}
 		}
 		for name in ['deadline', 'term', 'int', 'watch', 'interrupted', 'interrupted-before'] {
@@ -772,6 +783,7 @@ fn run() !int {
 		reference_sdk_sha256: reference_hash
 		reference_runtime_sha256: reference_runtime_hash
 		reference_profiles: reference.profiles
+		reference_jit: reference_jit
 		reference_tools: reference_tools
 		native_source_sha256: native_plan.source.sha256
 		native_source_revision: source_revision

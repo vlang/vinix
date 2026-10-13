@@ -124,9 +124,10 @@ fn (mut runner Runner) profile(name string) ! {
 			runner.verify_binary('project')!
 		}
 		'java' {
+			for program in ['java', 'javac', 'jar'] { runner.command(program, ['--version'])! }
 			runner.write('Project.java', java_source)!
 			runner.command('javac', ['Project.java'])!
-			runner.command('jar', ['--create', '--file', 'project.jar', '--main-class', 'Project',
+			runner.command('jar', ['--create', '--date=2023-11-14T22:13:20Z', '--file', 'project.jar', '--main-class', 'Project',
 				'Project.class'])!
 			if runner.command('java', ['-jar', 'project.jar'])!.trim_space() != marker {
 				return error('Java archive execution failed')

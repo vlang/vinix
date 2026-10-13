@@ -103,3 +103,52 @@ fn test_go_receipts_require_the_trimmed_build_and_execution_of_its_exact_artifac
 		assert false, 'execution accepted without a recorded Go artifact'
 	}
 }
+
+fn test_java_receipts_require_compilation_deterministic_packing_and_jar_execution() {
+	work := '/home/developer/reference-a/work'
+	project := work + '/qualification/java'
+	qualifier := 'a'.repeat(64)
+	mut tools := map[string]devcore.Pin{}
+	for name in ['java', 'javac', 'jar'] { tools[name] = devcore.Pin{'/opt/reference/bin/' + name, 'b'.repeat(64)} }
+	argv := [[tools['java'].path, '--version'], [tools['javac'].path, '--version'], [tools['jar'].path, '--version'],
+		[tools['javac'].path, 'Project.java'],
+		[tools['jar'].path, '--create', '--date=2023-11-14T22:13:20Z', '--file', 'project.jar', '--main-class', 'Project', 'Project.class'],
+		[tools['java'].path, '-jar', 'project.jar']]
+	mut executed := []Command{}
+	for i, args in argv { executed << Command{argv: args, executable_sha256: 'b'.repeat(64), log: project + '/command-' + i.str() + '.log'} }
+	report := Report{schema: 1, kernel: 'Vinix', architecture: 'aarch64', uid: 1000,
+		context: 'vinix-native', runner_sha256: qualifier, requested: ['java'],
+		command_timeout_seconds: 600, complete: true, all_selected_passed: true,
+		results: [Verdict{profile: 'java', status: 'passed', commands: executed}]}
+	outputs := {'qualification/java/Project.class': 'c'.repeat(64), 'qualification/java/project.jar': 'd'.repeat(64),
+		'qualification/java/project.data': 'e'.repeat(64)}
+	verify_report(json2.encode(report), 'aarch64', ['java'], qualifier, tools, work, outputs)!
+	if _ := verify_report(json2.encode(report), 'aarch64', ['java'], qualifier, tools, work, {}) {
+		assert false, 'Java run accepted without its produced class and JAR pins'
+	}
+	for replacement in [[tools['jar'].path, '--create', '--file', 'project.jar', '--main-class', 'Project', 'Project.class'],
+		[tools['jar'].path, '--version']] {
+		mut changed := executed.clone()
+		changed[4] = Command{...changed[4], argv: replacement}
+		forged := Report{...report, results: [Verdict{...report.results[0], commands: changed}]}
+		if _ := verify_report(json2.encode(forged), 'aarch64', ['java'], qualifier, tools, work, outputs) {
+			assert false, 'incomplete or changing JAR build accepted'
+		}
+	}
+	mut changed := executed.clone()
+	changed[5] = Command{...changed[5], executable_sha256: 'c'.repeat(64)}
+	forged := Report{...report, results: [Verdict{...report.results[0], commands: changed}]}
+	if _ := verify_report(json2.encode(forged), 'aarch64', ['java'], qualifier, tools, work, outputs) {
+		assert false, 'changed JVM pin accepted'
+	}
+	mut requested := executed.clone()
+	for i in 0 .. requested.len { requested[i] = Command{...requested[i], environment_overrides: {'VINIX_ALLOW_WX': '1'}} }
+	approved := Report{...report, jit_requested: true, results: [Verdict{...report.results[0], commands: requested}]}
+	verify_report_jit(json2.encode(approved), 'aarch64', ['java'], qualifier, tools, work, outputs, true)!
+	if _ := verify_report(json2.encode(approved), 'aarch64', ['java'], qualifier, tools, work, outputs) {
+		assert false, 'JIT request accepted without the selected authorization workflow'
+	}
+	if _ := verify_report_jit(json2.encode(report), 'aarch64', ['java'], qualifier, tools, work, outputs, true) {
+		assert false, 'JIT report accepted without the actual requested child environments'
+	}
+}

@@ -5,7 +5,7 @@ import json2
 import os
 import tools.development.devcore
 
-pub const catalog = ['make', 'cmake', 'ninja', 'sqlite', 'node', 'go']
+pub const catalog = ['make', 'cmake', 'ninja', 'sqlite', 'node', 'go', 'java']
 
 pub struct Settings {
 pub:
@@ -24,6 +24,7 @@ pub fn required_tools(profiles []string) []string {
 			'sqlite' { ['sqlite3'] }
 			'node' { ['node'] }
 			'go' { ['go'] }
+			'java' { ['java', 'javac', 'jar'] }
 			else { []string{} }
 		}
 		for name in selected { if name !in names { names << name } }
@@ -38,7 +39,7 @@ pub fn options(root string, selection string, arch string) !Settings {
 	}
 	profiles := selection.split(',')
 	if profiles.len == 0 || profiles.any(it !in catalog) {
-		return error('reference profiles must select make,cmake,ninja,sqlite,node,go')
+		return error('reference profiles must select make,cmake,ninja,sqlite,node,go,java')
 	}
 	mut seen := map[string]bool{}
 	for name in profiles {
@@ -88,6 +89,7 @@ pub fn artifacts(profiles []string) []string {
 			'sqlite' { paths << base + 'project.db' }
 			'node' { paths << [base + 'project.js', base + 'project.data'] }
 			'cmake' { paths << [base + 'build/project', base + 'project.data'] }
+			'java' { paths << [base + 'Project.class', base + 'project.jar', base + 'project.data'] }
 			else { paths << [base + 'project', base + 'project.data'] }
 		}
 	}
@@ -100,6 +102,7 @@ pub:
 	executable_sha256 string
 	exit_code int
 	log string
+	environment_overrides map[string]string
 }
 
 struct Verdict {
@@ -117,6 +120,7 @@ struct Report {
 	context string
 	requested []string
 	command_timeout_seconds int
+	jit_requested bool
 	complete bool
 	all_selected_passed bool
 	results []Verdict
@@ -134,6 +138,10 @@ fn commands(profile string, work string) [][]string {
 		'node' { return [[bin + 'node', 'project.js']] }
 		'go' { return [[bin + 'go', 'build', '-trimpath', '-buildvcs=false', '-o', 'project', 'main.go'],
 			[work + '/project']] }
+		'java' { return [[bin + 'java', '--version'], [bin + 'javac', '--version'], [bin + 'jar', '--version'],
+			[bin + 'javac', 'Project.java'],
+			[bin + 'jar', '--create', '--date=2023-11-14T22:13:20Z', '--file', 'project.jar', '--main-class', 'Project', 'Project.class'],
+			[bin + 'java', '-jar', 'project.jar']] }
 		'sqlite' { return [[bin + 'sqlite3', 'project.db',
 			'CREATE TABLE answer(n INTEGER); BEGIN; INSERT INTO answer VALUES(42); COMMIT; BEGIN; INSERT INTO answer VALUES(7); ROLLBACK;'],
 			[bin + 'sqlite3', 'project.db', 'PRAGMA integrity_check; SELECT n FROM answer;']] }
@@ -143,15 +151,27 @@ fn commands(profile string, work string) [][]string {
 
 pub fn verify_report(text string, arch string, profiles []string, qualifier_sha string,
 	tool_pins map[string]devcore.Pin, work string, outputs map[string]string) ! {
+	verify_report_jit(text, arch, profiles, qualifier_sha, tool_pins, work, outputs, false)!
+}
+
+pub fn verify_report_jit(text string, arch string, profiles []string, qualifier_sha string,
+	tool_pins map[string]devcore.Pin, work string, outputs map[string]string, jit bool) ! {
 	report := json2.decode[Report](text, strict: true)!
 	if report.schema != 1 || report.kernel != 'Vinix' || report.architecture != arch
 		|| report.uid != 1000 || report.context != 'vinix-native' || report.command_timeout_seconds != 600
 		|| report.runner_sha256 != qualifier_sha || !report.complete || !report.all_selected_passed
+		|| report.jit_requested != jit || (jit && profiles != ['java'])
 		|| report.requested != profiles || report.results.len != profiles.len {
 		return error('reference qualification identity or verdict failed validation')
 	}
 	for i, result in report.results {
 		profile := profiles[i]
+		if profile == 'java' {
+			for name in ['Project.class', 'project.jar', 'project.data'] {
+				hash := outputs['qualification/java/' + name]
+				if hash.len != 64 || !hash.bytes().all(it.is_hex_digit()) { return error('missing Java project artifact pin: ' + name) }
+			}
+		}
 		project := work + '/qualification/' + profile
 		expected := commands(profile, project)
 		if result.profile != profile || result.status != 'passed' || result.commands.len != expected.len {
@@ -167,6 +187,7 @@ pub fn verify_report(text string, arch string, profiles []string, qualifier_sha 
 				hash = outputs[argv[0].all_after(work + '/')] or { return error('executed reference artifact is missing') }
 			}
 			if actual.argv != argv || actual.exit_code != 0 || actual.executable_sha256 != hash
+				|| actual.environment_overrides != if jit { {'VINIX_ALLOW_WX': '1'} } else { map[string]string{} }
 				|| hash.len != 64 || actual.log != project + '/command-' + index.str() + '.log' {
 				return error('reference executed argv, executable pin, status or log changed')
 			}

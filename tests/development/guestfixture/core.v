@@ -563,6 +563,7 @@ pub fn run() i32 {
 			return job_payload()
 		}
 		require_vinix()
+		jit_approved := reference_jit_prepare()
 		check(C.chown(c'/home/developer', 1000, 1000) == 0 && C.chmod(c'/home/developer', 0o700) == 0, 154)
 		for path in [&char(c'/home/developer/token'), &char(c'/home/developer/jobs.json'),
 			&char(c'/home/developer/link-jobs.json'), &char(c'/home/developer/build-template.json')]! {
@@ -604,6 +605,7 @@ pub fn run() i32 {
 			if reaped == pid { check(status == 0, 164); break }
 			if reaped <= 0 { C.usleep(10000) }
 		}
+		reference_jit_revoke(jit_approved)
 		C.puts(c'DEVELOPMENT GUEST PASS')
 		for { C.pause() }
 		return 0

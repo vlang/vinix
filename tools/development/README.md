@@ -153,6 +153,25 @@ creation. `reference-sdk.json` records the original/imported installation,
 compiler, musl runtime and final SDK hashes. Only `complete: true` represents
 a prepared SDK; native project acceptance uses the separate guest gate.
 
+[stage-java.v](stage-java.v) prepares a native OpenJDK reference prefix from an
+existing overlay and a selected directory beneath its `usr/lib/jvm`:
+
+```
+V_C_ERROR_BUG_REPORT_DISABLED=1 v -cc cc run tools/development/stage-java.v \
+  aarch64 /path/to/prepared-java-overlay java-25-openjdk /path/to/new-java-stage
+```
+
+The output is `new-java-stage/sdk`, with direct relative aliases for `java`,
+`javac` and `jar` into `share/jdk/bin`. The complete JDK and licenses remain
+together. The standard absolute `cacerts` alias is materialized from the
+supplied overlay's ordinary `etc/ssl/certs/java/cacerts`, and its source pin
+is recorded. Other links must stay inside the JDK. The stager excludes Python
+helpers, refuses set-ID/special files and escaping inputs/output aliases,
+inspects every JDK ELF and recursively imports external runtime libraries.
+`reference-sdk.json` records readelf, source files/aliases, JDK and SDK pins.
+Only `complete: true` represents a prepared SDK; native qualification and
+explicit administrator-controlled JIT approval use the separate guest gate.
+
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links
 and permissions, sets `SOURCE_DATE_EPOCH`, and records command results and output

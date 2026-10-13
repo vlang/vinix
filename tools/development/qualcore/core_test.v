@@ -92,3 +92,25 @@ fn test_host_evidence_cannot_be_submitted_as_vinix_evidence() {
 	}
 	assert false
 }
+
+fn test_jit_request_rejects_invalid_values_and_host_context_before_output_creation() {
+	root := sourcecommand.temporary('vinix-qualification-jit')!
+	defer { os.rmdir_all(root) or {} }
+	original := os.getenv_opt('VINIX_QUALIFY_JIT')
+	defer {
+		if value := original { os.setenv('VINIX_QUALIFY_JIT', value, true) }
+		else { os.unsetenv('VINIX_QUALIFY_JIT') }
+	}
+	for value in ['true', '2', '-1', ' 1'] {
+		os.setenv('VINIX_QUALIFY_JIT', value, true)
+		if _ := qualify(['java'], root + '/result', false) { assert false, 'invalid JIT request accepted' }
+		assert !os.exists(root + '/result')
+	}
+	os.setenv('VINIX_QUALIFY_JIT', '1', true)
+	if _ := qualify(['c'], root + '/result', false) { assert false, 'JIT request accepted for unrelated profile' }
+	assert !os.exists(root + '/result')
+	if os.uname().sysname.to_lower() != 'vinix' {
+		if _ := qualify(['java'], root + '/result', false) { assert false, 'host JIT request accepted as native authorization' }
+		assert !os.exists(root + '/result')
+	}
+}

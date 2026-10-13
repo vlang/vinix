@@ -34,7 +34,7 @@ uploads are disabled in project command environments.
 | V | Compile the project with the installed native C compiler, use an array, write/read a file and execute the exact binary. |
 | Rust / Cargo | Compile or build offline, run a thread, use a vector, write/read a file and execute the exact binary. |
 | Go | Build, communicate with a goroutine through a channel, write/read a file and execute the exact binary. |
-| Java | Compile, create an executable JAR, run it, join a thread and write/read a file. |
+| Java | Record JDK/JAR versions, compile, create an executable JAR with fixed entry timestamps, run it, join a thread and write/read a file. |
 | JavaScript / TypeScript | Run Node file/crypto checks; compile strict typed code with tsc and execute its JavaScript. |
 | GNU make / CMake / Ninja | Build and execute the same C thread/file project through each build system. |
 | npm | Pack a local dependency, install its archive offline with scripts disabled, and resolve it from the real Node project. |
@@ -68,7 +68,7 @@ qualify the complete catalog or IDE workflows.
 
 The guest controller also accepts a separate prepared reference prefix through
 `VINIX_DEVELOPMENT_REFERENCE_SDK`, with an explicit comma-separated
-`VINIX_DEVELOPMENT_REFERENCE_PROFILES` selection from `make,cmake,ninja,sqlite,node,go`.
+`VINIX_DEVELOPMENT_REFERENCE_PROFILES` selection from `make,cmake,ninja,sqlite,node,go,java`.
 Its [reference-mode instructions](../../tests/development/README.md) describe the
 flat prefix, required tool entries and native runtime closure. Each selected
 workflow runs twice as UID/GID 1000 through a pinned build plan. The controller
@@ -95,6 +95,33 @@ prefix. Its native AArch64 gate validates the version, full SDK/runtime pins,
 actual trimmed compile argv and exact executed artifact hash. This covers the
 pure-Go reference project; x86 Go, cgo, wider modules and network/server projects
 remain open.
+
+[stage-java.v](stage-java.v) imports an existing native OpenJDK installation,
+its ELF runtime dependencies and the supplied overlay's standard Java trust
+store into a contained reference prefix. It preserves source-file/alias pins,
+the imported JDK tree and full SDK hash. No package builder, network fetch or
+Python helper runs. Java's [JAR entry date option](https://docs.oracle.com/en/java/javase/25/docs/specs/man/jar.html)
+pins archive timestamps to the reference epoch; the gate requires matching
+class, JAR and readback hashes across fresh workspaces, plus all six exact
+version/compile/pack/run commands. The JAR tool must support the `--date` option;
+native qualification here used OpenJDK 25.0.4.
+
+`VINIX_QUALIFY_JIT=1` explicitly requests the existing Vinix W^X compatibility
+mode for the Java-only profile. The standalone qualifier requires an already
+[administrator-approved runtime mount](../../docs/mount-execution-policy.md);
+it never grants approval itself. Invalid values, host contexts and other
+profile selections are rejected before creating output. Reports retain
+`jit_requested` and each actual `VINIX_ALLOW_WX` child-environment override.
+Without this option, inherited W^X requests are omitted.
+
+The disposable guest controller's separate
+`VINIX_DEVELOPMENT_REFERENCE_JIT=1` option prepares the pinned JDK's
+`/opt/reference/share/jdk` as a read-only `nosuid,nodev,wxallowed` self-bind
+before dropping credentials. It proves UID 1000 requests fail before approval
+and outside that mount, refuses ordinary-user remount/writes, and revokes
+approval before checking another denied launch. This option requires only the
+prepared Java profile. Approval applies to that test guest and does not install
+or change production administrator policy.
 
 Python and Python-based build tooling, including Meson, are not executed by this
 runner because the repository requires V tooling and forbids running Python.

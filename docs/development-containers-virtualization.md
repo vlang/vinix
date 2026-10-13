@@ -157,7 +157,7 @@ identity; it does not implement the remaining debugger or container interfaces.
 
 The additional [reference-SDK gate](../tests/development/README.md) imports a
 prepared native prefix, independently pins its runtime and selects explicit
-`make,cmake,ninja,sqlite,node,go` workflows. It runs pinned versions and real
+`make,cmake,ninja,sqlite,node,go,java` workflows. It runs pinned versions and real
 projects through the build runner twice as UID/GID 1000, validating exact plan,
 input and executed-command pins and matching produced artifacts. On 13 October
 2026 AArch64 passed GNU make 4.4.1 and the Ninja-compatible Samurai CLI with
@@ -197,6 +197,27 @@ documentation. This qualifies the pure-Go reference project through Vinix's
 Linux ABI. Native x86 Go, cgo, wider module/network/server projects and the
 remaining section 17 gates stay open. Completed image, firmware and redundant
 SDK imports may be pruned; qualification receipts and serial logs remain.
+
+The maintained [OpenJDK SDK stager](../tools/development/stage-java.v) and
+explicit Java JIT reference gate passed OpenJDK/`javac`/`jar` 25.0.4 on AArch64
+HVF on 13 October 2026. UID/GID 1000 compiled, packed and ran the thread/file
+project in two fresh workspaces, producing identical class/JAR/data files.
+The JAR entry timestamp is fixed to the reference epoch. The disposable guest
+uses the existing administrator-controlled `wxallowed` policy on only the
+pinned, read-only `nosuid,nodev` JDK mount. It verifies denied requests before
+approval, outside that mount and after revocation, plus ordinary-user
+remount/write refusal. Native reports preserve each actual child request;
+the qualifier itself never grants production approval. All 17 receipt records
+passed in `build/development17-20261013/guest-arm-reference-java-jit-b`.
+Exact SDK/JDK/runtime and matching artifact pins are recorded in the guest
+documentation. Native x86 Java and wider JVM/IDE/debugger, network/TLS/module
+and production-server workloads remain open.
+
+The updated qualifier also retained the matching Go project artifacts with
+JIT disabled, and the x86_64 account/job/build regression passed using the
+updated fixture. These receipts remain in
+`build/development17-20261013/guest-arm-reference-go-jit-regression-a` and
+`build/development17-20261013/guest-x86-java-fixture-regression-a`.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,

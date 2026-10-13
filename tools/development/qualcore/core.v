@@ -24,6 +24,7 @@ pub:
 	executable_sha256 string
 	exit_code         int
 	log               string
+	environment_overrides map[string]string
 }
 
 pub struct Verdict {
@@ -46,6 +47,7 @@ pub:
 	started       string
 	requested     []string
 	command_timeout_seconds int = 120
+	jit_requested bool
 pub mut:
 	complete            bool
 	all_selected_passed bool
@@ -56,6 +58,7 @@ struct Runner {
 	work string
 	env  map[string]string
 	timeout_seconds int = 120
+	jit_requested bool
 mut:
 	commands []CommandReceipt
 }
@@ -69,11 +72,12 @@ fn (mut runner Runner) command(program string, arguments []string) !string {
 	argv := [executable, ...arguments]
 	log := runner.work + '/command-${runner.commands.len}.log'
 	hash := devcore.file_hash(executable)!
+	overrides := if runner.jit_requested { {'VINIX_ALLOW_WX': '1'} } else { map[string]string{} }
 	status := devcore.run(argv, runner.work, runner.env, runner.timeout_seconds, log) or {
-		runner.commands << CommandReceipt{argv, hash, -1, log}
+		runner.commands << CommandReceipt{argv, hash, -1, log, overrides}
 		return err
 	}
-	runner.commands << CommandReceipt{argv, hash, status, log}
+	runner.commands << CommandReceipt{argv, hash, status, log, overrides}
 	if status != 0 { return error('command failed with ${status}: ${log}') }
 	if os.stat(log)!.size > 1024 * 1024 { return error('command output exceeds 1 MiB: ${log}') }
 	return os.read_file(log)!
@@ -98,6 +102,9 @@ fn command_timeout(value string) !int {
 
 pub fn qualify(profiles []string, output_path string, require_vinix bool) !Report {
 	timeout := if value := os.getenv_opt('VINIX_QUALIFY_TIMEOUT_SECONDS') { command_timeout(value)! } else { 120 }
+	jit_value := os.getenv('VINIX_QUALIFY_JIT')
+	if jit_value !in ['', '0', '1'] { return error('VINIX_QUALIFY_JIT must be 0 or 1') }
+	jit := jit_value == '1'
 	if profiles.len == 0 || profiles.any(it !in catalog) {
 		return error('unknown or empty qualification profile')
 	}
@@ -108,6 +115,7 @@ pub fn qualify(profiles []string, output_path string, require_vinix bool) !Repor
 	}
 	uname := os.uname()
 	native := uname.sysname.to_lower() == 'vinix'
+	if jit && (!native || profiles != ['java']) { return error('JIT qualification currently requires only the native Java profile and an administrator-approved runtime mount') }
 	if require_vinix && !native {
 		return error('guest qualification requires an installed Vinix system')
 	}
@@ -123,6 +131,7 @@ pub fn qualify(profiles []string, output_path string, require_vinix bool) !Repor
 		started:       time.now().format_rfc3339()
 		requested:     profiles
 		command_timeout_seconds: timeout
+		jit_requested: jit
 	}
 	mut passed := true
 	os.write_file(output + '/report.json', json2.encode(report, prettify: true) + '\n')!
@@ -144,7 +153,8 @@ pub fn qualify(profiles []string, output_path string, require_vinix bool) !Repor
 		env['npm_config_cache'] = work + '/home/npm-cache'
 		env['VJOBS'] = '1'
 		env['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
-		mut runner := Runner{ work: work, env: env, timeout_seconds: timeout }
+		if jit { env['VINIX_ALLOW_WX'] = '1' }
+		mut runner := Runner{ work: work, env: env, timeout_seconds: timeout, jit_requested: jit }
 		mut status := 'passed'
 		mut detail := 'project compiled and completed its checks'
 		runner.profile(profile) or {

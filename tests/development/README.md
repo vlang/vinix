@@ -100,6 +100,7 @@ refused before creating state. The current reference catalog is:
 | `sqlite` | `sqlite3` |
 | `node` | `node` |
 | `go` | `go`, with its matching standard library and native compiler subprograms |
+| `java` | `java`, `javac`, `jar`, with a complete matching JDK |
 
 The controller imports the prefix as `/opt/reference`, excludes Python helpers,
 installs its runtime in `/lib` and pins both complete trees separately. It
@@ -108,7 +109,8 @@ pinned shell. Prepare one coherent prefix; this mode cannot be mixed with the
 positional GCC/V SDK arguments. No host tool is silently substituted.
 
 UID/GID 1000 runs a generated build plan twice in fresh private workspaces.
-Pinned version commands precede `vinix-qualify --require-vinix`, whose project
+Pinned version commands precede `vinix-qualify --require-vinix`; Java records
+its versions as the first three qualifier commands. The project
 commands retain the 600-second budget. The plan uses 1800-second step deadlines
 and the guest receives 2 GiB of RAM. Both input trees are verified before and
 after the build. The fixture checks account ownership and mode-0700 output
@@ -224,6 +226,46 @@ The completed stage is retained in
 `build/development17-20261013/reference-arm-go-b`. This qualifies the tested
 pure-Go project through Vinix's Linux ABI; native x86 Go, cgo, wider module,
 network, debugger and production-server workflows remain separate gates.
+
+Java uses the [native SDK stager](../../tools/development/stage-java.v) and
+the explicit JIT gate shown in [tests/java](../java/README.md). The qualifier
+records all six version/compile/pack/run commands, the actual JIT environment
+overrides and the generated class/JAR/data pins. The host rejects missing
+artifacts, changing archive timestamps, substituted version commands, changed
+tool pins and unselected JIT requests.
+
+On 13 October 2026 AArch64 HVF passed OpenJDK, `javac` and `jar` 25.0.4 from
+the pinned Alpine SDK as UID/GID 1000 in
+`build/development17-20261013/guest-arm-reference-java-jit-b`. Both private
+workspaces compiled `Project.java`, created an executable JAR with fixed
+entry timestamps, and ran its thread/file checks. All 17 native records
+passed independent validation. The native fixture denied requests before
+approval and outside the read-only JDK mount, refused the ordinary account's
+remount/write attempts, and denied another launch after administrator
+revocation. No sandbox-disable or authorization fallback was used.
+
+The SDK pin is
+`affee8307732e90b3964a25ade378f01084bb3ae5536d8ed8fbe0f3bad3bc5a1`,
+runtime pin is
+`d61c4ea878bc136699e5ad8d766a1097533107615359dd67518f15338ade8c45`
+and imported JDK tree pin is
+`3dea0bec80a14b66b5c7f7f520674a40a37a786cb768485e8e51fbdde55c295a`.
+The matching class hash is
+`d62742a5498c2bee7586977ca7d6edfa5b95726b826f4aaa50fcc34dec0be133`,
+JAR hash is
+`0f5525b507a9c1e251a1e24795b5bb2f84e2762229c13a8d1db5b49433ff36bb`
+and readback files contain `42`. Stage manifests retain each source file/alias,
+runtime and trust-store pin. The prepared SDKs and receipts remain in
+`build/development17-20261013/reference-arm-java-a` and `reference-arm-java-b`.
+This qualifies the tested thread/file/JAR workflow with explicit mount approval;
+native x86 Java, wider JVM/IDE/debugger, module, TLS/network and server workloads
+remain separate gates.
+
+The existing Go gate also passed with the updated qualifier and JIT disabled
+in `build/development17-20261013/guest-arm-reference-go-jit-regression-a`,
+retaining its earlier matching program hash and empty child overrides. The
+updated fixture's x86_64 TCG account/job/build regression passed in
+`build/development17-20261013/guest-x86-java-fixture-regression-a`.
 
 Host option/receipt refusal tests run with:
 
