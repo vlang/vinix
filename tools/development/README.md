@@ -216,6 +216,21 @@ not import arbitrary additional shared-library dependencies. The
 [HTTP guest gate](../../tests/development/README.md) qualifies these applets
 and the actual runtime tuple separately.
 
+HTTP transport failures identify the request method, path and operation
+(`connect`, `write`, `read` or `response`) and retain the underlying error code.
+Authorization headers and request bodies are excluded from those diagnostics.
+The qualifier still records a failed project receipt when a connection fails;
+it does not repeat a CGI request after a transport failure.
+
+On 13 October 2026 the host qualifier suite passed, including a real loopback
+server that returns incomplete headers: its failure identifies
+`HTTP GET /index.html response` without either supplied secret. Updated native
+qualifiers also passed both fresh-workspace HTTP/account/job/build gates on
+x86_64 TCG and AArch64 HVF, with 19 independently validated records each in
+`build/development17-20261013/http-diagnostic-x86` and `http-diagnostic-arm`.
+The earlier x86 connection-aborted receipt remains evidence for further
+network reliability work; adding request context does not close that issue.
+
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links
 and permissions, sets `SOURCE_DATE_EPOCH`, and records command results and output

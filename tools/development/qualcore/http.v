@@ -72,7 +72,10 @@ fn response(text string) !HttpResponse {
 
 fn request(address string, method string, path string, authorization string, body string, deadline u64) !HttpResponse {
 	devcore.check_interrupted()!
-	mut connection := net.dial_tcp(address)!
+	context := 'HTTP ' + method + ' ' + path
+	mut connection := net.dial_tcp(address) or {
+		return error_with_code(context + ' connect: ' + err.msg(), err.code())
+	}
 	defer { connection.close() or {} }
 	connection.set_read_timeout(2 * time.second)
 	connection.set_write_timeout(2 * time.second)
@@ -84,7 +87,9 @@ fn request(address string, method string, path string, authorization string, bod
 	for written < text.len {
 		devcore.check_interrupted()!
 		if time.sys_mono_now() >= deadline { return error('HTTP workload deadline expired') }
-		count := connection.write_string(text[written..])!
+		count := connection.write_string(text[written..]) or {
+			return error_with_code(context + ' write: ' + err.msg(), err.code())
+		}
 		if count <= 0 { return error('incomplete HTTP request write') }
 		written += count
 	}
@@ -95,13 +100,15 @@ fn request(address string, method string, path string, authorization string, bod
 		if time.sys_mono_now() >= deadline { return error('HTTP workload deadline expired') }
 		count := connection.read(mut buffer) or {
 			if err is io.Eof { break }
-			return error('HTTP response read failed')
+			return error_with_code(context + ' read: ' + err.msg(), err.code())
 		}
 		if count == 0 { break }
 		if received.len + count > 65536 { return error('HTTP response exceeds 64 KiB') }
 		received << buffer[..count]
 	}
-	return response(received.bytestr())!
+	return response(received.bytestr()) or {
+		return error_with_code(context + ' response: ' + err.msg(), err.code())
+	}
 }
 
 pub struct HttpProof {
