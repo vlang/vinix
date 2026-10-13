@@ -243,6 +243,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'_$sSS10describingSSx_tclufC' { u64(unsafe { voidptr(swift_string_describing) }) }
 		'_$sS2SycfC' { u64(unsafe { voidptr(swift_string_empty) }) }
 		'_$sBOWV' { swift_unknown_value_witnesses() }
 		// Darwin SwiftError owners use Cocoa ARC, including boxed Swift errors

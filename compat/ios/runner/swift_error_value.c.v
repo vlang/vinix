@@ -106,6 +106,13 @@ fn swift_error_metadata_arena() u64 {
 	swift_protocol_relative(module + 8, data + 336)
 	C.memcpy(unsafe { voidptr(data + 336) }, c'Swift', 6)
 	C.memcpy(unsafe { voidptr(data + 344) }, c'Error', 6)
+	// Special one-word Error existential: protocol count one and Error flag.
+	unsafe {
+		*(&u64(data + 384)) = witness
+		*(&u64(data + 392)) = 0x303
+		*(&u64(data + 400)) = 0x181000001
+		*(&u64(data + 408)) = protocol
+	}
 	C.__builtin___clear_cache(allocation, unsafe { voidptr(code + 128) })
 	if C.mprotect(allocation, usize(page), C.PROT_READ | C.PROT_EXEC) != 0
 		|| C.mprotect(unsafe { voidptr(data) }, usize(page), C.PROT_READ) != 0 {

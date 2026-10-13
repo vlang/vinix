@@ -4161,6 +4161,40 @@ Fortnite passes the former empty-string constructor import and exits with
 status 1 before entry at `_$sSS10describingSSx_tclufC`. Full regression remains unpassed;
 entry, rendering and gameplay are unverified.
 
+`Swift describing values` now implement the measured consuming constructor
+`_$sSS10describingSSx_tclufC` from libswiftCore. Native LLVM inspection and the
+actual MarketplaceKitWrapper call at `0x8e28` show an indirect value in x0 and
+type metadata in x1, followed by an owned String result in x0/x1. The wrapper
+retains the caught Error before this consuming call. Guarded native calls
+verify exactly one consumed error reference and preserved x20/x21 registers.
+
+The V constructor transfers concrete String ownership and formats signed Int,
+Void and concrete CFError values. Canonical one-word Error existential metadata
+is sealed in the existing error arena and resolves the bounded `s5Error_p`
+mangled name and the actual seven-byte indirect Error protocol reference plus
+`_p`. CFError descriptions copy their fields before releasing the
+input, matching native `Error Domain=... Code=...` text, including an empty or
+one NSString `NSLocalizedDescription` userInfo field. General reflection,
+arbitrary conformances, Swift error boxes, other error classes and additional
+userInfo fields remain explicitly unsupported. Checked rejection leaves the
+input unconsumed and borrows a static error without boxing an allocation.
+
+All 81 programs build and 115 generated C streams restore to their hashes.
+Thirty-four host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 36 Swift/loader programs. The new fixture covers protected
+value boundaries, empty/inline/long/Unicode Strings, signed integer limits,
+owned String transfer, concrete and existential errors, descriptions surviving
+input release, invalid metadata/owners/fields, and two drained runtimes.
+
+Evidence is retained under `build/ios/fortnite/describing-final-checks`, including
+pinned tooling and inputs, native measurements, the actual image callsite,
+allocation audits, and verified executable/debug archives. Prototype and
+rejected native/compiler trials are retained with their sources. Transparent
+filesystem compression preserves prior evidence bytes. Five published runners
+remain unchanged. Fortnite passes the former describing constructor import and exits
+with status 1 before entry at `_$sSS11withCStringyxxSPys4Int8VGKXEKlF`.
+Full regression remains unpassed; entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4168,10 +4202,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,448 | 712 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 121 | 55 | 23 |
-| All images | 2,228 | 770 | 120 |
+| MarketplaceKitWrapper | 122 | 54 | 23 |
+| All images | 2,229 | 769 | 120 |
 
-The C++/GLES/Text variant reports 2,241 resolved imports, 757 unresolved strong
+The C++/GLES/Text variant reports 2,242 resolved imports, 756 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

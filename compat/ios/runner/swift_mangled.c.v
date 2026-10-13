@@ -37,7 +37,10 @@ fn swift_mangled_parse(name u64, length u64) !SwiftMangledType {
 	first := swift_mangled_byte(name, length, offset)
 	second := swift_mangled_byte(name, length, offset + 1)
 	if first == 0 { return SwiftMangledType{} }
-	if first == `S` && (second == `S` || second == 0) {
+	if first == `s` && length - offset >= 9
+		&& C.memcmp(unsafe { voidptr(name + offset) }, c's5Error_p', 9) == 0 {
+		kind = 8; offset += 9
+	} else if first == `S` && (second == `S` || second == 0) {
 		kind = 1; offset += if second == 0 { u64(1) } else { u64(2) }
 	} else if first == `S` && second == `i` {
 		kind = 2; offset += 2
@@ -67,6 +70,10 @@ fn swift_mangled_parse(name u64, length u64) !SwiftMangledType {
 		if value == 0 { return error('iOS: null Swift symbolic type descriptor') }
 		if value % 4 != 0 { return error('iOS: unaligned Swift symbolic type descriptor') }
 		kind = 5; offset += 5
+		if swift_mangled_byte(name, length, offset) == `_`
+			&& swift_mangled_byte(name, length, offset + 1) == `p` {
+			kind = 9; offset += 2 // Symbolic protocol existential, not a nominal accessor.
+		}
 	} else if first == `S` && second == `o` {
 		offset += 2
 		for {
@@ -147,6 +154,19 @@ fn swift_mangled_lookup_checked(name u64, length u64, context u64, generic_args 
 			metadata = swift_objc_metadata_checked(cls)!
 		}
 		7 { metadata = swift_task_priority_metadata() }
+		8 { metadata = swift_error_existential_metadata() }
+		9 {
+			// The image's indirect protocol reference has already been bound.
+			// Match the canonical Error descriptor before reading any foreign
+			// protocol or calling an accessor. Other existentials need support.
+			C.ios_objc_initialize_lock()
+			protocol := if ios_runtime.swift_error_arena == 0 { u64(0) } else {
+				ios_runtime.swift_error_arena + u64(C.getpagesize()) + 240
+			}
+			C.ios_objc_initialize_unlock()
+			if parsed.value != protocol || protocol == 0 { return swift_describing_failure() }
+			metadata = swift_error_existential_metadata()
+		}
 		else { return error('iOS: invalid Swift type expression') }
 	}
 	for _ in u64(0) .. parsed.arrays { metadata = swift_array_access(0, metadata).metadata }
