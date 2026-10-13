@@ -2,9 +2,9 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `7f6b5f434e4a2361a44df62518521fb704a5667a`,
+not been reached. At source `7da8032f9ea39d0d6dacd0c609aebd77f13ff8ed`,
 Linguist 7.27.0 reports **Python 0.21%** (10 files, 89,440 bytes) and
-**V 83.96%** (4,009 files, 36,517,066 bytes). The complete committed-blob inventory and reproduction
+**V 84.02%** (4,024 files, 36,636,770 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
@@ -3381,3 +3381,22 @@ qualifier writes newc/gzip initramfs data and retains failure console output.
 No Python, actual Steam client, graphics or Vinix guest executes: these are
 reference Linux SDK behavior/resource checks, not a new Vinix kernel pass. See
 [native Steam probes](../tests/steam/syscall-probes/README.md).
+
+Supplement `7da8032f` replaces seven embedded Python readers in browser,
+LibreOffice and OBS scripts with the native surface-probe command, totaling
+5,967 original body bytes and 152 logical lines. Inline command bodies retain
+their exact bytes, without a synthetic final newline. These Shell files
+receive zero Python-file retirement credit. The V readers preserve shared
+1,000-window RGB sampling and negative slicing, damage sentinel/unsigned
+boundaries, 64-sample CRC with seed zero, XWD paint layout/grid/threshold and
+45-second deadline. OBS capture retains Display 1/MIT-SHM/RandR checks and
+restores its marker on every path, also freeing the returned XImage before
+closing its display and library. Twelve cold ARM/x86/host-ASanUBSan builds
+pass actual mapping updates, eight file sizes, 8,000 signed offset comparisons,
+external-gzip CRC golden, XWD/timed blank cases and thirty native fixture
+capture/error ownership paths. Six real dynamic-musl guest ELFs link, and
+all seven exports in the actual ARM X11 SDK are verified as data. Desktop
+staging invokes that same producer. No Python, graphical app, real X11 server
+or Vinix guest executes; this establishes reader behavior/ABI/build contracts
+without claiming a new graphics runtime pass. See
+[native surface checks](../tests/native-surface-tools/README.md).

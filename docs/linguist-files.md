@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `7f6b5f434e4a2361a44df62518521fb704a5667a`,
+at source commit `7da8032f9ea39d0d6dacd0c609aebd77f13ff8ed`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,874 | 5.51% |
+| C | 599 | 2,396,874 | 5.50% |
 | Python | 10 | 89,440 | 0.21% |
-| Shell | 821 | 1,369,977 | 3.15% |
+| Shell | 821 | 1,364,453 | 3.13% |
 
-All `.v` files are classified as V. The resulting V share is 83.96%, with no
+All `.v` files are classified as V. The resulting V share is 84.02%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 7f6b5f434e4a2361a44df62518521fb704a5667a --breakdown --json
+github-linguist --rev 7da8032f9ea39d0d6dacd0c609aebd77f13ff8ed --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -865,7 +865,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,588 |
 | `scripts/build-claude-aarch64.sh` | 5,923 |
 | `scripts/build-codex-aarch64.sh` | 4,845 |
-| `scripts/build-desktop-aarch64.sh` | 92,836 |
+| `scripts/build-desktop-aarch64.sh` | 93,116 |
 | `scripts/build-desktop-amd64.sh` | 15,186 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 193 |
@@ -1088,10 +1088,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/application-sandbox/test-ui.sh` | 737 |
 | `tests/archive-tools/run.sh` | 333 |
 | `tests/block-storage/run` | 201 |
-| `tests/browsers/chromium-init.sh` | 6,384 |
+| `tests/browsers/chromium-init.sh` | 6,029 |
 | `tests/browsers/chromium-install-desktop-init.sh` | 1,916 |
-| `tests/browsers/desktop-init.sh` | 5,058 |
-| `tests/browsers/firefox-init.sh` | 3,813 |
+| `tests/browsers/desktop-init.sh` | 4,322 |
+| `tests/browsers/firefox-init.sh` | 3,182 |
 | `tests/browsers/pkg-init.sh` | 1,786 |
 | `tests/browsers/run_vm` | 126 |
 | `tests/build-cache/run.sh` | 478 |
@@ -1300,7 +1300,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/numa/run_vm` | 213 |
 | `tests/office-compat/run` | 184 |
 | `tests/office-compat/run-vm` | 185 |
-| `tests/office/libreoffice-init.sh` | 4,188 |
+| `tests/office/libreoffice-init.sh` | 3,859 |
 | `tests/office/run.sh` | 1,226 |
 | `tests/openbsd-security/run.sh` | 182 |
 | `tests/openbsd-security/run_vm` | 217 |
@@ -1314,7 +1314,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/packages/gimp-smoke.sh` | 2,521 |
 | `tests/packages/gnumeric-smoke.sh` | 2,730 |
 | `tests/packages/gtk-smoke.sh` | 2,134 |
-| `tests/packages/obs-init.sh` | 6,566 |
+| `tests/packages/obs-init.sh` | 2,813 |
 | `tests/packages/qemu-install-gtk.sh` | 452 |
 | `tests/packages/qemu-persistence-guest.sh` | 951 |
 | `tests/packages/sublime-smoke.sh` | 2,661 |
