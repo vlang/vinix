@@ -251,11 +251,34 @@ fn qualify_package_linux(mut t Test) ! {
 	original_state := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
 	os.write_file(policy_path, json2.encode(pkgcore.PolicyDocument{ architecture: architecture,
 		policy: pkgcore.Policy{ allowed: [application.id], reserve_bytes: 0 } }))!
-	mut policy_review := pkgcore.decode_policy_review(package_success(['policy-review', policy_path])!)!
+	policy_review_text := package_success(['policy-review', policy_path])!
+	mut policy_review := pkgcore.decode_policy_review(policy_review_text)!
 	defer { policy_review.close() }
 	assert policy_review.rows.len == 2 && policy_review.rows.all(it.diagnostic_before == '')
 	assert policy_review.rows.all(it.diagnostic_after.contains(runtime.id + ': blocked by organization allowlist'))
 	assert pkgcore.load_config('')! == original_configuration
+	policy_text := os.read_file(policy_path)!
+	for ambiguous in [policy_text.replace('"offline":false', '"offline":true,"offline":false'),
+		policy_text.replace('"offline":false', '"offline":true,"off\\u006cine":false'),
+		policy_text.replace('"policy":{', '"policy":{"allow_firmwar":true,'),
+		policy_text.replace('"pins":[]', '"pins":[{"id":"' + application.id + '","id":"' + application.id + '","minimum":"","before":""}]')] {
+		os.write_file(policy_path, ambiguous)!
+		for operation in [['policy-review', policy_path], ['policy-apply', policy_review.fingerprint, policy_path]] {
+			refused := run(['/usr/bin/vinix-package', ...operation], '', none, none)
+			assert refused.status != 0 && refused.output.contains('document field'), refused.output
+		}
+		assert pkgcore.load_config('')! == original_configuration
+		assert pkgcore.read_state('/var/lib/vinix-packages', architecture)! == original_state
+	}
+	os.write_file(policy_path, policy_text)!
+	for incomplete in [policy_review_text.replace('"firmware":false,', ''),
+		policy_review_text.replace('"proprietary":false,', '')] {
+		if mut accepted := pkgcore.decode_policy_review(incomplete) {
+			accepted.close()
+			assert false, 'policy review omitted license/firmware disclosure'
+		}
+	}
+	t.say('PACKAGE DOCUMENTS unknown-duplicate-escaped-keys explicit-policy-disclosure PASS')
 	ordinary_policy := run(['/usr/bin/vinix-package', 'policy-apply', policy_review.fingerprint, policy_path], '', db, must_user(db, 'alex'))
 	assert ordinary_policy.status != 0 && pkgcore.load_config('')! == original_configuration, ordinary_policy.output
 	package_success(['policy-apply', policy_review.fingerprint, policy_path])!

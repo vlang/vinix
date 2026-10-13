@@ -192,6 +192,21 @@ fn qualify(binary string) ! {
 	assert policy_review.rows.len == 1 && policy_review.rows[0].diagnostic_before == ''
 	assert policy_review.rows[0].diagnostic_after.contains('permissions blocked')
 	assert pkgcore.load_config(work + '/root')!.policy == enrolled_config.policy
+	// A valid fingerprint cannot authorize an ambiguous policy file, even when
+	// the decoder's last value would reproduce the reviewed policy.
+	policy_text := os.read_file(policy_path)!
+	for ambiguous in [policy_text.replace('"offline":false', '"offline":true,"offline":false'),
+		policy_text.replace('"permissions":[]', '"permissions":["files"],"permissions":[]'),
+		policy_text.replace('"policy":{', '"policy":{"allow_firmwar":true,')] {
+		os.write_file(policy_path, ambiguous)!
+		for operation in [['policy-review', policy_path], ['policy-apply', policy_review.fingerprint, policy_path]] {
+			refused := command(binary, [...root_args, ...operation])!
+			assert refused.code != 0 && refused.text.contains('document field'), refused.text
+		}
+		assert pkgcore.load_config(work + '/root')! == enrolled_config
+		assert pkgcore.read_state(store, 'aarch64')!.generation == installed.generation
+	}
+	os.write_file(policy_path, policy_text)!
 	success(binary, [...root_args, 'policy-apply', policy_review.fingerprint, policy_path])!
 	stale_policy := command(binary, [...root_args, 'policy-apply', policy_review.fingerprint, policy_path])!
 	assert stale_policy.code != 0 && stale_policy.text.contains('stale')

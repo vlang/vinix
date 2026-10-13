@@ -378,7 +378,12 @@ available under restrictive policy. This does not reconcile installed roots or
 activate a package generation; use a separately reviewed deployment afterward.
 
 Documents reject missing/null fields, type coercion, malformed version ranges,
-duplicate entries/pin IDs and unknown permissions. Allowlists, pins and accepted
+unknown/duplicate object keys (including escaped spellings), duplicate entries/pin
+IDs and unknown permissions. Keys are checked independently in the document,
+policy and each version-pin record; JSON-looking license text remains ordinary
+text. Policy review responses require explicit proprietary/firmware flags and
+before/after diagnostics for every installed package, so an incomplete disclosure
+cannot silently appear unrestricted. Allowlists, pins and accepted
 licenses are limited to 4096 entries, permissions to the five named grants and
 disk reserve to 1 TiB. Lists are sorted for reproducible review identity; input
 order is immaterial. Existing configurations with duplicate policy entries must

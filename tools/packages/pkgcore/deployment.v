@@ -104,38 +104,19 @@ fn read_deployment(path string, architecture string) !DeploymentLock {
 // accepts duplicate keys. After decoding, inspect object keys without parsing
 // values again; the document schema has only a root and flat locked records.
 fn deployment_keys(text string, format int) ! {
-	root_keys := if format == 1 { ['format', 'architecture', 'packages'] } else { ['format', 'architecture', 'packages', 'locked'] }
-	row_keys := ['id', 'version', 'architecture', 'repository', 'public_key', 'minimum_sequence', 'metadata_sha256']
-	mut objects := []map[string]bool{}
-	mut i := 0
-	for i < text.len {
-		if text[i] == `{` {
-			objects << map[string]bool{}
-		} else if text[i] == `}` {
-			objects.delete_last()
-		} else if text[i] == `"` {
-			start := i
-			i++
-			for i < text.len && text[i] != `"` {
-				if text[i] == `\\` { i++ }
-				i++
-			}
-			end := i + 1
-			mut next := end
-			for next < text.len && text[next] in [u8(` `), `\t`, `\r`, `\n`] { next++ }
-			if next < text.len && text[next] == `:` {
-				key := json2.decode[[]string]('[' + text[start..end] + ']')![0]
-				if objects.len == 0 || objects.len > 2 || (objects.len == 1 && key !in root_keys)
-					|| (objects.len == 2 && (format != 2 || key !in row_keys)) {
-					return error('unknown deployment field: ${key}')
-				}
-				mut seen := objects[objects.len - 1]
-				if key in seen { return error('duplicate deployment field: ${key}') }
-				seen[key] = true
-				objects[objects.len - 1] = seen
-			}
-		}
-		i++
+	document_keys(text, if format == 1 { deployment_roots_field } else { deployment_lock_field })!
+}
+
+fn deployment_roots_field(parent string, key string) bool {
+	return parent == '' && key in ['format', 'architecture', 'packages']!
+}
+
+fn deployment_lock_field(parent string, key string) bool {
+	return match parent {
+		'' { key in ['format', 'architecture', 'packages', 'locked']! }
+		'locked' { key in ['id', 'version', 'architecture', 'repository', 'public_key',
+			'minimum_sequence', 'metadata_sha256']! }
+		else { false }
 	}
 }
 

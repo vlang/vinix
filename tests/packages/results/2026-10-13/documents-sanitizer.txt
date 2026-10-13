@@ -1,0 +1,65 @@
+ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1
+Baseline package source revision: 7d01a61b4aa0aae61f6ce378101b3585fa8b0080
+
+policy-asan.log
+=================================================================
+==36237==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x00016d0769d8 at pc 0x000103fc6c84 bp 0x00016d0763a0 sp 0x00016d075b50
+READ of size 160 at 0x00016d0769d8 thread T0
+    #0 0x000103fc6c80 in __asan_memcpy+0x400 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x3ec80)
+    #1 0x000102d9e6f8 in vmemcpy+0x60 (policy-asan:arm64+0x10002a6f8)
+    #2 0x000102deee9c in copy_element_to+0xd8 (policy-asan:arm64+0x10007ae9c)
+    #3 0x000102de04b8 in array__push+0xb14 (policy-asan:arm64+0x10006c4b8)
+    #4 0x000102eb8cbc in edwards25519__Point__bytes_generic+0x2f8 (policy-asan:arm64+0x100144cbc)
+    #5 0x000102e976f8 in edwards25519__Point__bytes+0x168 (policy-asan:arm64+0x1001236f8)
+    #6 0x000102e95020 in ed25519__new_key_from_seed_generic+0x734 (policy-asan:arm64+0x100121020)
+    #7 0x000102e947f0 in ed25519__new_key_from_seed+0x1a0 (policy-asan:arm64+0x1001207f0)
+    #8 0x000102e943bc in ed25519__generate_key+0x348 (policy-asan:arm64+0x1001203bc)
+    #9 0x000103244470 in pkgcore__keygen+0x4b0 (policy-asan:arm64+0x1004d0470)
+    #10 0x000103268748 in pkgcore__policy_fixture+0x14c0 (policy-asan:arm64+0x1004f4748)
+    #11 0x0001032c2480 in pkgcore__test_policy_review_is_read_only_canonical_and_reports_dependency_effects+0x3098 (policy-asan:arm64+0x10054e480)
+    #12 0x00010346e4a8 in main+0x1c4 (policy-asan:arm64+0x1006fa4a8)
+    #13 0x000186ddfdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+SUMMARY: AddressSanitizer: stack-buffer-overflow (policy-asan:arm64+0x10002a6f8) in vmemcpy+0x60
+
+deployment-asan.log
+=================================================================
+==36238==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x00016d7ee378 at pc 0x0001036b6c84 bp 0x00016d7edd40 sp 0x00016d7ed4f0
+READ of size 160 at 0x00016d7ee378 thread T0
+    #0 0x0001036b6c80 in __asan_memcpy+0x400 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x3ec80)
+    #1 0x0001026266f8 in vmemcpy+0x60 (deployment-asan:arm64+0x10002a6f8)
+    #2 0x000102676e9c in copy_element_to+0xd8 (deployment-asan:arm64+0x10007ae9c)
+    #3 0x0001026684b8 in array__push+0xb14 (deployment-asan:arm64+0x10006c4b8)
+    #4 0x000102740cbc in edwards25519__Point__bytes_generic+0x2f8 (deployment-asan:arm64+0x100144cbc)
+    #5 0x00010271f6f8 in edwards25519__Point__bytes+0x168 (deployment-asan:arm64+0x1001236f8)
+    #6 0x00010271d020 in ed25519__new_key_from_seed_generic+0x734 (deployment-asan:arm64+0x100121020)
+    #7 0x00010271c7f0 in ed25519__new_key_from_seed+0x1a0 (deployment-asan:arm64+0x1001207f0)
+    #8 0x00010271c3bc in ed25519__generate_key+0x348 (deployment-asan:arm64+0x1001203bc)
+    #9 0x000102ab9414 in pkgcore__keygen+0x4b0 (deployment-asan:arm64+0x1004bd414)
+    #10 0x000102ab72fc in pkgcore__deployment_fixture+0x16c4 (deployment-asan:arm64+0x1004bb2fc)
+    #11 0x000102b38600 in pkgcore__test_locked_deployments_reproduce_versions_and_runtime_closure_after_refresh_and_offline+0x3cd8 (deployment-asan:arm64+0x10053c600)
+    #12 0x000102ce90e4 in main+0x1c4 (deployment-asan:arm64+0x1006ed0e4)
+    #13 0x000186ddfdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+SUMMARY: AddressSanitizer: stack-buffer-overflow (deployment-asan:arm64+0x10002a6f8) in vmemcpy+0x60
+
+baseline-policy-asan.log
+=================================================================
+==59131==ERROR: AddressSanitizer: stack-buffer-overflow on address 0x00016fd0e9d8 at pc 0x000101192c84 bp 0x00016fd0e3a0 sp 0x00016fd0db50
+READ of size 160 at 0x00016fd0e9d8 thread T0
+    #0 0x000101192c80 in __asan_memcpy+0x400 (libclang_rt.asan_osx_dynamic.dylib:arm64e+0x3ec80)
+    #1 0x0001001066f8 in vmemcpy+0x60 (baseline-policy-asan:arm64+0x10002a6f8)
+    #2 0x000100156e9c in copy_element_to+0xd8 (baseline-policy-asan:arm64+0x10007ae9c)
+    #3 0x0001001484b8 in array__push+0xb14 (baseline-policy-asan:arm64+0x10006c4b8)
+    #4 0x000100220cbc in edwards25519__Point__bytes_generic+0x2f8 (baseline-policy-asan:arm64+0x100144cbc)
+    #5 0x0001001ff6f8 in edwards25519__Point__bytes+0x168 (baseline-policy-asan:arm64+0x1001236f8)
+    #6 0x0001001fd020 in ed25519__new_key_from_seed_generic+0x734 (baseline-policy-asan:arm64+0x100121020)
+    #7 0x0001001fc7f0 in ed25519__new_key_from_seed+0x1a0 (baseline-policy-asan:arm64+0x1001207f0)
+    #8 0x0001001fc3bc in ed25519__generate_key+0x348 (baseline-policy-asan:arm64+0x1001203bc)
+    #9 0x0001005a7b0c in pkgcore__keygen+0x4b0 (baseline-policy-asan:arm64+0x1004cbb0c)
+    #10 0x0001005caf5c in pkgcore__policy_fixture+0x14c0 (baseline-policy-asan:arm64+0x1004eef5c)
+    #11 0x00010061572c in pkgcore__test_policy_review_is_read_only_canonical_and_reports_dependency_effects+0x3098 (baseline-policy-asan:arm64+0x10053972c)
+    #12 0x0001007c1754 in main+0x1c4 (baseline-policy-asan:arm64+0x1006e5754)
+    #13 0x000186ddfdfc in start+0x1b4c (dyld:arm64e+0x1fdfc)
+
+SUMMARY: AddressSanitizer: stack-buffer-overflow (baseline-policy-asan:arm64+0x10002a6f8) in vmemcpy+0x60

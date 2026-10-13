@@ -32,18 +32,18 @@ struct PolicyFile {
 
 pub struct PolicyImpact {
 pub:
-	id                string
-	name              string
-	version           string
-	kind              string
-	license           string
-	proprietary       bool
-	firmware          bool
-	repository        string
-	public_key        string
-	requested         bool
-	diagnostic_before string
-	diagnostic_after  string
+	id                string @[required]
+	name              string @[required]
+	version           string @[required]
+	kind              string @[required]
+	license           string @[required]
+	proprietary       bool @[required]
+	firmware          bool @[required]
+	repository        string @[required]
+	public_key        string @[required]
+	requested         bool @[required]
+	diagnostic_before string @[required]
+	diagnostic_after  string @[required]
 }
 
 pub struct PolicyReview {
@@ -103,10 +103,35 @@ fn read_policy_document(path string, architecture string) !PolicyDocument {
 	defer { unsafe { input.architecture.free() } }
 	policy := policy_from_input(input.policy)
 	defer { close_owned_policy(policy) }
+	document_keys(text, policy_document_field)!
 	if input.format != 1 || input.architecture != architecture {
 		return error('organization policy format or architecture mismatch')
 	}
 	return PolicyDocument{ architecture: architecture.clone(), policy: canonical_policy(policy)! }
+}
+
+fn policy_document_field(parent string, key string) bool {
+	return match parent {
+		'' { key in ['format', 'architecture', 'policy']! }
+		'policy' { policy_field(key) }
+		'pins' { key in ['id', 'minimum', 'before']! }
+		else { false }
+	}
+}
+
+fn policy_field(key string) bool {
+	return key in ['offline', 'allowed', 'pins', 'permissions', 'licenses', 'allow_firmware', 'reserve_bytes']!
+}
+
+fn policy_review_field(parent string, key string) bool {
+	return match parent {
+		'' { key in ['format', 'architecture', 'generation', 'fingerprint', 'previous', 'proposed', 'rows']! }
+		'previous', 'proposed' { policy_field(key) }
+		'pins' { key in ['id', 'minimum', 'before']! }
+		'rows' { key in ['id', 'name', 'version', 'kind', 'license', 'proprietary', 'firmware',
+			'repository', 'public_key', 'requested', 'diagnostic_before', 'diagnostic_after']! }
+		else { false }
+	}
 }
 
 fn policy_fingerprint(config Config, state State, proposed PolicyDocument) string {
@@ -259,6 +284,7 @@ pub fn decode_policy_review(text string) !PolicyReview {
 	mut review := PolicyReview{ format: input.format, architecture: input.architecture,
 		generation: input.generation, fingerprint: input.fingerprint,
 		previous: policy_from_input(input.previous), proposed: policy_from_input(input.proposed), rows: input.rows }
+	document_keys(text, policy_review_field) or { review.close(); return err }
 	review.validate() or { review.close(); return err }
 	return review
 }

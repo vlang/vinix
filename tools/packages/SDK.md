@@ -453,15 +453,18 @@ persistent configuration. `policy-review FILE` emits
 modifying configuration or fetching metadata. Input files must contain the format,
 matching host architecture and all policy fields: `offline`, `allowed`, `pins`,
 `permissions`, `licenses`, `allow_firmware`, `reserve_bytes`. Boolean/number fields
-use their JSON types; null/missing fields and type coercion are refused. Policy
-sets contain unique entries; pin IDs appear once and version ranges use the
+use their JSON types; null/missing fields and type coercion are refused. Unknown
+and duplicate object keys fail, including duplicate escaped spellings, at the root,
+policy and each pin record. Unique escaped keys have the same canonical identity.
+Policy sets contain unique entries; pin IDs appear once and version ranges use the
 dependency contract. Allowlists/pins/licenses have at most 4096 entries, licenses
 are nonempty printable strings up to 256 bytes, permissions use the five named
 grants and disk reserve is at most 1 TiB. Sets/pins are sorted in output.
 
 Review rows cover every installed package with ID/name/version/kind, license,
 proprietary/firmware flags, publisher ID/key, requested-root flag and
-`diagnostic_before`/`diagnostic_after`. Empty diagnostics mean the complete
+`diagnostic_before`/`diagnostic_after`. Every row field is required with its JSON
+type, including false flags and empty diagnostics. Empty diagnostics mean the complete
 dependency closure is allowed by current trust and the corresponding policy.
 Runtime restrictions consequently appear on dependent application rows too.
 Review needs neither a usable catalog nor a live publisher.
@@ -480,7 +483,8 @@ V clients use `Service.policy`, `Service.review_policy`, `Service.apply_policy`,
 `PolicyDocument` and `PolicyReview`. `decode_policy_review` checks bounded complete
 responses and installed provenance. Returned documents/reviews and decoded
 reviews own their presentation fields; call `.close()` after use under manual
-memory management. Additional JSON fields are ignored; formats other than 1 are
+memory management. Unknown/duplicate keys in review roots, policies, pins and
+installed rows are refused; formats other than 1 are
 refused. See [organization administration](../../docs/application-distribution.md#offline-and-organization-deployment).
 
 `review install|remove|upgrade|deploy|rollback [ID...]` emits a format-1 review

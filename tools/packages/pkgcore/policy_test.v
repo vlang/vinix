@@ -185,3 +185,89 @@ fn test_policy_reader_and_writer_locks_and_unsafe_configuration() {
 	service.review_policy(work + '/linked-policy.json') or { refused = err.msg().contains('regular file') }
 	assert refused
 }
+
+fn test_policy_documents_reject_unknown_and_duplicate_keys_before_review_or_apply() {
+	work, service, config := policy_fixture('keys', true)!
+	defer { os.rmdir_all(work) or {} }
+	path := policy_file(work, Policy{ offline: true, allowed: ['app', 'runtime'],
+		pins: [Dependency{ id: 'app', minimum: '1.0.0', before: '2.0.0' },
+			Dependency{ id: 'runtime', minimum: '1.0.0' }],
+		licenses: ['Vendor-EULA'], allow_firmware: true, reserve_bytes: 0 })!
+	valid := os.read_file(path)!
+	mut reviewed := service.review_policy(path)!
+	defer { reviewed.close() }
+	state := service.state()!
+	history := os.read_file(state_directory(service.root) + '/trust-history.json')!
+	configuration := os.read_file(service.root + '/etc/vinix-packages/config.json')!
+	for invalid in [
+		valid.replace('"format":1', '"format":1,"format":1'),
+		valid.replace('"format":1', '"format":1,"f\\u006frmat":1'),
+		valid.replace('"architecture":"aarch64"', '"architecture":"x86_64","architecture":"aarch64"'),
+		valid.replace('"format":1', '"format":1,"offline":false'),
+		valid.replace('"policy":{', '"policy":{"unknown":{"pins":[]},'),
+		valid.replace('"offline":true', '"offline":false,"offline":true'),
+		valid.replace('"offline":true', '"off\\u006cine":false,"offline":true'),
+		valid.replace('"offline":true', '"offline":true,"format":1'),
+		valid.replace('"allow_firmware":true', '"allow_firmware":false,"allow_firmware":true'),
+		valid.replace('"licenses":["Vendor-EULA"]', '"licenses":[],"licenses":["Vendor-EULA"]'),
+		valid.replace('"id":"app"', '"id":"app","id":"app"'),
+		valid.replace('"minimum":"1.0.0"', '"minimum":"0.0.0","minimum":"1.0.0"'),
+		valid.replace('"id":"app"', '"id":"app","permissions":["files"]'),
+	] {
+		os.write_file(path, invalid)!
+		mut rejected := 0
+		service.review_policy(path) or { assert err.msg().contains('document field'); rejected += 1 }
+		service.apply_policy(path, reviewed.fingerprint) or { assert err.msg().contains('document field'); rejected += 1 }
+		assert rejected == 2, invalid
+		assert os.read_file(service.root + '/etc/vinix-packages/config.json')! == configuration
+		assert service.state()! == state && os.read_file(state_directory(service.root) + '/trust-history.json')! == history
+	}
+	// Escaped key spelling is accepted when unique, and does not change identity.
+	escaped := valid.replace('"policy":', '"pol\\u0069cy":').replace('"offline":', '"off\\u006cine":')
+	os.write_file(path, escaped)!
+	mut same := service.review_policy(path)!
+	assert same.fingerprint == reviewed.fingerprint
+	same.close()
+	os.write_file(path, valid)!
+	mut applied := service.apply_policy(path, reviewed.fingerprint)!
+	assert applied.policy.offline && applied.policy.licenses == ['Vendor-EULA'] && applied.policy.allow_firmware
+	applied.close()
+	assert load_config(service.root)!.repositories == config.repositories && service.state()! == state
+}
+
+fn test_policy_review_decoder_rejects_ambiguous_and_incomplete_disclosure() {
+	work, service, config := policy_fixture('review-keys', true)!
+	defer { os.rmdir_all(work) or {} }
+	path := policy_file(work, Policy{ ...config.policy,
+		pins: [Dependency{ id: 'app' }, Dependency{ id: 'runtime' }] })!
+	mut review := service.review_policy(path)!
+	defer { review.close() }
+	valid := json2.encode(review)
+	for invalid in [
+		valid.replace('"format":1', '"format":1,"format":1'),
+		valid.replace('"format":1', '"format":1,"future":false'),
+		valid.replace('"previous":{', '"previous":{"future":false,'),
+		valid.replace('"proposed":{', '"proposed":{"format":1,'),
+		valid.replace('"offline":false', '"offline":true,"offline":false'),
+		valid.replace('"id":"app"', '"id":"app","id":"app"'),
+		valid.replace('"id":"app"', '"id":"app","i\\u0064":"app"'),
+		valid.replace('"kind":"linux"', '"kind":"linux","permissions":[]'),
+		valid.replace('"proprietary":true,', ''),
+		valid.replace('"firmware":true,', ''),
+		valid.replace('"diagnostic_before":"",', ''),
+		valid.replace('"proprietary":true', '"proprietary":"true"'),
+	] {
+		if mut accepted := decode_policy_review(invalid) {
+			accepted.close()
+			assert false, invalid
+		}
+	}
+	mut decoded := decode_policy_review(valid)!
+	assert decoded.rows.len == 2 && decoded.rows[1].proprietary && decoded.rows[1].firmware
+	decoded.close()
+	// JSON-looking license/diagnostic values are text, not additional keys.
+	text := '{"format":1,"architecture":"aarch64","policy":{"offline":false,"allowed":[],"pins":[{"id":"app","minimum":"","before":""},{"id":"runtime","minimum":"","before":""}],"permissions":[],"licenses":["{\\\"offline\\\":true}","braces [] {} and \\\"quotes\\\""],"allow_firmware":false,"reserve_bytes":0}}'
+	input := json2.decode[PolicyFile](text, strict: true)!
+	document_keys(text, policy_document_field)!
+	assert input.policy.licenses.len == 2
+}
