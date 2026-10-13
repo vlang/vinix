@@ -53,6 +53,12 @@ numbers, expressions, assertions, explicit `#line` filenames and paths outside
 that directory retain their meaning. This adaptation is recorded with the
 other source hashes. Build each project from its source root.
 
+`VINIX_V_ROOT` can select an absolute, complete V library installation separately
+from the executable's location. Invalid roots are refused. Pin that installation
+as an SDK input in a build plan. This keeps `@VROOT`/`@VEXEROOT` library paths
+stable when a newly rebuilt compiler runs from different private workspaces;
+the running compiler's executable pin still identifies the tool actually used.
+
 The host V compiler translates that committed compiler source, then the selected
 musl C compiler builds a static native compiler and the adjacent runtime objects
 needed by the reference projects. These include process capture, pthreads,
@@ -104,6 +110,16 @@ userland and signed-package reproducibility gate passed in
 `build/development17-20261013/guest-arm-package-repro`; it builds the same
 package CLI and payload in two different workspace paths and independently
 verifies their matching hashes and release signatures.
+
+The stages with explicit library-root selection completed in
+`build/development17-20261013/native-v-arm-pinned` and
+`build/development17-20261013/native-v-x86-pinned`, with patched-source pin
+`19ca2b8fb88459cc615a93ba8fceba54f7e4eb2109336c6d452617740b85a0b7`.
+The AArch64 guest rebuilt the C-backend compiler in two fresh workspaces and
+used those matching compilers to build identical userland and signed packages
+in `build/development17-20261013/guest-arm-selfhost-v-m`. The x86 version/help
+and bounded diagnostic-log regression passed in
+`build/development17-20261013/guest-x86-v-pinned`.
 
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links

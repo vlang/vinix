@@ -14,6 +14,10 @@ fn replace_one(source string, anchor string, replacement string) !string {
 pub fn portable_pref(source string) !string {
 	anchor := 'fn detect_vroot() string {\n\tbaked_root := @VMODROOT\n\tif baked_root.len > 0 {\n\t\treturn baked_root\n\t}'
 	replacement := 'fn detect_vroot() string {\n' +
+		"\tif selected := os.getenv_opt('VINIX_V_ROOT') {\n" +
+		"\t\tif !os.is_abs_path(selected) || !os.is_dir(os.join_path(selected, 'vlib', 'builtin')) {\n" +
+		"\t\t\tpanic('VINIX_V_ROOT must name an absolute V installation root')\n\t\t}\n" +
+		'\t\treturn os.real_path(selected)\n\t}\n' +
 		'\texecutable_root := detect_vroot_from(os.real_path(os.executable()))\n' +
 		'\tif executable_root.len > 0 { return executable_root }\n' +
 		'\tbaked_root := @VMODROOT\n' +
