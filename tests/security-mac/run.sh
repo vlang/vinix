@@ -10,13 +10,13 @@ case "$arch" in
 esac
 kernel=${VINIX_KERNEL_DIR:-"$repo/kernel"}
 if [ -n "${VINIX_MAC_STATE_DIR:-}" ]; then
-  exec python3 "$repo/tests/kernel-gaps/run.py" \
+  exec "$repo/tests/kernel-gaps/run-native" \
     --source "$repo/tests/security-mac/guestfixture/core.v" --arch "$arch" \
     --kernel-dir "$kernel" --state-dir "$VINIX_MAC_STATE_DIR" --no-network \
     --expect 'SECURITY MAC PASS' --fail 'SECURITY MAC FAIL' \
     --timeout "${VINIX_QEMU_TIMEOUT:-300}"
 fi
-exec python3 "$repo/tests/kernel-gaps/run.py" \
+exec "$repo/tests/kernel-gaps/run-native" \
   --source "$repo/tests/security-mac/guestfixture/core.v" --arch "$arch" \
   --kernel-dir "$kernel" --no-network \
   --expect 'SECURITY MAC PASS' --fail 'SECURITY MAC FAIL' \

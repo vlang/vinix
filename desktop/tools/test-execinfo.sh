@@ -14,10 +14,10 @@ defines=
 if [ "$(uname -s)" = Darwin ]; then
     defines='-d execinfo_darwin'
 fi
-python3 "$root/build-support/compile-v-module.py" \
+"$root/build-support/compile-v-module" \
     "$root/desktop/execinfocore" "$work/execinfo.c" $defines \
     --header "$work/execinfo_compat.h"
-python3 "$root/build-support/compile-v-module.py" \
+"$root/build-support/compile-v-module" \
     "$root/desktop/tools/tests/execinfofixture" "$work/test.c"
 "$cc" -std=c11 -g -O2 -fno-omit-frame-pointer -funwind-tables \
 	-D_GNU_SOURCE \

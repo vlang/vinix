@@ -25,7 +25,7 @@ exec "$VINIX_NATIVE_TEST_CC" "$@" -w
 EOF
 chmod +x "$work/cc"
 VINIX_NATIVE_TEST_CC="$native_cc" CC="$work/cc" CC_AMD64="$work/cc" \
-python3 "$root/tests/kernel-gaps/run.py" --source "$work/native.c" \
+"$root/tests/kernel-gaps/run-native" --source "$work/native.c" \
     --arch "$arch" --kernel-dir "$kernel" \
     --expect 'APPLICATION NATIVE SANDBOX GUEST PASS' \
     --fail 'APPLICATION NATIVE SANDBOX FAIL'

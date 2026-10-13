@@ -62,7 +62,7 @@ This ledger was refreshed on **2026-10-03** alongside [the 49-finding comparison
 
 ## Validation
 
-- `tests/kernel-gaps/run.py`: real static Linux/musl PID 1 programs on ARM64 and x86-64, with mandatory verdicts, failure detection, serial logs and isolated state. Host runner rejection tests and both-architecture guest smoke pass (`71574e19`).
+- `tests/kernel-gaps/run-native`: real static Linux/musl PID 1 programs on ARM64 and x86-64, with mandatory verdicts, failure detection, serial logs and isolated state. Host runner rejection tests and both-architecture guest smoke pass (`71574e19`).
 - `tests/block-storage/run`: three host fault-model suites pass. These exercise native driver functions; they do not establish real-device power-loss durability.
 - `tests/reboot-persistence/run.sh`: ARM64 VirtIO write/sync/reboot/read-back passes.
 - `tests/security-audit/test.c`: combined ARM64 and x86-64 guests pass. After the metric-reader correction, retained slab delta is exactly zero after 10,000 producers and after 1,000 collectors on both architectures. The previous seccomp evaluator retained 64 bytes per filtered syscall.

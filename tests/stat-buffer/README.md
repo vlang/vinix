@@ -11,11 +11,11 @@ sleep. Allocation-site output is included when the kernel has ALLOC_TRACK=1.
 Build each kernel in an isolated worktree, then run from the repository root:
 
 ```sh
-python3 tests/kernel-gaps/run.py --arch aarch64 --no-network \
+tests/kernel-gaps/run-native --arch aarch64 --no-network \
   --source tests/stat-buffer/guestfixture/core.v --kernel-dir /path/to/arm/kernel \
   --expect 'XNU STAT PASS' --expect 'XNU STAT SEMANTICS PASS' \
   --fail 'XNU STAT FAIL' --timeout 180
-python3 tests/kernel-gaps/run.py --arch x86_64 --no-network \
+tests/kernel-gaps/run-native --arch x86_64 --no-network \
   --source tests/stat-buffer/guestfixture/core.v --kernel-dir /path/to/x86/kernel \
   --expect 'XNU STAT PASS' --expect 'XNU STAT SEMANTICS PASS' \
   --fail 'XNU STAT FAIL' --timeout 360

@@ -81,7 +81,7 @@ compiler. For example, after building the native signal comparison:
 ```sh
 tests/qemu-core/test-signalfixture /tmp/qemu-signal-native \
   --native-build --arch arm64
-python3 tests/kernel-gaps/run.py --arch aarch64 \
+tests/kernel-gaps/run-native --arch aarch64 \
   --prebuilt-init /tmp/qemu-signal-native/signal-init \
   --kernel-dir /path/to/kernel --state-dir /tmp/qemu-signal-vm \
   --expect 'QEMU CORE SIGNAL DIFFERENTIAL PASS: 6 native signal/fork cases' \

@@ -58,11 +58,11 @@ Build each architecture in a separate worktree, with kernel dependencies linked
 as described in [AGENTS.md](../../AGENTS.md), then run:
 
 ```sh
-python3 tests/kernel-gaps/run.py --source tests/sysvmsg/guest.c \
+tests/kernel-gaps/run-native --source tests/sysvmsg/guest.c \
   --arch aarch64 --kernel-dir kernel \
   --expect 'SYSVMSG PASS' --fail 'SYSVMSG FAIL' --timeout 240
 
-python3 tests/kernel-gaps/run.py --source tests/sysvmsg/guest.c \
+tests/kernel-gaps/run-native --source tests/sysvmsg/guest.c \
   --arch x86_64 --kernel-dir /path/to/x86-worktree/kernel \
   --expect 'SYSVMSG PASS' --fail 'SYSVMSG FAIL' --timeout 240
 ```

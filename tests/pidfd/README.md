@@ -93,7 +93,7 @@ PID 1 with the common standalone kernel-gap harness:
 ```sh
 VEXE=/Users/alex/code/v/v make -C kernel -j4 CC=clang \
   V=/Users/alex/code/v/v ARCH=aarch64 PROD=true LIMINE_MP=1
-python3 tests/kernel-gaps/run.py --no-network --source tests/pidfd/guest.c \
+tests/kernel-gaps/run-native --no-network --source tests/pidfd/guest.c \
   --arch aarch64 --kernel-dir kernel --expect 'PIDFD PASS' \
   --fail 'PIDFD FAIL' --timeout 900
 ```

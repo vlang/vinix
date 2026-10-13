@@ -621,7 +621,7 @@ of at least 584×506. ICC/colour-space conversion, image copy and host clipboard
 writing remain separate work; the macOS comparison is
 [Apple's Digital Color Meter guide](https://support.apple.com/en-ca/guide/digital-color-meter/welcome/mac).
 
-The optional `tests/desktop-perf/run.py --scenarios=tools` QEMU scenario opens
+The optional `tests/desktop-perf/run --scenarios=tools` QEMU scenario opens
 Color Meter, Calculator and Notes, installs their aliases in older images,
 and requires the compositor plus all three native clients. It checks startup
 and rendering; utility model/export/ownership tests are documented in
@@ -704,7 +704,7 @@ The new counters and job control require booting the rebuilt kernel. Older
 kernels still run the app and show unavailable data where appropriate.
 
 `desktop/tools/test-activity.sh` checks the application, controls and allocation
-lifetimes. `tests/activity-monitor/run.py` boots architecture-specific syscall,
+lifetimes. `tests/activity-monitor/run` boots architecture-specific syscall,
 resource-accounting and repeated-process-read allocation regressions in QEMU.
 
 ## Disk Usage, the disk inventory
@@ -942,7 +942,7 @@ recorded in `SOURCES.txt` beside it on the image.
 ## Fonts
 
 Vinix has no font files and no rasteriser, so the glyphs travel inside the
-binary. `tools/genfont.py` rasterises several Roboto faces with Noto Sans CJK
+binary. `tools/genfont` rasterises several Roboto faces with Noto Sans CJK
 SC and Noto Sans JP fallback into 8-bit coverage atlases and writes them to
 `font_data.v` as base64 of zlib-compressed atlases. Each face is one string,
 so unused faces require no heap-allocated string tables. `font.v` loads only
@@ -970,14 +970,14 @@ with no real glyph is dropped and reported. Anything not baked draws as a space.
 Regenerate after changing a size, a face, or translation characters. The first
 run downloads and verifies the pinned Noto source fonts into a host cache:
 
-    python3 desktop/tools/genfont.py
+    desktop/tools/genfont
 
 When adding Japanese characters, update the bundled subsets as described in
 `fonts/README.md` before regenerating.
 
 Check every catalog character and both raster scales against the baked data:
 
-    python3 desktop/tools/tests/test_font_data.py
+    desktop/tools/tests/test_font_data
 
 ## Memory
 
@@ -1197,7 +1197,7 @@ disk:
 
     VINIX_DESKTOP_INITRAMFS=$PWD/build/first-run.tar \
         ./scripts/build-desktop-aarch64.sh --compact-initramfs
-    python3 tests/browsers/run_vm.py --first-run --initramfs build/first-run.tar
+    tests/browsers/run_vm --first-run --initramfs build/first-run.tar
 
 Setting `VOFFICE_BUNDLE_URL` at the top of `tests/desktop/first-run-apps-init.sh`
 installs a real VOffice bundle instead, for example one served from the host at

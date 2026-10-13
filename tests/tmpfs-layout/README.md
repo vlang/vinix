@@ -18,7 +18,7 @@ privately and shared; and measures what ten thousand files of 100 bytes and
 two thousand of 70 KiB take from free memory.
 
 ```sh
-python3 tests/kernel-gaps/run.py --source tests/tmpfs-layout/guest.c \
+tests/kernel-gaps/run-native --source tests/tmpfs-layout/guest.c \
     --arch aarch64 --kernel-dir kernel \
     --expect 'TMPFS-LAYOUT PASS all' --fail 'TMPFS-LAYOUT FAIL' --timeout 400
 ```

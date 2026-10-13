@@ -25,7 +25,7 @@ large-page accounting must match its warmed baseline after startup storage has
 retired (three snapshots and a seven-second grace):
 
 ```sh
-python3 tests/kernel-gaps/run.py --arch x86_64 --no-network \
+tests/kernel-gaps/run-native --arch x86_64 --no-network \
   --kernel-dir /path/to/kernel --source tests/memory/bigio/core.v \
   --expect 'vmap: self-test passed' --expect 'BIG IO PASS:' --timeout 240
 ```

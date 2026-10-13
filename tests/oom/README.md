@@ -56,9 +56,9 @@ was refused or killed, that a new process still starts, and that the memory
 came back.
 
 ```sh
-python3 tests/kernel-gaps/run.py --source tests/oom/guest.c --arch aarch64 \
+tests/kernel-gaps/run-native --source tests/oom/guest.c --arch aarch64 \
     --kernel-dir kernel --expect 'OOM PASS all' --fail 'OOM FAIL' --timeout 500
-python3 tests/kernel-gaps/run.py --source tests/oom/guest.c --arch x86_64 \
+tests/kernel-gaps/run-native --source tests/oom/guest.c --arch x86_64 \
     --kernel-dir build-amd64-kernel --expect 'OOM PASS all' --fail 'OOM FAIL' \
     --timeout 1200
 ```

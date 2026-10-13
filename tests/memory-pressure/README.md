@@ -37,7 +37,7 @@ These substitute physical-memory snapshots, synchronization, atomic operations,
 and event delivery. They exercise threshold recovery, separate reads, stable
 partial reads, delayed acknowledged events, subscription limits and slot reuse.
 `guest.c` exercises real procfs opens, poll, epoll, descriptor sharing and slot
-reuse on either architecture through `tests/kernel-gaps/run.py`.
+reuse on either architecture through `tests/kernel-gaps/run-native`.
 It also faults in anonymous memory while leaving a bounded kernel reserve,
 checks warning/critical readiness and a background reclaim attempt, then unmaps
 the allocation and verifies the normal recovery notification.

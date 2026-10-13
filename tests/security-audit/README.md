@@ -9,7 +9,7 @@ bytes after 10,000 producing calls and 1,000 collector opens.
 
 ```sh
 make -C kernel CC=clang V=/path/to/v ARCH=aarch64 LIMINE_MP=1
-python3 tests/kernel-gaps/run.py --source tests/security-audit/test.c \
+tests/kernel-gaps/run-native --source tests/security-audit/test.c \
   --arch aarch64 --kernel-dir kernel --expect 'SECURITY AUDIT PASS' \
   --fail 'SECURITY AUDIT FAIL'
 ```

@@ -37,11 +37,11 @@ real multicore guests exercise actual atomic publication and interrupt delivery.
 Build each architecture in a separate worktree, then run:
 
 ```sh
-python3 tests/kernel-gaps/run.py \
+tests/kernel-gaps/run-native \
   --source tests/scheduler-preemption/guest.c --arch aarch64 \
   --kernel-dir /path/to/arm/kernel \
   --expect 'SCHED-PREEMPT PASS' --fail 'SCHED-PREEMPT FAIL'
-python3 tests/kernel-gaps/run.py \
+tests/kernel-gaps/run-native \
   --source tests/scheduler-preemption/guest.c --arch x86_64 \
   --kernel-dir /path/to/x86/kernel \
   --expect 'SCHED-PREEMPT PASS' --fail 'SCHED-PREEMPT FAIL'

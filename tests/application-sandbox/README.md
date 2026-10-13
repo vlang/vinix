@@ -51,10 +51,10 @@ injected callbacks.
 Boot the userspace launcher regression against independently built kernels:
 
 ```sh
-python3 tests/kernel-gaps/run.py --source tests/application-sandbox/guestfixture/core.v \
+tests/kernel-gaps/run-native --source tests/application-sandbox/guestfixture/core.v \
   --arch aarch64 --kernel-dir kernel --expect 'APPLICATION SANDBOX GUEST PASS' \
   --fail 'APPLICATION SANDBOX FAIL'
-python3 tests/kernel-gaps/run.py --source tests/application-sandbox/guestfixture/core.v \
+tests/kernel-gaps/run-native --source tests/application-sandbox/guestfixture/core.v \
   --arch x86_64 --kernel-dir build-amd64-kernel --expect 'APPLICATION SANDBOX GUEST PASS' \
   --fail 'APPLICATION SANDBOX FAIL'
 sh tests/application-sandbox/run-native.sh aarch64 kernel

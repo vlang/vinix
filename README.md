@@ -362,8 +362,9 @@ standard-library dependencies. Stage it before assembling the userland:
 Both aarch64 userland builders automatically merge
 `build-aarch64-python/staging` when it is present. Set
 `VINIX_PYTHON_STAGING=/path/to/staging` to use another tree. The staging script
-also installs `/root/python3-smoke.py`; the ARM64 VM image runs this test during
-its boot suite and it can be rerun manually with `python3`.
+also installs the native V `/root/python3-smoke` executable; the ARM64 VM image
+runs it during its boot suite, and it can be rerun directly. It checks the
+interpreter and extensions through their C API.
 
 ### Ruby on aarch64
 
@@ -906,10 +907,10 @@ The bring-up tests boot QEMU, start a browser through the same bridge the
 compositor uses, and wait for a viewable top-level window:
 
 ```sh
-python3 tests/browsers/run_vm.py              # Chromium
-python3 tests/browsers/run_vm.py --firefox    # Firefox
-python3 tests/browsers/run_vm.py --desktop    # Firefox inside a desktop window
-python3 tests/browsers/run_vm.py --package    # pkg install chromium, then run it
+tests/browsers/run_vm              # Chromium
+tests/browsers/run_vm --firefox    # Firefox
+tests/browsers/run_vm --desktop    # Firefox inside a desktop window
+tests/browsers/run_vm --package    # pkg install chromium, then run it
 ```
 
 The Chromium, Firefox and package profiles run the browser through the X11

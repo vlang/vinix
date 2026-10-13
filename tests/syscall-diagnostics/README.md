@@ -8,7 +8,7 @@ dereference a user path before checked pathname copying runs.
 
 ```sh
 VINIX_CMDLINE=vinix.user_access=strict \
-python3 tests/kernel-gaps/run.py --arch x86_64 --no-network \
+tests/kernel-gaps/run-native --arch x86_64 --no-network \
   --kernel-dir /path/to/debug-amd64-kernel \
   --source tests/syscall-diagnostics/guestfixture/core.v \
   --expect 'SYSCALL DIAGNOSTICS PASS' --timeout 180
