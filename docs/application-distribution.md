@@ -622,6 +622,25 @@ already admitted applications retain their launch snapshot. Uninstall stays
 available under restrictive policy. This does not reconcile installed roots or
 activate a package generation; use a separately reviewed deployment afterward.
 
+In Software, open **Deployment → Organization policy** to browse the active
+offline setting, allowed IDs, version pins, permitted permissions, accepted
+proprietary licenses, firmware permission and disk reserve. Empty allowlists are
+unrestricted within trusted publishers; empty permission/license lists permit
+no grants/accept no proprietary licenses. These meanings are shown explicitly.
+
+Enter an absolute policy file path and choose **Review policy**. The review
+starts with the complete frozen filename; browse each settings category to
+compare previous and proposed values, and **Installed-app effects** to inspect
+every installed package’s provenance, license/firmware flags and before/after
+diagnostics. Long values remain available across pages. **Confirm policy** uses
+the exact file and fingerprint through the existing administrator approval
+transport for ordinary sessions. Read and review need no password. Cancellation
+before approval writes nothing. Apply failures invalidate the displayed policy
+and require reload/review; success reloads persistent settings. Normal window
+close is blocked while an approved change runs. Policy changes retain installed
+packages and personal data; a deployment is a separate reviewed action. See the
+[policy manager qualification](../tests/packages/policy-ui-check.md).
+
 Documents reject missing/null fields, type coercion, malformed version ranges,
 unknown/duplicate object keys (including escaped spellings), duplicate entries/pin
 IDs and unknown permissions. Keys are checked independently in the document,

@@ -4,6 +4,7 @@ module pkgcore
 import json2
 import os
 import time
+import tools.packages.pkgprotocol
 
 fn policy_fixture(label string, installed bool) !(string, Service, Config) {
 	work := os.temp_dir() + '/vinix-policy-' + label + '-' + os.getpid().str() + '-' + time.now().unix_micro().str()
@@ -55,6 +56,14 @@ fn test_policy_review_is_read_only_canonical_and_reports_dependency_effects() {
 	assert review.rows.all(it.diagnostic_before == '' && it.diagnostic_after.contains('runtime: permissions blocked'))
 	assert review.rows[1].proprietary && review.rows[1].firmware && !review.rows[1].requested
 	assert review.proposed.allowed == ['app', 'runtime'] && review.previous.licenses == ['Vendor-EULA']
+	mut client := pkgprotocol.decode_policy_review(json2.encode(review))!
+	assert client.rows.len == review.rows.len && client.fingerprint == review.fingerprint
+	assert client.rows[1].proprietary && client.rows[1].firmware && !client.rows[1].requested
+	assert client.rows[0].diagnostic_after == review.rows[0].diagnostic_after && client.proposed.permissions.len == 0
+	client.close()
+	mut document_client := pkgprotocol.decode_policy_document(json2.encode(service.policy()!))!
+	assert document_client.policy.allow_firmware && document_client.policy.licenses == ['Vendor-EULA']
+	document_client.close()
 	assert os.read_file(service.root + '/etc/vinix-packages/config.json')! == before_config
 	assert service.state()! == before_state && os.read_file(directory + '/trust-history.json')! == before_history
 	os.write_file(path, json2.encode(PolicyDocument{ architecture: 'aarch64', policy: Policy{ ...review.proposed, allowed: ['app', 'runtime'] } }))!

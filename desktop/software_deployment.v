@@ -109,6 +109,7 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 	children << software_label('The review includes installs, retained packages, updates and removals, with publisher keys, permissions, licenses and disk requirements. Empty deployments remove all packages. Personal data stays on disk.', 14, 204, width - 28, 60, false)
 	if a.worker == unsafe { nil } {
 		children << software_button('software.deployment.review', 'Review deployment', 14, 286, 180)
+		children << software_button('software.policy', 'Organization policy', 14, 330, 180)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
 	children << software_label(a.status, 14, height - if a.progress_seen { 88 } else { 98 }, width - 28, if a.progress_seen { 80 } else { 90 }, false)

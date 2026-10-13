@@ -1,0 +1,22 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1; direct -no-skip-unused runners.
+Policy presentation (3 assertions), existing personal-data presentation (3 assertions), core policy (6 assertions including actual-producer contract): PASS, exit 0.
+Policy presentation clang ASan/UBSan: PASS, exit 0; -fsanitize=address,undefined -fno-omit-frame-pointer; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1.
+Final production Software sources with headless UI fixtures: PASS; -gc none -manualfree -enable-globals -d ui2_headless; both Linux -check frontends PASS.
+Guest account/package/authentication/session programs freshly compiled; retained production kernels. Final presentation reader on both guests. x86_64 passed its original five-second detached-worker poll; final ARM fixture uses thirty seconds with unchanged assertions.
+Initial ARM attempt compared canonical and unsorted permission arrays by struct equality. Corrected fixture restores/computes canonical original policy. A second ARM run passed policy assertions but failed the old five-second detached-worker bound. First x86_64 attempt timed out after 600 seconds. All attempts retained; deadlines are functional, not performance qualification.
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed
+Native window broker: 1000 fragmented text frames, focus/edit/discard, UI builds and owned-tree retirements retain zero tracked bytes
+Software administrator approval: 1000 prompt/edit/render/wipe cycles retain zero tracked bytes
+Software personal data: 1000 wide/invalid/valid decode/select/render/confirm/cancel/retire cycles retain zero tracked bytes
+Software organization policy: 1000 wide-document/valid-review/invalid-review/page/redraw/cancel/retire cycles retain zero tracked bytes
+Software distribution checks passed

@@ -66,6 +66,7 @@ fn qualify_package_admin(mut t Test) ! {
 	}
 	assert os.ls('/run/user/1000')!.all(!it.starts_with('pkg-'))
 	t.say('PACKAGE ADMIN ordinary-admin password-required peer-bound reviewed-install progress stale-refusal no-launch PASS')
+	qualify_package_policy_admin(mut t, db, alex, sam)!
 	mut removal := service.review('remove', ['admin-fixture'])!
 	defer { removal.close() }
 	removed := run(['/usr/bin/vinix-package', 'admin', 'apply', removal.fingerprint, 'remove', 'admin-fixture'], alex_password + '\n', db, alex)
@@ -79,7 +80,9 @@ fn qualify_package_admin(mut t Test) ! {
 	disconnected := run(['/sbin/init', 'package-admin-disconnect', disconnected_review.fingerprint], '', db, alex)
 	assert disconnected.status == 0, disconnected.output
 	mut completed := false
-	for _ in 0 .. 100 {
+	// A detached worker can still be scheduled behind the authentication child
+	// under TCG. Bound completion by 30 seconds without weakening state checks.
+	for _ in 0 .. 600 {
 		state := service.state() or { C.usleep(50_000); continue }
 		if state.packages.len == 0 { completed = true; break }
 		C.usleep(50_000)

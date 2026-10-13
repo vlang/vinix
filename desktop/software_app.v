@@ -86,6 +86,19 @@ mut:
 	data_pending    string // frozen ID shown in the deletion confirmation
 	data_result     string
 	data_worker     SoftwareDataWorker
+	policy_mode     bool
+	policy_document pkgprotocol.PolicyDocument
+	policy_snapshot pkgprotocol.PolicyReview
+	policy_ready    bool
+	policy_review_ready bool
+	policy_path     []u8
+	policy_pending  string
+	policy_worker   SoftwarePolicyWorker
+	policy_pages    []SoftwarePolicyPage
+	policy_page     int
+	policy_section  int
+	policy_starts   [7]int
+	policy_result   string
 	progress_snapshot pkgprotocol.Progress
 	progress_pending []u8
 	progress_seen bool
@@ -212,6 +225,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker_mirror = false
 	a.repository_worker = .none
 	a.data_worker = .none
+	a.policy_worker = .none
 	a.worker = os.new_process(a.service_path.clone())
 	mut owned := []string{cap: arguments.len + 1}
 	authorized := a.administration_required && pkgadmin.administrative(arguments)
@@ -491,10 +505,13 @@ fn (mut a SoftwareApp) poll() bool {
 	running := a.worker_run
 	repository_worker := a.repository_worker
 	data_worker := a.data_worker
+	policy_worker := a.policy_worker
 	mirroring := a.worker_mirror
 	a.retire_worker()
 	a.clear_admin_prompt()
 	if code != 0 {
+		if policy_worker == .review { a.clear_policy_review(); a.prepare_policy_pages(false) }
+		if policy_worker == .apply { a.policy_ready = false; a.clear_policy_pages() }
 		if repository_worker == .review { a.clear_repository_review() }
 		if reviewing && repository_worker == .none { a.clear_review() }
 		diagnostic := software_output_tail(a.output)
@@ -511,6 +528,14 @@ fn (mut a SoftwareApp) poll() bool {
 			'The package service failed. Check administrator access, repository configuration and disk space.'
 		})
 		unsafe { diagnostic.free() }
+	} else if policy_worker == .list {
+		if !a.worker_failed { a.load_policy_document() }
+	} else if policy_worker == .review {
+		if a.worker_failed { a.clear_policy_review(); a.prepare_policy_pages(false) } else { a.load_policy_review() }
+	} else if policy_worker == .apply {
+		unsafe { a.policy_result.free() }
+		a.policy_result = 'Organization policy saved. Subsequent launches and maintenance use it; existing applications and personal data are retained.'.clone()
+		a.read_policy()
 	} else if data_worker == .list {
 		if !a.worker_failed { a.load_personal_data() }
 	} else if data_worker == .purge {
@@ -608,6 +633,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		return
 	}
 	if event_id.starts_with(packagecore.request_prefix) {
+		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.launch_mode { a.set_status('Close launch options before opening another application.'); return }
 		if a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
@@ -621,13 +647,25 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.run_requested()
 		return
 	}
-	if event_id == 'software.search' && !a.data_mode && !a.deployment_mode && !a.mirror_mode {
+	if event_id == 'software.search' && !a.policy_mode && !a.data_mode && !a.deployment_mode && !a.mirror_mode {
 		a.focus = true
 		return
 	}
 	if a.worker != unsafe { nil } { return }
+	if a.policy_mode { a.handle_policy(event_id); return }
 	if a.data_mode { a.handle_personal_data(event_id); return }
 	if a.launch_mode { a.handle_launch_options(event_id); return }
+	if event_id == 'software.policy' {
+		a.clear_review()
+		a.clear_repository_review()
+		a.repository_mode = false
+		a.deployment_mode = false
+		a.mirror_mode = false
+		a.focus = false; a.select_all = false
+		a.policy_mode = true
+		a.read_policy()
+		return
+	}
 	if event_id == 'software.data' {
 		a.clear_review()
 		a.clear_repository_review()
@@ -803,6 +841,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.admin_prompt { a.admin_key_input(input); return }
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
+	if a.policy_mode { a.policy_key_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input); return }
@@ -829,6 +868,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.admin_prompt { a.admin_paste_input(input); return }
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
+	if a.policy_mode { a.policy_paste_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {
@@ -886,6 +926,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.page_rows = if height > 400 { (height - 236) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+	if a.policy_mode { return a.build_policy(width, height) }
 	if a.data_mode { return a.build_personal_data(width, height) }
 	if a.launch_mode { return a.build_launch_options(width, height) }
 	if a.repository_mode { return a.build_repositories(width, height) }
@@ -1057,6 +1098,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_repository_review()
 	a.repository_status.close()
 	a.clear_personal_data()
+	a.clear_policy()
 	a.clear_progress()
 	unsafe {
 		a.launch_request.free()

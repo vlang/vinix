@@ -12,6 +12,10 @@ Cancelling a following repository refresh reports that trust was already saved.
 format-1, 4,096-byte request with a fresh 128-bit nonce. Only catalog refresh and
 reviewed apply/repository/deployment/policy/offline-export operations are admitted.
 The service repeats the exact fingerprint and current trust/policy/state checks.
+The current guest/controller also require the subsequent
+[organization-policy workflow](policy-ui-check.md). Its public-read,
+administrator/standard-role, changed-file refusal and policy-only persistence
+checks have separate receipts; existing receipts keep their original scope.
 Launches, arbitrary executables, alternate roots, publisher tooling and raw
 unreviewed transactions are refused before authentication.
 

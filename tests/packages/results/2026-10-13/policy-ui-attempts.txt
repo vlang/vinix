@@ -1,0 +1,127 @@
+AArch64 initial canonical-order fixture assertion
+FAIL aarch64 packages-admin (36.1s)
+  forbidden "V panic:" in the line: V panic: Assertion failed...
+  last 40 serial lines:
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | /Users/alex/code/vinix/tests/accounts/guest/package_policy_admin.v:62: FAIL: fn main.qualify_package_policy_admin: assert restored.status == 0 && pkgcore.load_config('')!.policy == initial.policy && service.state()! == before, restored.output
+  |       message: {"format":1,"architecture":"aarch64","policy":{"offline":true,"allowed":[],"pins":[],"permissions":["audio","display","files","network","process"],"licenses":[],"allow_firmware":false,"reserve_bytes":0}}
+  | 
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/pkpui/arm/packages-admin
+
+
+AArch64 original detached-worker completion bound
+FAIL aarch64 packages-admin (74.0s)
+  forbidden "FAIL: fn main.qualify_package_admin" in the line: /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:88: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+  last 40 serial lines:
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x27b900
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x252010
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:88: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/pkpui/arm2/packages-admin
+
+
+x86_64 initial timeout
+FAIL x86_64 packages-admin (600.5s)
+  timed out after 600 s without "PACKAGE POLICY ordinary-admin-standard public-read complete-impact literal-path password-role stale-file-refusal atomic-policy-only reload clean-runtime PASS", "PACKAGE ADMIN reviewed-remove rollback trust-revocation root-state audit no-password-log clean-runtime PASS", "HWTEST PASS packages-admin"
+  last 27 serial lines:
+  | BdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+  | initramfs: Unpacking...
+  | >+ [1] ./ sz=0
+  | >+ [2] ./proc/ sz=0
+  | !>+ [3] ./home/ sz=0
+  | !>+ [4] ./usr/ sz=0
+  | !>+ [5] ./sbin/ sz=0
+  | !>+ [6] ./etc/ sz=0
+  | !>+ [7] ./var/ sz=0
+  | !>+ [8] ./sys/ sz=0
+  | !>+ [9] ./root/ sz=0
+  | !>+ [10] ./dev/ sz=0
+  | !>+ [11] ./run/ sz=0
+  | !>+ [12] ./tmp/ sz=0
+  | !>+ [13] ./var/log/ sz=0
+  | !>+ [14] ./etc/vinix/ sz=0
+  | !>+ [15] ./etc/group sz=19
+  | !>+ [16] ./etc/passwd sz=30
+  | !>+ [17] ./etc/hwtest-scenario sz=15
+  | !>+ [18] ./etc/vinix/auth.conf sz=15
+  | !>+ [19] ./sbin/init sz=2890256
+  | !>+ [20] ./usr/bin/ sz=0
+  | !>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xff00000037e8a600
+  | initramfs: Done (30 entries)
+  | HWTEST START packages-admin
+  | PACKAGE ADMIN ordinary-admin password-required peer-bound reviewed-install progress stale-refusal no-launch PASS
+  logs: /Users/alex/code/vinix/build/pkpui/x86/packages-admin
+

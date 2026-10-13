@@ -1198,6 +1198,33 @@ memory management. Unknown/duplicate keys in review roots, policies, pins and
 installed rows are refused; formats other than 1 are
 refused. See [organization administration](../../docs/application-distribution.md#offline-and-organization-deployment).
 
+The lightweight `pkgprotocol` presentation module also supplies `PolicyDocument`,
+`PolicySettings`, `PolicyPin`, `PolicyReview`, `PolicyImpact`,
+`decode_policy_document` and `decode_policy_review` for the existing format-1
+CLI responses. This decoder consumes **canonical service output**, requiring
+sorted unique sets/pins/rows, complete typed fields, valid ranges/provenance,
+unsigned integer bounds and UTF-8. It rejects unknown/duplicate keys (including
+escaped spellings), missing/null/coerced fields and trailing input. Reply bounds
+remain 8 MiB, 4096 allowed IDs/pins/licenses/installed rows, five permissions and
+1 TiB reserve. The schema reader releases partial strings/arrays on failure and
+replaced buffers under `-gc none`; presentation instances own their fields and
+must be `.close()`d. Input policy files still use the service’s authoring contract,
+which accepts arbitrary list order and canonicalizes it for review.
+
+Software’s **Deployment → Organization policy** workflow freezes the literal
+path and complete review, discloses all previous/proposed settings and installed
+effects, and sends `policy-apply FINGERPRINT FILE` without a shell or progress
+option. Ordinary callers use the existing peer-bound administrator/password
+transport. Read/review are public operations; mutation retains the exact reviewed
+arguments during approval. The UI checks the administrator request’s encoded
+4096-byte bound before requesting credentials; an oversized escaped path requires
+a shorter path and fresh review. A handed-off or failed review cannot be
+confirmed again without fresh review. Apply errors invalidate cached policy; success
+reloads persistent settings. The approval prompt remains responsible for masked,
+bounded credential input and wiping. This UI never synthesizes a deployment,
+accepts a license implicitly or changes firmware permission outside the reviewed
+policy file. See [qualification](../../tests/packages/policy-ui-check.md).
+
 `mirror-review NEW_DIRECTORY ID...` emits a format-1
 [`pkgprotocol.MirrorReview`](pkgprotocol/mirror.v) envelope. Every envelope field
 is required: `format`, the literal `input_destination`, canonical absolute
