@@ -371,6 +371,20 @@ refresh, update-all, rollback, launch, progress and recent failure output. A run
 mutation prevents normal window close. Mutations require administrator access;
 there is no setuid service or automatic privilege escalation.
 
+Select a package and choose **Package details…** to read its complete overview,
+description, repository/publisher key, permissions, license and diagnostics.
+Each section has **Previous**/**Next** pages, including long UTF-8 text. Control
+bytes appear as `\xHH`. Catalog and update details identify the displayed version
+separately from installed launch permissions and native-window protocol; older
+services report unavailable installed fields explicitly.
+
+The same button is available for each package in an install, uninstall, update,
+deployment, rollback or offline-export review. It shows the reviewed operation,
+role, generations and disk byte counts, plus deployment/export paths when
+present. **Back to review** or Escape returns to the unchanged confirmation and
+selection. Only navigation is active while details are open. See the
+[package-details UI checks](../tests/packages/details-ui-check.md).
+
 For an installed CLI application, **Launch in Terminal** opens an interactive
 terminal inside Software. Type commands there; for SQLite, `.quit` exits and
 reveals **Back to Software**. Keyboard input, paste, resize and bounded output

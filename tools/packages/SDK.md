@@ -1332,6 +1332,22 @@ ownership contract. Software releases refusal errors and never enables
 confirmation or requests administrator credentials for malformed metadata. See
 [review metadata qualification](../../tests/packages/review-metadata-check.md).
 
+Software's **Package details…** inspector renders complete selected catalog or
+review fields in six paged sections. Pages own their copied text, titles and
+page labels; Back, Escape, service start, view replacement, review retirement
+and close release them. UTF-8 is validated and field bounds checked before
+pagination. Control bytes are escaped as `\xHH`; each page has at most fourteen
+lines, with chunks of at most 48 bytes ending at UTF-8 boundaries. Page caches
+can grow without retaining replaced buffers under `-gc none -manualfree`.
+
+Catalog/update pages distinguish displayed permissions from installed launch
+permissions/kind/window protocol. A service without installed launch fields
+reports them as unavailable. Review pages retain the decoded snapshot and
+literal deployment/export inputs without enabling actions through the inspector;
+returning preserves the fingerprint, selected package and review scroll. This
+presentation adds no protocol fields or package state. See the
+[package-details qualification](../../tests/packages/details-ui-check.md).
+
 [The V example](../../examples/package-hello/main.v) and target manifests show a
 native payload. `v run examples/package-hello/build.v /build/new-example-repository`
 cross-compiles and packs both ELF targets using the matching musl compilers.

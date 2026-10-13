@@ -73,6 +73,12 @@ mut:
 	review_selected int = -1
 	review_scroll   int
 	review_summary  string
+	details_mode    bool
+	details_review  bool
+	details_pages   []SoftwareDetailsPage
+	details_page    int
+	details_section int
+	details_starts  [6]int
 	worker          &os.Process = unsafe { nil }
 	worker_view     bool
 	worker_review   bool
@@ -216,6 +222,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 		a.set_status('The package service is missing. Install the V package tools in this image.')
 		return
 	}
+	a.clear_details()
 	a.output.clear()
 	a.clear_progress()
 	a.worker_failed = false
@@ -286,6 +293,7 @@ fn (mut a SoftwareApp) filter_rows() {
 }
 
 fn (mut a SoftwareApp) load_view() {
+	a.clear_details()
 	a.clear_launch_options()
 	a.clear_review()
 	a.deployment_mode = false
@@ -340,6 +348,7 @@ fn (mut a SoftwareApp) load_view() {
 }
 
 fn (mut a SoftwareApp) clear_review() {
+	a.clear_details()
 	a.clear_mirror_review()
 	a.review_snapshot.close()
 	unsafe {
@@ -634,6 +643,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		} else { a.terminal_app.handle(event_id)! }
 		return
 	}
+	if a.details_mode { a.handle_details(event_id); return }
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
@@ -722,6 +732,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 	}
 	match event_id {
+		'software.details' { a.open_details() }
 		'software.run-options' { a.open_launch_options() }
 		'software.run-terminal' {
 			if a.selected < 0 || a.selected >= a.rows.len { return }
@@ -843,6 +854,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.admin_prompt { a.admin_key_input(input); return }
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
+	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
 	if a.policy_mode { a.policy_key_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -870,6 +882,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.admin_prompt { a.admin_paste_input(input); return }
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
+	if a.details_mode { return }
 	if a.policy_mode { a.policy_paste_input(input); return }
 	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -926,8 +939,9 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			14, 40, width - 28, 60, false)
 		return ui2.screen(app_surface, compact)
 	}
-	a.page_rows = if height > 400 { (height - 236) / 30 } else { 5 }
+	a.page_rows = if height > 400 { (height - 274) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+	if a.details_mode { return a.build_details(width, height) }
 	if a.policy_mode { return a.build_policy(width, height) }
 	if a.data_mode { return a.build_personal_data(width, height) }
 	if a.launch_mode { return a.build_launch_options(width, height) }
@@ -993,6 +1007,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		} else {
 			a.rows[a.selected]
 		}
+		children << software_button('software.details', 'Package details…', 14, height - 176, 232)
 		children << software_label(row.name, 274, 90, if !reviewing && row.installed_version != '' && software_launch_kind(row) !in ['runtime', 'data'] { width - 466 } else { width - 288 }, 28, false)
 		children << software_label(row.description, 274, 124, if !reviewing && row.installed_version != '' && software_launch_kind(row) !in ['runtime', 'data'] { width - 466 } else { width - 288 }, 72, false)
 		children << software_label(if !reviewing && row.update_action == 'remove' {

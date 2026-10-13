@@ -364,6 +364,7 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'data-memory' { check_software_data_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'policy-memory' { check_software_policy_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'metadata-memory' { check_software_metadata_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'details-memory' { check_software_details_memory() or { panic(err) }; return }
 	mut args := os.args.clone()
 	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
@@ -555,6 +556,7 @@ fn main() {
 	check_software_data() or { panic(err) }
 	check_software_policy() or { panic(err) }
 	check_software_metadata() or { panic(err) }
+	check_software_details() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
 }
 

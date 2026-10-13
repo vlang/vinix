@@ -62,6 +62,8 @@ fn check() ! {
 		run(work + '/terminal-check', [])!
 	}
 	os.cp(repository + '/desktop/software_app.v', work + '/software/software_app.v')!
+	os.cp(repository + '/desktop/software_details.v', work + '/software/software_details.v')!
+	os.cp(repository + '/tests/packages/software_details_fixture.v', work + '/software/details_fixture.v')!
 	os.cp(repository + '/desktop/software_repositories.v', work + '/software/software_repositories.v')!
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
@@ -93,6 +95,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['data-memory'])!
 	run(work + '/window-broker-memory', ['policy-memory'])!
 	run(work + '/window-broker-memory', ['metadata-memory'])!
+	run(work + '/window-broker-memory', ['details-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {
