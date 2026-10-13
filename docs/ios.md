@@ -206,7 +206,7 @@ autorelease pools allow Foundation work on native app threads. Tests race eight
 threads against weak loads/deallocation and verify thread-exit pool cleanup.
 
 ```sh
-python3 tests/ios/run.py --with-cxx --with-gles --with-2048
+tests/ios/run --with-cxx --with-gles --with-2048
 ```
 
 These tests execute original ARM64 iOS instructions inside Vinix, checking shader
@@ -4132,7 +4132,7 @@ build/ios/run-ios-ppsspp-host --imports \
 
 # Inspect and attempt the identical executable in a real Vinix ARM64 guest:
 ./scripts/build-ios-aarch64.sh --with-cxx
-python3 tests/ios/run.py --no-build --with-cxx --with-ppsspp
+tests/ios/run --no-build --with-cxx --with-ppsspp
 ```
 
 The downloader verifies the release's 31,124,277-byte IPA against the publisher's
@@ -4196,7 +4196,7 @@ thread destructors. Normal calculator/2048 teardown continues to check ARC.
 Reproduce the native menu/Settings test and capture its actual pixels:
 
 ```sh
-python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
+tests/ios/run --no-build --with-cxx --with-gles --with-2048 \
   --with-ppsspp --ppsspp-muted --timeout 300 > build/ios/ppsspp-guest.log 2>&1
 tests/ios/frame build/ios/ppsspp-guest.log build/ios/ppsspp-settings.png
 ```
@@ -4215,7 +4215,7 @@ Its `Cube Sample` MIPS executable draws the textured rotating cube from the
 Neither the PSP binary nor the iOS executable is rewritten.
 
 ```sh
-python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
+tests/ios/run --no-build --with-cxx --with-gles --with-2048 \
   --with-ppsspp --ppsspp-muted --ppsspp-cube --timeout 300 \
   > build/ios/ppsspp-cube-guest.log 2>&1
 tests/ios/frame build/ios/ppsspp-cube-guest.log build/ios/ppsspp-cube.png
@@ -4261,7 +4261,7 @@ textures, game code and sounds. Neither `EBOOT.PBP` nor PPSSPP's Mach-O is
 patched or rebuilt.
 
 ```sh
-python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
+tests/ios/run --no-build --with-cxx --with-gles --with-2048 \
   --with-ppsspp --ppsspp-muted --ppsspp-nzp --timeout 300 \
   > build/ios/ppsspp-nzp-guest.log 2>&1
 tests/ios/frame build/ios/ppsspp-nzp-guest.log build/ios/ppsspp-nzp-before.png --frame 0
@@ -4312,7 +4312,7 @@ archive members, executable size/hash and headers, and installs it under
 patched. The binaries remain in the ignored build directory.
 
 ```sh
-python3 tests/ios/run.py --no-build --with-cxx --with-gles --with-2048 \
+tests/ios/run --no-build --with-cxx --with-gles --with-2048 \
   --with-ppsspp --ppsspp-muted --ppsspp-gow --timeout 1200 \
   > build/ios/ppsspp-gow-guest.log 2>&1
 tests/ios/frame build/ios/ppsspp-gow-guest.log build/ios/ppsspp-gow.png
@@ -4397,7 +4397,7 @@ across separate process executions. XML plist tests preserve whitespace and
 mixed text/CDATA order:
 
 ```sh
-python3 tests/ios/run.py --with-cxx --with-2048 --with-ppsspp
+tests/ios/run --with-cxx --with-2048 --with-ppsspp
 # Independently validate PPSSPP's actual linker streams without executing it:
 VINIX_IOS_PPSSPP_BINARY="$PWD/build/ios/ppsspp/unpacked/Payload/PPSSPP.app/PPSSPP" \
   v -enable-globals -gc none test compat/ios/macho
@@ -4466,13 +4466,13 @@ missing iOS executable.
 VMODULES="$PWD/compat/ios" v -enable-globals -cc clang test compat/ios
 ./tests/ios/run-objc-calculator.sh
 ./tests/ios/uikit # after building build/ios/run-ios-host above
-python3 tests/ios/run.py
+tests/ios/run
 ./tests/ios/desktop --desktop build/vinix-desktop
 # Upstream iOS-2048, including original model tests and real guest swipes:
 ./tests/ios/build-2048-model.sh # after building the app
 build/ios/run-ios-host build/ios/2048/model-tests
 ./tests/ios/game2048
-python3 tests/ios/run.py --with-2048
+tests/ios/run --with-2048
 ./tests/ios/desktop --app 2048 --desktop build/vinix-desktop
 ```
 

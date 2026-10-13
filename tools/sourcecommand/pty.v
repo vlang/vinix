@@ -84,7 +84,20 @@ pub fn spawn_pty(argv []string, environment map[string]string, directory string)
 		break
 	}
 	if !acknowledged { return error('PTY session setup timed out') }
-	if C.getpgid(int(pid)) != pid { return error('PTY child did not create a private process group') }
+	// A failed exec can exit between readiness and this query. waitid keeps
+	// that leader reserved. Darwin can remove its group just before publishing
+	// waitid's exit record; wait within the existing setup deadline for that
+	// record. An absent group is safe only after observed exit.
+	for {
+		group := C.getpgid(int(pid))
+		group_error := C.errno
+		if group == pid { break }
+		if group < 0 && group_error == C.ESRCH {
+			if child.poll()!.exited { break }
+			if time.sys_mono_now() < deadline { time.sleep(time.millisecond); continue }
+		}
+		return error('PTY child did not create a private process group (${group}, errno ${group_error})')
+	}
 	if C.fcntl(descriptor, C.F_SETFD, C.FD_CLOEXEC) != 0 || C.fcntl(descriptor, C.F_SETFL, C.O_NONBLOCK) != 0 { return os.error_posix() }
 	ready = true
 	return child

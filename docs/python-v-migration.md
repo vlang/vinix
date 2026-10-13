@@ -3315,3 +3315,19 @@ cycles and existing QMP cases keep descriptors flat. Public CLI checks pass.
 No Python, real Vinix guest or new kernel allocation result is claimed. This
 caller-preparation stage receives zero Python-file retirement credit. See
 [native ext2 controller](../tests/native-ext2-run/README.md).
+
+The native main iOS VM controller now supplies the maintained `tests/ios/run`
+command and all nine original switches. Fifteen cold ARM/x86/ASanUBSan builds
+pass all 512 option combinations, every missing/duplicated marker, exact
+universal/ARM64e/truncated image bytes, original build plans, native PSP fetches,
+copy/link/directory metadata and hard-link fallback. Each profile compiles the
+unchanged static ARM64 C init and checks eight controlled full workflows, eleven
+failure/output/signal/descendant cases, 100 failed-exec boots, 1,000 fast PTY
+exits and existing VM regressions. Cleanup stress exposed the Darwin gap between
+process-group removal and waitid exit publication; the reserved owner now waits
+within its setup deadline before accepting an exited child. Large serial output
+uses bounded overlapping marker scans without repeated whole-log copies. No
+Python or real Vinix guest is executed; native gzip headers and archive ordering
+can differ while members retain their bytes/modes/links. The independently
+staged Python bridge remains intact, so this controller receives zero
+Python-file retirement credit. See [native iOS VM controller](../tests/native-ios-run/README.md).

@@ -1,0 +1,217 @@
+{
+    "evidence": "~/.cache/vinix-ios-controller-native-20261013",
+    "lifetime_review": "The sole PTY owner retains the leader through observations, bounded stop and group retirement; its close is idempotent. The absent-group setup path accepts only reserved waitid-confirmed exit within the original deadline. The stop-marker string view borrows an owned noslices buffer only during a synchronous read-only call and expires before any append; complete-log verdicts use a copy. The work-tree defer follows every staging/compiler/archive/guest failure; no shared input link is removed by cleanup.",
+    "limits": "Controlled fixture builders and VM only; no new iOS/graphics/kernel result. USTAR content/mode/link semantics retained but order/padding and gzip filename/timestamp headers can differ. Alternate runner root supplies the boot script rather than Python callbacks. Concurrently staged object bridge and legacy Python files remain intact; zero retirement credit.",
+    "original": {
+        "current_bytes": 11552,
+        "current_sha256": "2f63b94c2f89a1538477889673289c22b7f11f814d78e0399d069ed920d495bf",
+        "features": [
+            "iOS PASS: lock-free Darwin atomic queues and node reuse",
+            "iOS PASS: Darwin assertion diagnostics and SIGABRT",
+            "iOS PASS: Darwin stack probes preserve native arguments",
+            "iOS PASS: Darwin descriptor checks and fortified operations with SIGTRAP",
+            "iOS PASS: Darwin Unicode rune flags and locale selection",
+            "iOS PASS: Darwin socket addresses, options and native network I/O",
+            "iOS PASS: image-scoped exit callbacks and real process termination",
+            "iOS PASS: Darwin floating and integer conversion errors",
+            "iOS PASS: Darwin NaN payloads and floating state preservation",
+            "iOS PASS: Darwin pipes, polling filters and native readiness waits",
+            "iOS PASS: Darwin file permissions and descriptor lifetime",
+            "iOS PASS: Darwin dispatch queues, deadlines and callback ownership",
+            "iOS PASS: Darwin descriptor controls and real file synchronization",
+            "iOS PASS: Darwin name resolution, address ownership and network I/O",
+            "iOS PASS: Darwin network interfaces, snapshots and address ownership",
+            "iOS PASS: Darwin system queries, account records and resource usage",
+            "iOS PASS: Darwin process credentials, signal delivery and allocation sizes",
+            "iOS PASS: native hierarchical app memory budgets and live accounting",
+            "iOS PASS: image-owned fork callbacks, real cloning and Darwin wait status",
+            "iOS PASS: Darwin thread attributes, native user stacks and detached creation",
+            "iOS PASS: Darwin condition attributes and native private synchronization",
+            "iOS PASS: native thread identities, explicit exit and key destructor iterations",
+            "iOS PASS: native thread scheduling, guarded Darwin parameters and privilege enforcement",
+            "iOS PASS: native Mach thread ports, send references and namespace lifetime",
+            "iOS PASS: Darwin ioctl controls, socket bytes and interface queries",
+            "iOS PASS: Darwin calendars, timezone configuration and native process clocks",
+            "iOS PASS: Mach-O arithmetic and libSystem imports",
+            "iOS PASS: legacy dyld imports and image/TLS lifecycle",
+            "iOS PASS: native chained and legacy pointer tags",
+            "iOS PASS: native CoreFoundation conversion, data and collection ownership",
+            "iOS PASS: native PCM conversion and AudioToolbox callback ABI",
+            "iOS PASS: native offline AudioUnit graph rendering and mixer ownership",
+            "iOS PASS: native CoreGraphics color precision, fill state and ownership",
+            "iOS PASS: native CoreGraphics providers, raw image formats and callback ownership",
+            "iOS PASS: native CoreGraphics geometry and HFA calling conventions",
+            "iOS PASS: native GameController typed key codes and string constants",
+            "iOS PASS: native Security certificates, public keys, constants and random bytes",
+            "iOS PASS: native Security X.509 and SSL policy ownership",
+            "iOS PASS: native Security explicit-anchor trust evaluation and key ownership",
+            "iOS PASS: native CFNetwork HTTP proxy settings and ownership",
+            "iOS PASS: native keychain queries, ownership and persistent credentials",
+            "iOS PASS: native CommonCrypto SHA, HMAC and AES calling conventions",
+            "iOS PASS: native framework constants match installed Apple libraries",
+            "iOS PASS: native accessibility metadata and weak container lifecycle",
+            "iOS PASS: native Objective-C reflection, replacement and dynamic classes",
+            "iOS PASS: native register-specific ARC calling conventions and ownership",
+            "iOS PASS: native UIKit bitmap contexts, image ownership and PNG/JPEG codecs",
+            "iOS PASS: bundled Mach-O libraries, dependent initialization and isolated image TLS",
+            "iOS PASS: import audit reports missing dependencies without executing app code",
+            "iOS PASS: lazy function imports defer unsupported calls",
+            "iOS PASS: Darwin stdio, varargs and system queries",
+            "iOS PASS: native UIKit scene and application launch",
+            "iOS PASS: native file launch and scene URL ownership",
+            "iOS PASS: thread-safe ARC and autorelease pools",
+            "iOS PASS: native Mach VM aliases and mapping lifetime",
+            "iOS PASS: return status and unsupported imports",
+            "iOS PASS: universal executable selects ARM64",
+            "iOS PASS: ARM64e and malformed images rejected",
+            "iOS PASS: UIKit Mach-O 27 button/action cases",
+            "iOS PASS: UIKit resize, keyboard, 1000 updates and ARC teardown"
+        ],
+        "head_sha256": "e67389d2a42baed16d06a3c6df6aa33b27cdc2691c439fa807be989300991877"
+    },
+    "profiles": [
+        {
+            "inputs": [
+                {
+                    "path": "cases/build/fixtures/calculator",
+                    "sha256": "54eda2d60ae9bf45dee7d895436faaa7ac97d24efbf97d9722bac10b3a6c3c8a"
+                },
+                {
+                    "path": "cases/build/objc/Calculator.app/Calculator",
+                    "sha256": "30d37e7090850ce0822df338542b9861550e1c827587eff9e78541464a0218f1"
+                },
+                {
+                    "path": "cases/build/2048/NumberTileGame.app/NumberTileGame",
+                    "sha256": "ff492524e54fc83d8af2467360bd0786534fa0e69ba40047d3ff15e057d76c6d"
+                }
+            ],
+            "qualification": {
+                "limits": "Real unchanged static guest C init and retained Mach-O inputs; controlled builders and VM runner only. Native USTAR member semantics retained; gzip header/order/padding may differ. No Python, Vinix guest or new kernel executed.",
+                "profile": "arm",
+                "receipts": [
+                    {
+                        "name": "main",
+                        "sha256": "acb7a3ce96f47cd1fc1cc93c9932552d4e36c1acc13e494218eeee416f990974"
+                    },
+                    {
+                        "name": "check",
+                        "sha256": "3af7778310655770c1bd44417c1a3ba78bc2e0d348bde34349d1b03cd4812ce3"
+                    },
+                    {
+                        "name": "stage",
+                        "sha256": "aa476985a1d43aa41de1c9135d699c086f253c10afe0d534d65a71bf34514abf"
+                    },
+                    {
+                        "name": "pty",
+                        "sha256": "a0abd7c2d6edd6ec6326c88fb16b8c45b01a9010ecf9a629e44fb4b5b82f1093"
+                    },
+                    {
+                        "name": "existing-vm",
+                        "sha256": "0f1c496228ff844ed0e993b4118c39aaedbd889679d56f6bb7e096250ab3a086"
+                    },
+                    {
+                        "name": "real-aarch64-init",
+                        "sha256": "a3b4010e7682cdf8d4bb2eae8d5a4e9c8b280229a14bf3414de4ce4103c5d7fd"
+                    }
+                ],
+                "status": "PASS"
+            }
+        },
+        {
+            "inputs": [
+                {
+                    "path": "cases/build/fixtures/calculator",
+                    "sha256": "54eda2d60ae9bf45dee7d895436faaa7ac97d24efbf97d9722bac10b3a6c3c8a"
+                },
+                {
+                    "path": "cases/build/objc/Calculator.app/Calculator",
+                    "sha256": "30d37e7090850ce0822df338542b9861550e1c827587eff9e78541464a0218f1"
+                },
+                {
+                    "path": "cases/build/2048/NumberTileGame.app/NumberTileGame",
+                    "sha256": "ff492524e54fc83d8af2467360bd0786534fa0e69ba40047d3ff15e057d76c6d"
+                }
+            ],
+            "qualification": {
+                "limits": "Real unchanged static guest C init and retained Mach-O inputs; controlled builders and VM runner only. Native USTAR member semantics retained; gzip header/order/padding may differ. No Python, Vinix guest or new kernel executed.",
+                "profile": "x86",
+                "receipts": [
+                    {
+                        "name": "main",
+                        "sha256": "f9679f1a3ed12ae0a68d397f0941b1eb55270532209080f89f21ca25c1dabfbb"
+                    },
+                    {
+                        "name": "check",
+                        "sha256": "4784eedf2a95e0372b4225d3b448811cb2c28c4feac02dca34f98f0d9d181aab"
+                    },
+                    {
+                        "name": "stage",
+                        "sha256": "931e6884c489ea312249c2a0206e74daf220ed68487cfed9757192c01d55a8b6"
+                    },
+                    {
+                        "name": "pty",
+                        "sha256": "7585c3bd93d895dea23f2dabf477a25a5dac3859050e1d427dd82aeaa223cabc"
+                    },
+                    {
+                        "name": "existing-vm",
+                        "sha256": "8ec1c53662e2f6732b93c36878d8c8f02d64103d8e22ed43aeb9b28415d34cd7"
+                    },
+                    {
+                        "name": "real-aarch64-init",
+                        "sha256": "a3b4010e7682cdf8d4bb2eae8d5a4e9c8b280229a14bf3414de4ce4103c5d7fd"
+                    }
+                ],
+                "status": "PASS"
+            }
+        },
+        {
+            "inputs": [
+                {
+                    "path": "cases/build/fixtures/calculator",
+                    "sha256": "54eda2d60ae9bf45dee7d895436faaa7ac97d24efbf97d9722bac10b3a6c3c8a"
+                },
+                {
+                    "path": "cases/build/objc/Calculator.app/Calculator",
+                    "sha256": "30d37e7090850ce0822df338542b9861550e1c827587eff9e78541464a0218f1"
+                },
+                {
+                    "path": "cases/build/2048/NumberTileGame.app/NumberTileGame",
+                    "sha256": "ff492524e54fc83d8af2467360bd0786534fa0e69ba40047d3ff15e057d76c6d"
+                }
+            ],
+            "qualification": {
+                "limits": "Real unchanged static guest C init and retained Mach-O inputs; controlled builders and VM runner only. Native USTAR member semantics retained; gzip header/order/padding may differ. No Python, Vinix guest or new kernel executed.",
+                "profile": "san",
+                "receipts": [
+                    {
+                        "name": "main",
+                        "sha256": "4ba3bcbe17577bc6a8fc1d8f3d940fa19d927b6c49a4df2917f7cb620c25f74c"
+                    },
+                    {
+                        "name": "check",
+                        "sha256": "c4594efc8b225e1d94400b0715b3c8d80c920068d5230df4d576603a976df6da"
+                    },
+                    {
+                        "name": "stage",
+                        "sha256": "28f26c79201f5c197ee3d7a8f3216ea3ebdea4d5661eb41f1f587ec9dd735a6b"
+                    },
+                    {
+                        "name": "pty",
+                        "sha256": "36799111d6c862938e6c3d2fb77538f45f26a71462ea04982146ec03f6017690"
+                    },
+                    {
+                        "name": "existing-vm",
+                        "sha256": "e22200c00eef832276df0230a34599c0d9bf5f7b4ef2de826fa255c080973969"
+                    },
+                    {
+                        "name": "real-aarch64-init",
+                        "sha256": "a3b4010e7682cdf8d4bb2eae8d5a4e9c8b280229a14bf3414de4ce4103c5d7fd"
+                    }
+                ],
+                "status": "PASS"
+            }
+        }
+    ],
+    "qualification": "Fifteen cold ARM/x86/ASanUBSan builds. Per profile: 512 option combinations and every marker omission/duplicate; exact FAT/ARM64e/truncation bytes; all valid original build plans and native PSP fetcher selection; regular/dangling link and directory metadata plus hard-link/copy fallback; actual unchanged static AArch64 C init and retained real Calculator/2048 inputs; eight full controlled workflows, eleven failure/large/signal/descendant cases, 100 failed-exec boots, 1000 immediate/failed PTY execs; existing 27 VM cases and three static guest ELFs. Cold public help/argument guards. No Python or Vinix guest executed.",
+    "retired_python_files": 0
+}

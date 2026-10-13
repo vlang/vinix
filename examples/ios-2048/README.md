@@ -72,7 +72,7 @@ build/ios/run-ios-host build/ios/2048/model-tests
 ./tests/ios/game2048
 
 # Real isolated Vinix guest: upstream model tests and interactive app protocol.
-python3 tests/ios/run.py --with-2048
+tests/ios/run --with-2048
 
 # Actual compositor and QEMU pointer swipes; writes build/ios/2048.ppm.
 ./tests/ios/desktop --app 2048 --desktop build/vinix-desktop

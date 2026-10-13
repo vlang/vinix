@@ -62,7 +62,7 @@ builder installs `/usr/bin/vinix-ios-calculator` and the unchanged bundle below
 `/usr/share/vinix/ios/`. The compositor draws UIKit's controls and delivers button
 and keyboard input. The runtime handles resize callbacks and ARC teardown.
 
-`python3 tests/ios/run.py` runs the C probe and UIKit binary in an isolated Vinix
+`tests/ios/run` runs the C probe and UIKit binary in an isolated Vinix
 VM. The UIKit test clicks all 27 model cases through the desktop protocol,
 checks resize and keyboard input, and runs 1,000 update cycles before closing.
 `./tests/ios/desktop --desktop build/vinix-desktop` additionally verifies
