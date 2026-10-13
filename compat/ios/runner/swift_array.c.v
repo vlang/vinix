@@ -147,6 +147,7 @@ fn swift_array_arena() u64 {
 }
 
 fn swift_array_symbol(symbol string) ?u64 {
+	if address := swift_set_symbol(symbol) { return address }
 	if address := swift_collection_symbol(symbol) { return address }
 	if address := swift_array_sequence_symbol(symbol) { return address }
 	return match symbol {
@@ -159,6 +160,7 @@ fn swift_array_symbol(symbol string) ?u64 {
 }
 
 fn swift_array_stop() {
+	swift_set_stop()
 	swift_collection_stop()
 	swift_array_sequence_stop()
 	// Shutdown has joined workers and drained all owners/callbacks. Retire

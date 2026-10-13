@@ -98,6 +98,7 @@ fn main() {
 		require_child('/opt/ios/swift-sequence-checks')
 		require_child('/opt/ios/swift-array-sequence-checks')
 		require_child('/opt/ios/swift-collection-checks')
+		require_child('/opt/ios/swift-set-checks')
 		require_child('/opt/ios/swift-metadata-checks')
 		require_child('/opt/ios/swift-protocol-checks')
 		require_child('/opt/ios/swift-hash-checks')
@@ -142,7 +143,7 @@ fn main() {
 	} else if mode == 'swift' {
 		if os.is_dir('/opt/ios/lookup-native') { os.setenv('VINIX_IOS_LOOKUP_NATIVE', '/opt/ios/lookup-native', true) }
 		require_child('/opt/ios/module-lookup-checks')
-		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'foreign-count', 'foreign-index', 'foreign-offset', 'foreign-subscript', 'utf16-offset', 'sequence', 'array-sequence', 'collection', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
+		for name in ['unknown-value', 'string', 'empty-string', 'describing', 'cstring', 'foreign-count', 'foreign-index', 'foreign-offset', 'foreign-subscript', 'utf16-offset', 'sequence', 'array-sequence', 'collection', 'set', 'metadata', 'protocol', 'hash', 'hasher', 'raw-representable',
 			'array', 'integer', 'integer-hash', 'fatal', 'interpolation', 'array-storage', 'vararg', 'void', 'version', 'initializer', 'heap', 'error', 'error-value', 'object-type', 'mangled', 'witness', 'once', 'objc-bool', 'actor-executor', 'task-priority', 'task-alloc', 'task-create', 'task-switch', 'nslog', 'string-unbridge', 'error-description'] {
 			require_child('/opt/ios/swift-' + name + '-checks')
 		}

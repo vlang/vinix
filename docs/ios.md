@@ -4611,6 +4611,54 @@ exits with status 1 before entry at MarketplaceKitWrapper's Set:Sequence
 descriptor, `_$sShyxGSTsMc`. Full regression remains unpassed; entry,
 rendering and gameplay remain unverified. Five published runners are unchanged.
 
+The next implementation adds native Set:Sequence and Set.Iterator witnesses
+in V, measured against this Mac's Swift library and its SDK interface. Set
+metadata retains the exact Element/Hashable pair and its frozen ownership
+word. Its complete Sequence table exposes direct Element/Iterator metadata,
+the IteratorProtocol table and all six methods. The 40-byte iterator transfers
+storage ownership and scans occupied bitmap buckets, including empty words;
+it copies each element through the caller's value witnesses. Contiguous copying
+builds an owned typed Array, `copyContents` returns an exhausted owned iterator,
+and `withContiguousStorageIfAvailable` returns nil without invoking its closure.
+Membership lookup uses the caller's raw-hash and Equatable witnesses with
+linear collision probing. The native minimum-capacity constructor allocates
+bounded typed storage or returns the sealed immortal empty singleton.
+
+Iterator copies retain storage, takes transfer it, and ValueBuffer copies
+share an owned box. Its measured enum layout has 126 spare payload cases;
+additional cases use a tag byte after the 40-byte value. The heap destructor
+destroys only occupied element slots before freeing its registered allocation.
+Callbacks run outside the registry lock, and consuming copies keep storage live
+until element callbacks finish. Generic witness construction only accepts
+canonical Set/Iterator metadata, rejects mismatched families, and retires
+specialization pages after owners and callbacks drain.
+
+Twelve native Set fixtures and matching V fixtures cover dense and sparse
+storage, collisions, reference elements, enum boundaries and boxed copies.
+Additional cases use real Int hashing with signed limits. Both `first(where:)`
+and `compactMap` preserve results, original x21 errors and element ownership.
+Concurrent first specialization and two runtime lifetimes leave the Swift
+ownership registries empty and the metadata pages unmapped. Nine focused
+host suites pass ASAN/UBSAN in both hashing modes (18 runs); nine freshly
+built suites pass in Vinix. All 21 programs and their original C streams,
+debug archives, input hashes, fixture corrections and four VM logs are retained
+under `build/ios/fortnite/set-sequence-checks`. Compressed evidence is persisted
+on Data and the owned RAM build volume is detached before recording proof.
+
+The supplied IPA now passes Set:Sequence and exits with status 1 before entry
+at MarketplaceKitWrapper's required `Collection.first` getter,
+`_$sSlsE5first7ElementQzSgvg`. This is a verified strong SwiftCore import in
+the actual framework. Full regression remains unpassed; game entry, rendering
+and gameplay remain unverified. The five published runners remain unchanged.
+
+This subset covers registered native storage and complete caller-supplied
+Hashable/value witnesses. Cocoa-backed sets, insertion/removal/resizing,
+Set:Collection/SetAlgebra, native NSSet bridging, reflection and general generic
+metadata/conformance discovery remain unsupported. The layout references are
+Swift's public [Set storage](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/SetStorage.swift),
+[hash-table layout](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/HashTable.swift)
+and [metadata ABI](https://github.com/swiftlang/swift/blob/main/include/swift/ABI/Metadata.h).
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4618,10 +4666,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,456 | 704 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 133 | 43 | 23 |
-| All images | 2,248 | 750 | 120 |
+| MarketplaceKitWrapper | 134 | 42 | 23 |
+| All images | 2,249 | 749 | 120 |
 
-The C++/GLES/Text variant reports 2,261 resolved imports, 737 unresolved strong
+The C++/GLES/Text variant reports 2,262 resolved imports, 736 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

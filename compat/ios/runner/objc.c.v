@@ -204,6 +204,9 @@ mut:
 	swift_array_sequence_metadata map[u64]u64 // Element -> sealed iterator metadata and complete Sequence tables.
 	swift_collection_arena u64
 	swift_collection_metadata map[u64]u64
+	swift_set_arena u64
+	swift_set_metadata map[u64]SwiftSetType // Sealed specialization page -> exact Element/Hashable pair.
+	swift_empty_set u64 // Immutable native empty singleton; retired with Set records.
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.
