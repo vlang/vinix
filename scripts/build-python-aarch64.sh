@@ -1,7 +1,8 @@
 #!/bin/bash
 # Stage a CPython 3 for the Vinix aarch64 (or amd64) userland.
 #
-# Nothing is compiled here: Alpine already ships a musl python3, which
+# CPython is reused from Alpine. The native V smoke controller is compiled
+# against the existing musl SDK. Alpine already ships a musl python3, which
 # is the same libc and architecture the Vinix userland uses, so its packages
 # drop straight into the initramfs. Building CPython from source in the guest
 # would take hours and prove nothing extra.
@@ -88,8 +89,8 @@ for pkg in "${PKGS[@]}"; do
 done
 
 mkdir -p "$STAGING/root"
-install -m644 "$SCRIPT_DIR/tests/python3/smoke.py" \
-    "$STAGING/root/python3-smoke.py"
+"$SCRIPT_DIR/build-support/python-smoke" --arch "$VINIX_ARCH" \
+    --output "$STAGING/root/python3-smoke"
 
 # Alpine ships some libraries as absolute symlinks, which resolve on the host
 # rather than in the guest. Replace them with the file they name.

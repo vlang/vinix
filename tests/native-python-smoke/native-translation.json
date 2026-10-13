@@ -1,0 +1,546 @@
+{
+    "evidence": "~/.cache/vinix-python-smoke-native-20261013",
+    "limits": "Model/reference and actual build/ABI qualification only. No actual interpreter, extension imports, real SDK thread or Vinix guest result established. Guest checks remain implemented against the real CPython SDK. The original aarch64 uname assertion remains, including on an amd64 staging build. Dynamic musl runtime and existing SDK are required.",
+    "original": {
+        "bytes": 9112,
+        "lines": 270,
+        "path": "tests/python3/smoke.py",
+        "sha256": "5736cdbdd14bcd7b6ffa1107508239765670c441d36bd6e8c7c43149407b29a9",
+        "static_check_labels": [
+            "interpreter is Python 3",
+            "write and stat a file",
+            "read it back",
+            "os.rename",
+            "symlink and readlink",
+            "os.listdir",
+            "os.truncate",
+            "os.statvfs",
+            "fork and pipe",
+            "waitpid exit status",
+            "subprocess.run",
+            "eight threads with a lock",
+            "threading.Event",
+            "select sees nothing ready",
+            "select sees a readable pipe",
+            "select.poll",
+            "select.epoll",
+            "socketpair round trip",
+            "SCM_RIGHTS stream boundary",
+            "SCM_RIGHTS descriptor delivery",
+            "SCM_RIGHTS leaves following bytes",
+            "unix socket connect/accept",
+            "unlink unix socket path",
+            "time.sleep and monotonic",
+            "time.time",
+            "process credentials",
+            "process ID",
+            "allocate a megabyte",
+            "os.urandom",
+            "zlib round trip",
+            "sha256",
+            "positioned file I/O",
+            "positioned vector write",
+            "posix_fallocate",
+            "posix_fadvise",
+            "seek/read beyond EOF",
+            "zero-filled sparse write",
+            "eventfd starts unreadable",
+            "eventfd and epoll",
+            "sendfile",
+            "sendfile explicit offset is positioned",
+            "sendfile contents",
+            "getrlimit",
+            "getcpu",
+            "sched_rr_get_interval",
+            "uname Linux layout",
+            "sqlite3 insert and select"
+        ]
+    },
+    "profiles": [
+        {
+            "limits": "No interpreter, SDK Python modules or Vinix guest executed. Ownership/callback tests use a native V model, and actual staged CPython ELF exports are checked as data. Both guest executables are generated and linked against real existing musl SDKs; this establishes builds/ABI availability and preserves source checks without asserting a new guest runtime result.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "d7551292f59a6fd75c966780f7a21f1186fed50b8c14c078a1bb2c8f144f2716"
+                },
+                {
+                    "name": "ownership",
+                    "sha256": "30816ebb51561c17e079365a69cb4504ac9ae565ea4b58c9d4f262e2e2a17a46"
+                },
+                {
+                    "name": "builder",
+                    "sha256": "52a30ef2b24a7ea8ff1a494ad1b74e71aa217eaefd6193e61de9c7c8d7079ecf"
+                },
+                {
+                    "arch": "aarch64",
+                    "compiler_sha256": "f35b1f243940861f7163c44d476c433bb0a6a7f0388d8e284f20b39a80d2aee7",
+                    "executable_sha256": "e3694f701b33a88c46cc41809e0d57be60510416120b8fb3e46b2c3982166d54",
+                    "generate": [
+                        "/Users/alex/.cache/vinix-linuxkpi-tools-native-20261012/toolchain-v/v",
+                        "-nocache",
+                        "-os",
+                        "linux",
+                        "-arch",
+                        "arm64",
+                        "-gc",
+                        "none",
+                        "-d",
+                        "no_segfault_handler",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-arm/.python-smoke.9OT7cO/smoke.c",
+                        "/Users/alex/code/vinix/tests/native-python-smoke/main.v"
+                    ],
+                    "inputs": [
+                        {
+                            "path": "tests/native-python-smoke/main.v",
+                            "sha256": "5ef6e30da14e58fbbb282fef2f31fecc0197e7f28b817c39da85b0a07d1ee763"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/core.v",
+                            "sha256": "79580aea25615fd2808b2795843a6b107c7af63355d3fe0aee8977a76a830b54"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/entry.v",
+                            "sha256": "a929d3cf2e04469cd2ea536129d5da1b8c1c2f26acafb2b6c1a007406e0e356f"
+                        },
+                        {
+                            "path": "build-support/cpythonapi/core.v",
+                            "sha256": "38fdf6911023b6551a39fe2ff75f8ff7d75564953aaeb02bc0052158d9563ecb"
+                        }
+                    ],
+                    "link": [
+                        "/opt/homebrew/opt/llvm/bin/clang",
+                        "--target=aarch64-linux-musl",
+                        "--sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot",
+                        "-nostdlib",
+                        "-O2",
+                        "-pthread",
+                        "-fno-strict-aliasing",
+                        "-Wno-pointer-sign",
+                        "-Wno-format",
+                        "-Wno-macro-redefined",
+                        "-Wno-invalid-noreturn",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crt1.o",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crti.o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-arm/.python-smoke.9OT7cO/smoke.c",
+                        "-L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib",
+                        "-L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib",
+                        "-Wl,--dynamic-linker=/lib/ld-musl-aarch64.so.1",
+                        "-fuse-ld=lld",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-arm/.python-smoke.9OT7cO/smoke",
+                        "/Users/alex/code/vinix/build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1",
+                        "-lgcc",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crtn.o"
+                    ],
+                    "qualification": "Build-only; no CPython or Vinix guest executed.",
+                    "runtime": "/Users/alex/code/vinix/build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1",
+                    "runtime_sha256": "8289c205aa793bc6920dc7fff4e42d28dd6de2bec42bbd222548ef6c0abaffce"
+                },
+                {
+                    "sdk": "/Users/alex/code/vinix/build-aarch64-python/staging/usr/lib/libpython3.12.so.1.0",
+                    "sha256": "9ecefc6a40ad13bfb5adc3f7925368778b72c91ca427f52a2e2dcc53331a3eeb",
+                    "symbols": 36
+                },
+                {
+                    "arch": "x86_64",
+                    "compiler_sha256": "f35b1f243940861f7163c44d476c433bb0a6a7f0388d8e284f20b39a80d2aee7",
+                    "executable_sha256": "59957367faafd44b4bbd31f591f6ef4d36db19cbef0700b15b99f8435eb74d07",
+                    "generate": [
+                        "/Users/alex/.cache/vinix-linuxkpi-tools-native-20261012/toolchain-v/v",
+                        "-nocache",
+                        "-os",
+                        "linux",
+                        "-arch",
+                        "amd64",
+                        "-gc",
+                        "none",
+                        "-d",
+                        "no_segfault_handler",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-arm/.python-smoke.7EgPgf/smoke.c",
+                        "/Users/alex/code/vinix/tests/native-python-smoke/main.v"
+                    ],
+                    "inputs": [
+                        {
+                            "path": "tests/native-python-smoke/main.v",
+                            "sha256": "5ef6e30da14e58fbbb282fef2f31fecc0197e7f28b817c39da85b0a07d1ee763"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/core.v",
+                            "sha256": "79580aea25615fd2808b2795843a6b107c7af63355d3fe0aee8977a76a830b54"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/entry.v",
+                            "sha256": "a929d3cf2e04469cd2ea536129d5da1b8c1c2f26acafb2b6c1a007406e0e356f"
+                        },
+                        {
+                            "path": "build-support/cpythonapi/core.v",
+                            "sha256": "38fdf6911023b6551a39fe2ff75f8ff7d75564953aaeb02bc0052158d9563ecb"
+                        }
+                    ],
+                    "link": [
+                        "/opt/homebrew/opt/llvm/bin/clang",
+                        "--target=x86_64-linux-musl",
+                        "--sysroot=/Users/alex/code/vinix/build-amd64-desktop/initramfs-root",
+                        "-nostdlib",
+                        "-O2",
+                        "-pthread",
+                        "-fno-strict-aliasing",
+                        "-Wno-pointer-sign",
+                        "-Wno-format",
+                        "-Wno-macro-redefined",
+                        "-Wno-invalid-noreturn",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crt1.o",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crti.o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-arm/.python-smoke.7EgPgf/smoke.c",
+                        "-L/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib",
+                        "-L/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0",
+                        "-Wl,--dynamic-linker=/lib/ld-musl-x86_64.so.1",
+                        "-fuse-ld=lld",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-arm/.python-smoke.7EgPgf/smoke",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/lib/ld-musl-x86_64.so.1",
+                        "-lgcc",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crtn.o"
+                    ],
+                    "qualification": "Build-only; no CPython or Vinix guest executed.",
+                    "runtime": "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/lib/ld-musl-x86_64.so.1",
+                    "runtime_sha256": "2fb72c67f292827c8c4095067197af7880c234a3a4060136e1b5518d10de1eb9"
+                },
+                {
+                    "sdk": "/Users/alex/code/vinix/build-amd64-python/staging/usr/lib/libpython3.12.so.1.0",
+                    "sha256": "6d99e40ceb006eeab796a54dbb58cc0efd0841d6d52c7f44c5b675871ceeae8e",
+                    "symbols": 36
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "No interpreter, SDK Python modules or Vinix guest executed. Ownership/callback tests use a native V model, and actual staged CPython ELF exports are checked as data. Both guest executables are generated and linked against real existing musl SDKs; this establishes builds/ABI availability and preserves source checks without asserting a new guest runtime result.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "096b36001d3d4804fb4f301cd20181e76650fe2741ee1cdae2047bb8a005593d"
+                },
+                {
+                    "name": "ownership",
+                    "sha256": "9b8325ccc3fe3102740563b6632e82720993457d1e1b0149e242858d92afc57d"
+                },
+                {
+                    "name": "builder",
+                    "sha256": "dd968a6daf5b6103eedc1c47fac92e9289506b943f452bcf6447e518caa952d5"
+                },
+                {
+                    "arch": "aarch64",
+                    "compiler_sha256": "f35b1f243940861f7163c44d476c433bb0a6a7f0388d8e284f20b39a80d2aee7",
+                    "executable_sha256": "e3694f701b33a88c46cc41809e0d57be60510416120b8fb3e46b2c3982166d54",
+                    "generate": [
+                        "/Users/alex/.cache/vinix-linuxkpi-tools-native-20261012/toolchain-v/v",
+                        "-nocache",
+                        "-os",
+                        "linux",
+                        "-arch",
+                        "arm64",
+                        "-gc",
+                        "none",
+                        "-d",
+                        "no_segfault_handler",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-x86/.python-smoke.9MnMFM/smoke.c",
+                        "/Users/alex/code/vinix/tests/native-python-smoke/main.v"
+                    ],
+                    "inputs": [
+                        {
+                            "path": "tests/native-python-smoke/main.v",
+                            "sha256": "5ef6e30da14e58fbbb282fef2f31fecc0197e7f28b817c39da85b0a07d1ee763"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/core.v",
+                            "sha256": "79580aea25615fd2808b2795843a6b107c7af63355d3fe0aee8977a76a830b54"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/entry.v",
+                            "sha256": "a929d3cf2e04469cd2ea536129d5da1b8c1c2f26acafb2b6c1a007406e0e356f"
+                        },
+                        {
+                            "path": "build-support/cpythonapi/core.v",
+                            "sha256": "38fdf6911023b6551a39fe2ff75f8ff7d75564953aaeb02bc0052158d9563ecb"
+                        }
+                    ],
+                    "link": [
+                        "/opt/homebrew/opt/llvm/bin/clang",
+                        "--target=aarch64-linux-musl",
+                        "--sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot",
+                        "-nostdlib",
+                        "-O2",
+                        "-pthread",
+                        "-fno-strict-aliasing",
+                        "-Wno-pointer-sign",
+                        "-Wno-format",
+                        "-Wno-macro-redefined",
+                        "-Wno-invalid-noreturn",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crt1.o",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crti.o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-x86/.python-smoke.9MnMFM/smoke.c",
+                        "-L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib",
+                        "-L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib",
+                        "-Wl,--dynamic-linker=/lib/ld-musl-aarch64.so.1",
+                        "-fuse-ld=lld",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-x86/.python-smoke.9MnMFM/smoke",
+                        "/Users/alex/code/vinix/build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1",
+                        "-lgcc",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crtn.o"
+                    ],
+                    "qualification": "Build-only; no CPython or Vinix guest executed.",
+                    "runtime": "/Users/alex/code/vinix/build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1",
+                    "runtime_sha256": "8289c205aa793bc6920dc7fff4e42d28dd6de2bec42bbd222548ef6c0abaffce"
+                },
+                {
+                    "sdk": "/Users/alex/code/vinix/build-aarch64-python/staging/usr/lib/libpython3.12.so.1.0",
+                    "sha256": "9ecefc6a40ad13bfb5adc3f7925368778b72c91ca427f52a2e2dcc53331a3eeb",
+                    "symbols": 36
+                },
+                {
+                    "arch": "x86_64",
+                    "compiler_sha256": "f35b1f243940861f7163c44d476c433bb0a6a7f0388d8e284f20b39a80d2aee7",
+                    "executable_sha256": "59957367faafd44b4bbd31f591f6ef4d36db19cbef0700b15b99f8435eb74d07",
+                    "generate": [
+                        "/Users/alex/.cache/vinix-linuxkpi-tools-native-20261012/toolchain-v/v",
+                        "-nocache",
+                        "-os",
+                        "linux",
+                        "-arch",
+                        "amd64",
+                        "-gc",
+                        "none",
+                        "-d",
+                        "no_segfault_handler",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-x86/.python-smoke.ukTISI/smoke.c",
+                        "/Users/alex/code/vinix/tests/native-python-smoke/main.v"
+                    ],
+                    "inputs": [
+                        {
+                            "path": "tests/native-python-smoke/main.v",
+                            "sha256": "5ef6e30da14e58fbbb282fef2f31fecc0197e7f28b817c39da85b0a07d1ee763"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/core.v",
+                            "sha256": "79580aea25615fd2808b2795843a6b107c7af63355d3fe0aee8977a76a830b54"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/entry.v",
+                            "sha256": "a929d3cf2e04469cd2ea536129d5da1b8c1c2f26acafb2b6c1a007406e0e356f"
+                        },
+                        {
+                            "path": "build-support/cpythonapi/core.v",
+                            "sha256": "38fdf6911023b6551a39fe2ff75f8ff7d75564953aaeb02bc0052158d9563ecb"
+                        }
+                    ],
+                    "link": [
+                        "/opt/homebrew/opt/llvm/bin/clang",
+                        "--target=x86_64-linux-musl",
+                        "--sysroot=/Users/alex/code/vinix/build-amd64-desktop/initramfs-root",
+                        "-nostdlib",
+                        "-O2",
+                        "-pthread",
+                        "-fno-strict-aliasing",
+                        "-Wno-pointer-sign",
+                        "-Wno-format",
+                        "-Wno-macro-redefined",
+                        "-Wno-invalid-noreturn",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crt1.o",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crti.o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-x86/.python-smoke.ukTISI/smoke.c",
+                        "-L/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib",
+                        "-L/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0",
+                        "-Wl,--dynamic-linker=/lib/ld-musl-x86_64.so.1",
+                        "-fuse-ld=lld",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-x86/.python-smoke.ukTISI/smoke",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/lib/ld-musl-x86_64.so.1",
+                        "-lgcc",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crtn.o"
+                    ],
+                    "qualification": "Build-only; no CPython or Vinix guest executed.",
+                    "runtime": "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/lib/ld-musl-x86_64.so.1",
+                    "runtime_sha256": "2fb72c67f292827c8c4095067197af7880c234a3a4060136e1b5518d10de1eb9"
+                },
+                {
+                    "sdk": "/Users/alex/code/vinix/build-amd64-python/staging/usr/lib/libpython3.12.so.1.0",
+                    "sha256": "6d99e40ceb006eeab796a54dbb58cc0efd0841d6d52c7f44c5b675871ceeae8e",
+                    "symbols": 36
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "No interpreter, SDK Python modules or Vinix guest executed. Ownership/callback tests use a native V model, and actual staged CPython ELF exports are checked as data. Both guest executables are generated and linked against real existing musl SDKs; this establishes builds/ABI availability and preserves source checks without asserting a new guest runtime result.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "0a18f6c7ec1cacc7c83765862ad796e225d1adba4258bef441b5a9cd4edb4ca1"
+                },
+                {
+                    "name": "ownership",
+                    "sha256": "7116d3406a730c5cef46254492a197b17d2c5b7f6093abde6ce85d830da1d14b"
+                },
+                {
+                    "name": "builder",
+                    "sha256": "17f2cd4b930b775e1ee43761f2f0749dd836f2fdf81b73b3d6ef7c949d22590f"
+                },
+                {
+                    "arch": "aarch64",
+                    "compiler_sha256": "f35b1f243940861f7163c44d476c433bb0a6a7f0388d8e284f20b39a80d2aee7",
+                    "executable_sha256": "e3694f701b33a88c46cc41809e0d57be60510416120b8fb3e46b2c3982166d54",
+                    "generate": [
+                        "/Users/alex/.cache/vinix-linuxkpi-tools-native-20261012/toolchain-v/v",
+                        "-nocache",
+                        "-os",
+                        "linux",
+                        "-arch",
+                        "arm64",
+                        "-gc",
+                        "none",
+                        "-d",
+                        "no_segfault_handler",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-san/.python-smoke.IEU3jW/smoke.c",
+                        "/Users/alex/code/vinix/tests/native-python-smoke/main.v"
+                    ],
+                    "inputs": [
+                        {
+                            "path": "tests/native-python-smoke/main.v",
+                            "sha256": "5ef6e30da14e58fbbb282fef2f31fecc0197e7f28b817c39da85b0a07d1ee763"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/core.v",
+                            "sha256": "79580aea25615fd2808b2795843a6b107c7af63355d3fe0aee8977a76a830b54"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/entry.v",
+                            "sha256": "a929d3cf2e04469cd2ea536129d5da1b8c1c2f26acafb2b6c1a007406e0e356f"
+                        },
+                        {
+                            "path": "build-support/cpythonapi/core.v",
+                            "sha256": "38fdf6911023b6551a39fe2ff75f8ff7d75564953aaeb02bc0052158d9563ecb"
+                        }
+                    ],
+                    "link": [
+                        "/opt/homebrew/opt/llvm/bin/clang",
+                        "--target=aarch64-linux-musl",
+                        "--sysroot=/Users/alex/code/vinix/build-aarch64-userland/sysroot",
+                        "-nostdlib",
+                        "-O2",
+                        "-pthread",
+                        "-fno-strict-aliasing",
+                        "-Wno-pointer-sign",
+                        "-Wno-format",
+                        "-Wno-macro-redefined",
+                        "-Wno-invalid-noreturn",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crt1.o",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crti.o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-san/.python-smoke.IEU3jW/smoke.c",
+                        "-L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib",
+                        "-L/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib",
+                        "-Wl,--dynamic-linker=/lib/ld-musl-aarch64.so.1",
+                        "-fuse-ld=lld",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-san/.python-smoke.IEU3jW/smoke",
+                        "/Users/alex/code/vinix/build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1",
+                        "-lgcc",
+                        "/Users/alex/code/vinix/build-aarch64-userland/sysroot/lib/crtn.o"
+                    ],
+                    "qualification": "Build-only; no CPython or Vinix guest executed.",
+                    "runtime": "/Users/alex/code/vinix/build-aarch64-userland/staging/lib/ld-musl-aarch64.so.1",
+                    "runtime_sha256": "8289c205aa793bc6920dc7fff4e42d28dd6de2bec42bbd222548ef6c0abaffce"
+                },
+                {
+                    "sdk": "/Users/alex/code/vinix/build-aarch64-python/staging/usr/lib/libpython3.12.so.1.0",
+                    "sha256": "9ecefc6a40ad13bfb5adc3f7925368778b72c91ca427f52a2e2dcc53331a3eeb",
+                    "symbols": 36
+                },
+                {
+                    "arch": "x86_64",
+                    "compiler_sha256": "f35b1f243940861f7163c44d476c433bb0a6a7f0388d8e284f20b39a80d2aee7",
+                    "executable_sha256": "59957367faafd44b4bbd31f591f6ef4d36db19cbef0700b15b99f8435eb74d07",
+                    "generate": [
+                        "/Users/alex/.cache/vinix-linuxkpi-tools-native-20261012/toolchain-v/v",
+                        "-nocache",
+                        "-os",
+                        "linux",
+                        "-arch",
+                        "amd64",
+                        "-gc",
+                        "none",
+                        "-d",
+                        "no_segfault_handler",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-san/.python-smoke.elT7uO/smoke.c",
+                        "/Users/alex/code/vinix/tests/native-python-smoke/main.v"
+                    ],
+                    "inputs": [
+                        {
+                            "path": "tests/native-python-smoke/main.v",
+                            "sha256": "5ef6e30da14e58fbbb282fef2f31fecc0197e7f28b817c39da85b0a07d1ee763"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/core.v",
+                            "sha256": "79580aea25615fd2808b2795843a6b107c7af63355d3fe0aee8977a76a830b54"
+                        },
+                        {
+                            "path": "tests/native-python-smoke/pysmoke/entry.v",
+                            "sha256": "a929d3cf2e04469cd2ea536129d5da1b8c1c2f26acafb2b6c1a007406e0e356f"
+                        },
+                        {
+                            "path": "build-support/cpythonapi/core.v",
+                            "sha256": "38fdf6911023b6551a39fe2ff75f8ff7d75564953aaeb02bc0052158d9563ecb"
+                        }
+                    ],
+                    "link": [
+                        "/opt/homebrew/opt/llvm/bin/clang",
+                        "--target=x86_64-linux-musl",
+                        "--sysroot=/Users/alex/code/vinix/build-amd64-desktop/initramfs-root",
+                        "-nostdlib",
+                        "-O2",
+                        "-pthread",
+                        "-fno-strict-aliasing",
+                        "-Wno-pointer-sign",
+                        "-Wno-format",
+                        "-Wno-macro-redefined",
+                        "-Wno-invalid-noreturn",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crt1.o",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crti.o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-san/.python-smoke.elT7uO/smoke.c",
+                        "-L/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib",
+                        "-L/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/gcc/x86_64-alpine-linux-musl/14.2.0",
+                        "-Wl,--dynamic-linker=/lib/ld-musl-x86_64.so.1",
+                        "-fuse-ld=lld",
+                        "-o",
+                        "/Users/alex/.cache/vinix-python-smoke-native-20261013/q2-san/.python-smoke.elT7uO/smoke",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/lib/ld-musl-x86_64.so.1",
+                        "-lgcc",
+                        "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/usr/lib/crtn.o"
+                    ],
+                    "qualification": "Build-only; no CPython or Vinix guest executed.",
+                    "runtime": "/Users/alex/code/vinix/build-amd64-desktop/initramfs-root/lib/ld-musl-x86_64.so.1",
+                    "runtime_sha256": "2fb72c67f292827c8c4095067197af7880c234a3a4060136e1b5518d10de1eb9"
+                },
+                {
+                    "sdk": "/Users/alex/code/vinix/build-amd64-python/staging/usr/lib/libpython3.12.so.1.0",
+                    "sha256": "6d99e40ceb006eeab796a54dbb58cc0efd0841d6d52c7f44c5b675871ceeae8e",
+                    "symbols": 36
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "qualification": "Nine cold ARM/x86/ASanUBSan main/model/builder builds; exact original static check-label coverage, all eleven imports retained; owned/borrowed/stolen/error/retired reference tests, signed i32 error results, method layout, Unicode/NUL, retained callback and creation-failure ownership. Six real ARM/x86 guest ELF builds with verified interpreter and source/compiler/runtime/executable manifests; all 36 required exports in both real staged CPython libraries verified as data; six failed compiles preserve existing output; cold public help and real ARM build. No Python or guest execution.",
+    "source_commit": "538d93af8085bf773b2cba2bf4b0f71bdf7fc02e"
+}
