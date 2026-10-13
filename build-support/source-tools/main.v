@@ -7,10 +7,33 @@ import os
 import sourcefixture
 import sourcecommand
 import hostfixture
+import qmpclient
+import hosttest
 
 fn run(args []string) ! {
 	if args.len == 0 || args[0] in ['--help', '-h'] {
-		println('Usage: source-tools clock|ext2-mmap|private-fixture|private-install INPUT OUTPUT\n       source-tools m1-kernel OUTPUT\n       source-tools test-directory COMPILER DIRECTORY [compiler flags...]\n       source-tools darwin-signals cxx|assertions|safety|process EXECUTABLE\n       source-tools game-bundle SOURCE BUNDLE\n       source-tools ipa BUILD_DIRECTORY Calculator|NumberTileGame\n       source-tools cpython-headers|cpython-version EXECUTABLE [INCLUDE_DIRECTORY]')
+		println('Usage: source-tools clock|ext2-mmap|private-fixture|private-install INPUT OUTPUT\n       source-tools m1-kernel OUTPUT\n       source-tools test-directory COMPILER DIRECTORY [compiler flags...]\n       source-tools darwin-signals cxx|assertions|safety|process EXECUTABLE\n       source-tools game-bundle SOURCE BUNDLE\n       source-tools ipa BUILD_DIRECTORY Calculator|NumberTileGame\n       source-tools cpython-headers|cpython-version EXECUTABLE [INCLUDE_DIRECTORY]\n       source-tools qmp SOCKET [JSON_REQUEST...]')
+		return
+	}
+	if args.len == 2 && args[0] == 'install-qmp' {
+		compiler := os.getenv_opt('V') or { return error('set V to the qualified compiler') }
+		os.mkdir_all(os.dir(args[1]))!
+		work := hosttest.work_dir('', 'qmp-build-')!
+		defer { hosttest.remove_work_dir(work) or {} }
+		result := sourcecommand.capture_full([compiler,'-nocache','-cc','cc','-o',work+'/qmp-client',@FILE],
+			os.environ(),300,16*1024*1024,cachecli.cancelled)!
+		text := result.stdout + result.stderr
+		if result.status != 0 || ['retrying with',': fn ','V panic:','runtime error:','ERROR: AddressSanitizer'].any(text.contains(it)) { return error('QMP frontend build failed\n'+text) }
+		os.chmod(work+'/qmp-client',0o755)!
+		// Copy into an adjacent private staging directory so final rename also
+		// works when the caller's output lives on another filesystem.
+		mut pattern := (os.dir(args[1])+'/.qmp-build.XXXXXX\x00').bytes()
+		if C.mkdtemp(pattern.data) == unsafe {nil} { return os.error_posix() }
+		adjacent := pattern.bytestr().all_before('\x00')
+		defer { hosttest.remove_work_dir(adjacent) or {} }
+		os.cp(work+'/qmp-client',adjacent+'/qmp-client')!
+		os.chmod(adjacent+'/qmp-client',0o755)!
+		os.rename(adjacent+'/qmp-client',args[1])!
 		return
 	}
 	if args.len == 3 && args[0] == 'darwin-signals' { hostfixture.signals(args[1], args[2], cachecli.cancelled)!; return }
@@ -71,6 +94,16 @@ fn run_tests(compiler string, directory string, flags []string) ! {
 fn main() {
 	guard := cachecli.own_commands()
 	defer { guard.close() }
+	if os.args.len >= 3 && os.args[1] == 'qmp' {
+		result := qmpclient.batch(os.args[2],os.args[3..],0,cachecli.cancelled) or {
+			eprintln(err.msg())
+			guard.close()
+			exit(if cachecli.cancelled() {cachecli.interrupt_status()} else {1})
+		}
+		if result.print_error { eprintln(result.message) }
+		guard.close()
+		exit(result.status)
+	}
 	run(os.args[1..]) or {
 		eprintln(err.msg())
 		exit(if cachecli.cancelled() { cachecli.interrupt_status() } else { 1 })

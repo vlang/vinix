@@ -1,0 +1,182 @@
+{
+    "attempts": "Initial ARM qualification passed. Initial Rosetta fixture timed out; an installed sanitizer fixture reported a socket error, with a separate retry passing. Final fixtures bound accepts, begin deadline tests after the capabilities handshake, and synchronize interrupts with a channel checkpoint. Production deadlines and signal handling are unchanged.",
+    "embedded_blocks": [
+        {
+            "bytes": 542,
+            "lines": 16,
+            "path": "scripts/test-iso.sh",
+            "sha256": "09a7e15ad21b878cf115a9db7f3b0bb9da8b6bf151f4c4506ef2f5eef803a614"
+        },
+        {
+            "bytes": 129,
+            "lines": 4,
+            "path": "tests/opengothic/kekvm-guest.sh",
+            "sha256": "75f6653fd54757e4dbfe939d14bd8529c180e6bd30b2a7aa19053236bb1b463f"
+        }
+    ],
+    "embedded_bytes": 671,
+    "embedded_lines": 20,
+    "evidence": "~/.cache/vinix-qmp-shell-native-20261013",
+    "limits": "No Python, SDK interpreter initialization, target ELF, guest, ISO boot or GUI application executes. QMP standard objects are required; error descriptions support text/null/boolean/integer statuses. No general nonstandard JSON/error-description compatibility claim. Existing pending Python sources/index entries remain untouched.",
+    "original_sha256": {
+        "build-support/source-tools/README.md": "a80beeb67fef6b3885fd6eb84eeaee5bbeacd782018897f93d46502eb4a5738e",
+        "build-support/source-tools/main.v": "d4579c98c23d3acda4dfdec9617e7fbed23c9c8d5656e3c2828f61b9bd78d18f",
+        "build-support/source-tools/sourcefixture/core.v": "42fe248005e95acf14fbd5f51a87121af1301e1dbf84a379b8ba8670b79a9dae",
+        "scripts/test-iso.sh": "c6ea98f1aa89c6dd6ec66b919262480ebd6939a61314e9e59eaf592bdd969916",
+        "tests/opengothic/kekvm-guest.sh": "6aab380b8e03e6165944d30b2fe951e6f04f0465ff41d4ffbfc2970ba2ac5212",
+        "tests/opengothic/kekvm.md": "dbfb6d06f1af78aa4e6a14000eed689044f02eaed35316ec315378da4a2239ed",
+        "tools/qmpclient/core.v": "931880eab4065a998c18ed0bb302837d5ef043201483c7fbb6141ec0cc8f576e"
+    },
+    "profiles": [
+        {
+            "inputs": {
+                "/Users/alex/code/vinix/build-support/source-tools/check-qmp.v": "54a1b0ce06c3f64b9283f1723d62cf7b22291b97a8ff860a346bf4b980349ec7",
+                "/Users/alex/code/vinix/build-support/source-tools/main.v": "e3c2a07cb357d51b7fd5054c9720664bdfd1273acdb9ccd88f165f2c1c9f43a8",
+                "/Users/alex/code/vinix/build-support/source-tools/sourcefixture/core.v": "817458050b486694e2bc3e8ce3bb3e74883c05c2bf57e5642e0d21a96ccc9a04",
+                "/Users/alex/code/vinix/build-support/source-tools/stage-trimmer.v": "051220e8a7fa85e54226da5e8c16151b88601db67a567e077afd22324f6b2d1d",
+                "/Users/alex/code/vinix/build-support/source-tools/trim-cmake.v": "7719fd75ffeeac8b96279f5047d0e3ebd116255a068c1782f3e84cdf0af50ea5",
+                "/Users/alex/code/vinix/tools/qmpclient/core.v": "a7342436174a9606c7aaf2486287f3a4a0718d56431ea13393fe5a6491efe8b1",
+                "/Users/alex/code/vinix/tools/qmpclient/owned.v": "2ca6aa41389ed117cd24c7d757f5db63777eb5887f2bd56d3fa8115efe068502",
+                "/Users/alex/code/vinix/tools/qmpclient/raw.v": "8b48c224e5aab08807273631249724831f08d052e7412c76d8e147c3fdbc0403"
+            },
+            "limits": "Native Unix-socket exchanges, installed CLI, interruption/descriptor/error/JSON policies and existing QMP/source/host regressions. Static AArch64/Linux ELF built with the existing musl SDK; no target ELF, guest, ISO boot or GUI application executes. No Python or foreign SDK interpreter initialization. QMP JSON must be standard objects; error desc accepts text, null, booleans and signed integer exit statuses.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "0f18cdedb47b2face32b0ec01da0ceb947d22c297de66c144fb4033ebcf3dd60"
+                },
+                {
+                    "name": "check",
+                    "sha256": "4b432b0e1d2e66a8a7f547665327155d7ff27fc943b4eac099b2786578504caf"
+                },
+                {
+                    "name": "trim",
+                    "sha256": "75dd254c01e4564abce787f2e83a0918aeae5baa119285ecaa7c71a6a3e9d654"
+                },
+                {
+                    "name": "stage",
+                    "sha256": "8bbe186f360895f07e4d4de2eb528693e45f96aa61fa9284d4d2f28317058d55"
+                },
+                {
+                    "name": "core-test",
+                    "sha256": "4c8a82095f8d1c4a8342c867838748ca1ec22720da128f341e9343344020410f"
+                },
+                {
+                    "name": "owned-test",
+                    "sha256": "00cec985c17e0e6e1ce2acfce91af176f92e03f4aad4c788bb76cafe0ae97b30"
+                },
+                {
+                    "name": "source-check",
+                    "sha256": "ac9b4310598949aaeac61e711fbd8dafb77bcc744e6e06e7cb3769cbe9b04f7c"
+                },
+                {
+                    "name": "host-check",
+                    "sha256": "887cf6f10cdb1d73d8c1db1f89fd1e441260a56734b8170def66bc614f1ab316"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "inputs": {
+                "/Users/alex/code/vinix/build-support/source-tools/check-qmp.v": "54a1b0ce06c3f64b9283f1723d62cf7b22291b97a8ff860a346bf4b980349ec7",
+                "/Users/alex/code/vinix/build-support/source-tools/main.v": "e3c2a07cb357d51b7fd5054c9720664bdfd1273acdb9ccd88f165f2c1c9f43a8",
+                "/Users/alex/code/vinix/build-support/source-tools/sourcefixture/core.v": "817458050b486694e2bc3e8ce3bb3e74883c05c2bf57e5642e0d21a96ccc9a04",
+                "/Users/alex/code/vinix/build-support/source-tools/stage-trimmer.v": "051220e8a7fa85e54226da5e8c16151b88601db67a567e077afd22324f6b2d1d",
+                "/Users/alex/code/vinix/build-support/source-tools/trim-cmake.v": "7719fd75ffeeac8b96279f5047d0e3ebd116255a068c1782f3e84cdf0af50ea5",
+                "/Users/alex/code/vinix/tools/qmpclient/core.v": "a7342436174a9606c7aaf2486287f3a4a0718d56431ea13393fe5a6491efe8b1",
+                "/Users/alex/code/vinix/tools/qmpclient/owned.v": "2ca6aa41389ed117cd24c7d757f5db63777eb5887f2bd56d3fa8115efe068502",
+                "/Users/alex/code/vinix/tools/qmpclient/raw.v": "8b48c224e5aab08807273631249724831f08d052e7412c76d8e147c3fdbc0403"
+            },
+            "limits": "Native Unix-socket exchanges, installed CLI, interruption/descriptor/error/JSON policies and existing QMP/source/host regressions. Static AArch64/Linux ELF built with the existing musl SDK; no target ELF, guest, ISO boot or GUI application executes. No Python or foreign SDK interpreter initialization. QMP JSON must be standard objects; error desc accepts text, null, booleans and signed integer exit statuses.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "21cfcf256ecadea28619e129953114b5138683d3b789014b15852e3935d261ed"
+                },
+                {
+                    "name": "check",
+                    "sha256": "536b9afda1b578e7851a94f29b18f36cbbc05172bf5fda39d64a7cfc8cb67a1a"
+                },
+                {
+                    "name": "trim",
+                    "sha256": "534802a737641fc82b7cc184231391d3dee55336f28a2b4bbefdea2cc0dd1342"
+                },
+                {
+                    "name": "stage",
+                    "sha256": "5cf941e35c4f4b97e89ef68b36d5dd9b04af9df22db3ee0a65c32926a0bb2ec6"
+                },
+                {
+                    "name": "core-test",
+                    "sha256": "69b33e322db453284a635b9c38a98f04493523fad6332ca9f27d0b7417c719ae"
+                },
+                {
+                    "name": "owned-test",
+                    "sha256": "7de7d4afada97be4eb5d0063493d8f0939d8e9b4ac5d4d33a8a1b34c75c2c1de"
+                },
+                {
+                    "name": "source-check",
+                    "sha256": "394d71ed43b05e84aafed4ac1a16c197310dbc2bc4feb5034995318a8537f018"
+                },
+                {
+                    "name": "host-check",
+                    "sha256": "e6e661d2abdaad0052e7e95b2c705be13c15e1a38b25404ab6e0a3cce305ca11"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "inputs": {
+                "/Users/alex/code/vinix/build-support/source-tools/check-qmp.v": "54a1b0ce06c3f64b9283f1723d62cf7b22291b97a8ff860a346bf4b980349ec7",
+                "/Users/alex/code/vinix/build-support/source-tools/main.v": "e3c2a07cb357d51b7fd5054c9720664bdfd1273acdb9ccd88f165f2c1c9f43a8",
+                "/Users/alex/code/vinix/build-support/source-tools/sourcefixture/core.v": "817458050b486694e2bc3e8ce3bb3e74883c05c2bf57e5642e0d21a96ccc9a04",
+                "/Users/alex/code/vinix/build-support/source-tools/stage-trimmer.v": "051220e8a7fa85e54226da5e8c16151b88601db67a567e077afd22324f6b2d1d",
+                "/Users/alex/code/vinix/build-support/source-tools/trim-cmake.v": "7719fd75ffeeac8b96279f5047d0e3ebd116255a068c1782f3e84cdf0af50ea5",
+                "/Users/alex/code/vinix/tools/qmpclient/core.v": "a7342436174a9606c7aaf2486287f3a4a0718d56431ea13393fe5a6491efe8b1",
+                "/Users/alex/code/vinix/tools/qmpclient/owned.v": "2ca6aa41389ed117cd24c7d757f5db63777eb5887f2bd56d3fa8115efe068502",
+                "/Users/alex/code/vinix/tools/qmpclient/raw.v": "8b48c224e5aab08807273631249724831f08d052e7412c76d8e147c3fdbc0403"
+            },
+            "limits": "Native Unix-socket exchanges, installed CLI, interruption/descriptor/error/JSON policies and existing QMP/source/host regressions. Static AArch64/Linux ELF built with the existing musl SDK; no target ELF, guest, ISO boot or GUI application executes. No Python or foreign SDK interpreter initialization. QMP JSON must be standard objects; error desc accepts text, null, booleans and signed integer exit statuses.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "f71236788e66e80bf054c9f426103ee002af07c743c510ee255cce41709022f6"
+                },
+                {
+                    "name": "check",
+                    "sha256": "024eef1382f09ee3c6208830cb612ecf5b7b729e349e6e41cd819c41c3527b7c"
+                },
+                {
+                    "name": "trim",
+                    "sha256": "9fc270d2c270c959ab0fedeee0eb073d0f7d7ef9267dc9c890bc49d3e5673868"
+                },
+                {
+                    "name": "stage",
+                    "sha256": "c4baa7497ca3ab7cba9dee5a6d7ca8a63492addead56a3d5307ef562c6b8c123"
+                },
+                {
+                    "name": "core-test",
+                    "sha256": "2999158c91dcf19e8ae7b98cfc370e326ef2a60391c53b646e55ead2ca75475a"
+                },
+                {
+                    "name": "owned-test",
+                    "sha256": "2f1025a1c7fa4d2daf7f1648c9989be1065a41bc2ec2fe9a5a3dbe346bc26cd6"
+                },
+                {
+                    "name": "source-check",
+                    "sha256": "da883f634717210e0c6c698f7ac46ee2888a406302d23c4f1f8e6be5596922dd"
+                },
+                {
+                    "name": "host-check",
+                    "sha256": "49e26a5954b7cb80c5b67bb95a3b658a3ef08f51bdae15d2bbb4f253cff379e6"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirement_credit": 0,
+    "qualification": "27 final cold host builds across ARM, Rosetta x86 and ARM ASanUBSan, including eight native tools/test programs and one installed QMP frontend per profile. Actual Unix-socket/CLI large-integer/full-object/event/uncorrelated-reply/capability-error/default-empty-Unicode-error/exit-status/UTF-8/EOF/deadline/SIGINT/SIGTERM cases, 600 missing-path connection retirements plus existing 900 failed/cancelled connection cases, original typed QMP/source/host regressions and strict UTF-8/newline/marker/unchanged-on-error CMake edits pass. Three static AArch64/Linux trimmers cross-link and verify ELF class/machine/no interpreter/16 KiB congruence. Compiler failure preserves QMP and guest outputs; both caller syntax and ISO help pass.",
+    "source_commit": "5fe5994c155c86eb1e9849e6fe817b9717bc83bd"
+}

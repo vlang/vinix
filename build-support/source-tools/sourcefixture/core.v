@@ -14,6 +14,10 @@ pub fn read(path string) !string {
 	return text.replace('\r\n', '\n').replace('\r', '\n')
 }
 
+pub fn trim_cmake(text string) string {
+	return text.all_before('# Vinix execinfo compatibility')
+}
+
 fn index(text string, marker string, start int) !int {
 	if start < 0 || start > text.len { return error('invalid source offset') }
 	position := text[start..].index(marker) or { return error('source marker missing: ' + marker) }

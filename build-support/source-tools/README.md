@@ -91,3 +91,42 @@ V controller checks native ARM reference children: the separate x86 Darwin
 overflow fixture raises SIGILL, which fails the original required SIGTRAP
 verdict. That verdict stays unchanged. No Python, interpreter initialization,
 Security/Keychain/credential fixture, Blender build, UI app or Vinix guest runs.
+
+The ISO boot tester sends complete QMP JSON objects with the native command:
+
+```sh
+build-support/source-tools/run qmp SOCKET '{"execute":"query-status"}'
+build-support/source-tools/run install-qmp OUTPUT
+build-support/source-tools/stage-trimmer OUTPUT
+```
+
+`test-iso.sh` installs its QMP executable once before starting any VM or input
+deadline. Subsequent exchanges execute that binary directly. Installation uses
+private scratch and adjacent staging, preserves the previous output on compiler
+failure and atomically replaces the executable after a successful build.
+
+The ISO policy consumes one strict UTF-8 text greeting, accepts a capabilities
+error, skips asynchronous events and accepts the first terminal reply without
+adding or correlating IDs. Full request objects retain arbitrary-sized integer
+tokens, escaped strings, arrays, booleans, nulls and last-value duplicate keys.
+Valid standard JSON objects are required. QMP error descriptions retain the
+default/empty/Unicode diagnostic and text/null/boolean/integer exit policies;
+other description types fail validation. Cancellation uses the existing owned
+socket and private command group, with exit statuses 130/143. Existing checked,
+typed-request and performance QMP policies remain unchanged.
+
+The standalone CMake trimmer retains strict UTF-8, universal newlines and the
+prefix before the first `# Vinix execinfo compatibility` marker. A missing
+marker retains the complete text; invalid UTF-8 fails before writing. The guest
+producer links static AArch64/Linux with the existing musl SDK, checks its ELF
+headers, interpreter absence and 16 KiB segment congruence, records source and
+compiler hashes and preserves the output on compile failure. KekVM receives it
+through its read-only share; see [guest preparation](../../tests/opengothic/kekvm.md).
+
+`qualify-qmp.v COMPILER NEW_EVIDENCE arm|x86|san` cold-builds eight native tools
+and existing test programs, installs the QMP frontend, runs actual Unix-socket
+and CLI/error/event/EOF/UTF-8/deadline/signal/descriptor cases, and reruns the
+original QMP, source and host regressions. Every profile cross-links the static
+guest ELF and verifies failure preserves both output kinds. Syntax and ISO help
+checks cover the callers. No Python, interpreter initialization, target ELF,
+Vinix guest, ISO boot or GUI application executes during this qualification.

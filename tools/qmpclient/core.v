@@ -128,7 +128,10 @@ pub fn (mut monitor Monitor) request(name string, arguments map[string]json2.Any
 }
 
 fn (mut monitor Monitor) send(object map[string]json2.Any) ! {
-	request := json2.encode(object) + '\n'
+	monitor.send_text(json2.encode(object) + '\n')!
+}
+
+fn (mut monitor Monitor) send_text(request string) ! {
 	mut position := 0
 	for position < request.len {
 		monitor.ready(true)!

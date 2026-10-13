@@ -2,7 +2,7 @@
 
 KekVM's prepared **Debian ARM64** guest can run this engine on Venus, backed
 by the Apple GPU. This tests the renderer on accelerated virtual graphics;
-Vinix's kernel and desktop are tested by `run.py` separately.
+Vinix's kernel and desktop are tested by `tests/opengothic/run` separately.
 
 The verified configuration uses OpenGothic
 `26b7159230834780fc6a8fc9aa0d060863cb443f` with the same two Tempest patches
@@ -30,6 +30,7 @@ guest_dir="$HOME/.local/share/v3-qemu-debian13"
 qemu_dir="$kekvm_dir/.tools/qemu-virgl"
 mkdir -p "$gothic_work"
 cp tests/opengothic/kekvm-guest.sh "$gothic_work/guest.sh"
+CC=/path/to/clang build-support/source-tools/stage-trimmer "$gothic_work/trim-cmake"
 cp "$guest_dir/kekvm-gpu-vars.fd" "$gothic_work/vars.fd"
 VK_DRIVER_FILES="$qemu_dir/share/vulkan/icd.d/libkosmickrisp_icd.json" \
 DYLD_FALLBACK_LIBRARY_PATH="$qemu_dir/lib:/usr/local/lib:/usr/lib" \
@@ -77,6 +78,16 @@ optional window manager. The accelerated guest is offline, so packages must
 be installed during preparation or downloaded on the host and installed
 from the share. This run's verified `.deb` files are cached in
 `build/opengothic/kekvm/debs`.
+
+The staged `trim-cmake` is native V, cross-linked as a static AArch64/Linux
+executable with the existing ARM musl SDK. It edits the private CMake source
+without requiring Python or a V compiler inside Debian. The producer verifies
+the ELF architecture and absence of a dynamic interpreter, records source and
+compiler hashes, and preserves the previous output on build failure.
+`VINIX_AARCH64_SYSROOT` selects another compatible SDK. The read-only share
+delivers it at `/mnt/gothic/kekvm/trim-cmake`; `OPENGOTHIC_SOURCE_TRIMMER`
+can select another guest path. Host qualification verifies source edits and
+static ELF construction; a fresh Debian guest execution is separate.
 
 Copy `/mnt/gothic/kekvm/guest.sh` to `/root/opengothic-kekvm/guest.sh` and
 run it with `build`, then start Xorg using KekVM's `guest-gpu-suite.sh xorg`

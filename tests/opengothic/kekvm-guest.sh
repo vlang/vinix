@@ -22,12 +22,7 @@ build)
     # be loaded into the ARM64/musl executable built for Vinix.
     tar --exclude=.git --exclude='._*' -cf - -C "$share" source vulkan-headers |
         tar -xf - -C "$work"
-    python3 - "$work/source/CMakeLists.txt" <<'PY'
-from pathlib import Path
-import sys
-p = Path(sys.argv[1])
-p.write_text(p.read_text().split("# Vinix execinfo compatibility")[0])
-PY
+    "${OPENGOTHIC_SOURCE_TRIMMER:-$share/kekvm/trim-cmake}" "$work/source/CMakeLists.txt"
     cmake -S "$work/source" -B "$work/build" -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DGLSLANGVALIDATOR=/usr/bin/glslangValidator \
         "-DCMAKE_CXX_FLAGS=-I$work/vulkan-headers/include -Wno-error=stringop-overflow" \

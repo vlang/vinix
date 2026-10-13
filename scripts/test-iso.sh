@@ -62,6 +62,11 @@ OUT="${OUT:-$(mktemp -d "${TMPDIR:-/tmp}/vinix-iso-test.XXXXXX")}"
 mkdir -p "$OUT"
 OUT="$(cd "$OUT" && pwd)"
 CHECK="$SCRIPT_DIR/build-support/check-screenshot"
+QMP_TOOL="$OUT/qmp-client"
+if [ "$RUN_QEMU" = 1 ]; then
+    # Finish compilation before any VM boot or input deadline starts.
+    "$SCRIPT_DIR/build-support/source-tools/run" install-qmp "$QMP_TOOL"
+fi
 
 HOST_OS="$(uname -s)"
 case "$(uname -m)" in
@@ -111,24 +116,7 @@ qemu_firmware() {
 
 # Send QMP commands, one JSON object per argument, to the VM under test.
 qmp() {
-    python3 - "$VM_QMP" "$@" <<'PY'
-import json, socket, sys
-sock = socket.socket(socket.AF_UNIX)
-sock.connect(sys.argv[1])
-reader = sock.makefile('r')
-reader.readline()
-def command(request):
-    sock.sendall(json.dumps(request).encode() + b'\n')
-    while True:
-        reply = json.loads(reader.readline())
-        if 'return' in reply or 'error' in reply:
-            return reply
-command({'execute': 'qmp_capabilities'})
-for request in sys.argv[2:]:
-    reply = command(json.loads(request))
-    if 'error' in reply:
-        sys.exit(reply['error'].get('desc', 'QMP error'))
-PY
+    "$QMP_TOOL" qmp "$VM_QMP" "$@"
 }
 
 # Save a screenshot of the VM under test to "$1" plus .ppm or .png.
