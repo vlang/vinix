@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume rewrap-volume CONFIG OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_CONFIG\n')
 	C.printf(c'       vinix-volume seal-volume DEVICE SLOT OFFSET_BYTES LENGTH_BYTES KEYFILE PASSPHRASE_FILE CONFIG [ro]\n       vinix-volume open-volume DEVICE CONFIG PASSPHRASE_FILE [ro]\n       vinix-volume unseal-volume-key CONFIG PASSPHRASE_FILE KEYFILE\n')
 	C.printf(c'       vinix-volume rewrap-key ENVELOPE OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_ENVELOPE\n')
 	C.printf(c'       vinix-volume seal-key KEYFILE PASSPHRASE_FILE ENVELOPE\n       vinix-volume unseal-key ENVELOPE PASSPHRASE_FILE KEYFILE\n       vinix-volume open-sealed DEVICE SLOT OFFSET_BYTES LENGTH_BYTES ENVELOPE PASSPHRASE_FILE [ro]\n')
@@ -93,6 +94,10 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'rewrap-volume') == 0 {
+			if argc != 6 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 || argv[5][0] == 0 { return usage() }
+			return rewrap_volume_seal(argv[2], argv[3], argv[4], argv[5])
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'seal-volume') == 0 {
 			if argc != 9 && argc != 10 { return usage() }
 			slot := decimal(argv[3]) or { return usage() }; offset := decimal(argv[4]) or { return usage() }; length := decimal(argv[5]) or { return usage() }

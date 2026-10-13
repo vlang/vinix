@@ -277,6 +277,14 @@ Guests verify real data without raw keyfiles or geometry arguments, wrong-disk
 and tamper refusal, full-cost retention, reordered boot and rejection of changed
 physical capacity. See [configuration qualification](volume-config.md).
 
+Configuration credential-change tests preserve authenticated MBR/GPT identity,
+512/4096-byte sectors, slot/extent/mode and key. They check authentication before
+new input/output, erased buffer reuse with shorter binary credentials, private
+no-overwrite publication, fault cleanup and continued original access. Guests
+unlock both RW/RO configurations without raw keys, reject old credentials and
+wrong disks, measure full-cost lifetimes and repeat unlock after device reorder.
+See [configuration rewrap qualification](volume-rewrap.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,

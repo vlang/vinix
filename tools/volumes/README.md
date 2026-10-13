@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`rewrap-volume CONFIG OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_CONFIG`
+changes credentials without exporting the raw key or opening a disk. It preserves
+all authenticated disk/mapping metadata and readonly mode, refreshes salt/nonce,
+erases credential buffers before reuse and publishes a separate private file.
+Old configurations remain usable with their old credentials. See
+[credential changes and limits](../../docs/storage-volumes.md#changing-encrypted-volume-configuration-credentials).
+
 `seal-volume DEVICE SLOT OFFSET_BYTES LENGTH_BYTES KEYFILE PASSPHRASE_FILE
 CONFIG [ro]` binds disk identity and mapping geometry to a wrapped key.
 `open-volume DEVICE CONFIG PASSPHRASE_FILE [ro]` authenticates before verifying

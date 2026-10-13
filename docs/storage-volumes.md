@@ -398,12 +398,51 @@ device; it cannot prevent a privileged actor from changing disk metadata after
 the final check. Physical capacity or sector-size changes require a fresh
 configuration, as do desired slot/extent/mode changes. Existing configurations
 remain usable with their saved credentials and matching geometry. The separate
-`rewrap-key` command accepts `VINIXKP1` key envelopes, not this configuration
-format. Keep an independent key backup and retain the sealed-key limits for
-persistent credentials, process termination, caches and hibernation. Volume
+`rewrap-key` command accepts `VINIXKP1` key envelopes; use `rewrap-volume` below
+for this configuration format. Keep an independent key backup and retain the
+sealed-key limits for persistent credentials, process termination, caches and
+hibernation. Volume
 data retains AES-XTS's unverified confidentiality semantics; encrypted-root boot
 and volume-key rotation remain separate work. See
 [configuration qualification](../tests/storage-volumes/volume-config.md).
+
+## Changing encrypted-volume configuration credentials
+
+`rewrap-volume CONFIG OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_CONFIG`
+authenticates a `VINIXVC1` configuration and publishes a new private configuration
+protecting the same volume key with new credential bytes, a fresh salt and a
+fresh nonce. The authenticated whole-disk identity, physical byte/sector geometry,
+mapping slot, offset, length and saved readonly mode remain exact. It needs no
+raw keyfile, opens no physical disk and changes no mapping or volume ciphertext.
+
+```sh
+vinix-volume rewrap-volume /root/data.vcrypt /root/old.pass /root/new.pass /root/data-next.vcrypt
+vinix-volume open-volume /dev/vda /root/data-next.vcrypt /root/new.pass ro
+```
+
+The original configuration's canonical format, bounded work profile and complete
+authentication tag are checked before reading the new credential or opening
+the output directory. The old passphrase and derived-key buffers are completely
+erased before reuse, including the unused suffix when the new input is shorter.
+Only authenticated metadata and the unwrapped volume key cross credential stages.
+Both derivations use the existing fixed scrypt profile. The new configuration
+uses the same 320-byte format, no-overwrite mode-0600 publication, directory lock,
+durability and normal-return secret erasure rules described above. Input and
+existing destination entries remain intact. Wrong old credentials, invalid
+inputs, entropy/derivation failures and publication faults never publish a
+partial configuration. Complete output can remain after post-publication cleanup,
+durability or reporting failures, which return 1. Syntax errors return 2.
+
+Credential files retain exact-byte semantics, including NUL, newline and
+non-ASCII bytes. Using the same credential for both inputs is permitted and
+refreshes the salt/nonce. The new configuration requires the new credential;
+the preserved original remains usable with its original credential. Changing
+credentials does not revoke copies of an old configuration or rotate the volume
+key. Retire old copies only after validating new access and retaining an
+independent recovery path. Rewrapping is offline: it preserves saved geometry
+even if the physical disk has changed; later unlock still verifies that geometry
+and rejects mismatches. Disk identity, readonly, credential-storage and volume-data
+limitations remain as above. See [configuration rewrap qualification](../tests/storage-volumes/volume-rewrap.md).
 
 ## Saved volume plans
 

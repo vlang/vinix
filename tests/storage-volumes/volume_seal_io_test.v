@@ -9,6 +9,13 @@ mut:
 	mode int
 	publication int
 	creating bool
+	rewrapping bool
+	new_input &char = unsafe { nil }
+	new_opens int
+	password_wipes int
+	wrapping_wipes int
+	password_buffer &u8 = unsafe { nil }
+	wrapping_buffer &u8 = unsafe { nil }
 	sector u64 = 512
 	kind u32 = 1
 	expected_flags u64
@@ -31,6 +38,15 @@ __global volume_seal_io VolumeSealIO
 
 fn volume_seal_mock_open(path &char, flags i32) i32 {
 	assert flags & C.O_CLOEXEC != 0 && flags & C.O_NOFOLLOW != 0
+	if volume_seal_io.rewrapping {
+		assert C.strcmp(path, c'/volume-seal-parent') != 0
+		if C.strcmp(path, volume_seal_io.new_input) == 0 {
+			assert volume_seal_io.derives == 1 && volume_seal_io.password_wipes == 1 && volume_seal_io.wrapping_wipes == 1
+			volume_seal_io.new_opens++
+		}
+		if flags & C.O_DIRECTORY != 0 { assert volume_seal_io.derives == 2 }
+		if volume_seal_io.mode == 28 && C.strcmp(path, c'/dev/urandom') == 0 { unsafe { C.errno = C.EIO }; return -1 }
+	}
 	if C.strcmp(path, c'/volume-seal-parent') == 0 {
 		assert flags & C.O_NONBLOCK != 0
 		assert volume_seal_io.derives == if volume_seal_io.creating { 0 } else { 1 }
@@ -53,6 +69,7 @@ fn volume_seal_mock_close(fd i32) i32 {
 }
 
 fn volume_seal_mock_ioctl(fd i32, number u64, output voidptr) i32 {
+	assert !volume_seal_io.rewrapping
 	assert fd == 900
 	if number == 0x56560006 {
 		assert !volume_seal_io.creating && volume_seal_io.statuses == 2
@@ -108,6 +125,24 @@ fn volume_seal_mock_pread(fd i32, output voidptr, size usize, offset i64) i64 {
 fn volume_seal_mock_derive(password &u8, size int, salt &u8, output &u8) bool {
 	assert size > 0 && size <= 1024
 	volume_seal_io.derives++
+	if volume_seal_io.rewrapping {
+		unsafe {
+			for i in 0 .. 64 { assert output[i] == 0 }
+			if volume_seal_io.derives == 1 {
+				volume_seal_io.password_buffer = password; volume_seal_io.wrapping_buffer = output
+				assert size == 1024
+				for i in 0 .. size { assert password[i] == u8(i * 11 + 1) }
+			} else {
+				assert volume_seal_io.derives == 2 && size == 6 && volume_seal_io.new_opens == 1
+				expected := [u8(0), u8(10), u8(0xe2), u8(0x82), u8(0xac), u8(0xff)]!
+				for i in 0 .. 6 { assert password[i] == expected[i] }
+				for i in 6 .. 1024 { assert password[i] == 0 }
+				if volume_seal_io.mode == 25 { return false }
+				for i in 0 .. 64 { output[i] = if volume_seal_io.mode == 26 { u8(7) } else if volume_seal_io.mode == 27 { u8(i * 13 + 7) } else { u8(i * 17 + 29) } }
+				return true
+			}
+		}
+	}
 	if volume_seal_io.mode == 21 { return false }
 	unsafe { for i in 0 .. 64 { output[i] = u8(i * 29 + 41) }; if volume_seal_io.mode == 22 { output[0] ^= 1 } }
 	return true
@@ -117,6 +152,79 @@ fn volume_seal_mock_erase(pointer voidptr, size usize) {
 	erase_key(pointer, size)
 	unsafe { for i in usize(0) .. size { assert (&u8(pointer))[i] == 0 } }
 	if size == sizeof(VolumeSealFiles) { volume_seal_io.wipes++ }
+	if volume_seal_io.rewrapping {
+		if size == 1024 && pointer == voidptr(volume_seal_io.password_buffer) { volume_seal_io.password_wipes++ }
+		if size == 64 && pointer == voidptr(volume_seal_io.wrapping_buffer) { volume_seal_io.wrapping_wipes++ }
+	}
+}
+
+fn test_volume_rewrap_authenticates_before_new_input_preserves_metadata_and_erases_each_stage() {
+	work := os.join_path(os.temp_dir(), 'vinix-volume-rewrap-io-${os.getpid()}')
+	os.mkdir(work)!; os.chmod(work, 0o700)!; defer { os.rmdir_all(work) or {} }
+	old := []u8{len: 1024, init: u8(index * 11 + 1)}
+	next := [u8(0), u8(10), u8(0xe2), u8(0x82), u8(0xac), u8(0xff)]
+	os.write_file_array(work + '/old', old)!; os.chmod(work + '/old', 0o600)!
+	os.write_file_array(work + '/next', next)!; os.chmod(work + '/next', 0o600)!
+	mut wrapping := [64]u8{}; mut fresh := [64]u8{}; mut random := [28]u8{init: u8(index * 11 + 3)}; mut source := [320]u8{}
+	mut request := EncryptedRequest{data: Request{slot: 5, length: 4096}}
+	for i in 0 .. 64 { wrapping[i] = u8(i * 29 + 41); fresh[i] = u8(i * 17 + 29); request.key[i] = u8(i * 13 + 7) }
+	for sector in [u64(512), u64(4096)] {
+		for kind in [u32(1), u32(2)] {
+			for mode in [u64(0), u64(1)] {
+				mut disk := DiskKey{bytes: 16777216, sector: sector, kind: kind}; disk.id[0] = 1
+				if kind == 2 { disk.id[15] = 0x83 }; request.data.offset = sector * 2; request.data.flags = mode
+				assert encode_volume_seal(&disk, &request, &wrapping[0], &random[0], &source[0])
+				os.write_file_array(work + '/source', source[..])!; os.chmod(work + '/source', 0o600)!
+				volume_seal_io = VolumeSealIO{rewrapping: true, new_input: (work + '/next').str}
+				assert rewrap_volume_seal((work + '/source').str, (work + '/old').str, (work + '/next').str, (work + '/result').str) == 0
+				assert volume_seal_io.opened == volume_seal_io.closed && volume_seal_io.wipes == 1 && volume_seal_io.new_opens == 1
+				assert volume_seal_io.parent_opens == 0 && volume_seal_io.imports == 0 && volume_seal_io.derives == 2 && !volume_seal_io.locked
+				result := os.read_bytes(work + '/result')!; mut decoded_disk := DiskKey{}; mut decoded := EncryptedRequest{}
+				assert decode_volume_seal(&result[0], 320, &fresh[0], mut decoded_disk, mut decoded)
+				assert decoded_disk == disk && decoded == request && os.read_bytes(work + '/source')! == source[..]
+				os.rm(work + '/result')!
+			}
+		}
+	}
+	for mode in [21, 22, 25, 26, 27, 28] {
+		volume_seal_io = VolumeSealIO{rewrapping: true, new_input: (work + '/next').str, mode: mode}
+		assert rewrap_volume_seal((work + '/source').str, (work + '/old').str, (work + '/next').str, (work + '/result').str) == 1
+		assert volume_seal_io.opened == volume_seal_io.closed && volume_seal_io.wipes == 1 && volume_seal_io.parent_opens == 0 && volume_seal_io.imports == 0
+		assert volume_seal_io.new_opens == if mode in [21, 22] { 0 } else { 1 }
+		assert !os.exists(work + '/result') && os.read_bytes(work + '/source')! == source[..]
+	}
+	os.write_file(work + '/empty', '')!; os.chmod(work + '/empty', 0o600)!
+	os.write_file_array(work + '/long', []u8{len: 1025, init: 7})!; os.chmod(work + '/long', 0o600)!
+	os.write_file_array(work + '/public', next)!; os.chmod(work + '/public', 0o644)!
+	os.symlink(work + '/next', work + '/link')!; os.mkdir(work + '/dir')!
+	assert os.exec(['mkfifo', work + '/fifo']).exit_code == 0
+	for name in ['absent', 'empty', 'long', 'public', 'link', 'dir', 'fifo'] {
+		input := work + '/' + name
+		volume_seal_io = VolumeSealIO{rewrapping: true, new_input: input.str}
+		assert rewrap_volume_seal((work + '/source').str, (work + '/old').str, input.str, (work + '/result').str) == 1
+		assert volume_seal_io.opened == volume_seal_io.closed && volume_seal_io.wipes == 1 && volume_seal_io.new_opens == 1 && volume_seal_io.derives == 1
+		assert volume_seal_io.parent_opens == 0 && volume_seal_io.imports == 0 && !os.exists(work + '/result')
+	}
+	for at in [0, 24, 88, 152, 192, 288] {
+		mut bad := source; bad[at] ^= 1
+		os.write_file_array(work + '/bad', bad[..])!; os.chmod(work + '/bad', 0o600)!
+		volume_seal_io = VolumeSealIO{rewrapping: true, new_input: (work + '/next').str}
+		assert rewrap_volume_seal((work + '/bad').str, (work + '/old').str, (work + '/next').str, (work + '/result').str) == 1
+		assert volume_seal_io.new_opens == 0 && volume_seal_io.opened == volume_seal_io.closed && volume_seal_io.wipes == 1 && !os.exists(work + '/result')
+	}
+	for publication in 0 .. 11 {
+		volume_seal_io = VolumeSealIO{rewrapping: true, new_input: (work + '/next').str, publication: publication}
+		assert rewrap_volume_seal((work + '/source').str, (work + '/old').str, (work + '/next').str, (work + '/result').str) == if publication in [0, 10] { 0 } else { 1 }
+		assert volume_seal_io.opened == volume_seal_io.closed && volume_seal_io.wipes == 1 && volume_seal_io.parent_opens == 0 && volume_seal_io.imports == 0 && !volume_seal_io.locked
+		assert os.exists(work + '/result') == (publication in [0, 6, 7, 8, 10])
+		if os.exists(work + '/result') {
+			result := os.read_bytes(work + '/result')!; mut disk := DiskKey{}; mut decoded := EncryptedRequest{}
+			assert decode_volume_seal(&result[0], 320, &fresh[0], mut disk, mut decoded) && decoded == request
+			os.rm(work + '/result')!
+		}
+		assert os.ls(work)!.all(!it.starts_with('.vinix-key-'))
+	}
+	assert os.read_bytes(work + '/source')! == source[..] && os.read_bytes(work + '/old')! == old && os.read_bytes(work + '/next')! == next
 }
 
 fn volume_seal_mock_flock(fd i32, flags i32) i32 {

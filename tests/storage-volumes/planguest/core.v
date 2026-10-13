@@ -490,6 +490,8 @@ fn first_boot(parent &char) {
 		rewrap_retention(parent)
 		planned_volume_seal(parent, wrong)
 		volume_seal_retention(parent)
+		planned_volume_rewrap(parent, wrong)
+		volume_rewrap_retention(parent)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -588,6 +590,8 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		if status(actual).bytes == 25165824 {
 			volume_seal_open_tool(actual, c'/root/volume.sealed', c'/root/crypt.pass', true, 1); missing(c'/dev/mapper/vinix60')
 			C.printf(c'PLAN VOLUME SEAL CHANGED CAPACITY REFUSED\n')
+			volume_seal_open_tool(actual, c'/root/volume-next.sealed', c'/root/next.pass', true, 1); missing(c'/dev/mapper/vinix60')
+			C.printf(c'PLAN VOLUME REWRAP CHANGED CAPACITY REFUSED\n')
 			physical_capacity_phase(actual, other)
 			C.printf(c'PLAN DONE\n')
 			for { C.pause() }
@@ -606,6 +610,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		sealed_reordered_boot(actual)
 		rewrap_reordered_boot(actual)
 		volume_seal_reordered_boot(actual, other)
+		volume_rewrap_reordered_boot(actual, other)
 		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation
 		second_before := status(c'/dev/mapper/vinix9').generation
