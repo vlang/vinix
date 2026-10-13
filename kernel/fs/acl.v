@@ -53,3 +53,14 @@ fn discard_created_node(mut node VFSNode, parent &VFSNode) {
 	}
 	retire_node(mut node)
 }
+
+// Backing overlay publication can fail after identity/ACL setup. Roll back the
+// private staged inode while keeping the old whiteout and merged name hidden.
+fn commit_created_node(mut node VFSNode, parent &VFSNode) ? {
+	overlay_commit_created(node) or {
+		failure := errno.get()
+		discard_created_node(mut node, parent)
+		errno.set(failure)
+		return none
+	}
+}

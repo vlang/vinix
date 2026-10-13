@@ -534,6 +534,23 @@ fn (mut filesystem EXT2Filesystem) update_dotdot(inode_index u32,
 
 fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 	old_name string, new_parent &vfs.VFSNode, new_name string, flags int) ? {
+	filesystem.rename_with_whiteout(old_parent, old_name, new_parent, new_name, flags,
+		unsafe { nil })?
+}
+
+fn (mut filesystem EXT2Filesystem) rename_whiteout(old_parent &vfs.VFSNode,
+	old_name string, new_parent &vfs.VFSNode, new_name string, whiteout &vfs.VFSNode) ? {
+	filesystem.rename_with_whiteout(old_parent, old_name, new_parent, new_name, 0, whiteout)?
+}
+
+fn (mut filesystem EXT2Filesystem) rename_with_whiteout(old_parent &vfs.VFSNode,
+	old_name string, new_parent &vfs.VFSNode, new_name string, flags int,
+	whiteout &vfs.VFSNode) ? {
+	if whiteout != unsafe { nil } && (flags != 0 || !vfs.is_whiteout(whiteout)
+		|| whiteout.parent == unsafe { nil } || whiteout.resource.stat.dev != filesystem.dev_id) {
+		errno.set(errno.einval)
+		return none
+	}
 	filesystem.l.acquire()
 	defer { filesystem.l.release() }
 	filesystem.begin_transaction()?
@@ -600,8 +617,24 @@ fn (mut filesystem EXT2Filesystem) rename_persistent(old_parent &vfs.VFSNode,
 			new_name)?
 	}
 	if old_parent_index == new_parent_index { old_dir = new_dir }
-	removed := filesystem.dir_remove(mut old_dir, old_parent_index, old_name)?
+	removed := if whiteout == unsafe { nil } {
+		filesystem.dir_remove(mut old_dir, old_parent_index, old_name)?
+	} else {
+		filesystem.dir_replace_inode(mut old_dir, old_parent_index, old_name,
+			u32(whiteout.resource.stat.ino), inode_type(whiteout.resource.stat.mode))?
+	}
 	if removed != old_inode_index { errno.set(errno.eio); return none }
+	if whiteout != unsafe { nil } {
+		// Read after the earlier directory writes so aliasing parents cannot
+		// restore a stale directory image. The staging name disappears in this
+		// same transaction; the whiteout inode keeps its single link.
+		mut work_dir := unsafe { &EXT2Inode(C.vinix_stack_alloc(sizeof(EXT2Inode))) }
+		unsafe { *work_dir = EXT2Inode{} }
+		work_index := u32(whiteout.parent.resource.stat.ino)
+		work_dir.read_entry(mut filesystem, work_index)?
+		work_removed := filesystem.dir_remove(mut work_dir, work_index, whiteout.name)?
+		if work_removed != u32(whiteout.resource.stat.ino) { errno.set(errno.eio); return none }
+	}
 	if old_parent_index != new_parent_index && stat.isdir(old_node.resource.stat.mode) {
 		filesystem.update_dotdot(old_inode_index, new_parent_index)?
 		if old_dir.hard_link_cnt > 0 { old_dir.hard_link_cnt-- }

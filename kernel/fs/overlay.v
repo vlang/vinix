@@ -33,6 +33,7 @@ module fs
 import errno
 import kbudget
 import klock
+import lib
 import proc
 import resource
 import security
@@ -44,6 +45,9 @@ mut:
 	upper  &VFSNode = unsafe { nil }
 	work   &VFSNode = unsafe { nil }
 	lowers []&VFSNode
+	staging_serial u64
+	staging_owner u32
+	work_next &OverlayFS = unsafe { nil }
 }
 
 // What an overlay node is made of.
@@ -55,6 +59,7 @@ mut:
  // Kept until generic identity/ACL initialization commits the creation.
  rollback_whiteout &VFSNode = unsafe { nil }
  uncommitted bool
+ staged bool
 	// A directory's lower directories, highest first, down to the first
 	// opaque one; for anything else, the lower file it shows while it has no
 	// upper copy.
@@ -234,7 +239,7 @@ fn overlay_dispose_real(mut real VFSNode, held bool) {
 fn overlay_release_unlinked_real(mut real VFSNode, held bool) {
  mut res := real.resource
  mode := res.stat.mode
- if stat.isdir(mode) { real.removed = true; res.stat.nlink = 0 }
+ if stat.isdir(mode) { overlay_detach_work_locked(mut real); real.removed = true; res.stat.nlink = 0 }
  if !held { release_resource_after_grace(res) }
  orphan_node(mut real, mode)
 }
@@ -273,9 +278,100 @@ fn overlay_whiteout_locked(mut dir VFSNode, name string) ? {
 }
 
 fn overlay_prepare_whiteout(mut dir VFSNode, name string) ?&VFSNode {
+ mut upper := dir.overlay.upper
+ if overlay_persistent_storage(mut upper.filesystem) {
+  return overlay_stage_create(mut dir, stat.ifchr, '', false)
+ }
  backing := device_by_name('null')
  if backing == unsafe { nil } { errno.set(errno.eio); return none }
- return prepare_device_node(mut dir, name, stat.ifchr, 0, backing)
+ return prepare_device_node(mut upper, name, stat.ifchr, 0, backing)
+}
+
+// Staged inodes have real disk names, but remain outside the merged tree until
+// their metadata and final backing rename succeed. Old whiteouts stay named.
+fn overlay_staging_work(dir &VFSNode) ?&VFSNode {
+ work := dir.overlay.fs.work
+ if work == unsafe { nil } || work.removed { errno.set(errno.enoent); return none }
+ return overlay_work_child(work, dir.overlay.fs.upper, dir.overlay.fs.staging_owner, true)
+}
+
+// A named work directory stays owned by its namespace. On removal, sever all
+// raw overlay pointers before normal FD/CWD/grace retirement can reclaim it.
+// Do not make it an upper/lower pin: that would retain a deleted disk inode.
+fn overlay_detach_work(mut node VFSNode) {
+ if node.overlay_work_owners == unsafe { nil } { return }
+ overlay_lock.acquire()
+ defer { overlay_lock.release() }
+ overlay_detach_work_locked(mut node)
+}
+
+fn overlay_detach_work_locked(mut node VFSNode) {
+ mut owner := node.overlay_work_owners
+ node.overlay_work_owners = unsafe { nil }
+ for owner != unsafe { nil } {
+  next := owner.work_next
+  owner.work = unsafe { nil }
+  owner.work_next = unsafe { nil }
+  owner = next
+ }
+}
+
+fn overlay_work_child(work &VFSNode, upper &VFSNode, owner u32, private bool) ?&VFSNode {
+ child := lookup_child_synced(work, 'work')
+ if child == unsafe { nil } || child.removed { errno.set(errno.enoent); return none }
+ if child.resource == unsafe { nil } || !stat.isdir(child.resource.stat.mode)
+  || child.redir != unsafe { nil } || child.mountpoint != unsafe { nil }
+  || child.ns_mounts > 0 || !same_filesystem(child, upper) {
+  errno.set(errno.einval); return none
+ }
+ if private && (child.resource.stat.mode & 0o777 != 0 || child.resource.stat.uid != owner) {
+  errno.set(errno.eacces); return none
+ }
+ return child
+}
+
+fn overlay_staging_name(mut ofs OverlayFS, work &VFSNode) ?string {
+ for {
+  if ofs.staging_serial == ~u64(0) { errno.set(errno.eoverflow); return none }
+  ofs.staging_serial++
+  mut text := lib.new_text(40)
+  text.add('.vinix-stage-')
+  text.add_unsigned(ofs.staging_serial)
+  name := lib.finish_text(text)
+  if name !in work.children { return name }
+  unsafe { name.free() }
+ }
+ return none
+}
+
+fn overlay_stage_create(mut dir VFSNode, mode u32, dest string, symlink bool) ?&VFSNode {
+ mut work := overlay_staging_work(dir)?
+ name := overlay_staging_name(mut dir.overlay.fs, work)?
+ defer { unsafe { name.free() } }
+ mut real := if symlink {
+  overlay_prepare_real_symlink(mut work, dest, name, dir.resource)?
+ } else { overlay_prepare_real_create(mut work, name, mode, dir.resource)? }
+ // Directory setgid belongs to the final parent, not the private work
+ // directory. Generic creation persists the final ACL/mode before commit.
+ if stat.isdir(mode) { real.resource.stat.mode = mode & ~u32(0o2000) }
+ apply_creation_identity(mut real, dir.overlay.upper) or {
+  failure := errno.get()
+  discard_created_node(mut real, work)
+  errno.set(failure)
+  return none
+ }
+ publish_child(work, name, real)
+ return real
+}
+
+fn overlay_discard_whiteout(mut node VFSNode) {
+ mut parent := node.parent
+ mut res := node.resource
+ res.unlink(voidptr(node)) or { return }
+ if node.name in parent.children && unsafe { voidptr(parent.children[node.name]) == voidptr(node) } {
+  remove_child(parent, node.name)
+ }
+ overlay_release_unlinked_real(mut node, false)
 }
 
 // ── Merging ──────────────────────────────────────────────────────────────────
@@ -599,7 +695,9 @@ fn overlay_create_locked(mut dir VFSNode, name string, mode u32) ?&VFSNode {
  replaced_whiteout := overlay_prepare_name_locked(mut dir, name)?
 	mut upper_dir := dir.overlay.upper
   mut previous := if replaced_whiteout { unsafe { upper_dir.children[name] } } else { &VFSNode(unsafe { nil }) }
-	real := overlay_prepare_real_create(mut upper_dir, name, mode, dir.resource)?
+	staged := previous != unsafe { nil } && overlay_persistent_storage(mut upper_dir.filesystem)
+	real := if staged { overlay_stage_create(mut dir, mode, '', false)? }
+ else { overlay_prepare_real_create(mut upper_dir, name, mode, dir.resource)? }
 	// A directory made where a lower one was removed must not show what that
 	// one held.
 	if stat.isdir(mode) && replaced_whiteout {
@@ -607,15 +705,21 @@ fn overlay_create_locked(mut dir VFSNode, name string, mode u32) ?&VFSNode {
   marker = unsafe { nil }
 	}
 	// internal_create() adds `.` and `..` to a new directory and links it in.
-	return overlay_new_node(dir, name, real, replaced_whiteout, previous)
+	mut node := overlay_new_node(dir, name, real, replaced_whiteout, previous)
+ node.overlay.staged = staged
+ return node
 }
 
 fn overlay_symlink_locked(mut dir VFSNode, dest string, name string) ?&VFSNode {
 	replaced_whiteout := overlay_prepare_name_locked(mut dir, name)?
 	mut upper_dir := dir.overlay.upper
   mut previous := if replaced_whiteout { unsafe { upper_dir.children[name] } } else { &VFSNode(unsafe { nil }) }
-	real := overlay_prepare_real_symlink(mut upper_dir, dest, name, dir.resource)?
-	return overlay_new_node(dir, name, real, replaced_whiteout, previous)
+	staged := previous != unsafe { nil } && overlay_persistent_storage(mut upper_dir.filesystem)
+ real := if staged { overlay_stage_create(mut dir, stat.iflnk | 0o777, dest, true)? }
+ else { overlay_prepare_real_symlink(mut upper_dir, dest, name, dir.resource)? }
+ mut node := overlay_new_node(dir, name, real, replaced_whiteout, previous)
+ node.overlay.staged = staged
+ return node
 }
 
 fn overlay_link_locked(mut dir VFSNode, name string, mut old_node VFSNode) ?&VFSNode {
@@ -628,14 +732,18 @@ fn overlay_link_locked(mut dir VFSNode, name string, mut old_node VFSNode) ?&VFS
 	mut upper_dir := dir.overlay.upper
   mut previous := if replaced_whiteout { unsafe { upper_dir.children[name] } } else { &VFSNode(unsafe { nil }) }
 	mut old_real := old_node.overlay.upper
+	staged := previous != unsafe { nil } && overlay_persistent_storage(mut upper_dir.filesystem)
+ mut real_parent := if staged { overlay_staging_work(dir)? } else { upper_dir }
 	charge := proc.reserve_kernel(.file, 4096 + u64(name.len) * 2)?
- real_name := name.clone()
- real := upper_dir.filesystem.link(upper_dir, real_name, mut old_real) or { unsafe { real_name.free() }; kbudget.release(charge); return none }
+ real_name := if staged { overlay_staging_name(mut dir.overlay.fs, real_parent) or { kbudget.release(charge); return none } } else { name.clone() }
+ real := real_parent.filesystem.link(real_parent, real_name, mut old_real) or { unsafe { real_name.free() }; kbudget.release(charge); return none }
  mut charged_real := unsafe { real }; charged_real.kernel_charge = charge
 	unsafe {
-		publish_child(upper_dir, name, real)
+		publish_child(real_parent, real_name, real)
 	}
-	return overlay_new_node(dir, name, real, replaced_whiteout, previous)
+	mut node := overlay_new_node(dir, name, real, replaced_whiteout, previous)
+ node.overlay.staged = staged
+ return node
 }
 
 // mknod(2) in an overlay directory: a FIFO or a device node in the upper
@@ -680,9 +788,36 @@ fn overlay_unlink(mut dir VFSNode, mut node VFSNode, name string) ? {
 	overlay_copy_up_locked(mut dir)?
 	mut upper_dir := dir.overlay.upper
  mut whiteout := &VFSNode(unsafe { nil })
- if node.overlay.has_lower { whiteout = overlay_prepare_whiteout(mut upper_dir, name)? }
- defer { if whiteout != unsafe { nil } { discard_created_node(mut whiteout, upper_dir) } }
+ if node.overlay.has_lower { whiteout = overlay_prepare_whiteout(mut dir, name)? }
+ defer { if whiteout != unsafe { nil } { overlay_discard_whiteout(mut whiteout) } }
 	held := is_dir && proc.directory_in_use(voidptr(node))
+	if whiteout != unsafe { nil } && voidptr(whiteout.parent) != voidptr(upper_dir) {
+  mut work := whiteout.parent
+  final_name := name.clone()
+  mut adopted := false
+  defer { if !adopted { unsafe { final_name.free() } } }
+  work.filesystem.rename(work, whiteout.name, upper_dir, name, 0)?
+  mut previous := node.overlay.upper
+  children_lock.acquire()
+  unsafe {
+   if name in upper_dir.children { mut slot := &upper_dir.children[name]; *slot = whiteout }
+   else { upper_dir.children[name] = whiteout }
+   work.children.delete(whiteout.name)
+   dir.children.delete(name)
+  }
+  children_lock.release()
+  adopt(mut whiteout, mut upper_dir, final_name)
+  adopted = true
+  whiteout = unsafe { nil }
+  if previous != unsafe { nil } {
+   if is_dir { overlay_drop_whiteouts_locked(mut previous) }
+   if previous.resource.stat.nlink > 0 { previous.resource.stat.nlink-- }
+   overlay_release_unlinked_real(mut previous, held)
+  }
+  hold_parent(mut node)
+  if is_dir { overlay_detach_work_locked(mut node); node.removed = true }
+  return
+ }
 	if node.overlay.upper != unsafe { nil } {
 		if is_dir {
 			mut real := node.overlay.upper
@@ -697,6 +832,7 @@ fn overlay_unlink(mut dir VFSNode, mut node VFSNode, name string) ? {
 	hold_parent(mut node)
 	remove_child(dir, name)
 	if is_dir {
+		overlay_detach_work_locked(mut node)
 		node.removed = true
 	}
 }
@@ -726,8 +862,8 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	mut new_upper := new_dir.overlay.upper
 	mut real := old_node.overlay.upper
  mut old_whiteout := &VFSNode(unsafe { nil })
- if old_node.overlay.has_lower { old_whiteout = overlay_prepare_whiteout(mut old_upper, old_name)? }
- defer { if old_whiteout != unsafe { nil } { discard_created_node(mut old_whiteout, old_upper) } }
+ if old_node.overlay.has_lower { old_whiteout = overlay_prepare_whiteout(mut old_dir, old_name)? }
+ defer { if old_whiteout != unsafe { nil } { overlay_discard_whiteout(mut old_whiteout) } }
 
 	// What the new name hides below it, which the moved one has to keep
 	// hiding.
@@ -748,10 +884,11 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	// the backend transaction, rather than a separate destructive unlink.
 	upper_name := new_name.clone()
 	merged_name := new_name.clone()
+	whiteout_name := if old_whiteout != unsafe { nil } && voidptr(old_whiteout.parent) != voidptr(old_upper) { old_name.clone() } else { '' }
 	mut names_adopted := false
-	defer { if !names_adopted { unsafe { upper_name.free(); merged_name.free() } } }
+	defer { if !names_adopted { unsafe { upper_name.free(); merged_name.free(); whiteout_name.free() } } }
 
-	old_upper.filesystem.rename(old_upper, old_name, new_upper, new_name, 0)?
+	overlay_storage_rename(mut old_upper.filesystem, old_upper, old_name, new_upper, new_name, old_whiteout)?
 	// Upper and merged paths publish together, with no destination deletion.
 	// Readers copy child pointers under this same lock; backend callbacks and
 	// retirement remain outside it.
@@ -762,7 +899,10 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 			*slot = real
 		} else { new_upper.children[new_name] = real }
 		old_upper.children.delete(old_name)
-		if old_whiteout != nil { old_upper.children[old_name] = old_whiteout }
+		if old_whiteout != nil {
+   if voidptr(old_whiteout.parent) != voidptr(old_upper) { old_whiteout.parent.children.delete(old_whiteout.name) }
+   old_upper.children[old_name] = old_whiteout
+  }
 		if replaced != nil {
 			mut slot := &new_dir.children[new_name]
 			*slot = old_node
@@ -772,6 +912,9 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	children_lock.release()
 	adopt(mut real, mut new_upper, upper_name)
 	adopt(mut old_node, mut new_dir, merged_name)
+	if old_whiteout != unsafe { nil } && voidptr(old_whiteout.parent) != voidptr(old_upper) {
+  adopt(mut old_whiteout, mut old_upper, whiteout_name)
+ }
 	names_adopted = true
 	if old_node.overlay.has_lower {
   old_whiteout = unsafe { nil }
@@ -788,7 +931,7 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	}
 	if replaced != unsafe { nil } {
 		hold_parent(mut replaced)
-		if replaced_is_dir { replaced.removed = true }
+  if replaced_is_dir { overlay_detach_work_locked(mut replaced); replaced.removed = true }
 	}
 }
 
@@ -796,6 +939,7 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 
 fn overlay_directory(parent &VFSNode, path string) ?&VFSNode {
 	node := get_node(parent, path, true)?
+	require_linked(node)?
 	if node.resource == unsafe { nil } || !stat.isdir(node.resource.stat.mode) {
 		errno.set(errno.enotdir)
 		return none
@@ -847,7 +991,14 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 		errno.set(errno.einval)
 		return none
 	}
+	// new_mount releases this lock before calling the overlay factory. Keep
+	// layer resolution and work-owner registration together so rmdir cannot
+	// queue a resolved work node before its owner is attached.
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
 	mut lowers := []&VFSNode{}
+	mut layers_assigned := false
+ defer { if !layers_assigned { unsafe { lowers.free() } } }
 	lower_paths := lower_spec.split(':')
 	defer {
 		unsafe { lower_paths.free() }
@@ -864,17 +1015,23 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 	if upper_path.len > 0 {
 		upper = overlay_directory(parent, upper_path)?
 		work = overlay_directory(parent, work_path)?
-		// Linux keeps its own directory in the work directory, and Docker
-		// chowns it right after mounting.
+		if !same_filesystem(upper, work) { errno.set(errno.exdev); return none }
+  if upper.resource.stat.ino == work.resource.stat.ino
+   || is_ancestor(upper, work) || is_ancestor(work, upper) { errno.set(errno.einval); return none }
+		// Persistent staging stays in a mode-zero directory owned by the
+		// mount creator. Validate preexisting directories before trusting them.
 		if 'work' !in work.children {
 			overlay_real_create(mut work, 'work', stat.ifdir, work.resource)?
 		}
+  overlay_work_child(work, upper, proc.current_thread().process.euid,
+   overlay_persistent_storage(mut upper.filesystem))?
 	}
 	mut ofs := &OverlayFS{
 		dev_id: resource.create_dev_id()
 		upper:  upper
 		work:   work
 		lowers: lowers.clone()
+  staging_owner: proc.current_thread().process.euid
 	}
 	mut root := create_node(ofs, mount_parent, name, true)
 	root.resource = if upper != unsafe { nil } { upper.resource } else { lowers[0].resource }
@@ -885,6 +1042,13 @@ fn overlay_mount(parent &VFSNode, mount_parent &VFSNode, name string, options st
 		lowers: lowers
 	}
 	mark_overlaid(root.overlay)
+ if work != unsafe { nil } {
+  overlay_lock.acquire()
+  ofs.work_next = work.overlay_work_owners
+  work.overlay_work_owners = ofs
+  overlay_lock.release()
+ }
+ layers_assigned = true
 	return root
 }
 
@@ -902,12 +1066,14 @@ fn overlay_discard_created(mut dir VFSNode, mut node VFSNode) {
   // A failed disk unlink may still leave this inode named. Keep its
  // reference and reservation until a safe cleanup is possible.
  res.unlink(voidptr(real)) or { return }
+  if node.overlay.staged { remove_child(real.parent, real.name) }
   res.stat.nlink = 0
   real.removed = true
   real.orphan = true
   real.directory_resource = true
   retire_node(mut real)
- } else { overlay_dispose_real(mut real, false) }
+ } else if node.overlay.staged { overlay_discard_whiteout(mut real) }
+ else { overlay_dispose_real(mut real, false) }
  // The previous whiteout never left its upper slot.
  node.overlay.rollback_whiteout = unsafe { nil }
  if node.children != unsafe { nil } && node.children.len == 0 {
@@ -916,11 +1082,37 @@ fn overlay_discard_created(mut dir VFSNode, mut node VFSNode) {
  retire_node(mut node)
 }
 
-fn overlay_commit_created(node &VFSNode) {
+fn overlay_commit_created(node &VFSNode) ? {
  if node.overlay == unsafe { nil } { return }
  overlay_lock.acquire()
+ defer { overlay_lock.release() }
  mut entry := node.overlay
  mut previous := entry.rollback_whiteout
+ if entry.staged {
+  mut real := entry.upper
+  mut work := real.parent
+  mut upper := node.parent.overlay.upper
+  final_name := node.name.clone()
+  mut adopted := false
+  defer { if !adopted { unsafe { final_name.free() } } }
+  work.filesystem.rename(work, real.name, upper, node.name, 0)?
+  children_lock.acquire()
+  unsafe {
+   mut slot := &upper.children[node.name]
+   *slot = real
+   work.children.delete(real.name)
+  }
+  children_lock.release()
+  adopt(mut real, mut upper, final_name)
+  adopted = true
+  entry.staged = false
+  entry.uncommitted = false
+  if previous != unsafe { nil } {
+   if previous.resource.stat.nlink > 0 { previous.resource.stat.nlink-- }
+   overlay_release_unlinked_real(mut previous, false)
+   previous = unsafe { nil }
+  }
+ }
  entry.rollback_whiteout = unsafe { nil }
  if entry.uncommitted {
   mut parent := entry.upper.parent
@@ -929,5 +1121,4 @@ fn overlay_commit_created(node &VFSNode) {
  entry.uncommitted = false
  mark_overlaid(entry)
  if previous != unsafe { nil } { overlay_dispose_real(mut previous, false) }
- overlay_lock.release()
 }

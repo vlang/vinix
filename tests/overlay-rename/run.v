@@ -134,8 +134,10 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	if case_name in ['atomic', 'all'] { expected << 'OVERLAY REPLACE: PASS' }
 	if case_name in ['failure', 'all'] { expected << 'OVERLAY BACKEND FAILURE: PASS' }
 	if case_name in ['disk', 'all'] {
-		expected << ['OVERLAY DISK: PASS', 'OVERLAY PERSISTENCE: PASS']
+		expected << ['OVERLAY DISK: PASS', 'OVERLAY PERSISTENCE: PASS', 'OVERLAY WHITEOUT: PASS',
+			'OVERLAY PRIVATE WORK: PASS', 'OVERLAY RECREATION PERSISTENCE: PASS']
 	}
+	if case_name == 'all' { expected << 'OVERLAY REMOVED WORK: PASS' }
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)
 	return guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 }

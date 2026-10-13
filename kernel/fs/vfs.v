@@ -71,6 +71,8 @@ pub mut:
 	seat bool
 	// What an overlay node is made of; see overlay.v.
 	overlay &OverlayEntry = unsafe { nil }
+	// Intrusive owners of a staging work directory; invalidated on removal.
+	overlay_work_owners &OverlayFS = unsafe { nil }
 	// How many open-file descriptions lead to this node, whether no name does
 	// any more, and whether it has been handed to the grace queue; see
 	// removed.v. An overlay built on the node, or a mount that has covered
@@ -564,7 +566,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 		return none
 	}
 
- overlay_commit_created(target_node)
+ commit_created_node(mut target_node, parent_of_tgt_node)?
 	publish_child(parent_of_tgt_node, basename, target_node)
 	inotify_emit(parent_of_tgt_node, basename, in_create, 0)
 	return target_node
@@ -610,7 +612,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	target_node.kernel_charge = charge
 	charge_transferred = true
 
- overlay_commit_created(target_node)
+ commit_created_node(mut target_node, parent_of_tgt_node)?
 	publish_child(parent_of_tgt_node, basename, target_node)
 	inotify_emit(parent_of_tgt_node, basename, in_create, 0)
 	inotify_emit(dest_node, '', in_attrib, 0)
@@ -849,7 +851,7 @@ fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, acces
 		return none
 	}
 
- overlay_commit_created(target_node)
+ commit_created_node(mut target_node, parent_of_tgt_node)?
 	if stat.isdir(target_node.resource.stat.mode) {
 		target_node.create_dotentries(parent_of_tgt_node)
 	}
@@ -1792,7 +1794,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 	}
 
  new_node.kernel_charge = charge
- overlay_commit_created(new_node)
+ commit_created_node(mut new_node, newparent) or { return errno.err, errno.get() }
 	publish_child(newparent, basename, new_node)
 	return 0, 0
 }

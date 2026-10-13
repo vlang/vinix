@@ -8,9 +8,12 @@ struct C.timespec {
 }
 
 struct C.stat {
+	st_ino   u64
 	st_uid   u32
+	st_gid   u32
 	st_mode  u32
 	st_nlink u64
+	st_rdev  u64
 }
 
 struct C.dirent {
@@ -24,9 +27,12 @@ fn C.write(int, voidptr, usize) isize
 fn C.close(int) int
 fn C.fsync(int) int
 fn C.fstat(int, &C.stat) int
+fn C.lstat(&char, &C.stat) int
 fn C.rename(&char, &char) int
 fn C.mkdir(&char, u32) int
 fn C.chown(&char, u32, u32) int
+fn C.chmod(&char, u32) int
+fn C.mknod(&char, u32, u64) int
 fn C.setgroups(usize, voidptr) int
 fn C.setgid(u32) int
 fn C.setuid(u32) int
@@ -52,6 +58,9 @@ fn C.pause() int
 fn C.mount(&char, &char, &char, usize, voidptr) int
 fn C.umount(&char) int
 fn C.unlink(&char) int
+fn C.rmdir(&char) int
+fn C.symlink(&char, &char) int
+fn C.link(&char, &char) int
 fn C.sync()
 
 fn owned_directory(path &char, site int) {
@@ -114,14 +123,46 @@ fn prepare_disk() {
 		owned_directory(c'/tmp/overlay-state/diskmerged', 56)
 		write_file(c'/tmp/overlay-state/disklower/current', c'AAAAAAAA', 57)
 		write_file(c'/tmp/overlay-state/disklower/move', c'AAAAAAAA', 58)
+		write_file(c'/tmp/overlay-state/disklower/deleted', c'AAAAAAAA', 96)
+		owned_directory(c'/tmp/overlay-state/disklower/empty', 97)
 		check(C.chown(c'/tmp/overlay-state/disklower/current', 1000, 1000) == 0
-			&& C.chown(c'/tmp/overlay-state/disklower/move', 1000, 1000) == 0, 59)
+			&& C.chown(c'/tmp/overlay-state/disklower/move', 1000, 1000) == 0
+			&& C.chown(c'/tmp/overlay-state/disklower/deleted', 1000, 1000) == 0, 59)
 		mut target := [512]char{}
 		long_path(&target[0], c'/tmp/overlay-state/disklower')
 		write_file(&target[0], c'AAAAAAAA', 60)
 		check(C.chown(&target[0], 1000, 1000) == 0, 61)
+		reject_work()
 		check(C.mount(c'overlay', c'/tmp/overlay-state/diskmerged', c'overlay', 0,
 			c'lowerdir=/tmp/overlay-state/disklower,upperdir=/tmp/overlay-volume/upper,workdir=/tmp/overlay-volume/work') == 0, 62)
+	}
+}
+
+fn reject_work() {
+	unsafe {
+		options := &char(c'lowerdir=/tmp/overlay-state/disklower,upperdir=/tmp/overlay-volume/upper,workdir=/tmp/overlay-volume/work')
+		write_file(c'/tmp/overlay-volume/work/work', c'AAAAAAAA', 108)
+		check(C.mount(c'overlay', c'/tmp/overlay-state/diskmerged', c'overlay', 0, options) == -1
+			&& *C.__errno_location() == C.EINVAL && contents(c'/tmp/overlay-volume/work/work', c'AAAAAAAA'), 109)
+		check(C.unlink(c'/tmp/overlay-volume/work/work') == 0
+			&& C.symlink(c'../upper', c'/tmp/overlay-volume/work/work') == 0, 110)
+		check(C.mount(c'overlay', c'/tmp/overlay-state/diskmerged', c'overlay', 0, options) == -1
+			&& *C.__errno_location() == C.EINVAL, 111)
+		check(C.unlink(c'/tmp/overlay-volume/work/work') == 0
+			&& C.mkdir(c'/tmp/overlay-volume/work/work', 0o2777) == 0, 112)
+		check(C.mount(c'overlay', c'/tmp/overlay-state/diskmerged', c'overlay', 0, options) == -1
+			&& *C.__errno_location() == C.EACCES, 113)
+		check(C.chmod(c'/tmp/overlay-volume/work/work', 0o2000) == 0, 114)
+		owned_directory(c'/tmp/overlay-volume/removed-work', 130)
+		removed := C.open(c'/tmp/overlay-volume/removed-work', C.O_RDONLY | C.O_DIRECTORY)
+		check(removed >= 0 && C.rmdir(c'/tmp/overlay-volume/removed-work') == 0, 131)
+		mut removed_options := [512]char{}
+		check(C.snprintf(&removed_options[0], 512,
+			c'lowerdir=/tmp/overlay-state/disklower,upperdir=/tmp/overlay-volume/upper,workdir=/proc/self/fd/%d', removed) > 0, 132)
+		check(C.mount(c'overlay', c'/tmp/overlay-state/diskmerged', c'overlay', 0, &removed_options[0]) == -1
+			&& *C.__errno_location() == C.ENOENT && C.close(removed) == 0, 133)
+		C.puts(c'OVERLAY PRIVATE WORK: PASS')
+		C.fflush(nil)
 	}
 }
 
@@ -138,6 +179,17 @@ fn backend_failure() {
 			result, code, int(source_ok), int(target_ok), C.getuid())
 		C.fflush(nil)
 		check(result == -1 && code == C.ENAMETOOLONG && source_ok && target_ok, 64)
+		// The lower-source path stages a real source whiteout. A rejected
+		// backing rename must discard that staging inode and keep both names.
+		lower_result := C.rename(c'/tmp/overlay-state/diskmerged/move', &target[0])
+		lower_code := *C.__errno_location()
+		lower_source_ok := contents(c'/tmp/overlay-state/diskmerged/move', c'AAAAAAAA')
+		lower_target_ok := contents(&target[0], c'AAAAAAAA')
+		C.printf(c'OVERLAY LOWER BACKEND FAILURE: result=%d errno=%d source_ok=%d target_ok=%d\n',
+			lower_result, lower_code, int(lower_source_ok), int(lower_target_ok))
+		C.fflush(nil)
+		check(lower_result == -1 && lower_code == C.ENAMETOOLONG
+			&& lower_source_ok && lower_target_ok, 120)
 		long_path(&target[0], c'/tmp/overlay-state/disklower')
 		check(contents(&target[0], c'AAAAAAAA'), 65)
 		C.puts(c'OVERLAY BACKEND FAILURE: PASS')
@@ -205,12 +257,14 @@ fn disk_replace() {
 			&& C.close(left) == 0 && C.close(right) == 0, 95)
 		C.printf(c'OVERLAY CROSS DIRECTORY: left=%lu->%lu right=%lu->%lu\n', left_before,
 			u64(st.st_nlink), right_before, u64(right_stat.st_nlink))
+		check(C.unlink(c'/tmp/overlay-state/diskmerged/deleted') == 0
+			&& C.rmdir(c'/tmp/overlay-state/diskmerged/empty') == 0, 98)
 		C.puts(c'OVERLAY DISK: PASS')
 		C.fflush(nil)
 	}
 }
 
-fn persistence() {
+fn persistence(stress bool) {
 	unsafe {
 		C.sync()
 		check(C.umount(c'/tmp/overlay-state/diskmerged') == 0 && C.umount(c'/tmp/overlay-volume') == 0, 79)
@@ -223,8 +277,79 @@ fn persistence() {
 			&& st.st_mode & 0o777 == 0o600 && C.close(fd) == 0, 82)
 		check(C.open(c'/tmp/overlay-volume/upper/source', C.O_RDONLY) == -1
 			&& *C.__errno_location() == C.ENOENT, 83)
-		check(C.umount(c'/tmp/overlay-volume') == 0, 84)
 		C.puts(c'OVERLAY PERSISTENCE: PASS')
+		C.fflush(nil)
+		check(C.mount(c'overlay', c'/tmp/overlay-state/diskmerged', c'overlay', 0,
+			c'lowerdir=/tmp/overlay-state/disklower,upperdir=/tmp/overlay-volume/upper,workdir=/tmp/overlay-volume/work') == 0, 99)
+		for marker in [&char(c'/tmp/overlay-volume/upper/move'),
+			&char(c'/tmp/overlay-volume/upper/deleted'), &char(c'/tmp/overlay-volume/upper/empty')]! {
+			check(C.lstat(marker, &st) == 0 && st.st_mode & C.S_IFMT == C.S_IFCHR
+				&& st.st_rdev == 0 && st.st_nlink == 1 && st.st_uid == 1000 && st.st_gid == 1000, 115)
+		}
+		if stress {
+			owned_directory(c'/tmp/overlay-state/othermerged', 125)
+			check(C.mount(c'overlay', c'/tmp/overlay-state/othermerged', c'overlay', 0,
+				c'lowerdir=/tmp/overlay-state/disklower,upperdir=/tmp/overlay-volume/upper,workdir=/tmp/overlay-volume/work') == 0, 126)
+		}
+		worker := C.fork()
+		check(worker >= 0, 100)
+		if worker == 0 {
+			check(C.setgroups(0, nil) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0, 101)
+			for path in [&char(c'/tmp/overlay-state/diskmerged/move'),
+				&char(c'/tmp/overlay-state/diskmerged/deleted'),
+				&char(c'/tmp/overlay-state/diskmerged/empty')]! {
+				fd_hidden := C.open(path, C.O_RDONLY)
+				code := *C.__errno_location()
+				C.printf(c'OVERLAY WHITEOUT REMOUNT: path=%s fd=%d errno=%d\n', path, fd_hidden, code)
+				C.fflush(nil)
+				check(fd_hidden == -1 && code == C.ENOENT, 102)
+			}
+			write_file(c'/tmp/overlay-state/diskmerged/deleted', c'BBBBBBBB', 103)
+			check(C.symlink(c'current', c'/tmp/overlay-state/diskmerged/move') == 0
+				&& contents(c'/tmp/overlay-state/diskmerged/move', c'BBBBBBBB')
+				&& C.mkdir(c'/tmp/overlay-state/diskmerged/empty', 0o700) == 0, 104)
+			check(C.lstat(c'/tmp/overlay-state/diskmerged/empty', &st) == 0
+				&& st.st_mode & 0o7777 == 0o700 && st.st_gid == 1000, 116)
+			check(C.unlink(c'/tmp/overlay-state/diskmerged/deleted') == 0
+				&& C.link(c'/tmp/overlay-state/diskmerged/current', c'/tmp/overlay-state/diskmerged/deleted') == 0
+				&& contents(c'/tmp/overlay-state/diskmerged/deleted', c'BBBBBBBB'), 105)
+			if stress {
+				check(contents(c'/tmp/overlay-state/othermerged/deleted', c'BBBBBBBB'), 127)
+				check(C.rmdir(c'/tmp/overlay-volume/work/work') == 0
+					&& C.rmdir(c'/tmp/overlay-volume/work') == 0 && C.usleep(6500000) == 0, 117)
+				check(C.unlink(c'/tmp/overlay-state/diskmerged/deleted') == -1
+					&& *C.__errno_location() == C.ENOENT
+					&& contents(c'/tmp/overlay-state/diskmerged/deleted', c'BBBBBBBB'), 118)
+				check(C.unlink(c'/tmp/overlay-state/othermerged/deleted') == -1
+					&& *C.__errno_location() == C.ENOENT
+					&& contents(c'/tmp/overlay-state/othermerged/deleted', c'BBBBBBBB'), 128)
+				C.puts(c'OVERLAY REMOVED WORK: PASS')
+				C.fflush(nil)
+			}
+			C._exit(0)
+		}
+		mut worker_status := 0
+		check(C.waitpid(worker, &worker_status, 0) == worker && C.WIFEXITED(worker_status) != 0
+			&& C.WEXITSTATUS(worker_status) == 0, 106)
+		check(C.usleep(6500000) == 0, 107)
+		C.sync()
+		if stress { check(C.umount(c'/tmp/overlay-state/othermerged') == 0, 129) }
+		check(C.umount(c'/tmp/overlay-state/diskmerged') == 0
+			&& C.umount(c'/tmp/overlay-volume') == 0, 84)
+		check(C.mount(volume_device(), c'/tmp/overlay-volume', c'ext2', 0, nil) == 0
+			&& contents(c'/tmp/overlay-volume/upper/deleted', c'BBBBBBBB')
+			&& contents(c'/tmp/overlay-volume/upper/move', c'BBBBBBBB'), 121)
+		mut linked := C.stat{}
+		check(C.lstat(c'/tmp/overlay-volume/upper/current', &st) == 0
+			&& C.lstat(c'/tmp/overlay-volume/upper/deleted', &linked) == 0
+			&& st.st_ino == linked.st_ino && st.st_nlink == 2 && linked.st_nlink == 2, 122)
+		check(C.lstat(c'/tmp/overlay-volume/upper/move', &st) == 0
+			&& st.st_mode & C.S_IFMT == C.S_IFLNK && st.st_uid == 1000 && st.st_gid == 1000, 123)
+		check(C.lstat(c'/tmp/overlay-volume/upper/empty', &st) == 0
+			&& st.st_mode & C.S_IFMT == C.S_IFDIR && st.st_mode & 0o7777 == 0o700
+			&& st.st_uid == 1000 && st.st_gid == 1000 && C.umount(c'/tmp/overlay-volume') == 0, 124)
+		C.puts(c'OVERLAY RECREATION PERSISTENCE: PASS')
+		C.puts(c'OVERLAY WHITEOUT: PASS')
 		C.fflush(nil)
 	}
 }
@@ -403,6 +528,8 @@ pub fn run() int {
 			check(C.getuid() == 1000 && C.geteuid() == 1000, 6)
 			check(C.mount(c'tmpfs', c'/tmp/overlay-state', c'tmpfs', 0, nil) == -1
 				&& *C.__errno_location() == C.EPERM, 39)
+			check(C.mknod(c'/tmp/overlay-state/denied-device', u32(C.S_IFCHR | 0o600), 0) == -1
+				&& *C.__errno_location() == C.EPERM, 119)
 			if concurrent {
 				sample(0)
 				exercise(false)
@@ -417,7 +544,7 @@ pub fn run() int {
 		mut status := 0
 		check(C.waitpid(worker, &status, 0) == worker && C.WIFEXITED(status) != 0
 			&& C.WEXITSTATUS(status) == 0, 88)
-		if disk { persistence() }
+		if disk { persistence(all) }
 		C.puts(c'OVERLAY GUEST: PASS')
 		C.fflush(nil)
 		for { C.pause() }

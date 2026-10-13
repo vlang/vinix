@@ -4,6 +4,7 @@ This V controller runs native Vinix guests with a private tmpfs overlay and,
 for disk cases, a fresh 128-MiB ext2 volume. Root prepares the mounts and transfers
 the private directories; all rename workloads run as UID/GID 1000 after clearing
 supplementary groups. An unprivileged mount attempt must fail with `EPERM`.
+An unprivileged device-node creation attempt must also fail with `EPERM`.
 The parent performs the final unmount/remount check after the worker exits.
 
 Build each kernel in an isolated worktree with the dependency symlinks described
@@ -35,8 +36,9 @@ The default `--case all` includes:
   descriptor for 6.5 seconds and checks content, UID 1000, mode 0600 and nlink 0.
   It prints slab samples before and after the phases.
 - `failure`: a lower tmpfs file has a 256-byte basename that ext2 cannot encode.
-  Renaming an upper file over it must return `ENAMETOOLONG` while preserving both
-  merged paths and the lower content. This reaches the real backing rename;
+  Renaming either an upper file or a copied-up lower file over it must return
+  `ENAMETOOLONG` while preserving both merged paths and the lower content.
+  This reaches the real backing rename;
   it uses no fault injection or extra authorization.
 - `disk`: an ext2 upper file replaces an existing upper inode held past the
   grace period. A lower source is copied up and renamed, leaving its old merged
@@ -44,7 +46,30 @@ The default `--case all` includes:
   whiteout destination. Empty upper directories replace one another in the
   same parent and across parents, verifying both parent link counts. After
   unmount/remount, regular upper content, ownership, permissions and source
-  removal must persist.
+  removal must persist. Lower-file deletion, lower-directory removal and
+  lower-source rename must leave real 0/0 character whiteouts in the upper,
+  owned by UID/GID 1000. After both the volume and overlay remount, those paths
+  must stay hidden. File, symlink, directory and hardlink recreation over the
+  markers must succeed, and another volume remount checks their backing content,
+  ownership, permissions and hardlink identity. Private staging rejects regular
+  files, symlinks and work directories accessible to other users; the staging
+  directory's setgid bit must not leak into the recreated directory.
+  A removed work directory reached through `/proc/self/fd` must be refused
+  with `ENOENT` while its descriptor still holds it alive.
+
+The default `all` case additionally removes the shared work directory beneath
+two mounted overlays, waits past the grace period and verifies that both refuse
+further staging with `ENOENT` while preserving the destination. `disk` leaves
+the work directory in place. After the owned guest exits, check either private
+volume without modifying it:
+
+```sh
+e2fsck -f -n /path/to/result/store.ext2
+```
+
+[Durable whiteout evidence and limits](whiteouts.md) records the current storage
+qualification. The following results and pins describe the earlier rename
+fix in commit `9a20f3de8`, whose fixture did not yet check persisted whiteouts.
 
 Results from 2026-10-13 are retained under `build/development17-20261013`:
 
@@ -102,7 +127,8 @@ log records `Denied.owner 1`, `Requested 8198`, `OwnerBytes 61898188` and
 `OwnerLimit 61902848`. The bounded fixture exposes this growth rather than
 claiming a leak-free overlay. `overlay-evidence.log` records the comparisons.
 
-Durable whiteouts across overlay remount, retained-directory/CWD stress, crash
-consistency, unsupported rename flags, full OCI security/delegation and mainstream
-rootless-runtime acceptance remain open. The disk persistence test qualifies
-regular upper files; it does not qualify persisted whiteout hiding.
+The earlier disk persistence test qualified regular upper files. Durable ext2
+whiteout hiding is now covered by the additional qualification linked above.
+General overlay retention, opaque-directory persistence, crash consistency,
+unsupported rename flags, full OCI security/delegation and mainstream
+rootless-runtime acceptance remain open.

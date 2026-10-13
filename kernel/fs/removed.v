@@ -51,6 +51,7 @@ fn orphan_node(mut node VFSNode, mode u32) {
 	if !(stat.isdir(mode) || stat.isreg(mode) || stat.islnk(mode) || stat.issock(mode) || stat.ischr(mode) || stat.isblk(mode) || stat.isifo(mode)) {
 		return
 	}
+	if stat.isdir(mode) { overlay_detach_work(mut node) }
 	hold_parent(mut node)
 	if pinned(node) { return }
 	// CGroup.node is a permanent controller identity, also read by asynchronous

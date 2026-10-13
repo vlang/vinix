@@ -275,10 +275,16 @@ passes 2,000 concurrent replacements per architecture, preserves both paths on
 an ext2 backend error, replaces whiteouts, verifies directory parent link counts
 and checks regular upper files after volume remount. Both kernels also pass the
 native authenticated HTTP/account/job/build gate with 19 validated records each.
-Slab samples still show the pre-existing overlay-node retention leak, and durable
-whiteouts, full OCI/rootless-runtime acceptance and broader server-load
-qualification remain open. Full pins and native CI instructions are recorded
-in [the guest evidence](../tests/development/README.md).
+The [durable whiteout qualification](../tests/overlay-rename/whiteouts.md) adds real
+ext2 0/0 whiteouts for lower-file deletion, lower-directory removal and
+lower-source rename. Hidden paths survive clean volume and overlay remounts;
+recreation replaces the marker only after metadata setup and the backing rename
+succeed. Private staging validates the work directory, preserves final-parent
+identity and refuses further operations after work-directory removal.
+Slab samples still show the pre-existing overlay-node retention leak. Persistent
+opaque directories, crash consistency, full OCI/rootless-runtime acceptance and
+broader server-load qualification remain open. Full pins and native CI
+instructions are recorded in [the guest evidence](../tests/development/README.md).
 Boot services, remote CI, deployment, broader projects and SSH remain open.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
