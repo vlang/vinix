@@ -44,8 +44,18 @@ retains redistribution notices and separates compatible library updates from
 the CLI. See the [publisher profile](SDK.md#sqlite-cli-publisher-profile) and
 [real SQLite lifecycle qualification](../../tests/packages/sqlite-profile-check.md).
 
+`ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` creates a
+pinned FFmpeg 8.0.1 local media profile: FFmpeg and FFprobe share a separately
+versioned musl/library runtime, with notices, upstream source and V build tools.
+See the [profile](SDK.md#ffmpeg-local-media-publisher-profile) and
+[qualification](../../tests/packages/ffmpeg-profile-check.md).
+
 Software's **Launch in Terminal** action runs an installed CLI application in a
 PTY within its window. `run-terminal ID [ABSOLUTE_FILE...]` provides the same
 ordinary-account launch from an existing terminal; it refuses redirected input
 or output. See [terminal execution](SDK.md#interactive-terminal-execution) and
 [qualification](../../tests/packages/terminal-check.md).
+
+`run-args` and `run-terminal-args` accept literal command arguments after `--`.
+Use `--file ABSOLUTE_FILE` before the separator for each explicit document grant;
+these grants do not append arguments. See [command execution](SDK.md#literal-command-arguments).

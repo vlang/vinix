@@ -306,6 +306,67 @@ Minimum is inclusive, before exclusive; either may be empty. Each ID appears onc
 Encode runtime/API compatibility in these bounds. Virtual providers, optional
 dependencies and external solver hooks are outside format 1.
 
+### FFmpeg local media publisher profile
+
+`ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY` inventories
+the pinned FFmpeg **8.0.1** local media profile on AArch64 and x86_64. Its three
+packages are `org.ffmpeg.cli`, `org.ffmpeg.probe` and
+`org.vinix.ffmpeg-runtime`. Both applications declare only `files`, share the
+runtime in the compatible `>=1.0.0,<2.0.0` range, and use the packaged static
+Linux runner and musl loader. Firmware/proprietary flags remain false.
+
+Each `PREPARED_ROOTS/aarch64` and `PREPARED_ROOTS/x86_64` contains:
+
+```text
+bin/ffmpeg, bin/ffprobe                 ELF64 musl PIE applications
+bin/vinix-linux-runner                  static target V SDK runner
+lib/libc.so                            target musl loader/library
+lib/libavcodec.so.62, libavdevice.so.62
+lib/libavfilter.so.11, libavformat.so.62
+lib/libavutil.so.60, libswresample.so.6, libswscale.so.9
+licenses/ffmpeg-LICENSE.md, ffmpeg-COPYING.LGPLv2.1
+licenses/musl-COPYRIGHT, vinix-COPYING, v-COPYRIGHT
+sources/ffmpeg.tar.xz                   exact pinned upstream source archive
+sources/build.json                     retained build command vectors
+sources/linux-runner.v, ffmpeg-build.v, ffmpeg-source.json
+```
+
+The source archive's length and SHA-256 must match
+[ffmpeg-source.json](../../tests/packages/ffmpeg-source.json). ELF format,
+architecture, interpreter presence and ordinary executable metadata are checked
+before import and again on captured payload objects. All notices/build sources
+are required, nonempty and bounded. Symlinks are materialized within captured
+guest roots. The output is a canonical `catalog.json` only; temporary payload
+copies are removed. Both architectures, closure, source pin, disk reserve and
+new destination requirements are enforced before publication. `pack-catalog`
+subsequently rechecks the exact inventory pins.
+
+The V builder [ffmpeg-build.v](../../tests/packages/ffmpeg-build.v) checks the
+archive pin, snapshots and extracts the unmodified upstream source, invokes its
+configure/make build with target musl compilers, and compiles the V SDK runner.
+It disables automatic external dependencies, GPL/nonfree options, network,
+hardware acceleration and assembler optimizations. The enabled local media
+subset includes AVI/MPEG-4, WAV/PCM, raw video, generated test video/sine audio,
+scale/format and audio resampling. This profile is deliberately narrower than
+an unrestricted Alpine FFmpeg installation. The upstream
+[license description](https://ffmpeg.org/doxygen/trunk/md_LICENSE.html) explains
+the LGPL/GPL configuration split. LGPL notices and corresponding
+upstream source are retained with the runtime; runtime versions are an explicit
+publisher compatibility declaration, not inferred ABI certification.
+
+```sh
+ffmpeg-build /secure/ffmpeg-8.0.1.tar.xz /build/new-ffmpeg-inputs
+vinix-package ffmpeg-catalog 1.0.0 /build/new-ffmpeg-inputs/roots /build/new-ffmpeg-lock
+vinix-package pack-catalog /build/new-ffmpeg-lock/catalog.json /build/new-ffmpeg-inputs/roots /build/new-ffmpeg-workspace
+vinix-package publish-release /build/new-ffmpeg-workspace company /secure/publisher.seed 1 EXPIRES_UNIX /srv/new-ffmpeg-release
+```
+
+The source pin records exact bytes from the official upstream HTTPS archive;
+it does not verify the upstream PGP signature or enroll a consumer publisher.
+Authenticate upstream delivery and review the configuration before public
+publication. [Qualification](../../tests/packages/ffmpeg-profile-check.md)
+covers the retained compiler/kernel tuple and enabled media subset.
+
 ## Runtimes and launch
 
 | Kind | Requirements |
@@ -417,6 +478,48 @@ The existing Start/Quick Launch requests retain their launch behavior; this
 terminal action is an explicit choice within Software. This provides CLI
 interaction, not a graphical display broker or an arbitrary application runtime.
 See [qualification](../../tests/packages/terminal-check.md).
+
+### Literal command arguments
+
+```text
+vinix-package run-args ID [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]
+vinix-package run-terminal-args ID [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]
+```
+
+These additive SDK 1 commands keep the signed entrypoint and fixed manifest
+arguments, then append the supplied literal argument vector. Values after `--`
+are never parsed as service options, evaluated by a shell or substituted with
+package/data/runtime paths. Empty arguments, spaces, newlines, leading options
+and shell punctuation retain their bytes; NUL and arguments exceeding 4,096
+bytes are refused. The input permits at most 256 arguments and 256 documents,
+with at most 64 KiB total including terminators.
+
+`--file` is an access grant, separate from the argument vector. Each document
+must be an existing absolute regular file and the application must declare
+`files`; grants retain the normal read/write semantics. Documents are **not**
+automatically appended in this mode. A path appearing in an argument grants
+no access by itself. New output files can be created in private application
+data; outside that directory, an existing file requires an explicit grant.
+For example, after installing the FFmpeg profile as an administrator:
+
+```sh
+vinix-package run-args org.ffmpeg.cli -- -version
+vinix-package run-args org.ffmpeg.cli -- -f lavfi -i testsrc2=size=64x48:rate=10:duration=1 -c:v mpeg4 -threads 2 /home/alex/.local/share/vinix-apps/org.ffmpeg.cli/example.avi
+vinix-package run-args org.ffmpeg.probe --file /home/alex/.local/share/vinix-apps/org.ffmpeg.cli/example.avi -- -v error -show_streams /home/alex/.local/share/vinix-apps/org.ffmpeg.cli/example.avi
+```
+
+Use the ordinary account's own private-data path. The root caller uses only the
+administrator-configured `launch_user`, reconstructs literal `--file`/`--`
+arguments for the isolated child, and the child rechecks limits, trust, policy,
+files and payloads before sandboxing. Generation locking/leases and declared
+permissions remain the usual launch contract. Terminal mode additionally checks
+terminal input/output and supplies `tty`/`TERM=linux`. `run`/`run-terminal` keep
+their existing document-appending behavior. Manifest/index/signature formats
+and digest encoding are unchanged.
+
+V SDK callers use `command_launch(argv) !CommandLaunch` to parse the service
+prefix and `Service.run_command(id, input, terminal) !int` to execute it;
+`command_launch_plan` exposes the same validated sandbox plan for inspection.
 
 ## Repository and JSON interfaces
 

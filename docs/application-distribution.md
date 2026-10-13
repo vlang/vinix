@@ -28,6 +28,14 @@ to check WAL/database reopen, ordinary-account isolation, library-only updates,
 rollback and cached offline reinstall while retaining application data. It does
 not enroll a public publisher or migrate the other advertised applications.
 
+The [FFmpeg local media profile](../tools/packages/SDK.md#ffmpeg-local-media-publisher-profile)
+packages FFmpeg/FFprobe with a shared, explicitly versioned musl/FFmpeg runtime,
+license notices, upstream source and V build tools. It supports local
+AVI/MPEG-4 and WAV/PCM workflows with a limited codec/filter set; network,
+hardware acceleration and external codec libraries are disabled. The
+[qualification](../tests/packages/ffmpeg-profile-check.md) covers real media
+encoding, decoding and inspection through the package service on both targets.
+
 ## Trust and configuration
 
 The image stage creates `/etc/vinix-packages/config.json` with an empty
@@ -150,6 +158,17 @@ vinix-package remove editor
 vinix-package verify
 vinix-package gc
 ```
+
+Command-line applications can receive literal flags through
+`vinix-package run-args ID [--file ABSOLUTE_FILE]... -- ARGUMENT...`.
+`run-terminal-args` uses the same syntax in a terminal. Package-declared arguments
+come first. Each `--file` grants an existing document under the application's
+declared `files` permission; it does not append that path to the command.
+Include the path explicitly among the application arguments when needed.
+Arguments alone grant no paths, remain literal across the ordinary-account
+handoff and do not expand `@APP@`, `@DATA@` or `@RUNTIME@`. Outputs belong in the
+application's private data directory or an explicitly granted existing file.
+See the [SDK command contract](../tools/packages/SDK.md#literal-command-arguments).
 
 Search covers names, IDs and descriptions. Info shows publisher, repository,
 license, permissions, target and installed version. Dependency ranges have

@@ -27,6 +27,10 @@ pub fn launch_session(config Config, executable string, id string, documents []s
 }
 
 fn launch_session_mode(config Config, executable string, id string, documents []string, terminal bool) !Launch {
+	return launch_session_request(config, executable, id, LaunchInput{ documents: documents, terminal: terminal })
+}
+
+fn launch_session_request(config Config, executable string, id string, input LaunchInput) !Launch {
 	config.validate()!
 	if config.launch_user == '' {
 		return error('run from an ordinary user session, or configure launch_user for the root desktop')
@@ -34,15 +38,24 @@ fn launch_session_mode(config Config, executable string, id string, documents []
 	if !executable.starts_with('/') || !printable(executable, 4096) || !identifier(id) {
 		return error('invalid isolated package launch')
 	}
-	for document in documents {
+	for document in input.documents {
 		if !document.starts_with('/') || !printable(document, 4096) {
 			return error('invalid launch document')
 		}
 	}
+	if input.command { validate_command(CommandLaunch{ arguments: input.arguments, documents: input.documents })! }
+	command := if input.command { if input.terminal { 'run-terminal-args' } else { 'run-args' } }
+		else { if input.terminal { 'run-terminal' } else { 'run' } }
+	mut argv := ['run', '--isolated', config.launch_user, executable, command, id]
+	if input.command {
+		for document in input.documents { argv << ['--file', document] }
+		argv << '--'
+		argv << input.arguments
+	} else { argv << input.documents }
 	return Launch{
 		program:   '/usr/sbin/vinix-session'
 		directory: '/'
-		arguments: ['run', '--isolated', config.launch_user, executable, if terminal { 'run-terminal' } else { 'run' }, id, ...documents]
+		arguments: argv
 	}
 }
 
@@ -51,10 +64,14 @@ pub fn run_in_session(config Config, id string, documents []string) !int {
 }
 
 fn run_in_session_mode(config Config, id string, documents []string, terminal bool) !int {
+	return run_in_session_request(config, id, LaunchInput{ documents: documents, terminal: terminal })
+}
+
+fn run_in_session_request(config Config, id string, input LaunchInput) !int {
 	if os.geteuid() != 0 {
 		return error('only the administrator can create an isolated package session')
 	}
-	launch := launch_session_mode(config, os.executable(), id, documents, terminal)!
+	launch := launch_session_request(config, os.executable(), id, input)!
 	if !os.is_executable(launch.program) {
 		return error('the account session tool is missing: ${launch.program}')
 	}

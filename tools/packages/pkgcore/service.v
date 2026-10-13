@@ -123,22 +123,30 @@ fn (service Service) prepare_launch(id string) !(Config, State, int) {
 }
 
 pub fn (service Service) run(id string, documents []string) !int {
-	return service.run_mode(id, documents, false)
+	return service.run_mode(id, LaunchInput{ documents: documents })
 }
 
 pub fn (service Service) run_terminal(id string, documents []string) !int {
 	if C.isatty(0) != 1 || C.isatty(1) != 1 { return error('terminal launch requires terminal standard input and output') }
-	return service.run_mode(id, documents, true)
+	return service.run_mode(id, LaunchInput{ documents: documents, terminal: true })
 }
 
-fn (service Service) run_mode(id string, documents []string, terminal bool) !int {
+pub fn (service Service) run_command(id string, input CommandLaunch, terminal bool) !int {
+	validate_command(input)!
+	if terminal && (C.isatty(0) != 1 || C.isatty(1) != 1) {
+		return error('terminal launch requires terminal standard input and output')
+	}
+	return service.run_mode(id, LaunchInput{ documents: input.documents, arguments: input.arguments, terminal: terminal, command: true })
+}
+
+fn (service Service) run_mode(id string, input LaunchInput) !int {
 	if service.root != '' { return error('application launch cannot use an alternate installation root') }
 	config, state, lease := service.prepare_launch(id)!
 	if lease < 0 {
 		// The ordinary child takes a new lock and rechecks trust. Do not hold the
 		// parent's lock while waiting for the child or its generation lease.
-		return run_in_session_mode(config, id, documents, terminal)
+		return run_in_session_request(config, id, input)
 	}
 	defer { C.close(lease) }
-	return run_leased_mode(config, state_directory(service.root), state, id, documents, terminal)
+	return run_leased_mode(config, state_directory(service.root), state, id, input)
 }

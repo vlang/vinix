@@ -20,10 +20,12 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  deployment-lock [ID...] | deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
+	'  run-args|run-terminal-args ID [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
 	'  sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
+	'  ffmpeg-catalog RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY\n' +
 	'  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX\n' +
 	'  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY\n'
 
@@ -93,6 +95,11 @@ fn checked(arguments []string) !int {
 		'sqlite-catalog' {
 			if names.len != 4 { return error('sqlite-catalog requires SQLite version, runtime version, prepared roots and a new lock directory') }
 			println(json2.encode(pkgcore.sqlite_catalog(names[0], names[1], names[2], names[3])!))
+			return 0
+		}
+		'ffmpeg-catalog' {
+			if names.len != 3 { return error('ffmpeg-catalog requires runtime version, prepared roots and a new lock directory') }
+			println(json2.encode(pkgcore.ffmpeg_catalog(names[0], names[1], names[2])!))
 			return 0
 		}
 		'publish', 'publish-release' {
@@ -277,11 +284,14 @@ fn checked(arguments []string) !int {
 			}
 			service.mirror(names[0], names[1..])!
 		}
-		'run', 'run-terminal' {
+		'run', 'run-terminal', 'run-args', 'run-terminal-args' {
 			if root != '' {
 				return error('application launch cannot use an alternate installation root')
 			}
 			if names.len < 1 { return error('run requires an application ID') }
+			if command in ['run-args', 'run-terminal-args'] {
+				return service.run_command(names[0], pkgcore.command_launch(names[1..])!, command == 'run-terminal-args')
+			}
 			if command == 'run-terminal' { return service.run_terminal(names[0], names[1..]) }
 			return service.run(names[0], names[1..])
 		}

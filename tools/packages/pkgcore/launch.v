@@ -28,14 +28,20 @@ fn application_closure(state State, id string) []Installed {
 }
 
 pub fn launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, documents []string) !Launch {
-	return application_launch_plan(config, directory, state, id, data, uid, gid, documents, false)
+	return application_launch_plan(config, directory, state, id, data, uid, gid, LaunchInput{ documents: documents })
 }
 
 pub fn terminal_launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, documents []string) !Launch {
-	return application_launch_plan(config, directory, state, id, data, uid, gid, documents, true)
+	return application_launch_plan(config, directory, state, id, data, uid, gid, LaunchInput{ documents: documents, terminal: true })
 }
 
-fn application_launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, documents []string, terminal bool) !Launch {
+pub fn command_launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, input CommandLaunch, terminal bool) !Launch {
+	validate_command(input)!
+	return application_launch_plan(config, directory, state, id, data, uid, gid, LaunchInput{
+		documents: input.documents, arguments: input.arguments, terminal: terminal, command: true })
+}
+
+fn application_launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, input LaunchInput) !Launch {
 	if !identifier(id) || uid <= 0 || gid <= 0 || !data.starts_with('/') || data.contains('\x00') {
 		return error('launch requires a non-root identity and an absolute application data directory')
 	}
@@ -57,7 +63,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	// Advisory locks coordinate writes to already unveiled app data. They grant
 	// no additional paths or inherited descriptors; SQLite requires F_SETLK.
 	mut promises := ['stdio', 'rpath', 'wpath', 'cpath', 'flock', 'exec', 'prot_exec']
-	if terminal { promises << 'tty' }
+	if input.terminal { promises << 'tty' }
 	if 'network' in p.permissions { promises << ['inet', 'dns'] }
 	if 'process' in p.permissions { promises << 'proc' }
 	if 'display' in p.permissions { promises << 'unix' }
@@ -78,12 +84,12 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	args << ['--env', 'HOME=' + data, '--env', 'TMPDIR=' + data + '/tmp', '--env',
 		'PATH=' + runtime + '/bin', '--env', 'LD_LIBRARY_PATH=' + libraries.join(':'), '--env',
 		'WINEPREFIX=' + data + '/wine', '--env', 'LANG=C.UTF-8']
-	if terminal { args << ['--env', 'TERM=linux'] }
+	if input.terminal { args << ['--env', 'TERM=linux'] }
 	if 'display' in p.permissions {
 		args << ['--unveil', '/tmp/.X11-unix', 'rw', '--env', 'DISPLAY=' + os.getenv('DISPLAY')]
 	}
 	if 'audio' in p.permissions { args << ['--unveil', '/dev/snd', 'rw'] }
-	for document in documents {
+	for document in input.documents {
 		if !document.starts_with('/') || !printable(document, 4096) || !os.is_file(document) {
 			return error('document must be an existing absolute regular file')
 		}
@@ -94,7 +100,8 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	for argument in p.arguments {
 		args << argument.replace('@APP@', app).replace('@DATA@', data).replace('@RUNTIME@', runtime)
 	}
-	args << documents
+	args << input.arguments
+	if !input.command { args << input.documents }
 	return Launch{ program: '/usr/bin/vinix-sandbox', arguments: args, directory: app }
 }
 
@@ -135,17 +142,17 @@ fn generation_lease(directory string, architecture string, id string) !(State, i
 }
 
 fn run_leased_application(config Config, directory string, state State, id string, documents []string) !int {
-	return run_leased_mode(config, directory, state, id, documents, false)
+	return run_leased_mode(config, directory, state, id, LaunchInput{ documents: documents })
 }
 
-fn run_leased_mode(config Config, directory string, state State, id string, documents []string, terminal bool) !int {
+fn run_leased_mode(config Config, directory string, state State, id string, input LaunchInput) !int {
 	uid := int(C.geteuid())
 	gid := int(C.getegid())
 	if uid == 0 || gid == 0 { return error('run applications from an ordinary user session') }
 	home := os.home_dir()
 	if home == '' || !home.starts_with('/') { return error('user home directory is unavailable') }
 	data := home.trim_right('/') + '/.local/share/vinix-apps/' + id
-	launch := application_launch_plan(config, directory, state, id, data, uid, gid, documents, terminal)!
+	launch := application_launch_plan(config, directory, state, id, data, uid, gid, input)!
 	for installed in application_closure(state, id) {
 		check_policy(installed.package, config.policy)!
 		if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
