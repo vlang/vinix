@@ -2,9 +2,9 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `02c1eda7d2fbd45c1e8aa9bae193ff9050e38935`,
+not been reached. At source `ddb80a662be5a6907ecda43221dd1fe90376bb49`,
 Linguist 7.27.0 reports **Python 0.20%** (10 files, 89,440 bytes) and
-**V 84.20%** (4,087 files, 37,114,222 bytes). The complete committed-blob inventory and reproduction
+**V 84.27%** (4,112 files, 37,336,071 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
@@ -3468,3 +3468,25 @@ no ZIP64 claim. No Python, interpreter initialization, Security/Keychain or
 credential fixture, Blender build, UI app or Vinix guest executes. Pending
 Python/index edits remain untouched; these Shell blocks receive zero Python-file
 credit. See [native host helpers](../build-support/source-tools/README.md).
+
+Supplement `ddb80a66` replaces two embedded Python bodies in the ISO
+boot tester and KekVM CMake helper, totaling 671 bytes and 20 lines. The native
+QMP frontend retains full JSON objects and arbitrary-sized integers, strict UTF-8
+greetings, ignored capability errors, asynchronous events, first terminal replies
+without ID correlation, default/empty/Unicode error output and text/null/bool/
+integer exit policies. It compiles once before any VM or input deadline starts;
+private adjacent staging preserves the old executable on compiler failure. The
+guest helper keeps strict UTF-8/universal newlines and the prefix before the first
+execinfo marker. Its producer builds static AArch64/Linux, verifies ELF machine,
+interpreter absence and 16 KiB segment congruence, and delivers the tool through
+the read-only share. Twenty-seven final cold host builds pass across ARM, Rosetta
+x86 and ARM ASanUBSan, with real Unix-socket/installed-CLI/event/error/UTF-8/EOF/
+deadline/SIGINT/SIGTERM checks, 600 missing-path retirement cases and the existing
+900 failed/cancelled connection cases. Existing typed QMP/source/host regressions,
+CMake marker/newline/error cases, old-output preservation and three static guest
+ELF builds pass. Final fixtures bound accepts and synchronize signals/deadlines
+after protocol checkpoints; production deadlines stay unchanged. Nonstandard
+JSON and other error-description types are outside the native contract.
+No Python, SDK interpreter initialization, target ELF, guest, ISO boot or GUI app
+executes. Pending Python/index edits remain untouched; these Shell blocks receive
+zero Python-file credit. See [native QMP/source helpers](../build-support/source-tools/README.md).

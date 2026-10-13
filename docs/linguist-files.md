@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `02c1eda7d2fbd45c1e8aa9bae193ff9050e38935`,
+at source commit `ddb80a662be5a6907ecda43221dd1fe90376bb49`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 600 | 2,397,145 | 5.44% |
+| C | 602 | 2,401,099 | 5.42% |
 | Python | 10 | 89,440 | 0.20% |
-| Shell | 823 | 1,357,139 | 3.08% |
+| Shell | 824 | 1,356,876 | 3.06% |
 
-All `.v` files are classified as V. The resulting V share is 84.20%, with no
+All `.v` files are classified as V. The resulting V share is 84.27%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 02c1eda7d2fbd45c1e8aa9bae193ff9050e38935 --breakdown --json
+github-linguist --rev ddb80a662be5a6907ecda43221dd1fe90376bb49 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -118,6 +118,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/quicklook_stb.h` | 454 |
 | `desktop/reminders_heap_test_guard.h` | 618 |
 | `desktop/tools/tests/heap_tracker.h` | 1,786 |
+| `desktop/windowfb/capi/vinix_window.h` | 3,644 |
 | `games/n64/abi.h` | 657 |
 | `games/ps1/abi.h` | 1,098 |
 | `games/ps2/abi.h` | 657 |
@@ -554,6 +555,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/office-compat/office-test-abi.h` | 2,070 |
 | `tests/oom/guest.c` | 19,200 |
 | `tests/openbsd-security/test.c` | 54,978 |
+| `tests/overlay-rename/overlayfixture/native-abi.h` | 310 |
 | `tests/packages/gtk-smoke-auto-close.c` | 3,407 |
 | `tests/pagecache/cachefixture/cache-native-abi.h` | 726 |
 | `tests/paging/guest.c` | 8,835 |
@@ -776,6 +778,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/security-tools/compile-v-core` | 167 |
 | `build-support/security-tools/stage` | 165 |
 | `build-support/source-tools/run` | 143 |
+| `build-support/source-tools/stage-trimmer` | 174 |
 | `build-support/sparse-file` | 178 |
 | `build-support/stage-oh-my-zsh.sh` | 2,893 |
 | `build-support/stage-uname.sh` | 215 |
@@ -927,7 +930,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/run-hyprland-aarch64.sh` | 840 |
 | `scripts/run-iso-virtualbox.sh` | 8,448 |
 | `scripts/test-gpu-kekvm.sh` | 263 |
-| `scripts/test-iso.sh` | 18,878 |
+| `scripts/test-iso.sh` | 18,534 |
 | `tests/aarch64-sigreturn/run` | 190 |
 | `tests/abi-scratch/run` | 182 |
 | `tests/accounts/run` | 835 |
@@ -1309,7 +1312,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/openbsd-security/run_vm` | 217 |
 | `tests/opengothic/guest-init.sh` | 1,880 |
 | `tests/opengothic/kekvm-control` | 125 |
-| `tests/opengothic/kekvm-guest.sh` | 2,747 |
+| `tests/opengothic/kekvm-guest.sh` | 2,654 |
 | `tests/opengothic/run` | 115 |
 | `tests/packages/blender-smoke.sh` | 1,269 |
 | `tests/packages/chromium-smoke.sh` | 2,685 |
