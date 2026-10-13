@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `e892a4d9d422280f39f46675d2b2b747d4c07fdf`,
+at source commit `e9d7f0f0568c7e9abd9595687cd2e94650731103`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,555 | 5.72% |
-| Python | 23 | 184,148 | 0.44% |
-| Shell | 808 | 1,373,045 | 3.28% |
+| C | 599 | 2,396,555 | 5.71% |
+| Python | 22 | 180,153 | 0.43% |
+| Shell | 809 | 1,373,186 | 3.27% |
 
-All `.v` files are classified as V. The resulting V share is 83.12%, with no
+All `.v` files are classified as V. The resulting V share is 83.16%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 184,148 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 180,153 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev e892a4d9d422280f39f46675d2b2b747d4c07fdf --breakdown --json
+github-linguist --rev e9d7f0f0568c7e9abd9595687cd2e94650731103 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -680,7 +680,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/run.py` | 3,048 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,384 |
-| `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tools/_package_store_native.py` | 4,314 |
@@ -1281,6 +1280,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/native-campaign-tools/campaignhost/verify-v4-init.txt` | 2,156 |
 | `tests/native-campaign-tools/run` | 179 |
 | `tests/native-game-tools/run` | 135 |
+| `tests/native-host/stdio-test` | 141 |
 | `tests/native-launcher-tools/run` | 135 |
 | `tests/native-linuxkpi-tools/run` | 135 |
 | `tests/native-render-tools/run` | 135 |
