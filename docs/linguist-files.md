@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `b9443a236beb31a8770ac5ac71938b67d9dd3fce`,
+at source commit `0a74a26758fce778e4565c826589f76ec858ee10`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,874 | 5.65% |
-| Python | 12 | 106,699 | 0.25% |
-| Shell | 816 | 1,374,252 | 3.24% |
+| C | 599 | 2,396,874 | 5.56% |
+| Python | 11 | 97,587 | 0.23% |
+| Shell | 820 | 1,373,190 | 3.19% |
 
-All `.v` files are classified as V. The resulting V share is 83.52%, with no
+All `.v` files are classified as V. The resulting V share is 83.78%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 106,699 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 97,587 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev b9443a236beb31a8770ac5ac71938b67d9dd3fce --breakdown --json
+github-linguist --rev 0a74a26758fce778e4565c826589f76ec858ee10 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -670,7 +670,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/kernel-gaps/_native.py` | 13,350 |
 | `tests/kernel-gaps/run.py` | 3,048 |
 | `tests/linuxkpi/compile-v-fixture.py` | 1,384 |
-| `tests/python3/smoke.py` | 9,112 |
 | `tests/realtime/run_vm.py` | 6,946 |
 | `tools/_package_store_native.py` | 4,314 |
 
@@ -731,6 +730,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/find-v.sh` | 3,160 |
 | `build-support/firefox/run-firefox` | 4,380 |
 | `build-support/gimp/run-gimp` | 2,536 |
+| `build-support/human-size` | 130 |
 | `build-support/hyprland/demo.sh` | 8,747 |
 | `build-support/init-aarch64/alpine-init` | 578 |
 | `build-support/init-aarch64/compile-init` | 151 |
@@ -762,6 +762,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ps1/download-homebrew` | 231 |
 | `build-support/ps2-homebrew/build` | 231 |
 | `build-support/ps2/build` | 209 |
+| `build-support/python-smoke` | 167 |
 | `build-support/qemu-storage.sh` | 9,938 |
 | `build-support/qemu-system/tests/run` | 131 |
 | `build-support/qemu-system/vinix-qemu` | 1,481 |
@@ -890,7 +891,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-opengothic-aarch64.sh` | 158 |
 | `scripts/build-ps1-aarch64.sh` | 3,148 |
 | `scripts/build-ps2-aarch64.sh` | 2,879 |
-| `scripts/build-python-aarch64.sh` | 3,553 |
+| `scripts/build-python-aarch64.sh` | 3,650 |
 | `scripts/build-python-amd64.sh` | 175 |
 | `scripts/build-qemu-input.sh` | 3,417 |
 | `scripts/build-qemu-ovmf-aarch64.sh` | 4,720 |
@@ -904,7 +905,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
 | `scripts/build-venus-aarch64.sh` | 5,339 |
-| `scripts/build-vinix-guest-disk.sh` | 1,837 |
+| `scripts/build-vinix-guest-disk.sh` | 222 |
 | `scripts/build-voffice-aarch64.sh` | 6,888 |
 | `scripts/build-x11-aarch64.sh` | 20,691 |
 | `scripts/build-x11-amd64.sh` | 197 |
@@ -913,7 +914,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/cross-compile-app.sh` | 4,493 |
 | `scripts/cross-compile-files.sh` | 212 |
 | `scripts/cross-compile-settings.sh` | 217 |
-| `scripts/deploy-iso.sh` | 18,650 |
+| `scripts/deploy-iso.sh` | 18,452 |
 | `scripts/deploy-m1-efi.sh` | 21,910 |
 | `scripts/kek.sh` | 16,153 |
 | `scripts/push-to-m1.sh` | 6,967 |
@@ -1157,6 +1158,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ext2-sparse/run` | 184 |
 | `tests/ext2-sparse/run-host.sh` | 158 |
 | `tests/ext2-xattr/host` | 152 |
+| `tests/ext2-xattr/run` | 157 |
 | `tests/fs-journal/run` | 214 |
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/fsync-scope/run` | 220 |
@@ -1187,6 +1189,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/ios/game2048` | 164 |
 | `tests/ios/reference-frameworks.sh` | 10,486 |
 | `tests/ios/reference-modules.sh` | 1,436 |
+| `tests/ios/run` | 200 |
 | `tests/ios/run-objc-calculator.sh` | 674 |
 | `tests/ios/uikit` | 161 |
 | `tests/ipv6-multicast/check-generated` | 146 |
