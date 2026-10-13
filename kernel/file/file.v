@@ -79,6 +79,9 @@ pub mut:
 	// Opened from a device of the seat, by this login session (0: by the
 	// system). Checked at every use; see proc/login.v.
 	seat_gated bool
+	// Whether this open created its file; immutable before table publication.
+	// Duplicates and fork retain this same description.
+	created bool
 	seat_owner u32
 	node          voidptr
 	// Identity of the mount traversed at open, rather than the inode's aliases.
@@ -1440,6 +1443,10 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		fd.handle.mac_check(proc.mac_inspect) or { failure := errno.get(); fd.unref(); return errno.err, failure }
 	}
 	match cmd {
+		f_created_query {
+			ret = if handle.created { u64(1) } else { u64(0) }
+			fd.unref()
+		}
 		f_dupfd_query {
 			// Compare open descriptions, including O_PATH and descriptions
 			// inherited through fork. Retain both descriptions until the

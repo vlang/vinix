@@ -4255,6 +4255,93 @@ manifests; gzip restoration reproduces their original bytes. Public inventory
 fingerprints use the committed parent plus this fix, separately from the
 isolated semantic inputs and unrelated shared-checkout changes.
 
-F_CREATED_QUERY, concurrent close/table-sharing races, full ordinary fcntl
-semantics, GNU wrappers and translated/ELF32 paths remain separate. The three
-broad section 15 acceptance gates remain open.
+F_CREATED_QUERY now has separate receipts below. Concurrent close/table-sharing
+races, full ordinary fcntl semantics, GNU wrappers and translated/ELF32 paths
+remain separate. The three broad section 15 acceptance gates remain open.
+
+### Fcntl file creation queries
+
+`F_CREATED_QUERY` now returns the actual creation result for the queried open
+description. The open path already distinguishes the creator from an existing
+file or a competing creator's fallback. It passes that result into the private
+new Handle before descriptor publication. The immutable bit occupies existing
+padding; ordinary duplication and fork retain the shared description. Generic
+resource descriptions default to false. The query ignores its argument, reads
+the retained bit and releases its paired descriptor/Handle lookup once.
+Invalid descriptors still return EBADF, including on O_PATH-compatible paths.
+The behavior follows the [Linux implementation](https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux/+/refs/tags/v6.12.38/fs/fcntl.c).
+
+| Root and UID/GID 1000 controls | Calls per architecture | Baseline failures | Candidate/Linux failures |
+| --- | ---: | ---: | ---: |
+| Creation-state and native-word matrix | 2304 | 2304 | 0 |
+| Invalid descriptors and held aliases above soft limits | 480 | 192 | 0 |
+| Musl valid/invalid description queries | 832 | 768 | 0 |
+| Real close/replacement/reuse | 192 | 96 | 0 |
+| Total | 3808 | 3360 | 0 |
+
+Both production candidates and actual Linux 6.12.51 references pass all 3808
+controls using byte-identical native musl C and ELF. Each credential uses 16
+description classes with original, ordinary duplicate and CLOEXEC duplicate:
+inherited new/existing files; child-owned new, O_CREAT reopen, ordinary reopen
+and O_TRUNC reopen; O_PATH with ignored creation/truncation flags; followed
+existing and initially dangling symlinks; O_PATH link and directory; an unlinked
+created file and its new replacement; and both nonblocking pipe endpoints.
+The ordinary child clears supplementary groups and sets UID/GID 1000 before
+creating its own files in its owned directory. The parent closes its inherited
+descriptors after both credential children exit.
+
+Eight full-width arguments include zero, all-ones, sign/high-word values and an
+invalid high address. None is dereferenced or validated. Independent source and
+command upper words retain native low-word behavior. Aliases 64/65 remain usable
+above soft limits eight and zero; the limit restores before further allocation.
+Descriptor 66 moves from closed to a creator alias, to an existing-file alias
+and back to closed, requiring exact boolean or EBADF results at each step.
+An exclusive reopen reports EEXIST, and O_PATH cannot create a missing name.
+Reopened descriptions of one inode retain different creation results.
+
+All 50 held metadata/descriptor/status/cursor snapshots remain exact. An alias
+moves its creator's cursor while an independent reopen retains its own position;
+the shared cursor restores. Created/reopened/unlinked/replacement file bytes
+and queued AB remain exact. All normal-path aliases, observer and test
+descriptors close. Fatal setup paths rely on process-exit cleanup. The fixture
+uses seven explicit stack allocations and has no hidden heap allocations or
+fixed-array indexing helpers in its executed C; synchronous callees retain none
+of those borrows.
+
+After warmup and settling, each credential runs 200 cycles querying true, false
+and invalid descriptions. All 18 ARM/14 x86 live slab classes and 68/177 large
+pages stay flat. Both kernels also pass fcntlquery, fcntlpath, open and runtime;
+eight host test files pass. Allocation scans retain 659/655 source files and
+400/292 sites, with the same existing allowance failures and no new sites.
+
+The baseline reuses the exact previous F_DUPFD_QUERY production kernels, C and
+build logs, after verifying every isolated kernel input against that qualified
+source inventory. Whole C restores by removing only the creation-bit field,
+the open constructor's parameter/prototype/assignment, its caller's argument
+and the new query branch. Only compiler temporary names inside fcntl and source
+offsets in unused variable names elsewhere are canonicalized. The rest stays identical.
+Independent lifetime review checks publication, default initialization,
+dup/fork ownership, the paired query release, stack borrows and cleanup.
+Foreign root VFS edits stay outside both isolated semantic builds and this
+commit; public inventory fingerprints use the committed parent plus this fix.
+
+The [V audit](../tests/linux-compat/results/2026-10-13/fcntlcreated-audit.v)
+requires exact baseline failures and candidate/reference counts, complete guest
+verdicts, source/C/ELF identity, state/retention controls, whole-C scope and
+independent review hashes. Assertion and passing-as-baseline negative controls
+must fail. [ARM evidence](../tests/linux-compat/results/2026-10-13/fcntlcreated-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/fcntlcreated-evidence-x86_64.json)
+bind all 63 isolated inputs and compiler/controller/source/C/kernel/native
+ELF/ISO, Linux kernel/wrapper/archive/QEMU and serial/build/audit/review hashes.
+Captures: [ARM baseline](../tests/linux-compat/results/2026-10-13/fcntlcreated-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/fcntlcreated-after-aarch64.log),
+[ARM Linux](../tests/linux-compat/results/2026-10-13/fcntlcreated-reference-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/fcntlcreated-before-x86_64.log),
+[x86 candidate](../tests/linux-compat/results/2026-10-13/fcntlcreated-after-x86_64.log),
+[x86 Linux](../tests/linux-compat/results/2026-10-13/fcntlcreated-reference-x86_64.log).
+Older completed ISO/firmware files were losslessly archived with verified SHA
+manifests; gzip restoration reproduces their original bytes.
+
+Concurrent creators/close/table sharing, GNU wrappers, O_TMPFILE, overlay/disk
+creation, translated/ELF32 paths and full ordinary fcntl semantics remain
+separate. The three broad section 15 acceptance gates remain open.

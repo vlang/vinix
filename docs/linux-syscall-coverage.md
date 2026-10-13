@@ -699,12 +699,12 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | --- | --- |
 | `kernel/c/pthread.h` | `349a5a9d0b696749923c0632cd28a42e52d41bdc067d31d53fb686ce48f353d2` |
 | `kernel/event/event.v` | `a92daf2add03c5304742ad1b112ca04635b94f49e4279e8316f2bee57da6b708` |
-| `kernel/file/file.v` | `466f78e1e1731ad24dff58199f9cf565286c8b10697de6fa85445fd552a0da5d` |
+| `kernel/file/file.v` | `976a8bf417aa259b1afbbf9526d9bf99ec69fac21ec78a75d4d28d9a0473787b` |
 | `kernel/fs/mount.v` | `e3af25d33e1fdfc40bde8c1a397b58de1df607e66629b813757f7834035d70a3` |
 | `kernel/fs/mount_policy.v` | `6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a` |
 | `kernel/fs/procfs.v` | `af0227fabd79200a4731b4835d9e09a01bddd12ae8f7198230fc0d083911fcc9` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
-| `kernel/fs/vfs.v` | `05c0e17466635cf2d9157e967fcc723604c05fbbad44a9cad2a2cc77896f95e3` |
+| `kernel/fs/vfs.v` | `70738f9b1de00216f51185139fdcd245eb23c8286c1f7c70f2105541ab42970e` |
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
 | `kernel/kbudget/budget.v` | `980b9ae894bda6376f920e22bbca0aa953e02bd0349977bfe054a24580869b06` |

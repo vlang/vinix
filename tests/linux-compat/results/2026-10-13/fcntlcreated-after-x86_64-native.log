@@ -1,0 +1,55 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=76168
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX FCNTLCREATED CASES: ordinary=1 kind=0 calls=1152 failures=0
+LINUX FCNTLCREATED CASES: ordinary=1 kind=1 calls=240 failures=0
+LINUX FCNTLCREATED CASES: ordinary=1 kind=2 calls=416 failures=0
+LINUX FCNTLCREATED CASES: ordinary=1 kind=3 calls=96 failures=0
+LINUX FCNTLCREATED SLAB: ordinary=1 size=16 live=1640/1640 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=32 live=2882/2882 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=64 live=210/210 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=192 live=380/380 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=256 live=800/800 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=384 live=555/555 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=512 live=503/503 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=1536 live=29/29 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX FCNTLCREATED STORAGE: ordinary=1 cycles=200 big_pages=177/177 PASS
+LINUX FCNTLCREATED CASES: ordinary=0 kind=0 calls=1152 failures=0
+LINUX FCNTLCREATED CASES: ordinary=0 kind=1 calls=240 failures=0
+LINUX FCNTLCREATED CASES: ordinary=0 kind=2 calls=416 failures=0
+LINUX FCNTLCREATED CASES: ordinary=0 kind=3 calls=96 failures=0
+LINUX FCNTLCREATED SLAB: ordinary=0 size=16 live=1652/1652 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=32 live=2882/2882 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=64 live=213/213 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=192 live=380/380 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=256 live=805/805 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=384 live=560/560 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=512 live=508/508 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=1536 live=29/29 cycles=200
+LINUX FCNTLCREATED SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX FCNTLCREATED STORAGE: ordinary=0 cycles=200 big_pages=177/177 PASS
+LINUX FCNTLCREATED: PASS
+QEMU: Terminated
+

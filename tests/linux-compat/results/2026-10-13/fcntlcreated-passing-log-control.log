@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/fcntlcreated-audit.v:82: FAIL: fn main.failure: assert log.contains('LINUX FCNTLCREATED DETAIL:'), 'fcntlcreated baseline failure markers required';
+      message: fcntlcreated baseline failure markers required
+V panic: Assertion failed...

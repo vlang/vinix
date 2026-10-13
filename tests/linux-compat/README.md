@@ -1103,3 +1103,21 @@ Use matching x86 inputs with `--arch x86_64`, and set `V` for both controllers
 and their guest modules. The pinned Linux 6.12.51 reference returns EBADF for
 either invalid descriptor; the original Linux 6.12 implementation differed
 for an invalid comparison descriptor. See [receipts and limits](../../docs/linux-posix-qualification.md#fcntl-duplicate-description-queries).
+
+The `fcntlcreated` case runs 3808 F_CREATED_QUERY controls per architecture for
+root and UID/GID 1000. Sixteen description classes and ordinary/CLOEXEC aliases
+cover inherited and child-owned creation, existing-file reopens and truncation,
+ignored O_PATH creation flags, existing/dangling symlink targets, O_PATH links
+and directories, unlink/recreation and pipe endpoints. Eight ignored full-width
+arguments, native descriptor/command words, exact errors, zero/eight soft limits
+and descriptor replacement must preserve metadata, flags, cursors, bytes and
+queued data. Two 200-cycle cohorts measure retained kernel storage.
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases fcntlcreated,fcntlquery,fcntlpath,open,runtime --timeout 1300
+v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/fcntlcreated-reference.v --arch aarch64 --kernel LINUX-KERNEL --init FRESH-NATIVE/fcntlcreated/init --state-dir FRESH-LINUX
+```
+
+Repeat with matching x86 inputs and `--arch x86_64`. Set `V` for both controllers
+and guest modules. Linux runs the same frozen native musl ELF and omits only
+Vinix allocator observations. See [receipts and limits](../../docs/linux-posix-qualification.md#fcntl-file-creation-queries).

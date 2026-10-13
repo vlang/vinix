@@ -862,7 +862,7 @@ fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, acces
 	return target_node
 }
 
-fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity &lib.MountContext) ?int {
+fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool, identity &lib.MountContext, created bool) ?int {
 	current_process := proc.current_thread().process
 	if node.seat && !proc.seat_may_open() {
 		security.event(security.event_seat, true, 0, node.name)
@@ -896,6 +896,7 @@ fn fdnum_create_from_node(mut node VFSNode, flags int, oldfd int, specific bool,
 		origin_transferred = true
 	}
 	mut fd := file.fd_create_from_opened(opened_resource, flags) or { return none }
+	fd.handle.created = created
 	fd.handle.mac_device = stat.ischr(node.resource.stat.mode) || stat.isblk(node.resource.stat.mode)
 	fd.handle.mac_block_device = stat.isblk(node.resource.stat.mode)
 	fd.handle.seat_gated = node.seat
@@ -1252,7 +1253,7 @@ pub fn syscall_openat_resolved(_ voidptr, dirfd int, _path charptr, requested_fl
 		mut res := node.resource
 		res.grow(unsafe { nil }, 0) or { return errno.err, errno.get() }
 	}
-	fdnum := fdnum_create_from_node(mut node, flags, 0, false, open_mount) or { return errno.err, errno.get() }
+	fdnum := fdnum_create_from_node(mut node, flags, 0, false, open_mount, created) or { return errno.err, errno.get() }
 	inotify_emit(node, '', in_open, 0)
 
 	return u64(fdnum), 0
