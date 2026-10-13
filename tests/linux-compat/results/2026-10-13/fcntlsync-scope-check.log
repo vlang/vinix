@@ -1,0 +1,2 @@
+arm: whole generated C identical except immutable synchronization status mask; PASS
+x86: whole generated C identical except immutable synchronization status mask; PASS

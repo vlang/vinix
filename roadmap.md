@@ -772,6 +772,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Implement F_CREATED_QUERY with the actual per-open creation result shared
   by aliases and fork; qualify reopens, symlinks, unlink/recreation, ignored
   arguments and flat retention on both architectures. See [the creation receipts](docs/linux-posix-qualification.md#fcntl-file-creation-queries).
+- [x] Preserve open-time O_SYNC/O_DSYNC across F_SETFL changes; qualify shared
+  append/nonblocking state, native words, exact refusals, descriptor replacement
+  and flat retention on both architectures. See [the status receipts](docs/linux-posix-qualification.md#fcntl-synchronization-status-preservation).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

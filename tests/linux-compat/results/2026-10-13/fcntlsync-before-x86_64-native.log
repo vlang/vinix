@@ -1,0 +1,45 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=79968
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX FCNTLSYNC INITIAL: ordinary=1 descriptors=35 PASS
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=0 call=5 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=0 call=6 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=0 call=7 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=2 call=2 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=2 call=3 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=2 call=4 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=3 call=1 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=3 call=3 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=1 kind=3 call=5 ret=0 errno=0
+LINUX FCNTLSYNC CASES: ordinary=1 kind=0 calls=864 failures=588
+LINUX FCNTLSYNC CASES: ordinary=1 kind=1 calls=320 failures=0
+LINUX FCNTLSYNC CASES: ordinary=1 kind=2 calls=296 failures=147
+LINUX FCNTLSYNC CASES: ordinary=1 kind=3 calls=256 failures=132
+LINUX FCNTLSYNC INITIAL: ordinary=0 descriptors=35 PASS
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=0 call=5 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=0 call=6 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=0 call=7 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=2 call=2 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=2 call=3 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=2 call=4 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=3 call=1 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=3 call=3 ret=0 errno=0
+LINUX FCNTLSYNC DETAIL: ordinary=0 kind=3 call=5 ret=0 errno=0
+LINUX FCNTLSYNC CASES: ordinary=0 kind=0 calls=864 failures=588
+LINUX FCNTLSYNC CASES: ordinary=0 kind=1 calls=320 failures=0
+LINUX FCNTLSYNC CASES: ordinary=0 kind=2 calls=296 failures=147
+LINUX FCNTLSYNC CASES: ordinary=0 kind=3 calls=256 failures=132
+LINUX FCNTLSYNC FAIL: synchronization, status, word, error or state controls
+QEMU: Terminated
+

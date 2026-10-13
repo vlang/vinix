@@ -1121,3 +1121,23 @@ v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/fcntlcreated-r
 Repeat with matching x86 inputs and `--arch x86_64`. Set `V` for both controllers
 and guest modules. Linux runs the same frozen native musl ELF and omits only
 Vinix allocator observations. See [receipts and limits](../../docs/linux-posix-qualification.md#fcntl-file-creation-queries).
+
+The `fcntlsync` case runs 3472 F_SETFL controls per architecture for root and
+UID/GID 1000. Nine regular/directory/unlinked/pipe description classes and
+ordinary/CLOEXEC aliases must retain the O_SYNC/O_DSYNC and access modes chosen
+at open. Append/nonblocking changes share across aliases while separate opens
+keep their own state. Six O_PATH aliases require EBADF. Native argument words,
+musl setters, held descriptors above zero/eight soft limits and replacement 66
+preserve metadata, descriptor flags, cursors, file bytes and queued AB. Two
+200-cycle cohorts measure retained kernel storage.
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases fcntlsync,fcntlabi,fcntlpath,open,runtime --timeout 1300
+v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/fcntlsync-reference.v --arch aarch64 --kernel LINUX-KERNEL --init FRESH-NATIVE/fcntlsync/init --state-dir FRESH-LINUX
+```
+
+Repeat with matching x86 inputs and `--arch x86_64`. Set `V` for both controllers
+and their guest modules. Linux boots the same native musl ELF. The dated
+qualification composes successful unchanged-kernel cases with recorded original
+receipts, excluding provisional sync probes and failed ISO setup. See
+[receipts and limits](../../docs/linux-posix-qualification.md#fcntl-synchronization-status-preservation).

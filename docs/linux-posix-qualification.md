@@ -4345,3 +4345,92 @@ manifests; gzip restoration reproduces their original bytes.
 Concurrent creators/close/table sharing, GNU wrappers, O_TMPFILE, overlay/disk
 creation, translated/ELF32 paths and full ordinary fcntl semantics remain
 separate. The three broad section 15 acceptance gates remain open.
+
+### Fcntl synchronization status preservation
+
+`F_SETFL` preserves the `O_SYNC` and `O_DSYNC` status selected at open. Previously
+those bits were mutable, so a request to set nonblocking mode could silently
+remove synchronized-write status, and an ordinary open could acquire it through
+fcntl. Linux excludes both from its [mutable status mask](https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux/+/refs/tags/v6.12.38/fs/fcntl.c).
+Vinix now limits its implemented mutable mask to append and nonblocking bits.
+Access and descriptor flags retain their separate behavior.
+
+| Root and UID/GID 1000 controls | Calls per architecture | Baseline failures | Candidate/Linux failures |
+| --- | ---: | ---: | ---: |
+| Native status/alias/argument matrix | 1728 | 1176 | 0 |
+| Bad descriptors and O_PATH refusals | 640 | 0 | 0 |
+| Musl setter controls | 592 | 294 | 0 |
+| Held descriptors above soft limits and replacement | 512 | 264 | 0 |
+| Total | 3472 | 1734 | 0 |
+
+Both strengthened native candidates and actual Linux 6.12.51 references pass
+all 3472 controls with byte-identical probe C and native musl ELF. Nine source
+classes each have an original, ordinary duplicate and CLOEXEC duplicate:
+readonly regular file, writeonly/RDWR O_DSYNC files, RDWR O_SYNC file, ordinary
+RDWR reopen, O_SYNC directory, both pipe endpoints and an unlinked O_SYNC file.
+Six O_PATH aliases cover regular and directory descriptions. Held 64/65 retain
+the synchronized and ordinary RDWR descriptions. The parent opens and aliases
+before fork; one child clears supplementary groups and sets UID/GID 1000.
+
+Each credential explicitly verifies the expected initial synchronization and
+access modes on all 35 held descriptors before any setter. The O_PATH assertion
+uses `O_PATH & O_ACCMODE`, matching the supplied libc mask. Eight requests mix
+zero, O_DSYNC, O_SYNC, append/nonblocking and ignored access/creation/descriptor
+flags. Four controls independently vary descriptor, command and argument upper
+words; musl setters agree with raw native calls. Every status change is visible
+through the description's aliases, while independent opens of the same inode
+retain their own status. Requests cannot add or remove synchronization status.
+
+All 35 metadata/descriptor/cursor snapshots remain exact during each request,
+and all flags restore after each successful setter. Invalid and O_PATH sources
+return EBADF without state changes. Existing 64/65 remain usable above soft
+limits eight and zero; limits restore before further allocation. Replacement 66
+moves through closed, synchronized alias, ordinary alias and closed states, with
+a separate valid snapshot for the replacement. A real alias moves its original
+cursor while an independent reopen stays at position three; the shared cursor
+restores. Parent-side file bytes, original AB and descriptor flags remain exact
+before all held descriptors close. Fatal setup paths rely on process exit.
+
+The probe has seven explicit stack allocations, no hidden heap allocations or
+fixed-array indexing helpers in executed C, and no retained synchronous borrows.
+After warmup and settling, each credential runs 200 cycles of synchronized and
+ordinary status changes/restores plus invalid-source refusal. All 18 ARM/14 x86
+live slab classes and 68/177 large pages remain flat. This measures status
+operations; it does not establish power-loss durability or creation-time
+allocation behavior. Eight host test files pass. Allocation scans retain
+659/655 files and 400/292 sites with unchanged existing allowance failures.
+
+The kernel baseline reuses the previous qualified production kernels, C and
+build logs after verifying every isolated kernel input. Complete generated C
+is byte-identical after restoring the single mutable-mask macro; no function,
+ownership, locking, adapter or constructor code changes. Independent lifetime
+review checks the unchanged kernel ownership and new fixture stack borrows,
+status restoration, observer/alias/replacement cleanup and parent waits/closes.
+
+Five guest cases pass on each exact candidate kernel: fcntlsync, fcntlabi,
+fcntlpath, open and runtime. [The V composer](../tests/linux-compat/results/2026-10-13/fcntlsync-compose.v)
+combines the fresh strengthened sync run with successful unchanged related
+cases, verifying kernel/source/ELF/ISO/C/serial identity and recording the original
+state for every case. ARM fcntlpath uses the successful retry after its first ISO
+build ran out of disk space. Immutable ISO hardlinks preserve the same bytes
+without duplicating their storage. Successful unrelated probes were not rerun.
+Provisional sync probes, the failed O_PATH access-mask assumption and failed ISO
+setup remain diagnostics and are excluded from qualified case selection.
+Original/fresh/retry receipts and captures remain visible in the evidence.
+Completed historical builds, ISO and firmware files were losslessly compressed
+with verified SHA manifests; restoration reproduces the original bytes.
+
+The [V audit](../tests/linux-compat/results/2026-10-13/fcntlsync-audit.v)
+requires exact initial checks, baseline failures, candidate/reference counts,
+state/retention results, artifact identity, macro-only kernel C scope,
+successful-case provenance and independent review hashes. Its assertion and
+passing-as-baseline negative controls must fail. [ARM evidence](../tests/linux-compat/results/2026-10-13/fcntlsync-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/fcntlsync-evidence-x86_64.json)
+bind all 63 isolated inputs and compiler/controller/source/C/kernel/native
+ELF/ISO, Linux kernel/wrapper/archive/QEMU and serial/build/composer/audit/review
+hashes. Public inventory uses committed inputs plus this fix, excluding other
+sessions' dirty kernel inputs.
+
+Direct/noatime/async flags, append-only permissions, physical durability,
+concurrent status changes, GNU wrappers and translated/ELF32 paths remain
+separate. The three broad section 15 acceptance gates remain open.

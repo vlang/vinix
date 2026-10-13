@@ -32,8 +32,9 @@ pub const file_creation_flags_mask = o_creat | o_directory | o_excl | o_noctty |
 pub const file_descriptor_flags_mask = o_cloexec
 pub const file_status_flags_mask = ~(file_creation_flags_mask | file_descriptor_flags_mask)
 // What fcntl(F_SETFL) may change. The access mode and the creation flags are
-// settled at open time and have to survive it.
-pub const file_settable_flags_mask = o_append | o_nonblock | o_dsync | o_sync
+// settled at open time and have to survive it. Linux also keeps O_SYNC
+// and O_DSYNC from the original open; F_SETFL cannot change durability.
+pub const file_settable_flags_mask = o_append | o_nonblock
 
 pub interface Resource {
 mut:

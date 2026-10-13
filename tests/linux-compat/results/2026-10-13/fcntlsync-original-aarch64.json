@@ -1,0 +1,47 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "59ca5505f55d93cf85d2012e7184bf71478504497ffac7f12feb59801f743dd1",
+    "results": [
+        {
+            "name": "fcntlsync",
+            "source_sha256": "6608c010c14ca2a622874316ac0653146532c91efe4a2ab29243a9f064f195ac",
+            "init_sha256": "66c5cd92dcb991156e0df5bc4f79ccdd18bf5bc745f87d7a148efec110e9ccc5",
+            "iso_sha256": "966aac2d889190e0a511c6e6cc946b95833998f1d7f0cbec6c21f54500e6aba3",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlabi",
+            "source_sha256": "6f70bc290dff8671cbde66025806b7b5d99d82468dc6e7098ec86a27cc43c3ac",
+            "init_sha256": "b92892f1860ff4aae349f27924922645aed79becbcff2dd00a0a18fc797fd3fd",
+            "iso_sha256": "2e5ad58461918c6e0ee957bf18fb392c1737eb38850ff5e2c683cf0bc620dff1",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlpath",
+            "source_sha256": "314b2cefc9567f5c6552d8b0534cd9e6039cd71c0d80689360ac7b1966dbea3e",
+            "init_sha256": "11b8c3ffb5a640d607c362244b6b3816acb3b7315c83b9f6c0d6ba8add464510",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "6b99a39b08b329e8b002a3a3b72f0fff114ca2f321eac6e3e151068dd41f1caa",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "0da6f3a5288c37a7197d74d963ca3967e166b5e479b6c7b9759cb5357335bdac",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

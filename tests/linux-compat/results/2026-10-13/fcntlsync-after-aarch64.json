@@ -1,0 +1,61 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU native musl ELF64; successful cases composed from actual runs on identical kernel bytes; pre-strengthening sync probe and ARM failed ISO setup excluded",
+    "kernel_sha256": "59ca5505f55d93cf85d2012e7184bf71478504497ffac7f12feb59801f743dd1",
+    "results": [
+        {
+            "name": "fcntlsync",
+            "source_sha256": "50f3f5237c0a6bd62b6e9a2642f21b130844ef8d66a2b6d0bb97334210885c02",
+            "init_sha256": "c098ccba02da4dfe3c57572d749f28b0352f87f5746fd9e8149cac462fe2d520",
+            "iso_sha256": "9711c96cc29563d2c52c91b0d4af236999cc43b6815da5970bc56881e5069831",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlabi",
+            "source_sha256": "6f70bc290dff8671cbde66025806b7b5d99d82468dc6e7098ec86a27cc43c3ac",
+            "init_sha256": "b92892f1860ff4aae349f27924922645aed79becbcff2dd00a0a18fc797fd3fd",
+            "iso_sha256": "2e5ad58461918c6e0ee957bf18fb392c1737eb38850ff5e2c683cf0bc620dff1",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlpath",
+            "source_sha256": "314b2cefc9567f5c6552d8b0534cd9e6039cd71c0d80689360ac7b1966dbea3e",
+            "init_sha256": "11b8c3ffb5a640d607c362244b6b3816acb3b7315c83b9f6c0d6ba8add464510",
+            "iso_sha256": "730c71acd661d664770b877165bd3134e09de94a5290c6101f4d58ec362af5d8",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "6b99a39b08b329e8b002a3a3b72f0fff114ca2f321eac6e3e151068dd41f1caa",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "0da6f3a5288c37a7197d74d963ca3967e166b5e479b6c7b9759cb5357335bdac",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ],
+    "provenance": {
+        "fcntlabi": "/Users/alex/.cache/vinix-linux-compat/fcntlsync-20261013/initial-after-arm",
+        "fcntlpath": "/Users/alex/.cache/vinix-linux-compat/fcntlsync-20261013/initial-mask-new-after-arm",
+        "fcntlsync": "/Users/alex/.cache/vinix-linux-compat/fcntlsync-20261013/new-after-arm",
+        "open": "/Users/alex/.cache/vinix-linux-compat/fcntlsync-20261013/initial-after-arm",
+        "runtime": "/Users/alex/.cache/vinix-linux-compat/fcntlsync-20261013/initial-after-arm"
+    },
+    "artifacts": {
+        "composer_source": "6ed07ca575bb3719094c42932b9ad824deb9460777d68bc7b05fd170d6cf0ce6",
+        "fresh_aggregate": "fcac720fa9d29e2f0bd94acf2963d65addddda3fb7690904b32cf5e639c53a73",
+        "fresh_receipt": "703ace73783a53edd84dc6ef84d857cdbd5546f242afbae857b3783bf0f914dc",
+        "original_aggregate": "3b66d340156939e7066c8c1af4acb6de0265674d6061fc3d2006ea614bb15748",
+        "original_receipt": "03ad7cde65a5c12cabed81dc22b395d86fc57a7e0ab6804e002932db72b57011"
+    }
+}

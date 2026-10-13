@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "ddc79e74900a643feba7c918bbad5bbde3798a432188bac80857a218dc38d74f",
+    "results": [
+        {
+            "name": "fcntlsync",
+            "source_sha256": "50f3f5237c0a6bd62b6e9a2642f21b130844ef8d66a2b6d0bb97334210885c02",
+            "init_sha256": "c098ccba02da4dfe3c57572d749f28b0352f87f5746fd9e8149cac462fe2d520",
+            "iso_sha256": "bc94a898ca0cd0699ba7baf4a28d18ced251c23e9f463648cca8c07eb7a1f770",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

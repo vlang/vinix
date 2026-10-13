@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/fcntlsync-audit.v:76: FAIL: fn main.failure: assert log.contains('LINUX FCNTLSYNC DETAIL:'), 'fcntlsync baseline failure markers required';
+      message: fcntlsync baseline failure markers required
+V panic: Assertion failed...
