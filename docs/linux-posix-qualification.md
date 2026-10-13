@@ -2227,10 +2227,93 @@ separately from concurrent shared-checkout changes. The initial bare fixture
 compile failure (`v_fixed_index`) is retained; it was corrected before runtime
 qualification. Independent review found no new lifetime blocker.
 
-The first inaccessible destination retains Vinix's existing queue-preserving
-precheck. Linux datagram copy faults retire the selected packet instead, so
-that error path remains a known divergence. Later destination-page faults,
-within-iovec copied-prefix reporting and queue rollback require further work.
+At this revision, the first inaccessible destination retained Vinix's
+queue-preserving precheck, a known divergence from Linux datagram behavior.
+The following record-fault qualification closes that native UNIX vector
+divergence. Later byte-stream destination faults, within-iovec copied-prefix
+reporting and queue rollback still require further work.
 GNU wrappers, foreign/translated ABIs, Internet/netlink/character-device paths,
 shared regular-file offset atomicity and allocator exhaustion remain unqualified.
 The three broad section-15 gates remain open.
+
+## Native UNIX record-vector copy faults
+
+A native readv or current-position preadv2 on a UNIX datagram/seqpacket socket
+previously checked its first destination before receiving. An inaccessible
+destination left the selected packet queued, even when Linux would consume it.
+A fault in a later iovec returned the number of previously copied bytes,
+instead of EFAULT; an empty queue or zero-length record could also lose its
+correct EAGAIN or zero result to the premature destination check.
+
+The vector receive now borrows a record-boundary query from the pinned
+resource. Only UNIX datagram/seqpacket endpoints opt in. It selects one record
+before copying, retires it on a copy fault, and reports EFAULT even after a
+committed prefix. Empty queues return EAGAIN before destination access; an
+empty selected record returns zero without probing payload memory. Complete
+header/range/length imports, valid empty vectors and flag refusals still precede
+the receive. Short packets do not access unused later destinations.
+
+[Linux v6.12 UNIX receives](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/net/unix/af_unix.c)
+select one packet, copy it through the complete iterator, then free the
+selected packet and return the copy error. The V fixture exercises this
+ordering, queue disposition and copied bytes, beyond the syscall result.
+
+`iovpacket` runs 350 probes in each root and UID/GID1000 child on both native
+architectures. readv and preadv2 at -1 use 2/8/9/513/1024-entry immutable
+headers. Cases include unmapped, PROT_NONE, read-only, later-entry and
+page-crossing destinations; copied prefixes; empty queues/records; valid and
+malformed empty vectors; invalid count/header/length/flags; and short records
+with inaccessible later destinations. Fresh unchanged kernels fail **140
+checks per cohort**. Candidates pass all **700 checks per architecture**.
+
+Two 200-cycle storage cohorts reuse two endpoint pairs and one two-page
+mapping, after 32 warm-up cycles. Each cycle makes 210 transfers through
+8/9/1024-entry imports and all applicable error/empty/valid paths. All live
+slab classes stay flat, with big pages **81/81 ARM and 218/218 x86**. The
+fixture borrows its mapping/endpoints synchronously, bounds header scratch to
+16KiB per transfer, resets page protections before reuse, and closes/unmaps
+only initialized owners on exit. It has no hidden heap promotion in emitted C.
+
+The record query emits an alloca-backed interface whose object pointer is
+the existing resource box. It dispatches immediately and returns a scalar;
+there is no heap box, escaped scratch pointer, new lock or reference owner.
+Independent review confirms this on both architectures. The receive buffer
+still erases/frees before charge release, with FD/vector cleanup left to the
+consuming caller. Whole generated consuming bodies and six syscall wrappers
+are otherwise identical to the baseline.
+
+Seven additional guest cases pass on both candidates: `iovstream`, `iovrange`,
+`iovimport`, `iovpin`, `iovflags`, `iovfd` and `runtime`. The stream fixture now
+expects record consumption for its first PROT_NONE control while retaining
+byte-stream queue preservation and empty-vector controls. Eight host test
+files, mapping geometry, both fresh kernel builds and inventory checks pass.
+Fresh before/after allocation audits retain **406 ARM / 295 x86** sites and
+identical existing allowance failures; no allowance is increased. The source
+inventory now fingerprints 63 inputs, including UNIX endpoint behavior.
+
+Host disk exhaustion stopped the first aggregate after five successful ARM
+rows and four successful x86 rows. Its failed logs and partial receipts remain
+published. Fresh completion suites run the remaining three ARM/four x86 cases
+on the identical candidate kernels; the interrupted aggregate is not relabeled
+as passing.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/iovpacket-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/iovpacket-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/iovpacket-audit.v)
+bind raw baseline/candidate logs, frozen fixtures/inits/images, kernel binaries,
+generated C, host/geometry/allocation checks and both executed failing controls.
+The committed fixture removes trailing blank lines; its freshly emitted C
+matches every frozen tested capture, whose original source hashes are retained.
+Both baseline kernels are freshly built in private worktrees at `b463fe892`;
+only `resource.v` and `linux_common.v` differ in the candidate kernel sources.
+The compiler remains the clean `f6358ecff9` snapshot. These isolated semantic
+inputs are recorded separately from the public dispatch inventory, which
+follows the committed parent plus this fix. Earlier broader performance and
+desktop receipts belong to the preceding stream fix and are not reported as
+new runs on this kernel.
+
+This qualification covers native UNIX record vector receives. Scalar reads
+and recvmsg, Internet/netlink records, later byte-stream faults and queue
+rollback, GNU wrappers, ELF32/translated paths, allocator exhaustion, shared
+regular-file offsets and complete Linux application installation/compatibility
+remain separate work. The three broad section-15 gates remain open.

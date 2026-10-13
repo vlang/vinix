@@ -871,7 +871,8 @@ fn linux_readv_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) (
 // record's tail, or consume the next record. Keep the imported vector and FD
 // borrowed while one bounded receive is scattered into its destinations.
 fn linux_readv_stream(mut fd file.FD, vector LinuxIOVector, count int) (u64, u64) {
-	for i := 0; i < count; i++ {
+	record := resource.read_keeps_boundaries(mut fd.handle.resource)
+	for i := 0; !record && i < count; i++ {
 		iov := unsafe { vector.data[i] }
 		if iov.len == 0 { continue }
 		// Preserve scalar stream reads' initial destination check.
@@ -896,7 +897,9 @@ fn linux_readv_stream(mut fd file.FD, vector LinuxIOVector, count int) (u64, u64
 		length := if iov.len < ret - copied { iov.len } else { ret - copied }
 		if length == 0 { continue }
 		if !usercopy.copy_to_user(iov.base, voidptr(u64(buffer) + copied), length) {
-			if copied != 0 { return copied, 0 }
+			// UNIX datagram/seqpacket copy faults retire the whole selected
+			// record and report EFAULT, including after a committed prefix.
+			if copied != 0 && !record { return copied, 0 }
 			return errno.err, errno.efault
 		}
 		copied += length

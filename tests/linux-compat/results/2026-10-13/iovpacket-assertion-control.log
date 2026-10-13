@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/iovpacket-audit.v:94: FAIL: fn main.main: assert false, 'audit assertions must execute';
+      message: audit assertions must execute
+V panic: Assertion failed...

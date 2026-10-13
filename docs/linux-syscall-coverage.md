@@ -734,13 +734,14 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/proc/securebits.v` | `292feabca897f6d4eba2455e9e411b8e04c4373a1232c5b26536b3a56d685316` |
 | `kernel/proc/state.v` | `93079c3a701c1119396b2ecd125a6a2a9eb781d859619927c48506b2b8e08785` |
 | `kernel/proc/thread_attach.v` | `5209866e21780214bd9994a32410c5ed7a670a3760a1a2e977db1af280e888d0` |
-| `kernel/resource/resource.v` | `b3906b2ab47e47130e25d98caec8fb5ca4b351088f2387c9967457a15d1b0404` |
+| `kernel/resource/resource.v` | `90be51bba570db9df5f58282b84cc23a9a67b9918895b747edb2bc390518eb29` |
 | `kernel/sched/inherit.v` | `99bf8fe1ac4e60858774d06d43e09273600dbcfb2395c2befc04d84bc1bad278` |
 | `kernel/sched/reap.v` | `58ba75716ed70697e25209943e38d798b8b4f297a4b8d8e5eb63a38d21411423` |
 | `kernel/sched/sched_amd64.v` | `b7d35c2f8895a7db92734731cd80d03048524afdc4b3cca43eb9116e98c85b54` |
 | `kernel/sched/sched_arm64.v` | `7fbd982e9ea4567b1a60e684bb55bc800ed240be3f8cf9439d8c0807740c768f` |
+| `kernel/socket/unix/unix.v` | `790740ff96eb65fe24310b97a08e49c38cdd94f9d60b84a4af9da91fb213ed80` |
 | `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
-| `kernel/syscall/table/linux_common.v` | `7f5a5b13ff93ce8fb654a79c2d5b05eef4acb7d1170901177b960eef684ab49f` |
+| `kernel/syscall/table/linux_common.v` | `c6adfe229c12eee5e76ce31c3ec4a32bc75de19a4f773d3b528578927c17475f` |
 | `kernel/syscall/table/linux_compat.v` | `3cff2259bc5463ef6d5b0cad84231e9c93139566dbf8ef31b29d73364b3642d6` |
 | `kernel/syscall/table/linux_table_amd64.v` | `864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `1519f6e3ec40f2bc702248ae63e3e9efb79766b81f4890b9d9a3090fbec4b01c` |
@@ -756,6 +757,6 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/userland/userland.v` | `a8bffd3e58bf07333ca0d18980dab9a2746811d9d0ccb6a114584b461cd39d69` |
 | `kernel/userland/userland_arm64.v` | `0e234395d8764d6a80a3f76d9d34e3ded33407b477af5de86d54b407b8f654e2` |
 | `kernel/vmstorage/storage.v` | `df6ee1fc37aa7858401f19576d8f450278987acfc3f083f956e8e750174cea7d` |
-| `tools/linux-compat/coverage.v` | `8df66c617b622b83b945ed6a0fdd1b732864984e6ecffbdd9fc5543c8ff16a28` |
+| `tools/linux-compat/coverage.v` | `4ceb584b16f54105ef4e4e2404fd49f0a02ba2d7e11246bde23aa8cb67e1930b` |
 | `tools/linux-compat/reference/aarch64-syscall.h` | `7b20fe57bf92c6b3cf800d4f83998419e92e19a88ead2d57c89c5725e0cfb816` |
 | `tools/linux-compat/reference/x86_64-syscall.h` | `c29e9cb15ff393eda50c320a6d96bb1132191251f8e079148a0646165bb8cabd` |

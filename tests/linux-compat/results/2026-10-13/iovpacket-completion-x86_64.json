@@ -1,0 +1,39 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "1a857890cad320b08d09495bf4fac193140c3c2dfc05d64ec7da66d95b41a33e",
+    "results": [
+        {
+            "name": "iovpin",
+            "source_sha256": "3a4e4decb1c124fcf4470a94e5fd3a7d4efb31767abef4bb2a71b9164be2df61",
+            "init_sha256": "103ed0c0236d663b541c7ee0dc8435a669b7151225781c20e45e4b949871fb86",
+            "iso_sha256": "182d9b0a9a007cb71cfb521137225b1f56c4b99b903e46b869926a2f93b40674",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovflags",
+            "source_sha256": "6f078e2a0eadfdac70fa87426d50348ded177356d7931aa1a01c02547d9c8567",
+            "init_sha256": "5eeb9df16e638e07d854e6f22e2715ad745f660e6d84bb1131c99cf2c271f617",
+            "iso_sha256": "10eebd6ae17d56cbaff2c1357f206dc806c734b51dfdadb096ba2d1664db12a4",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovfd",
+            "source_sha256": "03355eb1560fd5502f6cd347aade5c8b5d7c010efc98115f41e2aeca8ab10724",
+            "init_sha256": "cbcf7594791c837fa64041e3b72346ac830f400c2a71b80cdfa58443974c3617",
+            "iso_sha256": "a2228aebeb5d15f58b0c6af83ba096b7531fa0fc70d6842690c44efaa9a6b936",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "4365aab4e93d0eae1690d6aa0393c97363a87713c4631605182324b4988cff9b",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

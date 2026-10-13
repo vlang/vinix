@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "2b6de474c805178c5af8cbac5570eb4ba51691536097dd63edb7b784bef1a229",
+    "results": [
+        {
+            "name": "iovpacket",
+            "source_sha256": "597155d1f0e5376bdda5905bb05c1d5d18c2754b41e0d88a042c7350335d8efb",
+            "init_sha256": "f464554e01a71e723c1898c527bbf55f05be8cb4fdb46035bc2821b6b12f9e33",
+            "iso_sha256": "ceaa23835e4691fbdc847819f07e69373611209b73dd8b5498c5e6e93835212e",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

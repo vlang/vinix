@@ -102,6 +102,27 @@ pub fn backend_is_read_only(mut res Resource) bool {
 	return false
 }
 
+// A record receive retires its selected message even when copying it to the
+// user fails. Keep the optional protocol query borrowed from the existing
+// resource box; ordinary byte streams need no extra callback.
+pub interface RecordReadableResource {
+	keeps_boundaries() bool
+}
+
+struct RecordReadScratch {
+mut:
+	backend RecordReadableResource
+}
+
+pub fn read_keeps_boundaries(mut res Resource) bool {
+	if mut res is RecordReadableResource {
+		mut scratch := unsafe { &RecordReadScratch(C.__builtin_alloca(sizeof(RecordReadScratch))) }
+		unsafe { scratch.backend = RecordReadableResource(res) }
+		return scratch.backend.keeps_boundaries()
+	}
+	return false
+}
+
 // A dynamic endpoint must retain its result before releasing the lookup/state
 // lock. The descriptor adopts this reference instead of retaining it later.
 pub interface OwnedOpenableResource {

@@ -138,7 +138,10 @@ fn probe(kind i32, version i32, count i32, variant i32, verbose bool) bool {
 			mut remaining := [8]u8{}
 			n := C.read(reader, &remaining[0], 8)
 			if kind >= 2 {
-				if n != 2 || remaining[0] != 0x41 || remaining[1] != 0x42 || C.read(reader, &remaining[0], 8) != 2 || remaining[0] != 0x58 || remaining[1] != 0x59 { valid = false }
+				if variant == 4 {
+					// A UNIX record copy fault consumes only its selected packet.
+					if n != 2 || remaining[0] != 0x58 || remaining[1] != 0x59 { valid = false }
+				} else if n != 2 || remaining[0] != 0x41 || remaining[1] != 0x42 || C.read(reader, &remaining[0], 8) != 2 || remaining[0] != 0x58 || remaining[1] != 0x59 { valid = false }
 			} else if n != 4 || remaining[0] != 0x41 || remaining[1] != 0x42 || remaining[2] != 0x58 || remaining[3] != 0x59 { valid = false }
 		} else {
 			if output[0] != 0x41 || output[4] != 0x42 { valid = false }

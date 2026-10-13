@@ -669,6 +669,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   messages and 1 MiB payloads as root/UID1000 on both architectures, with flat
   retention and published destination-fault limits. See
   [the stream-vector receipts](docs/linux-posix-qualification.md#native-stream-vector-receives).
+- [x] Retire selected native UNIX datagram/seqpacket records on vector copy
+  faults and return EFAULT even after copied prefixes; qualify empty queues,
+  empty/short records, import refusals and flat storage on both architectures.
+  See [the record-fault receipts](docs/linux-posix-qualification.md#native-unix-record-vector-copy-faults).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

@@ -138,7 +138,7 @@ The `iovstream` case checks 220 pipe/UNIX stream/datagram/seqpacket probes in
 each root and UID/GID1000 child, using native readv and preadv2 at -1 with
 2/8/9/513/1024-entry imports. It checks full/truncated records, untouched next
 messages, available data returning while the writer stays open, empty vectors,
-the existing first-destination error precheck and complete 1MiB records. The
+first-destination errors and complete 1MiB records. The
 blocking probe joins its worker after a late delivery if the call waits for
 another record; it never unwinds borrowed storage before the join. Two
 200-cycle cohorts reuse endpoint pairs and a payload mapping, checking valid,
@@ -146,11 +146,26 @@ empty, invalid-count and EAGAIN callback cleanup with flat slab/big-page counts.
 An earlier resource-churn stress hit the separate 4096-socket object limit
 before grace retirement; those diagnostic failures remain published. The
 `iovimport` checkpoint now counts active receive/vector reservations and passes
-both old and fixed kernels. First-destination queue preservation is existing
-Vinix behavior; Linux datagram copy faults consume the packet. Later faults,
-partial-copy counts, Internet/netlink/character-device paths, allocator
-exhaustion and foreign ABIs remain separate qualification. See
+both old and fixed stream kernels. Byte streams retain their initial
+destination precheck; UNIX record copy faults now consume the selected packet,
+as qualified separately by `iovpacket`. Later byte-stream faults, partial-copy
+counts, Internet/netlink/character-device paths, allocator exhaustion and
+foreign ABIs remain separate qualification. See
 [the report](../../docs/linux-posix-qualification.md#native-stream-vector-receives).
+
+The `iovpacket` case checks 350 UNIX datagram/seqpacket native readv and
+current-position preadv2 probes in each root and UID/GID1000 child. Headers
+with 2/8/9/513/1024 entries cover stack and heap imports. Unmapped, PROT_NONE,
+read-only, later-entry and page-crossing copy faults must return EFAULT and
+retire only the selected record, including after a copied prefix. Empty queues
+return EAGAIN before copying; an empty queued record returns zero and retires
+without touching an inaccessible destination. Empty/malformed/count/length
+and flag-import controls preserve queued data, and short records never touch
+later invalid destinations. Two stable socket pairs and one two-page mapping
+warm 32 cycles and measure 200 cycles of 210 transfers each, requiring flat
+slab objects and big pages. Scalar reads/recvmsg, other socket families, GNU
+wrappers, foreign ABIs and later byte-stream faults remain separate. See
+[the record-fault receipts](../../docs/linux-posix-qualification.md#native-unix-record-vector-copy-faults).
 
 The `iovflags` case checks 1,540 native preadv2/pwritev2 cases in each root
 and UID/GID 1000 child. Unknown low flag bits must follow negative-offset,
