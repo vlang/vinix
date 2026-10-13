@@ -1,0 +1,75 @@
+{
+    "embedded_python_blocks": 2,
+    "evidence": "~/.cache/vinix-image-tools-native-20261013",
+    "originals": [
+        {
+            "bytes": 1837,
+            "path": "scripts/build-vinix-guest-disk.sh",
+            "sha256": "5ad886e5ea4cc6050501166d4ec1dc2d292b551fa3036506a7c6530719b48651"
+        },
+        {
+            "bytes": 18650,
+            "path": "scripts/deploy-iso.sh",
+            "sha256": "98d0fd100e23f6e13be9a5e4beef0e575ccee96e0ae844ce1e9dfc3437b2d1b7"
+        }
+    ],
+    "profiles": [
+        {
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "check",
+                    "sha256": "c8d1bb5ec82a18f6dae5da4f428dcdbcbc43153649737d62c5408c6a6acdfe23"
+                },
+                {
+                    "name": "disk",
+                    "sha256": "3795782f7a448f66f51c500c497ce7b80f704adfd0a2993808d609e9f49036c9"
+                },
+                {
+                    "name": "human",
+                    "sha256": "8928fe31625beec3a2efd72abe22ede15dba859df7705b7908c6c8ab63677b52"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "check",
+                    "sha256": "1974559dbe9331c82d65de93b84ddaf7d5f357597d9997cf220b3a045f717d94"
+                },
+                {
+                    "name": "disk",
+                    "sha256": "a94fa5a4a5a3dc5f6bf8d23ff897b251fe6dfea178d6b1f0dd1aef5c1b62902e"
+                },
+                {
+                    "name": "human",
+                    "sha256": "b2b5d87fa0f807af5994693686f49f5142125e6c05311a875abe6772ca2c6a44"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "check",
+                    "sha256": "7c749bce62e8058720113308756254173999433d6b61f9384b9064724025c3d2"
+                },
+                {
+                    "name": "disk",
+                    "sha256": "7f47250df8cdd618fdc9601f713a9edf94a3bdf79dc8fd03c7df6da80d5e2157"
+                },
+                {
+                    "name": "human",
+                    "sha256": "a81e9ca3ca45c0621504b5a56ddd178578ceb8e0e70cb97d6afa2ea8ee5e6496"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirements": 0,
+    "qualification": "Nine cold ARM/x86/ASanUBSan builds; two actual FAT32 images per profile; exact four boot member contents, 128/129 MiB sparse lengths, umask, SDK failure/input/output guards, atomic publication race, signals and exact PID/descriptor retirement; original arithmetic/rounding boundaries and public commands; no Python, guest boot, release build or publication",
+    "source_commit": "bd5fd8762c196f678475258d87841f14eaed0106"
+}

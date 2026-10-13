@@ -93,12 +93,7 @@ need() {
 }
 
 human_size() {
-    python3 -c 'import sys; n = float(sys.argv[1])
-for unit in ("bytes", "KiB", "MiB", "GiB"):
-    if n < 1024 or unit == "GiB":
-        print(f"{n:.0f} {unit}" if unit == "bytes" else f"{n:.1f} {unit}")
-        break
-    n /= 1024' "$1"
+    "$SCRIPT_DIR/build-support/human-size" "$1"
 }
 
 file_size() {
@@ -107,7 +102,7 @@ file_size() {
 
 # ── What to build ──────────────────────────────────────────────────────────
 
-need git python3 curl clang ld.lld xorriso cc rsync
+need git curl clang ld.lld xorriso cc rsync
 cd "$SCRIPT_DIR"
 COMMIT="$(git rev-parse --verify "$REF^{commit}")" || die "no such commit: $REF"
 SHORT="$(git rev-parse --short=10 "$COMMIT")"

@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+support=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$support/run-v-tool.sh" "$support/human-size.v" "$@"

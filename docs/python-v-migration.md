@@ -3288,3 +3288,15 @@ retain leader identity through group cleanup and sole reap; desktop cleanup
 escalates after ten seconds. No Python or Vinix guest is executed. The retained
 host runner remains an external input; sanitizers instrument the V controller
 and fixtures. See [native iOS UI tests](../tests/native-ios-ui/README.md).
+
+A following native image-tool closure removes the two embedded Python blocks in
+`scripts/build-vinix-guest-disk.sh` and `scripts/deploy-iso.sh`. The guest image
+workflow is now V, including checked payload sizing, private sparse FAT32
+construction, original boot members and atomic publication without overwrite.
+Release sizes retain the original unit transitions and rounding. Nine cold
+ARM/x86/ASanUBSan builds pass two real FAT32 images per profile, exact member
+contents, umask, output races, missing inputs/tools, SDK errors, signal cleanup
+and public commands. No Python, guest boot, release build or publication is
+performed. These scripts were classified as Shell, so this closure receives
+zero Python-file retirement credit and leaves the recorded twelve-file count
+unchanged. See [native image tools](../build-support/imagehost/README.md).
