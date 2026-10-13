@@ -91,9 +91,48 @@ pub mut:
 
 __global (
 	vfs_lock    klock.Lock
+	children_lock klock.Lock
 	vfs_root    &VFSNode
 	filesystems map[string]&FileSystem
 )
+
+// Protect map storage separately from the VFS writer lock. Path walkers also
+// run inside writer operations, so they cannot acquire vfs_lock recursively.
+// Only copy pointers or change map storage here; callbacks and node retirement
+// run after unlocking. The removed-node grace period protects copied pointers.
+fn lookup_child_synced(node &VFSNode, name string) &VFSNode {
+	if is_procfs_resource(node.resource) || is_sysfs_resource(node.resource) {
+		return lookup_child(node, name)
+	}
+	children_lock.acquire()
+	child := lookup_child(node, name)
+	children_lock.release()
+	return child
+}
+
+fn directory_snapshot_synced(node &VFSNode) ([]string, []&VFSNode) {
+	if is_procfs_resource(node.resource) || is_sysfs_resource(node.resource) {
+		return directory_snapshot(node)
+	}
+	children_lock.acquire()
+	names, nodes := directory_snapshot(node)
+	children_lock.release()
+	return names, nodes
+}
+
+pub fn publish_child(parent &VFSNode, name string, child &VFSNode) {
+	children_lock.acquire()
+	mut directory := unsafe { parent }
+	unsafe { directory.children[name] = child }
+	children_lock.release()
+}
+
+fn remove_child(parent &VFSNode, name string) {
+	children_lock.acquire()
+	mut directory := unsafe { parent }
+	directory.children.delete(name)
+	children_lock.release()
+}
 
 pub fn create_node(filesystem &FileSystem, parent &VFSNode, name string, dir bool) &VFSNode {
 	mut node := &VFSNode{
@@ -298,7 +337,7 @@ fn walk_path_resolved(parent &VFSNode, path string, depth int, effective bool, i
 				effective, identity, resolve)
 		} else {
 			overlay_lookup_refresh(current_node)
-			child := lookup_child(current_node, elem_str)
+			child := lookup_child_synced(current_node, elem_str)
 			if child == unsafe { nil } {
 				errno.set(errno.enoent)
 				if last == true {
@@ -425,9 +464,9 @@ pub fn (mut node VFSNode) create_dotentries(parent &VFSNode) {
 	unsafe {
 		dot.redir = node
 		dotdot.redir = parent
-		node.children['.'] = dot
-		node.children['..'] = dotdot
 	}
+	publish_child(node, '.', dot)
+	publish_child(node, '..', dotdot)
 }
 
 // The path of a node as the calling process sees it: from its root, through
@@ -526,9 +565,7 @@ pub fn symlink(parent &VFSNode, dest string, target string) ?&VFSNode {
 	}
 
  overlay_commit_created(target_node)
-	unsafe {
-		parent_of_tgt_node.children[basename] = target_node
-	}
+	publish_child(parent_of_tgt_node, basename, target_node)
 	inotify_emit(parent_of_tgt_node, basename, in_create, 0)
 	return target_node
 }
@@ -574,9 +611,7 @@ pub fn link(parent &VFSNode, dest string, target string) ?&VFSNode {
 	charge_transferred = true
 
  overlay_commit_created(target_node)
-	unsafe {
-		parent_of_tgt_node.children[basename] = target_node
-	}
+	publish_child(parent_of_tgt_node, basename, target_node)
 	inotify_emit(parent_of_tgt_node, basename, in_create, 0)
 	inotify_emit(dest_node, '', in_attrib, 0)
 	return target_node
@@ -641,7 +676,7 @@ pub fn unlink(parent &VFSNode, name string, remove_dir bool) ? {
 		node.resource.stat.nlink = 0
 		node.directory_resource = true
 	}
-	parent_of_tgt.children.delete(basename)
+	remove_child(parent_of_tgt, basename)
 	mode := node.resource.stat.mode
 	if !node.directory_resource {
 		// The namespace reference protects lockless metadata readers too.
@@ -815,12 +850,10 @@ fn internal_create_resolved_locked(parent &VFSNode, name string, mode u32, acces
 	}
 
  overlay_commit_created(target_node)
-	unsafe {
-		parent_of_tgt_node.children[basename] = target_node
-	}
 	if stat.isdir(target_node.resource.stat.mode) {
 		target_node.create_dotentries(parent_of_tgt_node)
 	}
+	publish_child(parent_of_tgt_node, basename, target_node)
 	dir_flag := if stat.isdir(target_node.resource.stat.mode) { in_isdir } else { u32(0) }
 	inotify_emit(parent_of_tgt_node, basename, in_create | dir_flag, 0)
 
@@ -1760,9 +1793,7 @@ pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _
 
  new_node.kernel_charge = charge
  overlay_commit_created(new_node)
-	unsafe {
-		newparent.children[basename] = new_node
-	}
+	publish_child(newparent, basename, new_node)
 	return 0, 0
 }
 
@@ -1899,7 +1930,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 
 	if dir_handle.dirlist_valid == false {
 		overlay_lookup_refresh(dir_node)
-		mut names, mut nodes := directory_snapshot(dir_node)
+		mut names, mut nodes := directory_snapshot_synced(dir_node)
 		defer {
 			unsafe {
 				names.free()
@@ -1930,7 +1961,7 @@ pub fn syscall_readdir(_ voidptr, fdnum int, mut buf stat.Dirent) (u64, u64) {
 		mut new_dirent := unsafe { &stat.Dirent(C.vinix_stack_alloc(sizeof(stat.Dirent))) }
 		mut i := u64(0)
 		for index in 0 .. entry_count {
-			child := if nodes.len > 0 { nodes[index] } else { unsafe { dir_node.children[names[index]] } }
+			child := if nodes.len > 0 { nodes[index] } else { lookup_child_synced(dir_node, names[index]) }
 			if child == unsafe { nil } { continue }
 			name := if nodes.len > 0 { child.name } else { names[index] }
 			node := reduce_node(child, false)
@@ -2193,10 +2224,12 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
 			new_basename, flags)?
 
+		children_lock.acquire()
 		unsafe {
 			old_parent_of.children[old_basename] = new_node
 			new_parent_of.children[new_basename] = old_node
 		}
+		children_lock.release()
 		adopt(mut old_node, mut new_parent_of, new_basename.clone())
 		adopt(mut new_node, mut old_parent_of, old_basename.clone())
 		first_cookie := inotify_next_cookie()
@@ -2267,6 +2300,26 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 	old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
 		new_basename, flags)?
 
+	// Publish the replacement before retiring its old node, without deleting
+	// the destination key. Keep source deletion under the same map lock: its
+	// backward shifts and compaction can also disturb concurrent lookups.
+	// Assign through its existing slot: even updating an existing key with
+	// map.set can grow and rehash the map before checking that key.
+	children_lock.acquire()
+	if unsafe { new_node != nil } {
+		unsafe {
+			mut destination := &new_parent_of.children[new_basename]
+			*destination = old_node
+		}
+	} else {
+		unsafe {
+			new_parent_of.children[new_basename] = old_node
+		}
+	}
+	old_parent_of.children.delete(old_basename)
+	children_lock.release()
+	adopt(mut old_node, mut new_parent_of, new_basename.clone())
+
 	if unsafe { new_node != 0 } {
 		// The filesystem rename hook already removed the destination name. Drop
 		// the VFS link without invoking a second backend unlink.
@@ -2274,7 +2327,6 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		hold_parent(mut new_node)
 		inotify_emit(new_node, '', in_delete_self, 0)
 		inotify_forget(new_node)
-		new_parent_of.children.delete(new_basename)
 		replaced_mode := new_node.resource.stat.mode
 		if stat.isdir(replaced_mode) {
 			new_node.removed = true
@@ -2286,11 +2338,6 @@ pub fn rename(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpath st
 		orphan_node(mut new_node, replaced_mode)
 	}
 
-	old_parent_of.children.delete(old_basename)
-	unsafe {
-		new_parent_of.children[new_basename] = old_node
-	}
-	adopt(mut old_node, mut new_parent_of, new_basename.clone())
 	cookie := inotify_next_cookie()
 	dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
 	inotify_emit(old_parent_of, old_basename, in_moved_from | dir_flag, cookie)

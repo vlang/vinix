@@ -13,7 +13,7 @@ missing kernel isolation, debugger or hardware virtualization interfaces.
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
 | VM integration and lifecycle | Private per-VM qcow2 disks/firmware variables, QMP lifecycle, offline paired snapshots, explicit user networking/loopback SSH forwarding, read-only 9p shares and a guest-agent transport. | Qualify guest OS workflows inside Vinix, provide Vinix guest tools/drivers, qualify shared folders and network behavior, and implement running-state snapshots and crash-atomic snapshot transactions if required. |
-| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity and authenticated HTTP/CGI projects on both architectures. AArch64 also passes two scheduled native Go CI builds with matching artifacts, isolated credentials and refusal of an existing output. [Per-account interval jobs](../tools/development/scheduled-jobs.md) use pinned executables, selected environment, protected credential files and durably reserved attempts for fresh outputs. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify ordinary-account execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. | Installed-system service/boot integration, wider database/server/TLS/load qualification, authenticated SSH development, native x86 CI and broader CI/deployment workflows. An intermittent x86 watcher-state read failure remains recorded. |
+| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity and authenticated HTTP/CGI projects on both architectures. AArch64 also passes two scheduled native Go CI builds with matching artifacts, isolated credentials and refusal of an existing output. [Per-account interval jobs](../tools/development/scheduled-jobs.md) use pinned executables, selected environment, protected credential files and durably reserved attempts for fresh outputs. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify ordinary-account execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. The [VFS rename regression](../tests/vfs-rename/README.md) covers the reproduced watcher-state publication race. | Installed-system service/boot integration, wider database/server/TLS/load qualification, authenticated SSH development, native x86 CI and broader CI/deployment workflows. A retained x86 HTTP connection-aborted run still needs investigation. |
 
 Validation on 12 October 2026 used the Darwin ARM host, V 0.5.2 `f6358ec`,
 QEMU 11.1.1 and the installed musl cross-compilers. All checks below passed:
@@ -263,10 +263,16 @@ Host tests interrupted the actual CLI chain with a compiler and descendant
 that ignore TERM, requiring both to retire before the build owner returned.
 Native x86 HTTP/account/job/build regressions passed with these tools in
 `build/development17-20261013/guest-x86-ci-cancellation-c` (19 records).
-An earlier x86 attempt run failed the watcher-state read assertion; the same
-inputs passed on repeat. That retained failure remains a reliability issue
-to investigate, rather than a section 17 closure claim. Full pins and native
-CI instructions are recorded in [the guest evidence](../tests/development/README.md).
+An earlier x86 attempt run failed the watcher-state read assertion; a focused
+guest test subsequently reproduced a VFS replacement gap and unsynchronized
+map changes. The [rename fix and native regression](../tests/vfs-rename/README.md)
+pass 8,000 replacements per architecture with concurrent listings and old
+descriptors retained beyond the grace period. Its final kernels passed the
+AArch64 scheduled Go CI and x86 HTTP/account/job gates. An earlier HTTP run on
+the final x86 kernel failed with a connection-aborted error; its failed receipt
+is retained separately. Atomic overlay replacement and broader server-load
+qualification remain open. Full pins and native CI instructions are recorded
+in [the guest evidence](../tests/development/README.md).
 Boot services, remote CI, deployment, broader projects and SSH remain open.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,

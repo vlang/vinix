@@ -276,9 +276,7 @@ fn create_cgroup_directory(parent &VFSNode, name string, parent_group &CGroup) &
 		res.name = file_name
 		res.text = default
 		child.resource = res.box
-		unsafe {
-			node.children[file_name] = child
-		}
+		publish_child(node, file_name, child)
 	}
 	ancestor = unsafe { parent_group }
 	for ancestor != unsafe { nil } { ancestor.descendants++; ancestor = ancestor.parent }
@@ -1288,7 +1286,7 @@ pub fn cgroup_may_remove(node &VFSNode) ?bool {
 	}
 	for name in names {
 		if !is_dot_name(name) {
-			dir.children.delete(name)
+			remove_child(dir, name)
 		}
 	}
 	mut removed := unsafe { group }

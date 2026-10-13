@@ -105,9 +105,14 @@ TCG account/job/build run passed in `guest-x86-job-attempt-b` (12 records).
 The controller checks one reserved attempt for ordinary/deadline/signal jobs,
 two for watcher ticks, and two attempts with one completion after interrupted
 recovery. The first x86 run, `guest-x86-job-attempt-a`, failed the existing
-watcher-state read assertion; that failed receipt remains retained. Its
-intermittent read failure still needs investigation; the repeat used the same
-kernel, tools and fixture inputs.
+watcher-state read assertion; that failed receipt remains retained. A focused
+guest test subsequently reproduced the VFS destination delete/publish gap
+and concurrent map mutation. The [rename regression](../../tests/vfs-rename/README.md)
+now passes 8,000 replacements per architecture, concurrent directory listings
+and retained-descriptor checks beyond the retirement grace period. The final
+kernels also passed the x86 HTTP/account/job gate and AArch64 scheduled Go CI
+gate. The watcher fixture checks open before read so a failed open's errno is
+preserved in future reports.
 
 The [scheduled native Go CI gate](../../tests/development/README.md) passed
 on AArch64 HVF on 13 October 2026 in

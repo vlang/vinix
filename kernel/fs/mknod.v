@@ -213,7 +213,7 @@ fn make_device_node(mut parent VFSNode, name string, mode u32, rdev u64) ?&VFSNo
 
 fn install_device_node(mut parent VFSNode, name string, mode u32, rdev u64, backing &resource.Resource) ?&VFSNode {
  node := prepare_device_node(mut parent, name, mode, rdev, backing)?
- unsafe { parent.children[name] = node }
+ publish_child(parent, name, node)
  return node
 }
 
@@ -285,9 +285,7 @@ fn make_fifo_node(mut parent VFSNode, name string, mode u32) ?&VFSNode {
 		errno.set(failure)
 		return none
 	}
-	unsafe {
-		parent.children[name] = node
-	}
+	publish_child(parent, name, node)
 	return node
 }
 

@@ -695,9 +695,7 @@ fn (mut this EXT2Filesystem) populate_checked_locked(node &vfs.VFSNode) ? {
 			}
 		}
 
-		unsafe {
-			vfs_node.parent.children[name] = vfs_node
-		}
+		vfs.publish_child(vfs_node.parent, name, vfs_node)
 		if stat.isdir(mode) && name != '.' && name != '..' {
 			vfs_node.create_dotentries(node)
 			this.populate_checked_locked(vfs_node)?

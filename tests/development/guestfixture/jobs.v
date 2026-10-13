@@ -205,8 +205,10 @@ fn job_lifecycle_checks() {
 		for {
 			mut text := [4096]char{}
 			fd := C.open(c'/home/developer/watch-state/state.json', C.O_RDONLY)
+			// Preserve open's errno; read(-1) would mask it with EBADF.
+			check(fd >= 0, 349)
 			count := C.read(fd, &text[0], text.len - 1)
-			check(fd >= 0 && count > 0 && C.close(fd) == 0, 349)
+			check(count > 0 && C.close(fd) == 0, 349)
 			if C.strstr(&text[0], c'"runs":2') != nil && C.strstr(&text[0], c'"in_flight":false') != nil { break }
 			check(job_clock() < deadline && C.kill(watcher, 0) == 0, 350)
 			C.usleep(10000)

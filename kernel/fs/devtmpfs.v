@@ -341,10 +341,7 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 
 	new_node.resource = new_resource.boxed()
 	new_node.create_dotentries(parent)
-	mut p := unsafe { parent }
-	unsafe {
-		p.children[name] = new_node
-	}
+	publish_child(parent, name, new_node)
 	return new_node
 }
 
@@ -424,9 +421,7 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 	new_node.resource.stat.ctim = realtime_clock
 	new_node.resource.stat.mtim = realtime_clock
 
-	unsafe {
-		parent.children[leaf] = new_node
-	}
+	publish_child(parent, leaf, new_node)
 }
 
 // Remove a dynamically-created device node. The resource held one reference
@@ -492,7 +487,7 @@ fn detach_device_node(name string, expected &resource.Resource) ?&VFSNode {
 	if voidptr(node.resource) != voidptr(expected) { return none }
 	if node.resource is LogicalVolume && pinned(node) { errno.set(errno.ebusy); return none }
 	hold_parent(mut node)
-	parent.children.delete(leaf)
+	remove_child(parent, leaf)
 	node.resource.stat.nlink = 0
 	mut removed_resource := node.resource
 	removed_resource.unref(unsafe { nil }) or {}
@@ -556,5 +551,5 @@ fn devtmpfs_add_volume(device &resource.Resource, name string) ? {
 	node.resource.stat.atim = realtime_clock
 	node.resource.stat.ctim = realtime_clock
 	node.resource.stat.mtim = realtime_clock
-	unsafe { parent.children[leaf] = node }
+	publish_child(parent, leaf, node)
 }

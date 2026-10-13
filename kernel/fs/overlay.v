@@ -148,7 +148,7 @@ fn is_opaque(node &VFSNode) bool {
 // caller's permission checks: a copy up is done for the caller, whoever it is.
 fn overlay_real_create(mut dir VFSNode, name string, mode u32, label_source &resource.Resource) ?&VFSNode {
  real := overlay_prepare_real_create(mut dir, name, mode, label_source)?
- unsafe { dir.children[name] = real }
+ publish_child(dir, name, real)
  return real
 }
 
@@ -185,7 +185,7 @@ fn overlay_prepare_real_create(mut dir VFSNode, name string, mode u32, label_sou
 
 fn overlay_real_symlink(mut dir VFSNode, dest string, name string, label_source &resource.Resource) ?&VFSNode {
  real := overlay_prepare_real_symlink(mut dir, dest, name, label_source)?
- unsafe { dir.children[name] = real }
+ publish_child(dir, name, real)
  return real
 }
 
@@ -235,7 +235,7 @@ fn overlay_drop_real_locked(mut dir VFSNode, name string, held bool) {
  if name !in dir.children { return }
  mut real := unsafe { dir.children[name] }
  if real != unsafe { nil } { hold_parent(mut real) }
- dir.children.delete(name)
+ remove_child(dir, name)
  if real != unsafe { nil } { overlay_dispose_real(mut real, held) }
 }
 
@@ -396,7 +396,7 @@ fn overlay_populate_locked(mut dir VFSNode) {
 				child.create_dotentries(dir)
 			}
 			unsafe {
-				dir.children[name] = child
+				publish_child(dir, name, child)
 			}
 		}
 		unsafe {
@@ -626,7 +626,7 @@ fn overlay_link_locked(mut dir VFSNode, name string, mut old_node VFSNode) ?&VFS
  real := upper_dir.filesystem.link(upper_dir, real_name, mut old_real) or { unsafe { real_name.free() }; kbudget.release(charge); return none }
  mut charged_real := unsafe { real }; charged_real.kernel_charge = charge
 	unsafe {
-		upper_dir.children[name] = real
+		publish_child(upper_dir, name, real)
 	}
 	return overlay_new_node(dir, name, real, replaced_whiteout, previous)
 }
@@ -651,7 +651,7 @@ pub fn overlay_mknod(mut dir VFSNode, name string, mode u32, rdev u64) ? {
  node.overlay.uncommitted = false
  mark_overlaid(node.overlay)
 	unsafe {
-		dir.children[name] = node
+		publish_child(dir, name, node)
 	}
 }
 
@@ -684,11 +684,11 @@ fn overlay_unlink(mut dir VFSNode, mut node VFSNode, name string) ? {
 		overlay_drop_real_locked(mut upper_dir, name, held)
 	}
 	if node.overlay.has_lower {
-		unsafe { upper_dir.children[name] = whiteout }
+		publish_child(upper_dir, name, whiteout)
   whiteout = unsafe { nil }
 	}
 	hold_parent(mut node)
-	dir.children.delete(name)
+	remove_child(dir, name)
 	if is_dir {
 		node.removed = true
 	}
@@ -743,7 +743,7 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 			overlay_drop_real_locked(mut new_upper, new_name, held)
 		}
 		hold_parent(mut replaced)
-		new_dir.children.delete(new_name)
+		remove_child(new_dir, new_name)
 		if replaced_is_dir {
 			replaced.removed = true
 		}
@@ -755,22 +755,22 @@ fn overlay_rename(mut old_dir VFSNode, old_name string, mut old_node VFSNode, mu
 	}
 
 	old_upper.filesystem.rename(old_upper, old_name, new_upper, new_name, 0)?
-	old_upper.children.delete(old_name)
+	remove_child(old_upper, old_name)
 	unsafe {
-		new_upper.children[new_name] = real
+		publish_child(new_upper, new_name, real)
 	}
 	adopt(mut real, mut new_upper, new_name.clone())
 	if old_node.overlay.has_lower {
-		unsafe { old_upper.children[old_name] = old_whiteout }
+		publish_child(old_upper, old_name, old_whiteout)
   old_whiteout = unsafe { nil }
 	}
 	old_node.overlay.has_lower = hides_lower
 	unsafe { old_node.overlay.lowers.free() }
 	old_node.overlay.lowers = []&VFSNode{}
 
-	old_dir.children.delete(old_name)
+	remove_child(old_dir, old_name)
 	unsafe {
-		new_dir.children[new_name] = old_node
+		publish_child(new_dir, new_name, old_node)
 	}
 	adopt(mut old_node, mut new_dir, new_name.clone())
 }
@@ -907,7 +907,7 @@ fn overlay_commit_created(node &VFSNode) {
  entry.rollback_whiteout = unsafe { nil }
  if entry.uncommitted {
   mut parent := entry.upper.parent
-  unsafe { parent.children[entry.upper.name] = entry.upper }
+  publish_child(parent, entry.upper.name, entry.upper)
  }
  entry.uncommitted = false
  mark_overlaid(entry)
