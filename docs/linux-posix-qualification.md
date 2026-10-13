@@ -2940,3 +2940,91 @@ restrictive MAC/pledge/unveil combinations, concurrent link/FD changes,
 partial-copy boundaries, disk/overlays, GNU/translated/ELF32 paths and complete
 Linux installation/sandbox/portal/runtime acceptance remain separate work.
 The three broad section-15 gates stay open.
+
+## Native empty-path readlink
+
+`readlinkat(fd, "", ...)` now reads the symlink named by an existing description,
+including O_PATH|O_NOFOLLOW handles after unlink or private-directory search
+permission denial. The descriptor lookup retains both FD and Handle until
+the synchronous target helper returns. The Handle pins its node and original
+resource; an orphan's parent pin preserves ancestry for policy checks. Every
+new return releases the reference. Non-symlink/no-node handles and AT_FDCWD
+return ENOENT; invalid descriptors return EBADF. Native signed32 size validation
+still runs first. This follows
+[Linux v6.12 do_readlinkat's empty-path lookup and type errors](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/stat.c).
+
+The existing policy/type/procfs/copy tail moves into `readlink_node` without
+source changes. Normal pathname handling retains its lookup, permissions,
+copy semantics and ownership. The empty-path handler uses the lower signed32
+descriptor word, keeps existing pathname ownership and calls that shared tail.
+Dynamic target text is freed exactly once after each copy or error.
+
+The V `readlinkempty` fixture passes **7,296 checks per architecture** in root
+and UID/GID1000 children. Fourteen classes cover named and dangling symlink
+handles, a symlink whose name is removed, a private-directory symlink inherited
+before dropping credentials, dynamic procfs self/exe links, ordinary and O_PATH
+regular files, directories, `/dev/null`, pipe/socket handles and invalid/FDCWD
+arguments. Ordinary links and their deleted/private counterparts hold target
+text even when the target is absent. Procfs exe names the staged `/sbin/init`;
+self retains Vinix's existing absolute spelling, whose Linux qualification
+is separate. Three aliases, eight size words, three raw FD upper-word patterns
+and musl controls cover valid/null/inaccessible buffers, signed32 size errors,
+exact-zero libc scratch behavior and upper-word decoding.
+
+Both baselines fail **1,197 checks per cohort**: 414 target/scratch copies,
+720 destination EFAULT refusals and 63 invalid-FD EBADF expectations all return
+ENOENT. Both fixed kernels have zero failures. Copies verify exact target
+prefix length/bytes, no NUL and unchanged canaries. Inode/device/mode/size/
+UID/GID/nlink, FD flags, shared regular-file cursors and actual ABCD bytes stay
+unchanged. The removed name still returns ENOENT; new ordinary-user private
+path opens still return EACCES despite the inherited descriptor authority.
+Real pipe/socket FIONREAD/poll retain two AB bytes; each child drains, compares
+and replenishes those queues.
+
+Each cohort has 38 descriptors, including three child-owned exe-link aliases;
+aliases share open-file descriptions. The parent keeps 35 inherited references.
+After 32 warm-ups, 200 cycles of 56 raw probes plus three transient dup/copy
+controls retain every slab live-object count and **70/70 ARM, 181/181 x86** big
+pages. Deleted handles remain usable well beyond the five-second node-reaping
+grace period. Handles/Slabs use bounded alloca and other buffers remain on the
+stack. Setup failures, child returns, temporary aliases, control opens and
+observer paths close their references. The successful parent pauses until
+guest teardown.
+
+The [independent final lifetime review](../tests/linux-compat/results/2026-10-13/readlinkempty-lifetime-review.md)
+confirms generated cleanup on every return, descriptor-before-node release
+ordering, origin-resource and orphan-parent pins, synchronous borrowing,
+matching final source/C captures and flat retention. No hidden fixture heap
+allocation or promotion is present.
+
+A concurrent cleanup deleted all `/tmp/vinix-*` build/compiler work areas
+during the first empty-path candidate builds. The root edits and committed
+prior results survived; no empty-path guest verdict existed in the lost area.
+Qualification was rebuilt from clean sources in
+`/Users/alex/.cache/vinix-linux-compat/readlinkempty-20261013`. The compiler's
+first rebuild lacked its untracked TinyCC header/library dependency, and a
+bootstrap-controller attempt encountered a segmentation fault. Those host
+failures remain preserved separately from successful fresh compiler/controller,
+baseline/candidate builds and guest runs. The compiler is the clean pinned
+`f6358ecff9` tree. The compiler make inherited a shared VEXE output path; its
+rebuilt shared binary matches the same clean source revision, while the native
+qualification rebuild writes an explicit separate compiler output.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/readlinkempty-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/readlinkempty-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/readlinkempty-audit.v)
+bind all before/after logs and source/init/image hashes, compiler/controller/
+kernel binaries/C, host incidents, final lifetime review and both executed
+failing controls. Both architectures also pass readlinkabi/open/pathio/runtime.
+Both builds, eight host test files and generated inventory checks pass. The
+allocation allowance audit retains **406 ARM/295 x86** failures with exact
+unchanged NEW rows; no allowance is raised. Private trees pin `49cee5ac7`; only
+fs/vfs.v differs. Removing the helper and restoring the handler reproduces
+the entire baseline kernel C. All 63 isolated semantic inputs are fingerprinted
+separately from the public committed-parent inventory.
+
+Linux procfs target spelling, atime, restrictive policy combinations,
+concurrent close/unlink/exec, partial-copy boundaries, disk/overlays and
+GNU/translated/ELF32 paths, plus complete Linux installation/sandbox/portal/
+runtime acceptance, remain separate work. The three broad section-15 gates
+stay open.

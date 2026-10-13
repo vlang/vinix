@@ -134,6 +134,21 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `readlinkempty` case checks 3,648 raw/musl calls per root/UID1000 child
+on both architectures. Empty paths name the retained symlink description,
+including O_PATH handles after unlink or private-directory search denial.
+Named/dangling/deleted links and dynamic procfs self/exe aliases retain exact
+target prefixes without NUL or canary damage. Invalid FDs return EBADF and
+nonlinks/FDCWD ENOENT; native signed32 sizes reject nonpositive values first,
+while musl exact-zero scratch lookup retains its path result. Descriptor
+upper words, metadata/flags/shared cursors, real AB queues and private/missing
+pathname refusals remain checked. Thirty-eight child descriptors survive 32
+warm-ups and 200 cycles of 56 probes plus three transient dup/copy controls
+with flat live slabs and big pages. Each child closes its inherited references
+and three private exe aliases; the parent keeps 35 descriptors while paused.
+Concurrent close/unlink/exec, restrictive policy and partial-copy boundaries
+remain separate qualification.
+
 The `readlinkabi` case checks 2,160 AArch64 or 2,880 x86-64 calls in each
 root/UID1000 child. Raw readlinkat, x86 readlink and both musl wrappers cover
 sixteen path classes, fifteen size words and valid/null/inaccessible buffers.
@@ -149,8 +164,8 @@ Six stable descriptors retain metadata/types/sizes, file bytes/shared cursors
 and descriptor flags. After 32 warm-ups, 200 cycles of 52 probes and a transient
 directory alias retain flat slab live objects and large pages. Original
 fixture expectation failures remain published alongside corrected runs.
-Empty-path symlink descriptors, atime, restrictive policy, concurrency and
-partial-copy boundaries require separate qualification.
+Empty-path symlink descriptors are covered by `readlinkempty`; atime,
+restrictive policy, concurrency and partial-copy boundaries remain separate.
 
 The `truncatepath` case checks 384 raw/musl pathname truncate calls in each
 root and UID/GID1000 child. Twenty-four classes cover regular/private files,

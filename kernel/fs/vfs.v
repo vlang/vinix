@@ -989,11 +989,26 @@ pub fn syscall_readlinkat(_ voidptr, dirfd int, _path charptr, buf voidptr, limi
 	}
 
 	if path.len == 0 {
-		return errno.err, errno.enoent
+		if is_fdcwd(dirfd) { return errno.err, errno.enoent }
+		// The description pins its symlink node, even after unlink. Keep
+		// that reference until the target has been checked and copied.
+		mut fd := file.fd_from_fdnum(process, int(i32(dirfd))) or {
+			return errno.err, errno.get()
+		}
+		defer { fd.unref() }
+		node := unsafe { &VFSNode(fd.handle.node) }
+		if node == unsafe { nil } || !stat.islnk(fd.handle.resource.stat.mode) {
+			return errno.err, errno.enoent
+		}
+		return readlink_node(node, buf, limit)
 	}
 	parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
 
 	node := get_node(parent, path, false) or { return errno.err, errno.get() }
+	return readlink_node(node, buf, limit)
+}
+
+fn readlink_node(node &VFSNode, buf voidptr, limit u64) (u64, u64) {
 	if !policy_check(node, proc.policy_inspect) {
 		return errno.err, errno.get()
 	}

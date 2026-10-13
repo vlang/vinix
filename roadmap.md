@@ -710,6 +710,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   sizes before lookup/copying; qualify exact target prefixes, musl zero-size
   scratch behavior, real errors, retained descriptor state and flat storage on
   both architectures. See [the readlink receipts](docs/linux-posix-qualification.md#native-readlink-size-words).
+- [x] Read symlink targets through empty-path readlinkat handles, including
+  unlinked and private O_PATH descriptions; retain descriptor ownership through
+  real lookup/copy errors and qualify aliases, metadata, queues and flat storage
+  on both architectures. See [the empty-path receipts](docs/linux-posix-qualification.md#native-empty-path-readlink).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

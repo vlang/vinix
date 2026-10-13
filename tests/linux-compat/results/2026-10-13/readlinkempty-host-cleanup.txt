@@ -1,0 +1,1 @@
+Concurrent cleanup removed /tmp/vinix-* work areas, including compiler/kernel/C captures and worktree helper scripts, during first empty-path candidate builds. Root source edits and committed receipts survived. No guest empty-path verdict existed in the deleted area. This fresh persistent qualification rebuilds baseline and candidate kernels from pinned sources.

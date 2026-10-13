@@ -1,0 +1,8 @@
+Using local vc
+Using local tcc
+bash "./cmd/tools/macos_vc_compat.sh" "./vc/v.c" clang   -DCUSTOM_DEFINE_v1_fallback -DCUSTOM_DEFINE_v1_fallback -std=c99 -w -o v1 -lm -lpthread  || cmd/tools/cc_compilation_failed_non_windows.sh
+./v1 -no-parallel -o v2 -gc none -cc clang    cmd/v
+./v2 -nocache -o /Users/alex/code/v/v -gc none -cc clang    cmd/v
+rm -rf v1 v2
+V has been successfully built
+V 0.5.2 f6358ec

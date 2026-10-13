@@ -1,0 +1,27 @@
+Using local vc
+Using local tcc
+The executable './thirdparty/tcc/tcc.exe' does not work.
+bash "./cmd/tools/macos_vc_compat.sh" "./vc/v.c" clang   -DCUSTOM_DEFINE_v1_fallback -DCUSTOM_DEFINE_v1_fallback -std=c99 -w -o v1 -lm -lpthread  || cmd/tools/cc_compilation_failed_non_windows.sh
+./v1 -no-parallel -o v2 -gc none -cc clang    cmd/v
+C compiler output from the default V compiler:
+failed to build C object /Users/alex/.cache/vinix-linux-compat/compiler-f6358ec/vlib/v/gen/fastc/libtcc_system_darwin.o from /Users/alex/.cache/vinix-linux-compat/compiler-f6358ec/vlib/v/gen/fastc/libtcc_system_darwin.c:
+/Users/alex/.cache/vinix-linux-compat/compiler-f6358ec/vlib/v/gen/fastc/libtcc_system_darwin.c:1:10: fatal error: 'libtcc.h' file not found
+    1 | #include <libtcc.h>
+      |          ^~~~~~~~~~
+1 error generated.
+V compilation failed (c_compilation_error); retrying with `/Users/alex/.cache/v/v1-fallback/0.5.2/v`.
+cmd/v/v.v:8:1: builder error: cannot import module "v.cmdexec" (not found)
+    6 | import os
+    7 | import strings
+    8 | import v.cmdexec
+      | ~~~~~~~~~~~~~~~~
+    9 | import v.driver
+   10 | import v.help
+cmd/v/v3_fallback_diagnostics.v:4:1: builder error: cannot import module "v.ansi" (not found)
+    2 | 
+    3 | import os
+    4 | import v.ansi
+      | ~~~~~~~~~~~~~
+    5 | 
+    6 | fn v3_exact_output_fixture_path(args []string) string {
+make: *** [all] Error 1
