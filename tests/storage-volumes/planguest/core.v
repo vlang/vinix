@@ -575,6 +575,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	$if volume_scrub_compare_test ? { return scrub_compare_entry() }
 	$if volume_scrub_auto_test ? { return auto_scrub_entry() }
 	$if volume_ciphertext_auto_test ? { return ciphertext_auto_entry() }
+	$if volume_reference_test ? { return reference_entry() }
 	parent := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
 	C.printf(c'PLAN START\n')
 	warm_image()

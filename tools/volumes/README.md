@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`show-volume-reference REFERENCE` displays complete validated saved geometry,
+recorded ciphertext digest and reference fingerprint.
+`compare-volume-references BEFORE_REFERENCE AFTER_REFERENCE` reports stable or
+changed recorded digests when exact saved metadata agrees. Both work offline
+with private files and preserve existing inputs and live mappings. See
+[reference queries](../../docs/storage-volumes.md#offline-ciphertext-reference-inspection-and-comparison).
+
 `hash-volume-auto`/`verify-volume-auto` and
 `hash-recovery-volume-auto`/`verify-recovery-volume-auto` create or verify a
 complete ciphertext checksum without a device path. Authentication and secret

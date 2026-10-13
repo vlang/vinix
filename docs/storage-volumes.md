@@ -826,6 +826,57 @@ or output failures return 1, and invalid syntax returns 2. Diagnostics may be
 printed on failure; output failure can leave a partial report. See
 [recovery inspection qualification](../tests/storage-volumes/recovery-inspect.md).
 
+## Offline ciphertext reference inspection and comparison
+
+`show-volume-reference REFERENCE` validates and displays a complete private
+`VINIXCH1` checksum reference. `compare-volume-references BEFORE_REFERENCE
+AFTER_REFERENCE` compares two valid references for the same saved mapping:
+
+```sh
+vinix-volume show-volume-reference /root/data.vchash
+vinix-volume compare-volume-references /root/before.vchash /root/after.vchash
+```
+
+Both inputs must be exact 128-byte private owned regular files. The existing
+pinned no-follow reader checks ownership, permissions, size and metadata before
+and after reading, retries interrupted/short reads and closes its descriptor on
+every exit. Magic/version/size, reserved bytes, complete CRC, MBR/GPT identity,
+native-sector alignment, slot/mode, signed extent bounds and SHA length must all
+validate. Every required input validates before any successful output appears.
+Comparison also requires exact saved capacity, native sector size, identity,
+slot, start, length and read-only mode. A valid different mapping returns an
+operational failure rather than a digest finding.
+
+Inspection reports the saved mapping, recorded extent digest and SHA-256
+fingerprint of all 128 reference bytes. Comparison reports the same geometry,
+both recorded extent digests and both complete reference fingerprints. The
+two-line inspection header is `format=VINIXCH1 operation=show-ciphertext-reference
+mappings=1 algorithm=sha256 reference_sha256=HEX`, followed by `disk_bytes=N
+sector=N identity=ID slot=N offset=N bytes=N readonly=0|1 sha256=HEX`.
+The comparison header uses `operation=compared-ciphertext-references`,
+`stable=0|1 changed=0|1`, `before_reference_sha256=HEX` and
+`after_reference_sha256=HEX`. Its mapping line ends with `result=stable|changed
+before_sha256=HEX after_sha256=HEX`. All integers retain their unsigned width;
+SHA-256 values use 64 lowercase hexadecimal digits.
+
+Inspection and stable comparisons return 0; differing recorded digests return
+2. Invalid/private-input, geometry or output failures return 1, taking precedence
+over a changed finding. Invalid syntax returns 2 without a finding. A late
+output failure may leave a partial or complete printed report. Same-path and
+hard-link aliases are valid; inputs remain unchanged.
+
+These operations need no credentials and do not access a physical parent,
+discover disks, derive keys, import mappings, lock destinations or publish
+files. Existing live mappings and their status/counters/descriptors remain
+unchanged. Manual, automatic, ordinary-credential and recovery references are
+interchangeable when their saved metadata agrees.
+
+Results describe recorded digests, without establishing current disk contents,
+authenticating reference replacements, proving an unlock key or inferring time
+order. Reference files must remain quiescent during the reads; pins establish
+per-file identity rather than a simultaneous two-file snapshot. The existing
+trusted-reference rules apply. See [reference query qualification](../tests/storage-volumes/reference.md).
+
 ## Identity-based automatic ciphertext checksums
 
 `hash-volume-auto CONFIG PASSPHRASE_FILE REFERENCE` and

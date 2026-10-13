@@ -1,5 +1,11 @@
 # Storage-volume qualification
 
+`--host-reference` and `--reference` qualify offline checksum reference
+inspection/comparison: complete private inputs, exact saved metadata, full-width
+reports and fingerprints, stable/changed/error precedence, unchanged inputs
+and live views, repeated utility lifetimes and reordered reboot. See
+[reference queries](reference.md).
+
 `--host-ciphertext-auto` and `--ciphertext-auto` qualify automatic checksum
 creation and verification in both credential domains and saved modes. They
 check validation/erasure before discovery, selected physical pin continuity,
