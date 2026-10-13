@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `0a74a26758fce778e4565c826589f76ec858ee10`,
-Linguist 7.27.0 reports **Python 0.23%** (11 files, 97,587 bytes) and
-**V 83.78%** (3,961 files, 36,102,019 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `54cb7b153c5e6b729523ed8b4bd9edd3d768169b`,
+Linguist 7.27.0 reports **Python 0.21%** (10 files, 89,440 bytes) and
+**V 83.92%** (4,001 files, 36,433,040 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **5,108,698 Python bytes**. All remaining
-97,587 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **5,116,845 Python bytes**. All remaining
+89,440 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -24,7 +24,7 @@ to an archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 88 stages below remove **517 Python files / 2,263,277 original bytes** and
+The 89 stages below remove **518 Python files / 2,271,424 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -120,6 +120,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | Native font generator and atlas test closure | direct FreeType/HarfBuzz owners, native SFNT metadata, cached SDK driver and PNG previews | 21,749 / 574 | `8d358c7a` |
 | Native iOS UIKit, 2048 and desktop UI tests | native duplex protocol, direct host app checks and isolated QMP desktop workflow | 17,035 / 373 | `b9443a23` |
 | Native CPython runtime smoke controller | V C API, owned callbacks and native dynamic-musl guest builder | 9,112 / 270 | `0a74a267` |
+| Native macOS installer policy | V allocation/action policy, keyword method descriptors and preserved upstream SDK authentication | 8,147 / 203 | `54cb7b15` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -752,9 +753,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 88 stages.
+or hidden in these 89 stages.
 
-The next fifty stages remove 365 Python files / 1,764,934 original bytes.
+The next fifty-one stages remove 366 Python files / 1,773,081 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -767,7 +768,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **395 Python files / 1,899,211 original bytes**. Earlier qualification
+translates **396 Python files / 1,907,358 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -3347,3 +3348,20 @@ existing outputs and a cold public ARM build passes. No interpreter, SDK Python
 module or Vinix guest is executed, so this establishes build/ABI/model contracts
 and does not claim a new runtime pass. The original aarch64 uname check remains
 even in amd64 staging. See [native CPython smoke](../tests/native-python-smoke/README.md).
+
+The native macOS installer policy closure retires one unchanged Python adapter,
+8,147 bytes and 203 lines. Its twelve overrides retain allocation/action safety,
+38 GB macOS headroom, unique booted-container selection, aligned resize, sole
+Vinix profile, stub subtraction and compatible firmware choice. The app bundles
+the V executable, and source installations build it before preparing components.
+The verified third-party Asahi v0.9.1 framework and SDK remain external; V
+attaches native method descriptors through the C API without evaluating
+first-party Python. Fifteen cold ARM/x86/ASanUBSan builds pass policy, callback,
+reference, retired-access and existing UI/smoke suites; both actual framework
+slices expose all 40 required symbols as data. The extended shared API also
+passes nine cold smoke host builds and six real guest ELF builds. A signed thin
+app, payload byte comparison and argument guards pass. No SDK initialization,
+Python, authentication, APFS mutation, installation, shutdown or guest execution
+is claimed. Aggregate test.sh stops at existing UI formatter differences under
+this compiler; the same UI binary and policy suites run directly, preserving
+that formatter guard. See [native installer policy](../installer/macos/asahipolicy/README.md).

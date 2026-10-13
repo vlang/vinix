@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `0a74a26758fce778e4565c826589f76ec858ee10`,
+at source commit `54cb7b153c5e6b729523ed8b4bd9edd3d768169b`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,874 | 5.56% |
-| Python | 11 | 97,587 | 0.23% |
-| Shell | 820 | 1,373,190 | 3.19% |
+| C | 599 | 2,396,874 | 5.52% |
+| Python | 10 | 89,440 | 0.21% |
+| Shell | 820 | 1,374,209 | 3.17% |
 
-All `.v` files are classified as V. The resulting V share is 83.78%, with no
+All `.v` files are classified as V. The resulting V share is 83.92%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 97,587 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 89,440 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 0a74a26758fce778e4565c826589f76ec858ee10 --breakdown --json
+github-linguist --rev 54cb7b153c5e6b729523ed8b4bd9edd3d768169b --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -664,7 +664,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/android/_boot_native.py` | 20,549 |
 | `build-support/cpython_host.py` | 1,007 |
 | `build-support/native_host.py` | 6,504 |
-| `installer/macos/vinix_auto.py` | 8,147 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/ios/run.py` | 20,826 |
 | `tests/kernel-gaps/_native.py` | 13,350 |
@@ -850,8 +849,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `gl-triangle/run-virgl-smoke` | 676 |
 | `gl-triangle/stage` | 136 |
 | `installer/macos/fetch-vinix-payload.sh` | 1,774 |
-| `installer/macos/install-vinix.sh` | 8,313 |
-| `installer/macos/test.sh` | 2,189 |
+| `installer/macos/install-vinix.sh` | 8,814 |
+| `installer/macos/test.sh` | 2,523 |
 | `kernel/get-deps` | 3,277 |
 | `kernel/linuxkpi/audit` | 130 |
 | `kernel/linuxkpi/generate-abi` | 158 |
@@ -882,7 +881,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-libreoffice-aarch64.sh` | 6,556 |
 | `scripts/build-limine-aarch64.sh` | 4,779 |
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
-| `scripts/build-macos-installer.sh` | 3,383 |
+| `scripts/build-macos-installer.sh` | 3,567 |
 | `scripts/build-minecraft-aarch64.sh` | 7,983 |
 | `scripts/build-n64-aarch64.sh` | 2,885 |
 | `scripts/build-nested-desktop-aarch64.sh` | 2,145 |
