@@ -99,6 +99,8 @@ an ext2 overlay upper. UID/GID 1000 replaces a bound endpoint, connects through
 the renamed path, unlinks it, keeps descriptors and an established connection
 across the grace period, and rebinds the removed name. Hardlinks and moves across
 directories must preserve inode identity and update held-descriptor link counts.
+Closing a separate `O_PATH` description of the listener must preserve its ability
+to accept a new connection through the renamed pathname.
 Two batches each run 32 cycles on each backend; every live slab class and the
 large-allocation count must match. A protected-directory bind must fail with
 `EACCES`. Root remounts the volume read-only, verifies that removed names stay

@@ -60,3 +60,40 @@ volumes, serial logs and available receipts were preserved.
 This qualifies clean namespace changes and resource retirement. Power-loss
 recovery, injected backend I/O failures, wider socket metadata interfaces and
 full database/server/container qualification remain open.
+
+## Metadata description release
+
+A second correction preserves a listening endpoint when a separate `O_PATH`
+description closes. The prior unref callback treated every non-null Handle as a
+transport close. The extended fixture closes such a metadata description before
+connecting to the renamed listener. Both kernels from the namespace correction
+fail that connection with `ECONNREFUSED` at assertion 407. The callback now treats
+an `O_PATH` release like a namespace/epoll reference release while other owners
+remain; the existing last-reference cleanup still runs. Independent review
+verified Handle lifetime, short-circuiting before a null dereference and
+allocation-free generated C on both architectures.
+
+`socketpath-arm-before-a` and `socketpath-x86-before-a` retain the failing
+controls. `socketpath-arm-after-a` and `socketpath-x86-after-a` pass the extended
+socket test, including closing metadata descriptions during every cycle on both
+backends. The `socketpath-*-all-a` regressions also pass. Complete live allocation
+samples stay flat, writes-after-free counters stay zero, and all four volumes
+pass read-only filesystem checks. The global allocation audit retains the same
+182 baseline findings.
+
+| Metadata-release input | SHA-256 |
+| --- | --- |
+| AArch64 kernel | `b7bb1185d65cabe39eaf1f756096ed6e5c6603f1c538a0b9222d81d5483493dc` |
+| x86_64 kernel | `48a27d88d0e8e2f852a7821d91ea5412c4cf6b708a7ba92c575ad9d8becab576` |
+| Extended socket fixture | `a94360c44d8ad9072f392ee1cb906c4bc6ad64f7523c2d5af21d72fb80bfaa9e` |
+
+The broader ARM syscall/churn/cache/desktop run uses the preceding namespace
+kernel, independently extracted from its boot disk. The metadata-release kernels
+are qualified by the extended native socket tests and complete overlay
+regressions above.
+That ARM run completes 36 batches of 200 syscalls with zero bytes retained per
+operation, and four batches of 300 short-lived processes with zero retained
+bytes or additional slab pages. It also passes the 32-MiB cache workload
+(16 MiB cached) and the idle, app and drag checks. Its JSON, serial log, screenshots
+and assertion-enabled evidence result are retained as `socket-desktop-perf-a*`
+and `socket-perf-evidence-checked.log` under the same artifact root.

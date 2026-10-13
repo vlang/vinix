@@ -1071,11 +1071,15 @@ fn (mut this UnixSocket) close_endpoint() {
 }
 
 fn (mut this UnixSocket) unref(handle voidptr) ? {
+	// Metadata-only descriptions retain the inode, without owning the live
+	// transport. Handle.unref keeps its flags valid throughout this callback.
+	path_only := handle != unsafe { nil }
+		&& unsafe { &file.Handle(handle) }.flags & resource.o_path != 0
 	still_referenced := katomic.dec(mut &this.refcount)
 	// A nil handle is the VFS dropping a pathname, or an epoll wait letting go,
 	// not an open socket being closed. If a descriptor is still alive it must
 	// retain the endpoint.
-	if handle == unsafe { nil } && still_referenced {
+	if (handle == unsafe { nil } || path_only) && still_referenced {
 		// The last thing keeping a closed socket may just have gone.
 		this.maybe_free()
 		return

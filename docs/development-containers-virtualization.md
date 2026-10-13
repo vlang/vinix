@@ -308,6 +308,9 @@ hardlinks and cross-parent moves pass as UID/GID 1000 on both architectures.
 Protected-directory and read-only binds remain refused. Repeated workloads
 retain no live allocation growth, removed names stay absent after remount, and
 all four read-only filesystem checks are clean.
+Closing a separate metadata-only `O_PATH` description also preserves the live
+listener; the extended native socket tests qualify this release behavior and
+balanced retirement on both architectures.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

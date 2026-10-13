@@ -158,7 +158,7 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 		expected << ['OVERLAY OPAQUE STORAGE FULL: PASS', 'OVERLAY STATFS: PASS']
 	}
 	if case_name == 'sockets' {
-		expected << ['OVERLAY PERSISTENT SOCKETS: PASS', 'OVERLAY SOCKET REMOUNT: PASS']
+		expected << ['OVERLAY PERSISTENT SOCKETS: PASS', 'OVERLAY SOCKET REMOUNT: PASS', 'OVERLAY SOCKET PATH CLOSE: PASS']
 	}
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)
 	code := guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
