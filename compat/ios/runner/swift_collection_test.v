@@ -82,6 +82,12 @@ fn collection_emit(code u64) {
 	for i, op in [u32(0xa9bf7bfd), 0xaa1403e2, 0xaa0803e3, 0x580000b0, 0xd63f0200, 0xaa0003f5, 0xa8c17bfd, 0xd65f03c0]! { write32(code + 128 + u64(i * 4), op) }
 	unsafe { *(&u64(code + 160)) = u64(voidptr(collection_body)) }
 	write32(code + 192, 0xdac10020); write32(code + 196, 0xd65f03c0)
+	for i, target in [u64(unsafe {voidptr(collection_first_custom_start)}), u64(unsafe {voidptr(collection_first_custom_end)})]! {
+		swift_collection_bridge(code + 256 + u64(i * 64), target, [u32(0xaa1403e2),0xaa0803e3]!,2)
+	}
+	swift_collection_bridge(code + 384,u64(unsafe {voidptr(collection_first_custom_read)}),[u32(0xaa1403e4),0]!,1)
+	swift_collection_bridge(code + 448,u64(unsafe {voidptr(collection_first_custom_resume)}),[u32(0),0]!,0)
+	swift_collection_bridge(code + 512,u64(unsafe {voidptr(collection_first_custom_equal)}),[u32(0),0]!,0)
 }
 struct CollectionBodyContext {
 	api CollectionApi
@@ -164,6 +170,7 @@ fn collection_value_witnesses(api CollectionApi, metadata u64, source u64) {
 	}
 }
 fn collection_operations(api CollectionApi, metadata u64, table u64, receiver u64, kind int, start i64, end i64, object u64, guard u64) {
+	collection_first_value(api, metadata, table, receiver, kind, start, end, object)
 	mut result := [u64(0x1234), 0, 0, 0, 0, 0]!
 	output := u64(unsafe { &result[0] })
 	collection_call(api, read64(table + 64), [metadata, table, 0, 0, 0]!, receiver, output); assert i64(result[0]) == start
@@ -208,6 +215,152 @@ fn collection_operations(api CollectionApi, metadata u64, table u64, receiver u6
 	slice_type := collection_association(api, table, metadata, 6); slice_table := collection_association(api, table, metadata, 4)
 	assert collection_association(api, slice_table, slice_type, 6) == slice_type
 	collection_destroy(output, slice_type)
+}
+fn collection_first_value(api CollectionApi, metadata u64, table u64, receiver u64,
+	kind int, start i64, end i64, object u64) {
+	mut entry := u64(0)
+	$if macos { if api.native { entry = u64(C.dlsym(api.core, c'$sSlsE5first7ElementQzSgvg')) } }
+	if !api.native { entry = runtime_symbol('/usr/lib/swift/libswiftCore.dylib', '_$sSlsE5first7ElementQzSgvg') or { panic(err) } }
+	element := if kind == 0 {api.int_type} else if kind == 1 {api.string_type} else {api.objc_type}
+	mut optional := [u64(0x4545454545454545), 0x4545454545454545, 0x4545454545454545, 0x4545454545454545]!
+	output := u64(unsafe { &optional[0] }); before := collection_refs(api, object)
+	collection_call(api, entry, [metadata, table, 0, 0, 0]!, receiver, output)
+	tag := unsafe { SwiftSequenceTag(voidptr(read64(read64(element - 8) + 48) & 0x0000ffffffffffff)) }
+	assert tag(output, 1, element) == if start == end {u32(1)} else {u32(0)}
+	if start < end {
+		collection_value_check(api, output, kind, start, object)
+		assert collection_refs(api, object) == before + if kind == 0 {i64(0)} else {i64(1)}
+		collection_destroy(output, element)
+	}
+	assert collection_refs(api, object) == before && optional[3] == 0x4545454545454545
+}
+struct CollectionFirstCustom {
+	api CollectionApi
+	metadata u64
+	index u64
+	start_object u64
+	end_object u64
+	object u64
+	element u64
+	empty bool
+	owned_index bool
+	reference bool
+	bad_yield bool
+mut:
+	table u64
+	starts int
+	ends int
+	compares int
+	reads int
+	resumes int
+	aborts int
+}
+fn collection_first_custom_state(receiver u64) &CollectionFirstCustom {return unsafe {&CollectionFirstCustom(read64(receiver))}}
+fn collection_first_custom_get(metadata u64, table u64, receiver u64, output u64, end bool) {
+	mut state:=collection_first_custom_state(receiver)
+	assert metadata==state.metadata && table==state.table
+	if end {assert state.starts==1;state.ends++}else{state.starts++}
+	if state.owned_index {
+		object:=if end {state.end_object}else{state.start_object};collection_keep_object(state.api,object)
+		unsafe {*(&u64(output))=0;*(&u64(output + 8))=object | 0x5000000000000000}
+	}else{unsafe {*(&i64(output))=if end && !state.empty {i64(-12)}else{i64(-17)}}}
+}
+fn collection_first_custom_start(metadata u64, table u64, receiver u64, output u64) {collection_first_custom_get(metadata,table,receiver,output,false)}
+fn collection_first_custom_end(metadata u64, table u64, receiver u64, output u64) {collection_first_custom_get(metadata,table,receiver,output,true)}
+fn collection_first_custom_equal(left u64, right u64, metadata u64, table u64) bool {
+	mut state:=unsafe {&CollectionFirstCustom(read64(table))}
+	assert state.starts==1 && state.ends==1 && metadata==state.index;state.compares++
+	if state.owned_index {
+		assert read64(left + 8)==state.start_object | 0x5000000000000000 && read64(right + 8)==state.end_object | 0x5000000000000000
+		assert collection_refs(state.api,state.start_object)==if state.empty {i64(3)}else{i64(2)}
+		return read64(left + 8)==read64(right + 8)
+	}
+	assert i64(read64(left))==-17 && i64(read64(right))==if state.empty {i64(-17)}else{i64(-12)}
+	return read64(left)==read64(right)
+}
+fn collection_first_custom_read(buffer u64, index u64, metadata u64, table u64, receiver u64) SwiftCollectionYield {
+	mut state:=collection_first_custom_state(receiver)
+	assert metadata==state.metadata && table==state.table && state.compares==1 && !state.empty
+	if state.owned_index {assert collection_refs(state.api,state.start_object)==2 && collection_refs(state.api,state.end_object)==1 && read64(index + 8)==state.start_object | 0x5000000000000000}
+	else {assert i64(read64(index))==-17}
+	if !state.api.native {
+		worker:=spawn collection_first_lookup_worker()
+		assert worker.wait()==ios_runtime.swift_collection_arena + 2112
+	}
+	state.reads++;collection_keep_object(state.api,state.object)
+	unsafe {*(&u64(buffer))=u64(state);*(&u64(buffer + 8))=0x445566}
+	mut continuation:=state.api.code + 448
+	$if macos {if state.api.native {sign:=unsafe {CollectionSign(voidptr(state.api.code + 192))};continuation=sign(continuation,buffer | (u64(56769) << 48))}}
+	return SwiftCollectionYield{continuation:continuation,address:if state.bad_yield {u64(1)}else{state.element}}
+}
+fn collection_first_custom_resume(buffer u64, aborting u64) {
+	mut state:=unsafe {&CollectionFirstCustom(read64(buffer))}
+	assert read64(buffer + 8)==0x445566 && state.reads==1 && state.resumes==0
+	if state.owned_index {assert collection_refs(state.api,state.start_object)==2 && collection_refs(state.api,state.end_object)==1}
+	assert collection_refs(state.api,state.object)==if state.reference && !state.bad_yield {i64(3)}else{i64(2)}
+	state.resumes++;state.aborts+=int(aborting);collection_drop_object(state.api,state.object)
+	unsafe {*(&u64(buffer + 8))=0}
+}
+fn collection_first_lookup_worker() u64 {return runtime_symbol('/usr/lib/swift/libswiftCore.dylib','_$sSlsE5first7ElementQzSgvg') or {panic(err)}}
+fn collection_first_custom_case(api CollectionApi, empty bool, owned_index bool, reference bool, bad_yield bool, guard u64) {
+	object:=collection_object(api);start_object:=collection_object(api);end_object:=if empty {start_object}else{collection_object(api)}
+	element_type:=if reference {api.string_type}else{api.int_type};index_type:=if owned_index {api.string_type}else{api.int_type}
+	metadata:=api.access(0,element_type).metadata
+	mut element:=[u64(73),0]!;if reference {element=[u64(0),object | 0x5000000000000000]!}
+	mut state:=CollectionFirstCustom{api:api,metadata:metadata,index:index_type,start_object:start_object,end_object:end_object,
+		object:object,element:u64(unsafe {&element[0]}),empty:empty,owned_index:owned_index,reference:reference,bad_yield:bad_yield}
+	mut equatable:=[u64(unsafe {&state}),api.code + 512]!;mut comparable:=[u64(0),u64(unsafe {&equatable[0]}),guard,guard,guard,guard]!
+	mut sequence:=[u64(0),guard,element_type,guard,guard,guard,guard,guard,guard,guard]!
+	mut table:=[25]u64{};for i in 0 .. 25 {table[i]=guard};table[0]=api.descriptor;table[1]=u64(unsafe {&sequence[0]});table[2]=u64(unsafe {&comparable[0]});table[5]=index_type
+	table[8]=api.code + 256;table[9]=api.code + 320;table[10]=api.code + 384
+	state.table=u64(unsafe {&table[0]})
+	$if macos {if api.native {
+		sign:=unsafe {CollectionSign(voidptr(api.code + 192))}
+		equatable[1]=sign(equatable[1],u64(unsafe {&equatable[1]}) | (u64(38891) << 48))
+		for slot,discriminator in {8:u64(16584),9:7774,10:1510} {table[slot]=sign(table[slot],(state.table + u64(slot * 8)) | (discriminator << 48))}
+	}}
+	mut receiver:=u64(unsafe {&state});self:=u64(unsafe {&receiver});mut result:=[u64(0x4545454545454545),0x4545454545454545,0x4545454545454545,0x4545454545454545]!
+	output:=u64(unsafe {&result[0]})
+	if bad_yield {
+		if _:=swift_collection_first_checked(metadata,state.table,self,output){assert false}
+		assert result.all(it==0x4545454545454545) && state.resumes==1 && state.aborts==1
+	}else{
+		mut entry:=u64(0);$if macos {if api.native {entry=u64(C.dlsym(api.core,c'$sSlsE5first7ElementQzSgvg'))}}
+		if !api.native {entry=ios_runtime.swift_collection_arena + 2112}
+		collection_call(api,entry,[metadata,state.table,guard,guard,guard]!,self,output)
+		get:=unsafe {SwiftSequenceTag(voidptr(read64(read64(element_type - 8) + 48) & 0x0000ffffffffffff))}
+		assert get(output,1,element_type)==if empty {u32(1)}else{u32(0)}
+		assert state.reads==if empty {0}else{1} && state.resumes==state.reads && state.aborts==0
+		if !empty {
+			if reference {assert result[0]==0 && result[1]==object | 0x5000000000000000}else{assert result[0]==73}
+			assert collection_refs(api,object)==if reference {i64(2)}else{i64(1)};collection_destroy(output,element_type)
+		}
+		assert result[3]==0x4545454545454545
+	}
+	assert state.starts==1 && state.ends==1 && state.compares==1
+	assert collection_refs(api,object)==1 && collection_refs(api,start_object)==1 && collection_refs(api,end_object)==1
+	collection_drop_object(api,object);collection_drop_object(api,start_object);if !empty {collection_drop_object(api,end_object)}
+}
+fn collection_first_custom_run(api CollectionApi, guard u64) {
+	for empty in [false,true]! {for owned_index in [false,true]! {for reference in [false,true]! {collection_first_custom_case(api,empty,owned_index,reference,false,guard)}}}
+	if !api.native {
+		for owned_index in [false,true]! {for reference in [false,true]! {collection_first_custom_case(api,false,owned_index,reference,true,guard)}}
+		if _:=swift_collection_first_layout_checked(0,guard){assert false}
+		metadata:=api.access(0,api.int_type).metadata;table:=api.lookup(api.descriptor,metadata,0)
+		if _:=swift_collection_first_checked(metadata,table,0,guard){assert false}
+		mut bad:=[25]u64{};C.memcpy(voidptr(unsafe {&bad[0]}),voidptr(table),200);bad[5]=guard | 1
+		if _:=swift_collection_first_layout_checked(metadata,u64(unsafe {&bad[0]})){assert false}
+	}
+}
+fn collection_first_range_limits(api CollectionApi) {
+	metadata:=api.access(0,api.int_type).metadata;table:=api.lookup(api.descriptor,metadata,0)
+	range_type:=collection_association(api,table,metadata,7);range_table:=collection_association(api,table,metadata,3)
+	object:=collection_object(api)
+	for pair in [[-i64(0x7fffffffffffffff)-1,-i64(0x7fffffffffffffff)]!,[i64(-1),0]!,[i64(0x7fffffffffffffff),i64(0x7fffffffffffffff)]!]! {
+		mut bounds:=[u64(pair[0]),u64(pair[1])]!
+		collection_first_value(api,range_type,range_table,u64(unsafe {&bounds[0]}),0,pair[0],pair[1],object)
+	}
+	collection_drop_object(api,object)
 }
 fn collection_sequence(api CollectionApi, metadata u64, table u64, receiver u64, kind int, start i64, end i64, object u64, guard u64) {
 	sequence := read64(table + 8); iterator := collection_iterator(api, sequence, metadata)
@@ -329,13 +482,15 @@ fn collection_constructors(api CollectionApi, metadata u64, table u64, guard u64
 fn test_swift_collection() {
 	page := usize(C.getpagesize()); allocation := C.mmap(unsafe {nil}, page, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
 	assert allocation != voidptr(-1); code := u64(allocation); collection_emit(code)
-	C.__builtin___clear_cache(allocation, voidptr(code + 200)); assert C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) == 0
+	C.__builtin___clear_cache(allocation, voidptr(code + 544)); assert C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) == 0
 	protected := C.mmap(unsafe {nil}, page, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0); assert protected != voidptr(-1); guard := u64(protected)
 	$if macos {
 		api := collection_api(true, code)
 		collection_comparisons(api, guard)
 		for kind in 0 .. 3 { for count in [u64(0), 1, 5, 33]! { collection_case(api, kind, count, guard) } }
+		collection_first_custom_run(api,guard);collection_first_range_limits(api)
 		println('IOS-COLLECTION-NATIVE: 12 typed Array fixtures, nested ArraySlice/Range Collection and Sequence operations, borrowed coroutine resume/abort and original indices')
+		println('IOS-COLLECTION-FIRST-NATIVE: Array/Slice/Range first, eight opaque caller tables, signed and owned indices, borrowed subscript copy/resume and nil ownership')
 	}
 	for _ in 0 .. 2 {
 		objc_start(); api := collection_api(false, code)
@@ -345,6 +500,7 @@ fn test_swift_collection() {
 		tables := workers.wait(); for table in tables { assert table == tables[0] }
 		collection_comparisons(api, guard); collection_constructors(api, metadata, tables[0], guard)
 		for kind in 0 .. 3 { for count in [u64(0), 1, 5, 33]! { collection_case(api, kind, count, guard) } }
+		collection_first_custom_run(api,guard);collection_first_range_limits(api)
 		if _ := swift_collection_table_checked(guard) { assert false }
 		assert (swift_collection_kind_checked(guard, false) or { -1 }) == -1
 		assert (swift_collection_sum_checked(i64(0x7fffffffffffffff), 1) or { -1 }) == -1
@@ -357,4 +513,5 @@ fn test_swift_collection() {
 	}
 	assert C.munmap(protected, page) == 0 && C.munmap(allocation, page) == 0
 	println('IOS-COLLECTION: complete Array/ArraySlice/Range direct associated tables, usable Sequence iterators, signed indices, nested slices, coroutine ownership, concurrent first specialization and two drained/unmapped lifetimes')
+	println('IOS-COLLECTION-FIRST: generic index/equality/read witnesses, owned Optional results, exact index destruction order, normal/abort borrow cleanup, no iterator or Self copy, reentrant lookup and two drained lifetimes')
 }

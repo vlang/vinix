@@ -335,6 +335,7 @@ fn swift_collection_arena() u64 {
 	swift_collection_bridge(code + 1920, u64(unsafe { voidptr(swift_collection_contains) }), [u32(0xaa1403e3), 0]!, 1)
 	swift_collection_bridge(code + 1984, u64(unsafe { voidptr(swift_collection_half_check) }), [u32(0), 0]!, 0)
 	swift_collection_bridge(code + 2048, u64(unsafe { voidptr(swift_collection_bounds_check) }), [u32(0), 0]!, 0)
+	swift_collection_first_emit(code)
 	module_descriptor := ios_runtime.swift_array_arena + u64(page) + 224
 	for i in 0 .. 3 {
 		descriptor := data + 160 + u64(i * 32); write32(descriptor, 0x51)
@@ -385,11 +386,12 @@ fn swift_collection_arena() u64 {
 	for i, text in ['Collection', 'Comparable', 'Index Indices SubSequence', 'ArraySlice', 'IndexingIterator', 'Range']! { offsets := [u64(1888), 1904, 1920, 1952, 1984, 2016]!; C.memcpy(voidptr(data + offsets[i]), text.str, usize(text.len + 1)) }
 	for i, text in ['x', '7ElementSTQz', '5IndexSlQz', '5IndexSlQz', '7IndicesSlQz', '7IndicesSlQz', '11SubSequenceSlQz', '11SubSequenceSlQz', '5IndexSlQz', '5IndexSlQz']! { C.memcpy(voidptr(data + 2112 + u64(i * 64)), text.str, usize(text.len + 1)) }
 	for i, text in ['', '11SubSequenceSl_7ElementSTQZ', '', '7IndicesSl_7ElementSTQZ', '', '7IndicesSl_11SubSequenceSlQZ', '', '11SubSequenceSl_AASlQZ', '7IndicesSl_5IndexSlQZ', '11SubSequenceSl_5IndexSlQZ']! { C.memcpy(voidptr(data + 2752 + u64(i * 64)), text.str, usize(text.len + 1)) }
-	C.__builtin___clear_cache(allocation, voidptr(code + 2080))
+	C.__builtin___clear_cache(allocation, voidptr(code + 2232))
 	if C.mprotect(allocation, page, C.PROT_READ | C.PROT_EXEC) != 0 || C.mprotect(voidptr(data), page, C.PROT_READ) != 0 { C.munmap(allocation, page * 3); panic('iOS: cannot seal Collection records') }
 	ios_runtime.swift_collection_arena = code; return code
 }
 fn swift_collection_symbol(symbol string) ?u64 {
+	if symbol == '_$sSlsE5first7ElementQzSgvg' { return swift_collection_arena() + 2112 }
 	offset := match symbol {
 		'_$sSayxGSlsMc' {32} '_$ss10ArraySliceVyxGSlsMc' {64} '_$sSnyxGSlsSxRzSZ6StrideRpzrlMc' {96}
 		'_$sSlMp' {256} '_$sSlTL' {392} '_$sSlSTTb' {400} '_$sSl5IndexSl_SLTn' {408}

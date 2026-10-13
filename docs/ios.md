@@ -4659,6 +4659,46 @@ Swift's public [Set storage](https://github.com/swiftlang/swift/blob/main/stdlib
 [hash-table layout](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/HashTable.swift)
 and [metadata ABI](https://github.com/swiftlang/swift/blob/main/include/swift/ABI/Metadata.h).
 
+`Collection.first` (`_$sSlsE5first7ElementQzSgvg`) now follows the caller's
+Collection witnesses in V. Native SwiftCore disassembly and the installed SDK
+interface establish Self metadata/table in x0/x1, borrowed Self in x20 and an
+indirect owned Optional<Element> in x8. The getter obtains owned start/end
+indices, compares them through Index:Equatable inherited from Comparable,
+and destroys the end index before selecting the empty/nonempty path. For a
+nonempty collection it copies the element while the subscript coroutine's
+borrow is active, resumes that coroutine, destroys the start index and marks
+the result as present. The empty path destroys both indices and returns nil.
+An invalid yielded address invokes the valid continuation with abort cleanup
+before rejecting; index cleanup leaves the destination untouched.
+
+This supports the existing Array, ArraySlice and Range tables and caller
+tables with complete direct associated metadata/conformances and supported
+value witnesses. It uses aligned stack scratch and calls witnesses without
+registry locks. It requires neither an iterator nor a copy or consumption of
+Self. Tagged/incomplete associated witnesses still require instantiation;
+general metadata or conformance discovery is outside this subset. The public
+algorithm is described by Swift's [Collection implementation](https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Collection.swift).
+
+Ten ASan/UBSan runs pass across Collection, Set, Sequence, witness and Array
+storage fixtures, each with normal and deterministic hashing. The same five
+suites pass in a fresh Vinix ARM64 guest. Collection fixtures compare the
+installed SwiftCore getter with the V implementation for twelve typed Array
+cases, nested slices, Range limits and eight opaque caller tables. Owned
+String indices verify destruction order; protected unused witness slots rule
+out an iterator or Self-copy dependency. Runtime cases additionally verify
+abort cleanup, untouched rejected output, lookup from another thread during
+the borrow and two fully drained runtime lifetimes. Thirteen fresh generated-C
+streams and executables, native measurements, input pins and VM probe/audit
+logs are retained under `build/ios/fortnite/collection-first-checks`. These are
+targeted regressions; the full iOS regression suite remains unpassed.
+
+The supplied IPA passes this import and exits with status 1 before entry at
+MarketplaceKitWrapper's required `UnsafeMutablePointer.deallocate` import,
+`_$sSp10deallocateyyF`. Native disassembly on this Mac shows its shared pointer
+deallocation entry sets size and alignment-mask arguments to -1 and tail-calls
+`swift_slowDealloc`. That entry is still unimplemented. Fortnite has not
+entered application code and remains unplayable.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4666,10 +4706,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,456 | 704 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 134 | 42 | 23 |
-| All images | 2,249 | 749 | 120 |
+| MarketplaceKitWrapper | 135 | 41 | 23 |
+| All images | 2,250 | 748 | 120 |
 
-The C++/GLES/Text variant reports 2,262 resolved imports, 736 unresolved strong
+The C++/GLES/Text variant reports 2,263 resolved imports, 735 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
