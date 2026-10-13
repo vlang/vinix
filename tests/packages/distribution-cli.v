@@ -175,6 +175,34 @@ fn qualify_configuration_schema(binary string, root string) ! {
 	println('Package CLI: ambiguous configuration refused without activation, cache or trust changes')
 }
 
+fn qualify_history_schema(binary string, root string, repository string, key string) ! {
+	store := pkgcore.state_directory(root)
+	path := store + '/trust-history.json'
+	original := os.read_file(path)!
+	defer { os.write_file(path, original) or { panic(err) } }
+	configuration := os.read_file(root + '/etc/vinix-packages/config.json')!
+	cache := os.read_file(store + '/catalog.json')!
+	current := os.readlink(store + '/current')!
+	for invalid in ['null', '{"format":1}', '{"format":1,"repositories":null}',
+		original.replace('"repositories":', '"repositories":[],"repositories":'),
+		original.replace('"sequence":2', '"sequence":1,"sequ\\u0065nce":2')] {
+		assert invalid != original
+		os.write_file(path, invalid)!
+		for arguments in [['repo-list'], ['update'],
+			['repo-review', 'enroll', 'fixture', 'file://' + repository, key],
+			['repo-enroll', 'fixture', 'file://' + repository, key]] {
+			reply := command(binary, ['--root', root, ...arguments])!
+			assert reply.code == 1 && reply.text.contains('invalid repository trust history:') && !reply.text.contains('V panic:'), reply.text
+		}
+		assert os.read_file(path)! == invalid && os.read_file(store + '/catalog.json')! == cache
+		assert os.read_file(root + '/etc/vinix-packages/config.json')! == configuration
+		assert os.readlink(store + '/current')! == current
+		assert !os.exists(store + '/refresh') && !os.exists(store + '/enrollment')
+	}
+	os.write_file(path, original)!
+	println('Package CLI: malformed retained history refuses replay after revocation and empty refresh')
+}
+
 fn qualify(binary string) ! {
 	work := os.real_path(os.temp_dir()) + '/vinix-package-cli-' + os.getpid().str()
 	os.mkdir_all(work + '/root/etc/vinix-packages')!
@@ -224,6 +252,19 @@ fn qualify(binary string) ! {
 	assert os.read_file(release_path + '/index.json')! == first_index
 	assert os.read_file(release_path + '/index.sig')! == first_signature
 	assert os.ls(release_path)!.len == 3 && !os.exists(release_path + '/manifests') && !os.exists(release_path + '/.publisher')
+	publisher_history_path := repository + '/.publisher/history.json'
+	publisher_history := os.read_file(publisher_history_path)!
+	for invalid in ['null', '{"format":1}', '{"format":1,"indexes":null}',
+		publisher_history.replace('"sequence":1', '"sequence":2,"sequ\\u0065nce":1')] {
+		os.write_file(publisher_history_path, invalid)!
+		refused := command(binary, ['publish-release', repository, 'fixture', work + '/seed', '1', expires.str(), work + '/history-refused-release'])!
+		assert refused.code == 1 && refused.text.contains('invalid publisher release history:') && !refused.text.contains('V panic:'), refused.text
+		assert os.read_file(publisher_history_path)! == invalid && !os.exists(work + '/history-refused-release')
+		assert os.read_file(release_path + '/index.json')! == first_index
+		assert os.read_file(release_path + '/index.sig')! == first_signature
+	}
+	os.write_file(publisher_history_path, publisher_history)!
+	println('Package CLI: malformed publisher history refuses release without changing prior publication')
 	for numbers in [['18446744073709551616', expires.str()], ['1', '9223372036854775808']] {
 		assert command(binary, ['publish-release', repository, 'fixture', work + '/seed', ...numbers, work + '/overflow'])!.code != 0
 		assert !os.exists(work + '/overflow')
@@ -432,6 +473,7 @@ fn qualify(binary string) ! {
 	assert pkgcore.read_snapshots(store)!.len == 0
 	os.write_file(repository + '/index.json', first_index)!
 	os.write_file(repository + '/index.sig', first_signature)!
+	qualify_history_schema(binary, work + '/root', repository, key)!
 	replay := command(binary, [...root_args, 'repo-enroll', 'fixture', 'file://' + repository, key])!
 	assert replay.code != 0 && replay.text.contains('retained trust history')
 	assert pkgcore.load_config(work + '/root')!.repositories.len == 0

@@ -329,11 +329,12 @@ fn test_invalid_persistent_history_fails_closed() {
 	enroll_repository(root, repository, false)!
 	directory := state_directory(root)
 	floor := read_history(directory)!.repositories[0]
-	for invalid in [TrustHistory{ format: 2, repositories: [floor] },
-		TrustHistory{ repositories: [floor, floor] },
-		TrustHistory{ repositories: [RepositoryFloor{ ...floor, sequence: 0 }] },
-		TrustHistory{ repositories: [RepositoryFloor{ ...floor, index_sha256: 'not-a-digest' }] }] {
-		os.write_file(directory + '/trust-history.json', json2.encode(invalid))!
+	for invalid in [json2.encode(TrustHistory{ format: 2, repositories: [floor] }),
+		json2.encode(TrustHistory{ repositories: [floor, floor] }),
+		json2.encode(TrustHistory{ repositories: [RepositoryFloor{ ...floor, sequence: 0 }] }),
+		json2.encode(TrustHistory{ repositories: [RepositoryFloor{ ...floor, index_sha256: 'not-a-digest' }] }),
+		'{"format":1}', '{"format":1,"repositories":null}'] {
+		os.write_file(directory + '/trust-history.json', invalid)!
 		if _ := enroll_repository(root, repository, false) {
 			assert false
 		}
@@ -341,6 +342,7 @@ fn test_invalid_persistent_history_fails_closed() {
 			assert false
 		}
 		assert load_config(root)!.repositories == [repository]
+		assert os.read_file(directory + '/trust-history.json')! == invalid
 	}
 	// Invalid history cannot prevent an administrator revoking a publisher.
 	revoke_repository(root, 'fixture')!

@@ -1057,6 +1057,18 @@ cache is refused until refreshed. The administrator owns this local history;
 it is not a hardware trust anchor. See the
 [administration and recovery contract](../../docs/application-distribution.md#trust-and-configuration).
 
+Consumer `trust-history.json` and `publish-release`'s `.publisher/history.json` are complete
+durable records. Their format-1 envelopes require `format` and respectively
+`repositories` or `indexes`. Every floor requires `id`, `public_key`, positive
+`sequence` and `index_sha256`. Unknown/duplicate fields, escaped duplicate names,
+null collections and invalid JSON value types are refused, including a root
+`null`. Explicit empty arrays remain valid for a fresh store; an absent file
+still follows initial/legacy migration rules. Canonical writer bytes are unchanged.
+Present malformed files are never normalized into empty history or overwritten
+by a failed refresh/enrollment/publication. Restore the retained history under
+the appropriate writer lock before retrying; revocation requires no history.
+See [history qualification](../../tests/packages/history-schema-check.md).
+
 `view` emits one `{format:1,generation,architecture,offline,catalog_error,update_error,rows,launch_user}`
 JSON object. Rows include ID/name/description, available/installed version, target,
 kind, repository/key, license/proprietary/firmware flags, permissions, explicit

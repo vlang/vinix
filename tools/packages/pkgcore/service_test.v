@@ -183,3 +183,42 @@ fn test_service_refuses_ambiguous_configuration_before_mutating_package_state() 
 	assert service.verify()!.packages.len == 1
 	assert service.rollback('')!.generation == 2
 }
+
+fn test_service_history_refusal_preserves_state_payloads_and_recovery_stages() {
+	work, service, config := service_fixture('history-schema')!
+	defer { os.rmdir_all(work) or {} }
+	directory := state_directory(service.root)
+	service.transact('install', ['app'], TransactionOptions{})!
+	service.transact('remove', ['app'], TransactionOptions{})!
+	mut review := service.review('install', ['app'])!
+	defer { review.close() }
+	path := directory + '/trust-history.json'
+	original := os.read_file(path)!
+	mut retained := ['catalog.json', 'generations/1/state.json', 'generations/2/state.json']
+	for file in os.ls(directory + '/objects')! { retained << 'objects/' + file }
+	mut hashes := []string{}
+	for file in retained { hashes << hash_file(directory + '/' + file)! }
+	configuration := os.read_file(service.root + '/etc/vinix-packages/config.json')!
+	os.mkdir_all(directory + '/generations/.stage-history-sentinel')!
+	for invalid in ['null', '{"format":1}', '{"format":1,"repositories":null}',
+		original.replace('"sequence":1', '"sequence":0,"sequ\\u0065nce":1')] {
+		os.write_file(path, invalid)!
+		mut errors := []string{}
+		service.refresh() or { errors << err.msg() }
+		service.transact('install', ['app'], TransactionOptions{expected_review: review.fingerprint}) or { errors << err.msg() }
+		service.review('install', ['app']) or { errors << err.msg() }
+		service.mirror(work + '/invalid-history-mirror', ['app']) or { errors << err.msg() }
+		review_repository(service.root, 'enroll', config.repositories[0], true) or { errors << err.msg() }
+		enroll_repository(service.root, config.repositories[0], true) or { errors << err.msg() }
+		assert errors.len == 6 && errors.all(it.contains('invalid repository trust history:')), errors.str()
+		assert os.read_file(path)! == invalid && service.state()!.generation == 2
+		assert os.read_file(service.root + '/etc/vinix-packages/config.json')! == configuration
+		for i, file in retained { assert hash_file(directory + '/' + file)! == hashes[i] }
+		assert os.is_dir(directory + '/generations/.stage-history-sentinel')
+		assert !os.exists(directory + '/refresh') && !os.exists(directory + '/enrollment')
+		assert !os.exists(directory + '/generations/3') && !os.exists(work + '/invalid-history-mirror')
+	}
+	os.write_file(path, original)!
+	assert service.transact('install', ['app'], TransactionOptions{expected_review: review.fingerprint})!.generation == 3
+	assert service.verify()!.packages.len == 1 && service.rollback('')!.generation == 2
+}

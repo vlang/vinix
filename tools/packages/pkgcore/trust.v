@@ -33,20 +33,9 @@ fn floor_order(a &RepositoryFloor, b &RepositoryFloor) int {
 fn read_history(directory string) !TrustHistory {
 	path := directory + '/trust-history.json'
 	if !os.exists(path) && !os.is_link(path) { return TrustHistory{} }
-	history := json2.decode[TrustHistory](read_metadata(path)!)!
-	if history.format != 1 || history.repositories.len > 4096 {
-		return error('unsupported repository trust history')
-	}
-	mut seen := map[string]bool{}
-	for floor in history.repositories {
-		key := floor.id + '/' + floor.public_key
-		if !identifier(floor.id) || !digest_valid(floor.public_key) || !digest_valid(floor.index_sha256)
-			|| floor.sequence == 0 || key in seen {
-			return error('invalid repository trust history')
-		}
-		seen[key] = true
-	}
-	return history
+	text := read_metadata(path)!
+	defer { unsafe { text.free() } }
+	return decode_history(text, false) or { return error('invalid repository trust history: ${err}') }
 }
 
 fn index_digest(text string) string {

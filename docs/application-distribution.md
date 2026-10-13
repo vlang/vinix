@@ -177,6 +177,15 @@ including revoked and replaced keys. Empty refreshes, garbage collection and
 re-enrollment never reset it. Authenticated legacy cached indexes migrate into
 this history even after expiry or revocation.
 
+Present consumer and `publish-release` history files require complete format and floor
+records. Null/missing arrays, ambiguous keys and invalid value types fail closed;
+they cannot silently reset the remembered sequence. A damaged file is preserved
+and blocks refresh, enrollment and new release publication until an administrator
+restores valid history under the package/publisher lock. Keep the original file
+and recover from retained trusted records or a protected backup; deleting history
+discards replay protection. Publisher revocation remains available with damaged
+history. See [history qualification](../tests/packages/history-schema-check.md).
+
 Refresh verifies all configured repositories before committing metadata. A fetch
 or validation failure keeps the previous catalog/history. History is flushed
 before the new catalog or enrollment configuration: an interrupted publication

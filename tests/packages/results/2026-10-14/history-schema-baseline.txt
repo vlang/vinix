@@ -1,0 +1,4 @@
+Before-change native CLI (witnessed by the prior configuration qualification), empty signed catalogs, exit 0:
+ACCEPTED signed sequence 1 after retained sequence 10 with {"format":1,"repositories":null}
+ACCEPTED signed sequence 1 after retained sequence 10 with {"format":1}
+ACCEPTED publisher sequence 1 after reserved sequence 10 with {"format":1,"indexes":null}

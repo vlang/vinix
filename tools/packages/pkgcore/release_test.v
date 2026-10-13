@@ -145,10 +145,17 @@ fn test_release_raced_publication_and_corrupt_history_fail_closed() {
 	assert release_history(work + '/repository')!.repositories[0].sequence == 1
 	path := work + '/repository/.publisher/history.json'
 	history := os.read_file(path)!
-	os.write_file(path, '{broken history')!
-	refused = false
-	publish_release(work + '/repository', 'fixture', work + '/seed', 2, expires, work + '/broken-history') or { refused = true }
-	assert refused && !os.exists(work + '/broken-history')
+	for invalid in ['{broken history', 'null', '{"format":1}', '{"format":1,"indexes":null}',
+		history.replace('"sequence":1', '"sequence":0,"sequ\\u0065nce":1'),
+		history.replace('"indexes":', '"indexes":[],"indexes":')] {
+		os.write_file(path, invalid)!
+		refused = false
+		publish_release(work + '/repository', 'fixture', work + '/seed', 2, expires, work + '/broken-history') or {
+			refused = err.msg().contains('invalid publisher release history:')
+		}
+		assert refused && !os.exists(work + '/broken-history')
+		assert os.read_file(path)! == invalid && os.ls(work)!.all(!it.starts_with('.vinix-release-'))
+	}
 	os.write_file(path, history)!
 	publish_release(work + '/repository', 'fixture', work + '/seed', 1, expires, work + '/retry')!
 }

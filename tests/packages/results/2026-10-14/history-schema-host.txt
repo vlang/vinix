@@ -1,0 +1,21 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1.
+Four affected core runners: -nocache -no-skip-unused -gc none -manualfree. History runner also -d track_heap. Exit 0.
+PASS history_schema_test.v with 1000-cycle consumer and publisher scanner measurements
+PASS administration_test.v
+PASS release_test.v
+PASS service_test.v
+PASS signed CLI contracts including consumer and publisher history refusals
+
+Scanner measurements:
+History scanner publisher=false: retained 0 bytes in 1000 cycles
+History scanner publisher=true: retained 0 bytes in 1000 cycles
+
+Signed CLI contracts:
+Package CLI: malformed publisher history refuses release without changing prior publication
+Package CLI: ambiguous configuration refused without activation, cache or trust changes
+Package CLI: malformed retained history refuses replay after revocation and empty refresh
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+
+Static target builds:
+PASS aarch64 static ELF service build; build only, no guest execution
+PASS x86_64 static ELF service build; build only, no guest execution

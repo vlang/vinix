@@ -54,16 +54,9 @@ fn publisher_lock(repository string) !Lock {
 fn release_history(repository string) !TrustHistory {
 	path := repository + '/.publisher/history.json'
 	if !os.exists(path) && !os.is_link(path) { return TrustHistory{} }
-	record := json2.decode[ReleaseHistory](read_metadata(path)!)!
-	if record.format != 1 || record.indexes.len > 4096 { return error('unsupported publisher release history') }
-	mut seen := map[string]bool{}
-	for floor in record.indexes {
-		identity := floor.id + '/' + floor.public_key
-		if !identifier(floor.id) || !digest_valid(floor.public_key) || !digest_valid(floor.index_sha256)
-			|| floor.sequence == 0 || identity in seen { return error('invalid publisher release history') }
-		seen[identity] = true
-	}
-	return TrustHistory{ repositories: record.indexes }
+	text := read_metadata(path)!
+	defer { unsafe { text.free() } }
+	return decode_history(text, true) or { return error('invalid publisher release history: ${err}') }
 }
 
 // Check structural installability without accepting licenses or changing any
