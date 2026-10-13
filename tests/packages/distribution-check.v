@@ -76,6 +76,8 @@ fn check() ! {
 	os.cp(repository + '/tests/packages/software_view_fixture.v', work + '/software/view_fixture.v')!
 	os.cp(repository + '/desktop/software_repositories.v', work + '/software/software_repositories.v')!
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
+	os.cp(repository + '/desktop/software_failure.v', work + '/software/software_failure.v')!
+	os.cp(repository + '/tests/packages/software_failure_fixture.v', work + '/software/failure_fixture.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
 	os.cp(repository + '/desktop/software_mirror.v', work + '/software/software_mirror.v')!
 	os.cp(repository + '/desktop/software_terminal.v', work + '/software/software_terminal.v')!
@@ -98,7 +100,8 @@ fn check() ! {
 		'@vlib|' + modules + '|@vmodules|' + repository, '-o', work + '/software-check',
 		work + '/software'])!
 	run(work + '/software-check', [])!
-	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-enable-globals', '-d', 'ui2_headless', '-d', 'track_heap', '-path',
+	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-enable-globals', '-d', 'ui2_headless', '-d', 'track_heap',
+		'-cflags', '-I' + repository + '/desktop', '-path',
 		'@vlib|' + modules + '|@vmodules|' + repository, '-o', work + '/window-broker-memory', work + '/software'])!
 	run(work + '/window-broker-memory', ['window-memory'])!
 	run(work + '/window-broker-memory', ['admin-memory'])!
@@ -107,6 +110,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['metadata-memory'])!
 	run(work + '/window-broker-memory', ['details-memory'])!
 	run(work + '/window-broker-memory', ['view-memory'])!
+	run(work + '/window-broker-memory', ['failure-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

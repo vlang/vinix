@@ -462,6 +462,19 @@ ignores unsupported/malformed presentation events. It keeps human failure output
 separately, so transfer updates cannot hide checksum, disk-space or authorization
 diagnostics. Read-only JSON catalog/review replies use their existing protocol.
 
+After a service failure, **Failure details** opens paged diagnostic output from
+the status area. It keeps the latest failure across successful catalog reloads,
+including long Unicode paths, the operation and exit status. **Previous**/**Next**
+read the retained output; **Back** or Escape returns to the same form or review.
+Package actions stay inactive while the details are open. **Clear failure**
+discards this window's snapshot; another failure replaces it and closing Software
+releases it. Output is bounded to 8 KiB of retained service bytes, with an explicit
+notice when earlier output or oversized lines were omitted. Controls and invalid
+UTF-8 bytes appear as visible escapes. The view writes no log file and does not
+copy administrator password input. Terminal and native-window applications keep
+their existing diagnostic views. See
+[failure-details qualification](../tests/packages/software-failure-check.md).
+
 The Updates filter and `vinix-package updates` use the same complete dependency
 resolution as `review upgrade`. They show runtime/data changes even when the
 application's version stays unchanged, dependencies added or removed by an

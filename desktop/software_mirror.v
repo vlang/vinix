@@ -237,6 +237,6 @@ fn (mut a SoftwareApp) build_mirror(width int, height int) ui2.Element {
 		}
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
-	children << software_label(a.status, 14, height - 88, width - 28, 80, false)
+	a.add_status_footer(mut children, width, height, true)
 	return ui2.screen(app_surface, children)
 }

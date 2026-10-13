@@ -112,6 +112,6 @@ fn (mut a SoftwareApp) build_deployment(width int, height int) ui2.Element {
 		children << software_button('software.policy', 'Organization policy', 14, 330, 180)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
-	children << software_label(a.status, 14, height - if a.progress_seen { 88 } else { 98 }, width - 28, if a.progress_seen { 80 } else { 90 }, false)
+	a.add_status_footer(mut children, width, height, a.progress_seen)
 	return ui2.screen(app_surface, children)
 }

@@ -45,7 +45,7 @@ fn (mut a SoftwareApp) operation_line(line string) {
 	}
 	// Presentation events do not displace the useful human diagnostic tail.
 	if line.len == 0 { return }
-	if a.output.len + line.len + 1 > 8192 { a.output.clear() }
+	if a.output.len + line.len + 1 > 8192 { a.output.clear(); a.output_truncated = true }
 	for byte in line { a.output << byte }
 	a.output << `\n`
 	tail := software_output_tail(a.output)
@@ -64,6 +64,7 @@ fn (mut a SoftwareApp) operation_output(bytes string) {
 			if a.progress_pending.len >= pkgprotocol.progress_limit {
 				a.progress_pending.clear()
 				a.progress_skip = true
+				a.output_truncated = true
 			} else { a.progress_pending << byte }
 		}
 	}

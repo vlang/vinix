@@ -163,6 +163,6 @@ fn (mut a SoftwareApp) build_launch_options(width int, height int) ui2.Element {
 		children << software_button('software.launch.run', 'Run', 14, height - 138, 100)
 		children << software_button('software.launch.terminal', 'Run in Terminal', 126, height - 138, 160)
 	}
-	children << software_label(a.status, 14, height - 98, width - 28, 90, false)
+	a.add_status_footer(mut children, width, height, false)
 	return ui2.screen(app_surface, children)
 }

@@ -366,11 +366,13 @@ fn main() {
 	if os.args.len == 2 && os.args[1] == 'metadata-memory' { check_software_metadata_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'details-memory' { check_software_details_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'view-memory' { check_software_view_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'failure-memory' { check_software_failure_memory() or { panic(err) }; return }
 	mut args := os.args.clone()
 	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if software_failure_service_fixture(args) { return }
 		if software_view_service_fixture(args) { return }
 		if software_policy_service_fixture(args) or { panic(err) } { return }
 		if software_metadata_service_fixture(args) { return }
@@ -562,6 +564,8 @@ fn main() {
 	check_software_metadata() or { panic(err) }
 	check_software_details() or { panic(err) }
 	check_software_view_reader() or { panic(err) }
+	check_software_failure() or { panic(err) }
+	check_software_failure_bounds() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
 }
 

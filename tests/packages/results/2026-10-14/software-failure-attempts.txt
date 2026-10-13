@@ -1,0 +1,22 @@
+Initial viewer compile refused a reused local/iteration name; renamed before the passing functional run.
+build/package-software-failure-work/software/software_failure.v:112:8: error: redefinition of value iteration variable `line`, use `for (line in array) {` if you want to check for a condition instead
+  110 |         if lines.len == 14 {
+  111 |             a.failure_add_page(lines)
+  112 |             for line in lines { unsafe { line.free() } }; lines.clear()
+      |                 ~~~~
+  113 |         }
+  114 |     }
+
+The first heap build needed the desktop include path. The maintained driver now provides it. Full compiler notices are retained privately and hashed.
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+C compilation error (from cc):
+src.c:1621:10: fatal error: 'tools/tests/heap_tracker.h' file not found
+ 1621 | #include "tools/tests/heap_tracker.h"
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 error generated.
+
+
+The private desktop harness initially used the same name for its executable and source directory. The directory was renamed before both passing target checks.
+path `/Users/alex/code/vinix/build/package-software-failure-work/desktop` already exists, and is not a folder

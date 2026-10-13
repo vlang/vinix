@@ -24,6 +24,12 @@ mut:
 	matching        []int
 	query           []u8
 	output          []u8
+	output_truncated bool
+	failure_pages []SoftwareFailurePage
+	failure_heading string
+	failure_mode bool
+	failure_page int
+	failure_truncated bool
 	status          string
 	catalog_error   string
 	update_error    string
@@ -191,6 +197,8 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	}
 	a.clear_details()
 	a.output.clear()
+	a.output_truncated = false
+	a.failure_mode = false
 	a.clear_progress()
 	a.worker_failed = false
 	a.worker_view = view
@@ -464,6 +472,7 @@ fn (mut a SoftwareApp) poll() bool {
 				for byte in chunk { a.output << byte }
 			} else {
 				a.worker_failed = true
+				a.output_truncated = true
 				a.set_status('Package response exceeds the supported size.')
 			}
 		} else {
@@ -482,6 +491,7 @@ fn (mut a SoftwareApp) poll() bool {
 					a.operation_output(chunk)
 				} else {
 					a.worker_failed = true
+					a.output_truncated = true
 					a.set_status('Package response exceeds the supported size.')
 				}
 				unsafe { chunk.free() }
@@ -491,6 +501,7 @@ fn (mut a SoftwareApp) poll() bool {
 	}
 	code := a.worker.code
 	if !a.worker_view && !a.worker_review { a.finish_operation_output() }
+	if code != 0 || a.worker_failed { a.capture_failure(a.worker.args, code) }
 	view := a.worker_view
 	reviewing := a.worker_review
 	running := a.worker_run
@@ -623,7 +634,12 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		} else { a.terminal_app.handle(event_id)! }
 		return
 	}
+	if a.failure_mode { a.handle_failure(event_id); return }
 	if a.details_mode { a.handle_details(event_id); return }
+	if event_id == 'software.failure' {
+		if a.worker == unsafe { nil } && a.failure_pages.len > 0 { a.failure_mode = true; a.focus = false }
+		return
+	}
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.policy_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
@@ -834,6 +850,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.admin_prompt { a.admin_key_input(input); return }
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
+	if a.failure_mode { if input == '\x1b' { a.failure_mode = false }; return }
 	if a.details_mode { if input == '\x1b' { a.clear_details() }; return }
 	if a.policy_mode { a.policy_key_input(input); return }
 	if a.data_mode { return }
@@ -862,6 +879,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.admin_prompt { a.admin_paste_input(input); return }
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
+	if a.failure_mode { return }
 	if a.details_mode { return }
 	if a.policy_mode { a.policy_paste_input(input); return }
 	if a.data_mode { return }
@@ -910,6 +928,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	if a.admin_prompt { return a.build_admin(size) }
 	if a.window_mode { return a.build_window(size) }
 	if a.terminal_app != unsafe { nil } { return a.build_terminal(size) }
+	if a.failure_mode { return a.build_failure(size) }
 	width := int(size.width)
 	height := int(size.height)
 	if width < 640 || height < 610 {
@@ -1049,7 +1068,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		children << software_button('software.data', 'Personal data', 502, height - 138, 124)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
-	children << software_label(a.status, 14, height - if a.progress_seen { 88 } else { 98 }, width - 28, if a.progress_seen { 80 } else { 90 }, false)
+	a.add_status_footer(mut children, width, height, a.progress_seen)
 	return ui2.screen(app_surface, children)
 }
 
@@ -1097,6 +1116,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_personal_data()
 	a.clear_policy()
 	a.clear_progress()
+	a.clear_failure()
 	unsafe {
 		a.launch_request.free()
 		a.service_path.free()
