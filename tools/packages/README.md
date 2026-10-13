@@ -1,6 +1,6 @@
 # Native V application packages
 
-Build with `v -o /tmp/vinix-package tools/packages/main.v`. Install/state commands
+Build with `v -path '@vlib|@vmodules|.|tools/accounts' -o /tmp/vinix-package tools/packages/main.v`. Install/state commands
 support a disposable `--root /absolute/root`. Launch uses the real root and an
 ordinary identity. The root desktop can hand off to an administrator-configured
 `launch_user` through the isolated account session runner.
@@ -131,3 +131,10 @@ explicit Enter-to-send/Escape-to-discard editing, and frame-bound field/control
 identities. Protocol 1 remains compatible. The
 [memo example](../../examples/package-memo/README.md) demonstrates explicit saving
 to private data; see [text-entry qualification](../../tests/packages/window-input-check.md).
+
+Ordinary-user Software sessions authenticate reviewed administrative changes
+through the fixed `packages-change` action. A root worker returns progress over
+a private, kernel-peer-checked runtime socket; passwords stay off command lines
+and the desktop clears them after submission or cancellation. CLI clients use
+`vinix-package admin [--progress] [--offline] COMMAND ...` for the same bounded
+reviewed-operation transport. See [administrator qualification](../../tests/packages/admin-check.md).

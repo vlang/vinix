@@ -94,6 +94,14 @@ fn stage() ! {
 		os.chmod(config_path, 0o644)!
 	}
 	os.chmod(staging + '/etc/vinix-packages', 0o755)!
+	os.mkdir_all(staging + '/usr/share/vinix/actions')!
+	// An ordinary desktop authenticates only this fixed reviewed-operation
+	// action. Preserve administrator-owned overrides when upgrading an image.
+	action := staging + '/usr/share/vinix/actions/packages-change'
+	if !os.exists(action) && !os.is_link(action) {
+		os.cp(repository + '/tools/accounts/actions/packages-change', action)!
+		os.chmod(action, 0o644)!
+	}
 	config := pkgcore.load_config(staging)!
 	if config.architecture != architecture {
 		return error('existing package configuration targets another architecture')

@@ -16,6 +16,8 @@ module main
 import os
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == 'package-admin-disconnect' { exit(package_admin_disconnect(os.args[2]) or { eprintln(err); 89 }) }
+	if os.args.len == 4 && os.args[1] == 'package-admin-peer-probe' { exit(package_admin_peer_probe(os.args[2], os.args[3]) or { eprintln(err); 89 }) }
 	if os.args.len > 1 && os.args[1] == 'package-signing-probe' {
 		qualify_package_signing() or { eprintln(err); exit(1) }
 		exit(0)
@@ -52,6 +54,7 @@ fn main() {
 		'packages-context' { scenario_packages_context(mut t) }
 		'packages-window' { scenario_packages_window(mut t) }
 		'packages-window-input' { scenario_packages_window_input(mut t) }
+		'packages-admin' { scenario_packages_admin(mut t) }
 		'packages-crash-staged', 'packages-crash-published', 'packages-crash-activated' {
 			scenario_package_recovery(mut t)
 		}

@@ -1,0 +1,53 @@
+36 package host assertion runners, SDK context/window heap and CLI/PTY/Software assertions: PASS
+Passed /Users/alex/code/vinix/tools/packages/signing/signing_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/administration_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/catalog_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/collection_limit_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/command_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/composition_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/context_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/deployment_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/distribution_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/document_keys_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/download_recovery_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/ffmpeg_profile_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/import_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/mirror_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/policy_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/progress_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/release_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/review_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/service_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/session_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/sqlite_profile_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/state_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/view_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/window_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/command_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/deployment_mirror_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/mirror_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/progress_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/repositories_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/review_test.v
+Passed /Users/alex/code/vinix/tools/packages/appsdk/context_test.v
+Passed /Users/alex/code/vinix/tools/packages/appsdk/window_input_test.v
+Passed /Users/alex/code/vinix/tools/packages/appsdk/window_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgadmin/protocol_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgadmin/socket_test.v
+Application SDK context: repeated decode/load/encode/refusal/close retain zero tracked bytes
+Native window SDK: 1000 frame/event decode, encode, validation refusal and retirement cycles retain zero tracked bytes
+Passed /Users/alex/code/vinix/desktop/packagecore/registry_test.v
+Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed
+Initial full host driver cross-stage failed on unused waitpid declaration; declaration removed, both final separate service stages PASS without compiler suppression.
+Final Software and desktop followups: PASS; both desktop architecture checks and actual launcher assertions, retained qualified headless UI overlay/calculator examples.
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Native window broker: 1000 fragmented text frames, focus/edit/discard, UI builds and owned-tree retirements retain zero tracked bytes
+Software administrator approval: 1000 prompt/edit/render/wipe cycles retain zero tracked bytes
+Software distribution checks passed
+Launcher allocation followup: PASS after explicit ownership/free of V-promoted fixture Software object.
+All shipped authentication actions assertion: PASS; root-peer fake-listener refusal assertion: PASS, no request bytes sent, secret wiped.
+Final administrator protocol runner: ASan/UBSan PASS; ASAN_OPTIONS=detect_leaks=0, UBSAN_OPTIONS=halt_on_error=1.
+Final AArch64/x86_64 QEMU TCG authenticated signed-package workflows: PASS; 16 input/serial artifact hashes verified, clean guest shutdown.
+x86_64 final release attempt hit ISO disk-space failure; only this task's superseded artifacts retired with logs preserved, fresh success run supplies final evidence.
+Ordinary administrator review/password/progress, non-admin and bad password, wrong-UID listener, stale/launch/root/raw refusal, remove/rollback/revocation, disconnected-client journal completion, root state, audit secrecy and socket cleanup qualified.
+No graphical ordinary-user desktop/application-launch group-isolation, physical presentation, foreign graphical/audio broker, public publisher enrollment or full catalog migration claim.

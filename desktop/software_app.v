@@ -7,6 +7,7 @@ import ui2
 import desktop.packagecore
 import tools.packages.pkgprotocol
 import tools.packages.appsdk
+import tools.packages.pkgadmin
 
 const software_row_actions = ['software.row.0', 'software.row.1', 'software.row.2', 'software.row.3',
 	'software.row.4', 'software.row.5', 'software.row.6', 'software.row.7', 'software.row.8',
@@ -148,11 +149,19 @@ mut:
 	window_input []u8
 	window_input_dirty bool
 	window_input_select_all bool
+	administration_required bool
+	admin_prompt bool
+	admin_focus bool
+	admin_select_all bool
+	admin_password [pkgadmin.password_limit]u8
+	admin_password_len int
+	admin_mask []u8
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
 	_ = desktop.tz_offset_seconds
 	mut app := &SoftwareApp{
+		administration_required: C.geteuid() != 0
 		rows:     []SoftwareRow{cap: 128}
 		matching: []int{cap: 128}
 		query:    []u8{cap: console_filter_limit}
@@ -196,11 +205,14 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.repository_worker = .none
 	a.worker = os.new_process(a.service_path.clone())
 	mut owned := []string{cap: arguments.len + 1}
+	authorized := a.administration_required && pkgadmin.administrative(arguments)
+	if authorized { owned << 'admin'.clone() }
 	if software_progress_command(arguments) { owned << '--progress'.clone() }
 	for argument in arguments { owned << argument.clone() }
 	a.worker.set_args(owned)
 	a.worker.set_redirect_stdio_merged()
 	a.worker.run()
+	if authorized { a.begin_admin_prompt() }
 	a.set_status(if view {
 		'Reading the software catalog…'
 	} else {
@@ -471,6 +483,7 @@ fn (mut a SoftwareApp) poll() bool {
 	repository_worker := a.repository_worker
 	mirroring := a.worker_mirror
 	a.retire_worker()
+	a.clear_admin_prompt()
 	if code != 0 {
 		if repository_worker == .review { a.clear_repository_review() }
 		if reviewing && repository_worker == .none { a.clear_review() }
@@ -566,6 +579,7 @@ fn (mut a SoftwareApp) run_requested() {
 fn (a &SoftwareApp) next_poll_ms() u64 { return 100 }
 
 fn (mut a SoftwareApp) handle(event_id string) ! {
+	if a.admin_prompt { a.handle_admin(event_id); return }
 	if a.window_mode { a.handle_window(event_id); return }
 	if a.terminal_app != unsafe { nil } {
 		if event_id == 'software.terminal-back' {
@@ -757,6 +771,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 }
 
 fn (mut a SoftwareApp) key_input(input string) {
+	if a.admin_prompt { a.admin_key_input(input); return }
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -781,6 +796,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 }
 
 fn (mut a SoftwareApp) paste_input(input string) {
+	if a.admin_prompt { a.admin_paste_input(input); return }
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }
@@ -825,6 +841,7 @@ fn software_review_row(row pkgprotocol.ReviewPackage) SoftwareRow {
 }
 
 fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
+	if a.admin_prompt { return a.build_admin(size) }
 	if a.window_mode { return a.build_window(size) }
 	if a.terminal_app != unsafe { nil } { return a.build_terminal(size) }
 	width := int(size.width)
@@ -966,6 +983,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a SoftwareApp) prepare_close() bool {
+	if a.admin_prompt { a.cancel_admin(); return true }
 	if a.window_mode && a.worker != unsafe { nil } {
 		a.request_window_close()
 		return false
@@ -986,6 +1004,7 @@ fn (mut a SoftwareApp) prepare_close() bool {
 }
 
 fn (mut a SoftwareApp) close_app() {
+	a.clear_admin_prompt()
 	a.clear_window()
 	a.clear_launch_options()
 	a.close_terminal()

@@ -15,7 +15,10 @@ fn test_shipped_actions_parse() ! {
 			assert false, '${name}: ${err.msg()}'
 			continue
 		}
-		assert action.exec in ['/usr/sbin/vinix-system', '/usr/sbin/vinix-account'], name
+		assert action.exec in ['/usr/sbin/vinix-system', '/usr/sbin/vinix-account', '/usr/bin/vinix-package'], name
+		if action.exec == '/usr/bin/vinix-package' {
+			assert name == 'packages-change' && action.auth == .admin && action.args == ['admin-authorize'] && action.input && action.params.len == 0
+		}
 		// Nothing that changes accounts or the machine's name is open to
 		// someone who merely sits at it.
 		if action.exec == '/usr/sbin/vinix-account' || name == 'hostname-set' {

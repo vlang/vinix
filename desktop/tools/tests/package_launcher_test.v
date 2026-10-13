@@ -40,7 +40,7 @@ fn test_package_terminal_uses_literal_arguments_and_releases_screen_history_and_
 	for warmup in 0 .. 2 {
 		if warmup == 1 { C.vinix_heap_begin() }
 		for _ in 0 .. 50 {
-			mut app := SoftwareApp{ service_path: '/missing-fixture-package-service'.clone() }
+			mut app := &SoftwareApp{ service_path: '/missing-fixture-package-service'.clone() }
 			app.open_terminal_request(packagecore.Request{ id: 'org.sqlite.cli', document: '/home/alex/a space; \$literal.txt' })!
 			assert app.terminal_app.package_argv == expected
 			app.terminal_app.started = true // exercise rendering without spawning a host application
@@ -63,6 +63,7 @@ fn test_package_terminal_uses_literal_arguments_and_releases_screen_history_and_
 			app.handle('software.terminal-back')!
 			assert app.terminal_app == unsafe { nil }
 			app.close_app()
+			unsafe { free(app) }
 		}
 	}
 	retained := C.vinix_heap_end()

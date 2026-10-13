@@ -359,12 +359,26 @@ fn check_software_window_text() ! {
 
 fn main() {
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+	if os.args.len == 2 && os.args[1] == 'admin-memory' { check_software_admin_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'window-memory' { check_window_broker_memory() or { panic(err) }; return }
 	mut args := os.args.clone()
 	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if args[1] == 'admin' {
+			assert args[2..] == ['--progress', 'apply', 'c'.repeat(64), 'install', 'editor']
+			mut bytes := [257]u8{}
+			mut count := 0
+			for count < bytes.len {
+				assert C.read(0, &bytes[count], 1) == 1
+				if bytes[count] == `\n` { break }
+				count++
+			}
+			assert unsafe { tos(&bytes[0], count) } == 'fixture secret é'
+			println(pkgprotocol.progress_prefix + json2.encode(pkgprotocol.Progress{ phase: 'complete', current: 1, total: 1 }))
+			return
+		}
 		if args[1] == 'run-window' { software_window_child(args[2]); return }
 		if args[1] == 'run-args' {
 			assert args[2..] == ['editor', '--data-cwd', '--file', '/private/tmp/a space; $literal.txt', '--', '-i', '/private/tmp/a space; $literal.txt', '', '$(literal)']
@@ -531,7 +545,75 @@ fn main() {
 	check_software_locked_mirror() or { panic(err) }
 	check_software_launch_options() or { panic(err) }
 	check_software_window() or { panic(err) }
+	check_software_admin() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
+}
+
+fn admin_tree_has_secret(tree ui2.Element) bool {
+	if tree.text.contains('fixture secret') { return true }
+	for child in tree.children { if admin_tree_has_secret(child) { return true } }
+	return false
+}
+
+fn check_software_admin() ! {
+	mut app := SoftwareApp{ administration_required: true, service_path: os.executable(), output: []u8{cap: 8192}, query: []u8{cap: 256} }
+	app.start(['apply', 'c'.repeat(64), 'install', 'editor'], false)
+	assert app.admin_prompt && app.worker.args == ['admin', '--progress', 'apply', 'c'.repeat(64), 'install', 'editor']
+	app.key_input('fixture secret é')
+	assert app.admin_password_len == 'fixture secret é'.len
+	app.paste_input('\n')
+	app.paste_input('x'.repeat(257))
+	assert app.admin_password_len == 'fixture secret é'.len && app.admin_prompt
+	app.handle('software.confirm')!
+	assert app.admin_prompt
+	tree := app.build(ui2.rect(0, 0, 900, 660))!
+	assert !admin_tree_has_secret(tree)
+	free_window_tree(tree)
+	app.key_input('\x7f')
+	assert app.admin_password_len == 'fixture secret '.len
+	app.key_input('é')
+	app.handle('software.admin.approve')!
+	assert !app.admin_prompt && app.admin_password_len == 0 && app.admin_password.all(it == 0)
+	wait_for_software(mut app)
+	assert app.worker == unsafe { nil } && app.status.contains('Select an application')
+	app.close_app()
+	mut cancelled := SoftwareApp{ administration_required: true, service_path: os.executable(), output: []u8{cap: 8192} }
+	cancelled.start(['apply', 'c'.repeat(64), 'install', 'editor'], false)
+	cancelled.key_input('fixture secret é')
+	assert cancelled.prepare_close() && cancelled.worker == unsafe { nil }
+	assert cancelled.admin_password.all(it == 0) && !cancelled.admin_prompt
+	cancelled.close_app()
+	mut refresh := SoftwareApp{ administration_required: true, service_path: '/missing-package-client'.clone(), admin_prompt: true,
+		admin_focus: true, repository_worker: .refresh }
+	refresh.cancel_admin()
+	assert refresh.repository_result.contains('trust was saved') && !refresh.admin_prompt
+	refresh.close_app()
+	println('Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed')
+}
+
+fn check_software_admin_memory() ! {
+	$if !track_heap ? { return error('compile administrator memory fixture with -d track_heap') }
+	$if track_heap ? {
+		mut pipe := [2]i32{}
+		assert C.pipe(&pipe[0]) == 0
+		mut app := SoftwareApp{ worker: os.new_process('unused') }
+		app.worker.use_stdio_ctl = true; app.worker.stdio_fd[0] = pipe[1]
+		for warmup in 0 .. 2 {
+			if warmup == 1 { C.vinix_heap_begin() }
+			for _ in 0 .. 1000 {
+				app.begin_admin_prompt()
+				app.admin_paste_input('fixture secret é')
+				free_window_tree(app.build_admin(ui2.rect(0, 0, 900, 660)))
+				app.clear_admin_prompt()
+				for byte in app.admin_password { assert byte == 0 }
+			}
+			unsafe { app.status.free() }; app.status = ''
+		}
+		kept := C.vinix_heap_end()
+		C.close(pipe[0]); app.retire_worker(); app.close_app()
+		assert kept == 0, 'administrator approval retained ${kept} bytes'
+		println('Software administrator approval: 1000 prompt/edit/render/wipe cycles retain zero tracked bytes')
+	}
 }
 
 fn check_window_broker_memory() ! {

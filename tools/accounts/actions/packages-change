@@ -1,0 +1,5 @@
+description = Apply the reviewed package administration request
+auth = admin
+exec = /usr/bin/vinix-package
+arg = admin-authorize
+input = secret

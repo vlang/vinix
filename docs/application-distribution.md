@@ -11,6 +11,27 @@ Existing Alpine ports and special downloads still use that frontend and its
 persistence rules. They do **not** acquire these rollback guarantees. Release
 migration of that catalog remains part of roadmap acceptance.
 
+An ordinary-user **Software** session asks for the current administrator's own
+password before applying its reviewed package, repository, deployment or offline
+export change, or refreshing signed catalogs. The fixed `packages-change`
+authentication action checks the real caller's account and administrator
+membership. A separate root worker runs the frozen command and returns progress
+and its completion receipt over that user's private runtime socket. Both sides
+check kernel peer credentials. Passwords never enter command arguments, package
+requests, progress or logs; the UI masks and clears its credential buffer. The
+root desktop continues to execute administrative commands directly. See
+[administrator transport](../tools/packages/SDK.md#administrator-package-transport)
+and [qualification](../tests/packages/admin-check.md).
+
+Repository enrollment and its subsequent refresh require separate approvals.
+Cancelling refresh clearly reports that trust was already saved. Cancelling a
+password prompt starts no authorized transaction. Once approved, a transaction
+keeps its normal lock/journal lifetime even if its client disconnects; a missing
+completion receipt instructs the caller to check installed state before retrying.
+Application launches, private-data operations and publisher tools stay outside
+this administrative interface. Full ordinary-user graphical login/application
+launch qualification remains a separate release gate.
+
 The [pinned catalog builder](../tools/packages/SDK.md#build-a-pinned-application-catalog)
 assembles a complete publisher workspace atomically from reviewed prepared-root
 recipes and file inventories. It checks every declared target/version and runtime

@@ -4,11 +4,16 @@ module main
 import json2
 import os
 import strconv
+import crypto.rand
+import authclient
+import authproto
+import tools.packages.pkgadmin
 import tools.packages.pkgcore
 import tools.packages.pkgprotocol
 
 const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]\n' +
 	'  update | search [QUERY] | info ID | list | status | updates | view\n' +
+	'  admin [--progress] [--offline] update|apply|repo-apply|deployment-apply|policy-apply|mirror-apply|mirror-deployment-apply ...\n' +
 	'  install ID... | remove ID... | upgrade | rollback | gc | verify\n' +
 	'  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json\n' +
 	'  review install|remove|upgrade|deploy|rollback [ID...]\n' +
@@ -22,7 +27,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
 	'  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
-	'  run-window ID [ABSOLUTE_FILE...] (native window protocol 1 broker client)\n' +
+	'  run-window ID [ABSOLUTE_FILE...] (declared native window broker protocol)\n' +
 	'  run-args|run-terminal-args ID [--data-cwd] [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
@@ -73,6 +78,12 @@ fn checked(arguments []string) !int {
 		return error('--progress supports update, install/remove/upgrade, apply, deploy/deployment-apply, rollback and mirror/mirror-apply/mirror-deployment-apply without --json')
 	}
 	names := args[1..].clone()
+	if command in ['admin', 'admin-authorize'] {
+		if root != '' || offline || as_json || progress { return error('administrator transport options follow admin, and cannot select another root') }
+		if command == 'admin' { return admin_client(names) }
+		if names.len != 0 { return error('admin-authorize takes no command-line request') }
+		return admin_authorize()
+	}
 	match command {
 		'keygen' {
 			if names.len != 1 { return error('keygen requires a new signing seed filename') }
@@ -359,6 +370,176 @@ fn print_progress(event pkgprotocol.Progress) {
 	println(frame)
 	flush_stdout()
 	unsafe { text.free(); frame.free() }
+}
+
+#include <termios.h>
+#include <sys/wait.h>
+#include <signal.h>
+fn C.fork() int
+fn C.setsid() int
+fn C.dup2(int, int) int
+fn C._exit(int)
+fn C.alarm(u32) u32
+fn C.tcgetattr(int, voidptr) int
+fn C.tcsetattr(int, int, voidptr) int
+struct C.termios { mut: c_lflag u32 }
+
+fn admin_password() ![]u8 {
+	mut saved := C.termios{}
+	typed := C.isatty(0) == 1
+	if typed {
+		if C.tcgetattr(0, &saved) != 0 { return error('cannot protect password input') }
+		mut quiet := saved
+		quiet.c_lflag &= ~u32(C.ECHO)
+		if C.tcsetattr(0, C.TCSAFLUSH, &quiet) != 0 { return error('cannot disable password echo') }
+		eprint('Your administrator password: ')
+	}
+	defer { if typed { C.tcsetattr(0, C.TCSAFLUSH, &saved); eprintln('') } }
+	mut password := []u8{cap: pkgadmin.password_limit}
+	unsafe { password.flags |= .noslices }
+	mut accepted := false
+	defer { if !accepted { for mut byte in password { byte = 0 }; unsafe { password.free() } } }
+	mut byte := u8(0)
+	for {
+		count := C.read(0, &byte, 1)
+		if count < 0 && C.errno == C.EINTR { continue }
+		if count < 0 { return error('password input is unavailable') }
+		if count == 0 || byte == `\n` { break }
+		if password.len == pkgadmin.password_limit || byte < 32 || byte == 127 { return error('password exceeds 256 bytes or contains a control character') }
+		password << byte
+	}
+	if password.len == 0 { return error('administrator password is required') }
+	accepted = true
+	return password
+}
+
+fn free_auth_reply(mut reply authproto.Frame) {
+	reply.wipe()
+	unsafe { for field in reply.fields { field.free() }; (&array(&reply.fields)).free() }
+}
+
+fn admin_client(arguments []string) !int {
+	pkgadmin.validate_arguments(arguments)!
+	uid := u32(os.geteuid())
+	if uid == 0 { return error('root runs reviewed package commands directly') }
+	mut described := authclient.ask_root(authclient.default_socket, authproto.op_describe, pkgadmin.action.bytes())!
+	defer { free_auth_reply(mut described) }
+	if described.code != authproto.status_ok || described.fields.len != 3 { return error('package administrator authentication action is unavailable') }
+	allowed := described.text(1)
+	defer { unsafe { allowed.free() } }
+	if allowed != '1' { return error('this account cannot approve package changes; use an administrator account') }
+	directory := pkgadmin.runtime_directory(uid)!
+	defer { unsafe { directory.free() } }
+	random := rand.bytes(16)!
+	nonce := random.hex()
+	request := pkgadmin.Request{ nonce: nonce, arguments: arguments }
+	text := request.encode()!
+	defer { unsafe { random.free(); nonce.free(); text.free() } }
+	mut listener := pkgadmin.listen_private(directory, uid, nonce)!
+	defer { listener.close() }
+	mut password := admin_password()!
+	defer { for mut byte in password { byte = 0 }; unsafe { password.free() } }
+	mut fields := [pkgadmin.action.bytes(), password, text.bytes()]
+	defer { unsafe { fields[0].free(); fields[2].free(); (&array(&fields)).free() } }
+	mut reply := authclient.ask_root(authclient.default_socket, authproto.op_run, ...fields)!
+	defer { free_auth_reply(mut reply) }
+	if reply.code == authproto.status_wait {
+		seconds := reply.text(0)
+		defer { unsafe { seconds.free() } }
+		return error('authentication is throttled; retry in ' + seconds + ' seconds')
+	}
+	if reply.code == authproto.status_denied { return error('administrator password was rejected or this account\'s access was revoked') }
+	if reply.code != authproto.status_ok || reply.fields.len != 2 || reply.text(0) != '0' {
+		diagnostic := if reply.fields.len == 2 { reply.text(1) } else { 'administrator approval was refused or its package worker could not start'.clone() }
+		defer { unsafe { diagnostic.free() } }
+		return error(diagnostic)
+	}
+	approved := reply.text(1)
+	defer { unsafe { approved.free() } }
+	if approved != nonce + '\n' { return error('authentication returned a different package request') }
+	fd := listener.accept_root()!
+	defer { C.close(fd) }
+	return admin_stream(fd, request)
+}
+
+fn admin_stream(fd int, request pkgadmin.Request) !int {
+	mut pending := []u8{cap: 16384}
+	unsafe { pending.flags |= .noslices }
+	defer { unsafe { pending.free() } }
+	mut bytes := [8192]u8{}
+	mut code := -1
+	mut skip := false
+	for {
+		count := C.read(fd, &bytes[0], usize(bytes.len))
+		if count < 0 && C.errno == C.EINTR { continue }
+		if count < 0 { return error('administrator package output failed; check package state before retrying') }
+		if count == 0 { break }
+		for index in 0 .. int(count) {
+			byte := bytes[index]
+			if code >= 0 { return error('data followed the administrator package completion receipt') }
+			if byte == `\n` {
+				if skip { println('Package diagnostic line exceeded 16 KiB and was omitted.'); flush_stdout(); skip = false; continue }
+				line := unsafe { tos(pending.data, pending.len) }
+				if line.starts_with(pkgadmin.result_prefix) { code = request.result(line)! }
+				else {
+					print(line); println(''); flush_stdout()
+				}
+				pending.clear()
+			} else {
+				if skip { continue }
+				if pending.len == pending.cap {
+					line := unsafe { tos(pending.data, pending.len) }
+					if line.starts_with(pkgadmin.result_prefix) || line.starts_with(pkgprotocol.progress_prefix) { return error('administrator protocol output exceeds its bound') }
+					pending.clear(); skip = true; continue
+				}
+				pending << byte
+			}
+		}
+	}
+	if pending.len != 0 || code < 0 { return error('administrator package completion was lost; check package state before retrying') }
+	return code
+}
+
+fn admin_authorize() !int {
+	if os.geteuid() != 0 { return error('admin-authorize is an authentication-service action') }
+	identity := os.getenv('VINIX_AUTH_UID')
+	defer { unsafe { identity.free() } }
+	if identity.len == 0 || identity.len > 10 || !identity.bytes().all(it >= `0` && it <= `9`)
+		|| identity[0] == `0` || identity.u64() > 0xffffffff { return error('the authentication service supplied no ordinary caller identity') }
+	uid := u32(identity.u64())
+	mut bytes := [pkgadmin.request_limit + 1]u8{}
+	mut used := 0
+	for used < bytes.len {
+		count := C.read(0, unsafe { &bytes[used] }, usize(bytes.len - used))
+		if count < 0 && C.errno == C.EINTR { continue }
+		if count < 0 { return error('administrator package request is unavailable') }
+		if count == 0 { break }
+		used += int(count)
+	}
+	mut request := pkgadmin.decode(unsafe { tos(&bytes[0], used) })!
+	defer { request.close() }
+	directory := pkgadmin.runtime_directory(uid)!
+	defer { unsafe { directory.free() } }
+	fd := pkgadmin.connect_private(directory, uid, request.nonce)!
+	defer { C.close(fd) }
+	child := C.fork()
+	if child < 0 { return error('cannot start administrator package worker') }
+	if child == 0 {
+		C.alarm(0)
+		if C.setsid() < 0 { C._exit(126) }
+		stdin := C.open(c'/dev/null', C.O_RDONLY)
+		if stdin < 0 || C.dup2(stdin, 0) != 0 || C.dup2(fd, 1) != 1 || C.dup2(fd, 2) != 2 { C._exit(126) }
+		for descriptor in 3 .. 1024 { C.close(descriptor) }
+		// The caller may close Software while the transaction completes. Ignore
+		// a broken output stream; the normal state journal still owns recovery.
+		unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+		code := checked(request.arguments) or { eprintln('vinix-package: ' + err.msg()); 1 }
+		receipt := request.receipt(code)
+		println(receipt); flush_stdout()
+		C._exit(code)
+	}
+	println(request.nonce)
+	return 0
 }
 
 fn main() {

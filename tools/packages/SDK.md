@@ -21,10 +21,67 @@ The writer lock excludes new launch admission throughout both phases; an already
 admitted holder that becomes busy remains protected. See
 [descriptor-limit qualification](../../tests/packages/collection-limit-check.md).
 
+## Administrator package transport
+
+`vinix-package admin [--progress] [--offline] COMMAND ...` is the ordinary-account
+client for authenticated package administration. The current account must be an
+administrator and provide its own password through standard input (without echo
+on a terminal). Software uses the same client with a masked, bounded password
+screen; Enter/Approve submits and clears the credential, Escape/Cancel clears it
+and retires the waiting unprivileged client. A submitted transaction must finish
+before normal Software close. Forced client retirement closes its output stream
+and leaves the approved worker to finish under the existing package journal.
+
+The installed `packages-change` action is `auth = admin`, invokes only
+`/usr/bin/vinix-package admin-authorize`, takes no caller arguments, and uses one
+bounded input field. Its canonical format-1 request contains a fresh 128-bit
+nonce and literal argument vector, at most 4,096 encoded bytes/69 arguments.
+Unknown/duplicate keys and noncanonical transport are refused. Software accepts
+single-line UTF-8 passwords, at most 256 bytes; the CLI reads a bounded single-line
+secret. It is sent only to the authentication
+service, separately from the action request. No password or authorization grant
+is cached.
+
+Allowed operations are `update`, reviewed `apply` for install/remove/upgrade/
+rollback, `repo-apply`, `deployment-apply`, `policy-apply`, `mirror-apply` and
+`mirror-deployment-apply`. Every operation except refresh requires its exact
+64-digit review fingerprint; normal service validation repeats under the writer
+lock. IDs and absolute file/destination paths are checked before authorization.
+Raw install/remove/upgrade/rollback, alternate roots, arbitrary executables,
+publisher tooling, application launches and nested administration are refused.
+Read-only review/status commands remain available directly to ordinary users.
+
+The client listens at `/run/user/UID/pkg-NONCE.sock` in its existing private
+0700 session runtime, with a 0600 socket. Runtime parents must be root-owned
+directories without other-user write access; links are refused. Root connects
+only to the authentication service's actual caller UID, and the client accepts
+only a root peer. Authorization returns quickly after forking the worker into
+its own session and clearing the inherited alarm. Transaction work is streamed
+separately, so the authentication service's action output/time limits apply only
+to approval. No long-lived privileged daemon, setuid executable, writable job
+spool or caller-selected root executable is added.
+
+The worker preserves standard progress frames and sends a final receipt binding
+nonce, canonical request SHA-256 and exit code. The client requires that receipt
+and EOF; mismatched/trailing/incomplete output is failure. Nonprotocol diagnostic
+lines over 16 KiB are omitted with an explicit notice; progress/receipt lines
+retain their strict bounds. A disconnect never becomes reported success. Check
+package state and obtain a fresh review before retrying an uncertain outcome.
+Authentication audit records approval by the real account; the worker's receipt
+reports the package operation's result. Repository trust application and its
+following refresh are separate approvals and retain their existing diagnostics.
+
+The package stage installs the action while preserving existing administrator
+overrides. Missing authentication service/action, non-administrator accounts,
+bad/throttled passwords, private-runtime/peer failures and stale reviews reach
+Software. [Administrator qualification](../../tests/packages/admin-check.md)
+covers real signed ordinary-account workflows on both target architectures and
+the actual Software prompt/progress/credential-retirement code.
+
 ## Build and publish
 
 ```sh
-v -o /tmp/vinix-package tools/packages/main.v
+v -path '@vlib|@vmodules|.|tools/accounts' -o /tmp/vinix-package tools/packages/main.v
 /tmp/vinix-package keygen /secure/publisher.seed
 /tmp/vinix-package pack manifest.json /build/payload /build/new-repository
 /tmp/vinix-package publish-release /build/new-repository company /secure/publisher.seed 1 2000000000 /srv/releases/company-1
