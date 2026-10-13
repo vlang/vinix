@@ -724,6 +724,25 @@ The built-in `NativeApp` V interface and VAPP version 11 remain internal desktop
 contracts. Third-party ui2 clients need compositor adapter qualification. Importing
 `desktop/app_process.v` is not a supported standalone UI SDK protocol.
 
+### Personal data cleanup
+
+Personal data survives uninstall and rollback. An ordinary account can use
+`vinix-package purge-data ID` after uninstall, or the additive SDK 1 method
+`Service.purge_data(id) !`, to erase only its own data. Root and alternate
+installation roots are refused. Cleanup holds the package reader lock and
+checks all retained generations containing the ID for live leases; any app
+using one of those generations blocks purge until it exits. This prevents
+deleting an uninstalled app's still-active data or racing reinstall/collection.
+
+The home and `.local/share/vinix-apps` parents must be ordinary caller-owned
+directories without write access for other accounts. Cleanup opens every
+component without following links, walks captured descriptors and refuses
+filesystem crossings. Nested links are unlinked without touching their targets;
+an aliased/special top-level data directory is refused. Missing data is a no-op.
+Cleanup is not transactional: storage errors or concurrent changes may require
+a retry, and nested directory depth is bounded at 64. See the
+[purge qualification](../../tests/packages/purge-data-check.md).
+
 ### Interactive terminal execution
 
 `run-terminal ID [ABSOLUTE_FILE...]` is an additive SDK 1 command. Standard input

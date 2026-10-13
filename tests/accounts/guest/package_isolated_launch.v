@@ -40,6 +40,14 @@ fn package_isolated_application_probe() !int {
 	mut context := appsdk.load()!
 	defer { context.close() }
 	assert context.data_directory == '/home/' + (if uid == 1000 { 'alex' } else { 'sam' }) + '/.local/share/vinix-apps/isolated-cli'
+	if os.args[2..] == ['hold'] {
+		os.write_file(context.data_directory + '/ready', 'leased')!
+		for _ in 0 .. 6000 {
+			if os.exists(context.data_directory + '/finish') { return 37 }
+			C.usleep(10_000)
+		}
+		return error('purge fixture did not release the running application')
+	}
 	if os.args.len == 3 && os.args[2].starts_with('/tmp/isolated-documents/') {
 		package_isolated_document(os.args[2])!
 		return 0
@@ -221,6 +229,7 @@ fn qualify_package_isolated_launch(mut t Test) ! {
 	assert C.write(terminal.terminal, c'terminal input\n', 15) == 15
 	isolated_terminal_output(terminal.terminal, 'PACKAGE ISOLATED TERMINAL DONE')!
 	assert sessioncore.wait(terminal.pid) == 37
+	qualify_package_data_purge(mut t, db, alex, sam)!
 	// Re-admission still happens as the ordinary account, after isolation.
 	original := pkgcore.load_config('')!
 	os.write_file('/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{ ...original, repositories: [] }))!

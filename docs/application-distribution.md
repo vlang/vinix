@@ -331,6 +331,21 @@ After uninstall an ordinary user can explicitly erase it with
 `vinix-package purge-data ID`. No package owns arbitrary home files. Data/schema
 compatibility across rollback remains the developer's responsibility.
 
+Purge holds the package reader lock through cleanup, refuses an installed app,
+and checks every retained generation containing its ID for a live lease. The
+check is conservative: another app using that same generation also prevents
+purge. Stop those apps and retry. Reinstall and collection cannot race the
+deletion. Missing personal data is a successful no-op.
+
+The home and each `.local/share/vinix-apps` component must be ordinary directories
+owned by the caller and not writable by other accounts. The deletion walk uses
+directory descriptors, never follows links, checks directory identity before
+removal and refuses filesystem crossings. Nested symlinks are removed as links;
+their targets remain untouched. A symlink or special file used as the top-level
+app data directory is refused. Storage errors, concurrent file operations or a
+tree deeper than 64 directories can leave partial cleanup; correct the reported
+problem and retry. See the [personal-data purge qualification](../tests/packages/purge-data-check.md).
+
 ## Software and execution
 
 **Software** offers catalog, installed and updates filters, description search,

@@ -1,0 +1,41 @@
+Expected failure with the previous qualified AArch64 service (b2f2e14974538259257b2532aa40a7c08a1bf29f0d3fef4b90b44bfbf8553869) and the current guest fixture: purge succeeds while an uninstalled app retains its generation lease.
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x277d30
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x237560
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+unix accept: got connection, setting up peer
+unix accept: done
+unix accept: waiting for connection
+unix accept: waiting for connection
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x237560
+unix accept: got connection, setting up peer
+unix accept: done
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x277d30
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x250bf0
+/Users/alex/code/vinix/tests/accounts/guest/package_purge.v:34: FAIL: fn main.qualify_package_data_purge: assert busy.status != 0 && busy.output.contains('still in use'), busy.output
+      message: 
+V panic: Assertion failed...

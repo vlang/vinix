@@ -354,16 +354,10 @@ fn checked(arguments []string) !int {
 			return service.run(names[0], names[1..])
 		}
 		'purge-data' {
-			if root != '' || names.len != 1 || !pkgcore.identifier(names[0]) || os.geteuid() == 0 {
+			if names.len != 1 {
 				return error('purge-data requires an application ID and an ordinary user session')
 			}
-			state := service.state()!
-			if state.packages.any(it.package.id == names[0]) {
-				return error('remove the application before purging its data')
-			}
-			path := os.home_dir().trim_right('/') + '/.local/share/vinix-apps/' + names[0]
-			if os.is_link(path) { return error('application data directory is a symlink') }
-			os.rmdir_all(path)!
+			service.purge_data(names[0])!
 		}
 		else { return error('unknown command: ${command}\n${usage}') }
 	}
