@@ -24,6 +24,11 @@ The controller additionally requires the
 [catalog metadata workflow](view-metadata-check.md), checking complete views,
 installed launch declarations and malformed-field refusal under both roles.
 Older receipts retain their original scope.
+The current controller also requires the
+[bounded dependency resolver workflow](resolver-check.md): a 4,096-package chain,
+a dense 512-package cyclic graph and an explicit refusal at the global search
+limit. These graph checks call the public resolver with synthetic data metadata;
+the subsequent signed administrator workflow checks service transactions.
 Launches, arbitrary executables, alternate roots, publisher tooling and raw
 unreviewed transactions are refused before authentication.
 

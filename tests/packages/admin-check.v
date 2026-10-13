@@ -33,6 +33,7 @@ fn suite(repository string) !hwhost.Suite {
 		scenarios: [hwhost.Scenario{ name: 'packages-admin', arches: ['aarch64', 'x86_64'],
 			about: 'reviewed package administration from an ordinary administrator through authenticated peer-bound progress transport',
 			required: ['HWTEST START packages-admin',
+				'PACKAGE RESOLVER chain-4096 dense-cycle-512 explicit-search-limit bounded-iterative PASS',
 				'PACKAGE ADMIN ordinary-admin password-required peer-bound reviewed-install progress stale-refusal no-launch PASS',
 				'PACKAGE METADATA ordinary-admin-standard complete-package-trust-history-offline-lock typed-flags nested-refusal read-only PASS',
 				'PACKAGE VIEW ordinary-admin-standard complete-catalog installed-launch-fields typed-flags nested-refusal read-only PASS',

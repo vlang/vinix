@@ -141,9 +141,32 @@ pub fn version_parts(version string) ![]u64 {
 	return result
 }
 
+// Sorting and constraint checks run repeatedly during dependency search. Keep
+// canonical numeric components on the stack instead of allocating split arrays.
+fn version_values(text string) ?[3]u64 {
+	if text.len == 0 || text.len > 29 { return none }
+	mut values := [3]u64{}
+	mut component := 0
+	mut digits := 0
+	mut zero := false
+	for byte in text {
+		if byte == `.` {
+			if component == 2 || digits == 0 { return none }
+			component++; digits = 0; zero = false
+		} else {
+			if byte < `0` || byte > `9` || digits == 9 || (digits > 0 && zero) { return none }
+			zero = digits == 0 && byte == `0`
+			values[component] = values[component] * 10 + u64(byte - `0`)
+			digits++
+		}
+	}
+	if component != 2 || digits == 0 { return none }
+	return values
+}
+
 pub fn compare_versions(left string, right string) int {
-	a := version_parts(left) or { return 0 }
-	b := version_parts(right) or { return 0 }
+	a := version_values(left) or { return 0 }
+	b := version_values(right) or { return 0 }
 	for i in 0 .. 3 {
 		if a[i] < b[i] { return -1 }
 		if a[i] > b[i] { return 1 }

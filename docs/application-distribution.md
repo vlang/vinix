@@ -183,6 +183,22 @@ accepts certificate-validated HTTPS or an absolute local `file://` repository.
 HTTP, unknown architectures, unsafe paths, special files, symlinks, conflicting
 file paths and ambiguous package ownership are rejected.
 
+Dependency resolution uses an iterative worklist with bounded backtracking.
+Shared dependencies and cycles expand each selected identity once, and constraints
+discovered later can change an earlier choice. Runtime kind and executable
+entrypoints participate in that search. At an equal version, the host architecture
+precedes `all`; ordinary installs still prefer an authenticated exact installed
+version, while upgrades prefer newer versions. Installed identities remain bound
+to their repository.
+
+The resolver accepts at most 4,096 requested roots and 32,768 catalog variants,
+selects at most 4,096 packages and allows at most 128 dependencies per package.
+Its 100,000-step budget counts constraint processing and candidate checks;
+exhaustion reports the search limit directly. Publisher release validation shares
+that budget across all advertised versions and both host architectures, with each
+advertised root fixed to its exact variant. See
+[dependency resolver qualification](../tests/packages/resolver-check.md).
+
 ## Install, maintenance and recovery
 
 ```sh

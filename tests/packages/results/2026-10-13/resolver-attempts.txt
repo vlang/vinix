@@ -1,0 +1,19 @@
+The retained pre-change recursive resolver reproducer failed its expected search-limit assertion: a nested budget refusal was swallowed by backtracking.
+
+tools/packages/pkgcore/resolve_search_test.v:25: fn test_resolution_search_budget_is_not_swallowed_by_backtracking
+    assert err.msg().contains('search limit'), err.msg()
+        Message: no trusted aarch64 candidate satisfies app ( .. )
+
+The first allocation fixture retained 53,000 bytes because it freed each returned IError box without freeing its independently owned message. The corrected fixture frees both. Search also frees each rejected policy diagnostic after cloning it; the final fixture adds policy refusals and retains zero bytes.
+
+tools/packages/pkgcore/resolve_search_test.v:249: fn test_search_work_buffers_retire_without_retained_allocations
+   > assert kept == 0, 'dependency search work buffers retained ${kept} bytes'
+     Left value (len: 5): `53000`
+    Right value (len: 1): `0`
+        Message: dependency search work buffers retained 53000 bytes
+
+The preliminary AArch64 guest passed before the final diagnostic cleanup. A fresh AArch64 run after cleanup supplies the final receipt. Only completed preliminary VM media was removed to free disk space; qualification/program/log inputs remain.
+
+PASS aarch64 packages-admin (39.4s)
+
+The private host helper was adapted to the pinned compiler argument-array os.exec interface; no production assertions or guest deadlines were weakened.

@@ -7,75 +7,30 @@ pub:
 	packages  []Installed
 }
 
-struct Search {
-	config     Config
-	candidates []Installed
-mut:
-	steps      int
-	diagnostic string
-}
-
-// Backtracking checks every constraint, including those added after a package
-// was selected. Cycles are legal; a selected package is expanded exactly once.
-fn (mut s Search) solve(pending []Dependency, selected []Installed) ![]Installed {
-	s.steps++
-	if s.steps > 100000 {
-		return error('dependency resolution exceeded its search limit; narrow the requested versions')
-	}
-	if pending.len == 0 {
-		for installed in selected {
-			p := installed.package
-			if p.runtime == '' { continue }
-			runtimes := selected.filter(it.package.id == p.runtime)
-			if runtimes.len != 1 || runtimes[0].package.kind != 'runtime'
-				|| !runtimes[0].package.files.any(it.path == p.entrypoint && it.executable) {
-				s.diagnostic = '${p.id}: isolated runtime ${p.runtime} does not provide ${p.entrypoint}'
-				return error(s.diagnostic)
-			}
-		}
-		return selected
-	}
-	dependency := pending[0]
-	rest := pending[1..].clone()
-	for chosen in selected {
-		if chosen.package.id == dependency.id {
-			if !dependency.accepts(chosen.package) {
-				s.diagnostic = 'conflicting version requirements for ${dependency.id}'
-				return error(s.diagnostic)
-			}
-			return s.solve(rest, selected)
-		}
-	}
-	for candidate in s.candidates {
-		p := candidate.package
-		if p.architecture !in [s.config.architecture, 'all'] || !dependency.accepts(p) { continue }
-		check_policy(p, s.config.policy) or {
-			s.diagnostic = err.msg()
-			continue
-		}
-		mut next := selected.clone()
-		next << candidate
-		mut requirements := rest.clone()
-		requirements << p.dependencies
-		answer := s.solve(requirements, next) or { continue }
-		return answer
-	}
-	if s.diagnostic == '' {
-		s.diagnostic = 'no trusted ${s.config.architecture} candidate satisfies ${dependency.id} (${dependency.minimum} .. ${dependency.before})'
-	}
-	return error(s.diagnostic)
-}
-
 fn candidate_order(a &Installed, b &Installed) int {
 	if a.package.id != b.package.id { return if a.package.id < b.package.id { -1 } else { 1 } }
-	return -compare_versions(a.package.version, b.package.version)
+	versions := compare_versions(a.package.version, b.package.version)
+	if versions != 0 { return -versions }
+	if a.package.architecture != b.package.architecture {
+		if a.package.architecture == 'all' { return 1 }
+		if b.package.architecture == 'all' { return -1 }
+		return if a.package.architecture < b.package.architecture { -1 } else { 1 }
+	}
+	if a.repository != b.repository { return if a.repository < b.repository { -1 } else { 1 } }
+	if a.public_key != b.public_key { return if a.public_key < b.public_key { -1 } else { 1 } }
+	return 0
 }
 
 pub fn resolve(catalog Catalog, config Config, current State, requested []string, upgrade bool) !Plan {
 	config.validate()!
+	if requested.len > 4096 || catalog.packages.len > 32768 { return error('dependency resolution exceeds its input limits') }
 	mut roots := requested.clone()
+	mut accepted := false
+	defer { if !accepted { unsafe { (&array(&roots)).free() } } }
 	roots.sort()
 	mut pending := []Dependency{}
+	unsafe { pending.flags |= .noslices }
+	defer { unsafe { (&array(&pending)).free() } }
 	for i, id in roots {
 		if !identifier(id) || (i > 0 && id == roots[i - 1]) {
 			return error('invalid or duplicate requested package: ${id}')
@@ -83,17 +38,20 @@ pub fn resolve(catalog Catalog, config Config, current State, requested []string
 		pending << Dependency{ id: id }
 	}
 	mut owners := map[string]string{}
+	defer { unsafe { owners.free() } }
 	for installed in current.packages { owners[installed.package.id] = installed.repository }
 	// A package's disappearance from one publisher is not permission for
 	// another enrolled repository to replace its installed identity.
 	mut candidates := catalog.packages.filter(it.package.id !in owners
 		|| owners[it.package.id] == it.repository)
+	defer { unsafe { (&array(&candidates)).free() } }
 	candidates.sort_with_compare(candidate_order)
 	if !upgrade {
 		// Reuse installed packages only when their exact provenance is still
 		// present in the authenticated catalog; revoked/removed versions cannot
 		// bypass current repository policy.
-		mut preferred := []Installed{}
+		mut preferred := []Installed{cap: candidates.len * 2}
+		unsafe { preferred.flags |= .noslices }
 		for installed in current.packages {
 			for candidate in candidates {
 				if candidate.package == installed.package && candidate.repository == installed.repository && candidate.public_key == installed.public_key {
@@ -102,20 +60,14 @@ pub fn resolve(catalog Catalog, config Config, current State, requested []string
 			}
 		}
 		preferred << candidates
-		candidates = preferred.clone()
+		unsafe { (&array(&candidates)).free() }
+		candidates = unsafe { preferred }
 	}
 	mut search := Search{ config: config, candidates: candidates }
-	mut packages := search.solve(pending, [])!
+	defer { unsafe { search.diagnostic.free() } }
+	mut packages := search.solve(pending)!
 	packages.sort(a.package.id < b.package.id)
-	for installed in packages {
-		p := installed.package
-		if p.runtime == '' { continue }
-		runtimes := packages.filter(it.package.id == p.runtime)
-		if runtimes.len != 1 || runtimes[0].package.kind != 'runtime'
-			|| !runtimes[0].package.files.any(it.path == p.entrypoint && it.executable) {
-			return error('${p.id}: isolated runtime ${p.runtime} does not provide ${p.entrypoint}')
-		}
-	}
+	accepted = true
 	return Plan{ requested: roots, packages: packages }
 }
 

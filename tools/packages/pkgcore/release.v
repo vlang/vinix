@@ -78,7 +78,8 @@ fn release_closures(index Index, public_key string) ! {
 	}
 	candidates.sort_with_compare(candidate_order)
 	mut steps := 0
-	for p in index.packages {
+	for root_index, candidate in candidates {
+		p := candidate.package
 		for architecture in ['aarch64', 'x86_64'] {
 			if p.architecture !in [architecture, 'all'] { continue }
 			config := Config{ architecture: architecture,
@@ -86,10 +87,13 @@ fn release_closures(index Index, public_key string) ! {
 			// Start with this exact root selected, rather than copying the entire
 			// catalog once per version (the CLI uses -gc none).
 			mut search := Search{ config: config, candidates: candidates, steps: steps }
-			search.solve(p.dependencies, [Installed{ package: p, repository: index.repository,
-				public_key: public_key, sequence: index.sequence }]) or {
-				return error('publisher dependency closure failed for ${p.id}/${p.architecture}/${p.version} on ${architecture}: ${err}')
+			result := search.solve_fixed(p.dependencies, [root_index]) or {
+				message := 'publisher dependency closure failed for ${p.id}/${p.architecture}/${p.version} on ${architecture}: ${err}'
+				cause := err.msg()
+				unsafe { search.diagnostic.free(); cause.free(); err.free() }
+				return error(message)
 			}
+			unsafe { (&array(&result)).free(); search.diagnostic.free() }
 			steps = search.steps
 		}
 	}

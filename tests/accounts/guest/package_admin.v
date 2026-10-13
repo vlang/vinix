@@ -19,6 +19,7 @@ fn qualify_package_admin(mut t Test) ! {
 	sessioncore.make_runtime_directory(sam)!
 	t.start_authd()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
+	qualify_package_resolver(mut t, architecture)!
 	root := '/tmp/admin-payload'
 	repository := '/tmp/admin-repository'
 	os.mkdir_all(root + '/share')!

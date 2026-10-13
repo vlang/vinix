@@ -119,9 +119,22 @@ Every advertised version must have a complete dependency closure within this
 workspace for its declared host architecture. An `all` data package must resolve
 on both hosts. Runtime entrypoints and version bounds use the consumer solver;
 a newer working version cannot hide an older broken version. The complete check
-has the resolver's 100,000-step budget. This checks structural installability;
+has the resolver's shared 100,000-step budget, counting processed constraints and
+candidate checks across every version and host. Exhaustion reports the search
+limit without falling back to a misleading missing-package diagnosis.
+This checks structural installability;
 it does not execute apps, qualify foreign APIs, accept consumer licenses or
 authorize firmware use. Proprietary/firmware declarations stay in signed metadata.
+
+The consumer resolver uses an iterative worklist and bounded backtracking, with
+at most 4,096 requested roots, 32,768 authenticated catalog variants, 4,096 selected
+packages and 128 dependencies per package. Late constraints, shared dependencies,
+cycles and runtime entrypoint fallback use the same search. Equal versions prefer
+the host architecture over `all`; a non-upgrade install first tries an exact
+installed variant still present with its authenticated provenance. Package
+identities remain bound to their installed repository. These limits supplement
+the signed metadata bounds; they do not truncate an accepted closure. See
+[resolver qualification](../../tests/packages/resolver-check.md).
 
 The command verifies and deduplicates objects, checks destination space with a
 64 MiB reserve, creates a private `.vinix-release-*` sibling tree, verifies copied

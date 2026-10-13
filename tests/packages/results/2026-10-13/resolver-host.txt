@@ -1,0 +1,41 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1; -no-skip-unused host assertion runners.
+All 27 package-core assertion runners: PASS, exit 0. The first four were rebuilt and rerun after diagnostic cleanup; later runners compiled after that production change.
+Resolver clang ASan/UBSan: PASS, exit 0; -fsanitize=address,undefined -fno-omit-frame-pointer; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1.
+Tracked-heap search fixture: PASS, exit 0; -gc none -manualfree -d track_heap; inputs are outside measurement and returned buffers/error messages/boxes are freed.
+Signed distribution CLI contracts: PASS, exit 0.
+Both guest init and service generated C were checked for iterative search, policy diagnostic release and nonallocating numeric comparison.
+QEMU TCG AArch64: 34.437 seconds; x86_64: 47.918 seconds; clean shutdown, eight verified hashes each. Fresh programs use retained qualified kernels. Timings are functional deadlines, not performance measurements.
+PASS tools/packages/pkgcore/administration_test.v
+PASS tools/packages/pkgcore/catalog_test.v
+PASS tools/packages/pkgcore/collection_limit_test.v
+PASS tools/packages/pkgcore/command_test.v
+PASS tools/packages/pkgcore/composition_test.v
+PASS tools/packages/pkgcore/context_test.v
+PASS tools/packages/pkgcore/deployment_test.v
+PASS tools/packages/pkgcore/distribution_test.v
+PASS tools/packages/pkgcore/document_keys_test.v
+PASS tools/packages/pkgcore/document_test.v
+PASS tools/packages/pkgcore/download_recovery_test.v
+PASS tools/packages/pkgcore/ffmpeg_profile_test.v
+PASS tools/packages/pkgcore/import_test.v
+PASS tools/packages/pkgcore/mirror_test.v
+PASS tools/packages/pkgcore/personal_data_test.v
+PASS tools/packages/pkgcore/policy_test.v
+PASS tools/packages/pkgcore/progress_test.v
+PASS tools/packages/pkgcore/purge_test.v
+PASS tools/packages/pkgcore/release_test.v
+PASS tools/packages/pkgcore/resolve_search_test.v
+PASS tools/packages/pkgcore/review_test.v
+PASS tools/packages/pkgcore/service_test.v
+PASS tools/packages/pkgcore/session_test.v
+PASS tools/packages/pkgcore/sqlite_profile_test.v
+PASS tools/packages/pkgcore/state_test.v
+PASS tools/packages/pkgcore/view_test.v
+PASS tools/packages/pkgcore/window_test.v
+PASS signed distribution CLI contracts
+PASS tools/packages/pkgcore/administration_test.v
+PASS tools/packages/pkgcore/catalog_test.v
+PASS tools/packages/pkgcore/collection_limit_test.v
+PASS tools/packages/pkgcore/command_test.v
+Dependency search: 1000 successful 256-package chains and missing/policy refusals retain zero tracked bytes
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
