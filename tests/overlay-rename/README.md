@@ -27,6 +27,7 @@ ABI header and `mke2fs` (`VINIX_MKE2FS` can select it). It owns a QEMU process w
 networking disabled and records kernel, fixture, ABI, init, ISO and disk hashes
 in `receipt.json`. Guest serial output is retained in `serial.log`. A positive
 verdict is required for every selected case; assertion failures fail the run.
+The timeout defaults to 360 seconds to include the chained retirement waits.
 
 The default `--case all` includes:
 
@@ -36,6 +37,13 @@ The default `--case all` includes:
   version, and the destination must stay present. Each phase holds the original
   descriptor for 6.5 seconds and checks content, UID 1000, mode 0600 and nlink 0.
   It prints slab samples before and after the phases.
+- `retention`: held directory descriptors and cwd, socket `O_PATH` descriptors,
+  stacked copy-up and a rename that retires nonempty layer arrays. Two batches
+  each perform 1,000 replacements and 100 repetitions of file, hardlink,
+  symlink, directory and socket creation/removal. Both batches allow 25 seconds
+  for chained retirement and backend queues. Every live slab class and the
+  large-allocation count must match; growth fails the host gate even when all
+  guest functional checks pass. See [retirement qualification](retention.md).
 - `failure`: a lower tmpfs file has a 256-byte basename that ext2 cannot encode.
   Renaming either an upper file or a copied-up lower file over it must return
   `ENAMETOOLONG` while preserving both merged paths and the lower content.
@@ -138,17 +146,19 @@ launch and drag met their process-count and duration checks. The report and
 screenshots are retained in `overlay-desktop-perf-a.json` and
 `overlay-desktop-shots-a`; `overlay-perf-evidence.log` records the report checks.
 
-This qualification does not close overlay memory retention. After the two
-phases and grace periods, both final kernels retain 4,023 additional size-256
+The earlier rename qualification left overlay allocations retained. After the
+two phases and grace periods, both earlier kernels retained 4,023 size-256
 objects, 2,012 size-96 objects and 4,044 size-16 objects. The pre-fix ARM control
 retains the same size-256/size-96 counts and 4,045 size-16 objects. An earlier
 4,000-replacement phase exhausted the existing owner metadata budget; its x86
 log records `Denied.owner 1`, `Requested 8198`, `OwnerBytes 61898188` and
 `OwnerLimit 61902848`. The bounded fixture exposes this growth rather than
 claiming a leak-free overlay. `overlay-evidence.log` records the comparisons.
+The [counted ownership and retirement correction](retention.md) now covers
+these per-operation allocations with matched controls and a strict memory gate.
 
 The earlier disk persistence test qualified regular upper files. Durable ext2
 whiteout hiding is now covered by the additional qualification linked above.
-General overlay retention, crash consistency,
+Retention across mounts, crash consistency,
 unsupported rename flags, full OCI security/delegation and mainstream
 rootless-runtime acceptance remain open.

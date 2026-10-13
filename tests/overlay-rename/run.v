@@ -29,10 +29,10 @@ fn main() {
 		hosttest.Option{
 			name:    '--case'
 			value:   true
-			choices: ['atomic', 'failure', 'disk', 'opaque', 'opaque-full', 'all']
+			choices: ['atomic', 'retention', 'failure', 'disk', 'opaque', 'opaque-full', 'all']
 		},
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|failure|disk|opaque|opaque-full|all] [--timeout SECONDS]')!
+	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|retention|failure|disk|opaque|opaque-full|all] [--timeout SECONDS]')!
 	for key in ['--arch', '--kernel-dir', '--state-dir'] {
 		if !options.has(key) {
 			eprintln('missing ' + key)
@@ -42,7 +42,7 @@ fn main() {
 	arch := options.value('--arch', '')
 	case_name := options.value('--case', 'all')
 	state := os.abs_path(options.value('--state-dir', ''))
-	timeout := options.integer('--timeout', 180)!
+	timeout := options.integer('--timeout', 360)!
 	if os.exists(state) || timeout <= 0 {
 		eprintln('state must be fresh and timeout positive')
 		exit(2)
@@ -64,10 +64,11 @@ fn main() {
 		'opaque_fixture':      digest(state + '/sources/overlayfixture/opaque.v')!
 		'opaque_full_fixture': digest(state + '/sources/overlayfixture/opaque_full.v')!
 		'statfs_fixture':      digest(state + '/sources/overlayfixture/statfs.v')!
+		'retention_fixture':   digest(state + '/sources/overlayfixture/retention.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
-	if case_name != 'atomic' {
+	if case_name !in ['atomic', 'retention'] {
 		os.write_file(disk, '')!
 		size_mb := if case_name == 'opaque-full' { 4 } else { 128 }
 		if unsafe { C.truncate(disk.str, i64(size_mb) * 1024 * 1024) } != 0 {
@@ -108,7 +109,7 @@ fn main() {
 	} {
 		inputs[name] = digest(path) or { '' }
 	}
-	if case_name != 'atomic' { inputs['disk_after'] = digest(disk) or { '' } }
+	if case_name !in ['atomic', 'retention'] { inputs['disk_after'] = digest(disk) or { '' } }
 	os.write_file(state + '/receipt.json', json2.encode(Receipt{
 		architecture: arch
 		case_name:    case_name
@@ -125,12 +126,12 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	os.mkdir_all(state + '/rootfs')!
 	os.write_file(state + '/rootfs/overlay-case', case_name)!
 	archive := guesthost.image(init, state)!
-	if arch == 'x86_64' && case_name != 'atomic' {
+	if arch == 'x86_64' && case_name !in ['atomic', 'retention'] {
 		os.setenv('VINIX_CMDLINE', os.getenv('VINIX_CMDLINE') + ' vinix.disk=auto', true)
 	}
 	configured := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
 	mut command := configured.command.clone()
-	if case_name != 'atomic' {
+	if case_name !in ['atomic', 'retention'] {
 		command << if arch == 'aarch64' {
 			['-drive', 'if=none,format=raw,file=' + disk + ',id=overlay-data', '-device',
 				'virtio-blk-device,drive=overlay-data']
@@ -140,6 +141,9 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	}
 	mut expected := ['OVERLAY GUEST: PASS']
 	if case_name in ['atomic', 'all'] { expected << 'OVERLAY REPLACE: PASS' }
+	if case_name in ['retention', 'all'] {
+		expected << ['OVERLAY RETENTION: PASS', 'OVERLAY DIRECTORY LIFETIME: PASS', 'OVERLAY SOCKET LIFETIME: PASS', 'OVERLAY STACKED LIFETIME: PASS']
+	}
 	if case_name in ['failure', 'all'] { expected << 'OVERLAY BACKEND FAILURE: PASS' }
 	if case_name in ['disk', 'all'] {
 		expected << ['OVERLAY DISK: PASS', 'OVERLAY PERSISTENCE: PASS', 'OVERLAY WHITEOUT: PASS',
@@ -160,23 +164,33 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 			return 1
 		}
 	}
+	if code == 0 && case_name in ['retention', 'all'] {
+		if !samples_flat(os.read_file(state + '/serial.log')!, 30, 31) {
+			eprintln('overlay operations retained live kernel allocations')
+			return 1
+		}
+	}
 	return code
 }
 
 fn statfs_samples_flat(serial string) bool {
+	return samples_flat(serial, 20, 21)
+}
+
+fn samples_flat(serial string, start int, end int) bool {
 	mut phase := -1
 	mut before := map[string]int{}
 	mut after := map[string]int{}
 	for raw in serial.split_into_lines() {
 		line := raw.trim_space()
 		if line.starts_with('OVERLAY SLAB: phase=') { phase = line.all_after('phase=').int() }
-		if phase !in [20, 21] { continue }
+		if phase != start && phase != end { continue }
 		fields := line.fields()
 		if fields.len != 4 || (!line.starts_with('size-') && !line.starts_with('large ')) {
 			continue
 		}
 		live := fields[if fields[0] == 'large' { 3 } else { 2 }].int()
-		if phase == 20 { before[fields[0]] = live } else { after[fields[0]] = live }
+		if phase == start { before[fields[0]] = live } else { after[fields[0]] = live }
 	}
 	if before.len == 0 || before.len != after.len { return false }
 	for name, live in before { if name !in after || after[name] != live { return false } }

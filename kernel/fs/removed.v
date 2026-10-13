@@ -32,8 +32,14 @@ struct RetiredItem {
 	charge kbudget.Charge
 	resource &resource.Resource = unsafe { nil }
 	node  &VFSNode = unsafe { nil }
+	// An overlay pointer removed from a still-live entry, released after grace.
+	overlay_backing &VFSNode = unsafe { nil }
 	bytes &u8      = unsafe { nil }
 	text string
+	// Keep the complete V array header: data may follow managed metadata and
+	// need not be the allocator's original pointer.
+	lower_nodes []&VFSNode
+	lower_resources []&resource.Resource
 	directory_busy bool
 	at    u64
 }
@@ -64,11 +70,10 @@ fn orphan_node(mut node VFSNode, mode u32) {
 	}
 }
 
-// Whether something holds `node` without a count, so that it is never freed:
-// an overlay built on it, or a mount on it or of it, now or once, here or in
-// another mount namespace.
+// Mounts retain their existing permanent pins. Overlay ownership is counted
+// separately so releasing the last alias can retire an unlinked backing node.
 fn pinned(node &VFSNode) bool {
-	return node.overlaid || node.mount_covered || node.mount_root || node.ns_mounts > 0
+	return node.mount_covered || node.mount_root || node.ns_mounts > 0
 		|| node.mountpoint != unsafe { nil }
 }
 
@@ -123,10 +128,13 @@ fn retire(item RetiredItem) {
 	removed_items.flags |= .noslices
 	removed_items << RetiredItem{
 		node:  item.node
+		overlay_backing: item.overlay_backing
 		bytes: item.bytes
 		charge: item.charge
 		resource: item.resource
 		text: item.text
+		lower_nodes: item.lower_nodes
+		lower_resources: item.lower_resources
 		directory_busy: item.directory_busy
 		at:    time.monotonic_ns()
 	}
@@ -172,8 +180,12 @@ pub fn reap_removed() {
 	mut index := 0
 	for item in items {
 		if item.node == unsafe { nil } {
+			if item.overlay_backing != unsafe { nil } { overlay_release_node(item.overlay_backing) }
 			unsafe { free(item.bytes) }
 			unsafe { item.text.free() }
+			mut lower_nodes := unsafe { item.lower_nodes }
+			mut lower_resources := unsafe { item.lower_resources }
+			unsafe { lower_nodes.free(); lower_resources.free() }
 			if item.resource != unsafe { nil } {
 				mut res := item.resource
 				resource.release_resource(mut res)
@@ -185,8 +197,15 @@ pub fn reap_removed() {
 		in_use := running[index]
 		index++
 		if pinned(node) {
-			// Mounted, overlaid or linked from /proc since it was retired: it
+			// Mounted or linked from /proc since it was retired: it
 			// stays.
+			continue
+		}
+		if katomic.load(&node.overlay_refs) != 0 {
+			// A final overlay release will requeue it. Reset first, then
+			// recheck so a concurrent final release cannot lose retirement.
+			katomic.store(mut &node.retired, u32(0))
+			if katomic.load(&node.overlay_refs) == 0 { retire_node(mut node) }
 			continue
 		}
 		if katomic.load(&node.handles) != 0 {
@@ -248,20 +267,23 @@ fn directory_releasing(pointer voidptr) {
 
 fn free_node(node &VFSNode) {
 	// A watch added through /proc/self/fd/N was never forgotten by name.
-	if node.directory_resource {
+	if node.directory_resource || (node.overlay != unsafe { nil } && node.removed) {
 		// Only dot redirects remain after rmdir. They are owned, rather than
 		// aliases of the parent, and share the enclosing node's grace period.
 		if node.children != unsafe { nil } {
 			for _, dot in node.children { unsafe { free(dot) } }
 			unsafe { node.children.free(); free(node.children) }
 		}
-		mut res := node.resource
-		resource.release_resource(mut res)
+		if node.directory_resource {
+			mut res := node.resource
+			resource.release_resource(mut res)
+		}
 	}
 	kbudget.release(node.kernel_charge)
 	inotify_forget(node)
  if node.overlay != unsafe { nil } {
-  unsafe { node.overlay.lowers.free(); free(node.overlay) }
+  overlay_release_entry(node.overlay)
+  unsafe { node.overlay.lowers.free(); node.overlay.lower_resources.free(); free(node.overlay) }
  }
 	unsafe {
 		node.name.free()
@@ -271,6 +293,16 @@ fn free_node(node &VFSNode) {
 			katomic.dec(mut &parent.parent_refs)
 		}
 		free(node)
+	}
+}
+
+fn overlay_release_after_grace(node &VFSNode, res &resource.Resource) {
+	retire(RetiredItem{overlay_backing: unsafe { node }, resource: unsafe { res }})
+}
+
+fn overlay_retire_lower_arrays(nodes []&VFSNode, resources []&resource.Resource) {
+	if nodes.data != unsafe { nil } || resources.data != unsafe { nil } {
+		retire(RetiredItem{lower_nodes: nodes, lower_resources: resources})
 	}
 }
 

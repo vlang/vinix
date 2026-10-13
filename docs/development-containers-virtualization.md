@@ -288,13 +288,19 @@ preserve the whiteout and restore exact disk block/inode counts; recovery and
 four read-only filesystem checks pass on both architectures. A separate ext2
 fix persists the destination parent's link count when a staged whiteout replaces
 an upper directory. Trusted-attribute authorization remains enforced.
-Slab samples still show the pre-existing overlay-node retention leak.
+The earlier slab samples exposed overlay-node retention on repeated replacement.
 Allocation tracking attributes the four small objects across two further
 failed creations to the existing `statfs` measurement-interface allocation.
 The [filesystem-stat correction](../tests/overlay-rename/statfs.md) removes
 that wrapper allocation: 2,000 pathname/descriptor calls and the repeated
 storage-failure samples stay flat on both architectures, with consistent
 backing values and all four read-only filesystem checks clean.
+The [overlay retirement correction](../tests/overlay-rename/retention.md) counts
+backing-node ownership, retains exact resource snapshots and retires removed
+aliases after descriptor, cwd and grace checks. Managed layer arrays retain
+their complete headers until V's destructor runs. Socket creation and resource
+adoption share a VFS transaction, transferring the entry's resource pin while
+preventing a competing unlink from retiring the placeholder twice.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

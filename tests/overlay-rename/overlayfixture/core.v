@@ -517,13 +517,15 @@ pub fn run() int {
 		}
 		all := C.strcmp(&selected[0], c'all') == 0
 		concurrent := all || C.strcmp(&selected[0], c'atomic') == 0
+		retention := all || C.strcmp(&selected[0], c'retention') == 0
 		failure := all || C.strcmp(&selected[0], c'failure') == 0
 		disk := all || C.strcmp(&selected[0], c'disk') == 0
 		opaque := all || C.strcmp(&selected[0], c'opaque') == 0
 		full := C.strcmp(&selected[0], c'opaque-full') == 0
-		check(concurrent || failure || disk || opaque || full, 86)
+		check(concurrent || retention || failure || disk || opaque || full, 86)
 		owned_directory(c'/tmp/overlay-state', 30)
-		if concurrent { prepare() }
+		if concurrent || retention { prepare() }
+		if retention { prepare_retained_layers() }
 		if failure || disk || opaque || full { prepare_disk(opaque, full) }
 		worker := C.fork()
 		check(worker >= 0, 87)
@@ -541,6 +543,7 @@ pub fn run() int {
 				C.puts(c'OVERLAY REPLACE: PASS')
 			}
 			if failure { backend_failure() }
+			if retention { overlay_retention() }
 			if disk { disk_replace() }
 			if opaque { opaque_changes() }
 			if full { opaque_full_prepare_worker() }

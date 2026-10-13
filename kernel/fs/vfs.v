@@ -75,8 +75,8 @@ pub mut:
 	overlay_work_owners &OverlayFS = unsafe { nil }
 	// How many open-file descriptions lead to this node, whether no name does
 	// any more, and whether it has been handed to the grace queue; see
-	// removed.v. An overlay built on the node, or a mount that has covered
-	// it, keeps it for good.
+	// removed.v. Overlay entries count their backing-node ownership; mounts
+	// retain their existing lifetime pins.
 	handles       int
 	orphan        bool
 	retired       u32
@@ -87,7 +87,7 @@ pub mut:
 	// A removed directory keeps its namespace resource reference until reap.
 	directory_resource bool
 	directory_released u64
-	overlaid      bool
+	overlay_refs  int
 	mount_covered bool
 }
 
@@ -717,21 +717,25 @@ pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 	return internal_create_checked(parent, name, mode, access)
 }
 
-// Have a node create() just made lead to `res` instead of the file it was
-// made with, as bind(2) has the name of a socket lead to the socket. A name
-// made in an overlay is a node in the upper layer too, which has to lead
-// there as well: unlinking the name releases what that node holds. It kept
-// the file, which was freed here, and postgres, unlinking its socket on the
-// way out, released whatever had been made in that memory since -- its
-// postmaster.opts, which the next start was then denied.
-pub fn replace_resource(mut node VFSNode, res &resource.Resource) {
+// Create and adopt a socket's namespace reference in one writer transaction.
+// A competing unlink must never retire the placeholder between creation and
+// adoption, or both paths would release its namespace reference.
+pub fn create_with_resource(parent &VFSNode, name string, mode u32, res &resource.Resource) ?&VFSNode {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+	access := if mode & stat.ifmt == stat.ifsock {
+		proc.policy_socket | proc.policy_create
+	} else { proc.policy_create }
+	mut node := internal_create_with_acl_locked(parent, name, mode, access, false)?
+	mut target := unsafe { res }
+	target.stat = node.resource.stat
 	mut replaced := node.resource
-	node.resource = unsafe { res }
-	if node.overlay != unsafe { nil } && node.overlay.upper != unsafe { nil } {
-		mut real := node.overlay.upper
-		real.resource = unsafe { res }
-	}
-	replaced.unref(unsafe { nil }) or {}
+	if node.overlay != unsafe { nil } {
+		overlay_replace_resource(mut node, res)
+	} else { node.resource = unsafe { res } }
+	// Lockless lookups can still be reading the placeholder's metadata.
+	release_resource_after_grace(replaced)
+	return node
 }
 
 // Replace a small regular file from a kernel service.  DHCP uses this after
@@ -2355,7 +2359,7 @@ fn adopt(mut node VFSNode, mut parent VFSNode, name string) {
 	node.name = name
 	free_string_after_grace(old_name)
 	if node.parent_held != 0 && voidptr(node.parent) != voidptr(parent) {
-		// A permanently pinned overlay/mount node may keep an orphan hold.
+		// A retained overlay/mount node may keep an orphan hold.
 		// Transfer it before publishing another parent or dropping the old one.
 		katomic.inc(mut &parent.parent_refs)
 		mut old_parent := node.parent

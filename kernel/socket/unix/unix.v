@@ -1447,14 +1447,12 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 		unsafe { path.free() }
 	}
 
-	mut node := fs.create(proc.current_directory_of(t.process), path, stat.ifsock | 0o777) or {
+	this.path_bound = true
+	fs.create_with_resource(proc.current_directory_of(t.process), path, stat.ifsock | 0o777, this.boxed()) or {
+		this.path_bound = false
 		return none
 	}
-
-	this.stat = node.resource.stat
-	this.path_bound = true
 	bound = true
-	fs.replace_resource(mut node, this.boxed())
 
 	this.name = *addr
 	this.name_len = u32(sizeof(u16)) + u32(path.len) + 1
