@@ -23,6 +23,14 @@ content at an existing hash. Increase sequence for every index change, including
 expiry. Administrators explicitly enroll, replace or revoke publisher keys using
 the repository commands below; publishers cannot authorize their own keys.
 
+Publisher and consumer use the [pinned V signing dependency](signing/README.md),
+with its MIT license, source blob/digest ledger and reproducible V regeneration
+tool. It preserves SDK-1 Ed25519 bytes and removes a compiler-sensitive variadic
+point-initialization check. Upgrades require renewed source, reference-vector,
+sanitizer and both-target qualification; compiler updates do not silently replace
+this signing implementation. Standard-library hashing/entropy dependencies are
+still part of the qualified toolchain closure.
+
 `publish-release REPOSITORY_DIR ID SEED SEQUENCE EXPIRES NEW_DIRECTORY` builds a
 complete consumer release without changing workspace indexes. It returns one
 format-1 JSON object with `repository`, `public_key`, `sequence`, `expires`,

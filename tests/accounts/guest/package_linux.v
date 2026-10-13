@@ -43,6 +43,11 @@ fn qualify_package_configuration_lock() ! {
 }
 
 fn qualify_package_linux(mut t Test) ! {
+	// Crypto's gc-none allocations belong to the probe process, not PID 1's
+	// later package workflow. Reap it before starting installation scenarios.
+	signing_probe := run(['/sbin/init', 'package-signing-probe'], '', none, none)
+	assert signing_probe.status == 0, signing_probe.output
+	t.say('PACKAGE SIGNING rfc8032 reference-keys reference-signatures tamper-refusal PASS')
 	db := t.make_accounts()
 	architecture := $if arm64 { 'aarch64' } $else { 'x86_64' }
 	prepared := '/tmp/linux-root'

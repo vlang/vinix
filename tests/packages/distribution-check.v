@@ -41,6 +41,7 @@ fn check() ! {
 	os.mkdir_all(work + '/software')!
 	defer { os.rmdir_all(work) or {} }
 	if '--software-only' !in os.args {
+		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/signing', work)!
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/pkgprotocol', work)!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/desktop/packagecore', work)!
@@ -68,6 +69,9 @@ fn check() ! {
 			staging := work + '/' + architecture
 			os.mkdir_all(staging)!
 			run(work + '/package-stage', ['--arch', architecture, '--staging', staging])!
+			assert os.read_file(staging + '/usr/share/licenses/vinix-packages/ed25519-MIT.txt')!
+				== os.read_file(repository + '/tools/packages/signing/LICENSE')!
+			println('Package signing license staged (${architecture})')
 		}
 	}
 	if '--desktop' in os.args {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-import crypto.ed25519
+import tools.packages.signing as ed25519
 import json2
 import os
 import time

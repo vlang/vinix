@@ -42,3 +42,7 @@ the baseline and both changed-source failures. Full signing primitive sanitizer
 qualification remains open. Functional host and guest passes
 remain separate evidence, and do not establish broader runtime or ordinary-user
 graphical-session coverage.
+
+The later [package-local signing qualification](signing-check.md) removes this
+variadic initialization failure for the package publisher/consumer. These original
+receipts and baseline traces remain historical evidence of the failure.

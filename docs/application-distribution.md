@@ -94,7 +94,11 @@ A root administrator can still alter installed code or local sequence records;
 this is not hardware protected antirollback.
 
 Ed25519 authenticates the exact index bytes **before** decoding. The service
-checks repository identity, format, expiry, increasing sequence and same-sequence
+uses a [pinned, licensed V signing dependency](../tools/packages/signing/README.md)
+for publisher and consumer. Its source ledger makes changes reproducible, and
+[reference/sanitizer/guest checks](../tests/packages/signing-check.md) cover the
+compiler-sensitive point-initialization adaptation.
+The service checks repository identity, format, expiry, increasing sequence and same-sequence
 equivocation. `/var/lib/vinix-packages/trust-history.json` retains the highest
 authenticated sequence and exact index digest for each repository ID/key,
 including revoked and replaced keys. Empty refreshes, garbage collection and

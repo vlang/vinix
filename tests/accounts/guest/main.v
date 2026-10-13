@@ -16,6 +16,10 @@ module main
 import os
 
 fn main() {
+	if os.args.len > 1 && os.args[1] == 'package-signing-probe' {
+		qualify_package_signing() or { eprintln(err); exit(1) }
+		exit(0)
+	}
 	if os.args.len > 1 && os.args[1] == '--uid' { exit(package_sandbox_handoff_probe()) }
 	if os.args.len > 1 && os.args[1] == 'package-probe' { exit(package_application_probe()) }
 	if os.args.len > 1 && os.args[1] == 'package-policy-probe' { exit(package_policy_probe()) }

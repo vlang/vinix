@@ -75,6 +75,11 @@ fn stage() ! {
 		os.chmod(staging + '/' + tool + '.new', 0o755)!
 		os.rename(staging + '/' + tool + '.new', staging + '/' + tool)!
 	}
+	// Retain the pinned signing implementation's license in binary releases.
+	notices := staging + '/usr/share/licenses/vinix-packages'
+	os.mkdir_all(notices)!
+	os.cp(repository + '/tools/packages/signing/LICENSE', notices + '/ed25519-MIT.txt')!
+	os.chmod(notices + '/ed25519-MIT.txt', 0o644)!
 	software := staging + '/usr/bin/vinix-software'
 	if os.exists(software) || os.is_link(software) { os.rm(software)! }
 	os.symlink('/usr/bin/vinix-desktop', software)!
