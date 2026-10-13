@@ -41,7 +41,7 @@ fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
 	volume_recovery_native_tests(root, work, v)!
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test', 'volume_growth_test', 'volume_boot_test', 'volume_boot_set_test', 'volume_recovery_inspect_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test', 'volume_growth_test', 'volume_boot_test', 'volume_boot_set_test', 'volume_recovery_inspect_test', 'volume_inspect_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -126,6 +126,20 @@ fn recovery_inspect_host(root string, work string) ! {
 	println('PASS recovery inspection native/model/syntax and both target allocation audits')
 }
 
+fn volume_inspect_host(root string, work string) ! {
+	v := os.getenv_opt('V') or { @VEXE }; os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
+	binary_codec := work + '/volume_seal_test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags', '-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags', '-fsanitize=address,undefined', '-o', binary_codec, root + '/tools/volumes/volumecli/volume_seal_test.v'])!
+	print(command([binary_codec])!); println('PASS volume_seal_test: independent VC1 codec ASan/UBSan'); volume_discovery_io_tests(root, work, v)!
+	binary := work + '/syntax-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, root + '/tools/volumes/volumecli/volume_inspect_test.v'])!
+	print(command([binary])!)
+	for arch in ['aarch64', 'x86_64'] { path := work + '/volume-' + arch + '.c'; generate(root, root + '/tools/volumes/volumecli', path, arch)!; check_generated(path)! }
+	println('PASS volume inspection native/model/syntax and both target allocation audits')
+}
+
 fn sealed_io_tests(root string, work string, v string) ! {
 	fixture := work + '/sealedio'; os.mkdir(fixture)!
 	for file in os.ls(root + '/tools/volumes/volumecli')! {
@@ -163,7 +177,7 @@ fn volume_discovery_io_tests(root string, work string, v string) ! {
 	for file in os.ls(root + '/tools/volumes/volumecli')! {
 		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
 		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
-		if file in ['discovery.v', 'volume_discovery.v', 'volume_recovery_unlock.v', 'volume_recovery_inspect.v', 'volume_boot.v', 'volume_boot_set.v', 'volume_seal_io.v', 'recovery_io.v', 'crypt.v', 'plan_io.v', 'plan_set.v'] {
+		if file in ['discovery.v', 'volume_discovery.v', 'volume_recovery_unlock.v', 'volume_recovery_inspect.v', 'volume_inspect.v', 'volume_boot.v', 'volume_boot_set.v', 'volume_seal_io.v', 'recovery_io.v', 'crypt.v', 'plan_io.v', 'plan_set.v'] {
 			for name in ['open', 'close', 'openat', 'fstat', 'fstatat', 'fdopendir', 'closedir', 'readdir', 'ioctl', 'pread', 'read', 'geteuid', 'fcntl'] {
 				if name == 'openat' && file !in ['discovery.v', 'volume_boot.v', 'volume_boot_set.v', 'plan_set.v'] { continue }
 				source = source.replace('C.' + name + '(', 'volume_discovery_mock_' + name + '(').replace('fn volume_discovery_mock_' + name + '(', 'fn C.' + name + '(')
@@ -171,16 +185,17 @@ fn volume_discovery_io_tests(root string, work string, v string) ! {
 		}
 		if file in ['volume_seal_io.v', 'volume_boot.v'] { source = source.replace('sealed_derive(', 'volume_discovery_mock_derive(') }
 		if file == 'plan_check.v' { source = source.replace('C.fflush(', 'volume_discovery_mock_fflush(').replace('C.ferror(', 'recovery_inspect_mock_ferror(').replace('fn recovery_inspect_mock_ferror(', 'fn C.ferror(') }
-		if file == 'volume_recovery_inspect.v' {
+		if file in ['volume_recovery_inspect.v', 'volume_inspect.v'] {
 			source = source.replace('unsafe { *work = VolumeSealFiles{} }', 'unsafe { *work = VolumeSealFiles{} }; recovery_inspect_record(work)')
-			source = source.replace('finish_bundle_report(show_recovery_volume(', 'finish_bundle_report(recovery_inspect_mock_report(')
+			source = source.replace('finish_bundle_report(show_recovery_volume(', 'finish_bundle_report(recovery_inspect_mock_report(').replace('finish_bundle_report(show_sealed_volume(', 'finish_bundle_report(recovery_inspect_mock_report(')
 		}
-		if file in ['discovery.v', 'volume_discovery.v', 'volume_recovery_unlock.v', 'volume_recovery_inspect.v', 'volume_boot.v', 'volume_boot_set.v', 'volume_seal_io.v'] { source = source.replace('erase_key(', 'volume_discovery_mock_erase(') }
+		if file in ['discovery.v', 'volume_discovery.v', 'volume_recovery_unlock.v', 'volume_recovery_inspect.v', 'volume_inspect.v', 'volume_boot.v', 'volume_boot_set.v', 'volume_seal_io.v'] { source = source.replace('erase_key(', 'volume_discovery_mock_erase(') }
 		os.write_file(fixture + '/' + file, source)!
 	}
 	os.write_file(fixture + '/volume_discovery_io_test.v', os.read_file(root + '/tests/storage-volumes/volume_discovery_io_test.v')!
 		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_unlock_io_test.v')!.all_after('import os\n')
-		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_inspect_io_test.v')!.all_after('import os\n'))!
+		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_inspect_io_test.v')!.all_after('import os\n')
+		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_inspect_io_test.v')!.all_after('import os\n'))!
 	binary := work + '/volume-discovery-io-test'
 	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 		'-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags',
@@ -494,7 +509,9 @@ fn plan_filesystem(work string) ! {
 
 fn compile_guest(root string, work string, arch string, nvme bool, recovery_mode string) ! {
 	source := work + '/guest.c'
-	if recovery_mode == 'inspect' {
+	if recovery_mode == 'volume-inspect' {
+		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v', root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_inspect_test'])!
+	} else if recovery_mode == 'inspect' {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
 			root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_recovery_inspect_test'])!
 	} else if recovery_mode == 'growth' {
@@ -849,6 +866,8 @@ fn main() {
 	mut recovery_growth := false
 	mut inspect_host := false
 	mut recovery_inspect := false
+	mut volume_inspect_host_only := false
+	mut volume_inspect := false
 	mut index := 1
 	for index < os.args.len {
 		name := os.args[index]
@@ -857,6 +876,8 @@ fn main() {
 		if name == '--host-recovery-rewrap' { is_host = true; rewrap_host = true; index++; continue }
 		if name == '--host-recovery-growth' { is_host = true; growth_host = true; index++; continue }
 		if name == '--host-recovery-inspect' { is_host = true; inspect_host = true; index++; continue }
+		if name == '--host-volume-inspect' { is_host = true; volume_inspect_host_only = true; index++; continue }
+		if name == '--volume-inspect' { volume_inspect = true; index++; continue }
 		if name == '--nvme' { nvme = true; index++; continue }
 		if name == '--volume-recovery' { recovery = true; index++; continue }
 		if name == '--recovery-unlock' { recovery_unlock = true; index++; continue }
@@ -864,7 +885,7 @@ fn main() {
 		if name == '--recovery-growth' { recovery_growth = true; index++; continue }
 		if name == '--recovery-inspect' { recovery_inspect = true; index++; continue }
 		if name !in ['--arch', '--work', '--kernel'] || index + 1 >= os.args.len || name in options {
-			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --host-recovery-unlock | --host-recovery-rewrap | --host-recovery-growth | --host-recovery-inspect | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery | --recovery-unlock | --recovery-rewrap | --recovery-growth | --recovery-inspect]]'); exit(2)
+			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --host-recovery-unlock | --host-recovery-rewrap | --host-recovery-growth | --host-recovery-inspect | --host-volume-inspect | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery | --recovery-unlock | --recovery-rewrap | --recovery-growth | --recovery-inspect | --volume-inspect]]'); exit(2)
 		}
 		options[name] = os.args[index + 1]; index += 2
 	}
@@ -875,16 +896,20 @@ fn main() {
 		|| (recovery_rewrap && (is_host || nvme || recovery || recovery_unlock)) || (rewrap_host && focused_host)
 		|| (recovery_growth && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap)) || (growth_host && (rewrap_host || focused_host))
 		|| (recovery_inspect && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap || recovery_growth))
-		|| (inspect_host && (focused_host || rewrap_host || growth_host)) {
+		|| (inspect_host && (focused_host || rewrap_host || growth_host))
+		|| (volume_inspect && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap || recovery_growth || recovery_inspect))
+		|| (volume_inspect_host_only && (focused_host || rewrap_host || growth_host || inspect_host)) {
 		eprintln('Select a new private work directory and supported architecture'); exit(2)
 	}
 	os.mkdir(work) or { eprintln(err); exit(1) }
 	root := os.dir(os.dir(os.dir(@FILE)))
-	if inspect_host { recovery_inspect_host(root, work) or { eprintln(err); exit(1) } }
+	if volume_inspect_host_only { volume_inspect_host(root, work) or { eprintln(err); exit(1) } }
+	else if inspect_host { recovery_inspect_host(root, work) or { eprintln(err); exit(1) } }
 	else if growth_host { recovery_growth_host(root, work) or { eprintln(err); exit(1) } }
 	else if rewrap_host { recovery_rewrap_host(root, work) or { eprintln(err); exit(1) } }
 	else if focused_host { recovery_unlock_host(root, work) or { eprintln(err); exit(1) } }
 	else if is_host { host(root, work) or { eprintln(err); exit(1) } }
+	else if volume_inspect { volume_inspect_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if recovery_inspect { recovery_inspect_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if recovery_growth { recovery_growth_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if recovery_rewrap { recovery_rewrap_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
@@ -968,5 +993,20 @@ fn recovery_inspect_guest(root string, work string, arch string, kernel string) 
 	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, false)! }
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN RECOVERY INSPECTION REORDERED BOOT PRESERVED') || second.contains('init: volume restore failed; continuing') { return error('Recovery inspection failed after reordered boot') }
+	println('PASS ' + arch + ': authenticated offline reports, read-only identity discovery, unchanged live mappings/data, retention and reordered reboot')
+}
+
+fn volume_inspect_guest(root string, work string, arch string, kernel string) ! {
+	if kernel == '' || !os.is_file(kernel) || work.contains(',') { return error('Select an existing kernel and safe work directory') }
+	compile_guest(root, work, arch, false, 'volume-inspect')!
+	write_disk(work + '/volume.raw', false)!; write_disk(work + '/wrong.raw', true)!
+	plan_filesystem(work)!; pack(work)!
+	first_args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, false)! }
+	first := boot(first_args, work + '/first-boot.log')!
+	if !first.contains('PLAN VOLUME INSPECTION PASSED:') || first.count('PLAN VOLUME INSPECTION CYCLES count=4') != 2
+		|| !first.contains('PLAN VOLUME INSPECTION LARGE ') || first.count('PLAN VOLUME INSPECTION RETAIN ') == 0 { return error('Missing complete volume inspection and retention qualification') }
+	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, false)! }
+	second := boot(second_args, work + '/second-boot.log')!
+	if !second.contains('PLAN VOLUME INSPECTION REORDERED BOOT PRESERVED') || second.contains('init: volume restore failed; continuing') { return error('Recovery inspection failed after reordered boot') }
 	println('PASS ' + arch + ': authenticated offline reports, read-only identity discovery, unchanged live mappings/data, retention and reordered reboot')
 }

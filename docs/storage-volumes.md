@@ -452,6 +452,54 @@ after the final check remains outside its guarantee. The existing encryption,
 credential storage, process-termination and cache limits apply. See
 [automatic unlock qualification](../tests/storage-volumes/volume-discovery.md).
 
+## Authenticated encrypted-volume inspection and discovery
+
+`show-volume CONFIG PASSPHRASE_FILE` authenticates an ordinary private VC1
+configuration and reports its saved disk capacity, native sector size, MBR/GPT
+identity, mapper slot, offset, byte length and saved read-only mode offline.
+`discover-volume CONFIG PASSPHRASE_FILE` also identifies the unique matching
+whole physical disk through pinned read-only descriptors:
+
+```sh
+vinix-volume show-volume /root/data.vcrypt /root/volume.pass
+vinix-volume discover-volume /root/data.vcrypt /root/volume.pass
+```
+
+Offline success starts with `operation=authenticated-volume`. Online success
+starts with `operation=discovered-volume device=/dev/NAME`. Both then print
+`disk_bytes=N sector=N identity=mbr:XXXXXXXX` (or canonical `gpt:GUID`) and
+`slot=N offset=N bytes=N readonly=0|1`. Full unsigned 64-bit metadata is retained;
+the read-only field describes the saved mapping independently of the physical
+disk's current mode. Reports contain no passphrase, volume key or wrapped key.
+
+Inputs use the existing private-owned-file policy and bounded 1–1024 exact
+credential bytes, including embedded NULs/newlines. Canonical format, geometry
+and fixed scrypt work-profile validation precede credential reads/KDF work.
+The existing salted 32 MiB scrypt loader authenticates the complete metadata
+and volume key and erases/releases its KDF workspace before returning. The
+queries then erase passphrase, wrapping key and decoded volume key before
+successful reporting or device access. Every exit erases the complete stack
+workspace and closes owned descriptors. No raw keyfile or new configuration
+is created, and no entropy source or writer lock is used.
+
+Discovery requires exact saved capacity, native sectors and disk identity,
+ignores partitions/logical views and accepts physical aliases sharing the
+runtime disk identity. Separate matching physical clones are ambiguous and
+fail. Missing/offline or unreadable matching-geometry candidates and enumeration
+failures reject. Two retained-descriptor rechecks cover identity, capacity,
+native sectors, runtime identity and physical read-only mode before any
+successful report; the descriptor remains pinned through output flushing.
+Every candidate open is read-only, even for a saved writable mapping.
+
+These queries preserve input bytes, live mapping status/generations/open
+descriptors and physical ciphertext. Discovery establishes a current physical
+match; it does not reserve slots, check live extent admission, authenticate the
+unauthenticated AES-XTS disk contents or guarantee a later unlock. Physical
+capacity changes need a separate explicit configuration adoption. Complete
+reports return 0, authentication/discovery/output failures return 1, and invalid
+syntax returns 2. Failures may print diagnostics, and output failures may leave
+partial authenticated reports. See [inspection qualification](../tests/storage-volumes/volume-inspect.md).
+
 ## Opt-in encrypted boot unlock
 
 The existing `boot-restore` startup hook can unlock an authenticated encrypted

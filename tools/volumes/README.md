@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`show-volume CONFIG PASSPHRASE_FILE` authenticates and reports ordinary encrypted
+configuration metadata offline. `discover-volume CONFIG PASSPHRASE_FILE` also
+locates the unique matching whole physical disk through read-only pins and
+final rechecks. Both use the existing bounded scrypt loader, erase all decoded
+secrets before reports/device access and preserve live mappings and ciphertext.
+See [encrypted configuration queries](../../docs/storage-volumes.md#authenticated-encrypted-volume-inspection-and-discovery).
+
 `show-recovery-volume BACKUP RECOVERY_KEYFILE` authenticates and reports saved
 disk/mapping metadata offline. `discover-recovery-volume BACKUP RECOVERY_KEYFILE`
 also finds the unique matching physical disk using pinned read-only descriptors

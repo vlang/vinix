@@ -568,6 +568,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	$if volume_recovery_rewrap_test ? { return recovery_rewrap_entry() }
 	$if volume_recovery_growth_test ? { return recovery_growth_entry() }
 	$if volume_recovery_inspect_test ? { return recovery_inspect_entry() }
+	$if volume_inspect_test ? { return volume_inspect_entry() }
 	parent := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
 	C.printf(c'PLAN START\n')
 	warm_image()

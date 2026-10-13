@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume show-volume CONFIG PASSPHRASE_FILE\n       vinix-volume discover-volume CONFIG PASSPHRASE_FILE\n')
 	C.printf(c'       vinix-volume plan-grow-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE EXPECTED_BYTES LENGTH_BYTES NEW_BACKUP\n')
 	C.printf(c'       vinix-volume rewrap-recovery-volume BACKUP OLD_RECOVERY_KEYFILE NEW_RECOVERY_KEYFILE NEW_BACKUP\n')
 	C.printf(c'       vinix-volume show-recovery-volume BACKUP RECOVERY_KEYFILE\n       vinix-volume discover-recovery-volume BACKUP RECOVERY_KEYFILE\n       vinix-volume open-recovery-volume-auto BACKUP RECOVERY_KEYFILE [ro]\n')
@@ -101,6 +102,10 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'show-volume') == 0 || C.strcmp(argv[1], c'discover-volume') == 0) {
+			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
+			return inspect_volume_seal(argv[2], argv[3], C.strcmp(argv[1], c'discover-volume') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'show-recovery-volume') == 0 || C.strcmp(argv[1], c'discover-recovery-volume') == 0) {
 			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
 			return inspect_volume_recovery(argv[2], argv[3], C.strcmp(argv[1], c'discover-recovery-volume') == 0)

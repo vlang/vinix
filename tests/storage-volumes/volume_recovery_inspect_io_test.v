@@ -31,7 +31,7 @@ fn recovery_inspect_mock_report(disk &DiskKey, row &Request, name &char, online 
 		assert pinned == 1
 	}
 	if volume_discovery_io.mode == 32 { return false }
-	return show_recovery_volume(disk, row, name, online)
+	return if volume_discovery_io.seal_inspect { show_sealed_volume(disk, row, name, online) } else { show_recovery_volume(disk, row, name, online) }
 }
 
 fn recovery_inspect_mock_ferror(stream voidptr) i32 {

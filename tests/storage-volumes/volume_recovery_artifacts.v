@@ -64,8 +64,36 @@ fn xts_unit(key []u8, unit u64, value u8) ![]u8 {
 	return result
 }
 
+fn inspect_artifacts(work string, output string, debugfs string, openssl string) ! {
+	for name in ['volume.sealed', 'volume-ro.sealed', 'crypt.pass'] {
+		r := os.exec([debugfs, '-R', 'dump /root/' + name + ' ' + output + '/' + name, work + '/config.ext2']); assert r.exit_code == 0, r.output
+	}
+	password := os.read_bytes(output + '/crypt.pass')!
+	assert password == [u8(0), 10, 0xe2, 0x82, 0xac, 0xff]
+	key := []u8{len: 64, init: u8(index * 13 + 7)}
+	mut evidence := ''
+	for readonly in [false, true] {
+		name := if readonly { 'volume-ro' } else { 'volume' }; sealed := os.read_bytes(output + '/' + name + '.sealed')!
+		header(sealed, false, readonly)
+		r := os.exec([openssl, 'kdf', '-keylen', '64', '-binary', '-out', output + '/' + name + '.wrapping',
+			'-kdfopt', 'hexpass:' + hex.encode(password), '-kdfopt', 'hexsalt:' + hex.encode(sealed[40..56]),
+			'-kdfopt', 'n:32768', '-kdfopt', 'r:8', '-kdfopt', 'p:3', '-kdfopt', 'maxmem_bytes:67108864', 'SCRYPT'])
+		assert r.exit_code == 0, r.output
+		wrapping := os.read_bytes(output + '/' + name + '.wrapping')!; assert wrapping.len == 64
+		unwrap(sealed, wrapping, key, output + '/' + name, openssl)!
+		evidence += name + ': independent canonical VC1 metadata, production scrypt profile, complete HMAC/ChaCha20 and exact volume key verified\n'
+	}
+	mut disk := os.open(work + '/volume.raw')!; disk.seek(15728640, .start)!
+	mut ciphertext := []u8{len: 512}; assert disk.read(mut ciphertext)! == 512; disk.close()
+	assert ciphertext == xts(key)!; os.write_file_array(output + '/xts.bin', ciphertext)!
+	evidence += 'AES-XTS ciphertext sha256=' + sha256.hexhash(ciphertext.bytestr()) + '\nPASS: independent persisted volume inspection configurations and ciphertext oracle\n'
+	os.write_file(output + '/oracle.log', evidence)!
+	mut manifest := ''; for name in os.ls(output)! { if name == 'SHA256SUMS' { continue }; manifest += sha256.hexhash(os.read_file(output + '/' + name)!) + '  ' + name + '\n'; os.chmod(output + '/' + name, 0o600)! }
+	os.write_file(output + '/SHA256SUMS', manifest)!; os.chmod(output + '/SHA256SUMS', 0o600)!; print(evidence)
+}
+
 fn main() {
-	assert os.args.len == 3 || (os.args.len == 4 && os.args[3] in ['--recovery-unlock', '--recovery-rewrap', '--recovery-growth']), 'Usage: volume_recovery_artifacts.v COMPLETED_GUEST_WORK NEW_OUTPUT [--recovery-unlock | --recovery-rewrap | --recovery-growth]'
+	assert os.args.len == 3 || (os.args.len == 4 && os.args[3] in ['--recovery-unlock', '--recovery-rewrap', '--recovery-growth', '--volume-inspect']), 'Usage: volume_recovery_artifacts.v COMPLETED_GUEST_WORK NEW_OUTPUT [--recovery-unlock | --recovery-rewrap | --recovery-growth | --volume-inspect]'
 	unlock := os.args.len == 4
 	rewrap := unlock && os.args[3] == '--recovery-rewrap'
 	growth := unlock && os.args[3] == '--recovery-growth'
@@ -75,6 +103,7 @@ fn main() {
 	for marker in ['first-boot.log', 'second-boot.log'] { assert os.read_file(work + '/' + marker)!.contains('PLAN DONE') }
 	debugfs := os.getenv_opt('VINIX_DEBUGFS') or { '/opt/homebrew/opt/e2fsprogs/sbin/debugfs' }
 	openssl := os.getenv_opt('VINIX_OPENSSL') or { '/opt/homebrew/opt/openssl@3/bin/openssl' }
+	if unlock && os.args[3] == '--volume-inspect' { inspect_artifacts(work, output, debugfs, openssl)!; return }
 	names := if growth { ['volume.vrecover', 'volume-ro.vrecover', 'grown.vrecover', 'grown-ro.vrecover', 'capacity.vrecover', 'capacity-ro.vrecover', 'recovery.key'] }
 		else if rewrap { ['volume.vrecover', 'volume-ro.vrecover', 'rotated.vrecover', 'rotated-ro.vrecover', 'recovery.key'] }
 		else if unlock { ['volume.vrecover', 'volume-ro.vrecover', 'recovery.key'] } else { ['volume.vrecover', 'volume-ro.vrecover', 'recovered.vcrypt', 'recovered-ro.vcrypt', 'recovery.key', 'next.pass'] }

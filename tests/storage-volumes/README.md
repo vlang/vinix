@@ -1,5 +1,13 @@
 # Storage-volume qualification
 
+Ordinary encrypted configuration inspection extends the same reader/discovery
+model with VC1 authentication, bounded binary passphrase inputs and failed KDF
+and tag paths. Targeted `--host-volume-inspect` and `--volume-inspect` modes
+qualify exact reports, zero secrets before reports/probes, no imports/writable
+device opens, four warmup and four measured paired real-scrypt queries, stable
+occupied mappings/ciphertext and reordered reboot. See
+[encrypted configuration inspection](volume-inspect.md).
+
 Authenticated recovery inspection extends the discovery model with exact report
 capture, full-width metadata, secret erasure before reports and every physical
 probe, read-only candidate opens, preserved modes, input/discovery/output faults

@@ -44,6 +44,8 @@ mut:
 	inspect bool
 	inspect_work &VolumeSealFiles = unsafe { nil }
 	reports int
+	seal_inspect bool
+	password_size int = 6
 }
 __global volume_discovery_io VolumeDiscoveryIO
 
@@ -257,7 +259,16 @@ fn volume_discovery_mock_pread(fd i32, output voidptr, size usize, offset i64) i
 }
 
 fn volume_discovery_mock_derive(password &u8, size int, salt &u8, output &u8) bool {
-	assert size == 6; volume_discovery_io.derives++
+	assert size == if volume_discovery_io.seal_inspect { volume_discovery_io.password_size } else { 6 }; volume_discovery_io.derives++
+	if volume_discovery_io.seal_inspect {
+		unsafe {
+			for i in size .. 1024 { assert password[i] == 0 }
+			if size == 6 {
+				expected := [u8(0), 10, 0xe2, 0x82, 0xac, 0xff]!
+				for i in 0 .. size { assert password[i] == expected[i] }
+			} else { for i in 0 .. size { assert password[i] == u8(i * 29 + 41) } }
+		}
+	}
 	if volume_discovery_io.multi {
 		unsafe { assert salt[0] == u8(volume_discovery_io.expected_slots[volume_discovery_io.derives - 1]) }
 		if volume_discovery_io.mode == 133 && volume_discovery_io.derives == 2 { return false }
