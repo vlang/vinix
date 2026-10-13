@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `54cb7b153c5e6b729523ed8b4bd9edd3d768169b`,
+at source commit `7f6b5f434e4a2361a44df62518521fb704a5667a`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,874 | 5.52% |
+| C | 599 | 2,396,874 | 5.51% |
 | Python | 10 | 89,440 | 0.21% |
-| Shell | 820 | 1,374,209 | 3.17% |
+| Shell | 821 | 1,369,977 | 3.15% |
 
-All `.v` files are classified as V. The resulting V share is 83.92%, with no
+All `.v` files are classified as V. The resulting V share is 83.96%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 54cb7b153c5e6b729523ed8b4bd9edd3d768169b --breakdown --json
+github-linguist --rev 7f6b5f434e4a2361a44df62518521fb704a5667a --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -897,7 +897,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-qemu-system-aarch64.sh` | 5,225 |
 | `scripts/build-roblox-aarch64.sh` | 128 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
-| `scripts/build-steam-aarch64.sh` | 13,216 |
+| `scripts/build-steam-aarch64.sh` | 13,488 |
 | `scripts/build-userland-aarch64-vm.sh` | 776 |
 | `scripts/build-userland-aarch64.sh` | 24,946 |
 | `scripts/build-userland-amd64.sh` | 5,989 |
@@ -1410,11 +1410,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/stack-protector/diagnostic` | 175 |
 | `tests/stack-protector/run` | 188 |
 | `tests/stack-protector/run-diagnostic` | 178 |
-| `tests/steam/hosted-test.sh` | 3,480 |
+| `tests/steam/hosted-command/run` | 165 |
+| `tests/steam/hosted-test.sh` | 3,229 |
 | `tests/steam/launcher-test.sh` | 6,952 |
 | `tests/steam/run-robust-vm` | 185 |
 | `tests/steam/run.sh` | 1,562 |
-| `tests/steam/steam-init.sh` | 11,630 |
+| `tests/steam/steam-init.sh` | 7,212 |
 | `tests/steam/steam-smoke` | 4,054 |
 | `tests/steam/test-robust-list` | 184 |
 | `tests/storage-volumes/host` | 184 |

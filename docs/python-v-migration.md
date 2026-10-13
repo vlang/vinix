@@ -2,9 +2,9 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `54cb7b153c5e6b729523ed8b4bd9edd3d768169b`,
+not been reached. At source `7f6b5f434e4a2361a44df62518521fb704a5667a`,
 Linguist 7.27.0 reports **Python 0.21%** (10 files, 89,440 bytes) and
-**V 83.92%** (4,001 files, 36,433,040 bytes). The complete committed-blob inventory and reproduction
+**V 83.96%** (4,009 files, 36,517,066 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
@@ -3365,3 +3365,19 @@ Python, authentication, APFS mutation, installation, shutdown or guest execution
 is claimed. Aggregate test.sh stops at existing UI formatter differences under
 this compiler; the same UI binary and policy suites run directly, preserving
 that formatter guard. See [native installer policy](../installer/macos/asahipolicy/README.md).
+
+Supplement `7f6b5f43` replaces nine embedded Python blocks in the Steam
+guest and hosted-launcher tests with V: 4,819 original body bytes and 147 lines.
+Because the containing files were Shell, this receives zero Python-file
+retirement credit. The six guest probes preserve semaphore wake/child alarm,
+eventfd and unfaulted pread, Unix epoll/recvmsg EOF, IPv4 ancillary length, empty
+ppoll timing and large shared mappings. Staging installs the real static V ELF,
+and the launcher retains its 20-second bound and original install/update/CSS
+fixtures. Six cold host builds, twelve actual static guest ELFs and six private
+RAM-only Linux SDK boots pass 360 probe checks, descriptor/path/child retirement
+and immediate mincore checks after munmap. ARM/x86/host-ASanUBSan launcher
+workflows, three real timeouts and the cold public wrapper pass. The native
+qualifier writes newc/gzip initramfs data and retains failure console output.
+No Python, actual Steam client, graphics or Vinix guest executes: these are
+reference Linux SDK behavior/resource checks, not a new Vinix kernel pass. See
+[native Steam probes](../tests/steam/syscall-probes/README.md).
