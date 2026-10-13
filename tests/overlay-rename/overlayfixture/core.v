@@ -522,11 +522,13 @@ pub fn run() int {
 		disk := all || C.strcmp(&selected[0], c'disk') == 0
 		opaque := all || C.strcmp(&selected[0], c'opaque') == 0
 		full := C.strcmp(&selected[0], c'opaque-full') == 0
-		check(concurrent || retention || failure || disk || opaque || full, 86)
+		sockets := C.strcmp(&selected[0], c'sockets') == 0
+		check(concurrent || retention || failure || disk || opaque || full || sockets, 86)
 		owned_directory(c'/tmp/overlay-state', 30)
 		if concurrent || retention { prepare() }
 		if retention { prepare_retained_layers() }
-		if failure || disk || opaque || full { prepare_disk(opaque, full) }
+		if failure || disk || opaque || full || sockets { prepare_disk(opaque, full) }
+		if sockets { check(C.mkdir(c'/tmp/overlay-volume/protected', 0o700) == 0, 427) }
 		worker := C.fork()
 		check(worker >= 0, 87)
 		if worker == 0 {
@@ -547,6 +549,7 @@ pub fn run() int {
 			if disk { disk_replace() }
 			if opaque { opaque_changes() }
 			if full { opaque_full_prepare_worker() }
+			if sockets { persistent_sockets() }
 			C.fflush(nil)
 			C._exit(0)
 		}
@@ -555,6 +558,7 @@ pub fn run() int {
 			&& C.WEXITSTATUS(status) == 0, 88)
 		if opaque { opaque_persistence() }
 		if full { opaque_full() }
+		if sockets { persistent_sockets_remount() }
 		if disk {
 			persistence(all)
 		} else if opaque {

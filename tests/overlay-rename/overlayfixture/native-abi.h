@@ -13,4 +13,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <grp.h>
+/* Declaration-only symbol alias: V cannot express connect's const pointer. */
+extern int vinix_overlay_connect(int, void *, unsigned int) __asm__("connect");
 #endif

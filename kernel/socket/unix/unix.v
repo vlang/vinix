@@ -128,6 +128,9 @@ pub mut:
 	freed   u32
 	// The interface box every descriptor and the pathname hold; freed with it.
 	box &resource.Resource = unsafe { nil }
+	// The original filesystem inode owns its one reference until this endpoint
+	// retires. Path operations use it even while descriptors use the endpoint.
+	namespace_resource &resource.Resource = unsafe { nil }
 
 	data      &u8 = unsafe { nil }
 	read_ptr  u64
@@ -204,6 +207,13 @@ fn (mut this UnixSocket) maybe_free() {
 	}
 	if !katomic.cas(mut &this.freed, u32(0), u32(1)) {
 		return
+	}
+	if this.namespace_resource != unsafe { nil } {
+		mut backing := this.namespace_resource
+		// A successful filesystem rename can remove a name without calling
+		// unlink again. The VFS publishes its final link count on the endpoint.
+		backing.stat.nlink = this.stat.nlink
+		fs.release_resource_after_grace(backing)
 	}
 	fs.free_after_grace(voidptr(this.box))
 	fs.free_charged_after_grace(voidptr(this), this.kernel_charge)
@@ -1079,14 +1089,20 @@ fn (mut this UnixSocket) unref(handle voidptr) ? {
 	this.maybe_free()
 }
 
-fn (mut this UnixSocket) link(_handle voidptr) ? {
-	return none
+fn (mut this UnixSocket) link(handle voidptr) ? {
+	if this.namespace_resource == unsafe { nil } { errno.set(errno.einval); return none }
+	mut backing := this.namespace_resource
+	backing.stat.nlink = this.stat.nlink
+	backing.link(handle)?
+	this.stat.nlink = backing.stat.nlink
 }
 
-fn (mut this UnixSocket) unlink(_handle voidptr) ? {
-	// The VFS owns the socket path. Once it has passed its namespace checks,
-	// there is no backing store operation left for a UNIX socket to perform.
-	return
+fn (mut this UnixSocket) unlink(handle voidptr) ? {
+	if this.namespace_resource == unsafe { nil } { errno.set(errno.einval); return none }
+	mut backing := this.namespace_resource
+	backing.stat.nlink = this.stat.nlink
+	backing.unlink(handle)?
+	this.stat.nlink = backing.stat.nlink
 }
 
 fn (mut this UnixSocket) grow(_handle voidptr, _new_size u64) ? {
@@ -1448,7 +1464,8 @@ fn (mut this UnixSocket) bind(_handle voidptr, _addr voidptr, addrlen u32) ? {
 	}
 
 	this.path_bound = true
-	fs.create_with_resource(proc.current_directory_of(t.process), path, stat.ifsock | 0o777, this.boxed()) or {
+	fs.create_with_resource(proc.current_directory_of(t.process), path, stat.ifsock | 0o777,
+		this.boxed(), unsafe { &this.namespace_resource }) or {
 		this.path_bound = false
 		return none
 	}

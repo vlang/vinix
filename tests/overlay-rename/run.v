@@ -29,10 +29,10 @@ fn main() {
 		hosttest.Option{
 			name:    '--case'
 			value:   true
-			choices: ['atomic', 'retention', 'failure', 'disk', 'opaque', 'opaque-full', 'all']
+			choices: ['atomic', 'retention', 'failure', 'disk', 'opaque', 'opaque-full', 'sockets', 'all']
 		},
 		hosttest.Option{ name: '--timeout', value: true },
-	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|retention|failure|disk|opaque|opaque-full|all] [--timeout SECONDS]')!
+	], [], 'Usage: run.v --arch ARCH --kernel-dir DIR --state-dir FRESH-DIR [--case atomic|retention|failure|disk|opaque|opaque-full|sockets|all] [--timeout SECONDS]')!
 	for key in ['--arch', '--kernel-dir', '--state-dir'] {
 		if !options.has(key) {
 			eprintln('missing ' + key)
@@ -65,6 +65,7 @@ fn main() {
 		'opaque_full_fixture': digest(state + '/sources/overlayfixture/opaque_full.v')!
 		'statfs_fixture':      digest(state + '/sources/overlayfixture/statfs.v')!
 		'retention_fixture':   digest(state + '/sources/overlayfixture/retention.v')!
+		'sockets_fixture':     digest(state + '/sources/overlayfixture/sockets.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
@@ -156,6 +157,9 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	if case_name == 'opaque-full' {
 		expected << ['OVERLAY OPAQUE STORAGE FULL: PASS', 'OVERLAY STATFS: PASS']
 	}
+	if case_name == 'sockets' {
+		expected << ['OVERLAY PERSISTENT SOCKETS: PASS', 'OVERLAY SOCKET REMOUNT: PASS']
+	}
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)
 	code := guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
 	if code == 0 && case_name == 'opaque-full' {
@@ -169,6 +173,10 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 			eprintln('overlay operations retained live kernel allocations')
 			return 1
 		}
+	}
+	if code == 0 && case_name == 'sockets' && !samples_flat(os.read_file(state + '/serial.log')!, 40, 41) {
+		eprintln('persistent UNIX sockets retained live kernel allocations')
+		return 1
 	}
 	return code
 }

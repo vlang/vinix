@@ -720,7 +720,10 @@ pub fn create(parent &VFSNode, name string, mode u32) ?&VFSNode {
 // Create and adopt a socket's namespace reference in one writer transaction.
 // A competing unlink must never retire the placeholder between creation and
 // adoption, or both paths would release its namespace reference.
-pub fn create_with_resource(parent &VFSNode, name string, mode u32, res &resource.Resource) ?&VFSNode {
+// The endpoint keeps the original filesystem resource for namespace operations
+// and inode cleanup. Initialize that ownership before exposing the endpoint.
+pub fn create_with_resource(parent &VFSNode, name string, mode u32, res &resource.Resource,
+	namespace &&resource.Resource) ?&VFSNode {
 	vfs_lock.acquire()
 	defer { vfs_lock.release() }
 	access := if mode & stat.ifmt == stat.ifsock {
@@ -729,12 +732,10 @@ pub fn create_with_resource(parent &VFSNode, name string, mode u32, res &resourc
 	mut node := internal_create_with_acl_locked(parent, name, mode, access, false)?
 	mut target := unsafe { res }
 	target.stat = node.resource.stat
-	mut replaced := node.resource
+	unsafe { *namespace = node.resource }
 	if node.overlay != unsafe { nil } {
 		overlay_replace_resource(mut node, res)
 	} else { node.resource = unsafe { res } }
-	// Lockless lookups can still be reading the placeholder's metadata.
-	release_resource_after_grace(replaced)
 	return node
 }
 

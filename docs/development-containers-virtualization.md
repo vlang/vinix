@@ -301,6 +301,13 @@ aliases after descriptor, cwd and grace checks. Managed layer arrays retain
 their complete headers until V's destructor runs. Socket creation and resource
 adoption share a VFS transaction, transferring the entry's resource pin while
 preventing a competing unlink from retiring the placeholder twice.
+The [persistent UNIX socket correction](../tests/overlay-rename/sockets.md) keeps
+the filesystem inode resource behind a bound endpoint. Direct ext2 and overlay
+upper unlink/rebind, replacement, held descriptors, live stream connections,
+hardlinks and cross-parent moves pass as UID/GID 1000 on both architectures.
+Protected-directory and read-only binds remain refused. Repeated workloads
+retain no live allocation growth, removed names stay absent after remount, and
+all four read-only filesystem checks are clean.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

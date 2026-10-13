@@ -94,6 +94,17 @@ volume without modifying it:
 e2fsck -f -n /path/to/result/store.ext2
 ```
 
+`--case sockets` separately qualifies UNIX stream sockets on direct ext2 and
+an ext2 overlay upper. UID/GID 1000 replaces a bound endpoint, connects through
+the renamed path, unlinks it, keeps descriptors and an established connection
+across the grace period, and rebinds the removed name. Hardlinks and moves across
+directories must preserve inode identity and update held-descriptor link counts.
+Two batches each run 32 cycles on each backend; every live slab class and the
+large-allocation count must match. A protected-directory bind must fail with
+`EACCES`. Root remounts the volume read-only, verifies that removed names stay
+absent, and checks that an ordinary-account bind fails with `EROFS`.
+See [persistent socket qualification](sockets.md) for controls, pins and limits.
+
 [Durable whiteout evidence and limits](whiteouts.md) and
 [persistent directory opacity](opacity.md) record the current storage
 qualifications. The following results and pins describe the earlier rename
