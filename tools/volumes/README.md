@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`plan-grow-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE EXPECTED_BYTES LENGTH_BYTES NEW_BACKUP`
+publishes authenticated recovery metadata with explicit nondecreasing physical
+capacity and extent length. It preserves key/start/slot/mode, erases plaintext
+secrets before pinned read-only device verification and rechecks before private
+publication. Live mappings and data change separately. See
+[recovery growth](../../docs/storage-volumes.md#recovery-volume-growth-and-capacity-adoption).
+
 `rewrap-recovery-volume BACKUP OLD_RECOVERY_KEYFILE NEW_RECOVERY_KEYFILE NEW_BACKUP`
 authenticates and reprotects recovery metadata/key directly under a new private
 recovery credential. It preserves geometry/read-only mode, refreshes the nonce,

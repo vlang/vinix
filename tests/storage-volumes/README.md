@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+Recovery volume growth adds explicit declared-capacity checks, secret erasure
+before read-only physical probes, both pinned final rechecks and signed mapping
+bounds to the recovery fault model. The `--recovery-growth` guests measure
+200 warmup and 200 measured plan/unlock/remove lifetimes, then adopt actual disk
+expansion after reordered reboot while preserving ciphertext and RW/RO modes.
+See [recovery growth qualification](recovery-growth.md).
+
 Recovery-backup credential changes extend the private reader/publisher model
 with authentication before replacement-credential access, erased buffer reuse,
 no-overwrite aliases and per-stage input/publication failures. Targeted

@@ -201,6 +201,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Authenticated encrypted-volume configuration backups and lost-credential recovery under independent recovery keys, exact metadata/key preservation, fresh passphrase wrapping, private no-overwrite publication and reordered boot persistence](docs/storage-volumes.md#encrypted-volume-configuration-recovery).
   - [x] [Direct authenticated recovery-key volume unlock with identity discovery, preserved readonly mode, erased credentials, no configuration publication and ciphertext rescue after credential loss/reordered reboot](docs/storage-volumes.md#direct-recovery-key-unlock).
   - [x] [Authenticated recovery-backup credential changes preserving disk/mapping metadata, volume key and readonly mode, fresh nonces, erased credential reuse, private no-overwrite publication and ciphertext rescue after old-key loss/reordered reboot](docs/storage-volumes.md#changing-recovery-backup-credentials).
+  - [x] [Authenticated recovery volume extent growth and explicit physical capacity adoption with preserved key/identity/start/slot/readonly mode, secrets erased before pinned read-only probes, private publication, stable live descriptors and ciphertext rescue after expansion/reordered reboot](docs/storage-volumes.md#recovery-volume-growth-and-capacity-adoption).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

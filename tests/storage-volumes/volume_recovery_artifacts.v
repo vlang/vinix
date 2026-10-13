@@ -13,14 +13,19 @@ fn put(mut bytes []u8, at int, count int, value u64) {
 }
 
 fn header(bytes []u8, backup bool, readonly bool) {
+	header_geometry(bytes, backup, readonly, 16777216, 4096)
+}
+
+fn header_geometry(bytes []u8, backup bool, readonly bool, capacity u64, length u64) {
 	assert bytes.len == 320
 	magic := if backup { 'VINIXVR1' } else { 'VINIXVC1' }
 	mut expected := []u8{len: 192}; copy(mut expected, magic.bytes())
 	for field in [[8, 4, 1], [12, 4, 1], [16, 4, 320], [20, 4, 64],
-		[80, 8, 16777216], [88, 8, 512], [96, 4, 1], [104, 4, 0x12345678],
-		[120, 4, 1], [124, 4, 60], [128, 8, 15728640], [136, 8, 4096]] {
+		[88, 8, 512], [96, 4, 1], [104, 4, 0x12345678],
+		[120, 4, 1], [124, 4, 60], [128, 8, 15728640]] {
 		put(mut expected, field[0], field[1], u64(field[2]))
 	}
+	put(mut expected, 80, 8, capacity); put(mut expected, 136, 8, length)
 	put(mut expected, 144, 8, u64(readonly))
 	if !backup {
 		put(mut expected, 24, 8, 32768); put(mut expected, 32, 4, 8); put(mut expected, 36, 4, 3)
@@ -41,12 +46,16 @@ fn unwrap(bytes []u8, wrapping []u8, key []u8, output string, openssl string) ! 
 }
 
 fn xts(key []u8) ![]u8 {
+	return xts_unit(key, 0, 0x73)
+}
+
+fn xts_unit(key []u8, unit u64, value u8) ![]u8 {
 	data := aes.new_cipher(key[..32])!; tweak_key := aes.new_cipher(key[32..])!
-	mut tweak := []u8{len: 16}; tweak_key.encrypt(mut tweak, []u8{len: 16})
+	mut tweak := []u8{len: 16}; mut number := []u8{len: 16}; put(mut number, 0, 8, unit); tweak_key.encrypt(mut tweak, number)
 	mut result := []u8{len: 512}
 	for at := 0; at < 512; at += 16 {
 		mut plain := []u8{len: 16}; mut cipher := []u8{len: 16}
-		for i in 0 .. 16 { plain[i] = 0x73 ^ tweak[i] }
+		for i in 0 .. 16 { plain[i] = value ^ tweak[i] }
 		data.encrypt(mut cipher, plain); for i in 0 .. 16 { result[at + i] = cipher[i] ^ tweak[i] }
 		mut shifted := [17]u8{}
 		for i in 0 .. 16 { shifted[i] |= tweak[i] << 1; shifted[i + 1] |= tweak[i] >> 7 }
@@ -56,16 +65,18 @@ fn xts(key []u8) ![]u8 {
 }
 
 fn main() {
-	assert os.args.len == 3 || (os.args.len == 4 && os.args[3] in ['--recovery-unlock', '--recovery-rewrap']), 'Usage: volume_recovery_artifacts.v COMPLETED_GUEST_WORK NEW_OUTPUT [--recovery-unlock | --recovery-rewrap]'
+	assert os.args.len == 3 || (os.args.len == 4 && os.args[3] in ['--recovery-unlock', '--recovery-rewrap', '--recovery-growth']), 'Usage: volume_recovery_artifacts.v COMPLETED_GUEST_WORK NEW_OUTPUT [--recovery-unlock | --recovery-rewrap | --recovery-growth]'
 	unlock := os.args.len == 4
 	rewrap := unlock && os.args[3] == '--recovery-rewrap'
+	growth := unlock && os.args[3] == '--recovery-growth'
 	work := os.abs_path(os.args[1]); output := os.abs_path(os.args[2])
 	assert !os.exists(output)
 	os.mkdir(output)!; os.chmod(output, 0o700)!
 	for marker in ['first-boot.log', 'second-boot.log'] { assert os.read_file(work + '/' + marker)!.contains('PLAN DONE') }
 	debugfs := os.getenv_opt('VINIX_DEBUGFS') or { '/opt/homebrew/opt/e2fsprogs/sbin/debugfs' }
 	openssl := os.getenv_opt('VINIX_OPENSSL') or { '/opt/homebrew/opt/openssl@3/bin/openssl' }
-	names := if rewrap { ['volume.vrecover', 'volume-ro.vrecover', 'rotated.vrecover', 'rotated-ro.vrecover', 'recovery.key'] }
+	names := if growth { ['volume.vrecover', 'volume-ro.vrecover', 'grown.vrecover', 'grown-ro.vrecover', 'capacity.vrecover', 'capacity-ro.vrecover', 'recovery.key'] }
+		else if rewrap { ['volume.vrecover', 'volume-ro.vrecover', 'rotated.vrecover', 'rotated-ro.vrecover', 'recovery.key'] }
 		else if unlock { ['volume.vrecover', 'volume-ro.vrecover', 'recovery.key'] } else { ['volume.vrecover', 'volume-ro.vrecover', 'recovered.vcrypt', 'recovered-ro.vcrypt', 'recovery.key', 'next.pass'] }
 	for name in names {
 		r := os.exec([debugfs, '-R', 'dump /root/' + name + ' ' + output + '/' + name, work + '/config.ext2']); assert r.exit_code == 0, r.output
@@ -85,6 +96,18 @@ fn main() {
 		header(backup, true, readonly)
 		old := if rewrap { []u8{len: 64, init: u8(index * 29 + 41)} } else { recovery }
 		unwrap(backup, old, key, output + '/' + name, openssl)!
+		if growth {
+			for stage in ['grown', 'capacity'] {
+				grown_name := stage + if readonly { '-ro' } else { '' }
+				grown := os.read_bytes(output + '/' + grown_name + '.vrecover')!
+				header_geometry(grown, true, readonly, if stage == 'grown' { u64(16777216) } else { u64(33554432) }, if stage == 'grown' { u64(8192) } else { u64(12288) })
+				previous := if stage == 'grown' { backup } else { os.read_bytes(output + '/grown' + if readonly { '-ro.vrecover' } else { '.vrecover' })! }
+				for i in 88 .. 192 { if i < 136 || i >= 144 { assert grown[i] == previous[i] } }
+				assert grown[56..68] != previous[56..68]
+				unwrap(grown, recovery, key, output + '/' + grown_name, openssl)!
+				evidence += grown_name + ': independent exact adopted geometry, preserved identity/key/mode, fresh nonce and HMAC/ChaCha20 verified\n'
+			}
+		}
 		if rewrap {
 			rotated_name := if readonly { 'rotated-ro' } else { 'rotated' }
 			rotated := os.read_bytes(output + '/' + rotated_name + '.vrecover')!
@@ -113,6 +136,16 @@ fn main() {
 	mut disk := os.open(work + '/volume.raw')!; disk.seek(15728640, .start)!
 	mut ciphertext := []u8{len: 512}; assert disk.read(mut ciphertext)! == 512; disk.close()
 	assert ciphertext == xts(key)!; os.write_file_array(output + '/xts.bin', ciphertext)!
+	if growth {
+		mut physical := os.open(work + '/volume.raw')!; defer { physical.close() }
+		for unit in [u64(8), u64(16)] {
+			physical.seek(i64(15728640 + unit * 512), .start)!
+			mut bytes := []u8{len: 512}; assert physical.read(mut bytes)! == 512
+			assert bytes == xts_unit(key, unit, if unit == 8 { u8(0xa6) } else { u8(0xc2) })!
+			os.write_file_array(output + '/xts-' + unit.str() + '.bin', bytes)!
+			evidence += 'AES-XTS grown unit=' + unit.str() + ' sha256=' + sha256.hexhash(bytes.bytestr()) + '\n'
+		}
+	}
 	evidence += 'AES-XTS ciphertext sha256=' + sha256.hexhash(ciphertext.bytestr()) + '\nPASS: independent persisted configuration recovery, sealed key and ciphertext oracle\n'
 	os.write_file(output + '/oracle.log', evidence)!
 	mut manifest := ''; for name in os.ls(output)! { if name == 'SHA256SUMS' { continue }; manifest += sha256.hexhash(os.read_file(output + '/' + name)!) + '  ' + name + '\n'; os.chmod(output + '/' + name, 0o600)! }

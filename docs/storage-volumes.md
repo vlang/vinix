@@ -686,6 +686,49 @@ revoke copies of those backups or rotate the underlying volume key. Deliberate
 capacity/extent changes still require a new backup of the adopted geometry.
 See [recovery credential-change qualification](../tests/storage-volumes/recovery-rewrap.md).
 
+## Recovery volume growth and capacity adoption
+
+`plan-grow-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE EXPECTED_BYTES
+LENGTH_BYTES NEW_BACKUP` authenticates a recovery backup and publishes a separate
+backup adopting a declared physical capacity and a nondecreasing extent length.
+It preserves the exact volume key, disk identity, native sectors, slot, offset
+and saved read-only mode. Original passphrases and ordinary configurations are
+not required:
+
+```sh
+vinix-volume plan-grow-recovery-volume /dev/vda /root/data.vrecover /root/recovery.key 33554432 12288 /root/grown.vrecover
+vinix-volume open-recovery-volume-auto /root/grown.vrecover /root/recovery.key
+```
+
+Capacity and length are explicit byte counts. Capacity cannot shrink and must
+remain native-sector aligned. Length cannot shrink, exceed the remaining
+physical capacity or exceed the kernel's signed mapping limit
+`0x7fffffffffffffff`; it must also be native-sector aligned. Equal geometry is
+allowed as a fresh-nonce refresh. No slot, offset, identity, sector-size or mode
+change is permitted.
+
+Canonical source checks precede recovery-key access, and authentication precedes
+all physical-device access. The candidate backup receives a fresh nonce and
+full authentication tag before disk verification. The recovery credential and
+decoded volume key erase before opening the physical parent. The command then
+opens only a pinned read-only parent, verifies its identity/sectors and exact
+declared capacity, and performs two further identity/geometry/runtime-identity
+and physical-mode rechecks. The final recheck runs under the destination writer
+lock immediately before private no-overwrite publication. The device descriptor
+and publication lock remain alive through reporting; every return erases the
+complete workspace and closes owned descriptors.
+
+This publishes desired recovery metadata. It does not resize a physical device,
+filesystem or live mapping, initialize newly exposed data, or create a raw
+keyfile. Existing live descriptors and ciphertext remain unchanged by planning.
+Apply live growth or reopen separately through the normal kernel protection
+and conflict checks. Changed capacity can make old backups unsuitable for
+direct unlock until explicit adoption; their saved bytes and credentials remain
+intact. Pre-publication failures create no output. Cleanup, directory-flush or
+reporting failure after publication can leave a complete private output with
+status 1; completed publication/reporting returns 0 and invalid syntax returns 2.
+See [recovery growth qualification](../tests/storage-volumes/recovery-growth.md).
+
 ## Authenticated encrypted-volume growth
 
 `plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`

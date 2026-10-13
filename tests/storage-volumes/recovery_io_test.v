@@ -25,6 +25,15 @@ __global recovery_io RecoveryIO
 
 fn recovery_mock_open(path &char, flags i32) i32 {
 	assert flags & C.O_CLOEXEC != 0 && flags & C.O_NOFOLLOW != 0
+	if recovery_growth_model {
+		recovery_growth_before_open(path, flags)
+		if C.strcmp(path, c'/recovery-growth-parent') == 0 {
+			recovery_growth_io.parent_opens++
+			if recovery_growth_io.physical == 11 { unsafe { C.errno = C.EACCES }; return -1 }
+			assert !recovery_growth_io.parent_live; recovery_growth_io.parent_live = true
+			recovery_io.opened++; return 900
+		}
+	}
 	if recovery_rewrap_model && !recovery_rewrap_before_open(path, flags) { return -1 }
 	if volume_recovery_model && (flags & C.O_DIRECTORY != 0 || (volume_recovery_io.derives > 0 && unsafe { C.strstr(path, c'/recovery') != nil })) {
 		volume_recovery_assert_erased()
@@ -41,7 +50,10 @@ fn recovery_mock_open(path &char, flags i32) i32 {
 }
 fn recovery_mock_close(fd i32) i32 {
 	recovery_io.closed++
-	result := C.close(fd)
+	mut result := i32(0)
+	if recovery_growth_model && fd == 900 {
+		assert recovery_growth_io.parent_live; recovery_growth_io.parent_live = false
+	} else { result = C.close(fd) }
 	if fd == recovery_io.temporary && recovery_io.mode == 17 { unsafe { C.errno = C.EIO }; return -1 }
 	if fd == recovery_io.directory { recovery_io.locked = false }
 	return result

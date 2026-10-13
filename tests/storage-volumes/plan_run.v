@@ -102,6 +102,18 @@ fn recovery_rewrap_host(root string, work string) ! {
 	println('PASS recovery rewrap native/model/syntax and both target allocation audits')
 }
 
+fn recovery_growth_host(root string, work string) ! {
+	v := os.getenv_opt('V') or { @VEXE }; os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
+	volume_recovery_native_tests(root, work, v)!; recovery_io_tests(root, work, v)!
+	binary := work + '/syntax-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -O2 -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, root + '/tools/volumes/volumecli/volume_recovery_growth_test.v'])!
+	print(command([binary])!)
+	for arch in ['aarch64', 'x86_64'] { path := work + '/volume-' + arch + '.c'; generate(root, root + '/tools/volumes/volumecli', path, arch)!; check_generated(path)! }
+	println('PASS recovery growth native/model/syntax and both target allocation audits')
+}
+
 fn sealed_io_tests(root string, work string, v string) ! {
 	fixture := work + '/sealedio'; os.mkdir(fixture)!
 	for file in os.ls(root + '/tools/volumes/volumecli')! {
@@ -205,12 +217,18 @@ fn recovery_io_tests(root string, work string, v string) ! {
 		if file == 'plan_check.v' { source = source.replace('C.fflush(', 'recovery_mock_fflush(') }
 		if file in ['volume_recovery.v', 'volume_seal_io.v'] { source = source.replace('sealed_derive(', 'volume_recovery_mock_derive(') }
 		if file == 'volume_recovery_rewrap.v' { source = source.replace('unsafe { *work = VolumeSealFiles{} }', 'unsafe { *work = VolumeSealFiles{} }; recovery_rewrap_record(work)') }
-		if file in ['recovery_io.v', 'recovery_crypto.v', 'data_sha256.v', 'volume_recovery.v', 'volume_recovery_rewrap.v', 'volume_recovery_crypto.v', 'volume_seal_io.v', 'volume_seal_crypto.v'] { source = source.replace('erase_key(', 'recovery_mock_erase(') }
+		if file == 'volume_recovery_growth.v' {
+			source = source.replace('unsafe { *work = VolumeSealFiles{} }', 'unsafe { *work = VolumeSealFiles{} }; recovery_growth_record(work)')
+			for name in ['open', 'close'] { source = source.replace('C.' + name + '(', 'recovery_mock_' + name + '(') }
+		}
+		if file == 'plan_io.v' { for name in ['ioctl', 'pread'] { source = source.replace('C.' + name + '(', 'recovery_growth_mock_' + name + '(').replace('fn recovery_growth_mock_' + name + '(', 'fn C.' + name + '(') } }
+		if file in ['recovery_io.v', 'recovery_crypto.v', 'data_sha256.v', 'volume_recovery.v', 'volume_recovery_rewrap.v', 'volume_recovery_growth.v', 'volume_recovery_crypto.v', 'volume_seal_io.v', 'volume_seal_crypto.v'] { source = source.replace('erase_key(', 'recovery_mock_erase(') }
 		os.write_file(fixture + '/' + file, source)!
 	}
 	os.write_file(fixture + '/recovery_io_test.v', os.read_file(root + '/tests/storage-volumes/recovery_io_test.v')!
 		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_io_test.v')!.all_after('import os\n')
-		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_rewrap_io_test.v')!.all_after('import os\n'))!
+		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_rewrap_io_test.v')!.all_after('import os\n')
+		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_growth_io_test.v')!.all_after('import os\n'))!
 	binary := work + '/recovery-io-test'
 	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -457,15 +475,18 @@ fn plan_filesystem(work string) ! {
 	}
 }
 
-fn compile_guest(root string, work string, arch string, nvme bool, recovery bool, recovery_unlock bool, recovery_rewrap bool) ! {
+fn compile_guest(root string, work string, arch string, nvme bool, recovery_mode string) ! {
 	source := work + '/guest.c'
-	if recovery_rewrap {
+	if recovery_mode == 'growth' {
+		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
+			root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_recovery_growth_test'])!
+	} else if recovery_mode == 'rewrap' {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
 			root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_recovery_rewrap_test'])!
-	} else if recovery_unlock {
+	} else if recovery_mode == 'unlock' {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
 			root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_recovery_unlock_test'])!
-	} else if recovery {
+	} else if recovery_mode == 'recovery' {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
 			root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_recovery_test'])!
 	} else if nvme {
@@ -637,7 +658,7 @@ fn boot(args []string, log string) !string {
 fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if kernel == '' || !os.is_file(kernel) { return error('Select an existing kernel with --kernel') }
 	if work.contains(',') { return error('Work directory cannot contain QEMU option separators') }
-	compile_guest(root, work, arch, nvme, false, false, false)!
+	compile_guest(root, work, arch, nvme, '')!
 	if nvme {
 		nvme_disk(work + '/nvme.raw',0x81)!
 		nvme_disk(work + '/nvme-warning.raw',0x82)!
@@ -804,18 +825,22 @@ fn main() {
 	mut focused_host := false
 	mut rewrap_host := false
 	mut recovery_rewrap := false
+	mut growth_host := false
+	mut recovery_growth := false
 	mut index := 1
 	for index < os.args.len {
 		name := os.args[index]
 		if name == '--host' { is_host = true; index++; continue }
 		if name == '--host-recovery-unlock' { is_host = true; focused_host = true; index++; continue }
 		if name == '--host-recovery-rewrap' { is_host = true; rewrap_host = true; index++; continue }
+		if name == '--host-recovery-growth' { is_host = true; growth_host = true; index++; continue }
 		if name == '--nvme' { nvme = true; index++; continue }
 		if name == '--volume-recovery' { recovery = true; index++; continue }
 		if name == '--recovery-unlock' { recovery_unlock = true; index++; continue }
 		if name == '--recovery-rewrap' { recovery_rewrap = true; index++; continue }
+		if name == '--recovery-growth' { recovery_growth = true; index++; continue }
 		if name !in ['--arch', '--work', '--kernel'] || index + 1 >= os.args.len || name in options {
-			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --host-recovery-unlock | --host-recovery-rewrap | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery | --recovery-unlock | --recovery-rewrap]]'); exit(2)
+			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --host-recovery-unlock | --host-recovery-rewrap | --host-recovery-growth | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery | --recovery-unlock | --recovery-rewrap | --recovery-growth]]'); exit(2)
 		}
 		options[name] = os.args[index + 1]; index += 2
 	}
@@ -823,14 +848,17 @@ fn main() {
 	if options['--work'] == '' || os.exists(work) || (!is_host && options['--arch'] !in ['amd64', 'aarch64'])
 		|| (nvme && (is_host || options['--arch'] != 'amd64')) || (recovery && (is_host || nvme))
 		|| (recovery_unlock && (is_host || nvme || recovery))
-		|| (recovery_rewrap && (is_host || nvme || recovery || recovery_unlock)) || (rewrap_host && focused_host) {
+		|| (recovery_rewrap && (is_host || nvme || recovery || recovery_unlock)) || (rewrap_host && focused_host)
+		|| (recovery_growth && (is_host || nvme || recovery || recovery_unlock || recovery_rewrap)) || (growth_host && (rewrap_host || focused_host)) {
 		eprintln('Select a new private work directory and supported architecture'); exit(2)
 	}
 	os.mkdir(work) or { eprintln(err); exit(1) }
 	root := os.dir(os.dir(os.dir(@FILE)))
-	if rewrap_host { recovery_rewrap_host(root, work) or { eprintln(err); exit(1) } }
+	if growth_host { recovery_growth_host(root, work) or { eprintln(err); exit(1) } }
+	else if rewrap_host { recovery_rewrap_host(root, work) or { eprintln(err); exit(1) } }
 	else if focused_host { recovery_unlock_host(root, work) or { eprintln(err); exit(1) } }
 	else if is_host { host(root, work) or { eprintln(err); exit(1) } }
+	else if recovery_growth { recovery_growth_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if recovery_rewrap { recovery_rewrap_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if recovery_unlock { recovery_unlock_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else if recovery { volume_recovery_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
@@ -841,7 +869,7 @@ fn main() {
 // pinned physical disks and QEMU transport, followed by reordered reboot.
 fn volume_recovery_guest(root string, work string, arch string, kernel string) ! {
 	if kernel == '' || !os.is_file(kernel) || work.contains(',') { return error('Select an existing kernel and safe work directory') }
-	compile_guest(root, work, arch, false, true, false, false)!
+	compile_guest(root, work, arch, false, 'recovery')!
 	write_disk(work + '/volume.raw', false)!; write_disk(work + '/wrong.raw', true)!
 	plan_filesystem(work)!; pack(work)!
 	first_args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, false)! }
@@ -856,7 +884,7 @@ fn volume_recovery_guest(root string, work string, arch string, kernel string) !
 
 fn recovery_unlock_guest(root string, work string, arch string, kernel string) ! {
 	if kernel == '' || !os.is_file(kernel) || work.contains(',') { return error('Select an existing kernel and safe work directory') }
-	compile_guest(root, work, arch, false, false, true, false)!
+	compile_guest(root, work, arch, false, 'unlock')!
 	write_disk(work + '/volume.raw', false)!; write_disk(work + '/wrong.raw', true)!
 	plan_filesystem(work)!; pack(work)!
 	first_args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, false)! }
@@ -871,7 +899,7 @@ fn recovery_unlock_guest(root string, work string, arch string, kernel string) !
 
 fn recovery_rewrap_guest(root string, work string, arch string, kernel string) ! {
 	if kernel == '' || !os.is_file(kernel) || work.contains(',') { return error('Select an existing kernel and safe work directory') }
-	compile_guest(root, work, arch, false, false, false, true)!
+	compile_guest(root, work, arch, false, 'rewrap')!
 	write_disk(work + '/volume.raw', false)!; write_disk(work + '/wrong.raw', true)!
 	plan_filesystem(work)!; pack(work)!
 	first_args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, false)! }
@@ -882,4 +910,20 @@ fn recovery_rewrap_guest(root string, work string, arch string, kernel string) !
 	second := boot(second_args, work + '/second-boot.log')!
 	if !second.contains('PLAN RECOVERY REWRAP REORDERED BOOT PRESERVED') || second.contains('init: volume restore failed; continuing') { return error('Rewrapped recovery configuration failed after reordered boot') }
 	println('PASS ' + arch + ': authenticated recovery credential changes, RW/RO ciphertext, retention and reordered reboot after old credential loss')
+}
+
+fn recovery_growth_guest(root string, work string, arch string, kernel string) ! {
+	if kernel == '' || !os.is_file(kernel) || work.contains(',') { return error('Select an existing kernel and safe work directory') }
+	compile_guest(root, work, arch, false, 'growth')!
+	write_disk(work + '/volume.raw', false)!; write_disk(work + '/wrong.raw', true)!
+	plan_filesystem(work)!; pack(work)!
+	first_args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, false)! }
+	first := boot(first_args, work + '/first-boot.log')!
+	if !first.contains('PLAN RECOVERY GROWTH PASSED:') || first.count('PLAN RECOVERY GROWTH CYCLES count=200') != 2
+		|| !first.contains('PLAN RECOVERY GROWTH LARGE ') || first.count('PLAN RECOVERY GROWTH RETAIN ') == 0 { return error('Missing complete recovery growth and retention qualification') }
+	shrink_disk(work + '/volume.raw', 33554432)!
+	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, false)! }
+	second := boot(second_args, work + '/second-boot.log')!
+	if !second.contains('PLAN RECOVERY GROWTH CAPACITY BOOT PRESERVED') || second.contains('init: volume restore failed; continuing') { return error('Recovery capacity adoption failed after reordered boot') }
+	println('PASS ' + arch + ': recovery extent growth, explicit physical capacity adoption, RW/RO ciphertext, retention and reordered reboot')
 }
