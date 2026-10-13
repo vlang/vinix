@@ -798,7 +798,7 @@ fn syscall_linux_fcntl(gpr_state voidptr, fdnum int, cmd int, arg u64) (u64, u64
 			value = u64(i64(i32(u32(arg))))
 		}
 		file.f_setfd, file.f_setfl, file.f_setown, file.f_setsig,
-		file.f_setpipe_sz, file.f_add_seals {
+		file.f_setpipe_sz, file.f_add_seals, file.f_dupfd_query {
 			value = u64(u32(arg))
 		}
 		else {}

@@ -1,0 +1,2 @@
+arm: direct Handle identity, paired releases and unchanged whole C outside F_DUPFD_QUERY/adapter; PASS
+x86: direct Handle identity, paired releases and unchanged whole C outside F_DUPFD_QUERY/adapter; PASS

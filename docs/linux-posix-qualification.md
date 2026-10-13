@@ -4165,3 +4165,96 @@ O_PATH disallowed commands, full status-flag/ownership/sealing behavior,
 dynamic pipe resizing, full lock semantics/concurrency, concurrent RLIMIT
 changes, GNU wrappers and translated/ELF32 paths remain separate. The three
 broad section 15 acceptance gates remain open.
+
+## Fcntl duplicate-description queries
+
+F_DUPFD_QUERY now compares the retained open descriptions behind two descriptors.
+The result is 1 for actual aliases and 0 for distinct descriptions, including
+separate opens of the same inode. Either invalid descriptor returns EBADF.
+The native adapter consumes the comparison descriptor's lower 32 bits alongside
+the existing descriptor/command decoding. It follows the [stable Linux query](https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux/+/refs/tags/v6.12.38/fs/fcntl.c).
+Actual Linux 6.12.51 reference boots confirm these errors; the original 6.12
+implementation returned 0 for an invalid comparison descriptor.
+
+The existing primary lookup retains its FD and Handle. A successful secondary
+lookup retains another paired hold, and a scalar address comparison completes
+before releasing the secondary and primary holds. Failed secondary lookup
+releases the primary before EBADF. The descriptor-table lock ends at each
+lookup; no lock is held across either release. The query allocates no object,
+stores no pointer and performs no resource operation.
+
+V's ordinary Handle-pointer equality initially emitted full structural equality
+after an address fast path, copying Handle records and reading mutable arrays.
+The implementation now explicitly compares void pointers. Whole generated-C
+and independent lifetime checks require that direct comparison and forbid
+Handle copies, structural equality or array traversal in the new branch.
+The initial structural build and fixed-index fixture setup failures are retained
+as private diagnostics and excluded from qualified evidence.
+
+| Root and UID/GID1000 controls | Calls per architecture | Baseline failures | Candidate/Linux failures |
+| --- | ---: | ---: | ---: |
+| Alias versus separate-description matrix | 6144 | 6144 | 0 |
+| Invalid descriptors, word and soft-limit errors | 1024 | 848 | 0 |
+| Musl, balanced directory references and close/replacement | 1912 | 1904 | 0 |
+| Total | 9080 | 8896 | 0 |
+
+Both native candidates and actual Linux 6.12.51 references pass all 9080 controls
+with byte-identical native musl C and ELF. Eight source classes each have an
+original, ordinary duplicate and CLOEXEC duplicate: regular file, root-private
+O_PATH file, O_PATH directory/FIFO/unfollowed symlink, unlinked regular file and
+both nonblocking pipe endpoints. Separate opens of the first six classes have
+equal selected inode metadata and distinct descriptions; a second pipe has
+independent endpoints. Four controls independently vary source, command and
+comparison descriptor upper words. Musl calls agree with raw native calls.
+
+The maintained fixture removes one trailing blank line from the exact frozen
+tested source. Regenerating both module previews retains byte-identical executed
+C; receipts keep the actual frozen-source hash, and the audit separately pins
+the maintained source and permits only that exact EOF change.
+
+Held descriptors 64/65 stay usable above lowered soft limits 8 and 0. Invalid
+source/target words, closed descriptors and real close/replacement of descriptor
+66 require exact outcomes. A directory cohort balances live reference counts
+with temporary aliases 68–71 and matching flags while retaining separate opens.
+The parent creates the descriptions before fork; both credential children query
+the inherited aliases. Every temporary alias closes, and limits restore before
+further allocation. All held metadata, descriptor/status flags and cursors stay
+exact. A real alias moves its source's cursor while an independent open retains
+its own position; the shared cursor restores. File bytes and queued AB/CD remain
+unchanged before the parent closes every test descriptor.
+
+After 32 warmup cycles and settling, each credential runs 200 cycles of true,
+false, closed-target and negative-target queries. All 18 ARM/14 x86 live slab
+classes and 73/194 large pages stay flat. Both production kernels also pass
+fcntlpath, open and runtime; eight host test files pass. Allocation scans retain
+659/655 source files, 400/292 sites and the same existing allowance failures.
+
+The exact previous fcntlpath candidate kernels, C and build logs serve as the
+baseline. Whole C restores by removing the new query branch and its adapter
+classification, canonicalizing only compiler temporary names inside fcntl and
+unused-return source offsets elsewhere. All remaining code stays identical.
+Independent lifetime review checks both releases, the no-later-pointer-use
+rule, the eight explicit fixture stack allocations, synchronous borrows and
+alias/limit/cursor/observer cleanup. Fatal setup paths rely on process exit.
+
+The [V audit](../tests/linux-compat/results/2026-10-13/fcntlquery-audit.v)
+requires exact counts, complete baseline failures, candidate/reference verdicts,
+state/retention controls, C scope and artifact identity. Assertion and
+passing-as-baseline negative controls must fail. [ARM evidence](../tests/linux-compat/results/2026-10-13/fcntlquery-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/fcntlquery-evidence-x86_64.json)
+bind all 63 isolated inputs and compiler/controller/source/C/kernel/native ELF/
+ISO, Linux kernel/wrapper/archive/QEMU and serial/build/audit/review hashes.
+Captures: [ARM baseline](../tests/linux-compat/results/2026-10-13/fcntlquery-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/fcntlquery-after-aarch64.log),
+[ARM Linux](../tests/linux-compat/results/2026-10-13/fcntlquery-reference-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/fcntlquery-before-x86_64.log),
+[x86 candidate](../tests/linux-compat/results/2026-10-13/fcntlquery-after-x86_64.log),
+[x86 Linux](../tests/linux-compat/results/2026-10-13/fcntlquery-reference-x86_64.log).
+Completed older ISO/firmware files were losslessly archived with verified SHA
+manifests; gzip restoration reproduces their original bytes. Public inventory
+fingerprints use the committed parent plus this fix, separately from the
+isolated semantic inputs and unrelated shared-checkout changes.
+
+F_CREATED_QUERY, concurrent close/table-sharing races, full ordinary fcntl
+semantics, GNU wrappers and translated/ELF32 paths remain separate. The three
+broad section 15 acceptance gates remain open.

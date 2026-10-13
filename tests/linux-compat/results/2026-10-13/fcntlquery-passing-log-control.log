@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/fcntlquery-audit.v:81: FAIL: fn main.failure: assert log.contains('LINUX FCNTLQUERY DETAIL:'), 'fcntlquery baseline failure markers required';
+      message: fcntlquery baseline failure markers required
+V panic: Assertion failed...

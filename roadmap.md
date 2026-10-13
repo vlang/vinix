@@ -764,6 +764,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Refuse non-pathname fcntl commands on O_PATH handles before pointer copies
   or state changes; qualify allowed operations, aliases, exact errors and flat
   retention on both architectures. See [the command receipts](docs/linux-posix-qualification.md#o_path-fcntl-command-refusals).
+- [x] Implement F_DUPFD_QUERY using real open-description identity and exact
+  invalid-descriptor errors; qualify aliases, reopened files, native argument
+  words and flat retention on both architectures. See [the identity receipts](docs/linux-posix-qualification.md#fcntl-duplicate-description-queries).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

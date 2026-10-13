@@ -1,0 +1,39 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "5916b7965ce9a0be56d14d8a9274c92c8f2bfa8c92972367dfacf111766de5d4",
+    "results": [
+        {
+            "name": "fcntlquery",
+            "source_sha256": "00b1a1cf512f07f7d4fc5e31961621dc4f58232c64cca6d31b684b999cb15bd9",
+            "init_sha256": "4e1e6186ab7364a3409bafbf39189f8c5909048d90c4abf0bbee863a270b0b18",
+            "iso_sha256": "b877a059aa3b800fb38dc60541e327700ebce6de261c4d99748ca81ed4b1996c",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "fcntlpath",
+            "source_sha256": "314b2cefc9567f5c6552d8b0534cd9e6039cd71c0d80689360ac7b1966dbea3e",
+            "init_sha256": "b0c820d141e0b7e7af9801761069655abf591d2e6e114c54cbcaba61b9555126",
+            "iso_sha256": "04da267a6c2601c21527f37bfa49c1a3fe75d63d0f3163da0369008f14cd0bf7",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "377071b25bf7f8a9b3a048c8eab9ec87c689beb7ca5791e8439a46a4131f222a",
+            "iso_sha256": "ce0c7cd8394b0e15fea8405bb89c35df3df882a42556a85289b917ecfe8caaf4",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "c57a13059fbe5a40aa526ef4e66e4d19d622a3bf94a6e61bd92dd7b638b3b2ef",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

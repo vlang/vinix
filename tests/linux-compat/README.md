@@ -1085,3 +1085,21 @@ v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/fcntlpath-refe
 Repeat with matching x86 inputs and `--arch x86_64`. Set `V` to the selected
 compiler for both controllers and guest modules. Linux boots run the frozen
 native ELF and skip only Vinix allocator reporting. See [receipts and limits](../../docs/linux-posix-qualification.md#o_path-fcntl-command-refusals).
+
+The `fcntlquery` case runs 9080 F_DUPFD_QUERY controls per architecture across
+root and UID/GID1000. Eight classes each have original/ordinary/CLOEXEC aliases;
+separate opens of six same-inode objects must compare different. Native word,
+libc, invalid-source/target, held-descriptor zero/eight soft-limit and real
+close/replacement tests preserve all metadata, flags, cursors, bytes and two
+pipe queues. A directory control balances live references and flags while
+retaining separate descriptions. Two 200-cycle query cohorts measure retention.
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases fcntlquery,fcntlpath,open,runtime --timeout 1300
+v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/fcntlquery-reference.v --arch aarch64 --kernel LINUX-KERNEL --init FRESH-NATIVE/fcntlquery/init --state-dir FRESH-LINUX
+```
+
+Use matching x86 inputs with `--arch x86_64`, and set `V` for both controllers
+and their guest modules. The pinned Linux 6.12.51 reference returns EBADF for
+either invalid descriptor; the original Linux 6.12 implementation differed
+for an invalid comparison descriptor. See [receipts and limits](../../docs/linux-posix-qualification.md#fcntl-duplicate-description-queries).

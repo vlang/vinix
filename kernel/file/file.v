@@ -1440,6 +1440,18 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 		fd.handle.mac_check(proc.mac_inspect) or { failure := errno.get(); fd.unref(); return errno.err, failure }
 	}
 	match cmd {
+		f_dupfd_query {
+			// Compare open descriptions, including O_PATH and descriptions
+			// inherited through fork. Retain both descriptions until the
+			// comparison; either missing descriptor returns EBADF.
+			mut other := fd_from_fdnum(unsafe { nil }, int(u32(arg))) or {
+				fd.unref()
+				return errno.err, errno.ebadf
+			}
+			ret = if voidptr(other.handle) == voidptr(handle) { u64(1) } else { u64(0) }
+			other.unref()
+			fd.unref()
+		}
 		f_dupfd {
 			ret = u64(fdnum_dup(unsafe { nil }, fdnum, unsafe { nil }, int(arg), 0, false, false) or {
 				fd.unref()
