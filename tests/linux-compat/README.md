@@ -1192,3 +1192,15 @@ window candidates plus actual same-ELF Linux references pass. Two 200-cycle
 cohorts measure mixed file/directory repetition/conversion/close storage in
 both candidate profiles. The uninstrumented baseline is not claimed to fail
 deterministically. See the [repetition receipts and limits](../../docs/linux-posix-qualification.md#same-kind-flock-ownership).
+
+The `fcntlsig` case qualifies existing F_SETSIG/F_GETSIG configuration with
+4,720 native controls per architecture as root and UID/GID 1000. Six ordinary
+source classes and three alias forms exercise signal boundaries, native
+upper words, musl setters, ignored getter arguments, O_PATH/missing sources,
+zero/eight descriptor limits and replacement 66. Independent opens retain
+their own setting; metadata/flags/owners/cursors/bytes/AB queues stay intact.
+Two 200-cycle setter/refusal/alias-close cohorts remain flat. Identical native
+probe C/ELFs pass actual Linux 6.12.51. The dispatch wrapper already imports
+low32 scalar words, so this qualification adds no kernel change or bug claim.
+Actual SIGIO/queued-signal delivery and asynchronous readiness remain
+unqualified. See the [receipts and limits](../../docs/linux-posix-qualification.md#native-fcntl-signal-configuration).

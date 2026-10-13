@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "f949d9fc73abff139fab556c7482b44b4a492f95c3f2054e02f67763df8d2eac",
+    "results": [
+        {
+            "name": "fcntlsig",
+            "source_sha256": "f35d4e360f663ca7bdc3d4e68fd9ea5ed398acd8c019b19aeb2c0c0cb04ae92e",
+            "init_sha256": "00dcc362c0bf43412b3766e6d6a5a140bd9770433512f97cf65a2205d2b3f98c",
+            "iso_sha256": "45d5976ca2b576eab1753eec16b064be36dc642b935ce0371b7b41b2563a3130",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

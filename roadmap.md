@@ -803,6 +803,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   ordinary/private scheduling-window kernels and flat storage on both architectures.
   See [the repetition receipts](docs/linux-posix-qualification.md#same-kind-flock-ownership).
 
+- [x] Qualify native F_SETSIG/F_GETSIG configuration against Linux, including
+  signal boundaries, upper words, aliases, ignored arguments, descriptor
+  limits/replacement, retained file/queue state and flat storage.
+  See [the signal-control receipts](docs/linux-posix-qualification.md#native-fcntl-signal-configuration).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

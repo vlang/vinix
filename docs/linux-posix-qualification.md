@@ -4737,3 +4737,76 @@ Restrictive policy, arbitrary concurrent mutation of a shared description,
 pressure/fairness/deadlock/cancellation, other filesystems/nonregular types,
 deprecated mandatory locks and GNU/translated/ELF32 paths remain separate.
 The three broad section 15 acceptance gates stay open.
+
+## Native fcntl signal configuration
+
+The existing native dispatch wrapper already imports F_SETSIG scalar
+arguments through low32 before calling the handler. Its 0..64 validation
+is equivalent to Linux signed-int validation for these signal numbers.
+For example, raw argument `0xabcdef0100000020` sets 32 and F_GETSIG returns
+32; invalid low values retain EINVAL without changing configuration.
+Missing/O_PATH descriptors retain EBADF before signal validation. This
+work adds conformance coverage; the kernel source/C/ELF stay unchanged.
+See the pinned [Linux fcntl source](https://github.com/gregkh/linux/blob/v6.12.51/fs/fcntl.c)
+and [signal validation](https://github.com/gregkh/linux/blob/v6.12.51/include/linux/signal.h),
+whose downloaded bytes are bound in the evidence.
+
+The V probe runs 4,720 controls per architecture in root and UID/GID 1000
+cohorts. Per credential, exact counts are 810 ordinary raw setters, 405
+invalid/O_PATH raw setters, 243 musl setters, 540 getter controls and 362
+limit/replacement/cursor controls. Values include default zero, 1, 32, 64,
+65, 127 and signed32 boundaries. Five raw forms vary descriptor, command
+and argument upper words; musl controls pass actual signed-int arguments.
+Six ordinary classes cover readonly/RDWR regular opens, a directory,
+nonblocking pipe reader/writer and a UNIX stream endpoint. Original/dup/
+F_DUPFD_CLOEXEC aliases share their actual description setting. Independent
+opens of the same inode and the socket peer keep independent configuration.
+Six O_PATH aliases and three missing/negative sources preserve real errors.
+
+F_GETSIG ignores all five full-width argument values, including inaccessible
+addresses. Held 64/65 remain usable at soft descriptor limits eight and zero.
+Reused 66 transitions through missing, regular, socket and closed states
+with opposing CLOEXEC. The probe checks all descriptor/status flags, primary
+and selected-target metadata/owners/cursors, actual shared cursor movement
+and complete final bytes/queued AB. Cohorts use inherited descriptors; the
+parent waits and closes all descriptions before removing its fixture paths.
+Restore calls keep cases independent. Actual asynchronous notifications are
+not enabled or measured by this sequence.
+
+The first unchanged-kernel runs passed every control, disproving the initial
+assumption that full-width signal words reached the handler. The local outer
+wrapper expected inner exit 1 and therefore asserted after the successful
+guest runs; its source and complete passing diagnostic receipts remain
+fingerprinted. A redundant handler edit was removed before any changed
+kernel build. Fresh corrected wrappers complete exit 0 and qualify five
+guest cases per architecture: fcntlsig/fcntlabi/fcntlpath/open/runtime. Actual
+Linux 6.12.51 passes identical native probe source/C/ELF. No baseline failure
+or kernel bug fix is claimed.
+
+Both initial and fresh native runs include two 200-cycle cohorts after 32
+warmups and settling. Accepted/refused setters, real alias duplication/close
+and unchanged AB queues retain all 18 ARM/14 x86 slab classes flat. Large
+pages stay at 70/70 on AArch64 and 181/181 on x86-64. Generated
+probe C has ten explicit allocas and no hidden heap/index helpers. The
+frozen kernel source/C/ELF are exactly unchanged, so no allocation, ownership,
+reclamation or lock-order change is introduced. Two production builds and
+eight host test files pass. The allocation inventory retains 400 ARM/292 x86
+sites and existing allowance refusals; it is not a globally passing allowance
+audit. An [independent lifetime review](../tests/linux-compat/results/2026-10-14/fcntlsig-lifetime-review.md)
+binds live frames, cleanup, unchanged kernels and completed captures.
+
+The maintained audit binds 63 frozen dispatch/source inputs, compiler/C/ELF/
+kernel/ISO, complete native/Linux captures, builds and review. Deliberately
+failing assertion and passing-as-failure controls must execute. Runtime
+evidence freezes `97e2f95bdad3acbf00ec27ada5ae38c09e25c6a6`; public dispatch
+fingerprints use the committed publication parent in an isolated view and
+remain separate from that frozen runtime snapshot.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/fcntlsig-native-aarch64.json), [capture](../tests/linux-compat/results/2026-10-14/fcntlsig-native-aarch64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/fcntlsig-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/fcntlsig-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/fcntlsig-native-x86_64.json), [capture](../tests/linux-compat/results/2026-10-14/fcntlsig-native-x86_64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/fcntlsig-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/fcntlsig-evidence-x86_64.json).
+- [Audit source](../tests/linux-compat/results/2026-10-14/fcntlsig-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/fcntlsig-audit.log); passing diagnostic captures, build/host/allocation logs and negative controls sit beside them.
+
+This qualifies signal configuration and exact error behavior. Actual SIGIO
+and queued-signal delivery, asynchronous readiness, ownership/security
+policy, concurrent mutation/close, GNU wrappers and translated/ELF32 paths
+remain unqualified. The three broad section 15 acceptance gates stay open.
