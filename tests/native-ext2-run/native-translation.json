@@ -1,0 +1,113 @@
+{
+    "evidence": "~/.cache/vinix-ext2-run-native-20261013",
+    "limits": "Default unchanged V fixture cannot compile with the pinned toolchain because generated C references undeclared memdup. Independent C/prebuilt workflows pass. Peer-dirty Python and its legacy imports remain preserved and counted; no retirement credit.",
+    "originals": [
+        {
+            "bytes": 12712,
+            "path": "tests/ext2-xattr/run.py",
+            "peer_dirty": true,
+            "sha256": "62952ccfaa6b169fbecffbbdf9c78974cf1e3f770b227f74ee6c93073848a25d"
+        },
+        {
+            "bytes": 3048,
+            "path": "tests/kernel-gaps/run.py",
+            "peer_dirty": false,
+            "sha256": "2b0221bf7a947b3482f65b100f97e9674c382e414c0f5a537f02fdc434461572"
+        },
+        {
+            "bytes": 13350,
+            "path": "tests/kernel-gaps/_native.py",
+            "peer_dirty": false,
+            "sha256": "6ff28dab05840cf0fb13adab6d809829b5dc5f2e6d3cf70d51b125a6b7eb5388"
+        }
+    ],
+    "profiles": [
+        {
+            "limits": "Original V guest fixture retains known unresolved memdup build failure; C/prebuilt full workflows pass. Controlled guest only; no real Vinix guest or new allocation result.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "92447ffb73854109a537293ff9cf26cf1d38698c55598d99791c1d3981fa3cdb"
+                },
+                {
+                    "name": "check",
+                    "sha256": "931a0515b8e61e8889ac5a6644b65f62bacf778d9dcba63f65c5a822c8b993c3"
+                },
+                {
+                    "name": "acl",
+                    "sha256": "aa61b2c1b543ce41ca9385bb2fbd765c15264eebdd49d4eb8f683c40256626bd"
+                },
+                {
+                    "name": "qmp",
+                    "sha256": "a99790c09b098ef2ffdcf94349e0d78cae2be98d61c2cbc75b328c28b798f47a"
+                },
+                {
+                    "name": "qmp-owned",
+                    "sha256": "6ab0a897b81f4e94a5301930f920b80b49f818f8a7063a7853f0b018eab57d08"
+                }
+            ],
+            "replay": "Only refused-socket fixture changed after full workflow success: use raw bind/close because the SDK listener close unlinks its path. Rebuilt and replayed all owned-connection and existing QMP cases; production controller/ACL code unchanged.",
+            "status": "PASS"
+        },
+        {
+            "limits": "Original V guest fixture retains known unresolved memdup build failure; C/prebuilt full workflows pass. Controlled guest only; no real Vinix guest or new allocation result.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "76aed10c5f59a99bd794a6662b494568201a03b91f7f1bd7667fe55572aac44a"
+                },
+                {
+                    "name": "check",
+                    "sha256": "547876bc5b4a208294dc5b524deea32231ca6799bf2b1e9b8a3e249a5b584185"
+                },
+                {
+                    "name": "acl",
+                    "sha256": "8b389892a894ec3f2f320887565b320b1b2102638d0435d974b505e8d71d13e6"
+                },
+                {
+                    "name": "qmp",
+                    "sha256": "b5144482aece044ddc2b2a1656f7fae6328e52093f9bf6479ac94b23265fd99f"
+                },
+                {
+                    "name": "qmp-owned",
+                    "sha256": "4304517ee9a1dc5ebfa744127a5c3b3c0c04583dc458c144b9dfef0a40c00adf"
+                }
+            ],
+            "replay": "Only refused-socket fixture changed after full workflow success: use raw bind/close because the SDK listener close unlinks its path. Rebuilt and replayed all owned-connection and existing QMP cases; production controller/ACL code unchanged.",
+            "status": "PASS"
+        },
+        {
+            "limits": "Original V guest fixture retains known unresolved memdup build failure; C/prebuilt full workflows pass. Controlled guest only; no real Vinix guest or new allocation result.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "a6d2240270303aab18b40008f777996a94f07481c085847af7e424fa55769e6d"
+                },
+                {
+                    "name": "check",
+                    "sha256": "9d703348c96630c92ed342a8b7726598cfc72975eb2692c1e23a46a2e81040d8"
+                },
+                {
+                    "name": "acl",
+                    "sha256": "3d23706a58f6bce4eaeb9a8c560de86ca04842ae0a2d71fbd373de45fc3dcadb"
+                },
+                {
+                    "name": "qmp",
+                    "sha256": "d24079c0ccef7d87bde54e3c43733df8fbbb4b68d313b8de546e43824bc481fd"
+                },
+                {
+                    "name": "qmp-owned",
+                    "sha256": "dc8d0069d0ee1c882bd480e2c5db880ce44d8fb56e28792f7746facec735aa74"
+                }
+            ],
+            "replay": "Only refused-socket fixture changed after full workflow success: use raw bind/close because the SDK listener close unlinks its path. Rebuilt and replayed all owned-connection and existing QMP cases; production controller/ACL code unchanged.",
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirements": 0,
+    "qualification": "15 cold ARM/x86/ASanUBSan native program builds; four real static original C guest ELFs and V serial objects per profile, immutable prebuilt replay, real ext2/USTAR/ACL preparation and e2fsck/debugfs; 13 controlled PTY/QMP workflows including explicit unchanged V-fixture memdup failures; exact four-byte ACL corruption and independent host detection; 100 missing/refused/cancelled socket connection cycles and existing QMP regressions; exact process/descriptor retirement and public CLI; no Python, real Vinix guest or new kernel allocation result",
+    "source_commit": "53e909df86d3afdf9c55bf29f50c461db04a4866"
+}

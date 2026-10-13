@@ -3300,3 +3300,18 @@ and public commands. No Python, guest boot, release build or publication is
 performed. These scripts were classified as Shell, so this closure receives
 zero Python-file retirement credit and leaves the recorded twelve-file count
 unchanged. See [native image tools](../build-support/imagehost/README.md).
+
+The native ext2 guest controller replaces the maintained command with V while
+preserving the concurrently edited Python source and its remaining legacy
+imports. Fifteen cold ARM/x86/ASanUBSan builds pass original C/prebuilt workflow
+controls, real static guest ELFs and V serial objects, native USTAR, ext2 ACL
+seeding and exact four-byte corruption, independent e2fsck/debugfs checks and
+13 controlled PTY/QMP process cases per profile. The unchanged default V fixture
+hits the existing generated-C `memdup` build failure; no allocator shim, fixture
+change or compiler guard relaxation is supplied. Resource checks found a real
+socket leak in the SDK failed-connect path. QMP now owns a nonblocking socket
+through connection and transfers it only on success; 100 missing/refused/cancel
+cycles and existing QMP cases keep descriptors flat. Public CLI checks pass.
+No Python, real Vinix guest or new kernel allocation result is claimed. This
+caller-preparation stage receives zero Python-file retirement credit. See
+[native ext2 controller](../tests/native-ext2-run/README.md).

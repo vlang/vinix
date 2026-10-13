@@ -47,7 +47,7 @@ fn connect_body(path string, deadline u64, cancel fn () bool, accept_errors bool
 	return connect_greeting(path,deadline,cancel,accept_errors,checked,false)
 }
 fn connect_greeting(path string, deadline u64, cancel fn () bool, accept_errors bool, checked bool, parse_json bool) !Monitor {
-	mut connection := unix.connect_stream(path)!
+	mut connection := owned_connection(path, deadline, cancel)!
 	mut monitor := Monitor{connection: connection, deadline: deadline, cancel: cancel, accept_errors: accept_errors,byte_json:parse_json}
 	mut open := false
 	defer { if !open { monitor.close() } }

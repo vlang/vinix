@@ -45,9 +45,15 @@ existing musl sysroot or x86 musl cross compiler:
 
 ```sh
 VEXE=/path/to/v make -C kernel -j4 CC=clang V=/path/to/v ARCH=aarch64 LIMINE_MP=1
-python3 tests/ext2-xattr/run.py
-python3 tests/ext2-xattr/run.py --arch=x86_64 --kernel-dir=/absolute/x86/kernel
+./tests/ext2-xattr/run --source tests/ext2-xattr/test.c
+./tests/ext2-xattr/run --arch=x86_64 --kernel-dir=/absolute/x86/kernel --source tests/ext2-xattr/test.c
 ```
+
+The controller is V. It also accepts `--prebuilt-fixture` for an immutable SDK
+payload. The default maintained V fixture currently hits an unresolved `memdup`
+call in the pinned compiler's generated C; that separate issue is reported
+without changing the fixture or compiler checks. The independent C fixture
+remains available as shown above. See [native controller notes](../native-ext2-run/README.md).
 
 The guest checks binary and empty values, create/replace/remove flags, size
 queries, listings, namespace permissions, maximum names, capacity failures,
