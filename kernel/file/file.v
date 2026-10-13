@@ -1140,7 +1140,13 @@ fn pread(fdnum int, buf voidptr, count u64, offset i64, to_user bool) (u64, u64)
 	defer {
 		fd.unref()
 	}
+	return pread_pinned_descriptor(mut fd, buf, count, offset, to_user)
+}
 
+// Borrow a descriptor held by the caller for the complete positioned operation.
+// The caller has already validated the offset and buffer range. In particular,
+// a vector syscall must not resolve the descriptor number for each segment.
+pub fn pread_pinned_descriptor(mut fd FD, buf voidptr, count u64, offset i64, to_user bool) (u64, u64) {
 	mut handle := fd.handle
 	if handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
@@ -1213,7 +1219,11 @@ pub fn syscall_pwrite(_ voidptr, fdnum int, buf voidptr, count u64, offset i64) 
 	defer {
 		fd.unref()
 	}
+	return pwrite_pinned_descriptor(mut fd, buf, count, offset)
+}
 
+// Same borrowed ownership and validated-range contract as the read helper.
+pub fn pwrite_pinned_descriptor(mut fd FD, buf voidptr, count u64, offset i64) (u64, u64) {
 	mut handle := fd.handle
 	if handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }

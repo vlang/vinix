@@ -229,41 +229,6 @@ fn import_linux_iov(iov_ptr u64, iovcnt int, fast voidptr) ?LinuxIOVector {
 // refused by its family rather than cut in two.
 const linux_writev_max = u64(1024 * 1024) + 1
 
-// Validate the complete vector before doing any I/O.  Linux rejects a bad
-// iovcnt, pointer, or aggregate length without partially consuming the file.
-fn validate_linux_iov(iov_ptr u64, iovcnt int) (u64, u64) {
-	if iovcnt < 0 || iovcnt > linux_iov_max {
-		return 0, errno.einval
-	}
-	if iovcnt == 0 {
-		return 0, 0
-	}
-	if iov_ptr == 0 {
-		return 0, errno.efault
-	}
-
-	mut total := u64(0)
-	for i := 0; i < iovcnt; i++ {
-		mut iov := LinuxIOVec{}
-		if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(i) * sizeof(LinuxIOVec), sizeof(LinuxIOVec)) {
-			return 0, errno.efault
-		}
-		if iov.len > u64(0x7fffffffffffffff) - total {
-			return 0, errno.einval
-		}
-		total += iov.len
-	}
-	return total, 0
-}
-
-fn read_linux_iov(iov_ptr u64, index int) ?LinuxIOVec {
-	mut iov := LinuxIOVec{}
-	if !usercopy.copy_from_user(voidptr(&iov), iov_ptr + u64(index) * sizeof(LinuxIOVec), sizeof(LinuxIOVec)) {
-		return none
-	}
-	return iov
-}
-
 // Linux validates descriptor access before importing even an empty vector.
 // The vector caller holds the lookup reference through its final operation.
 fn linux_iov_access_error(fd &file.FD, write bool) u64 {

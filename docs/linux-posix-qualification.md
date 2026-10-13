@@ -1932,3 +1932,88 @@ GNU libc wrappers and ELF32/translated variants need separate qualification.
 Positioned header/descriptor lifetime, positive-offset error ordering, flags,
 MAX_RW_COUNT, shared-offset atomicity, disk-backed files and allocator
 exhaustion remain open. The three broad section-15 gates stay open.
+
+## Native positioned-vector imports and errors
+
+Positive-offset preadv/pwritev and their v2 forms now retain one descriptor
+reference and import the headers once through the same bounded owner as
+readv/writev. Each segment calls a scalar helper that borrows that descriptor;
+it cannot resolve a replacement descriptor number. The scalar wrappers retain
+their existing validation and release their reference after the borrowed
+helper returns. v2's current-position -1 case delegates directly to the
+existing unpositioned path, without a preliminary header scan.
+
+Invalid/O_PATH descriptors return EBADF before header faults or count errors.
+Pipe/FIFO/socket positioned calls return ESPIPE before import, including empty
+vectors and wrong access modes. Regular-file access errors also precede import.
+Every signed length and original canonical range is checked before I/O, with
+the existing single-entry versus multiple-entry MAX_RW_COUNT rules. The whole
+imported transfer must fit the signed file-position range before any segment
+runs. These ordering rules follow [Linux 6.12's positioned and vectored
+paths](https://github.com/torvalds/linux/blob/v6.12/fs/read_write.c#L940) and
+[its O_PATH-filtering descriptor lookup](https://github.com/torvalds/linux/blob/v6.12/fs/file.c#L1056).
+
+The V `iovposition` fixture runs 396 checks in each root and UID/GID 1000
+child: 192 descriptor/access/seek cases, 48 current-position access cases,
+100 range/length cases, 20 valid header cases, four payload-prefix cases,
+four signed-position-overflow cases and 28 EOF transfer-cap boundaries.
+Headers containing 2/8/9/513/1024 entries cover both the syscall stack and
+the existing fallible heap import; valid headers are mapped with read
+permission only. Refusals must retain file contents, the shared cursor,
+destination bytes and pipe/socket queues. PROT_NONE payloads still return
+the prefix already copied. Fixed mmap probes measure the native user limit.
+
+Both unchanged kernels fail 148 descriptor cases, 16 current-position cases,
+80 range cases and all four signed-position cases per credential group, plus
+both 14-check EOF-cap groups. Empty unusable vectors incorrectly return zero;
+header errors displace descriptor errors; later malformed ranges can return a
+partial result and alter the first byte. Offset overflow can return EOF or
+EFBIG instead of EINVAL. RLIMIT_FSIZE=1024 bounds the unchanged write-overflow
+control; it never attempts to allocate a file near INT64_MAX. Normal and
+payload-prefix controls already pass. Both fixed kernels pass all 792 checks
+per architecture, with identical fixture C across each before/after pair.
+
+Each credential group warms 32 cycles and measures 200 cycles of valid,
+empty, malformed and overflowing imports. Every slab class stays flat,
+as do big-page counts: 66/66 on ARM and 168/168 on x86. Independent source
+and generated-C lifetime review verifies importer failure cleanup, one FD
+owner, borrowed scalar helpers, release ordering and bounded synchronous
+fixture borrows. This is implementation and retention evidence; a
+deterministic positioned close/dup2/header-mutation race remains unqualified.
+
+Eleven native guest regressions pass per architecture: positioned imports,
+offsets, vector ranges, immutable headers, descriptor pinning, O_PATH access,
+openat2, directory errors, zero-byte pipes, runtime and shared memory. Eight
+compatibility host test files and mapping-storage geometry checks pass.
+Allocation audits still fail the same existing allowances with 406 ARM and
+295 x86 sites; only two diagnostic source line numbers move, and no
+allowance or site count is increased. The generated inventory retains 62
+input fingerprints.
+
+The [dated receipts](../tests/linux-compat/results/2026-10-13/) include
+`iovposition-before-*`, `iovposition-after-*`, host/geometry/allocation logs
+and the [assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/iovposition-audit.v).
+Its negative controls prove assertions execute and passing output is rejected
+as a native failure. Clean worktrees pin kernel inputs at `7d01a61b4`; only
+the three I/O source files differ. A rebuilt clean V tree pins compiler sources
+at `f6358ecff9`. Previous temporary build trees had disappeared, so both
+unchanged controls were rebuilt for this comparison.
+
+The broader ARM comparison uses the same cached desktop image and its
+extracted 13 MiB desktop binary. All 36 workloads repeat 200 operations and
+retain zero bytes on both kernels, including tmpfs and ext2 operations; all
+four 300-process churn workloads retain zero memory and slab objects. The
+32 MiB cache workload records its expected storage cost. Idle, app startup
+and dragging each pass one five-second sample before and after, including
+seven measured app/compositor processes. The candidate screenshot was
+inspected. The [performance evidence](../tests/linux-compat/results/2026-10-13/iovposition-performance-evidence.json)
+and raw `iovposition-perf-*`/`iovposition-desktop-*` logs preserve those runs.
+The [V controller](../tests/linux-compat/results/2026-10-13/iovposition-performance.v)
+uses the maintained harness while preserving shared cached archives. These
+startup and retention checks do not qualify full Linux application lifecycle,
+x86 desktop performance or physical hardware.
+
+Flags and character-device positioned I/O, GNU libc wrappers, native ELF32
+and translated variants, actual payload transfers at the 2 GiB cap,
+disk-backed vector behavior, shared-offset atomicity and allocation exhaustion
+remain separate qualification work. The three broad section-15 gates stay open.

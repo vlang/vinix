@@ -646,6 +646,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   qualify sparse data above 4 GiB/across 8 GiB, negative error precedence,
   file/pipe cursor behavior and flat retention on both architectures.
   See [the positioned-offset receipts](docs/linux-posix-qualification.md#native-positioned-vector-offsets).
+- [x] Import native positioned vectors once and retain one open description;
+  validate descriptor/access/pipe/socket errors before headers and complete
+  original ranges and signed positions before I/O. Qualify readonly headers,
+  unchanged data/cursors/queues, copied prefixes and flat retention on both
+  architectures, with independent lifetime review. See [the positioned-import receipts](docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

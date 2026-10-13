@@ -1,0 +1,788 @@
+==> Assembling /private/tmp/vinix-iovposition-1013/before-arm/iovposition/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovposition-1013/before-arm/iovposition/.vinix-aarch64.iso.VBLcnN'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 13.8g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovposition-1013/before-arm/iovposition/iso-build/.iso-staging.xKdgVe/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 17789 sectors
+Written to medium : 17789 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovposition-1013/before-arm/iovposition/.vinix-aarch64.iso.VBLcnN' completed successfully.
+
+    /private/tmp/vinix-iovposition-1013/before-arm/iovposition/test.iso (36431872 bytes)
+Guest artifacts: /private/tmp/vinix-iovposition-1013/before-arm/iovposition
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x77350000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x77350000 to 0xffffffff80000000, length: 0x2cc000
+vmm: Kernel: Mapping 0x7761c000 to 0xffffffff802cc000, length: 0x2c000
+vmm: Kernel: Mapping 0x77648000 to 0xffffffff802f8000, length: 0xf7d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x77350000 +0x2f8000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff000077323000
+initramfs: Size:    109056
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=102528
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff00007733d600
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211e90
+LINUX IOVPOSITION ADDRESS: user_limit=140737488355328 last_page=mapped next_page=refused
+LINUX IOVPOSITION DETAIL: label=3 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=3 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=3 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=3 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=10 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=11 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=12 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=10 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=11 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=12 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=10 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=11 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=12 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=10 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=11 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=12 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=20 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=21 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=22 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=23 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=24 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=20 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=21 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=22 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=23 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=24 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=20 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=21 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=22 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=23 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=24 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=20 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=21 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=22 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=23 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=24 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=30 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=31 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=32 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=30 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=31 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=32 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=30 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=31 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=32 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=30 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=31 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=32 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=40 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=41 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=42 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=43 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=44 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=40 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=41 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=42 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=43 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=44 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=40 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=41 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=42 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=43 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=44 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=40 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=41 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=42 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=43 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=44 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=50 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=51 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=52 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=53 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=54 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=50 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=51 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=52 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=53 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=54 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=50 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=51 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=52 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=53 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=54 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=50 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=51 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=52 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=53 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=54 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=60 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=61 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=62 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=63 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=64 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=60 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=61 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=62 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=63 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=64 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=60 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=61 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=62 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=63 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=64 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=60 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=61 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=62 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=63 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=64 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=70 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=71 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=72 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=73 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=74 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=70 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=71 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=72 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=73 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=74 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=70 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=71 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=72 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=73 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=74 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=70 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=71 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=72 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=73 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=74 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=3 write=0 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=0 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=3 write=1 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=1 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=0 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=0 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=1 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=1 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=0 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=0 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=1 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=1 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=53 write=0 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=54 write=0 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=53 write=1 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=54 write=1 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=2 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=2 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=2 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=2 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=2 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=2 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=2 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=2 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=2 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=2 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=2 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=2 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=2 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=2 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=2 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=2 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=8 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=8 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=8 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=8 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=8 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=8 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=8 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=8 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=8 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=8 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=8 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=8 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=8 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=8 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=8 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=8 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=9 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=9 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=9 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=9 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=9 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=9 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=9 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=9 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=9 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=9 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=9 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=9 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=9 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=9 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=9 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=9 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=513 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=513 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=513 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=513 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=513 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=513 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=513 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=513 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=513 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=513 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=513 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=513 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=513 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=513 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=513 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=513 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=1024 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=1024 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=1024 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=1024 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=1024 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=1024 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=1024 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=1024 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=1024 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=1024 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=1024 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=1024 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=1024 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=1024 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=1024 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=1024 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=220 write=0 v=0 count=2 offset=9223372036854775806 result=0/0 expected=-1/22
+LINUX IOVPOSITION DETAIL: label=220 write=0 v=1 count=2 offset=9223372036854775806 result=0/0 expected=-1/22
+LINUX IOVPOSITION DETAIL: label=220 write=1 v=0 count=2 offset=9223372036854775806 result=-1/27 expected=-1/22
+LINUX IOVPOSITION DETAIL: label=220 write=1 v=1 count=2 offset=9223372036854775806 result=-1/27 expected=-1/22
+LINUX IOVPOSITION DETAIL: label=301 write=0 v=0 count=1 offset=0 result=-1/14 expected=0/0
+LINUX IOVPOSITION DETAIL: label=303 write=0 v=0 count=1 offset=0 result=-1/14 expected=0/0
+LINUX IOVPOSITION DETAIL: label=305 write=0 v=0 count=1 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=305 write=0 v=0 count=2 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=310 write=0 v=0 count=2 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION LIMIT: v=0 page=16384 max_rw_count=2147467264 checks=14 FAIL
+LINUX IOVPOSITION DETAIL: label=301 write=0 v=1 count=1 offset=0 result=-1/14 expected=0/0
+LINUX IOVPOSITION DETAIL: label=303 write=0 v=1 count=1 offset=0 result=-1/14 expected=0/0
+LINUX IOVPOSITION DETAIL: label=305 write=0 v=1 count=1 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=305 write=0 v=1 count=2 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=310 write=0 v=1 count=2 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION LIMIT: v=1 page=16384 max_rw_count=2147467264 checks=14 FAIL
+LINUX IOVPOSITION OUTCOMES: ordinary=1 descriptor=192/148 sentinel=48/16 range=100/80 normal=20/0 partial=4/0 overflow=4/4 limit_checks=28 failed_limit_groups=2
+LINUX IOVPOSITION ADDRESS: user_limit=140737488355328 last_page=mapped next_page=refused
+LINUX IOVPOSITION DETAIL: label=3 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=3 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=3 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=3 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=10 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=11 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=12 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=10 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=11 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=12 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=10 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=11 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=12 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=10 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=11 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=12 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=20 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=21 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=22 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=23 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=24 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=20 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=21 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=22 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=23 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=24 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=20 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=21 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=22 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=23 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=24 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=20 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=21 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=22 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=23 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=24 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=30 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=31 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=32 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=30 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=31 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=32 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=30 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=31 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=32 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=30 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=31 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=32 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=40 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=41 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=42 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=43 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=44 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=40 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=41 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=42 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=43 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=44 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=40 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=41 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=42 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=43 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=44 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=40 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=41 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=42 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=43 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=44 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=50 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=51 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=52 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=53 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=54 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=50 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=51 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=52 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=53 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=54 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=50 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=51 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=52 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=53 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=54 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=50 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=51 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=52 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=53 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=54 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=60 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=61 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=62 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=63 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=64 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=60 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=61 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=62 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=63 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=64 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=60 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=61 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=62 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=63 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=64 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=60 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=61 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=62 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=63 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=64 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=70 write=0 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=71 write=0 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=72 write=0 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=73 write=0 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=74 write=0 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=70 write=0 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=71 write=0 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=72 write=0 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=73 write=0 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=74 write=0 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=70 write=1 v=0 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=71 write=1 v=0 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=72 write=1 v=0 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=73 write=1 v=0 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=74 write=1 v=0 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=70 write=1 v=1 count=0 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=71 write=1 v=1 count=1 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=72 write=1 v=1 count=1024 offset=5 result=0/0 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=73 write=1 v=1 count=1 offset=5 result=-1/14 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=74 write=1 v=1 count=1025 offset=5 result=-1/22 expected=-1/29
+LINUX IOVPOSITION DETAIL: label=3 write=0 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=0 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=3 write=1 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=4 write=1 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=0 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=0 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=13 write=1 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=14 write=1 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=0 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=0 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=33 write=1 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=34 write=1 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=53 write=0 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=54 write=0 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=53 write=1 v=1 count=1 offset=-1 result=-1/14 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=54 write=1 v=1 count=1025 offset=-1 result=-1/22 expected=-1/9
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=2 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=2 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=2 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=2 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=2 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=2 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=2 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=2 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=2 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=2 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=2 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=2 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=2 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=2 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=2 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=2 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=2 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=8 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=8 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=8 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=8 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=8 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=8 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=8 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=8 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=8 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=8 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=8 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=8 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=8 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=8 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=8 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=8 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=8 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=9 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=9 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=9 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=9 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=9 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=9 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=9 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=9 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=9 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=9 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=9 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=9 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=9 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=9 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=9 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=9 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=9 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=513 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=513 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=513 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=513 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=513 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=513 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=513 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=513 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=513 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=513 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=513 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=513 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=513 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=513 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=513 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=513 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=513 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=1024 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=1024 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=0 count=1024 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=0 count=1024 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=0 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=1024 variant=0 byte=41
+LINUX IOVPOSITION DETAIL: label=101 write=0 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=1024 variant=1 byte=41
+LINUX IOVPOSITION DETAIL: label=102 write=0 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=0 v=1 count=1024 variant=2 byte=41
+LINUX IOVPOSITION DETAIL: label=103 write=0 v=1 count=1024 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=1024 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=1024 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=0 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=0 count=1024 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=0 count=1024 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=100 write=1 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=1024 variant=0 byte=58
+LINUX IOVPOSITION DETAIL: label=101 write=1 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=1024 variant=1 byte=58
+LINUX IOVPOSITION DETAIL: label=102 write=1 v=1 count=1024 offset=0 result=1/0 expected=-1/14
+LINUX IOVPOSITION MUTATION: range write=1 v=1 count=1024 variant=2 byte=58
+LINUX IOVPOSITION DETAIL: label=103 write=1 v=1 count=1024 offset=0 result=-1/22 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=220 write=0 v=0 count=2 offset=9223372036854775806 result=0/0 expected=-1/22
+LINUX IOVPOSITION DETAIL: label=220 write=0 v=1 count=2 offset=9223372036854775806 result=0/0 expected=-1/22
+LINUX IOVPOSITION DETAIL: label=220 write=1 v=0 count=2 offset=9223372036854775806 result=-1/27 expected=-1/22
+LINUX IOVPOSITION DETAIL: label=220 write=1 v=1 count=2 offset=9223372036854775806 result=-1/27 expected=-1/22
+LINUX IOVPOSITION DETAIL: label=301 write=0 v=0 count=1 offset=0 result=-1/14 expected=0/0
+LINUX IOVPOSITION DETAIL: label=303 write=0 v=0 count=1 offset=0 result=-1/14 expected=0/0
+LINUX IOVPOSITION DETAIL: label=305 write=0 v=0 count=1 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=305 write=0 v=0 count=2 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=310 write=0 v=0 count=2 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION LIMIT: v=0 page=16384 max_rw_count=2147467264 checks=14 FAIL
+LINUX IOVPOSITION DETAIL: label=301 write=0 v=1 count=1 offset=0 result=-1/14 expected=0/0
+LINUX IOVPOSITION DETAIL: label=303 write=0 v=1 count=1 offset=0 result=-1/14 expected=0/0
+LINUX IOVPOSITION DETAIL: label=305 write=0 v=1 count=1 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=305 write=0 v=1 count=2 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION DETAIL: label=310 write=0 v=1 count=2 offset=0 result=0/0 expected=-1/14
+LINUX IOVPOSITION LIMIT: v=1 page=16384 max_rw_count=2147467264 checks=14 FAIL
+LINUX IOVPOSITION OUTCOMES: ordinary=0 descriptor=192/148 sentinel=48/16 range=100/80 normal=20/0 partial=4/0 overflow=4/4 limit_checks=28 failed_limit_groups=2
+LINUX IOVPOSITION FAIL: positioned vector errors, ranges or storage
+Missing verdicts: ['LINUX IOVPOSITION: PASS']; failures: ['FAIL:', 'LINUX IOVPOSITION FAIL']
+Linux compatibility qualification failed; see /private/tmp/vinix-iovposition-1013/before-arm/receipt.json

@@ -13,6 +13,7 @@ import file
 import fs
 import proc
 import resource
+import stat
 import time
 import usercopy
 
@@ -43,45 +44,10 @@ fn syscall_linux_preadv2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, 
 		return errno.err, errno.eopnotsupp
 	}
 
-	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
-	if validation_error != 0 {
-		return errno.err, validation_error
-	}
-
 	if offset == -1 {
 		return syscall_linux_readv(gpr_state, fdnum, iov_ptr, iovcnt)
 	}
-
-	// Even a zero-length vector validates the descriptor.
-	mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
-		return errno.err, errno.get()
-	}
-	checked_fd.unref()
-
-	mut total := u64(0)
-	for i := 0; i < iovcnt; i++ {
-		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
-		if iov.len == 0 {
-			continue
-		}
-		if total > u64(0x7fffffffffffffff) - u64(offset)
-			|| iov.len > u64(0x7fffffffffffffff) - u64(offset) - total {
-			return if total > 0 { total, u64(0) } else { errno.err, errno.einval }
-		}
-		ret, err := file.syscall_pread(gpr_state, fdnum, voidptr(iov.base), iov.len,
-			offset + i64(total))
-		if err != 0 {
-			if total > 0 {
-				return total, 0
-			}
-			return ret, err
-		}
-		total += ret
-		if ret < iov.len {
-			break
-		}
-	}
-	return total, 0
+	return linux_positioned_iov(fdnum, iov_ptr, iovcnt, offset, false)
 }
 
 fn syscall_linux_pwritev2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int, pos_low u64, pos_high u64, flags u32) (u64, u64) {
@@ -91,32 +57,44 @@ fn syscall_linux_pwritev2(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int,
 		return errno.err, errno.eopnotsupp
 	}
 
-	_, validation_error := validate_linux_iov(iov_ptr, iovcnt)
-	if validation_error != 0 {
-		return errno.err, validation_error
-	}
-
 	if offset == -1 {
 		return syscall_linux_writev(gpr_state, fdnum, iov_ptr, iovcnt)
 	}
+	return linux_positioned_iov(fdnum, iov_ptr, iovcnt, offset, true)
+}
 
-	mut checked_fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
+// Keep the selected open description and the imported headers through every
+// segment. Descriptor/access and pipe/socket seek errors precede header import,
+// including for empty vectors. Validate the aggregate position before I/O.
+fn linux_positioned_iov(fdnum int, iov_ptr u64, iovcnt int, offset i64, write bool) (u64, u64) {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or {
 		return errno.err, errno.get()
 	}
-	checked_fd.unref()
+	defer { fd.unref() }
+	if fd.handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
+	mode := fd.handle.resource.stat.mode
+	if stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
+		return errno.err, errno.espipe
+	}
+	access_error := linux_iov_access_error(fd, write)
+	if access_error != 0 { return errno.err, access_error }
+	fast := C.vinix_stack_alloc(linux_iov_fast * sizeof(LinuxIOVec))
+	vector := import_linux_iov(iov_ptr, iovcnt, fast) or { return errno.err, errno.get() }
+	defer { vector.release() }
+	if vector.total == 0 { return 0, 0 }
+	if vector.total > u64(0x7fffffffffffffff) - u64(offset) { return errno.err, errno.einval }
 
 	mut total := u64(0)
 	for i := 0; i < iovcnt; i++ {
-		iov := read_linux_iov(iov_ptr, i) or { return errno.err, errno.efault }
+		iov := unsafe { vector.data[i] }
 		if iov.len == 0 {
 			continue
 		}
-		if total > u64(0x7fffffffffffffff) - u64(offset)
-			|| iov.len > u64(0x7fffffffffffffff) - u64(offset) - total {
-			return if total > 0 { total, u64(0) } else { errno.err, errno.einval }
+		ret, err := if write {
+			file.pwrite_pinned_descriptor(mut fd, voidptr(iov.base), iov.len, offset + i64(total))
+		} else {
+			file.pread_pinned_descriptor(mut fd, voidptr(iov.base), iov.len, offset + i64(total), true)
 		}
-		ret, err := file.syscall_pwrite(gpr_state, fdnum, voidptr(iov.base), iov.len,
-			offset + i64(total))
 		if err != 0 {
 			if total > 0 {
 				return total, 0

@@ -18,7 +18,7 @@ tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-d
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86
 ```
 
-`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset` selects the tests; `--timeout` sets each guest's
+`--cases bpf,access,open,mmap,runtime,namespace,sharedmem,seccomp,futex,futexkeys,futexbits,futexop,futexerror,futexqueue,sparsefork,seccompquery,budget,mapstorage,sysrq,jit,nnp,nnpthread,keepcaps,securebits,ambient,capbset,capset,cappid,capabi,seccompthread,seccompkill,seccompinstall,seccompalloc,sysnr,pipezero,readerror,pathio,iovpin,iovimport,iovrange,iovoffset,iovposition` selects the tests; `--timeout` sets each guest's
 deadline. The kernel is never rebuilt implicitly. Build in separate worktrees
 and supply the ARM musl sysroot through `VINIX_AARCH64_SYSROOT` when necessary.
 
@@ -116,6 +116,23 @@ Two 200-cycle valid/error/sentinel cohorts require flat slab and big-page
 counts while reusing the sparse file. GNU wrappers, ELF32/translated paths,
 positioned header/descriptor lifetime, other flags/errors, count limits and
 shared-offset atomicity remain separate. See the [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-offsets).
+
+The `iovposition` case checks 396 native positioned-vector cases in each root
+and UID/GID 1000 child. Descriptor/access and pipe/socket seek errors precede
+header faults/count errors, including empty vectors and v2's current-position
+access refusals. All signed lengths and original ranges are checked before
+I/O; failed imports retain data, cursors and pipe/socket queues. Read-only
+2/8/9/513/1024-entry headers cover both storage paths. Whole-vector signed
+offset overflow returns EINVAL before EOF or file-size-limit behavior. The
+fixture bounds the unchanged write-overflow control with RLIMIT_FSIZE=1024.
+In-range PROT_NONE payloads retain completed prefixes. Fourteen EOF boundary
+checks per version cover MAX_RW_COUNT without allocating a 2 GiB payload.
+Two 200-cycle cohorts require flat slab classes and big-page counts. Emitted
+code verifies one descriptor lookup/import and scoped ownership; deterministic
+positioned close/dup2/header races require separate qualification. Flags,
+character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
+disk-backed vectors and shared-offset atomicity remain open. See the
+[qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
 The `sharedmem` case drops to UID 1000/GID 2000 and checks memfd creator
 ownership, mode 0777 independent of umask, zero links, owner chmod and a
