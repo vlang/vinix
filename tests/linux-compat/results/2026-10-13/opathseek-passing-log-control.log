@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/opathseek-audit.v:89: FAIL: fn main.native_failure: assert log.contains('offset=0 whence=0 result=0/0 expected=-1/9'), 'native failure markers required'
+      message: native failure markers required
+V panic: Assertion failed...

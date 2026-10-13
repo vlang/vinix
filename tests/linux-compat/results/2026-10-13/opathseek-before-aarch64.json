@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "dfd37954fb521f652fd825844752b4fed0fa0aa03b0dcdf9e49ff5bfb1022852",
+    "results": [
+        {
+            "name": "opathseek",
+            "source_sha256": "cea2d706eab06e5bdade51d2095ca1ec5a8d87388c0691b81339110f74e08b5b",
+            "init_sha256": "540141c57a3bfeabf25e358ac7b5c5987eb1325c314cd1811a3286579f76a69c",
+            "iso_sha256": "a772dd5d406eba93889c231faae203b7e933a76397c52c641132bfc8afb0da9a",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

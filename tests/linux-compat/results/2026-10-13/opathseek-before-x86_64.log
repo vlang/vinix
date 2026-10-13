@@ -1,0 +1,222 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   582k      0 --:--:-- --:--:-- --:--:--  580k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  1 2880k    1 50101    0     0  65926      0  0:00:44 --:--:--  0:00:44 65922 22 2880k   22  639k    0     0   360k      0  0:00:07  0:00:01  0:00:06  360k 52 2880k   52 1519k    0     0   550k      0  0:00:05  0:00:02  0:00:03  550k 86 2880k   86 2479k    0     0   651k      0  0:00:04  0:00:03  0:00:01  651k100 2880k  100 2880k    0     0   690k      0  0:00:04  0:00:04 --:--:--  690k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  41059      0 --:--:-- --:--:-- --:--:-- 41109
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   325k      0 --:--:-- --:--:-- --:--:--  326k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  59159      0 --:--:-- --:--:-- --:--:-- 59146
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   172k      0 --:--:-- --:--:-- --:--:--  172k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-scalarfd-1013/before-final-x86/opathseek/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-scalarfd-1013/before-final-x86/opathseek/.vinix-amd64.iso.vosLV9'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 1244m free
+Added to ISO image: directory '/'='/private/tmp/vinix-scalarfd-1013/before-final-x86/opathseek/iso-build/.iso-staging.FmGRvC/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13534 sectors
+Written to medium : 13534 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-scalarfd-1013/before-final-x86/opathseek/.vinix-amd64.iso.vosLV9' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd377.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-scalarfd-1013/before-final-x86/opathseek/test.iso (27717632 bytes)
+Guest artifacts: /private/tmp/vinix-scalarfd-1013/before-final-x86/opathseek
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75464
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK OUTCOMES: ordinary=1 cases=3024 failures=3024
+LINUX OPATHSEEK CONTROLS: ordinary=1 normal/sparse/negative/invalid/private/metadata PASS
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=0/0 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK DETAIL: offset=0 whence=0 result=-1/29 expected=-1/9
+LINUX OPATHSEEK OUTCOMES: ordinary=0 cases=3024 failures=3024
+LINUX OPATHSEEK CONTROLS: ordinary=0 normal/sparse/negative/invalid/private/metadata PASS
+LINUX OPATHSEEK FAIL: pathname seek access or storage
+QEMU: Terminated
+Missing verdicts: ['LINUX OPATHSEEK: PASS']; failures: ['FAIL:', 'LINUX OPATHSEEK FAIL']
+Linux compatibility qualification failed; see /private/tmp/vinix-scalarfd-1013/before-final-x86/receipt.json

@@ -134,6 +134,18 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `opathseek` case checks 3,024 native lseek refusals in each root and
+UID/GID1000 child. O_PATH handles for readable/private files, directories,
+FIFOs, unfollowed links and devices must return EBADF before policy, type,
+offset or whence errors. Four requested flag variants and original/dup/
+F_DUPFD_CLOEXEC aliases retain metadata and descriptor flags. Ordinary sparse,
+relative, negative and invalid seeks, saved file bytes and private-file access
+remain valid controls. Two 200-cycle cohorts reuse twelve descriptors and
+exercise 510 refusals per cycle, including six temporary dup/close operations,
+requiring flat slab and big-page storage. GNU wrappers, upper-word argument
+decoding, foreign ABIs, ordinary SEEK_DATA/SEEK_HOLE and shared-position races
+remain separate. See [the seek receipts](../../docs/linux-posix-qualification.md#native-o_path-seek-access).
+
 The `iovstream` case checks 220 pipe/UNIX stream/datagram/seqpacket probes in
 each root and UID/GID1000 child, using native readv and preadv2 at -1 with
 2/8/9/513/1024-entry imports. It checks full/truncated records, untouched next

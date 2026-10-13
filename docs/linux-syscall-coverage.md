@@ -704,10 +704,10 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/fs/mount_policy.v` | `6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a` |
 | `kernel/fs/procfs.v` | `2f55b33b127e0a02ccd563df76934875167049e459b61cb3dfaa4a78cd41a532` |
 | `kernel/fs/tmpfs.v` | `99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010` |
-| `kernel/fs/vfs.v` | `94e3350d84ec67006dfa542ab557bba23720616e62f333ec9aea8fb22176d9a4` |
+| `kernel/fs/vfs.v` | `e1839cc7e577b1a44f9c839b76a79e38b0a4561f6d77d2af4b05294d1b727380` |
 | `kernel/futex/futex.v` | `171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d` |
 | `kernel/futex/pi.v` | `69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba` |
-| `kernel/kbudget/budget.v` | `f578cc7e9f537f63c8c6859742c3e510eafe10c58dfc405c0a8aa41374e2492d` |
+| `kernel/kbudget/budget.v` | `980b9ae894bda6376f920e22bbca0aa953e02bd0349977bfe054a24580869b06` |
 | `kernel/kprint/kprint_amd64.v` | `fac3ed46448ec9e481dd44c2d8b715834087b2175374974170a2e0ce2286076b` |
 | `kernel/kprint/kprint_arm64.v` | `f7745a82aa8e57c8bfcb12697c29be47ce77c07feee6755150687ea78a4f113c` |
 | `kernel/kprint/printf_policy.v` | `118820ff0c5d3af102434c3a7e04cbb2dedab312942694e4d03baf00018dd302` |

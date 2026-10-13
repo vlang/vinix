@@ -2317,3 +2317,79 @@ and recvmsg, Internet/netlink records, later byte-stream faults and queue
 rollback, GNU wrappers, ELF32/translated paths, allocator exhaustion, shared
 regular-file offsets and complete Linux application installation/compatibility
 remain separate work. The three broad section-15 gates remain open.
+
+## Native O_PATH seek access
+
+O_PATH handles retained pathname access but lseek previously accepted them
+on files, directories and unfollowed symlinks, or returned ESPIPE for FIFOs
+and devices. Invalid offsets/whence could mask the required EBADF error.
+The seek syscall now refuses O_PATH immediately after its pinned descriptor
+lookup, before policy, handle locking, type checks or cursor calculations.
+Its existing defer releases the reference once; no new allocation or lock
+owner is introduced. Scalar read/write already reject O_PATH through the
+access-mode mask, which includes the pathname bit, and remain unchanged.
+
+[Linux v6.12 descriptor lookup](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/file.c)
+filters pathname handles from ordinary fdget operations; its
+[lseek path](https://raw.githubusercontent.com/torvalds/linux/v6.12/fs/read_write.c)
+uses that lookup before examining whence or invoking filesystem seek.
+The regression checks exact error precedence and retained descriptor behavior.
+
+The V `opathseek` fixture checks 3,024 raw native seeks in each root and
+UID/GID1000 child on both architectures. Six node types cover readable and
+private files, a directory, FIFO, unfollowed symlink and character device.
+Four requested flag variants exercise ignored write/truncate/append/nonblock
+bits; original, dup and F_DUPFD_CLOEXEC descriptors cover shared handles and
+descriptor flags. Six signed 64-bit offsets include a position above 4GiB,
+-1 and INT64_MIN; seven whence values include ordinary, data/hole, large
+invalid and negative selectors. Fresh baseline kernels fail every refusal,
+while fixed kernels pass all **6,048 checks per architecture**.
+
+Metadata retains inode, device, size and type before/after each alias cohort.
+Readable file bytes remain ABCD despite requested O_TRUNC, and ordinary users
+still receive EACCES when opening the root-owned private file for reading.
+Ordinary file controls preserve sparse positions above 4GiB/across 8GiB,
+relative/end seeks and negative/invalid seek errors with unchanged cursors.
+An invalid descriptor still returns EBADF before malformed arguments.
+
+Two 200-cycle retention cohorts keep twelve pathname descriptors live, after
+32 warm-up cycles. Each cycle makes 504 refused seeks plus six temporary
+dup/seek/close controls. Every slab live count stays flat, with big pages
+**63/63 ARM and 160/160 x86** in both credential groups. Opened-count cleanup
+closes only initialized owners; stat values and observation buffers stay on
+the stack, with two bounded alloca-backed slab snapshots. Complete fixture C
+matches both baseline/candidate captures, without hidden heap promotion.
+
+Independent lifetime review confirms the new emitted error branch unrefs its
+FD once, returns before MAC/lock acquisition and never dereferences the handle
+after release. Removing only the guard and canonicalizing generated return
+temporary names leaves the complete seek body identical to baseline. Scalar
+read/write/close, positioned I/O and vector consuming bodies remain identical.
+Four other guest cases pass on both architectures: pathio, readerror, pipezero
+and runtime. Eight host test files, both fresh kernel builds and inventory
+checks pass. Fresh allocation audits retain **406 ARM / 295 x86** existing
+sites and identical allowance failures; no allowance is increased. The source
+inventory fingerprints the same 63 inputs, including the modified seek code.
+
+The first fixture C compilation was rejected on both architectures for a
+printf long-long/long format mismatch. It was corrected before runtime tests;
+the rejection logs and receipts remain published. The first x86 candidate
+aggregate later failed when host disk exhaustion interrupted the runtime
+image build, after four passing guest cases. Its failed runtime row has no
+image hash and remains failed. A fresh runtime-only completion run passes on
+the identical candidate kernel with identical frozen fixture C.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/opathseek-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/opathseek-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/opathseek-audit.v)
+bind source/init/image hashes, raw logs, kernel binaries/C, allocation and host
+checks, compilation rejections, the x86 completion and both executed failing
+audit controls. Private kernel trees pin `116ba2c785`; only `fs/vfs.v` changes.
+The compiler is the clean `f6358ecff9` snapshot. Semantic receipts identify
+those isolated inputs separately from the public dispatch inventory, which
+follows the committed parent plus this guard.
+
+Upper-word descriptor/whence decoding, GNU wrappers, foreign/ELF32 paths,
+ordinary SEEK_DATA/SEEK_HOLE, shared-position concurrency, disk-backed handles,
+allocation exhaustion and complete application installation/sandbox/portal
+support remain separate work. The three broad section-15 gates stay open.

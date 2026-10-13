@@ -1,0 +1,6 @@
+/private/tmp/vinix-scalarfd-1013/before-arm/opathseek/fixture.c:1372:90: error: format specifies type 'long long' but the argument has type 'i64' (aka 'long') [-Werror,-Wformat]
+ 1372 |                         printf("LINUX OPATHSEEK DETAIL: offset=%lld whence=%d result=%ld/%d expected=-1/9\n", offset, whence, actual, code);
+      |                                                                ~~~~                                           ^~~~~~
+      |                                                                %ld
+1 error generated.
+Linux compatibility qualification failed; see /private/tmp/vinix-scalarfd-1013/before-arm/receipt.json

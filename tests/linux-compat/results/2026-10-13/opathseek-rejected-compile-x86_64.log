@@ -1,0 +1,9 @@
+/private/tmp/vinix-scalarfd-1013/before-x86/opathseek/fixture.c: In function 'opathseekfixture__refuse':
+/private/tmp/vinix-scalarfd-1013/before-x86/opathseek/fixture.c:1372:67: error: format '%lld' expects argument of type 'long long int', but argument 2 has type 'i64' {aka 'long int'} [-Werror=format=]
+ 1372 |                         printf("LINUX OPATHSEEK DETAIL: offset=%lld whence=%d result=%ld/%d expected=-1/9\n", offset, whence, actual, code);
+      |                                                                ~~~^                                           ~~~~~~
+      |                                                                   |                                           |
+      |                                                                   long long int                               i64 {aka long int}
+      |                                                                %ld
+cc1: all warnings being treated as errors
+Linux compatibility qualification failed; see /private/tmp/vinix-scalarfd-1013/before-x86/receipt.json

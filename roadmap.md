@@ -673,6 +673,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   faults and return EFAULT even after copied prefixes; qualify empty queues,
   empty/short records, import refusals and flat storage on both architectures.
   See [the record-fault receipts](docs/linux-posix-qualification.md#native-unix-record-vector-copy-faults).
+- [x] Refuse lseek on O_PATH handles and aliases before policy/type/argument
+  errors; qualify metadata, private permissions and ordinary sparse seeks as
+  root/UID1000 on both architectures, with flat descriptor cleanup storage.
+  See [the pathname-seek receipts](docs/linux-posix-qualification.md#native-o_path-seek-access).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

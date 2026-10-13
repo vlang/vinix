@@ -2005,6 +2005,9 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 	}
 
 	mut handle := fd.handle
+	// O_PATH retains a pathname without granting seek access, including for
+	// otherwise seekable nodes. Refuse it before policy/type/argument checks.
+	if handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 
 	handle.l.acquire()
