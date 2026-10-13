@@ -563,6 +563,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 			check(false, c'exec packaged init')
 		}
 	}
+	$if volume_recovery_test ? { return volume_recovery_entry() }
 	parent := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
 	C.printf(c'PLAN START\n')
 	warm_image()

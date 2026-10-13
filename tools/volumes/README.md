@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`backup-volume CONFIG PASSPHRASE_FILE RECOVERY_KEYFILE BACKUP` preserves an
+authenticated encrypted mapping and its key under an independent recovery key.
+`recover-volume BACKUP RECOVERY_KEYFILE NEW_PASSPHRASE_FILE CONFIG` rebuilds an
+ordinary sealed configuration after credential/configuration loss. Both are
+offline, private and no-overwrite operations, with no disk access or raw keyfile.
+See [configuration recovery](../../docs/storage-volumes.md#encrypted-volume-configuration-recovery).
+
 `boot-restore` combines `/etc/vinix/boot-volume.vcrypt` and its
 `boot-volume.pass` with named `NAME.vcrypt`/`NAME.pass` pairs in
 `/etc/vinix/boot-volumes.d`. All inputs authenticate, saved slot/extent conflicts

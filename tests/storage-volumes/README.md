@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+Encrypted configuration recovery adds independent ChaCha20/HMAC oracle checks,
+every-byte tamper/key-half refusal and real private-reader/publication fault
+coverage. The targeted `--volume-recovery` guest mode measures four warmup and
+four measured backup/recover/unlock lifetimes with three production KDFs each,
+then verifies production init and recovery after credential loss and device
+reordering. See [configuration recovery qualification](volume-recovery.md).
+
 Encrypted boot sets add all-64-slot/full-width metadata tests and extend the
 discovery model with sorted private pairs, complete authentication and physical
 preflight, independent disks/keys, late failures and retained directory replacement.

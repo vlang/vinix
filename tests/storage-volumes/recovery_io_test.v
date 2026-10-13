@@ -15,6 +15,7 @@ mut:
 	unlinks int
 	links int
 	wipes int
+	volume_wipes int
 	directory i32 = -1
 	temporary i32 = -1
 	random i32 = -1
@@ -24,6 +25,9 @@ __global recovery_io RecoveryIO
 
 fn recovery_mock_open(path &char, flags i32) i32 {
 	assert flags & C.O_CLOEXEC != 0 && flags & C.O_NOFOLLOW != 0
+	if volume_recovery_model && (flags & C.O_DIRECTORY != 0 || (volume_recovery_io.derives > 0 && unsafe { C.strstr(path, c'/recovery') != nil })) {
+		volume_recovery_assert_erased()
+	}
 	if C.strcmp(path, c'/dev/urandom') == 0 && recovery_io.mode == 6 { unsafe { C.errno = C.EACCES }; return -1 }
 	fd := C.open(path, flags)
 	if fd >= 0 {
@@ -116,6 +120,7 @@ fn recovery_mock_erase(pointer voidptr, size usize) {
 	erase_key(pointer, size)
 	unsafe { for i in usize(0) .. size { assert (&u8(pointer))[i] == 0 } }
 	if size == sizeof(RecoveryFiles) { recovery_io.wipes++ }
+	if size == sizeof(VolumeSealFiles) { recovery_io.volume_wipes++ }
 }
 
 fn test_recovery_all_io_failures_balance_descriptors_erase_keys_and_preserve_publication() {

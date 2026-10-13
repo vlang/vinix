@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume backup-volume CONFIG PASSPHRASE_FILE RECOVERY_KEYFILE BACKUP\n       vinix-volume recover-volume BACKUP RECOVERY_KEYFILE NEW_PASSPHRASE_FILE CONFIG\n')
 	C.printf(c'       vinix-volume boot-unlock\n')
 	C.printf(c'       vinix-volume plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG\n')
 	C.printf(c'       vinix-volume open-volume-auto CONFIG PASSPHRASE_FILE [ro]\n')
@@ -97,6 +98,11 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'backup-volume') == 0 || C.strcmp(argv[1], c'recover-volume') == 0) {
+			if argc != 6 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 || argv[5][0] == 0 { return usage() }
+			return if C.strcmp(argv[1], c'backup-volume') == 0 { backup_volume_seal(argv[2], argv[3], argv[4], argv[5]) }
+				else { recover_volume_seal(argv[2], argv[3], argv[4], argv[5]) }
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'boot-unlock') == 0 {
 			if argc != 2 { return usage() }
 			return boot_unlock_volume()

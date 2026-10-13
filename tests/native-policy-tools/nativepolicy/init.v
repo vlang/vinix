@@ -31,9 +31,19 @@ pub fn generate_init(tool string, destination string, host bool, echo bool, wifi
 	if wifi { defines << 'init_wifi_bundle' }
 	if echo { defines << 'init_busybox_echo_test' }
 	generate_project(work, destination, '', false, defines)!
-	text := read(destination)!
+	text := without_unused_stdio_printers(read(destination)!)
 	if pri_token(text) { return error('Unsupported native PRI format macro') }
 	write(destination, init_warnings + text.replace('#include <inttypes.h>\n', '') + init_layout)!
+}
+
+// Newer V emits these stdio helpers even for -no-builtin projects that never
+// print through V. Freestanding init provides its own console; retain any
+// live or unfamiliar compiler block rather than deleting required code.
+fn without_unused_stdio_printers(text string) string {
+	block := 'static FILE* v3_eprint_begin(void) {\n\tfflush(stdout);\n\tfflush(stderr);\n\treturn stderr;\n}\nstatic void v3_eprint_end(void) {\n\tfflush(stderr);\n}\n#define v3_eprintf(...) do { fprintf(v3_eprint_begin(), __VA_ARGS__); v3_eprint_end(); } while (0)\nstatic void v3_eprint_lit(const char* s) {\n\tv3_eprintf("%s", s);\n}\nstatic void v3_eprintln_string(string s) {\n\tv3_eprintf("%.*s\\n", s.len, (char*)s.str);\n}\n'
+	if text.count(block) != 1 { return text }
+	remaining := text.replace(block, '')
+	return if remaining.contains('v3_eprint') { text } else { remaining }
 }
 
 fn pri_token(text string) bool {

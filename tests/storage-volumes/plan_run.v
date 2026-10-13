@@ -40,6 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
+	volume_recovery_native_tests(root, work, v)!
 	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test', 'recovery_test', 'sealed_test', 'sealed_rewrap_test', 'volume_seal_test', 'volume_rewrap_test', 'volume_discovery_test', 'volume_growth_test', 'volume_boot_test', 'volume_boot_set_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
@@ -167,16 +168,27 @@ fn recovery_io_tests(root string, work string, v string) ! {
 			for name in ['open', 'close', 'flock'] { source = source.replace('C.' + name + '(', 'recovery_mock_' + name + '(').replace('fn recovery_mock_' + name + '(', 'fn C.' + name + '(') }
 		}
 		if file == 'plan_check.v' { source = source.replace('C.fflush(', 'recovery_mock_fflush(') }
-		if file in ['recovery_io.v', 'recovery_crypto.v', 'data_sha256.v'] { source = source.replace('erase_key(', 'recovery_mock_erase(') }
+		if file in ['volume_recovery.v', 'volume_seal_io.v'] { source = source.replace('sealed_derive(', 'volume_recovery_mock_derive(') }
+		if file in ['recovery_io.v', 'recovery_crypto.v', 'data_sha256.v', 'volume_recovery.v', 'volume_recovery_crypto.v', 'volume_seal_io.v', 'volume_seal_crypto.v'] { source = source.replace('erase_key(', 'recovery_mock_erase(') }
 		os.write_file(fixture + '/' + file, source)!
 	}
-	os.cp(root + '/tests/storage-volumes/recovery_io_test.v', fixture + '/recovery_io_test.v')!
+	os.write_file(fixture + '/recovery_io_test.v', os.read_file(root + '/tests/storage-volumes/recovery_io_test.v')!
+		+ '\n' + os.read_file(root + '/tests/storage-volumes/volume_recovery_io_test.v')!.all_after('import os\n'))!
 	binary := work + '/recovery-io-test'
 	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
 		'-fsanitize=address,undefined', '-o', binary, fixture + '/recovery_io_test.v'])!
 	print(command([binary])!)
 	println('PASS key recovery: source/nonce faults, complete erasure, no-overwrite publication, temporary ownership, durability/output failures and descriptor balance under ASan/UBSan')
+}
+
+fn volume_recovery_native_tests(root string, work string, v string) ! {
+	binary := work + '/volume_recovery_test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, root + '/tools/volumes/volumecli/volume_recovery_test.v'])!
+	print(command([binary])!)
+	println('PASS volume_recovery_test: ASan/UBSan, independent crypto and complete authenticated metadata')
 }
 
 fn crypt_io_tests(root string, work string, v string) ! {
@@ -380,7 +392,7 @@ fn write_disk(path string, wrong bool) ! {
 	file.seek(16 * 1024 * 1024 - 1, .start)!
 	file.write([u8(0)])!
 	mut sector := [512]u8{}
-	sector[440] = if wrong { 0x79 } else { 0x78 }; sector[441] = 0x56; sector[442] = 0x34; sector[443] = 0x12
+	sector[440] = if wrong { u8(0x79) } else { u8(0x78) }; sector[441] = 0x56; sector[442] = 0x34; sector[443] = 0x12
 	sector[510] = 0x55; sector[511] = 0xaa
 	// An unformatted partition must not be mistaken for its whole parent.
 	sector[450] = 0x83; sector[455] = 0x40; sector[459] = 8
@@ -408,9 +420,12 @@ fn plan_filesystem(work string) ! {
 	}
 }
 
-fn compile_guest(root string, work string, arch string, nvme bool) ! {
+fn compile_guest(root string, work string, arch string, nvme bool, recovery bool) ! {
 	source := work + '/guest.c'
-	if nvme {
+	if recovery {
+		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
+			root + '/tests/storage-volumes/planguest', source, '--arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'volume_recovery_test'])!
+	} else if nvme {
 		command(['sh', root + '/build-support/run-v-tool.sh', root + '/tests/linuxkpi/generate_module.v',
 			root + '/tests/storage-volumes/planguest', source, '--arch', 'amd64', '-d', 'nvme_health_test'])!
 	} else { generate(root, root + '/tests/storage-volumes/planguest', source, arch)! }
@@ -579,7 +594,7 @@ fn boot(args []string, log string) !string {
 fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if kernel == '' || !os.is_file(kernel) { return error('Select an existing kernel with --kernel') }
 	if work.contains(',') { return error('Work directory cannot contain QEMU option separators') }
-	compile_guest(root, work, arch, nvme)!
+	compile_guest(root, work, arch, nvme, false)!
 	if nvme {
 		nvme_disk(work + '/nvme.raw',0x81)!
 		nvme_disk(work + '/nvme-warning.raw',0x82)!
@@ -741,23 +756,43 @@ fn main() {
 	mut options := map[string]string{}
 	mut is_host := false
 	mut nvme := false
+	mut recovery := false
 	mut index := 1
 	for index < os.args.len {
 		name := os.args[index]
 		if name == '--host' { is_host = true; index++; continue }
 		if name == '--nvme' { nvme = true; index++; continue }
+		if name == '--volume-recovery' { recovery = true; index++; continue }
 		if name !in ['--arch', '--work', '--kernel'] || index + 1 >= os.args.len || name in options {
-			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --arch amd64|aarch64 --kernel KERNEL [--nvme]]'); exit(2)
+			eprintln('Usage: plan_run.v --work NEW_DIRECTORY [--host | --arch amd64|aarch64 --kernel KERNEL [--nvme | --volume-recovery]]'); exit(2)
 		}
 		options[name] = os.args[index + 1]; index += 2
 	}
 	work := os.abs_path(options['--work'])
 	if options['--work'] == '' || os.exists(work) || (!is_host && options['--arch'] !in ['amd64', 'aarch64'])
-		|| (nvme && (is_host || options['--arch'] != 'amd64')) {
+		|| (nvme && (is_host || options['--arch'] != 'amd64')) || (recovery && (is_host || nvme)) {
 		eprintln('Select a new private work directory and supported architecture'); exit(2)
 	}
 	os.mkdir(work) or { eprintln(err); exit(1) }
 	root := os.dir(os.dir(os.dir(@FILE)))
 	if is_host { host(root, work) or { eprintln(err); exit(1) } }
+	else if recovery { volume_recovery_guest(root, work, options['--arch'], os.real_path(options['--kernel'])) or { eprintln(err); exit(1) } }
 	else { guest(root, work, options['--arch'], os.real_path(options['--kernel']), nvme) or { eprintln(err); exit(1) } }
+}
+
+// Targeted recovery qualification uses the same production init, volume tool,
+// pinned physical disks and QEMU transport, followed by reordered reboot.
+fn volume_recovery_guest(root string, work string, arch string, kernel string) ! {
+	if kernel == '' || !os.is_file(kernel) || work.contains(',') { return error('Select an existing kernel and safe work directory') }
+	compile_guest(root, work, arch, false, true)!
+	write_disk(work + '/volume.raw', false)!; write_disk(work + '/wrong.raw', true)!
+	plan_filesystem(work)!; pack(work)!
+	first_args := if arch == 'aarch64' { arm_boot(root, work, kernel, false)! } else { amd64_boot(root, work, kernel, false, false)! }
+	first := boot(first_args, work + '/first-boot.log')!
+	if !first.contains('PLAN VOLUME RECOVERY PASSED:') || first.count('PLAN VOLUME RECOVERY CYCLES count=4') != 2
+		|| !first.contains('PLAN VOLUME RECOVERY LARGE ') || first.count('PLAN VOLUME RECOVERY RETAIN ') == 0 { return error('Missing complete volume recovery and retention qualification') }
+	second_args := if arch == 'aarch64' { arm_boot(root, work, kernel, true)! } else { amd64_boot(root, work, kernel, true, false)! }
+	second := boot(second_args, work + '/second-boot.log')!
+	if !second.contains('PLAN VOLUME RECOVERY REORDERED BOOT PRESERVED') || second.contains('init: volume restore failed; continuing') { return error('Recovered configuration failed production boot replay') }
+	println('PASS ' + arch + ': authenticated configuration recovery, full-cost retention and production reordered reboot')
 }

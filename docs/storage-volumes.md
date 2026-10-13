@@ -565,6 +565,59 @@ This remains data-volume unlock after root is available, with the existing
 offline credential-storage and encrypted-root limits. See
 [encrypted boot-set qualification](../tests/storage-volumes/volume-boot-set.md).
 
+## Encrypted-volume configuration recovery
+
+`backup-volume CONFIG PASSPHRASE_FILE RECOVERY_KEYFILE BACKUP` authenticates a
+`VINIXVC1` configuration and backs up its exact disk identity, capacity, native
+sectors, slot, extent, readonly mode and volume key under an independent private
+64-byte recovery key. `recover-volume BACKUP RECOVERY_KEYFILE
+NEW_PASSPHRASE_FILE CONFIG` restores that metadata and key into a new ordinary
+passphrase-sealed configuration. Neither command opens a disk, imports a mapping
+or creates a plaintext keyfile. The old configuration and credential are not
+required for recovery once the backup exists.
+
+```sh
+vinix-volume backup-volume /root/data.vcrypt /root/volume.pass /root/recovery.key /root/data.vrecover
+# After losing the original configuration or its credential:
+vinix-volume recover-volume /root/data.vrecover /root/recovery.key /root/new.pass /root/recovered.vcrypt
+vinix-volume open-volume-auto /root/recovered.vcrypt /root/new.pass
+```
+
+Backups authenticate the source configuration before reading the recovery key.
+Recovery validates the canonical backup and authenticates it before reading the
+new credential or doing KDF work. Both recovery-key halves authenticate before
+any plaintext or metadata is released. Recovery keys must have distinct halves
+and differ from the volume key. Existing private-file ownership, permissions,
+exact sizes, retained descriptors and symlink refusal apply to every input.
+New credentials use the existing 1–1024-byte binary credential policy and fixed
+production scrypt profile. Every recovery generates a fresh salt and nonce.
+
+The private recovery format `VINIXVR1` is exactly 320 bytes. It has version 1,
+algorithm 1 (direct ChaCha20 and HMAC-SHA256), total size 320 and key size 64 at
+the same offsets 8, 12, 16 and 20 as `VINIXVC1`. Bytes 24–55 are zero, with a
+fresh 12-byte nonce at 56. All disk/mapping fields, ciphertext, authentication
+tag and other reserved bytes retain the configuration layout above. The first
+32 recovery-key bytes encrypt the key with ChaCha20 counter 1. The second 32
+key HMAC-SHA256 over the first 32 recovery-key bytes followed by backup bytes
+0–287. The separate authenticated magic prevents key-envelope or sealed-volume
+format substitution. Disk and mapping metadata remain readable.
+
+Both outputs use locked, private, no-overwrite durable publication. An existing
+destination, including a dangling symlink or input alias, is preserved. Failures
+before publication create no destination; post-publication cleanup, directory
+flush or reporting failure can leave a complete private output with status 1.
+Credential/recovery buffers erase before reuse and all plaintext secrets erase
+before destination acquisition and on every normal return. Syntax returns 2,
+controlled failures 1 and completed publication/reporting 0.
+
+Keep the recovery key separately protected from the backup. A backup is an
+independent access path; changing credentials does not revoke it or rotate the
+volume key. Back up new geometry after deliberate growth/capacity adoption:
+recovery preserves the saved geometry and never guesses changes from a live
+disk. Unlock and boot replay keep their physical identity/conflict checks and
+normal limits. Recovery does not repair corrupted ciphertext or authenticate
+AES-XTS data. See [configuration recovery qualification](../tests/storage-volumes/volume-recovery.md).
+
 ## Authenticated encrypted-volume growth
 
 `plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`
