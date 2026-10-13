@@ -11,6 +11,10 @@ The desktop starts the service after user registration. Connections must belong
 to its user. A process can open multiple connections, one per window, and can
 start from a shell or any other launcher.
 
+For C and other-language bindings, use the [C API and SDK](windowfb/capi/README.md)
+with [`vinix_window.h`](windowfb/capi/vinix_window.h), a shared/static library,
+opaque window handles, mapped pixel pointers, and a waitable event FD.
+
 The V client module is `desktop.windowfb`. It has no ui2 dependency:
 
 ```v
