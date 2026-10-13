@@ -18,6 +18,12 @@ fn read_private_key_file(path &char, output &u8, minimum int, maximum int) int {
 	fd := C.open(path, C.O_RDONLY | C.O_NOFOLLOW | C.O_CLOEXEC | C.O_NONBLOCK)
 	if fd < 0 { C.perror(c'vinix-volume: open key input'); return 0 }
 	defer { C.close(fd) }
+	return read_private_key_fd(fd, output, minimum, maximum)
+}
+
+// The caller owns fd. Relative boot inputs use the same pinned-file policy.
+fn read_private_key_fd(fd i32, output &u8, minimum int, maximum int) int {
+	if minimum <= 0 || maximum < minimum || maximum > 1024 { return 0 }
 	mut info := C.stat{}
 	if C.fstat(fd, unsafe { &info }) != 0 || C.S_ISREG(info.st_mode) == 0 || info.st_size < minimum || info.st_size > maximum
 		|| info.st_mode & 0o077 != 0 || info.st_uid != C.geteuid() { plan_error(c'key input must be a private owned regular file within the required size'); return 0 }

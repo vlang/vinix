@@ -145,8 +145,17 @@ fn boot_restore() i32 {
 	mut set := unsafe { &PlanSet(C.alloca(sizeof(PlanSet))) }
 	unsafe { *set = PlanSet{} }
 	if !load_boot_plans(directory, mut set) { return 1 }
-	if set.count == 0 { return 0 }
+	mut work := unsafe { &VolumeSealFiles(C.alloca(sizeof(VolumeSealFiles))) }
+	unsafe { *work = VolumeSealFiles{} }
+	defer { erase_key(work, sizeof(VolumeSealFiles)) }
+	loaded := load_boot_volume(etc, directory, mut *work)
+	if loaded < 0 { return 1 }
+	if set.count == 0 && loaded == 0 { return 0 }
 	if !trusted_directory(etc, c'boot configuration directory must be owned by root and not writable by group or others')
 		|| !trusted_directory(directory, c'boot plan directory must be owned by root and not writable by group or others') { return 1 }
-	return restore_plan_set(set)
+	if loaded == 1 && !boot_volume_set_compatible(set, work) { return plan_error(c'boot encrypted mapping conflicts with the saved plain set') }
+	if restore_plan_set(set) != 0 { return 1 }
+	if loaded == 0 { return 0 }
+	if !boot_volume_directories(etc, directory) { return 1 }
+	return open_loaded_volume_seal_auto(mut *work, false)
 }

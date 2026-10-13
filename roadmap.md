@@ -196,6 +196,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [Authenticated encrypted-volume credential changes preserving disk/mapping metadata and readonly mode, fresh salt/nonce, erased credential reuse, no raw keyfile or device access and reboot persistence](docs/storage-volumes.md#changing-encrypted-volume-configuration-credentials).
   - [x] [Authenticated identity-based encrypted-volume unlock with bounded discovery, physical-alias acceptance, duplicate refusal, erased credentials, pinned import, readonly preservation and reboot persistence](docs/storage-volumes.md#automatic-encrypted-volume-discovery).
   - [x] [Authenticated encrypted-volume extent growth and physical capacity adoption preserving key/start/slot/readonly mode, fresh wrapping, pinned rechecks, separate live application and ciphertext/reboot persistence](docs/storage-volumes.md#authenticated-encrypted-volume-growth).
+  - [x] [Opt-in authenticated encrypted data-volume boot unlock with private root-owned pinned inputs, plain-set conflict preflight, identity discovery, readonly preservation, controlled recovery and reboot persistence](docs/storage-volumes.md#opt-in-encrypted-boot-unlock).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

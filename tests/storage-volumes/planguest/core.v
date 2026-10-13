@@ -496,6 +496,7 @@ fn first_boot(parent &char) {
 		volume_discovery_retention(parent)
 		planned_volume_growth(parent, wrong)
 		volume_growth_retention(parent)
+		volume_boot_retention(parent)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -531,6 +532,7 @@ fn first_boot(parent &char) {
 		check(C.unlink(c'/root/crypt.key') == 0, c'remove original key before reboot recovery')
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, wrong, &char(nil), 0)
 		pool_members(c'/etc/vinix/volumes.vset')
+		boot_volume_prepare(c'/root/volume-grown-ro.sealed')
 		plan := C.open(c'/root/saved.vmap', C.O_RDONLY); check(plan >= 0, c'open exported plan')
 		mut bytes := [2112]u8{}
 		size := C.read(plan, &bytes[0], 2112)
@@ -568,6 +570,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		C.close(phase)
 		actual := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 		other := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
+		volume_boot_reboot_probe(actual)
 		data_phase := C.open(c'/data-boot', C.O_RDONLY)
 		if data_phase >= 0 {
 			check(C.close(data_phase) == 0, c'close checksum phase marker'); data_boot_phase(actual, other)
@@ -589,6 +592,8 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		if status(actual).bytes == 20971520 {
 			volume_discovery_tool(c'/root/volume-capacity.sealed', c'/root/next.pass', true, 1); missing(c'/dev/mapper/vinix60')
 			C.printf(c'PLAN VOLUME GROWTH PHYSICAL CONTRACTION REFUSED\n')
+			pending := C.open(c'/etc/vinix/boot-volume.vcrypt', C.O_RDONLY)
+			if pending >= 0 { check(C.close(pending) == 0, c'close refused boot configuration'); boot_volume_disable() }
 			physical_capacity_contract_phase(actual, other)
 			C.printf(c'PLAN DONE\n')
 			for { C.pause() }
@@ -601,6 +606,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 			volume_discovery_tool(c'/root/volume-next.sealed', c'/root/next.pass', true, 1); missing(c'/dev/mapper/vinix60')
 			C.printf(c'PLAN VOLUME DISCOVERY CHANGED CAPACITY REFUSED\n')
 			volume_growth_capacity_boot(actual)
+			boot_volume_prepare(c'/root/volume-capacity-ro.sealed')
 			physical_capacity_phase(actual, other)
 			C.printf(c'PLAN DONE\n')
 			for { C.pause() }
@@ -622,10 +628,12 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		volume_rewrap_reordered_boot(actual, other)
 		volume_discovery_reordered_boot(actual)
 		volume_growth_reordered_boot(actual)
+		planned_volume_boot(actual)
 		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation
 		second_before := status(c'/dev/mapper/vinix9').generation
 		simple(c'boot-restore', unsafe { &char(nil) }, unsafe { &char(nil) }, 0)
+		boot_volume_view(actual, 8192, true)
 		check(status(c'/dev/mapper/vinix2').generation == before
 			&& status(c'/dev/mapper/vinix9').generation == second_before, c'reboot restore idempotence')
 	}

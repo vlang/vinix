@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+Opt-in encrypted boot unlock adds full-width plain/encrypted conflict tests
+and extends the discovery syscall model with root directory/input policy,
+pinned relative reads, disabled configuration, pre-import trust rechecks and
+path replacement. Production init is checked after device reordering and
+capacity adoption, including capacity/contraction refusal and measured unlock
+lifetimes. See [boot-unlock qualification](volume-boot.md).
+
 Authenticated encrypted growth adds full-width/native-sector metadata tests
 and extends the publication model with same-key capacity adoption, credential
 buffer reuse, pinned read-only probes and pre-/post-KDF disk rechecks. Both guests

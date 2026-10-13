@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume boot-unlock\n')
 	C.printf(c'       vinix-volume plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG\n')
 	C.printf(c'       vinix-volume open-volume-auto CONFIG PASSPHRASE_FILE [ro]\n')
 	C.printf(c'       vinix-volume rewrap-volume CONFIG OLD_PASSPHRASE_FILE NEW_PASSPHRASE_FILE NEW_CONFIG\n')
@@ -96,6 +97,10 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'boot-unlock') == 0 {
+			if argc != 2 { return usage() }
+			return boot_unlock_volume()
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'plan-grow-volume') == 0 {
 			if argc != 7 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 || argv[6][0] == 0 { return usage() }
 			length := decimal(argv[5]) or { return usage() }; if length == 0 { return usage() }

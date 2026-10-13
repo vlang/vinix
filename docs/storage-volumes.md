@@ -442,14 +442,78 @@ workspace. Status 0 means import and reporting succeeded, 1 means a controlled
 failure and 2 means invalid syntax. Reporting failure after successful import
 can leave a live mapping, as with `open-volume`.
 
-This is explicit unlock after the system has booted. It does not add unattended
-credential storage, automatic init replay, encrypted-root boot or volume-key
-rotation. Saved configurations still reject changed capacity or sector size.
+This command is explicit unlock after the system has booted. Opt-in init replay
+is available through [encrypted boot unlock](#opt-in-encrypted-boot-unlock) below.
+Encrypted-root boot and volume-key rotation remain separate work. Saved
+configurations still reject changed capacity or sector size.
 Partition-table identities are cloneable; uniqueness is established among the
 observable candidates during this scan, and a privileged metadata rewrite
 after the final check remains outside its guarantee. The existing encryption,
 credential storage, process-termination and cache limits apply. See
 [automatic unlock qualification](../tests/storage-volumes/volume-discovery.md).
+
+## Opt-in encrypted boot unlock
+
+The existing `boot-restore` startup hook can unlock one authenticated encrypted
+volume after restoring the plain saved set. Enable it with
+`/etc/vinix/boot-volume.vcrypt`, a private `VINIXVC1` configuration, and
+`/etc/vinix/boot-volume.pass`, its private credential file. The saved disk
+identity, exact capacity/native sectors, key, slot, start, length and readonly
+mode remain authoritative. Device reordering is handled by the existing bounded
+identity scanner. No raw keyfile is created.
+
+```sh
+# Install the credential first; the configuration enables automatic unlock.
+install -m 600 /root/volume.pass /etc/vinix/boot-volume.pass
+install -m 600 /root/data.vcrypt /etc/vinix/boot-volume.vcrypt
+# Test encrypted unlock alone without applying plain saved plans.
+vinix-volume boot-unlock
+# Removing the configuration disables automatic unlock.
+rm /etc/vinix/boot-volume.vcrypt
+```
+
+The directories `/etc` and `/etc/vinix` must be owned by root and not writable
+by group or others. Both inputs must be root-owned private regular files; the
+credential retains the existing 1–1024 exact binary byte policy. All directory
+and input opens use no-follow and close-on-exec, and input opens are nonblocking.
+Inputs are opened relative to the retained configuration directory and rechecked
+after EOF, so path replacement cannot redirect a read. Missing configuration
+means disabled, even if a credential remains; missing directories also return
+success. Other access errors, hostile types/permissions, malformed envelopes or
+wrong credentials fail before discovery or encrypted import. Invalid canonical
+headers fail before credential access and KDF work. Credential and wrapping-key
+buffers erase before any device scan; all secret state erases on normal returns.
+
+`boot-restore` loads and validates the plain set, authenticates the encrypted
+configuration, then rejects a duplicate global slot or overlapping saved plain
+extent before applying either. Directory trust is checked again after
+authentication and before encrypted import. Plain restore retains its complete
+preflight and pinned-device checks; a plain-set failure prevents encrypted
+unlock. Encrypted import follows the existing unique-device discovery, retained
+descriptor and two final identity/geometry/readonly checks. An occupied encrypted
+slot refuses a second unlock; matching geometry cannot establish that an
+existing mapping uses the authenticated key.
+
+These phases are sequential. A later encrypted discovery/import/report failure
+may leave successfully restored plain mappings, and reporting failure after
+encrypted import may leave the encrypted mapping live. There is no cross-phase
+kernel transaction. Status 0 means disabled or successful import/reporting,
+1 means a controlled failure and 2 means invalid command syntax. Existing init
+reports failure and continues to its recovery desktop or shell. The ARM init
+policy and both x86 init variants already call `boot-restore` before applications;
+no new startup script is required.
+
+This unlocks a data volume after the system root is available. It does not mount
+filesystems or provide encrypted-root boot, interactive credential prompts,
+hardware-protected credentials, volume-key rotation or authenticated data
+ciphertext. A plaintext credential on the same unencrypted media permits an
+offline reader to unlock the volume; use a separately protected boot source
+when that threat matters. Removing the configuration does not remove an already
+live mapping or erase credential copies. Disable the configuration before
+changing the pair, install the new credential before the new configuration,
+and make both files and their directory durable before reboot. Physical capacity
+or sector changes still reject until a matching configuration is deliberately
+installed. See [boot-unlock qualification](../tests/storage-volumes/volume-boot.md).
 
 ## Authenticated encrypted-volume growth
 

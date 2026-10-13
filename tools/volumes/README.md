@@ -4,6 +4,14 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`boot-restore` optionally authenticates `/etc/vinix/boot-volume.vcrypt` with
+`/etc/vinix/boot-volume.pass` before applying the plain set, rejects saved
+slot/extent conflicts, then unlocks the encrypted mapping through pinned
+identity discovery. Root-owned private inputs are relative to a retained
+trusted directory; credentials erase before discovery. `boot-unlock` applies
+only this optional encrypted configuration. Missing configuration means disabled.
+See [startup behavior and credential limits](../../docs/storage-volumes.md#opt-in-encrypted-boot-unlock).
+
 `plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`
 authenticates saved encrypted metadata, checks the same identity/native sectors
 on a pinned read-only parent, and publishes a separate configuration adopting
