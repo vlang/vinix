@@ -4294,6 +4294,38 @@ unchanged. Fortnite passes the former foreign-index import and exits with
 status 1 before entry at `_$sSS8UTF8ViewV13_foreignIndex_8offsetBySS0D0VAF_SitF`.
 Full regression remains unpassed; entry, rendering and gameplay are unverified.
 
+`Swift foreign UTF-8 offsets` now implement the measured borrowed movement helper
+`_$sSS8UTF8ViewV13_foreignIndex_8offsetBySS0D0VAF_SitF` from libswiftCore.
+Native library and MarketplaceKitWrapper measurements establish the index in
+x0, signed byte distance in x1, borrowed UTF8View in x2/x3 and raw result in x0.
+The fixture compares 4,744 exact native results across five foreign Strings,
+including forward/backward/zero movement, endpoints, Unicode, embedded NUL,
+combining marks and surrogate pairs, without changing input ownership.
+
+The V helper reuses the checked foreign view and static borrowed errors under
+an outer recursive registry lock. Two linear scans map UTF-16/transcoding
+indices to byte positions and back. Zero distance preserves the exact input
+without reading the view. Positive movement sets flags 9 at scalar boundaries
+or 8 inside a scalar; negative movement sets flags 8. Bounds are checked before
+signed addition, including INT64_MIN/MAX. The helper allocates no owner,
+scratch, mapping or error box. It supports the existing full UTF-16-indexed
+NSString/decoded constant subset bounded to 1 MiB. UTF-8-only indices, invalid
+transcoding, falsely scalar-aligned surrogate interiors and negative movement
+from surrogate interiors reject; unmarked forward interiors align to the
+scalar start. Other String storage limitations remain.
+
+All 85 programs build and 123 generated C streams restore to their hashes.
+Thirty-eight host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 40 Swift/loader programs. The new fixture also checks four
+concurrent readers, constants, guarded/dead/empty/mismatched views, invalid
+indices, signed bounds and two drained runtime lifetimes. Evidence is retained
+under `build/ios/fortnite/foreign-offset-checks`, with pinned source/toolchain
+inputs, native ABI and actual callsite measurements, allocation audits and
+verified executable/debug archives. Five published runners remain unchanged.
+Fortnite passes the former foreign-offset import and exits with status 1
+before entry at `_$sSS8UTF8ViewV17_foreignSubscript8positions5UInt8VSS5IndexV_tF`.
+Full regression remains unpassed; entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4301,10 +4333,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,448 | 712 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 125 | 51 | 23 |
-| All images | 2,232 | 766 | 120 |
+| MarketplaceKitWrapper | 126 | 50 | 23 |
+| All images | 2,233 | 765 | 120 |
 
-The C++/GLES/Text variant reports 2,245 resolved imports, 753 unresolved strong
+The C++/GLES/Text variant reports 2,246 resolved imports, 752 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
