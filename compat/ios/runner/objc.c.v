@@ -452,6 +452,7 @@ fn objc_allocate(cls u64) u64 {
 }
 
 fn objc_retain(object u64) u64 {
+	if os_log_is_handle(object) { return object }
 	ns_pool_reject_ownership(object)
 	if object != 0 && dispatch_objc_retain(object) { return object }
 	if object != 0 && is_block(object) { return block_retain(object) }
@@ -486,6 +487,7 @@ fn objc_release(object u64) {
 }
 
 fn objc_release_regular(object u64) {
+	if os_log_is_handle(object) { return }
 	if object == 0 || object in ios_runtime.classes || object in ios_runtime.constants { return }
 	if dispatch_objc_release(object) { return }
 	if is_block(object) {
@@ -638,6 +640,7 @@ fn format_double(destination &char, size usize, format &char, value f64) int {
 
 fn runtime_symbol(library string, symbol string) !u64 {
 	if library == '/usr/lib/swift/libswiftFoundation.dylib' { return swift_foundation_symbol(symbol) }
+	if library == '/usr/lib/swift/libswiftos.dylib' && symbol == '_$sSo13os_log_type_ta0A0E5errorABvgZ' { return u64(unsafe { voidptr(swift_os_log_error_type) }) }
 	if library == '/usr/lib/swift/libswift_Concurrency.dylib' { return swift_concurrency_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftObjectiveC.dylib' {
 		if address := swift_objc_bool_symbol(symbol) { return address }

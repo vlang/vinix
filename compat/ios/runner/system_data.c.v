@@ -46,6 +46,10 @@ mut:
 	dl_error string
 	dl_error_pending bool
 	dispatch_once map[u64]voidptr
+	logs &OsLogHandle = unsafe { nil }
+	log_count int
+	log_default [8]u8
+	log_disabled [8]u8
 }
 
 __global system_data = unsafe { &SystemData(nil) }
@@ -97,6 +101,7 @@ fn system_data_stop() {
 	if system_data == unsafe { nil } { return }
 	signals_stop()
 	dispatch_free()
+	os_log_stop()
 	system_queries_stop()
 	mach_memory_stop()
 	mach_threads_stop()

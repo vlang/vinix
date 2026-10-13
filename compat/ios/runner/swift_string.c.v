@@ -186,6 +186,7 @@ fn swift_bridge_release_n(object u64, count i32) {
 fn swift_bridge_release(object u64) { swift_bridge_release_n(object, 1) }
 
 fn swift_unknown_is_native(object u64) bool {
+	if os_log_is_handle(object) { return false }
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	if swift_task_find_locked(object) != 0 { return true }

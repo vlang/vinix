@@ -110,6 +110,7 @@ fn libsystem_symbol(library string, symbol string) !u64 {
 	if address := dyld_symbol(symbol) { return address }
 	if address := fixed_symbol(symbol) { return address }
 	if address := dispatch_symbol(symbol) { return address }
+	if address := os_log_symbol(symbol) { return address }
 	if address := time_symbol(symbol) { return address }
 	if address := files_symbol(symbol) { return address }
 	if address := sockets_symbol(symbol) { return address }

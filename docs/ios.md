@@ -4063,17 +4063,58 @@ unchanged. Fortnite passes the former short-type rejection and exits with
 status 1 before entry at `__os_log_impl`. Full regression remains unpassed;
 game entry, rendering and gameplay remain unverified.
 
+`OS logging` now decodes measured compiler-produced records
+through the fixed six-argument `_os_log_impl` family, rather than treating the
+encoded buffer as varargs. Both MarketplaceKitWrapper formats are supported:
+public C strings and public Objective-C descriptions. The installed Mac's
+canonical log handles, disabled enablement, privacy descriptors and scalar
+payloads are measured from V. LLVM decodes the scoped Swift error-type getter
+as `mov w0, #16; ret`; a guarded raw call verifies preserved x20/x21.
+
+The local policy writes complete messages to stderr, enables default/info/error/
+fault and disables debug. Default and disabled data symbols name objects
+directly. Textual subsystem/category pairs intern thread-safe runtime-owned
+handles, recognized by Objective-C and Swift unknown-object ARC. Handle storage
+is reclaimed after worker and Objective-C shutdown. Decoding and emission use
+stack storage; public object descriptions run outside registry/sink locks and
+drain temporary owners through a nested pool. Private/default dynamic content
+is redacted without dereferencing its pointers. The entire record envelope and
+format are checked before public content is read.
+
+Labels are limited to 255 bytes, the cache to 256 pairs, records to 64, format
+strings to 1,023 bytes, public content to 1,024 bytes and message bodies to
+4,095 bytes. Basic signed/unsigned/hex/octal/pointer/character/floating scalars,
+C strings, object descriptions and literal percent signs are supported. Width,
+precision, errno/raw-data records and unsupported annotations reject explicitly.
+Native OS_os_log methods, persistent log storage and configuration remain
+unimplemented. The sink preserves errno and serializes each completed write.
+
+All 78 programs build and 109 generated C streams restore to their hashes.
+Thirty-one host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+31 Objective-C and 34 Swift/loader programs. The logging fixture compares
+Clang-produced buffers, checks guard-adjacent truncated records and bounded
+strings, rejects mismatched formats before pointer reads, exercises reentrant
+descriptions and 8,000 concurrent ownership cycles, invokes all four logging
+entry points and drains two runtime lifetimes. The initial passing sanitizer
+trial with a rejected generated-C stack-buffer allocation is retained.
+
+Evidence is retained under `build/ios/fortnite/oslog-checks`, with pinned
+tooling and inputs, native measurements, allocation audits and executable/debug
+archives. Five published runners remain unchanged. Fortnite passes the former
+OS logging import and exits with status 1 before entry at `_memset_s`.
+Full regression remains unpassed; entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,443 | 717 | 79 |
+| Fortnite executable | 1,448 | 712 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 116 | 60 | 23 |
-| All images | 2,218 | 780 | 120 |
+| MarketplaceKitWrapper | 119 | 57 | 23 |
+| All images | 2,226 | 772 | 120 |
 
-The C++/GLES/Text variant reports 2,231 resolved imports, 767 unresolved strong
+The C++/GLES/Text variant reports 2,239 resolved imports, 759 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
