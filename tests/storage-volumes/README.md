@@ -1,5 +1,10 @@
 # Storage-volume qualification
 
+`--host-scrub-reference` and `--scrub-reference` qualify complete historical
+scrub/reference binding, native geometry, failure precedence and repeated
+lifetimes across reordered reboot. The independent oracle reconstructs 24
+complete persisted artifacts per guest. See [reference binding](scrub-reference.md).
+
 `--host-data-scrub-history` and `--data-scrub-history` qualify offline multi-disk
 scrub comparisons: complete reference/row binding, all four transition classes,
 whole-report fingerprints, ordinary reader/output faults, unchanged live views,

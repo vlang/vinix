@@ -577,6 +577,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	$if volume_ciphertext_auto_test ? { return ciphertext_auto_entry() }
 	$if volume_reference_test ? { return reference_entry() }
 	$if data_auto_test ? { return data_auto_entry() }
+	$if scrub_reference_test ? { return scrub_reference_entry() }
 	$if data_scrub_history_test ? { return data_scrub_history_entry() }
 	$if data_scrub_view_test ? { return data_scrub_view_entry() }
 	$if data_reference_test ? { return data_reference_entry() }

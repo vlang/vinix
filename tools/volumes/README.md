@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`verify-data-scrub-reference MANIFEST REPORT` binds a saved plain-data scrub to
+its complete checksum reference, then prints native disk geometry and every
+historical finding. The reference fingerprint and exact rows/expected digests
+must agree; output includes both complete input fingerprints. Changed findings
+return 2 and operational failures return 1.
+See [reference binding](../../docs/storage-volumes.md#binding-data-scrub-reports-to-checksum-references).
+
 `compare-data-scrubs BEFORE_REPORT AFTER_REPORT` compares all recorded plain-disk
 scrub findings with exact reference/row binding and complete report fingerprints.
 Results distinguish stable, new-change, restored and changed-again observations.

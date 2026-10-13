@@ -3154,6 +3154,53 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Binding data scrub reports to checksum references
+
+`verify-data-scrub-reference MANIFEST REPORT` checks a saved `VINIXSR1`
+plain-data scrub against its complete `VINIXDH1` checksum reference. It reads
+ordinary files without opening disks, discovering devices or changing mappings.
+
+```sh
+vinix-volume verify-data-scrub-reference /root/data.vhash /root/scrub.txt
+```
+
+Both inputs receive complete strict validation before any findings are printed.
+The report's reference SHA-256 must equal the hash of the entire canonical DH1
+file, including disk order, identities, native capacities and sectors, mapping
+metadata, pool order and allocation windows, and expected digests. Disk and row
+counts, each ordered disk index/slot/extent/mode and every expected digest must
+also match explicitly. A copied fingerprint alone cannot establish binding.
+Any malformed input or incompatible reference takes precedence over recorded
+data changes, including a mismatch in the last row.
+
+The complete bounded output begins with
+`format=VINIXSR1 operation=verified-data-scrub-reference`, counts all matched
+and changed observations, and includes `reference_sha256` and `report_sha256`
+for the entire reference and original scrub report. Each saved disk, including
+an empty disk, prints its native capacity, sector and identity, followed by its
+canonical rows with expected and actual digests and `match`/`changed` findings.
+Pool metadata is bound by the reference fingerprint. This output is a view;
+the input scrub grammar remains `operation=scrubbed-data`.
+
+Both file descriptors and parent directory descriptors stay pinned until
+printing and final stdout flush/error checks finish. Inputs may be ordinary
+0644 files or hard-linked aliases. Symlinks, directories, FIFOs, oversized,
+truncated and trailing input are refused. The operation takes no writer lock
+and remains usable while a writer holds the directory lock. It performs no
+KDF, device I/O or report publication.
+
+Exit status is 0 when every historical observation matches, 2 when a valid
+bound report records any changes, and 1 on an operational failure. Syntax
+errors return 2. Encoding, printing and final stdout failures return 1 even
+when the report records changes. Invalid inputs emit no binding header or rows;
+existing diagnostics may use stdout.
+
+This verifies a historical report against a trusted reference. SHA-256 does
+not authenticate either file, and the observations do not establish current
+disk integrity, provide a concurrent snapshot or repair data. Live data checks
+remain available through `verify-data-auto` and `scrub-data-auto`. See
+[the qualification](../tests/storage-volumes/scrub-reference.md).
+
 ## Comparing multi-disk data scrub history
 
 `compare-data-scrubs BEFORE_REPORT AFTER_REPORT` compares complete historical
