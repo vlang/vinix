@@ -1,0 +1,495 @@
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FC86000 start failed: Unsupported
+Error: Image at 0007FC0B000 start failed: Not Found
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+BdsDxe: starting Boot0001 "UEFI Non-Block Boot Device" from PciRoot(0x0)/Pci(0x2,0x0)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x77e74000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x77e74000 to 0xffffffff80000000, length: 0x2c4000
+vmm: Kernel: Mapping 0x78138000 to 0xffffffff802c4000, length: 0x2c000
+vmm: Kernel: Mapping 0x78164000 to 0xffffffff802f0000, length: 0xf3d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x77e74000 +0x2f0000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 29
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 30
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 1000000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+initramfs: Module:  1
+initramfs: Address: 0xffff000077830000
+initramfs: Size:    6569472
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./home/ sz=0
+!>+ [4] ./usr/ sz=0
+!>+ [5] ./sbin/ sz=0
+!>+ [6] ./etc/ sz=0
+!>+ [7] ./var/ sz=0
+!>+ [8] ./sys/ sz=0
+!>+ [9] ./root/ sz=0
+!>+ [10] ./dev/ sz=0
+!>+ [11] ./run/ sz=0
+!>+ [12] ./tmp/ sz=0
+!>+ [13] ./var/log/ sz=0
+!>+ [14] ./etc/vinix/ sz=0
+!>+ [15] ./etc/group sz=19
+!>+ [16] ./etc/passwd sz=30
+!>+ [17] ./etc/hwtest-scenario sz=15
+!>+ [18] ./etc/vinix/auth.conf sz=15
+!>+ [19] ./sbin/init sz=2194808
+!>+ [20] ./usr/bin/ sz=0
+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>+!>initramfs: no ustar sig at 0xffff000077e73a00
+initramfs: Done (33 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 1000000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+pci: Found [0:2:0:-1]
+devcore: 3 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 3 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x267930
+HWTEST START packages-linux
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x267930
+PACKAGE SIGNING rfc8032 reference-keys reference-signatures tamper-refusal PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x227cb0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x227cb0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x227cb0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE CATALOG pinned-import architecture-closure canonical-workspace refusal-cleanup PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE RELEASE reproducible-index complete-runtime-closure private-state-exclusion sequence-fork-refusal offline-install PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE REVIEW full-runtime-closure provenance stale-confirmation PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40024c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x1d000000 phdr=0x1d000040 entry=0x1d0683d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE MIRROR REVIEW read-only closure destination-binding progress interrupted-retry PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x267930
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x267930
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE OFFLINE atomic-export failure-cleanup cached-retry ordinary-read signed-runtime-closure PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE DOCUMENTS unknown-duplicate-escaped-keys explicit-policy-disclosure PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40024c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0xc00000 phdr=0xc00040 entry=0xc683d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40024c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x27600000 phdr=0x27600040 entry=0x276683d8
+random: reseeded from 3041 events, 4 hardware words
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE LOCKED MIRROR exact-old-runtime bundled-lock offline-reproduction PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x267930
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE STATE runtime-closure duplicate-fields canonical-generations collection-preflight restore PASS
+PACKAGE COLLECTION obsolete=128 nofile=32 live-lease preserved-and-released verified-state PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE UPDATES runtime-only resolved-version complete-closure PASS
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40024c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0xee00000 phdr=0xee00040 entry=0xee683d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40024c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x24800000 phdr=0x24800040 entry=0x248683d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40024c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x5000000 phdr=0x5000040 entry=0x50683d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x4001dc
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x400040 entry=0x40024c
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x31400000 phdr=0x31400040 entry=0x314683d8
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x226390
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+exec: syscall handler entered; copying user path
+ELF auxval: base=0x0 phdr=0x200040 entry=0x24dec0
+PACKAGE TRUST REVIEW read-only authenticated-metadata stale-confirmation reviewed-revocation PASS
+PACKAGE CONFIGURATION lock-scoped-policy verified-json-status busy-launch PASS
+PACKAGE ORGANIZATION reviewed-policy dependency-impact stale-refusal ordinary-user-denial atomic-restore PASS
+PACKAGE DEPLOYMENT exact-metadata complete-runtime-closure offline-reproduction stale-refusal ordinary-user-denial rollback PASS
+PACKAGE PROGRESS bounded-byte-counters verified-copy activation-completion offline-runtime-closure PASS
+PACKAGE REPOSITORY authenticated-enrollment revocation retained-replay-floor re-enrollment PASS
+PACKAGE LINUX IMPORT signed-source-aliases explicit-runtime tamper-refusal missing-library rollback clean-uninstall PASS
+HWTEST PASS packages-linux
+syspower: power off: stopping devices

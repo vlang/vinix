@@ -106,3 +106,9 @@ garbage collection admits retained states and obsolete-generation leases before
 deleting anything. Corrupt rollback metadata or malformed leases preserve cache
 and generation contents for administrator recovery. See
 [state validation qualification](../../tests/packages/state-validation-check.md).
+
+Collection preflight uses a bounded descriptor pair instead of retaining one
+descriptor per obsolete generation. Removal rechecks directory/lease identities
+and the live lock under the package writer lock. See
+[collection qualification](../../tests/packages/collection-limit-check.md) for
+the reproduced 128-generation / 32-descriptor failure and corrected workflow.

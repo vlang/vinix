@@ -15,6 +15,12 @@ and admits regular-file leases before removal. Applications and publishers must
 use the service instead of writing this state. See
 [state validation qualification](../../tests/packages/state-validation-check.md).
 
+Collection checks obsolete-generation leases with a bounded descriptor pair,
+then reopens the same directory/lease identities and relocks before removal.
+The writer lock excludes new launch admission throughout both phases; an already
+admitted holder that becomes busy remains protected. See
+[descriptor-limit qualification](../../tests/packages/collection-limit-check.md).
+
 ## Build and publish
 
 ```sh

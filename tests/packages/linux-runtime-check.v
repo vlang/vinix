@@ -86,7 +86,7 @@ fn linux_suite(work string, repository string) !hwhost.Suite {
 			arches:   ['aarch64', 'x86_64']
 			about:    'prepared-root import and signed musl loader/library execution under real sandbox enforcement'
 			required: ['HWTEST START packages-linux', 'PACKAGE SIGNING', 'PACKAGE CATALOG', 'PACKAGE RELEASE', 'PACKAGE REVIEW', 'PACKAGE TRUST REVIEW', 'PACKAGE CONFIGURATION', 'PACKAGE ORGANIZATION', 'PACKAGE DOCUMENTS', 'PACKAGE DEPLOYMENT', 'PACKAGE PROGRESS', 'PACKAGE OFFLINE', 'PACKAGE MIRROR REVIEW', 'PACKAGE REPOSITORY', 'PACKAGE UPDATES', 'PACKAGE LINUX IMPORT',
-				'PACKAGE LOCKED MIRROR', 'PACKAGE STATE', 'HWTEST PASS packages-linux']
+				'PACKAGE LOCKED MIRROR', 'PACKAGE STATE', 'PACKAGE COLLECTION', 'HWTEST PASS packages-linux']
 			ending:   .poweroff
 			timeout:  180
 		}]

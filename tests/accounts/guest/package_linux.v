@@ -7,6 +7,27 @@ import time
 import tools.packages.pkgcore
 import tools.packages.pkgprotocol
 
+#include <sys/resource.h>
+
+struct PackageCollectionLimit {
+	current u64
+	maximum u64
+}
+
+fn package_collection_limit_probe(root string) !int {
+	mut original := PackageCollectionLimit{}
+	if C.getrlimit(C.RLIMIT_NOFILE, voidptr(&original)) != 0 { return error('cannot read collector descriptor limit') }
+	limited := PackageCollectionLimit{ current: 32, maximum: original.maximum }
+	if C.setrlimit(C.RLIMIT_NOFILE, voidptr(&limited)) != 0 { return error('cannot lower collector descriptor limit') }
+	mut actual := PackageCollectionLimit{}
+	if C.getrlimit(C.RLIMIT_NOFILE, voidptr(&actual)) != 0 || actual.current != 32 {
+		return error('collector descriptor limit was not applied')
+	}
+	arguments := [c'/usr/bin/vinix-package', c'--root', &char(root.str), c'gc', &char(unsafe { nil })]!
+	C.execv(c'/usr/bin/vinix-package', unsafe { &arguments[0] })
+	return error('cannot execute the limited package collector')
+}
+
 fn reviewed_package_operation(operation string, names []string) !string {
 	mut review := pkgprotocol.decode_review(package_success(['review', operation, ...names])!)!
 	defer { review.close() }
@@ -91,6 +112,27 @@ fn qualify_package_stored_state(root string, architecture string, application_id
 	os.rm(directory + '/current')!
 	os.symlink('generations/1', directory + '/current')!
 	os.rmdir_all(directory + '/generations/01')!
+	package_success(['--root', root, 'verify'])!
+	// Generation 2 already exists. Add 127 obsolete published directories so
+	// the production CLI must handle 128 candidates under a 32-FD limit.
+	for generation in 3 .. 130 {
+		path_generation := directory + '/generations/' + generation.str()
+		os.mkdir(path_generation)!
+		os.write_file(path_generation + '/lease', '')!
+		os.write_file(path_generation + '/payload', 'lease sentinel')!
+	}
+	lease := C.open((directory + '/generations/64/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+	assert lease >= 0 && C.flock(lease, C.LOCK_SH) == 0
+	defer { C.close(lease) }
+	os.write_file(orphan, 'unused cache sentinel')!
+	limited_gc := run(['/sbin/init', 'package-collection-limit-probe', root], '', none, none)
+	assert limited_gc.status == 0, limited_gc.output
+	assert os.ls(directory + '/generations')!.sorted() == ['1', '64']
+	assert os.read_file(directory + '/generations/64/payload')! == 'lease sentinel'
+	assert !os.exists(orphan) && os.readlink(directory + '/current')! == 'generations/1'
+	assert C.flock(lease, C.LOCK_UN) == 0
+	package_success(['--root', root, 'gc'])!
+	assert os.ls(directory + '/generations')! == ['1']
 	package_success(['--root', root, 'verify'])!
 }
 
@@ -449,6 +491,7 @@ fn qualify_package_linux(mut t Test) ! {
 	t.say('PACKAGE LOCKED MIRROR exact-old-runtime bundled-lock offline-reproduction PASS')
 	qualify_package_stored_state(locked_client, architecture, application.id, runtime.id)!
 	t.say('PACKAGE STATE runtime-closure duplicate-fields canonical-generations collection-preflight restore PASS')
+	t.say('PACKAGE COLLECTION obsolete=128 nofile=32 live-lease preserved-and-released verified-state PASS')
 	updates := json2.decode[pkgcore.SoftwareView](package_success(['view'])!)!
 	assert updates.update_error == '' && updates.rows.filter(it.updatable).map(it.id) == [runtime.id]
 	assert updates.rows.any(it.id == runtime.id && it.kind == 'runtime' && it.version == '1.1.0'

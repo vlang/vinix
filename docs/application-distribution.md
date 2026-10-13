@@ -261,7 +261,12 @@ canonical positive u64 names; leading-zero aliases, zero and overflow are refuse
 Generation directories and state files must be ordinary filesystem entries.
 
 Before collection deletes anything, it validates both retained states, parses all
-numeric generation names and obtains every eligible obsolete-generation lease.
+numeric generation names and checks every eligible obsolete-generation lease.
+Preflight uses one directory/lease descriptor pair at a time and records their
+device/inode identities. Under the same package writer lock, removal reopens
+and checks those identities, then reacquires the exclusive lease. A lease that
+becomes busy is retained; a replaced directory/lease refuses removal with a
+retry diagnostic. New package launches cannot enter while the writer lock is held.
 Busy leases remain protected. Missing, symbolic, directory or FIFO
 obsolete-generation leases refuse collection without retiring another generation
 or cache object; FIFO checks are
@@ -272,6 +277,9 @@ known-good administrator backup. Use `verify` for the active generation and
 `review rollback` for the restored previous generation before cleanup or rollback;
 the service does not guess manifests or rewrite corrupt history. See
 [persistent state qualification](../tests/packages/state-validation-check.md).
+The [collection descriptor qualification](../tests/packages/collection-limit-check.md)
+reproduces the previous failure with 128 obsolete generations under a 32-FD limit
+and checks successful cleanup with bounded descriptor use and protected live leases.
 
 Personal data under `~/.local/share/vinix-apps/ID` survives uninstall/rollback.
 After uninstall an ordinary user can explicitly erase it with

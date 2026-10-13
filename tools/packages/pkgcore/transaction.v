@@ -377,7 +377,7 @@ fn collect_locked(config Config, directory string) ! {
 	}
 	targets := collection_targets(directory, current)!
 	defer { close_collection_targets(targets) }
-	for target in targets { os.rmdir_all(target.path)! }
+	for target in targets { remove_collection_target(target)! }
 	for name in os.ls(directory + '/objects')! {
 		if digest_valid(name) && name !in keep { os.rm(directory + '/objects/' + name)! }
 		if name.ends_with('.part') && digest_valid(name.all_before_last('.part')) {

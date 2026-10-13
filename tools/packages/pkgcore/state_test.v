@@ -217,3 +217,46 @@ fn test_generation_allocation_refuses_bad_names_before_abandoned_stage_cleanup()
 	}
 	assert next_generation(work)! == 3
 }
+
+fn test_collection_rechecks_directory_lease_identity_and_late_shared_locks() {
+	work := state_validation_work('collection-recheck')!
+	defer { os.rmdir_all(work) or {} }
+	path := work + '/generations/3'
+	os.mkdir(path)!
+	os.write_file(path + '/lease', '')!
+	os.write_file(path + '/payload', 'protected')!
+	guard := acquire(work)!
+	defer { guard.release() }
+	targets := collection_targets(work, State{ generation: 2, previous: 1 })!
+	defer { close_collection_targets(targets) }
+	assert targets.len == 1
+	// An already admitted holder can change its lock state after preflight.
+	lease := C.open((path + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+	assert lease >= 0 && C.flock(lease, C.LOCK_SH) == 0
+	remove_collection_target(targets[0])!
+	assert os.read_file(path + '/payload')! == 'protected'
+	assert C.flock(lease, C.LOCK_UN) == 0
+	C.close(lease)
+	// Keep old inodes linked so their numbers cannot be immediately reused.
+	os.rename(path + '/lease', path + '/old-lease')!
+	os.write_file(path + '/lease', '')!
+	if _ := remove_collection_target(targets[0]) { assert false }
+	assert os.read_file(path + '/payload')! == 'protected'
+	os.rm(path + '/lease')!
+	os.rename(path + '/old-lease', path + '/lease')!
+	os.rename(path, work + '/saved-generation')!
+	os.mkdir(path)!
+	os.write_file(path + '/lease', '')!
+	os.write_file(path + '/replacement', 'leave intact')!
+	if _ := remove_collection_target(targets[0]) { assert false }
+	assert os.read_file(path + '/replacement')! == 'leave intact'
+	assert os.read_file(work + '/saved-generation/payload')! == 'protected'
+	os.rmdir_all(path)!
+	os.symlink(work + '/saved-generation', path)!
+	if _ := remove_collection_target(targets[0]) { assert false }
+	assert os.read_file(work + '/saved-generation/payload')! == 'protected'
+	os.rm(path)!
+	os.rename(work + '/saved-generation', path)!
+	remove_collection_target(targets[0])!
+	assert !os.exists(path)
+}

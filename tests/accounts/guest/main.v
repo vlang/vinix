@@ -24,6 +24,9 @@ fn main() {
 	if os.args.len > 1 && os.args[1] == 'package-probe' { exit(package_application_probe()) }
 	if os.args.len > 1 && os.args[1] == 'package-policy-probe' { exit(package_policy_probe()) }
 	if os.args.len > 1 && os.args[1] == 'package-context-probe' { exit(package_context_probe() or { eprintln(err); 89 }) }
+	if os.args.len == 3 && os.args[1] == 'package-collection-limit-probe' {
+		exit(package_collection_limit_probe(os.args[2]) or { eprintln(err); 89 })
+	}
 	if os.args.len > 1 && os.args[1] == 'probe' {
 		exit(run_probe(os.args[2..]))
 	}
