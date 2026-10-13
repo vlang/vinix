@@ -178,7 +178,9 @@ pub fn fetch(url string, destination string, maximum u64, resume bool, offline b
 	fetch_progress(url, destination, maximum, resume, offline, pkgprotocol.Progress{}, no_progress)!
 }
 
-fn fetch_progress(url string, destination string, maximum u64, resume bool, offline bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) ! {
+// Return whether the completed bytes actually used the retained prefix. A
+// server can refuse ranges, requiring a bounded fresh transfer instead.
+fn fetch_progress(url string, destination string, maximum u64, resume bool, offline bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) !bool {
 	if url.starts_with('file:///') {
 		source := url[7..]
 		if !ordinary_file(source) {
@@ -195,12 +197,33 @@ fn fetch_progress(url string, destination string, maximum u64, resume bool, offl
 			offset = 0
 		}
 		copy_file_progress(source, destination, offset, maximum, event, report)!
-		return
+		return offset > 0
 	}
 	if offline { return error('offline mode: verified payload is missing from cache: ${url}') }
 	if !url.starts_with('https://') {
 		return error('repository transport requires HTTPS or a local file repository')
 	}
+	mut resumed := resume && ordinary_file(destination) && os.file_size(destination) > 0
+	mut code := https_transfer(url, destination, maximum, resumed, event, report)!
+	if code == 33 && resumed {
+		// curl's explicit range-support refusal is the only transport error that
+		// discards a prefix automatically. Other failures retain it for retry.
+		os.rm(destination)!
+		label := if event.package == '' { 'download' } else { event.package + '/' + event.path }
+		println('Restarting ${label}: repository does not support byte ranges')
+		resumed = false
+		code = https_transfer(url, destination, maximum, false, event, report)!
+	}
+	if code != 0 { return error('download failed (${code}); retained partial data for retry: ${url}') }
+	if os.file_size(destination) > maximum {
+		os.rm(destination)!
+		return error('download exceeded its size limit')
+	}
+	sync_file(destination)!
+	return resumed
+}
+
+fn https_transfer(url string, destination string, maximum u64, resume bool, event pkgprotocol.Progress, report fn (pkgprotocol.Progress)) !int {
 	mut args := ['--disable', '--fail', '--show-error', '--silent', '--location', '--proto', '=https',
 		'--proto-redir', '=https', '--tlsv1.2', '--connect-timeout', '20', '--max-time', '1800',
 		'--retry', '3', '--max-filesize', maximum.str(), '--output', destination]
@@ -209,18 +232,13 @@ fn fetch_progress(url string, destination string, maximum u64, resume bool, offl
 	mut process := os.new_process('/usr/bin/curl')
 	defer { process.close() }
 	process.set_args(args)
+	if event.phase != '' { report(pkgprotocol.Progress{ ...event, current: if resume { transfer_size(destination) } else { u64(0) } }) }
 	if event.phase == '' {
 		process.wait()
-		if process.code != 0 { return error('download failed (${process.code}); retained partial data for retry: ${url}') }
-	} else {
-		process.run()
-		monitor_transfer(mut process, destination, maximum, event, report) or { return error('${err}: ${url}') }
+		return process.code
 	}
-	if os.file_size(destination) > maximum {
-		os.rm(destination)!
-		return error('download exceeded its size limit')
-	}
-	sync_file(destination)!
+	process.run()
+	return monitor_transfer_status(mut process, destination, maximum, event, report) or { return error('${err}: ${url}') }
 }
 
 pub fn free_bytes(path string) !u64 {

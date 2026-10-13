@@ -1142,6 +1142,13 @@ Metadata, payload verification and offline sources require ordinary regular
 files; directories/FIFOs in partial cache paths refuse before transfer. See
 [download recovery qualification](../../tests/packages/download-recovery-check.md).
 
+An HTTPS server's explicit byte-range refusal (curl exit 33) also discards the
+prefix and permits one fresh transfer. A completed fresh fallback is classified
+as fresh, so an integrity failure cannot trigger another transfer. Certificate,
+hostname, access-denial and redirect failures preserve the prefix. The existing
+HTTPS-only, TLS, size and retry/time bounds apply to both attempts. See
+[real TLS transport qualification](../../tests/packages/https-check.md).
+
 Frames are bounded to 8192 bytes. Identifiers/paths, phase-specific counter
 limits, JSON field types and formats are validated by
 [`pkgprotocol.decode_progress`](pkgprotocol/progress.v). Decoded events own their

@@ -197,6 +197,13 @@ A refused refresh or enrollment preserves the previous cached catalog, trust
 history, configuration and installed generation. See
 [signed metadata qualification](../tests/packages/index-schema-check.md).
 
+If an HTTPS repository refuses byte-range resume, acquisition discards that
+prefix and retries once from byte zero. A corrupt fresh fallback stops without
+another integrity retry. Other transport failures preserve partial data for a
+later transaction. [Real TLS transport checks](../tests/packages/https-check.md)
+cover certificate/hostname trust, HTTPS-only redirects, authenticated size bounds,
+range recovery, progress and preserved activation/rollback.
+
 Dependency resolution uses an iterative worklist with bounded backtracking.
 Shared dependencies and cycles expand each selected identity once, and constraints
 discovered later can change an earlier choice. Runtime kind and executable

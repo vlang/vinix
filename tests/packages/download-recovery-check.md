@@ -78,7 +78,9 @@ The ledger verifies eleven artifact hashes per guest. Existing compiler notices
 and generated-C warnings remain in local logs. Sanitizer results concern the
 exercised safety checks; leak detection is disabled.
 
-This qualification exercises signed local/offline sources. It does not add an
-HTTPS server/Range-negotiation fixture, physical-media/power-cut test, public
-publisher enrollment, graphical broker or broader foreign-runtime coverage.
+This qualification exercises signed local/offline sources. The later
+[real TLS transport fixture](https-check.md) adds HTTPS Range negotiation,
+certificate/hostname and redirect refusal, interrupted transfers and signed
+transaction recovery on the host. Neither fixture adds a physical-media/power-cut
+test, public publisher enrollment, graphical broker or broader foreign-runtime coverage.
 Roadmap 14 remains open.

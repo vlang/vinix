@@ -29,6 +29,11 @@ retain declarations to avoid pruning required crypto types. The launcher heap
 fixture disables the compiler's crash handler in its separately linked C unit;
 assertions and process exit failures still fail the check.
 
+`--https` adds the [real TLS transport fixture](../../tests/packages/https-check.md);
+`--https-only` runs it without desktop/UI prerequisites. It uses native curl and
+OpenSSL to check range recovery, certificate/redirect refusal and signed
+transaction state. The fixture binds only to loopback and uses a temporary CA.
+
 Use `publish-release REPOSITORY_DIR ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY`
 to emit a complete signed consumer repository with atomic publication, dependency
 closure validation on each declared architecture and retained publisher sequence

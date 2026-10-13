@@ -40,6 +40,13 @@ fn check() ! {
 	work := temporary + '/vinix-distribution-check-' + os.getpid().str()
 	os.mkdir_all(work + '/software')!
 	defer { os.rmdir_all(work) or {} }
+	if '--https' in os.args || '--https-only' in os.args {
+		run(v, [...helper_flags, '-gc', 'none', '-o', work + '/https-fixture', repository + '/tests/packages/https-fixture.v'])!
+		run(v, [...helper_flags, '-gc', 'none', '-path', '@vlib|@vmodules|' + repository,
+			'-o', work + '/https-check', repository + '/tests/packages/https-check.v'])!
+		run(work + '/https-check', [work + '/https-fixture', work + '/https-run'])!
+		if '--https-only' in os.args { println('Package HTTPS checks passed'); return }
+	}
 	if '--software-only' !in os.args {
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/signing', work)!
 		check_tests(v, ['-gc', 'none'], repository + '/tools/packages/pkgcore', work)!

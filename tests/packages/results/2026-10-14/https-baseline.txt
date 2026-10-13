@@ -1,0 +1,48 @@
+Pre-change client exit 1 against the real TLS fixture: honored Range succeeds, ignored Range returns curl 33 and leaves the prefix.
+
+PASS HTTPS ranges recovered authenticated bytes
+curl: (33) HTTP server doesn't seem to support byte ranges. Cannot resume.
+download failed (33); retained partial data for retry: https://127.0.0.1:29662/no-range/payload
+
+Requests:
+ranges payload bytes=4096-
+no-range payload bytes=4096-
+
+An initial expanded fixture changed repository URLs without refreshing their authenticated cache. The fixture was corrected to refresh after each mirror change; production cache admission was preserved.
+PASS HTTPS ranges recovered authenticated bytes
+curl: (33) HTTP server doesn't seem to support byte ranges. Cannot resume.
+Restarting download: repository does not support byte ranges
+PASS HTTPS no-range recovered authenticated bytes
+curl: (60) SSL certificate problem: self signed certificate
+More details here: https://curl.se/docs/sslcerts.html
+
+curl failed to verify the legitimacy of the server and therefore could not
+establish a secure connection to it. To learn more about this situation and
+how to fix it, please visit the web page mentioned above.
+PASS HTTPS untrusted-ca refusal preserves the prefix
+curl: (60) SSL: no alternative certificate subject name matches target host name 'localhost'
+More details here: https://curl.se/docs/sslcerts.html
+
+curl failed to verify the legitimacy of the server and therefore could not
+establish a secure connection to it. To learn more about this situation and
+how to fix it, please visit the web page mentioned above.
+PASS HTTPS wrong-host refusal preserves the prefix
+PASS HTTPS offline refusal preserves the prefix
+PASS HTTPS plain-http refusal preserves the prefix
+curl: (63) Maximum file size exceeded
+PASS HTTPS oversized refusal preserves the prefix
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 3
+PASS HTTPS signed transaction ranges bounded requests, progress and persistent state
+Updating trusted repository tls-fixture
+Installing HTTPS fixture 1.0.0 (1/1) from tls-fixture
+Downloading https-app/share/payload (229376 bytes)
+Activated package generation 1
+Activated package generation 2
+tls-fixture: no authenticated cached index; run update

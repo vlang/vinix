@@ -1,0 +1,50 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1.
+All 29 core assertion runners: -no-skip-unused -gc none -manualfree, exit 0.
+PASS administration_test.v
+PASS catalog_test.v
+PASS collection_limit_test.v
+PASS command_test.v
+PASS composition_test.v
+PASS context_test.v
+PASS deployment_test.v
+PASS distribution_test.v
+PASS document_keys_test.v
+PASS document_test.v
+PASS download_recovery_test.v
+PASS ffmpeg_profile_test.v
+PASS import_test.v
+PASS index_schema_test.v
+PASS mirror_test.v
+PASS personal_data_test.v
+PASS policy_test.v
+PASS progress_test.v
+PASS publisher_schema_test.v
+PASS purge_test.v
+PASS release_test.v
+PASS resolve_search_test.v
+PASS review_test.v
+PASS service_test.v
+PASS session_test.v
+PASS sqlite_profile_test.v
+PASS state_test.v
+PASS view_test.v
+PASS window_test.v
+PASS signed CLI contracts
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+Real HTTPS fixture, maintained --https-only driver and ASan/UBSan client/controller: exit 0. Leak detection disabled.
+PASS aarch64 static ELF service build; build only, no guest execution
+PASS x86_64 static ELF service build; build only, no guest execution
+
+Native tools and TLS linkage:
+curl 8.7.1 (x86_64-apple-darwin25.0) libcurl/8.7.1 (SecureTransport) LibreSSL/3.3.6 zlib/1.2.12 nghttp2/1.68.1
+Release-Date: 2024-03-27
+Protocols: dict file ftp ftps gopher gophers http https imap imaps ipfs ipns ldap ldaps mqtt pop3 pop3s rtsp smb smbs smtp smtps telnet tftp
+Features: alt-svc AsynchDNS GSS-API HSTS HTTP2 HTTPS-proxy IPv6 Kerberos Largefile libz MultiSSL NTLM SPNEGO SSL threadsafe UnixSockets
+
+OpenSSL 4.0.3 29 Sep 2026 (Library: OpenSSL 4.0.3 29 Sep 2026)
+
+build/package-https-work/server:
+	/opt/homebrew/opt/openssl@4/lib/libssl.4.dylib (compatibility version 4.0.0, current version 4.0.0)
+	/opt/homebrew/opt/openssl@4/lib/libcrypto.4.dylib (compatibility version 4.0.0, current version 4.0.0)
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
+

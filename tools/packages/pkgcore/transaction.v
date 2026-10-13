@@ -157,12 +157,12 @@ fn cached_payload_progress(config Config, installed Installed, payload Payload, 
 		return error('${installed.package.id}: repository was revoked or its key changed')
 	}
 	url := repositories[0].url.trim_right('/') + '/objects/' + payload.sha256
-	resumed := os.is_file(part) && os.file_size(part) > 0 && os.file_size(part) < payload.bytes
+	mut resumed := false
 	event := pkgprotocol.Progress{ phase: 'download', package: installed.package.id,
 		repository: installed.repository, path: payload.path, total: payload.bytes }
 	if !verified_file(part, payload) {
 		println('Downloading ${installed.package.id}/${payload.path} (${payload.bytes} bytes)')
-		fetch_progress(url, part, payload.bytes, true, config.policy.offline, event, report)!
+		resumed = fetch_progress(url, part, payload.bytes, true, config.policy.offline, event, report)!
 	}
 	report(pkgprotocol.Progress{ phase: 'verify', package: installed.package.id, repository: installed.repository, path: payload.path })
 	if !verified_file(part, payload) && resumed {
