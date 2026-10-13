@@ -4739,20 +4739,62 @@ MarketplaceKitWrapper's required `UnsafeMutablePointer.deinitialize(count:)`
 import, `_$sSp12deinitialize5countSvSi_tF`. Native disassembly records count in
 x0, the raw pointer in x1 and the returned raw pointer in x0; the SDK describes
 destroying initialized Pointee values without freeing their storage. This
-entry remains unimplemented. Fortnite has not entered application code and
-remains unplayable.
+entry was unimplemented at that stage. Fortnite had not entered application
+code.
+
+Pointer `deinitialize(count:)` and `swift_arrayDestroy` now use V adapters.
+The method takes signed count/Self/Pointee metadata in x0/x1/x2 and returns
+Self in x0. The runtime function takes pointer/unsigned count/Element metadata
+in x0/x1/x2. Native SwiftCore disassembly confirms the method forwards to the
+array runtime, which returns on zero count before reading metadata and skips
+payload/destroy access for POD values. For non-POD values, the V implementation
+reads the caller's complete direct value-witness table and calls its destroy
+entry in ascending order at the advertised stride. It uses no iterator,
+copy/take/tag witness, descriptor discovery, registry lock or scratch allocation.
+The standard algorithm is documented in Swift's [array runtime](https://github.com/swiftlang/swift/blob/main/stdlib/public/runtime/Array.cpp).
+
+Destruction preserves the caller's allocation and returns its original
+pointer; a value's own destroy witness may modify its bytes. The caller frees
+the storage separately. The adapter rejects negative method counts, malformed
+metadata/table alignment, incomplete layouts, missing/misaligned destroy
+entries, bad size/stride/alignment and address-range overflow before calling a
+destroy witness. Complete caller-owned metadata and valid initialized payloads
+remain prerequisites; general metadata instantiation is outside this subset.
+
+Ten ASan/UBSan runs pass across pointer destruction, raw allocation, heap,
+Collection and Array storage fixtures with normal/deterministic hashing.
+The same five suites pass in a fresh Vinix ARM64 guest. Native comparisons
+cover 24 typed ranges and 26 minimal caller-witness ranges, including owned
+String/ObjC releases, padded and over-aligned elements, zero-size non-POD
+callbacks, protected zero-count/POD paths and storage preserved until caller
+free. Runtime cases additionally check lookup from another thread during
+destruction, rejected layouts/range overflow and two drained lifetimes.
+Generated C confirms no adapter allocation/free or registry lock, with
+borrowed static failures. The public dedicated target, full build, regression
+and Swift guest modes include the fixture. Evidence, thirteen generated-C
+streams/executables and native measurements are retained under
+`build/ios/fortnite/pointer-deinit-checks`. The initial name collision with
+the existing Array value-witness destructor is retained as a rejected build;
+the new bulk-destruction function uses a distinct name. Full iOS regression
+remains unpassed.
+
+Both audits resolve two more required imports across the supplied images.
+The actual IPA now exits with status 1 before entry at MarketplaceKitWrapper's
+required typed `allocate(capacity:)` import,
+`_$sSp8allocate8capacitySpyxGSi_tFZ`. That entry remains unimplemented.
+Fortnite has not entered application code and remains unplayable.
 
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,458 | 702 | 79 |
+| Fortnite executable | 1,459 | 701 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 137 | 39 | 23 |
-| All images | 2,254 | 744 | 120 |
+| MarketplaceKitWrapper | 138 | 38 | 23 |
+| All images | 2,256 | 742 | 120 |
 
-The C++/GLES/Text variant reports 2,267 resolved imports, 731 unresolved strong
+The C++/GLES/Text variant reports 2,269 resolved imports, 729 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -50,6 +50,8 @@ fn swift_pointer_deallocate(pointer u64, _metadata u64) {
 
 fn swift_raw_alloc_symbol(symbol string) ?u64 {
 	return match symbol {
+		'_swift_arrayDestroy' { u64(unsafe { voidptr(swift_array_destroy_elements) }) }
+		'_$sSp12deinitialize5countSvSi_tF' { u64(unsafe { voidptr(swift_pointer_deinitialize) }) }
 		'_swift_slowAlloc' { u64(unsafe { voidptr(swift_raw_allocate) }) }
 		'_swift_slowDealloc' { u64(unsafe { voidptr(swift_raw_deallocate) }) }
 		'_$sSp10deallocateyyF', '_$sSP10deallocateyyF',
