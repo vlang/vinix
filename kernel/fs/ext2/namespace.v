@@ -596,6 +596,7 @@ fn (mut filesystem EXT2Filesystem) rename_with_whiteout(old_parent &vfs.VFSNode,
 		return
 	}
 
+	mut new_parent_links_changed := false
 	if new_name in new_parent.children {
 		new_node := unsafe { new_parent.children[new_name] }
 		replaced := filesystem.dir_replace_inode(mut new_dir, new_parent_index,
@@ -611,6 +612,7 @@ fn (mut filesystem EXT2Filesystem) rename_with_whiteout(old_parent &vfs.VFSNode,
 		if replaced != 0 { filesystem.decrement_replaced_inode(replaced)? }
 		if replaced != 0 && stat.isdir(new_node.resource.stat.mode) && new_dir.hard_link_cnt > 0 {
 			new_dir.hard_link_cnt--
+			new_parent_links_changed = true
 		}
 	} else {
 		filesystem.dir_add(mut new_dir, new_parent_index, old_inode_index, old_kind,
@@ -639,7 +641,13 @@ fn (mut filesystem EXT2Filesystem) rename_with_whiteout(old_parent &vfs.VFSNode,
 		filesystem.update_dotdot(old_inode_index, new_parent_index)?
 		if old_dir.hard_link_cnt > 0 { old_dir.hard_link_cnt-- }
 		new_dir.hard_link_cnt++
+		new_parent_links_changed = true
 		old_dir.write_entry(mut filesystem, old_parent_index)?
+	}
+	// A staged whiteout is a non-directory source, but replacing an upper
+	// directory still removes one link from its parent. Persist that count
+	// even when the moved source does not need a dotdot/link-count update.
+	if old_parent_index != new_parent_index && new_parent_links_changed {
 		new_dir.write_entry(mut filesystem, new_parent_index)?
 	}
 	filesystem.commit_transaction()?
