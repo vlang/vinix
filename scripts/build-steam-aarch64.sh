@@ -265,6 +265,10 @@ done
 "$SCRIPT_DIR/build-support/steam/build-guest" --arch aarch64 --static --output "$BUILD_DIR/steam-guest-helpers"
 install -m755 "$BUILD_DIR/steam-guest-helpers" "$STAGING/usr/bin/lsof"
 install -m755 "$BUILD_DIR/steam-guest-helpers" "$HELPERS/tar"
+"$SCRIPT_DIR/build-support/build-validation-guest" --arch aarch64 --static \
+    --source "$SCRIPT_DIR/tests/steam/syscall-probes/main.v" \
+    --output "$BUILD_DIR/steam-syscall-probe"
+install -m755 "$BUILD_DIR/steam-syscall-probe" "$STAGING/usr/bin/steam-syscall-probe"
 # Valve's runtime scripts start with #!/bin/bash. The desktop build installs
 # this only into an image that has no bash of its own.
 install -m755 "$SCRIPT_DIR/build-support/steam/bash" "$STAGING/usr/libexec/vinix-steam/bash"

@@ -55,172 +55,34 @@ echo "VINIX STEAM PASS: translated glibc runtime"
 
 # Steam's thread synchronisation uses System V semaphores. Check the value
 # operations and a real cross-process wake before waiting for its updater.
-/usr/bin/python3 - <<'PY' || fail "System V semaphore operations failed"
-import ctypes
-import os
-import signal
-import time
-
-class Operation(ctypes.Structure):
-    _fields_ = [('number', ctypes.c_ushort), ('change', ctypes.c_short),
-                ('flags', ctypes.c_short)]
-
-libc = ctypes.CDLL(None, use_errno=True)
-libc.semget.restype = ctypes.c_int
-libc.semop.argtypes = [ctypes.c_int, ctypes.POINTER(Operation), ctypes.c_size_t]
-libc.semop.restype = ctypes.c_int
-libc.semctl.restype = ctypes.c_int
-semid = libc.semget(0, 1, 0o1600)
-assert semid >= 0, ctypes.get_errno()
-try:
-    assert libc.semctl(semid, 0, 16, ctypes.c_int(0)) == 0
-    child = os.fork()
-    if child == 0:
-        signal.alarm(5)
-        result = libc.semop(semid, ctypes.byref(Operation(0, -1, 0)), 1)
-        os._exit(0 if result == 0 else 1)
-    time.sleep(0.1)
-    assert libc.semop(semid, ctypes.byref(Operation(0, 1, 0)), 1) == 0
-    assert os.waitpid(child, 0)[1] == 0
-    assert libc.semctl(semid, 0, 12) == 0
-finally:
-    assert libc.semctl(semid, 0, 0) == 0
-PY
+/usr/bin/steam-syscall-probe semaphores || fail "System V semaphore operations failed"
 echo "VINIX STEAM PASS: System V semaphore wake"
 
 # Chromium uses eventfd for its completion ports, and the client reads large
 # files into pages that have not been faulted in yet. Exercise both syscall
 # paths before the long client startup so an EFAULT regression fails promptly.
-/usr/bin/python3 - <<'PY' || fail "eventfd or file buffer copy failed"
-import ctypes
-import mmap
-import os
-
-libc = ctypes.CDLL(None, use_errno=True)
-counter = libc.eventfd(0, 0)
-assert counter >= 0, ctypes.get_errno()
-try:
-    assert os.write(counter, (1).to_bytes(8, 'little')) == 8
-    assert int.from_bytes(os.read(counter, 8), 'little') == 1
-finally:
-    os.close(counter)
-
-fd = os.open('/usr/bin/qemu-i386', os.O_RDONLY)
-area = mmap.mmap(-1, 65536, prot=mmap.PROT_READ | mmap.PROT_WRITE)
-try:
-    buffer = (ctypes.c_char * len(area)).from_buffer(area)
-    libc.pread.argtypes = [ctypes.c_int, ctypes.c_void_p, ctypes.c_size_t,
-                          ctypes.c_longlong]
-    libc.pread.restype = ctypes.c_ssize_t
-    assert libc.pread(fd, ctypes.addressof(buffer), len(area), 0) > 0
-    del buffer
-finally:
-    area.close()
-    os.close(fd)
-PY
+/usr/bin/steam-syscall-probe lazy-buffer || fail "eventfd or file buffer copy failed"
 echo "VINIX STEAM PASS: eventfd and lazy file buffer"
 
 # A closed Chromium IPC peer leaves EPOLLHUP ready. recvmsg must drain its
 # buffered bytes and then return EOF, or the browser loops on EAGAIN forever.
-/usr/bin/python3 - <<'PY' || fail "Unix recvmsg hangup failed"
-import select
-import socket
-
-reader, writer = socket.socketpair()
-poller = select.epoll()
-try:
-    reader.setblocking(False)
-    poller.register(reader.fileno(), select.EPOLLIN)
-    writer.sendall(b'abc')
-    writer.close()
-    assert poller.poll(1), 'closed peer did not wake epoll'
-    assert reader.recvmsg(2)[0] == b'ab'
-    assert reader.recvmsg(2)[0] == b'c'
-    assert reader.recvmsg(2)[0] == b'', 'closed peer did not return EOF'
-finally:
-    poller.close()
-    reader.close()
-    writer.close()
-PY
+/usr/bin/steam-syscall-probe unix-hangup || fail "Unix recvmsg hangup failed"
 echo "VINIX STEAM PASS: Unix recvmsg hangup"
 
 # QEMU translates IPv4 recvmsg control messages. Return the actual ancillary
 # length (zero here) so it never interprets the caller's spare buffer as data.
-/bin/busybox timeout 5 /usr/bin/python3 - <<'PY' || fail "IPv4 recvmsg ancillary length failed"
-import ctypes
-import socket
-
-class IOVec(ctypes.Structure):
-    _fields_ = [('base', ctypes.c_void_p), ('length', ctypes.c_size_t)]
-
-class MsgHdr(ctypes.Structure):
-    _fields_ = [('name', ctypes.c_void_p), ('namelen', ctypes.c_uint),
-                ('iov', ctypes.POINTER(IOVec)), ('iovlen', ctypes.c_size_t),
-                ('control', ctypes.c_void_p), ('controllen', ctypes.c_size_t),
-                ('flags', ctypes.c_int)]
-
-reader = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-writer = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-try:
-    reader.bind(('127.0.0.1', 0))
-    assert writer.sendto(b'x', reader.getsockname()) == 1
-    payload = ctypes.create_string_buffer(8)
-    control = ctypes.create_string_buffer(128)
-    iov = IOVec(ctypes.addressof(payload), len(payload))
-    msg = MsgHdr(None, 0, ctypes.pointer(iov), 1,
-                 ctypes.addressof(control), len(control), -1)
-    libc = ctypes.CDLL(None, use_errno=True)
-    libc.recvmsg.argtypes = [ctypes.c_int, ctypes.POINTER(MsgHdr), ctypes.c_int]
-    libc.recvmsg.restype = ctypes.c_ssize_t
-    assert libc.recvmsg(reader.fileno(), ctypes.byref(msg), 0) == 1, ctypes.get_errno()
-    assert payload.raw[0:1] == b'x'
-    assert msg.controllen == 0 and msg.flags == 0, (msg.controllen, msg.flags)
-finally:
-    reader.close()
-    writer.close()
-PY
+/bin/busybox timeout 5 /usr/bin/steam-syscall-probe ipv4-ancillary || fail "IPv4 recvmsg ancillary length failed"
 echo "VINIX STEAM PASS: IPv4 recvmsg ancillary length"
 
 # A browser thread may use an empty ppoll as a timed sleep. Returning at once
 # makes its event loop spin and can starve the translated client.
-/bin/busybox timeout 5 /usr/bin/python3 - <<'PY' || fail "empty ppoll sleep failed"
-import ctypes
-import time
-
-class Timespec(ctypes.Structure):
-    _fields_ = [('seconds', ctypes.c_long), ('nanoseconds', ctypes.c_long)]
-
-libc = ctypes.CDLL(None, use_errno=True)
-started = time.monotonic()
-result = libc.syscall(73, ctypes.c_void_p(0), ctypes.c_ulong(0),
-                      ctypes.byref(Timespec(0, 150_000_000)), ctypes.c_void_p(0),
-                      ctypes.c_size_t(8))
-assert result == 0, ctypes.get_errno()
-assert time.monotonic() - started >= 0.10
-PY
+/bin/busybox timeout 5 /usr/bin/steam-syscall-probe ppoll || fail "empty ppoll sleep failed"
 echo "VINIX STEAM PASS: empty ppoll sleeps"
 
 # Chromium creates shared-memory segments above 16 MiB. They must live on
 # tmpfs: devtmpfs regular files grow as one contiguous allocation and can
 # stall when its heap cannot extend one to the requested size.
-/usr/bin/python3 - <<'PY' || fail "large shared-memory file failed"
-import mmap
-import os
-
-path = '/dev/shm/vinix-steam-shm-probe'
-size = 26214416
-fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600)
-try:
-    os.ftruncate(fd, size)
-    with mmap.mmap(fd, size, flags=mmap.MAP_SHARED,
-                   prot=mmap.PROT_READ | mmap.PROT_WRITE) as area:
-        area[0] = 0x5a
-        area[-1] = 0xa5
-        assert area[0] == 0x5a and area[-1] == 0xa5
-finally:
-    os.close(fd)
-    os.unlink(path)
-PY
+/usr/bin/steam-syscall-probe shared-mapping || fail "large shared-memory file failed"
 echo "VINIX STEAM PASS: large shared-memory mapping"
 
 # A persistent /root can shadow the copy the image ships there.

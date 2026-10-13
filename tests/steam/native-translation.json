@@ -1,0 +1,216 @@
+{
+    "embedded_blocks": [
+        {
+            "original_bytes": 968,
+            "original_lines": 29,
+            "original_sha256": "697969f5259ca3f17db7d3d5e666cbe27aa16fe16f0b5e537a8d0cd7505c3c27",
+            "path": "tests/steam/steam-init.sh",
+            "probe": "semaphores"
+        },
+        {
+            "original_bytes": 776,
+            "original_lines": 25,
+            "original_sha256": "9ef61a974497116d3f472a9c9126998ce7892c008a9d363dadc89d64a6f4183e",
+            "path": "tests/steam/steam-init.sh",
+            "probe": "lazy-buffer"
+        },
+        {
+            "original_bytes": 504,
+            "original_lines": 18,
+            "original_sha256": "b3cc6a3e4afa3f730174a1e5e738b5e8f99340bf7b4d668a8408992569b000a4",
+            "path": "tests/steam/steam-init.sh",
+            "probe": "unix-hangup"
+        },
+        {
+            "original_bytes": 1328,
+            "original_lines": 31,
+            "original_sha256": "6a0803da41cb6e89c27b8ce0e36ff0a702051c95b873ab1a1d5457e0fa540325",
+            "path": "tests/steam/steam-init.sh",
+            "probe": "ipv4-ancillary"
+        },
+        {
+            "original_bytes": 476,
+            "original_lines": 13,
+            "original_sha256": "79b1156c6c2a676b0ac5df15d3f5b4a29586a45c18ad088663655ade3bc51921",
+            "path": "tests/steam/steam-init.sh",
+            "probe": "ppoll"
+        },
+        {
+            "original_bytes": 437,
+            "original_lines": 16,
+            "original_sha256": "5994f26a765af6f581a04a23992c8e5796ae5ddd52faa68b4e363c3067ce5174",
+            "path": "tests/steam/steam-init.sh",
+            "probe": "shared-mapping"
+        },
+        {
+            "original_bytes": 110,
+            "original_lines": 5,
+            "original_sha256": "ac2a9cd095a5471c5877a89c39f7450df87dbb0df53cbb7816c104ceb7e6ea25",
+            "path": "tests/steam/hosted-test.sh",
+            "probe": "install"
+        },
+        {
+            "original_bytes": 110,
+            "original_lines": 5,
+            "original_sha256": "ac2a9cd095a5471c5877a89c39f7450df87dbb0df53cbb7816c104ceb7e6ea25",
+            "path": "tests/steam/hosted-test.sh",
+            "probe": "installed"
+        },
+        {
+            "original_bytes": 110,
+            "original_lines": 5,
+            "original_sha256": "ac2a9cd095a5471c5877a89c39f7450df87dbb0df53cbb7816c104ceb7e6ea25",
+            "path": "tests/steam/hosted-test.sh",
+            "probe": "update"
+        }
+    ],
+    "embedded_bytes": 4819,
+    "embedded_lines": 147,
+    "evidence": "~/.cache/vinix-steam-probes-native-20261013",
+    "limits": "No Python, Steam client, graphical app or Vinix guest executed. Linux SDK boot tests execute actual static V/musl probes on official Alpine kernel data; they establish reference behavior and cleanup, not a new Vinix kernel pass. Host ASan/UBSan instruments host tools only. No full Steam download/staging build executed; its added producer call is the same actual producer qualified here.",
+    "originals": [
+        {
+            "bytes": 11630,
+            "path": "tests/steam/steam-init.sh",
+            "sha256": "a76c60b1c077bf685f286840a64347d7ced80d25d09cd917484ba2396d79649a"
+        },
+        {
+            "bytes": 3480,
+            "path": "tests/steam/hosted-test.sh",
+            "sha256": "1c49b7a3b264f3d65de00e6162b12f7fb2eaa2d219b12b766340f83ee25c8a39"
+        },
+        {
+            "bytes": 13216,
+            "path": "scripts/build-steam-aarch64.sh",
+            "sha256": "4b9702b1f31aa7e4e8f9e10c887dfddfa9e1001ae3151f84ae7e2caff81b922e"
+        }
+    ],
+    "profiles": [
+        {
+            "limits": "Actual musl-linked V probes execute on private RAM-only Alpine Linux SDK VMs on both architectures; repeated descriptor/path/child cleanup checked. No Python, Steam client, graphical app or Vinix guest executes. This establishes probe behavior and resource cleanup on the reference Linux SDK, not a new Vinix kernel pass.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "program": "hosted",
+                    "sha256": "faa918164aec8f1ba3f306d6e3b33556426c8611176a7b2adad238dd746e6c20"
+                },
+                {
+                    "program": "builder",
+                    "sha256": "2cca632065c473e431b205b686bea6c23db2cfca84298c7d8d27f52893315d92"
+                },
+                {
+                    "program": "production-aarch64",
+                    "sha256": "fcba64fba0c1b089994fce845e7671adc7595d90ae0f1e9d460a547f16a7b466"
+                },
+                {
+                    "program": "sdk-aarch64",
+                    "sha256": "5475f61f1929d99ef282230243ae081956750262945367b37e38b40583849de7"
+                },
+                {
+                    "initramfs_sha256": "928599bf6e86fd2291b3389f0223e41f108a1e18bf56304eba687d18996ab90c",
+                    "sdk_kernel": "aarch64",
+                    "sha256": "dd37c4460f933ec909ff022c34944ff7e1a5300aff99750e3bdc02cd4074c332"
+                },
+                {
+                    "program": "production-x86_64",
+                    "sha256": "d105aa14c6aa36d14b8a82bd448a5af61a8ffbebdd6181a08da1e97b0ded1986"
+                },
+                {
+                    "program": "sdk-x86_64",
+                    "sha256": "28629875f8927b3a7bc57d5c525552995197ca446e5d36c9f7443a3bd1e85c90"
+                },
+                {
+                    "initramfs_sha256": "95b02b715fb79684652865105fb26b3dc7da4f1135d4760ac921f1ea8e8e9212",
+                    "sdk_kernel": "x86_64",
+                    "sha256": "6b58e5d779e44e57c9efa20232da18650415eceb9d4f544e5c165c1f392c5d51"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "Actual musl-linked V probes execute on private RAM-only Alpine Linux SDK VMs on both architectures; repeated descriptor/path/child cleanup checked. No Python, Steam client, graphical app or Vinix guest executes. This establishes probe behavior and resource cleanup on the reference Linux SDK, not a new Vinix kernel pass.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "program": "hosted",
+                    "sha256": "247ec0ef37659de969406403e35f32d0507791938378d019f1bf04a857418de6"
+                },
+                {
+                    "program": "builder",
+                    "sha256": "387d4f259fd7f618d2bc35f8fb0a294be1cd4e0073f771bb7a343124352b0f13"
+                },
+                {
+                    "program": "production-aarch64",
+                    "sha256": "fcba64fba0c1b089994fce845e7671adc7595d90ae0f1e9d460a547f16a7b466"
+                },
+                {
+                    "program": "sdk-aarch64",
+                    "sha256": "5475f61f1929d99ef282230243ae081956750262945367b37e38b40583849de7"
+                },
+                {
+                    "initramfs_sha256": "928599bf6e86fd2291b3389f0223e41f108a1e18bf56304eba687d18996ab90c",
+                    "sdk_kernel": "aarch64",
+                    "sha256": "dd37c4460f933ec909ff022c34944ff7e1a5300aff99750e3bdc02cd4074c332"
+                },
+                {
+                    "program": "production-x86_64",
+                    "sha256": "d105aa14c6aa36d14b8a82bd448a5af61a8ffbebdd6181a08da1e97b0ded1986"
+                },
+                {
+                    "program": "sdk-x86_64",
+                    "sha256": "28629875f8927b3a7bc57d5c525552995197ca446e5d36c9f7443a3bd1e85c90"
+                },
+                {
+                    "initramfs_sha256": "95b02b715fb79684652865105fb26b3dc7da4f1135d4760ac921f1ea8e8e9212",
+                    "sdk_kernel": "x86_64",
+                    "sha256": "6b58e5d779e44e57c9efa20232da18650415eceb9d4f544e5c165c1f392c5d51"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "Actual musl-linked V probes execute on private RAM-only Alpine Linux SDK VMs on both architectures; repeated descriptor/path/child cleanup checked. No Python, Steam client, graphical app or Vinix guest executes. This establishes probe behavior and resource cleanup on the reference Linux SDK, not a new Vinix kernel pass.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "program": "hosted",
+                    "sha256": "94e6b0d53e6c8d159897760018e936a5d785e9331b64023a53a21b0b6c5eddc0"
+                },
+                {
+                    "program": "builder",
+                    "sha256": "7d526659f4540e24b849467da8c6be6d59e79d655b81d450694af0ec358a243d"
+                },
+                {
+                    "program": "production-aarch64",
+                    "sha256": "fcba64fba0c1b089994fce845e7671adc7595d90ae0f1e9d460a547f16a7b466"
+                },
+                {
+                    "program": "sdk-aarch64",
+                    "sha256": "5475f61f1929d99ef282230243ae081956750262945367b37e38b40583849de7"
+                },
+                {
+                    "initramfs_sha256": "928599bf6e86fd2291b3389f0223e41f108a1e18bf56304eba687d18996ab90c",
+                    "sdk_kernel": "aarch64",
+                    "sha256": "dd37c4460f933ec909ff022c34944ff7e1a5300aff99750e3bdc02cd4074c332"
+                },
+                {
+                    "program": "production-x86_64",
+                    "sha256": "d105aa14c6aa36d14b8a82bd448a5af61a8ffbebdd6181a08da1e97b0ded1986"
+                },
+                {
+                    "program": "sdk-x86_64",
+                    "sha256": "28629875f8927b3a7bc57d5c525552995197ca446e5d36c9f7443a3bd1e85c90"
+                },
+                {
+                    "initramfs_sha256": "95b02b715fb79684652865105fb26b3dc7da4f1135d4760ac921f1ea8e8e9212",
+                    "sdk_kernel": "x86_64",
+                    "sha256": "6b58e5d779e44e57c9efa20232da18650415eceb9d4f544e5c165c1f392c5d51"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirement_credit": 0,
+    "qualification": "Six cold ARM/x86/ASanUBSan hosted/controller builds, twelve real static production/test ELFs across both architectures, six private RAM-only Linux SDK boots totaling 360 original probe checks. Descriptor/path/child retention remains flat; mincore verifies each retired probe mapping immediately after munmap. Nine existing hosted install/installed/update workflows retain exact arguments and font patch behavior, plus three real 20-second timeouts and argument/failed-exec/status guards. Cold public wrapper and original hosted-test fixture pass. All 9 embedded Python blocks retired; containing files were Shell, so Python-file credit is zero.",
+    "source_commit": "49cee5ac7dcb554339b00b7d413ac5c569ad40f7"
+}
