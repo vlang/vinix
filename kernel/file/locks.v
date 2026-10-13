@@ -329,13 +329,27 @@ pub fn syscall_flock(_ voidptr, fdword int, opword int) (u64, u64) {
 	resource_id := lock_resource_id(handle.resource)
 	owner := u64(handle)
 
+	write := operation & lock_ex != 0
+	if kind != lock_un {
+		// Repeating the held kind is a no-op on the open description. In
+		// particular, do not wake a waiter by briefly dropping this lock.
+		advisory_locks_lock.acquire()
+		for held in advisory_locks {
+			if held.resource_id == resource_id && held.owner == owner
+				&& held.class == lock_class_flock && held.write == write {
+				advisory_locks_lock.release()
+				return 0, 0
+			}
+		}
+		advisory_locks_lock.release()
+	}
+
 	// Conversion first releases the old whole-file lock held by this open file
 	// description, matching Linux's non-atomic conversion semantics.
 	release_description_locks(handle, true)
 	if operation & lock_un != 0 {
 		return 0, 0
 	}
-	write := operation & lock_ex != 0
 	for {
 		advisory_locks_lock.acquire()
 		if _ := conflicting_lock(resource_id, owner, lock_class_flock, 0, u64(-1), write, false) {

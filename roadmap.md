@@ -797,6 +797,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   record commands, aliases, retained locks/file state and flat storage.
   See [the access receipts](docs/linux-posix-qualification.md#native-advisory-lock-access-and-words).
 
+- [x] Preserve same-kind flock ownership without release/reacquisition; qualify
+  queued contenders, regular/directory aliases, real conversions/final close,
+  ordinary/private scheduling-window kernels and flat storage on both architectures.
+  See [the repetition receipts](docs/linux-posix-qualification.md#same-kind-flock-ownership).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

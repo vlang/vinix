@@ -4657,3 +4657,83 @@ Nonregular/disk/network/overlay filesystems, deprecated LOCK_MAND, restrictive
 policy and concurrent close, descriptor pressure/fairness/cancellation, POSIX
 deadlock detection and GNU/translated/ELF32 paths remain separate. The three
 broad section 15 acceptance gates stay open.
+
+## Same-kind flock ownership
+
+Repeating SH or EX through the same open description previously removed its
+held lock before reacquisition. That woke a queued contender and could make
+the repeat return EWOULDBLOCK or surrender ownership. Linux checks an
+existing same-description/same-kind lock before deleting it. The handler
+now scans the table under its existing lock and returns success without
+mutation or notification when resource, description, flock class and kind
+match. The retained descriptor and existing defer cover this return. Access
+and MAC validation still run first; actual conversion and unlock retain
+the existing release/reacquisition behavior. See the
+[pinned Linux normalizer/locking source](https://github.com/gregkh/linux/blob/v6.12.51/fs/locks.c).
+
+The maintained V probe runs 1,936 counted controls per architecture/run, in
+root and UID/GID1000 cohorts. Per credential: 192 repeat results, 192 waiter
+continuity checks, 240 contender/file-state controls and 344 sequential
+conversion/alias-close controls. Each cohort forks 24 independent contenders
+across regular files/directories, SH/EX, original/ordinary/CLOEXEC aliases
+and libc/raw upper-word forms. The child signals readiness, closes inherited
+owner descriptions, reopens independently and blocks for EX. Parent procfs
+and pipe checks establish its waiting state before eight repeated NB calls.
+It must stay blocked until explicit unlock; peer SH/EX probes verify the
+original held kind, and metadata/flags/bytes/shared regular-file offsets stay
+unchanged. Child result/acknowledgment/waitpid enforce clean final release.
+
+Sequential controls exercise blocking and NB repeats through all aliases,
+actual SH-to-EX/EX-to-SH conversions, peer reader/writer compatibility,
+nonfinal close retention and final close release. They reject a false fix
+that treats every request on an already locked description as a no-op.
+Directory ownership/mode/inode/flags are checked separately from regular-file
+bytes/size/cursors. The same native musl source/C/ELF passes actual Linux
+6.12.51, which skips Vinix allocator accounting.
+
+To expose the release window, the maintained V instrumenter adds a private
+sched import and 32 reschedules immediately after description-lock release
+for NB requests, with no advisory table lock held. Removing that block and
+import restores each before/after source exactly. The same-kind branch
+precedes the window; real conversion/unlock continues through it. The
+[window baseline receipts](../tests/linux-compat/results/2026-10-14/flocksame-before-window-aarch64.json)
+and [x86 counterpart](../tests/linux-compat/results/2026-10-14/flocksame-before-window-x86_64.json)
+expose 792 ARM/790 x86 failures in their recorded runs. Both ARM credentials
+and x86 UID1000 fail 192 repeat, 192 continuity and 12 peer-state controls;
+x86 root records 191/191/12. All 344 sequential controls per credential pass.
+An uninstrumented baseline is not claimed to fail deterministically.
+Ordinary and window candidates pass all 1,936 controls each.
+
+Each candidate profile runs two mixed 200-cycle storage cohorts after 32
+warmups and settling: file/directory acquisition, repeated same kind, real
+downgrade, peer sharing, unlock and alias/final close. All 18 ARM/14 x86 live
+slab classes stay flat; large pages remain 63/63 ARM and 160/160 x86. Probe C
+has eleven explicit allocas and no hidden heap/index helpers. Whole ordinary
+and whole window kernel C remain byte-identical outside the sole syscall_flock
+definition/prototype. Window/ordinary comparison allows that function and,
+where required on x86, one relocated 48-line block of byte-identical mmap
+literals from the scheduling import. Other generated C remains exact.
+Allocation inventories retain 400 ARM/292 x86 sites and existing allowance
+refusals. An independent
+[lifetime review](../tests/linux-compat/results/2026-10-14/flocksame-lifetime-review.md)
+binds the table-read/retained-descriptor path, private yields, stack buffers,
+source/C/kernel/ELF/complete captures and measured cleanup.
+
+All eight ordinary/window before/after production builds pass. The ordinary
+flocksame/lockaccess/ofdlocks/open/runtime suites pass on each architecture,
+as do the separate window probe and eight host test files. The audit pins
+all 64 dispatch/lock inputs, exact source/C/ELF/kernel/ISO/Linux-reference
+receipts, scope, builds and independent review. Assertion and passing-as-
+baseline controls must execute and fail. Runtime evidence freezes commit
+`84e6321ed2e61682b3a98ca3e6f9665f1f8e2380` plus the sole locks.v change;
+public dispatch fingerprints use the committed publication parent in an
+isolated view and remain separate from this runtime snapshot.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/flocksame-after-aarch64.json), [capture](../tests/linux-compat/results/2026-10-14/flocksame-after-aarch64-native.log), [window receipt](../tests/linux-compat/results/2026-10-14/flocksame-after-window-aarch64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/flocksame-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/flocksame-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/flocksame-after-x86_64.json), [capture](../tests/linux-compat/results/2026-10-14/flocksame-after-x86_64-native.log), [window receipt](../tests/linux-compat/results/2026-10-14/flocksame-after-window-x86_64.json), [Linux reference](../tests/linux-compat/results/2026-10-14/flocksame-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/flocksame-evidence-x86_64.json).
+- [Audit source](../tests/linux-compat/results/2026-10-14/flocksame-audit.v), [verdict](../tests/linux-compat/results/2026-10-14/flocksame-audit.log), [instrumenter](../tests/linux-compat/flocksame-instrument.v); baseline captures, build/host/scope/allocation logs and negative controls sit beside them.
+
+Restrictive policy, arbitrary concurrent mutation of a shared description,
+pressure/fairness/deadlock/cancellation, other filesystems/nonregular types,
+deprecated mandatory locks and GNU/translated/ELF32 paths remain separate.
+The three broad section 15 acceptance gates stay open.

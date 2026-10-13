@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "1b276897dd866f29ecf12bb952814d5fbe5c40f1ade4dbda1765ffee25bef58f",
+    "results": [
+        {
+            "name": "flocksame",
+            "source_sha256": "ad87937c51de361f5e3b8a148b33226b227e11b8bab554f1fa2d4f76cc784975",
+            "init_sha256": "706b4560694b57f7a57fbfc03409fcf7a0d7cd69b17638b9db6324db28880fb8",
+            "iso_sha256": "abe10a0550bb2dad4edf50c14e4f93c3e3f064b222b7c156916ed644eb96148a",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

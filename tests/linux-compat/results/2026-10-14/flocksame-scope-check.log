@@ -1,0 +1,2 @@
+arm whole ordinary/window C differs only at syscall_flock; scheduling copy restores exactly after that function and (if x86 needs it) identical48-line mmap literal placement: PASS
+x86 whole ordinary/window C differs only at syscall_flock; scheduling copy restores exactly after that function and (if x86 needs it) identical48-line mmap literal placement: PASS

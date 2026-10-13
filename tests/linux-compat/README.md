@@ -1180,3 +1180,15 @@ flags and real shared cursors are checked; two 200-cycle cohorts measure
 refused calls plus actual OFD/flock alias cleanup. The same native musl ELF
 passes actual Linux 6.12.51; both unchanged kernels reproduce 1,458 failures.
 See the [access receipts and limits](../../docs/linux-posix-qualification.md#native-advisory-lock-access-and-words).
+
+The `flocksame` case checks same-kind open-description ownership with 1,936
+controls per architecture/run as root and UID/GID1000. Regular files and
+directories, SH/EX, three alias forms and libc/raw high argument words retain
+their locks while independent queued children stay asleep until explicit
+unlock. Blocking/NB repetition, both actual conversions and final-close
+release are positive controls. Private scheduling copies alone yield 32 times
+after real release: baselines expose 792 ARM/790 x86 failures; ordinary and
+window candidates plus actual same-ELF Linux references pass. Two 200-cycle
+cohorts measure mixed file/directory repetition/conversion/close storage in
+both candidate profiles. The uninstrumented baseline is not claimed to fail
+deterministically. See the [repetition receipts and limits](../../docs/linux-posix-qualification.md#same-kind-flock-ownership).
