@@ -92,8 +92,9 @@ data without allowing writes. Raw parent reads expose ciphertext.
 This format is headerless: callers retain the exact physical extent, native
 sector size and key. Opening never formats, converts existing data or verifies
 a key. AES-XTS provides confidentiality without authentication; a wrong key or
-tampered ciphertext yields unverified plaintext. There is no password derivation,
-key rotation, authenticated volume metadata or encrypted-root boot integration.
+tampered ciphertext yields unverified plaintext. Passphrase wrapping is available
+through the sealed-key commands below. Key rotation, authenticated volume
+metadata and encrypted-root boot integration remain separate work.
 The keyfile example uses the current root filesystem; its storage must meet the
 user's key protection requirements. Losing the key loses access to the data.
 
@@ -179,6 +180,90 @@ unlock at boot. Losing both the original volume key and the recovery key still
 loses access. Persistent keyfiles, filesystem caches and ordinary userspace
 memory retain their existing protection requirements, including the hibernation
 limits described above. See [key recovery qualification](../tests/storage-volumes/key-recovery.md).
+
+## Passphrase-sealed volume keys
+
+`seal-key KEYFILE PASSPHRASE_FILE ENVELOPE` wraps an existing volume key with
+a passphrase-derived key. `unseal-key ENVELOPE PASSPHRASE_FILE KEYFILE` verifies
+the envelope before restoring an exact private keyfile. `open-sealed DEVICE SLOT
+OFFSET_BYTES LENGTH_BYTES ENVELOPE PASSPHRASE_FILE [ro]` verifies and unlocks the
+volume directly, without creating a plaintext keyfile. The original extent,
+native sector size and volume key stay the same; changing the wrapping does not
+rewrite disk data.
+
+```sh
+# The passphrase file already contains your private credential bytes.
+chmod 600 /root/volume.pass
+vinix-volume seal-key /root/data.key /root/volume.pass /root/data.sealed
+vinix-volume open-sealed /dev/vda 0 1048576 16777216 /root/data.sealed /root/volume.pass ro
+# Optional explicit recovery into an absent private filename.
+vinix-volume unseal-key /root/data.sealed /root/volume.pass /root/restored.key
+```
+
+Passphrase files must contain 1–1024 bytes, be owned regular files with no
+group/other permissions and have no final symlink. All bytes are significant:
+embedded NULs, newlines and UTF-8 sequences are preserved, with no normalization
+or trimming. Use a strong passphrase. These commands accept credential files
+for headless use; they do not prompt on a terminal. Passphrase bytes never appear
+in command arguments, diagnostics, metadata or reports. Source reads handle
+short/EINTR transfers, probe EOF and recheck size, owner and permissions.
+
+Every seal generates a fresh 16-byte salt and 12-byte nonce from `/dev/urandom`.
+The fixed scrypt profile is **N=32768, r=8, p=3**, deriving 64 bytes with a single
+32 MiB private anonymous ROMix vector reused across all three lanes. Other
+workspaces stay on the stack. The vector is erased completely before unmapping;
+the derived key is withheld if allocation, computation or release fails. This
+profile is one of the published [OWASP scrypt configurations](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html#scrypt).
+Unsupported file work profiles reject before KDF allocation or computation.
+The work cost is deliberate; it cannot make a weak passphrase safe against
+offline guessing. Store persistent passphrase files with the protection their
+contents require, and retain an independent key backup/recovery path.
+
+The exact 192-byte `VINIXKP1` format is separate from `VINIXKR1` recovery files.
+Header fields are little-endian:
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 8 | ASCII `VINIXKP1` |
+| 8 | 4 | Version 1 |
+| 12 | 4 | Algorithm 1: scrypt, ChaCha20, HMAC-SHA256 |
+| 16 | 4 | Total bytes 192 |
+| 20 | 4 | Volume key bytes 64 |
+| 24 | 8 | N=32768 |
+| 32 | 4 | r=8 |
+| 36 | 4 | p=3 |
+| 40 | 16 | Salt |
+| 56 | 12 | Nonce |
+| 68 | 28 | Reserved, zero |
+| 96 | 64 | Encrypted volume key |
+| 160 | 32 | Full authentication tag |
+
+The first 32 derived bytes key one ChaCha20 block at counter 1. The last 32
+bytes key HMAC-SHA256 over the first 32 derived bytes followed by envelope bytes
+0–159, binding both key halves, the work profile, salt, nonce and ciphertext.
+Decoding validates the entire canonical header, derives the wrapping key and
+compares the complete tag before decrypting or releasing any volume key. It
+also rejects identical XTS halves or a volume key equal to its wrapping key.
+Wrong passphrases, altered envelopes and unsupported profiles never publish a
+keyfile or open the physical parent. scrypt retains its algorithm's
+data-dependent ROMix addressing; it is not presented as a constant-time KDF.
+
+Seal/unseal outputs follow the same pinned-directory lock, mode-0600 temporary,
+file-fsync/close, no-replacement hard-link publication and directory-fsync rules
+as key recovery. Existing entries and input aliases are preserved. Status 0
+means the operation and output flush succeeded, 1 means a controlled input,
+authentication, resource or I/O failure, and invalid syntax returns 2. A failure
+after file publication can leave a complete private destination; a stdout failure
+after successful direct import can leave the mapping active. Inspect that state
+before retrying. Passwords, wrapping keys, plaintext candidates, imported
+requests and secret workspaces are erased on ordinary returns. Process
+termination, persistent credentials, caches and hibernation retain the existing
+userspace/keyfile limits described above.
+
+This authenticates the sealed keyfile, while AES-XTS volume data keeps its
+existing confidentiality-only semantics. It does not verify disk data, convert
+plaintext storage, rotate the volume key or arrange encrypted-root boot. See
+[sealed-key qualification](../tests/storage-volumes/sealed-keys.md).
 
 ## Saved volume plans
 

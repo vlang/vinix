@@ -4,6 +4,14 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`seal-key KEYFILE PASSPHRASE_FILE ENVELOPE` wraps an existing volume key with
+salted scrypt. `unseal-key ENVELOPE PASSPHRASE_FILE KEYFILE` authenticates before
+restoring a private keyfile. `open-sealed DEVICE SLOT OFFSET_BYTES LENGTH_BYTES
+ENVELOPE PASSPHRASE_FILE [ro]` unlocks directly without writing a plaintext key.
+The fixed profile uses 32 MiB; credentials are private owned files containing
+1–1024 exact bytes. Existing destinations are preserved. See
+[sealed-key format, work profile and limits](../../docs/storage-volumes.md#passphrase-sealed-volume-keys).
+
 `vinix-volume backup-key KEYFILE RECOVERY_KEYFILE ENVELOPE` wraps a 64-byte volume
 key with a separate random 64-byte recovery key. `recover-key ENVELOPE
 RECOVERY_KEYFILE KEYFILE` authenticates the backup before restoring an exact

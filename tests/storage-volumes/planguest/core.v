@@ -484,6 +484,8 @@ fn first_boot(parent &char) {
 		planned_lock(parent, wrong)
 		planned_crypt(parent)
 		planned_recovery(parent)
+		planned_sealed(parent)
+		sealed_retention(parent)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -595,6 +597,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		scrub_reordered_boot(actual, other)
 		recovery_reordered_boot()
 		crypt_reordered_boot(actual)
+		sealed_reordered_boot(actual)
 		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation
 		second_before := status(c'/dev/mapper/vinix9').generation

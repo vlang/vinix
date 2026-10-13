@@ -10,40 +10,51 @@ fn C.linkat(i32, &char, i32, &char, i32) i32
 // Exact, private, pinned binary inputs. Recheck the descriptor after EOF so
 // ownership/permissions and length changes cannot silently become trusted.
 fn read_recovery_file(path &char, output &u8, size int) bool {
+	return size > 0 && read_private_key_file(path, output, size, size) == size
+}
+
+fn read_private_key_file(path &char, output &u8, minimum int, maximum int) int {
+	if minimum <= 0 || maximum < minimum || maximum > 1024 { return 0 }
 	fd := C.open(path, C.O_RDONLY | C.O_NOFOLLOW | C.O_CLOEXEC | C.O_NONBLOCK)
-	if fd < 0 { C.perror(c'vinix-volume: open recovery input'); return false }
+	if fd < 0 { C.perror(c'vinix-volume: open key input'); return 0 }
 	defer { C.close(fd) }
 	mut info := C.stat{}
-	if C.fstat(fd, unsafe { &info }) != 0 || C.S_ISREG(info.st_mode) == 0 || info.st_size != size
-		|| info.st_mode & 0o077 != 0 || info.st_uid != C.geteuid() { plan_error(c'recovery input must be a private owned regular file of the exact size'); return false }
+	if C.fstat(fd, unsafe { &info }) != 0 || C.S_ISREG(info.st_mode) == 0 || info.st_size < minimum || info.st_size > maximum
+		|| info.st_mode & 0o077 != 0 || info.st_uid != C.geteuid() { plan_error(c'key input must be a private owned regular file within the required size'); return 0 }
+	size := int(info.st_size)
 	mut done := 0
 	for done < size {
 		count := C.read(fd, unsafe { output + done }, usize(size - done))
 		if count < 0 && unsafe { C.errno == C.EINTR } { continue }
-		if count <= 0 || count > size - done { plan_error(c'incomplete recovery input'); return false }; done += int(count)
+		if count <= 0 || count > size - done { plan_error(c'incomplete key input'); return 0 }; done += int(count)
 	}
 	mut extra := u8(0); defer { erase_key(unsafe { &extra }, 1) }
 	for {
 		count := C.read(fd, unsafe { &extra }, 1)
 		if count < 0 && unsafe { C.errno == C.EINTR } { continue }
-		if count != 0 { plan_error(c'recovery input changed while reading'); return false }; break
+		if count != 0 { plan_error(c'key input changed while reading'); return 0 }; break
 	}
 	if C.fstat(fd, unsafe { &info }) != 0 || info.st_size != size || info.st_mode & 0o077 != 0
-		|| info.st_uid != C.geteuid() { plan_error(c'recovery input changed while reading'); return false }
-	return true
+		|| info.st_uid != C.geteuid() { plan_error(c'key input changed while reading'); return 0 }
+	return size
 }
 
 fn recovery_nonce(output &u8) bool {
+	return key_random_bytes(output, 12)
+}
+
+fn key_random_bytes(output &u8, size int) bool {
+	if size <= 0 || size > 64 { return false }
 	fd := C.open(c'/dev/urandom', C.O_RDONLY | C.O_NOFOLLOW | C.O_CLOEXEC | C.O_NONBLOCK)
 	if fd < 0 { C.perror(c'vinix-volume: open nonce source'); return false }
 	defer { C.close(fd) }
 	mut info := C.stat{}
 	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & C.S_IFMT != C.S_IFCHR { plan_error(c'nonce source must be a character device'); return false }
 	mut done := 0
-	for done < 12 {
-		count := C.read(fd, unsafe { output + done }, usize(12 - done))
+	for done < size {
+		count := C.read(fd, unsafe { output + done }, usize(size - done))
 		if count < 0 && unsafe { C.errno == C.EINTR } { continue }
-		if count <= 0 || count > 12 - done { plan_error(c'nonce source failed'); return false }; done += int(count)
+		if count <= 0 || count > size - done { plan_error(c'nonce source failed'); return false }; done += int(count)
 	}
 	return true
 }
@@ -53,7 +64,7 @@ fn recovery_nonce(output &u8) bool {
 // publication and reporting. An owned directory prevents temporary-file swaps.
 @[direct_array_access]
 fn publish_recovery(edit &PlanEdit, bytes &u8, size int) bool {
-	if edit.directory < 0 || !edit.locked || (size != 64 && size != recovery_bytes) { return false }
+	if edit.directory < 0 || !edit.locked || (size != 64 && size != recovery_bytes && size != sealed_bytes) { return false }
 	mut info := C.stat{}
 	if C.fstat(edit.directory, unsafe { &info }) != 0 || info.st_mode & C.S_IFMT != C.S_IFDIR
 		|| info.st_uid != C.geteuid() || info.st_mode & 0o022 != 0 { plan_error(c'key destination directory must be owned and not writable by group or others'); return false }

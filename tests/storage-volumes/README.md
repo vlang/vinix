@@ -252,6 +252,15 @@ recover exact private bytes, reopen real ciphertext, repeat 400 backup/restore
 lifetimes and recover after reboot and device reordering. See
 [key recovery qualification](key-recovery.md).
 
+Sealed-key tests compare scrypt against complete RFC vectors and OpenSSL across
+work parameters, binary inputs and the 64-byte HMAC-key boundary. They check the
+production cost, complete envelope/key mutations, authentication before release,
+allocation and unmap faults, vector erasure, private inputs and no-replacement
+publication. Guests unlock without a raw keyfile, verify RW/RO behavior and
+recovered bytes, measure repeated full-cost KDF lifetimes separately, and unlock
+after raw-key deletion and device reordering. The earlier 400-cycle workload and
+nine boot assertions stay enabled. See [sealed-key qualification](sealed-keys.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
