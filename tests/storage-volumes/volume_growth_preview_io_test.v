@@ -15,7 +15,7 @@ fn growth_preview_report(disk &DiskKey, row &Request, saved_capacity u64, saved_
 }
 
 fn growth_preview_mock_ferror(stream voidptr) i32 {
-	if growth_preview_model && recovery_io.mode == 33 { return 1 }
+	if (growth_preview_model || ciphertext_model) && recovery_io.mode == 33 { return 1 }
 	return C.ferror(stream)
 }
 

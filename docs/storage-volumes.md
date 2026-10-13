@@ -826,6 +826,72 @@ or output failures return 1, and invalid syntax returns 2. Diagnostics may be
 printed on failure; output failure can leave a partial report. See
 [recovery inspection qualification](../tests/storage-volumes/recovery-inspect.md).
 
+## Encrypted ciphertext checksum references
+
+`hash-volume DEVICE CONFIG PASSPHRASE_FILE REFERENCE` and
+`hash-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE REFERENCE` authenticate an
+encrypted mapping, then record SHA-256 over its entire physical ciphertext
+extent. `verify-volume` and `verify-recovery-volume` take the same arguments and
+compare that extent against an existing reference:
+
+```sh
+vinix-volume hash-volume /dev/vda /root/data.vcrypt /root/volume.pass /root/data.vchash
+vinix-volume verify-recovery-volume /dev/vdb /root/data.vrecover /root/recovery.key /root/data.vchash
+```
+
+The reference binds exact physical capacity, native sector size, MBR/GPT
+identity, slot, starting offset, extent length and saved read-only mode. Either
+credential domain can verify the same reference when this metadata agrees;
+credential rotation preserves it. Changed geometry or mode requires a new
+reference. Verification checks format, reserved fields, CRC and every metadata
+field before opening the physical parent. SHA mismatch returns failure after
+reading the complete extent, without a successful report.
+
+Both paths use the existing private pinned credential readers and canonical
+VC1/VR1 authentication. Passwords, wrapping keys and decoded volume keys erase
+before reference access, physical opens, streaming reads, publication or output.
+Every return erases the complete authentication workspace. No decryption,
+entropy access, raw keyfile or mapper import occurs. The parent is pinned
+read-only, nonblocking, no-follow and close-on-exec; it must be a whole online
+physical disk matching authenticated identity and exact geometry. Rechecks
+verify runtime identity and physical read-only state twice before reading and
+once afterward, plus once after acquiring the publication lock for recording.
+The descriptor stays pinned through output finalization.
+
+One fixed 64-KiB buffer streams the extent in native-sector units. EINTR and
+aligned short transfers retry; EOF, I/O errors, oversized or misaligned
+transfers fail. Offset and exclusive extent end must fit signed positioned-I/O
+limits; the extent length must fit SHA-256's bit-length field. Reference files
+are exactly 128 private bytes, owned by the effective user and inaccessible to
+group/others. Recording uses the existing locked, flushed, no-overwrite private
+publication protocol, so existing configurations, credentials and references
+are preserved, including aliases. Temporary ownership and cleanup follow the
+key-recovery publisher. A post-publication directory-flush or output failure
+can leave the complete reference present while returning failure.
+
+`VINIXCH1` version 1 is little endian: magic at 0; version/size at 8/12;
+capacity/sector at 16/24; identity kind/slot at 32/36; offset/length/mode at
+40/48/56; 16 identity bytes at 64; 32 digest bytes at 80; twelve zero reserved
+bytes at 112; CRC-32 at 124 computed with that field zero. References contain
+public geometry and ciphertext digests, without keys or credential bindings.
+
+Complete reports have two lines: `operation=recorded-ciphertext` or
+`operation=verified-ciphertext`, `format=volume|recovery algorithm=sha256`, then
+`disk_bytes=N sector=N identity=ID slot=N offset=N bytes=N readonly=0|1
+sha256=HEX`. Integers keep their unsigned width and digests use 64 lowercase
+hex digits. Success returns 0, operational/authentication/data failure returns
+1, and invalid syntax returns 2. Output failure can leave partial authenticated
+metadata after a completed scan.
+
+Keep all writes to the extent quiescent throughout the scan. Pinning and
+identity checks do not provide a coherent snapshot of concurrent data writes.
+Use a trusted reference: CRC and SHA-256 detect accidental corruption against
+that reference, without authenticating attacker-replaced references or
+plaintext, proving the decryption key, or providing authenticated encryption.
+Checksums cover ciphertext already stored, including uninitialized encrypted
+sectors. Live mappings and their counters, generations and descriptors remain
+unchanged. See [ciphertext qualification](../tests/storage-volumes/ciphertext.md).
+
 ## Read-only encrypted growth previews
 
 `plan-preview-grow-volume DEVICE CONFIG PASSPHRASE_FILE EXPECTED_BYTES

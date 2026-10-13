@@ -1,5 +1,13 @@
 # Storage-volume qualification
 
+Encrypted ciphertext references add exact public geometry/CRC binding,
+full-extent native-sector streaming, independent digest checks, corruption and
+post-read/post-lock device changes to the actual recovery reader/publisher
+model. `--host-ciphertext` and `--ciphertext` qualify both credential domains,
+private no-overwrite publication, stable live views and reordered reboot, with
+four warmup/four measured real-KDF recording/recovery verification pairs. See
+[ciphertext references](ciphertext.md).
+
 Encrypted growth previews extend the actual reader/physical-probe model with
 both credential domains, declared candidate capacity, signed/native-sector
 extent bounds, exact original/candidate/action reports, erased secrets before

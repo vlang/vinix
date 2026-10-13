@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`hash-volume`/`verify-volume` and `hash-recovery-volume`/`verify-recovery-volume`
+authenticate encrypted geometry and record/verify a trusted full-extent SHA-256
+ciphertext reference through pinned read-only physical reads. Secrets erase
+before reads and output; recording publishes a private no-overwrite reference.
+Keep extent writes quiescent. See
+[ciphertext checksum rules](../../docs/storage-volumes.md#encrypted-ciphertext-checksum-references).
+
 `plan-preview-grow-volume DEVICE CONFIG PASSPHRASE_FILE EXPECTED_BYTES LENGTH_BYTES`
 and `plan-preview-grow-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE EXPECTED_BYTES LENGTH_BYTES`
 report authenticated original/candidate geometry and `keep`/`grow` actions after

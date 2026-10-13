@@ -3,6 +3,8 @@
 module volumecli
 
 import os
+import crypto.sha256
+import encoding.hex
 
 struct RecoveryIO {
 mut:
@@ -26,6 +28,7 @@ __global recovery_io RecoveryIO
 fn recovery_mock_open(path &char, flags i32) i32 {
 	assert flags & C.O_CLOEXEC != 0 && flags & C.O_NOFOLLOW != 0
 	if growth_preview_model { assert flags & (C.O_WRONLY | C.O_RDWR | C.O_CREAT | C.O_DIRECTORY) == 0 && C.strcmp(path, c'/dev/urandom') != 0 }
+	if ciphertext_model { assert C.strcmp(path, c'/dev/urandom') != 0 }
 	if recovery_growth_model {
 		recovery_growth_before_open(path, flags)
 		if C.strcmp(path, c'/recovery-growth-parent') == 0 {
@@ -142,7 +145,8 @@ fn recovery_mock_unlinkat(fd i32, name &char, flags i32) i32 {
 	return C.unlinkat(fd, name, flags)
 }
 fn recovery_mock_fflush(stream voidptr) i32 {
-	if growth_preview_model { recovery_growth_erased(); assert !recovery_io.locked && recovery_growth_io.parent_live && recovery_growth_io.statuses == 3 }
+	if ciphertext_model { ciphertext_report_ready() }
+	else if growth_preview_model { recovery_growth_erased(); assert !recovery_io.locked && recovery_growth_io.parent_live && recovery_growth_io.statuses == 3 }
 	else { assert recovery_io.locked }
 	if recovery_io.mode == 21 { unsafe { C.errno = C.EIO }; return -1 }
 	return C.fflush(stream)

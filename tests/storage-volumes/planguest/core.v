@@ -570,6 +570,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 	$if volume_recovery_inspect_test ? { return recovery_inspect_entry() }
 	$if volume_inspect_test ? { return volume_inspect_entry() }
 	$if volume_growth_preview_test ? { return growth_preview_entry() }
+	$if volume_ciphertext_test ? { return ciphertext_entry() }
 	parent := $if amd64 { &char(c'/dev/sd0') } $else { &char(c'/dev/vda') }
 	C.printf(c'PLAN START\n')
 	warm_image()

@@ -34,7 +34,7 @@ fn recovery_growth_before_open(path &char, flags i32) {
 		recovery_growth_erased()
 		assert flags == C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK
 	}
-	if flags & C.O_DIRECTORY != 0 { recovery_growth_erased(); assert recovery_growth_io.parent_live && recovery_growth_io.statuses == 2 }
+	if flags & C.O_DIRECTORY != 0 { recovery_growth_erased(); assert recovery_growth_io.parent_live && recovery_growth_io.statuses == if ciphertext_model { 4 } else { 2 } }
 }
 
 fn recovery_growth_mock_ioctl(fd i32, number u64, output voidptr) i32 {
