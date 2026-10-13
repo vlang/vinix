@@ -133,6 +133,68 @@ The full compiler/package gate uses 600-second command deadlines and a
 2400-second guest deadline. The selected qualifier command budget is recorded
 and independently checked in its report; other guest runs retain 900 seconds.
 
+To rebuild V inside the guest before the project builds, set
+`VINIX_DEVELOPMENT_SELFHOST_V=1` on the complete SDK/V/BusyBox invocation:
+
+```
+VINIX_DEVELOPMENT_SELFHOST_V=1 tests/development/run-guest aarch64 /path/to/kernel /path/to/staged-tools /path/to/new-state /path/to/aarch64-linux-musl-native /path/to/vlang /path/to/native-static-busybox
+```
+
+The prepared native V bootstrap translates its pinned `/usr/lib/vlang/cmd/v`
+sources to C, exits, and then native GCC builds a static compiler with the
+pinned runtime objects. The rebuild selects the C backend and omits unqualified
+FastC, WebAssembly, native ARM code generation and interpreter backends through
+the compiler's existing feature defines. Those backends retain separate gates.
+Separate processes release the GC-free bootstrap's AST before GCC and the
+assembler need memory. Each workspace copies the pinned installation and
+replaces its compiler with the rebuilt executable beside its matching libraries
+and help files. Each workspace gets its own rebuilt compiler;
+the remaining V help, package, assertion and utility builds use that compiler.
+Project builds select the pinned `/usr/lib/vlang` library root through
+`VINIX_V_ROOT` and disable caches, so library-path constants and cached-object
+filenames cannot introduce the workspace prefix into the resulting artifacts.
+The runner checks its generated artifact pin before each execution. All 23
+steps must pass, compiler versions must match the pinned `VERSION`, and the
+generated C, rebuilt compiler and every other artifact must match across
+workspaces. This mode gives the guest 8 GiB of RAM, build commands 1800 seconds
+and the guest 7200 seconds; the reference-project qualifier retains its separately recorded
+600-second budget.
+The outer receipt records `selfhost_v`; invalid option values or a missing
+complete SDK are refused before creating a state directory. Compiler sources,
+runtime objects and libraries come from the pinned installation input, and
+retain its recorded source adaptations. This checks a compiler rebuild and its
+use to build projects; rebuilding every Vinix layer remains a separate gate.
+
+On 13 October 2026 the self-host compiler gate passed as UID/GID 1000 on
+AArch64 HVF. The 14-record receipt and transcript are retained in
+`build/development17-20261013/guest-arm-selfhost-v-m`. Both fresh workspaces
+completed all 23 steps. Their generated C, rebuilt compiler, project binaries,
+payload, manifest and signed release matched exactly. The controller independently
+verified the Ed25519 signatures and the 228648-byte executable payload. Selected
+matching SHA-256s are:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `selfhost-v.c` | `3a2cdc5fdd34b23a2e527db4c04f3f5d25ce7251196ab215ea4e24d0a4c4fc2b` |
+| `compiler/v` | `4ef097b34415443a6e91bd19934a91ca6b4df9384e9b9c41b6dec6bcfc99dbac` |
+| `package-bin` | `f72592db6d1a5cc97e897d0c02c75954a8016fed649f49d030ecf94c4bc7cf72` |
+| `payload/bin/lscpu` | `8c2ba41f687c66f6b3602860f09bae79c19739ae81fc7453cdcd932c19b01f5f` |
+| Package manifest | `0c6977d18ee94658c874999fc152c7756c41c039255793821709e9f50a987090` |
+| `release/index.json` | `9eee3b494a6e92353520db3dd27f00a7fc06b3a1dbc8004ff10292bf91ba672b` |
+| `release/index.sig` | `a6a852712b73b14757ba22be35293b535e79bf66d933b3962bf6f527b57e23c1` |
+
+The run used V sources `f6358ecff9cffbf2d8b03e6a09269aac7707e26c`,
+GCC/G++ 11.2.1 (20211120), BusyBox 1.36.1 and the prepared installation from
+`build/development17-20261013/native-v-arm-pinned`. The receipt records all
+source, SDK, compiler and runtime pins; its committed Vinix source revision is
+`116ba2c7850ca331a5bf9851470f1bae4a9136d3`. The isolated production kernel was
+built from `776b9f0d3` plus the bounded metadata-budget policy in `116ba2c78`.
+That policy preserves the previous limits through 4 GiB and allows the native
+compiler on the 8 GiB development machine. Both production architectures built,
+and native exact-budget exhaustion/recovery checks passed on both. The larger
+existing C resource fixture still reaches its fixed mapping bound on both the
+unchanged and updated kernels; see [the separate failing gate](../../docs/kernel-resources.md).
+
 For prepared compiler startup/help coverage without a GCC SDK, set
 `VINIX_DEVELOPMENT_V_SMOKE_ROOT` to the complete matching installation root:
 
@@ -146,6 +208,11 @@ records `v_smoke_root_sha256` and `v-smoke`; the version output stays in the
 transcript. This option is separate from the native V build gate and cannot be
 combined with its V-root argument. Startup/help coverage does not qualify native
 project compilation.
+
+The x86_64 startup/help and account/job/build regression passed on 13 October
+2026 in `build/development17-20261013/guest-x86-v-pinned` with the prepared root
+in `build/development17-20261013/native-v-x86-pinned`. No native x86 GCC SDK was
+supplied, so compiler rebuilding and project compilation on x86 remain open.
 
 To run the CPU inspection check with a separately prepared `lscpu` ELF, set
 `VINIX_DEVELOPMENT_CPU_BINARY` to its host path. The controller checks the
@@ -172,6 +239,12 @@ Once the initramfs archive is complete, its duplicate staging tree is removed
 before ISO assembly. The standalone archive is removed once the ISO is complete.
 The ISO, compiled fixture, receipts and transcripts remain; obsolete
 images from earlier runs may be pruned independently of their retained evidence.
+
+Command diagnostics retain the first and last 8191 bytes of long logs, checking
+both blocks for the synthetic credential. A UID 1000 fixture puts distinct
+sentinels at each end; both architectures must expose both markers. Failed
+native builds also emit their receipt and bounded memory/limit/resource reports
+before failing, preserving the executed command and artifact pins for diagnosis.
 
 On 13 October 2026 these workflows passed on x86_64 and AArch64 using the
 previously staged commands and isolated production kernels. Receipts are in

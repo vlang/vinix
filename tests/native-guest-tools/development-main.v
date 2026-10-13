@@ -117,6 +117,7 @@ struct Receipt {
 	sdk_sha256      string
 	v_root_sha256   string
 	v_smoke_root_sha256 string
+	selfhost_v bool
 	native_source_sha256 string
 	native_source_revision string
 	tools           map[string]string
@@ -195,6 +196,10 @@ fn run() !int {
 	}
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
+	selfhost_option := os.getenv('VINIX_DEVELOPMENT_SELFHOST_V')
+	if selfhost_option !in ['', '0', '1'] { return error('VINIX_DEVELOPMENT_SELFHOST_V must be 0 or 1') }
+	selfhost_v := selfhost_option == '1'
+	if selfhost_v && os.args.len != 8 { return error('native V self-hosting requires the complete SDK, V root and shell arguments') }
 	if os.args.len == 8 && os.getenv('VINIX_DEVELOPMENT_V_SMOKE_ROOT') != '' {
 		return error('use either the native V build gate or the prepared V smoke root')
 	}
@@ -357,10 +362,45 @@ fn run() !int {
 				'tools/packages/main.v', 'tools/packages/pkgcore', 'tools/packages/pkgprotocol', 'tools/packages/signing'], userland, build_source)!
 			os.write_file(userland + '/SOURCE_REVISION', source_revision + '\n')!
 			os.write_file(userland + '/assert-failure.v', 'fn main() {\n    assert 1 == 2\n}\n')!
-			mut steps := [BuildStep{ name: 'help-v', argv: ['{v}', '--help'], artifacts: []string{} }]
+			mut steps := []BuildStep{}
+			if selfhost_v {
+				os.write_file(root + '/home/developer/selfhost-v', '1\n')!
+				v_revision := os.read_file(v_root + '/VERSION')!.trim_space()
+				if v_revision.len !in [40, 64] || !v_revision.bytes().all(it.is_hex_digit()) {
+					return error('self-host compiler needs a full pinned VERSION')
+				}
+				// The bootstrap is GC-free. Let it exit before native GCC starts,
+				// so the compiler AST and GCC/assembler do not compete for RAM.
+				steps << BuildStep{
+					name: 'copy-selfhost-root'
+					argv: ['{toolbox}', 'cp', '-a', '/usr/lib/vlang', '{work}/compiler']
+					artifacts: []string{}
+				}
+				steps << BuildStep{
+					name: 'translate-selfhost-v'
+					argv: ['{v}', '-nocache', '-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler',
+						'-d', 'skip_fastc', '-d', 'skip_wasm', '-d', 'skip_arm64', '-d', 'skip_eval', '-d', 'skip_ssa',
+						'-path', '@vlib|/usr/lib/vlang', '-os', 'linux',
+						'-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
+						'-o', '{work}/selfhost-v.c', '/usr/lib/vlang/cmd/v']
+					artifacts: ['selfhost-v.c']
+				}
+				steps << BuildStep{
+					name: 'compile-selfhost-v'
+					argv: ['{cc}', '-static', '-O0', '-w', '-std=gnu11', '-D_GNU_SOURCE', '-DV_COMMIT_HASH="' + v_revision + '"',
+						'-include', '/usr/lib/vlang/vlib/v/pthread_helper.h', '{work}/selfhost-v.c',
+						'/usr/lib/vlang/vlib/os/execute_capture_nix.o', '/usr/lib/vlang/vlib/v/pthread_helper.o',
+						'/usr/lib/vlang/vlib/v/bench/peak_rss.o', '/usr/lib/vlang/vlib/v/modulecache/file_metadata.o',
+						'/usr/lib/vlang/vlib/builtin/segfault_handler_nix.o', '-o', '{work}/compiler/v', '-lm', '-lpthread']
+					artifacts: ['compiler/v']
+				}
+				steps << BuildStep{ name: 'version-selfhost-v', argv: ['{work}/compiler/v', '--version'], artifacts: []string{} }
+			}
+			project_v := if selfhost_v { '{work}/compiler/v' } else { '{v}' }
+			steps << BuildStep{ name: 'help-v', argv: [project_v, '--help'], artifacts: []string{} }
 			steps << BuildStep{
 				name: 'compile-package'
-				argv: ['{v}', '-new-compiler', '-nocache', '-showcc', '-no-retry-compilation', '-no-parallel', '-no-memory-limit',
+				argv: [project_v, '-new-compiler', '-nocache', '-showcc', '-no-retry-compilation', '-no-parallel', '-no-memory-limit',
 					'-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-musl', '-gc', 'none',
 					'-cc', '{cc}', '-path', '@vlib|{work}', '-o', '{work}/package-bin', '{work}/tools/packages/main.v']
 				artifacts: ['package-bin']
@@ -368,7 +408,7 @@ fn run() !int {
 			steps << BuildStep{ name: 'help-package', argv: ['{work}/package-bin', '--help'], artifacts: []string{} }
 			steps << BuildStep{
 				name: 'compile-assertion'
-				argv: ['{v}', '-new-compiler', '-nocache', '-no-retry-compilation', '-no-parallel', '-no-memory-limit',
+				argv: [project_v, '-new-compiler', '-nocache', '-no-retry-compilation', '-no-parallel', '-no-memory-limit',
 					'-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-musl', '-gc', 'none',
 					'-cc', '{cc}', '-o', '{work}/assert-bin', '{work}/assert-failure.v']
 				artifacts: ['assert-bin']
@@ -377,7 +417,7 @@ fn run() !int {
 				input := if name == 'init' { '/init' } else { '/util-vinix/' + name }
 				steps << BuildStep{
 					name: 'compile-' + name
-					argv: ['{v}', '-new-compiler', '-no-retry-compilation', '-no-parallel',
+					argv: [project_v, '-new-compiler', '-nocache', '-no-retry-compilation', '-no-parallel',
 						'-no-memory-limit', '-os', 'vinix', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
 						'-musl', '-gc', 'none', '-cc', '{cc}', '-o', '{work}/' + name + '-bin', '{work}' + input]
 					artifacts: [name + '-bin']
@@ -410,8 +450,8 @@ fn run() !int {
 					'sh': Pin{'/bin/sh', hashes['sh']}
 					'toolbox': Pin{'/bin/busybox', hashes['sh']}
 				}
-				timeout_seconds: 600
-				environment: { 'VJOBS': '1', 'V_C_ERROR_BUG_REPORT_DISABLED': '1' }
+				timeout_seconds: if selfhost_v { 1800 } else { 600 }
+				environment: { 'VJOBS': '1', 'V_C_ERROR_BUG_REPORT_DISABLED': '1', 'VINIX_V_ROOT': '/usr/lib/vlang' }
 				steps: steps
 			}
 			os.write_file(root + '/home/developer/native-build.json', json2.encode(native_plan))!
@@ -430,9 +470,13 @@ fn run() !int {
 		if cpu := os.getenv_opt('VINIX_QEMU_CPU') { command[command.index('-cpu') + 1] = cpu }
 	}
 	if sdk_hash != '' {
-		for i, argument in command { if argument == '-m' { command[i + 1] = if v_root_hash == '' { '2048' } else { '3072' } } }
+		for i, argument in command { if argument == '-m' {
+			command[i + 1] = if selfhost_v { '8192' } else if v_root_hash == '' { '2048' } else { '3072' }
+		} }
 	}
 	mut expected := [
+		'DEVELOPMENT LOG HEAD SENTINEL',
+		'DEVELOPMENT LOG TAIL SENTINEL',
 		'DEVELOPMENT ACCOUNT PASS:',
 		'DEVELOPMENT BUILD PASS:',
 		'DEVELOPMENT GUEST PASS',
@@ -440,10 +484,11 @@ fn run() !int {
 	if sdk_hash != '' { expected << 'DEVELOPMENT TOOLCHAINS PASS:' }
 	if v_root_hash != '' { expected << 'DEVELOPMENT USERLAND PASS:' }
 	if v_root_hash != '' { expected << 'DEVELOPMENT PACKAGES PASS:' }
+	if selfhost_v { expected << 'DEVELOPMENT SELFHOST PASS:' }
 	if 'lscpu-smoke' in hashes { expected << 'DEVELOPMENT CPU PASS:' }
 	if 'v-smoke' in hashes { expected << 'DEVELOPMENT V SMOKE PASS:' }
 	result := guesthost.boot(command, launch.env, state, expected,
-		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], if v_root_hash != '' { 2400 } else { 900 }, true)!
+		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], if selfhost_v { 7200 } else if v_root_hash != '' { 2400 } else { 900 }, true)!
 	mut receipts := map[string]string{}
 	for line in os.read_lines(state + '/serial.log')! {
 		if !line.starts_with('DEVELOPMENT RECEIPT ') { continue }
@@ -552,6 +597,7 @@ fn run() !int {
 		sdk_sha256:      sdk_hash
 		v_root_sha256:   v_root_hash
 		v_smoke_root_sha256: v_smoke_hash
+		selfhost_v: selfhost_v
 		native_source_sha256: native_plan.source.sha256
 		native_source_revision: source_revision
 		tools:           hashes

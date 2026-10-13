@@ -55,6 +55,7 @@ fn C.printf(&char, ...) i32
 fn C.snprintf(&char, usize, &char, ...) i32
 fn C.memcmp(voidptr, voidptr, usize) i32
 fn C.readlink(&char, voidptr, usize) isize
+fn C.lseek(i32, i64, i32) i64
 fn C.setvbuf(&C.FILE, &char, i32, usize) i32
 fn C.__errno_location() &i32
 fn C._exit(i32)
@@ -176,9 +177,31 @@ fn emit_command_log(path &char) {
 		if fd < 0 { return }
 		mut text := [8192]char{}
 		count := C.read(fd, &text[0], text.len - 1)
-		check(count >= 0 && C.close(fd) == 0, 255)
+		check(count >= 0, 255)
 		check(C.strstr(&text[0], c'vinix-native-fixture-secret') == nil, 256)
 		C.printf(c'DEVELOPMENT COMMAND LOG %s\n%s\n', path, &text[0])
+		mut st := C.stat{}
+		check(C.fstat(fd, &st) == 0, 309)
+		if st.st_size > text.len - 1 {
+			check(C.lseek(fd, -i64(text.len - 1), C.SEEK_END) >= 0, 310)
+			text = [8192]char{}
+			tail := C.read(fd, &text[0], text.len - 1)
+			check(tail >= 0 && C.strstr(&text[0], c'vinix-native-fixture-secret') == nil, 311)
+			C.printf(c'DEVELOPMENT COMMAND LOG TAIL %s\n%s\n', path, &text[0])
+		}
+		check(C.close(fd) == 0, 312)
+	}
+}
+
+fn command_log_checks() {
+	unsafe {
+		mut text := [16384]char{}
+		head := &char(c'DEVELOPMENT LOG HEAD SENTINEL')
+		tail := &char(c'DEVELOPMENT LOG TAIL SENTINEL')
+		for i in 0 .. 29 { text[i] = head[i] }
+		for i in 0 .. 29 { text[8193 + i] = tail[i] }
+		write_text(c'/home/developer/log-fixture.log', &text[0], usize(text.len))
+		emit_command_log(c'/home/developer/log-fixture.log')
 	}
 }
 
@@ -333,22 +356,53 @@ fn assertion_checks(output &char) {
 	}
 }
 
+fn selfhost_checks(output &char) {
+	unsafe {
+		mut path := [512]char{}
+		C.snprintf(&path[0], path.len, c'%s/work/compiler/v', output)
+		mut st := C.stat{}
+		check(C.stat(&path[0], &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o111 != 0, 304)
+		C.snprintf(&path[0], path.len, c'%s/version-selfhost-v.log', output)
+		mut version := [128]char{}
+		fd := C.open(&path[0], C.O_RDONLY)
+		count := C.read(fd, &version[0], version.len - 1)
+		check(fd >= 0 && count > 0 && count < version.len - 1 && C.close(fd) == 0
+			&& C.strstr(&version[0], c'V 0.') != nil, 305)
+		mut revision := [66]char{}
+		fd_revision := C.open(c'/usr/lib/vlang/VERSION', C.O_RDONLY)
+		bytes := C.read(fd_revision, &revision[0], revision.len)
+		check(fd_revision >= 0 && bytes in [isize(41), isize(65)]!
+			&& C.close(fd_revision) == 0 && revision[bytes - 1] == char(10), 306)
+		revision[7] = 0
+		check(C.strstr(&version[0], &revision[0]) != nil, 307)
+		emit_command_log(&path[0])
+	}
+}
+
 fn native_userland_checks() {
 	unsafe {
+		marker := C.open(c'/home/developer/selfhost-v', C.O_RDONLY)
+		selfhost := marker >= 0
+		if selfhost { check(C.close(marker) == 0, 308) }
 		private_receipt(c'/home/developer/native-build.json', c'/home/developer/native-source')
 		for output in [&char(c'/home/developer/native-a'), &char(c'/home/developer/native-b')]! {
 			status := command(c'/usr/bin/vinix-build', c'build', c'/home/developer/native-build.json', output)
 			mut path := [256]char{}
 			check(C.snprintf(&path[0], path.len, c'%s/receipt.json', output) > 0, 261)
 			if status != 0 {
+				emit_command_log(c'/proc/meminfo')
+				emit_command_log(c'/proc/self/limits')
+				emit_command_log(c'/proc/kernel-resources')
 				check(command(c'/bin/busybox', c'ls', c'-la', c'/opt/native/lib') == 0, 268)
 				check(command_output(c'/usr/bin/vinix-build', c'hash', c'/opt/native', nil, c'/home/developer/sdk-pin.sha') == 0, 269)
 				emit_command_log(c'/home/developer/sdk-pin.sha')
-				for step in [&char(c'help-v'), &char(c'compile-assertion'), &char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh'), &char(c'compile-lscpu'), &char(c'compile-init'), &char(c'inspect-lscpu'),
+				for step in [&char(c'translate-selfhost-v'), &char(c'compile-selfhost-v'), &char(c'version-selfhost-v'), &char(c'help-v'), &char(c'compile-assertion'), &char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh'), &char(c'compile-lscpu'), &char(c'compile-init'), &char(c'inspect-lscpu'),
 					&char(c'compile-package'), &char(c'help-package'), &char(c'pack-package'), &char(c'publish-package')]! {
 					C.snprintf(&path[0], path.len, c'%s/%s.log', output, step)
 					emit_command_log(&path[0])
 				}
+				C.snprintf(&path[0], path.len, c'%s/receipt.json', output)
+				emit_receipt(&path[0], c'Vinix', false)
 			}
 			check(status == 0, 262)
 			C.snprintf(&path[0], path.len, c'%s/receipt.json', output)
@@ -384,9 +438,13 @@ fn native_userland_checks() {
 			cpu_output_checks(&path[0])
 			assertion_checks(output)
 			package_checks(output)
+			if selfhost { selfhost_checks(output) }
 		}
 		C.puts(c'DEVELOPMENT USERLAND PASS: UID 1000, pinned SDK/V/runtime, two fresh workspaces, fetch/mount/chsh/lscpu/init compiled and executed, procfs CPU count matched')
 		C.puts(c'DEVELOPMENT PACKAGES PASS: UID 1000, native package CLI, compiled lscpu payload, signed releases in two workspaces, verified copied objects')
+		if selfhost {
+			C.puts(c'DEVELOPMENT SELFHOST PASS: UID 1000, V compiler rebuilt twice, matching version, rebuilt compiler used for userland and signed packages')
+		}
 	}
 }
 
@@ -394,6 +452,7 @@ fn account_checks() {
 	unsafe {
 		check(C.setgroups(0, nil) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0, 116)
 		check(C.chdir(c'/home/developer') == 0, 117)
+		command_log_checks()
 		check(C.setenv(c'UNSELECTED_PARENT_SECRET', c'parent-must-not-reach-job', 1) == 0, 118)
 		for program in [&char(c'/usr/bin/vinix-build'), &char(c'/usr/bin/vinix-qualify'),
 			&char(c'/usr/bin/vinix-vm'), &char(c'/usr/bin/vinix-jobs')]! {

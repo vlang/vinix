@@ -7,8 +7,8 @@ missing kernel isolation, debugger or hardware virtualization interfaces.
 
 | Requirement | Available implementation | Remaining acceptance / implementation |
 | --- | --- | --- |
-| Installed-system self-hosting | [V build plans](../tools/development/README.md) pin prepared source/tool/SDK inputs, build in a private copy, enforce deadlines and record output hashes. Native kernel, utility, init and package-CLI recipes are documented. [Guest runner checks](../tests/development/README.md) qualify UID 1000 source/link copying, epoch/environment control, matching artifacts and changed-input refusal on both architectures. AArch64 compiles the four `util-vinix` utilities, `init` and the package CLI in two fresh workspaces from immutable committed sources, executes the tools, packs the compiled `lscpu` and signs a consumer release. Executable/payload/manifest/index/signature hashes match; the controller independently verifies the signature and payload metadata with full SDK/V/runtime pins. | Complete native kernel/desktop/dependency recipes, init boot/login qualification and the remaining userland/package workflows; rebuild all four requested layers inside an installed system on both architectures. Basic runner checks use a prebuilt V payload; utility/init/package checks use native compilation. No full self-hosted rebuild was run here. |
-| Toolchains and developer applications | [Project qualification](../tools/development/qualification.md) covers C/C++/V, Node/TypeScript, Rust/Cargo, Go, Java, make/CMake/Ninja, npm, GDB and SQLite. A [V compiler stager](../tools/development/stage-v.v) exports committed compiler/library sources, records portable-source adaptations and prepares matching static ELF installations for both architectures. [Native guest checks](../tests/development/README.md) passed C/C++ thread/file projects and the V file project as UID/GID 1000 on AArch64 with GCC/G++ 11.2.1 and V 0.5.2 `f6358ec`. Both architectures passed prepared V version/help gates; AArch64 also verified actual assertion failures with relative source paths. Missing tools and failed workflows remain failing gates. | Qualify native compiler rebuilding, the remaining profiles and native x86 compiler projects with exact package versions and retained receipts; qualify IDE workflows and broader package ecosystems. Python/Meson execution is excluded by the repository's no-Python rule, so their acceptance stays open. |
+| Installed-system self-hosting | [V build plans](../tools/development/README.md) pin prepared source/tool/SDK inputs, build in a private copy, enforce deadlines and record output hashes. Native kernel, utility, init and package-CLI recipes are documented. [Guest runner checks](../tests/development/README.md) qualify UID 1000 source/link copying, epoch/environment control, matching artifacts and changed-input refusal on both architectures. AArch64 rebuilds the V C-backend compiler in two fresh workspaces, then uses each rebuilt compiler for the four `util-vinix` utilities, `init` and the package CLI from immutable committed sources. It executes the tools, packs the compiled `lscpu` and signs a consumer release. Generated-C/compiler/executable/payload/manifest/index/signature hashes match; the controller independently verifies the signature and payload metadata with full SDK/V/runtime pins. | Complete native kernel/desktop/dependency recipes, init boot/login qualification and the remaining userland/package workflows; rebuild all four requested layers inside an installed system on both architectures. Basic runner checks use a prebuilt V payload; AArch64 compiler/utility/init/package checks use native compilation. No full self-hosted rebuild was run here. |
+| Toolchains and developer applications | [Project qualification](../tools/development/qualification.md) covers C/C++/V, Node/TypeScript, Rust/Cargo, Go, Java, make/CMake/Ninja, npm, GDB and SQLite. A [V compiler stager](../tools/development/stage-v.v) exports committed compiler/library sources, records portable-source adaptations and prepares matching static ELF installations for both architectures. [Native guest checks](../tests/development/README.md) passed C/C++ thread/file projects and the V file project as UID/GID 1000 on AArch64 with GCC/G++ 11.2.1 and V 0.5.2 `f6358ec`. AArch64 also rebuilt the V C-backend compiler twice and used both matching compilers to build reproducible projects and signed packages. Both architectures passed prepared V version/help and bounded diagnostic-log gates; AArch64 verified actual assertion failures with relative source paths. Missing tools and failed workflows remain failing gates. | Qualify the remaining V backends, reference profiles and native x86 compiler projects with exact package versions and retained receipts; qualify IDE workflows and broader package ecosystems. Python/Meson execution is excluded by the repository's no-Python rule, so their acceptance stays open. |
 | Debugging and diagnostics | Dumpability and authorized `process_vm_readv/writev` already exist. The GDB profile requires a real source breakpoint, backtrace and continued execution. | Native ptrace attach/register/step/events, ELF core generation and output/limit policy, profiler events, process stack sampling and authorized hang/crash reporting. No new kernel tracing implementation is claimed. |
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
@@ -99,7 +99,37 @@ The x86 TCG startup/help and account/job/build regression passed in
 `build/development17-20261013/guest-x86-v-assertions`; no native x86 GCC SDK was
 supplied. The signed fixture uses a public synthetic zero seed. It proves
 ordinary-user native package publication; enrollment, installed-app execution,
-compiler rebuilding and complete kernel/desktop builds retain their own gates.
+compiler rebuilding and complete kernel/desktop builds were outside that run.
+
+The later AArch64 HVF compiler-rebuild gate on 13 October 2026 passed all 23
+steps in each fresh workspace, recorded `selfhost_v: true` and retained 14
+independently validated records in
+`build/development17-20261013/guest-arm-selfhost-v-m`. The ordinary account
+rebuilt V's C-backend compiler, checked its pinned revision and used that exact
+executable for all subsequent V project builds. Those builds disable caches
+and select the separately pinned `/usr/lib/vlang` installation with `VINIX_V_ROOT`.
+The generated C and rebuilt compiler matched across workspaces, as did every
+project binary and signed package artifact. Selected hashes and complete tool
+versions are recorded in [the guest qualification evidence](../tests/development/README.md).
+The source revision was `116ba2c7850ca331a5bf9851470f1bae4a9136d3`, source
+pin `73b14d03f8e7ec87fbb27143f96e6b9ce67c471910d5d6b86d85d2d1695bffe1`
+and V installation pin
+`d4b98ffc143c42d97437d9848000920daa7eb99a8e0568fd679f8cad5a834de4`.
+
+The isolated kernel used `776b9f0d3` plus `116ba2c78`, which scales the bounded
+metadata budget for larger development machines. This resolves the measured
+per-creator mapping-budget denial during native compiler assembly while retaining
+the RAM fraction, resource-group admission and cleanup reserves. Production
+kernels built on both architectures, and exact-budget exhaustion/recovery
+passed in native V fixtures on both. The larger existing C resource fixture
+still fails its mapping-array bound on both unchanged and updated kernels;
+[that baseline failure remains recorded](kernel-resources.md).
+
+The updated x86 TCG compiler startup/help and account/job/build regression
+passed in `build/development17-20261013/guest-x86-v-pinned`. Both architecture
+runs also verified the first and last blocks of bounded command logs as UID
+1000. No native x86 GCC SDK was supplied. Full kernel/desktop self-hosting,
+x86 compiler/project rebuilding and the wider toolchain gates remain open.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,
