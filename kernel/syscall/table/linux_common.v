@@ -873,6 +873,22 @@ fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, ma
 	return 0, 0
 }
 
+// The native fstatat adapters share Linux's C-int argument widths and flag
+// validation, while keeping their architecture-specific stat conversions.
+// Linux fstatat accepts both sync bits; its NULL descriptor shortcut requires
+// exactly AT_EMPTY_PATH, unlike statx's broader descriptor-only spelling.
+fn linux_fstatat_lookup(gpr_state voidptr, dirfd int, path charptr, storage &stat.Stat, flags int) (u64, u64) {
+	query_flags := u32(flags)
+	allowed := u32(fs.at_symlink_nofollow | fs.at_empty_path) | statx_no_automount | statx_sync_type
+	if query_flags & ~allowed != 0 {
+		return errno.err, errno.einval
+	}
+	if path == unsafe { nil } && i32(u32(dirfd)) >= 0 && query_flags == u32(fs.at_empty_path) {
+		return fs.syscall_fstat(gpr_state, int(u32(dirfd)), storage)
+	}
+	return fs.syscall_fstatat(gpr_state, int(u32(dirfd)), path, storage, int(query_flags))
+}
+
 // readv(fd, iov, iovcnt)
 fn syscall_linux_readv(gpr_state voidptr, fdnum int, iov_ptr u64, iovcnt int) (u64, u64) {
 	return linux_readv_flags(gpr_state, fdnum, iov_ptr, iovcnt, 0)

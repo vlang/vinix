@@ -741,6 +741,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Validate native statx requests and argument words before lookup/output;
   qualify real metadata, NULL descriptors, exact errors and flat retention
   against Linux on both architectures. See [the statx receipts](docs/linux-posix-qualification.md#native-statx-requests-and-error-precedence).
+- [x] Correct native fstat/newfstatat descriptor words, flag errors and NULL queries;
+  qualify metadata, libc/legacy controls and flat retention against Linux
+  on both architectures. See [the stat receipts](docs/linux-posix-qualification.md#native-stat-descriptor-words-and-flag-errors).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

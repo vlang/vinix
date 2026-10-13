@@ -981,3 +981,25 @@ v -cc cc test tools/linux-compat
 
 If the local V compiler reports missing cached `_v3_lit_*` literals after edits,
 use a fresh `V3CACHE` directory or `v -nocache -cc cc run` for the host tool.
+
+The `statabi` case checks native fstat/newfstatat argument words, unknown flags,
+NULL/empty descriptor queries, actual metadata and exact lookup/output errors
+as root and UID/GID1000. It includes x86 legacy stat/lstat and ordinary musl
+wrappers, output canaries/sentinels, unchanged file bytes/cursor and two
+200-cycle allocation cohorts. Native statx/open/runtime regressions accompany
+the [dated stat qualification](../../docs/linux-posix-qualification.md#native-stat-descriptor-words-and-flag-errors).
+
+The same native probe ELF can run against a Linux kernel through the V
+reference controller. Its fresh artifact directory retains frozen kernel/probe
+inputs, wrapper source/C/ELF, V-generated initramfs, QEMU command and receipt,
+including when qualification fails. The macOS ARM path uses HVF; x86 uses TCG.
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases statabi,statx,open,runtime
+v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/statabi-reference.v --arch aarch64 --kernel LINUX-KERNEL --init FRESH-NATIVE/statabi/init --state-dir FRESH-LINUX
+```
+
+Use matching `--arch x86_64` and kernel/probe inputs for x86. `--reference`
+selects the same semantic matrix while skipping Vinix-specific slab reporting;
+the native audit still requires the allocation cohorts. NULL is tested through
+raw syscalls because musl's fstatat wrapper requires a non-NULL pathname.

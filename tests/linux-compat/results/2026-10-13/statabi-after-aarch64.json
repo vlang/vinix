@@ -1,0 +1,39 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "6929cc866344d205e4a12997ea08f919b070002dbe49a4da0699128df8eb1d34",
+    "results": [
+        {
+            "name": "statabi",
+            "source_sha256": "467c23ba0f1b1a4f6e36c88aec01834e17785a703df9682b44cae8270dc6bdd5",
+            "init_sha256": "66163106c2ecf5288de964899b3272f9046dc4c57cba948d3ba510fa5bb11233",
+            "iso_sha256": "cd81858ae3bba5427ad6fcbf5cddd0d06b43ef006758fd066ccc002f8283b21d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "statx",
+            "source_sha256": "8e267e3f8b68c25dfc8544738f019ad8c5039a41d0dc3cab693618eccdd4e57c",
+            "init_sha256": "3d52e3d76c2db18050f64c466e938311c942f56e1e7b045cc74524e6619c2df2",
+            "iso_sha256": "87720103deeba9203824cffd4078c292db99eed431631bd26682c62f8eb43683",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "b41456ec1e04ca2e2e83e39ac5f01da498edfc8011f4eb71541bbc9ec9ec7c6a",
+            "iso_sha256": "7fd7fb84bf8b6215f8922aa51beff17a549cb892460abd4ecee72b067832f83e",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "74fb99756c12b8b72656770d69816a730120d1d9e180a689e1889bda6f1e9261",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

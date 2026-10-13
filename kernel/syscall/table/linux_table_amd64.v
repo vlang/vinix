@@ -66,7 +66,7 @@ fn syscall_linux_fstat(gpr_state voidptr, fdnum int, buf u64) (u64, u64) {
 	// Neither the filesystem fill nor the checked user copy retains this scratch.
 	vinix_stat := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
 	unsafe { *vinix_stat = stat.Stat{} }
-	ret, err := fs.syscall_fstat(gpr_state, fdnum, vinix_stat)
+	ret, err := fs.syscall_fstat(gpr_state, int(u32(fdnum)), vinix_stat)
 	if err != 0 {
 		return ret, err
 	}
@@ -77,7 +77,7 @@ fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, buf u64, fl
 	// Neither the filesystem fill nor the checked user copy retains this scratch.
 	vinix_stat := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
 	unsafe { *vinix_stat = stat.Stat{} }
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, vinix_stat, flags)
+	ret, err := linux_fstatat_lookup(gpr_state, dirfd, path, vinix_stat, flags)
 	if err != 0 {
 		return ret, err
 	}

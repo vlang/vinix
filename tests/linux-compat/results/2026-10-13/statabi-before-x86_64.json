@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "e152c7d63d4aa47d576a84bea35348359b09a0d3039bc965f00fc4ed2911b7aa",
+    "results": [
+        {
+            "name": "statabi",
+            "source_sha256": "467c23ba0f1b1a4f6e36c88aec01834e17785a703df9682b44cae8270dc6bdd5",
+            "init_sha256": "105a50fb5d8c04f3e26e87b86c0864e7d1910dc1bd2917b9d28541dfa73b5bd3",
+            "iso_sha256": "f126500bd7535a30b44a85196ca17568fe26e23a28b62fa36f426dca23b3985f",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

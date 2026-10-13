@@ -316,7 +316,7 @@ fn syscall_linux_fstatat(gpr_state voidptr, dirfd int, path charptr, linux_buf u
 	// Neither the filesystem fill nor the checked conversion retains this scratch.
 	stat_storage := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
 	unsafe { *stat_storage = stat.Stat{} }
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, stat_storage, flags)
+	ret, err := linux_fstatat_lookup(gpr_state, dirfd, path, stat_storage, flags)
 	if err != 0 {
 		return ret, err
 	}
@@ -331,7 +331,7 @@ fn syscall_linux_fstat(gpr_state voidptr, fdnum int, linux_buf u64) (u64, u64) {
 	// Neither the filesystem fill nor the checked conversion retains this scratch.
 	stat_storage := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
 	unsafe { *stat_storage = stat.Stat{} }
-	ret, err := fs.syscall_fstat(gpr_state, fdnum, stat_storage)
+	ret, err := fs.syscall_fstat(gpr_state, int(u32(fdnum)), stat_storage)
 	if err != 0 {
 		return ret, err
 	}

@@ -3733,3 +3733,88 @@ build inputs.
 Remote synchronization, actual automount triggers, extended statx fields,
 concurrent close/disk metadata, GNU wrappers and translated/ELF32 paths remain
 separate. The three broad section 15 acceptance gates remain open.
+
+## Native stat descriptor words and flag errors
+
+The native fstat adapters now consume the lower 32 bits of the descriptor.
+Both newfstatat adapters share descriptor/flag narrowing and validation before
+pathname, descriptor or output access. Unknown flags return EINVAL and leave
+writable output untouched. The 144-byte x86 and 128-byte ARM stat layouts,
+checked output copies, stack scratch and VFS descriptor owners stay unchanged.
+
+Linux 6.12 newfstatat accepts the sync selectors, including both bits together;
+the statx adapter still rejects that pair. A NULL pathname selects a descriptor
+only with exactly AT_EMPTY_PATH and a nonnegative signed descriptor word.
+Adding NO_AUTOMOUNT, NOFOLLOW or a sync bit keeps NULL's EFAULT behavior.
+Negative NULL descriptors, including AT_FDCWD, return EFAULT; invalid positive
+NULL descriptors return EBADF. Empty strings retain ordinary descriptor and
+current-directory behavior. The same native musl ELF verifies these distinctions
+on actual Linux 6.12.51 reference boots, alongside the
+[Linux stat implementation](https://raw.githubusercontent.com/torvalds/linux/v6.12/fs/stat.c).
+
+| Calls across root and UID/GID1000 | ARM calls | x86 calls | Baseline failures on each architecture | Candidate/reference failures |
+| --- | ---: | ---: | ---: | ---: |
+| Raw fstat descriptor/output controls | 108 | 108 | 48 | 0 |
+| Successful raw newfstatat metadata/word queries | 696 | 696 | 280 | 0 |
+| Unknown flags and NULL queries with extra flags | 2304 | 2304 | 1944 | 0 |
+| Lookup/output and x86 legacy stat/lstat controls | 192 | 264 | 18 | 0 |
+| Musl fstat/fstatat/stat/lstat controls | 24 | 24 | 2 | 0 |
+
+Each candidate and Linux reference passes all 3324 ARM or 3396 x86 calls;
+each baseline fails 2292. Three upper-word patterns and all 27 unknown flag
+bits exercise narrowing and precedence. Regular, unfollowed-link, unlinked
+and pipe descriptors return actual mode/inode/ownership/link-count/size/block
+fields matching fstat. Absolute and directory-relative lookups follow or retain
+symlinks as requested. Every call checks output canaries, and errors preserve
+the writable stat sentinel. File contents and the held cursor remain exact.
+The musl wrapper controls use non-NULL pathnames; NULL is qualified through
+raw syscalls because this musl wrapper dereferences its pathname.
+
+Both native candidates pass statabi, statx, open and runtime suites. Each
+200-cycle retention cohort performs 21 successful/refused calls per cycle
+after warmup and grace, with stable descriptors. All 18 ARM and 14 x86 live
+slab classes stay exact, as do 63/63 ARM and 160/160 x86 large pages, in both
+credential groups. Eight host test files and the generated inventory check
+pass. Allocation scans retain 658/654 source files and 403/292 sites with
+identical existing allowance refusals; no allowances change.
+
+The maintained [V reference controller](../tests/linux-compat/statabi-reference.v)
+boots the unchanged probe ELF with a caller-supplied Linux kernel. It freezes
+inputs, compiles a V exec wrapper, creates a newc archive in V and records the
+QEMU command/binary and wrapper/source/C/ELF/archive/serial hashes. The dated
+inputs are the same fixed Alpine 3.22.2 kernels used by the statx reference:
+both identify Linux 6.12.51. ARM uses macOS HVF; x86 uses TCG. `--reference`
+runs the identical semantic matrix while skipping Vinix-specific slab reads.
+
+The isolated kernel worktrees start at
+`8fc078a86a6cd540c80ef667d9335afaf7c0230e`, with only the three stat adapter
+sources changed. Replacing the two emitted adapter bodies and removing one
+shared helper declaration/body restores the whole baseline kernel C, ignoring
+only unused-loop source-offset identifiers. Statx, VFS snapshots and stat
+conversion bodies remain exact. The independent
+[lifetime review](../tests/linux-compat/results/2026-10-13/statabi-lifetime-review.md)
+checks stack borrows and descriptor release against source, generated C and
+actual native/Linux captures.
+
+The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/statabi-audit.v)
+requires exact baseline failures, candidate/reference outcomes, flat retention,
+source isolation, whole-C scope and artifact hashes. A deliberately failing
+assertion and a passing candidate supplied as baseline evidence both fail.
+[ARM evidence](../tests/linux-compat/results/2026-10-13/statabi-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/statabi-evidence-x86_64.json)
+bind all 63 isolated inputs and the compiler, controllers, source/C/kernel,
+ELF/ISO, Linux kernel/wrapper/archive/QEMU, captures, builds, audit and review.
+Captures:
+[ARM baseline](../tests/linux-compat/results/2026-10-13/statabi-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/statabi-after-aarch64.log),
+[ARM Linux](../tests/linux-compat/results/2026-10-13/statabi-reference-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/statabi-before-x86_64.log),
+[x86 candidate](../tests/linux-compat/results/2026-10-13/statabi-after-x86_64.log),
+[x86 Linux](../tests/linux-compat/results/2026-10-13/statabi-reference-x86_64.log).
+The initial fixture's invalid musl NULL-wrapper control and its failed native
+and Linux captures remain private. Public inventory fingerprints use the
+committed parent plus this fix, separately from the isolated semantic builds.
+
+Remote synchronization, automount triggers, concurrent close and disk metadata,
+GNU wrappers and translated/ELF32 paths remain separate. The three broad
+section 15 acceptance gates remain open.
