@@ -19,6 +19,8 @@
 //	session  the person at the machine without a password; anyone else as
 //	         `admin`
 //	self     any person, with their own password
+//	account  any ordinary account, identified by the kernel, without a
+//	         password; only for explicitly public, bounded service actions
 //
 // `param` lines say what the caller supplies, in order, after the fixed
 // arguments: `name` (an account name), `hostname`, `number`, `text` (one
@@ -38,6 +40,7 @@ pub enum AuthRule {
 	admin
 	session
 	self
+	account
 }
 
 pub enum ParamKind {
@@ -210,6 +213,7 @@ pub fn parse_action(name string, text string) !Action {
 					'admin' { AuthRule.admin }
 					'session' { AuthRule.session }
 					'self' { AuthRule.self }
+					'account' { AuthRule.account }
 					else { return error('line ${number + 1}: unknown auth rule "${value}"') }
 				}
 			}

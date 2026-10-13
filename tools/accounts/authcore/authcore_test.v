@@ -74,6 +74,7 @@ fn new_world() !World {
 		'restart':          'description = Restart the computer\nauth = session\nexec = /usr/sbin/vinix-system\narg = power\narg = restart\n'
 		'account-password': 'description = Change a password\nauth = admin\nexec = /usr/sbin/vinix-account\narg = passwd\nparam = name\ninput = secret\n'
 		'own-thing':        'description = Something of one\'s own\nauth = self\nexec = /bin/true\n'
+		'own-launch':       'description = Launch as the caller\nauth = account\nexec = /usr/sbin/vinix-session\narg = package-launch\ninput = secret\n'
 		'profile':          'description = Power profile\nauth = admin\nexec = /bin/true\nparam = choice:fast,quiet\nparam = number\n'
 		'fails':            'description = Fails\nauth = admin\nexec = /bin/false\n'
 		'broken':           'description = Broken\nauth = admin\nexec = /bin/true\nshell = yes\n'
@@ -177,6 +178,23 @@ fn test_info() ! {
 	os.chmod(w.env.session, 0o644)!
 	assert ask(w, w.sam, authproto.op_info).text(2) == '1'
 	assert ask(w, w.alex, authproto.op_info).text(2) == '0'
+}
+
+fn test_account_action_needs_only_a_known_ordinary_peer() ! {
+	w := new_world()!
+	for peer in [w.alex, w.sam] {
+		description := ask(w, peer, authproto.op_describe, 'own-launch')
+		assert description.code == authproto.status_ok && description.text(1) == '1' && description.text(2) == '0'
+		assert ask(w, peer, authproto.op_run, 'own-launch', '', 'nonce').code == authproto.status_ok
+		assert ran().contains('|${peer.uid}|/usr/sbin/vinix-session package-launch|nonce')
+	}
+	for peer in [w.greet, Peer{ uid: 4242 }] {
+		assert ask(w, peer, authproto.op_run, 'own-launch', '', 'nonce').code == authproto.status_denied
+		assert ran() == ''
+	}
+	assert ask(w, w.sam, authproto.op_run, 'own-launch', '', 'nonce', 'alex').code == authproto.status_invalid
+	assert ran() == ''
+	assert ask(w, w.sam, authproto.op_run, 'account-password', '', 'nonce', 'alex').code == authproto.status_denied
 }
 
 fn test_verify_rules() ! {

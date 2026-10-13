@@ -47,6 +47,14 @@ same IDs/capabilities as a normal session, and waits for the command. It does
 not acquire the hardware seat. Normal sessions retain their account groups.
 The package service uses this profile for its configured `launch_user`.
 
+Ordinary desktops keep their account memberships. Package launches from those
+sessions use the fixed `packages-launch` action (`auth = account`): the kernel
+identifies the caller, and `vinix-session package-launch` runs only the installed
+package CLI with that account's isolated profile. The helper and supervisor drop
+root; existing stdin/stdout/stderr descriptors preserve native-window and terminal
+I/O. No password or account selection is involved. See
+[qualification](../../tests/packages/isolated-launch-check.md).
+
 ## Adding an action
 
 Write a file in `actions/` (the format is at the top of

@@ -18,6 +18,8 @@
 //	  password if the action says `session`; to a member of the admin group
 //	  with their own password; and, if it says `self`, to anyone with their
 //	  own password. To nobody else, and never with someone else's password.
+//	  An explicit `account` action uses a known ordinary peer without a
+//	  password; its fixed program must bound the public operation itself.
 //	- Every decision is written to the log, with who asked.
 module authcore
 
@@ -283,6 +285,7 @@ fn (env Env) may_run(db accountcore.Database, peer Peer, user accountcore.User, 
 		return false, false
 	}
 	match action.auth {
+		.account { return true, false }
 		.self {
 			return true, true
 		}

@@ -1,0 +1,5 @@
+description = Launch an installed application as the calling account without account groups
+auth = account
+exec = /usr/sbin/vinix-session
+arg = package-launch
+input = secret

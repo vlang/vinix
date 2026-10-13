@@ -95,12 +95,14 @@ fn stage() ! {
 	}
 	os.chmod(staging + '/etc/vinix-packages', 0o755)!
 	os.mkdir_all(staging + '/usr/share/vinix/actions')!
-	// An ordinary desktop authenticates only this fixed reviewed-operation
-	// action. Preserve administrator-owned overrides when upgrading an image.
-	action := staging + '/usr/share/vinix/actions/packages-change'
-	if !os.exists(action) && !os.is_link(action) {
-		os.cp(repository + '/tools/accounts/actions/packages-change', action)!
-		os.chmod(action, 0o644)!
+	// Fixed actions separate reviewed administration from own-account launch
+	// isolation. Preserve administrator-owned overrides when upgrading an image.
+	for name in ['packages-change', 'packages-launch'] {
+		action := staging + '/usr/share/vinix/actions/' + name
+		if !os.exists(action) && !os.is_link(action) {
+			os.cp(repository + '/tools/accounts/actions/' + name, action)!
+			os.chmod(action, 0o644)!
+		}
 	}
 	config := pkgcore.load_config(staging)!
 	if config.architecture != architecture {

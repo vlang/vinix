@@ -32,6 +32,16 @@ Application launches, private-data operations and publisher tools stay outside
 this administrative interface. Full ordinary-user graphical login/application
 launch qualification remains a separate release gate.
 
+Ordinary-account application launches now use a separate fixed `packages-launch`
+action when account memberships need stripping. It asks for no password and
+selects only the kernel-authenticated caller, re-executing the installed package
+CLI after the checked isolated identity transition. Existing standard streams
+travel as descriptors, preserving native-window input/output and terminal I/O.
+The completion supervisor also drops privileges. Package trust, policy, payload
+and generation-lease admission repeat as the ordinary user. See
+[launch qualification](../tests/packages/isolated-launch-check.md); a full graphical
+login/display workflow remains a release requirement.
+
 The [pinned catalog builder](../tools/packages/SDK.md#build-a-pinned-application-catalog)
 assembles a complete publisher workspace atomically from reviewed prepared-root
 recipes and file inventories. It checks every declared target/version and runtime

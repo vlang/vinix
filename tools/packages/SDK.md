@@ -688,6 +688,33 @@ The chosen account cannot come from a package, an argument or an environment
 variable. This profile does not acquire the hardware seat; display/audio runtimes
 still require broker qualification. An ordinary caller uses its own identity.
 
+Ordinary login sessions retain their account memberships. If the package CLI
+finds supplementary groups, every launch mode automatically uses the fixed
+`packages-launch` action with `auth = account`. The authentication service checks
+the kernel peer's ordinary account without requesting a password. The root-only
+`vinix-session package-launch` helper loads that same account from the trusted
+database and accepts only `run`, `run-terminal`, `run-window`, `run-args` or
+`run-terminal-args` for a valid installed-package ID. No selected identity,
+executable, environment, root directory or administrative operation is accepted.
+The root-desktop `launch_user` setting never overrides an ordinary caller.
+
+A random 128-bit invitation connects both sides through the existing private
+runtime transport, with root/caller peer checks. The canonical bounded request
+travels on that socket; its 512 KiB encoded limit preserves the full 64 KiB
+literal-command contract, including JSON escaping. The fixed action's input is
+only the 32-digit invitation. Three SCM_RIGHTS descriptors carry the caller's
+existing stdin/stdout/stderr, without combining diagnostics and native frames or
+replacing a terminal with a pipe. Additional/missing rights fail and are closed.
+The child starts the ordinary isolated session before package admission; the
+completion supervisor also drops root and all account groups before waiting.
+The helper reads only protected public passwd/group metadata; no shadow records
+enter the application session or the supervisor that sheds root.
+Its final receipt binds the nonce, canonical request digest and exit code, with
+EOF required. Missing/malformed completion is failure. No launcher grant is
+cached, and a missing/refused action fails closed with account-tool diagnostics.
+Callers already without supplementary groups retain the direct launch path.
+See [ordinary-account launch qualification](../../tests/packages/isolated-launch-check.md).
+
 Launch reads trust/policy under the package reader lock and acquires its generation
 lease before releasing that lock. The ordinary child repeats this admission check
 after the credential handoff. Later revocation prevents new launches; an already

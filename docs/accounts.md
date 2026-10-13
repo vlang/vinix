@@ -127,9 +127,18 @@ and who may ask:
 | `admin` | An administrator, with their own password. |
 | `session` | The person at the machine, without a password; anyone else as `admin`. |
 | `self` | Any person, with their own password. |
+| `account` | A known ordinary account, identified by its kernel peer credentials, without a password. Only explicitly public bounded actions should use this rule. |
 
 Root is always allowed and never asked. Nobody is ever allowed with someone
 else's password, and accounts that are not people's are allowed nothing.
+
+The shipped `account` action is `packages-launch`: it starts only the installed
+package service as the caller's own account, with all supplementary groups and
+capabilities removed. It accepts no command-line parameters or selected account,
+and repeats package trust, policy and payload admission as that ordinary user.
+Its private socket accepts exactly the caller's three existing standard streams;
+both the application session and its completion supervisor drop root before work.
+See [launch qualification](../tests/packages/isolated-launch-check.md).
 
 A caller's argument must be what its `param` line says -- an account `name`,
 a `hostname`, a `number`, one line of printable `text` that does not start

@@ -5,6 +5,12 @@ support a disposable `--root /absolute/root`. Launch uses the real root and an
 ordinary identity. The root desktop can hand off to an administrator-configured
 `launch_user` through the isolated account session runner.
 
+An ordinary caller with account groups automatically uses the fixed
+`packages-launch` account action to strip them before launch. It preserves the
+caller's identity and existing standard streams, including terminals and native
+window events. The installed service rechecks package admission after that
+handoff. See [ordinary launch qualification](../../tests/packages/isolated-launch-check.md).
+
 Both desktop builders use the existing native security-tools staging path.
 Standalone staging and qualification are also available:
 

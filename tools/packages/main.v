@@ -8,6 +8,7 @@ import crypto.rand
 import authclient
 import authproto
 import tools.packages.pkgadmin
+import tools.packages.pkglaunch
 import tools.packages.pkgcore
 import tools.packages.pkgprotocol
 
@@ -78,6 +79,14 @@ fn checked(arguments []string) !int {
 		return error('--progress supports update, install/remove/upgrade, apply, deploy/deployment-apply, rollback and mirror/mirror-apply/mirror-deployment-apply without --json')
 	}
 	names := args[1..].clone()
+	if command in ['run', 'run-terminal', 'run-window', 'run-args', 'run-terminal-args'] && os.geteuid() != 0 {
+		if root != '' { return error('application launch does not support an alternate installation root') }
+		if offline || as_json || progress { return error('application launches use the real root without administration/output options') }
+		if command in ['run-terminal', 'run-terminal-args'] && (C.isatty(0) != 1 || C.isatty(1) != 1) {
+			return error('terminal launch requires terminal standard input and output')
+		}
+		if pkglaunch.needs_isolation()! { return pkglaunch.run(args) }
+	}
 	if command in ['admin', 'admin-authorize'] {
 		if root != '' || offline || as_json || progress { return error('administrator transport options follow admin, and cannot select another root') }
 		if command == 'admin' { return admin_client(names) }
