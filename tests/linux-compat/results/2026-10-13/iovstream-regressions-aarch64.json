@@ -1,0 +1,103 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "c49d75f2ab092e97d3c6c9d9b8e54b30e610619d29a8c686bb311382c36a7381",
+    "results": [
+        {
+            "name": "iovstream",
+            "source_sha256": "230427a524b234d9a1af82c112d01e796b8bd828be262d9666a5d5d7028d9289",
+            "init_sha256": "f06533990013e1ea7a22c6058ce662d5d36efe8e5cbf66b3bb1090a918b28305",
+            "iso_sha256": "04b01c29834cdaab50eba970f233650b0349bdf2692cc38380899247dc2b9592",
+            "exit_code": 1,
+            "detail": ""
+        },
+        {
+            "name": "iovfd",
+            "source_sha256": "03355eb1560fd5502f6cd347aade5c8b5d7c010efc98115f41e2aeca8ab10724",
+            "init_sha256": "78b46d1af1286f373c94111fbb100999d89e3c7c1d581f48e46a1db5032dc1a7",
+            "iso_sha256": "b1ff823761761d10915d8d4772922686e9f926757fefce1e17f8a6634c70b5db",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovflags",
+            "source_sha256": "6f078e2a0eadfdac70fa87426d50348ded177356d7931aa1a01c02547d9c8567",
+            "init_sha256": "048e20298ada467bdeb53b562a5d521ee74af49bff57e10c0370eca55fb10c32",
+            "iso_sha256": "7d2bc86fd405bd8d9192839332191b9458fc6c8ce4d0566c841c5527879cb8f9",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovposition",
+            "source_sha256": "7291e5e38e16fa2b3fa99392bdf68361a7315c5232a23cb421c9d6d654756770",
+            "init_sha256": "bbe994371c48d7b471b51e96e83b78057aa9f6d429410320fd3689dccf045fd7",
+            "iso_sha256": "55637b3fcfc676ee7623fba92dd1742292ad881aafd917b4213cbc8df67e244d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovoffset",
+            "source_sha256": "1c3c52db711f413f511e41355b1ebfc2e4b376949af10fe106cab3afcc5560f7",
+            "init_sha256": "d26ee3a8501337aef1fd8b5e30af24caedcba27fe6d7f1d56e9300c073342373",
+            "iso_sha256": "29141a2691b048537be9274e87621eb697f01c984ade5682fb37fe7f55802ecd",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovrange",
+            "source_sha256": "a19883facc6f1fc864e6f5ba6998e2d8451ee752bd4dcce37614fff6a2c6e902",
+            "init_sha256": "b3d2a0cdd3ce63a18587e804bf6e69572ca7d66e00977ef864eeb5a43d1a9b92",
+            "iso_sha256": "e67de8ce8516daa6a32a3468db1fdd5a32ac638ab94f3a4414b5871cfcea4cee",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovimport",
+            "source_sha256": "9184cb47eb30f02eceb99d6e4400b6f43abdc15611db6ac6592b3f646949fdef",
+            "init_sha256": "69542224bae105362c6c7968318e0bcb1eff2cfc69f88d48ceba098efc4dbc72",
+            "iso_sha256": "cdb6f96af98122c3c5966a3585c3285472cc11e163a02a194f18abea7db000a6",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "iovpin",
+            "source_sha256": "3a4e4decb1c124fcf4470a94e5fd3a7d4efb31767abef4bb2a71b9164be2df61",
+            "init_sha256": "fb4814af34504168bd5081eae7bcf9f4f0ece10fbab243ad96157cea01bb53ac",
+            "iso_sha256": "866a82db2e53587624cebba3671a3573e30f1a64a2d71fc0c1fa8983250cced5",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pathio",
+            "source_sha256": "28a7d58e04956b559c2024bcf6a3c081a770982a357724b7f52a54c536720d16",
+            "init_sha256": "48bf8c1b2a50662dfe0f1c976cb1b0884776ba756486cbf5ff95596890df79d0",
+            "iso_sha256": "ab915e5de2fd749c74bafaf0cb1711685fd5d600da6ba31409675ffa5b11de67",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "readerror",
+            "source_sha256": "f9d31a081f68f7de6f75651da8b10389202b2457e2bda232a45141ac1369ea64",
+            "init_sha256": "effe25b84eb5a0d81f390dd413f7271bd0b5eb088dffb361ce55b1899f221d11",
+            "iso_sha256": "856eb3fc23da46a18989395274afad933435b61d7ab6f8b6318bfe6f4b7b2b8d",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pipezero",
+            "source_sha256": "45e03f2ebcc0806aba964d20b1e9ba0f89910264ad92f0c991687e1e41d34c96",
+            "init_sha256": "b28904aa9745a499fafc34d8b05c83500b13bac595c2385fe629a8c7dd65e675",
+            "iso_sha256": "ed3baafa1a7ef6d6be04ed3baa4a6593515a437409c0c0c7e238c827d0b75b03",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "a27160c033a470689dafc283d37636bb5b81b1344d19e93a2c6071701187e44b",
+            "iso_sha256": "ff7637cc32c1fa9fbfa266454e2491ab2689c2c4fe6f2e36de158d2e19f1862d",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

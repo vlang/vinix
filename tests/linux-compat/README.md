@@ -134,6 +134,24 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `iovstream` case checks 220 pipe/UNIX stream/datagram/seqpacket probes in
+each root and UID/GID1000 child, using native readv and preadv2 at -1 with
+2/8/9/513/1024-entry imports. It checks full/truncated records, untouched next
+messages, available data returning while the writer stays open, empty vectors,
+the existing first-destination error precheck and complete 1MiB records. The
+blocking probe joins its worker after a late delivery if the call waits for
+another record; it never unwinds borrowed storage before the join. Two
+200-cycle cohorts reuse endpoint pairs and a payload mapping, checking valid,
+empty, invalid-count and EAGAIN callback cleanup with flat slab/big-page counts.
+An earlier resource-churn stress hit the separate 4096-socket object limit
+before grace retirement; those diagnostic failures remain published. The
+`iovimport` checkpoint now counts active receive/vector reservations and passes
+both old and fixed kernels. First-destination queue preservation is existing
+Vinix behavior; Linux datagram copy faults consume the packet. Later faults,
+partial-copy counts, Internet/netlink/character-device paths, allocator
+exhaustion and foreign ABIs remain separate qualification. See
+[the report](../../docs/linux-posix-qualification.md#native-stream-vector-receives).
+
 The `iovflags` case checks 1,540 native preadv2/pwritev2 cases in each root
 and UID/GID 1000 child. Unknown low flag bits must follow negative-offset,
 descriptor/access/seek, header/count/range and explicit-position overflow

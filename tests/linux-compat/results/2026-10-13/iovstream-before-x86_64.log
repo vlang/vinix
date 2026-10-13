@@ -1,0 +1,236 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 51  248k   51  127k    0     0   147k      0  0:00:01 --:--:--  0:00:01  147k100  248k  100  248k    0     0   285k      0 --:--:-- --:--:-- --:--:--  285k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 31 2880k   31  906k    0     0   977k      0  0:00:02 --:--:--  0:00:02  977k100 2880k  100 2880k    0     0  1803k      0  0:00:01  0:00:01 --:--:-- 1804k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  47591      0 --:--:-- --:--:-- --:--:-- 47527
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   350k      0 --:--:-- --:--:-- --:--:--  350k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  94479      0 --:--:-- --:--:-- --:--:-- 94407
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   316k      0 --:--:-- --:--:-- --:--:--  316k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/before-final-x86/iovstream/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/before-final-x86/iovstream/.vinix-amd64.iso.4B6kFX'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 11.2g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/before-final-x86/iovstream/iso-build/.iso-staging.VE3MH8/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13491 sectors
+Written to medium : 13491 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/before-final-x86/iovstream/.vinix-amd64.iso.4B6kFX' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2cb.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/before-final-x86/iovstream/test.iso (27629568 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/before-final-x86/iovstream
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=85152
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000038083200
+initramfs: Done (9 entries)
+LINUX IOVSTREAM DETAIL: kind=0 version=0 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=0 version=1 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=1 version=0 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=1 version=1 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=2 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=2 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=2 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=8 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=8 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=8 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=9 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=9 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=9 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=513 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=513 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=513 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=1024 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=1024 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=1024 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=2 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=2 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=2 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=8 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=8 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=8 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=9 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=9 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=9 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=513 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=513 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=513 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=1024 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=1024 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=1024 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=2 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=2 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=2 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=8 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=8 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=8 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=9 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=9 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=9 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=513 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=513 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=513 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=1024 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=1024 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=1024 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=2 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=2 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=2 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=8 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=8 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=8 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=9 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=9 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=9 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=513 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=513 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=513 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=1024 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=1024 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=1024 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM LARGE: kind=2 version=0 count=3 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=0 count=9 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=0 count=1024 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=1 count=3 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=1 count=9 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=1 count=1024 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=0 count=3 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=0 count=9 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=0 count=1024 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=1 count=3 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=1 count=9 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=1 count=1024 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM OUTCOMES: ordinary=1 cases=220 failures=80
+LINUX IOVSTREAM DETAIL: kind=0 version=0 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=0 version=1 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=1 version=0 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=1 version=1 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=2 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=2 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=2 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=8 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=8 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=8 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=9 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=9 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=9 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=513 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=513 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=513 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=1024 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=1024 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=0 count=1024 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=2 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=2 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=2 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=8 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=8 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=8 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=9 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=9 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=9 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=513 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=513 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=513 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=1024 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=1024 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=2 version=1 count=1024 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=2 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=2 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=2 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=8 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=8 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=8 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=9 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=9 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=9 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=513 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=513 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=513 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=1024 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=1024 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=0 count=1024 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=2 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=2 variant=1 early=0 result=4/0 expected=2/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=2 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=2 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=8 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=8 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=8 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=9 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=9 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=9 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=513 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=513 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=513 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=1024 variant=0 early=1 result=2/0 expected=2/0 bytes=41,58,00,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=1024 variant=2 early=1 result=3/0 expected=4/0 bytes=41,58,59,00
+LINUX IOVSTREAM DETAIL: kind=3 version=1 count=1024 variant=3 early=1 result=3/0 expected=3/0 bytes=41,58,59,00
+LINUX IOVSTREAM LARGE: kind=2 version=0 count=3 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=0 count=9 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=0 count=1024 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=1 count=3 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=1 count=9 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=2 version=1 count=1024 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=0 count=3 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=0 count=9 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=0 count=1024 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=1 count=3 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=1 count=9 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM LARGE: kind=3 version=1 count=1024 result=524288/0 expected=1048576/0
+LINUX IOVSTREAM OUTCOMES: ordinary=0 cases=220 failures=80
+LINUX IOVSTREAM FAIL: record boundaries, available data or storage
+QEMU: Terminated
+Missing verdicts: ['LINUX IOVSTREAM: PASS']; failures: ['FAIL:', 'LINUX IOVSTREAM FAIL']
+Linux compatibility qualification failed; see /private/tmp/vinix-iovstream-1013/before-final-x86/receipt.json

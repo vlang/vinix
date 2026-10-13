@@ -840,6 +840,10 @@ fn linux_readv_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) (
 		fd.handle.mac_check(proc.mac_read) or { return errno.err, errno.get() }
 		return errno.err, errno.eopnotsupp
 	}
+	mode := fd.handle.resource.stat.mode
+	if stat.isifo(mode) || stat.issock(mode) || mode & stat.ifmt == stat.ifpipe {
+		return linux_readv_stream(mut fd, vector, iovcnt)
+	}
 
 	mut total := u64(0)
 	for i := 0; i < iovcnt; i++ {
@@ -860,6 +864,44 @@ fn linux_readv_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) (
 		}
 	}
 	return total, 0
+}
+
+// A pipe/socket read supplies one available piece or one complete record.
+// Reading again for a later iovec can wait after receiving data, discard a
+// record's tail, or consume the next record. Keep the imported vector and FD
+// borrowed while one bounded receive is scattered into its destinations.
+fn linux_readv_stream(mut fd file.FD, vector LinuxIOVector, count int) (u64, u64) {
+	for i := 0; i < count; i++ {
+		iov := unsafe { vector.data[i] }
+		if iov.len == 0 { continue }
+		// Preserve scalar stream reads' initial destination check.
+		if !usercopy.writable(iov.base) { return errno.err, errno.efault }
+		break
+	}
+	size := if vector.total < u64(1024 * 1024) { vector.total } else { u64(1024 * 1024) }
+	reservation := vmstorage.allocation_bytes(size) or { return errno.err, errno.enomem }
+	charge := proc.reserve_kernel(.scratch, reservation) or { return errno.err, errno.get() }
+	defer { kbudget.release(charge) }
+	buffer := memory.malloc_packed_fallible(size) @[freed]
+	if buffer == unsafe { nil } { return errno.err, errno.enomem }
+	defer {
+		krandom.explicit_bzero(buffer, usize(size))
+		unsafe { free(buffer) }
+	}
+	ret, err := fs.read_pinned_descriptor(mut fd, buffer, size, false)
+	if err != 0 { return ret, err }
+	mut copied := u64(0)
+	for i := 0; i < count && copied < ret; i++ {
+		iov := unsafe { vector.data[i] }
+		length := if iov.len < ret - copied { iov.len } else { ret - copied }
+		if length == 0 { continue }
+		if !usercopy.copy_to_user(iov.base, voidptr(u64(buffer) + copied), length) {
+			if copied != 0 { return copied, 0 }
+			return errno.err, errno.efault
+		}
+		copied += length
+	}
+	return copied, 0
 }
 
 const grnd_nonblock = 0x0001

@@ -2145,3 +2145,92 @@ This qualification covers these native vector descriptor words. Scalar and
 other FD APIs, GNU wrappers, ELF32/translated variants, deterministic
 positioned races, shared-offset atomicity and allocation exhaustion remain
 separate work. The three broad section-15 gates stay open.
+
+## Native stream-vector receives
+
+Native readv and preadv2 at offset -1 previously read each nonempty iovec
+separately. A two-byte UNIX datagram split across one-byte destinations could
+return the first byte of that record and the first byte of the next one,
+discarding both tails. A blocking pipe or socket read could receive all
+available data in its first destination, then wait for more input for the
+second destination while the writer remained open.
+
+Pipe/socket vectors now use one receive of at most 1MiB, then scatter that
+piece across the imported destinations. The consuming syscall retains its
+single FD and immutable vector owner. The receive helper borrows both, reserves
+the allocator's actual slab/page geometry, uses a fallible allocation, and
+erases/frees its buffer before releasing its reservation on every post-allocation
+return. No new offset lock is held across a blocking stream callback.
+Regular files and character devices retain their existing paths.
+
+[Linux v6.12 UNIX receives](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/net/unix/af_unix.c)
+copy a selected datagram to the complete iterator and retire that record;
+[pipe reads](https://raw.githubusercontent.com/torvalds/linux/v6.12/fs/pipe.c)
+return received data when the queue empties. The regression covers this
+valid-transfer behavior, separately from the destination-fault limits below.
+
+The V `iovstream` fixture checks 220 cases in each root and UID/GID1000 child
+on both native architectures. readv and preadv2 at -1 use 2/8/9/513/1024-entry
+imports across pipes and UNIX stream/datagram/seqpacket sockets. Checks cover
+complete records, truncation, untouched next messages, available-data returns
+with the writer open, valid empty vectors, the existing first-destination
+precheck and complete 1MiB records. Blocking probes release a stuck baseline
+with late input before joining its worker; its borrowed storage remains live.
+Unchanged kernels fail 80 checks per cohort: 60 mixed/truncated-record cases,
+eight blocking available-data cases and 12 large-record cases. Fixed kernels
+pass all 440 checks per architecture.
+
+Two 200-cycle cohorts retain identical live slab objects and big pages:
+**212/212 ARM and 725/725 x86**. Stable endpoint pairs and one payload mapping
+isolate receive/import storage; each cycle exercises stack/heap imports,
+empty/count errors, EAGAIN callback cleanup and full 1MiB record receives.
+The first retention stress instead created thousands of endpoint pairs before
+their grace periods elapsed. Both diagnostic runs reach `socket 4096 33554432`
+with `LastDenied: objects` / `LastDeniedKind: socket`. That failed stress and
+the initial candidate aggregate receipts remain published. The corrected
+stream-only reruns pass; their complete generated fixture C is identical on
+both kernels and architectures, without hidden heap promotions.
+
+Eleven other guest cases pass on both candidates: `iovfd`, `iovflags`,
+`iovposition`, `iovoffset`, `iovrange`, `iovimport`, `iovpin`, `pathio`,
+`readerror`, `pipezero` and `runtime`. Their success rows remain in the initial
+aggregate receipts alongside its failed old stream-retention case; that
+aggregate has not been relabeled as passing. The `iovimport` checkpoint now
+counts active vector/receive reservations to prove that import completed,
+and passes on both unchanged kernels too. Eight host tests, mapping geometry
+checks and both kernel builds pass. The existing allocation allowance failures
+remain **406 ARM / 295 x86**, with identical `NEW:` rows and no allowance increase.
+
+Fresh AArch64 `ops,churn,cache` comparisons use the same cached archive,
+extracted desktop and V controller. All 36 200-operation rows retain zero
+bytes before/after. All four 300-process candidate churn rows remain flat.
+Baseline curl retains one 16KiB size-32 slab page with **zero additional live
+objects**; the other three baseline rows remain flat. This capacity difference
+is preserved in the receipts and does not establish a performance improvement.
+The 32MiB cache workload reports 20MiB used growth and 16MiB cached. Candidate
+idle/apps/drag pass their five-second samples; the seven-process app screenshot
+was inspected. These checks do not qualify x86 desktop performance or Linux
+application installation/lifecycle.
+
+The [ARM evidence](../tests/linux-compat/results/2026-10-13/iovstream-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/iovstream-x86_64-evidence.json),
+[performance evidence](../tests/linux-compat/results/2026-10-13/iovstream-performance-evidence.json)
+and [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/iovstream-audit.v)
+bind raw logs, frozen source/init/image hashes, kernel binaries, generated C,
+the clean `f6358ecff9` compiler and both executed failing controls. Private
+trees pin `bced1c4ec`; only `linux_common.v` differs. The tested copy also
+retains two concurrent erase-before-free additions in existing writev/sendfile;
+those independently owned hunks are excluded from this fix's commit.
+Its existing writev C is otherwise identical, and all six syscall wrappers
+remain identical. Qualification fingerprints identify these isolated inputs,
+separately from concurrent shared-checkout changes. The initial bare fixture
+compile failure (`v_fixed_index`) is retained; it was corrected before runtime
+qualification. Independent review found no new lifetime blocker.
+
+The first inaccessible destination retains Vinix's existing queue-preserving
+precheck. Linux datagram copy faults retire the selected packet instead, so
+that error path remains a known divergence. Later destination-page faults,
+within-iovec copied-prefix reporting and queue rollback require further work.
+GNU wrappers, foreign/translated ABIs, Internet/netlink/character-device paths,
+shared regular-file offset atomicity and allocator exhaustion remain unqualified.
+The three broad section-15 gates remain open.

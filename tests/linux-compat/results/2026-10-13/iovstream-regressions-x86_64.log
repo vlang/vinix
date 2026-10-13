@@ -1,0 +1,1158 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   392k      0 --:--:-- --:--:-- --:--:--  392k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 66 2880k   66 1915k    0     0  1757k      0  0:00:01  0:00:01 --:--:-- 1757k100 2880k  100 2880k    0     0  2118k      0  0:00:01  0:00:01 --:--:-- 2117k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  41502      0 --:--:-- --:--:-- --:--:-- 41564
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   394k      0 --:--:-- --:--:-- --:--:--  394k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   101k      0 --:--:-- --:--:-- --:--:--  102k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   204k      0 --:--:-- --:--:-- --:--:--  204k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/iovstream/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovstream/.vinix-amd64.iso.J7iECX'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 17.6g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/iovstream/iso-build/.iso-staging.rlA6PL/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13496 sectors
+Written to medium : 13496 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovstream/.vinix-amd64.iso.J7iECX' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2df.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/iovstream/test.iso (27639808 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/iovstream
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80880
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91000
+initramfs: Done (9 entries)
+LINUX IOVSTREAM OUTCOMES: ordinary=1 cases=220 failures=0
+LINUX IOVSTREAM OUTCOMES: ordinary=0 cases=220 failures=0
+LINUX IOVSTREAM FAIL: record boundaries, available data or storage
+QEMU: Terminated
+Missing verdicts: ['LINUX IOVSTREAM: PASS']; failures: ['FAIL:', 'LINUX IOVSTREAM FAIL']
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 16  248k   16 42153    0     0   138k      0  0:00:01 --:--:--  0:00:01  138k100  248k  100  248k    0     0   559k      0 --:--:-- --:--:-- --:--:--  558k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 27 2880k   27  778k    0     0   912k      0  0:00:03 --:--:--  0:00:03  912k100 2880k  100 2880k    0     0  1945k      0  0:00:01  0:00:01 --:--:-- 1947k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 37 22528   37  8427    0     0  26378      0 --:--:-- --:--:-- --:--:-- 26334100 22528  100 22528    0     0  65952      0 --:--:-- --:--:-- --:--:-- 65871
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   423k      0 --:--:-- --:--:-- --:--:--  423k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   123k      0 --:--:-- --:--:-- --:--:--  124k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   301k      0 --:--:-- --:--:-- --:--:--  301k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/iovfd/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovfd/.vinix-amd64.iso.1wMa41'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 17.0g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/iovfd/iso-build/.iso-staging.ypoDHF/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13493 sectors
+Written to medium : 13493 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovfd/.vinix-amd64.iso.1wMa41' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2d3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/iovfd/test.iso (27633664 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/iovfd
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=74968
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX IOVFD OUTCOMES: ordinary=1 cases=3080 failures=0
+LINUX IOVFD SLAB: ordinary=1 size=16 live=1623/1623 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=32 live=2876/2876 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=64 live=153/153 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=192 live=374/374 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=256 live=787/787 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=384 live=546/546 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=512 live=494/494 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=1536 live=13/13 cycles=200
+LINUX IOVFD SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX IOVFD STORAGE: ordinary=1 cycles=200 big_pages=210/210 PASS
+LINUX IOVFD OUTCOMES: ordinary=0 cases=3080 failures=0
+LINUX IOVFD SLAB: ordinary=0 size=16 live=1623/1623 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=32 live=2876/2876 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=64 live=153/153 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=192 live=374/374 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=256 live=787/787 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=384 live=546/546 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=512 live=494/494 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=1536 live=13/13 cycles=200
+LINUX IOVFD SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX IOVFD STORAGE: ordinary=0 cycles=200 big_pages=210/210 PASS
+LINUX IOVFD PASS: root/UID1000 native readv/writev/preadv/pwritev/preadv2/pwritev2 use low32 descriptor bits; high patterns preserve valid I/O and descriptor/access/seek/import/negative-offset errors without altering data/cursors/queues on refusal; full-width vector counts remain invalid; repeated fast/heap/error imports release storage
+LINUX IOVFD: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   651k      0 --:--:-- --:--:-- --:--:--  652k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 94 2880k   94 2733k    0     0  2335k      0  0:00:01  0:00:01 --:--:-- 2334k100 2880k  100 2880k    0     0  2430k      0  0:00:01  0:00:01 --:--:-- 2430k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  68825      0 --:--:-- --:--:-- --:--:-- 68892
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   462k      0 --:--:-- --:--:-- --:--:--  463k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   146k      0 --:--:-- --:--:-- --:--:--  146k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   351k      0 --:--:-- --:--:-- --:--:--  351k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/iovflags/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovflags/.vinix-amd64.iso.lAE75N'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 16.7g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/iovflags/iso-build/.iso-staging.dkc7wJ/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13493 sectors
+Written to medium : 13493 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovflags/.vinix-amd64.iso.lAE75N' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2d3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/iovflags/test.iso (27633664 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/iovflags
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75000
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX IOVFLAGS OUTCOMES: ordinary=1 cases=1540 failures=0
+LINUX IOVFLAGS SLAB: ordinary=1 size=16 live=1623/1623 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=32 live=2876/2876 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=64 live=153/153 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=192 live=374/374 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=256 live=787/787 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=384 live=546/546 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=512 live=494/494 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=1536 live=13/13 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX IOVFLAGS STORAGE: ordinary=1 cycles=200 big_pages=186/186 PASS
+LINUX IOVFLAGS OUTCOMES: ordinary=0 cases=1540 failures=0
+LINUX IOVFLAGS SLAB: ordinary=0 size=16 live=1623/1623 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=32 live=2876/2876 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=64 live=153/153 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=192 live=374/374 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=256 live=787/787 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=384 live=546/546 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=512 live=494/494 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=1536 live=13/13 cycles=200
+LINUX IOVFLAGS SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX IOVFLAGS STORAGE: ordinary=0 cycles=200 big_pages=186/186 PASS
+LINUX IOVFLAGS PASS: root/UID1000 native preadv2/pwritev2 validate offsets, descriptors, access, seek and imported vectors before unknown flag errors; empty valid vectors succeed without I/O; unknown nonempty requests preserve data/cursors/queues; high flag bits are ignored and flags0 preserve I/O; repeated fast/heap/error imports release storage
+LINUX IOVFLAGS: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   381k      0 --:--:-- --:--:-- --:--:--  381k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 2880k  100 2880k    0     0  2440k      0  0:00:01  0:00:01 --:--:-- 2442k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  44861      0 --:--:-- --:--:-- --:--:-- 44787
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  2  207k    2  5615    0     0  10376      0  0:00:20 --:--:--  0:00:20 10359100  207k  100  207k    0     0   312k      0 --:--:-- --:--:-- --:--:--  312k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  93944      0 --:--:-- --:--:-- --:--:-- 94045
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   222k      0 --:--:-- --:--:-- --:--:--  222k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/iovposition/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovposition/.vinix-amd64.iso.bdx8fl'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 15.4g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/iovposition/iso-build/.iso-staging.o8ogsP/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13496 sectors
+Written to medium : 13496 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovposition/.vinix-amd64.iso.bdx8fl' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2df.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/iovposition/test.iso (27639808 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/iovposition
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=79976
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX IOVPOSITION ADDRESS: user_limit=72057594037927936 last_page=mapped next_page=refused
+LINUX IOVPOSITION LIMIT: v=0 page=4096 max_rw_count=2147479552 checks=14 PASS
+LINUX IOVPOSITION LIMIT: v=1 page=4096 max_rw_count=2147479552 checks=14 PASS
+LINUX IOVPOSITION OUTCOMES: ordinary=1 descriptor=192/0 sentinel=48/0 range=100/0 normal=20/0 partial=4/0 overflow=4/0 limit_checks=28 failed_limit_groups=0
+LINUX IOVPOSITION SLAB: ordinary=1 size=16 live=1621/1621 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=32 live=2880/2880 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=64 live=154/154 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=192 live=374/374 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=256 live=788/788 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=384 live=547/547 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=512 live=495/495 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=1536 live=14/14 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX IOVPOSITION STORAGE: ordinary=1 cycles=200 big_pages=168/168 PASS
+LINUX IOVPOSITION ADDRESS: user_limit=72057594037927936 last_page=mapped next_page=refused
+LINUX IOVPOSITION LIMIT: v=0 page=4096 max_rw_count=2147479552 checks=14 PASS
+LINUX IOVPOSITION LIMIT: v=1 page=4096 max_rw_count=2147479552 checks=14 PASS
+LINUX IOVPOSITION OUTCOMES: ordinary=0 descriptor=192/0 sentinel=48/0 range=100/0 normal=20/0 partial=4/0 overflow=4/0 limit_checks=28 failed_limit_groups=0
+LINUX IOVPOSITION SLAB: ordinary=0 size=16 live=1621/1621 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=32 live=2880/2880 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=64 live=154/154 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=192 live=374/374 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=256 live=788/788 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=384 live=547/547 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=512 live=495/495 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=1536 live=14/14 cycles=200
+LINUX IOVPOSITION SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX IOVPOSITION STORAGE: ordinary=0 cycles=200 big_pages=168/168 PASS
+LINUX IOVPOSITION PASS: root/UID1000 native positioned vectors check descriptor/access/seek before headers, reject every original range and signed length before I/O, cap EOF transfers, validate the whole signed position, accept read-only fast/large headers and return copied payload prefixes without moving the cursor; repeated valid/error imports release all measured storage
+LINUX IOVPOSITION: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   638k      0 --:--:-- --:--:-- --:--:--  637k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 53 2880k   53 1551k    0     0  2093k      0  0:00:01 --:--:--  0:00:01 2091k100 2880k  100 2880k    0     0  2860k      0  0:00:01  0:00:01 --:--:-- 2862k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  50857      0 --:--:-- --:--:-- --:--:-- 50968
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   520k      0 --:--:-- --:--:-- --:--:--  519k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   127k      0 --:--:-- --:--:-- --:--:--  127k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   294k      0 --:--:-- --:--:-- --:--:--  293k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/iovoffset/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovoffset/.vinix-amd64.iso.Cc1bvs'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 12.4g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/iovoffset/iso-build/.iso-staging.jG4Q86/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13493 sectors
+Written to medium : 13493 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovoffset/.vinix-amd64.iso.Cc1bvs' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2d3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/iovoffset/test.iso (27633664 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/iovoffset
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75504
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX IOVOFFSET NORMAL: ordinary=1 cases=78 failures=0
+LINUX IOVOFFSET NEGATIVE: ordinary=1 cases=252 failures=0
+LINUX IOVOFFSET SENTINEL: ordinary=1 cases=18 failures=0
+LINUX IOVOFFSET SLAB: ordinary=1 size=16 live=1623/1623 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=32 live=2876/2876 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=64 live=153/153 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=192 live=374/374 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=256 live=787/787 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=384 live=546/546 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=512 live=494/494 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=1536 live=14/14 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX IOVOFFSET STORAGE: ordinary=1 cycles=200 big_pages=4258/4258 PASS
+LINUX IOVOFFSET NORMAL: ordinary=0 cases=78 failures=0
+LINUX IOVOFFSET NEGATIVE: ordinary=0 cases=252 failures=0
+LINUX IOVOFFSET SENTINEL: ordinary=0 cases=18 failures=0
+LINUX IOVOFFSET SLAB: ordinary=0 size=16 live=1623/1623 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=32 live=2876/2876 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=64 live=153/153 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=192 live=374/374 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=256 live=787/787 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=384 live=546/546 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=512 live=494/494 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=1536 live=14/14 cycles=200
+LINUX IOVOFFSET SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX IOVOFFSET STORAGE: ordinary=0 cycles=200 big_pages=4258/4258 PASS
+LINUX IOVOFFSET PASS: root/UID1000 raw preadv/pwritev/preadv2/pwritev2 preserve full native offsets above4GiB and ignore pos_h; public musl wrappers preserve sparse data, lower aliases, size and cursor; signed negative errors precede invalid vectors/descriptors; only v2 minus1 uses and updates the current position on files/pipes; repeated valid/error/sentinel storage stays flat
+LINUX IOVOFFSET: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   618k      0 --:--:-- --:--:-- --:--:--  618k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 34 2880k   34  986k    0     0  1285k      0  0:00:02 --:--:--  0:00:02 1285k100 2880k  100 2880k    0     0  1956k      0  0:00:01  0:00:01 --:--:-- 1957k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  65180      0 --:--:-- --:--:-- --:--:-- 65109
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   544k      0 --:--:-- --:--:-- --:--:--  545k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   120k      0 --:--:-- --:--:-- --:--:--  121k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   315k      0 --:--:-- --:--:-- --:--:--  315k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/iovrange/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovrange/.vinix-amd64.iso.e3AhFx'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 11.5g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/iovrange/iso-build/.iso-staging.KhIn8G/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13493 sectors
+Written to medium : 13493 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovrange/.vinix-amd64.iso.e3AhFx' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2d3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/iovrange/test.iso (27633664 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/iovrange
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=75472
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX IOVRANGE ADDRESS: user_limit=72057594037927936 last_page=mapped next_page=refused
+LINUX IOVRANGE LIMIT: page=4096 max_rw_count=2147479552 checks=14 PASS
+LINUX IOVRANGE CASE: ordinary=1 checks=215 failures=0
+LINUX IOVRANGE SLAB: ordinary=1 size=16 live=1621/1621 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=32 live=2880/2880 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=64 live=153/153 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=192 live=374/374 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=256 live=788/788 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=384 live=547/547 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=512 live=495/495 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=1536 live=13/13 cycles=200
+LINUX IOVRANGE SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX IOVRANGE STORAGE: ordinary=1 cycles=200 big_pages=174/174 PASS
+LINUX IOVRANGE ADDRESS: user_limit=72057594037927936 last_page=mapped next_page=refused
+LINUX IOVRANGE LIMIT: page=4096 max_rw_count=2147479552 checks=14 PASS
+LINUX IOVRANGE CASE: ordinary=0 checks=215 failures=0
+LINUX IOVRANGE SLAB: ordinary=0 size=16 live=1621/1621 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=32 live=2880/2880 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=64 live=153/153 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=192 live=374/374 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=256 live=788/788 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=384 live=547/547 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=512 live=495/495 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=1536 live=13/13 cycles=200
+LINUX IOVRANGE SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX IOVRANGE STORAGE: ordinary=0 cycles=200 big_pages=174/174 PASS
+LINUX IOVRANGE PASS: root/UID1000 native readv/writev validate all signed lengths and canonical ranges before file/pipe/stream/datagram I/O; zero-length invalid tails fail, original queues/offsets/content survive refusal; single-segment page-size transfer cap precedes range checks, multiple segments validate original ranges; in-range page faults retain copied prefixes; import storage stays flat
+LINUX IOVRANGE: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   370k      0 --:--:-- --:--:-- --:--:--  369k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 2880k    0  5615    0     0  11495      0  0:04:16 --:--:--  0:04:16 11482 98 2880k   98 2831k    0     0  1936k      0  0:00:01  0:00:01 --:--:-- 1935k100 2880k  100 2880k    0     0  1938k      0  0:00:01  0:00:01 --:--:-- 1938k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  41321      0 --:--:-- --:--:-- --:--:-- 41335
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  2  207k    2  5615    0     0  12300      0  0:00:17 --:--:--  0:00:17 12286100  207k  100  207k    0     0   405k      0 --:--:-- --:--:-- --:--:--  405k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  88750      0 --:--:-- --:--:-- --:--:-- 88773
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   210k      0 --:--:-- --:--:-- --:--:--  209k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/iovimport/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovimport/.vinix-amd64.iso.DykKhO'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 11.5g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/iovimport/iso-build/.iso-staging.bFAiKE/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13496 sectors
+Written to medium : 13496 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovimport/.vinix-amd64.iso.DykKhO' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2df.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/iovimport/test.iso (27639808 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/iovimport
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80832
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91000
+initramfs: Done (9 entries)
+LINUX IOVIMPORT SLAB: ordinary=1 size=16 live=1621/1621 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=32 live=2876/2876 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=64 live=152/152 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=192 live=374/374 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=256 live=786/786 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=384 live=545/545 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=512 live=493/493 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=1536 live=13/13 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX IOVIMPORT STORAGE: ordinary=1 cycles=200 big_pages=160/160 PASS
+LINUX IOVIMPORT ROUND: ordinary=1 round=0 failures=0
+LINUX IOVIMPORT ROUND: ordinary=1 round=1 failures=0
+LINUX IOVIMPORT CASE: ordinary=1 reads=20 writes=20 PASS
+LINUX IOVIMPORT SLAB: ordinary=0 size=16 live=1621/1621 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=32 live=2876/2876 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=64 live=154/154 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=192 live=375/375 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=256 live=786/786 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=384 live=545/545 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=512 live=493/493 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=1536 live=13/13 cycles=200
+LINUX IOVIMPORT SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX IOVIMPORT STORAGE: ordinary=0 cycles=200 big_pages=160/160 PASS
+LINUX IOVIMPORT ROUND: ordinary=0 round=0 failures=0
+LINUX IOVIMPORT ROUND: ordinary=0 round=1 failures=0
+LINUX IOVIMPORT CASE: ordinary=0 reads=20 writes=20 PASS
+LINUX IOVIMPORT PASS: root/UID1000 blocked readv and multi-chunk writev use imported readonly 2/8/9/513/1024-entry vectors after user header mutation or protection; valid/empty/error storage stays flat
+LINUX IOVIMPORT: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   599k      0 --:--:-- --:--:-- --:--:--  600k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 62 2880k   62 1792k    0     0  1265k      0  0:00:02  0:00:01  0:00:01 1265k100 2880k  100 2880k    0     0  1556k      0  0:00:01  0:00:01 --:--:-- 1555k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  59025      0 --:--:-- --:--:-- --:--:-- 59128
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   421k      0 --:--:-- --:--:-- --:--:--  420k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   126k      0 --:--:-- --:--:-- --:--:--  126k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   347k      0 --:--:-- --:--:-- --:--:--  347k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/iovpin/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovpin/.vinix-amd64.iso.PVBiZE'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 10.1g free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/iovpin/iso-build/.iso-staging.K8rWWt/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  0.00% done
+ISO image produced: 13496 sectors
+Written to medium : 13496 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/iovpin/.vinix-amd64.iso.PVBiZE' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd2df.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/iovpin/test.iso (27639808 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/iovpin
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80376
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX IOVPIN SLAB: ordinary=1 size=16 live=1621/1621 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=32 live=2876/2876 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=48 live=326/326 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=64 live=152/152 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=96 live=20/20 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=128 live=19/19 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=192 live=374/374 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=256 live=786/786 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=384 live=545/545 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=512 live=493/493 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=768 live=12/12 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=1024 live=13/13 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=1536 live=13/13 cycles=200
+LINUX IOVPIN SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX IOVPIN STORAGE: ordinary=1 cycles=200 big_pages=160/160 PASS
+LINUX IOVPIN ROUND: ordinary=1 round=0 failures=0
+LINUX IOVPIN ROUND: ordinary=1 round=1 failures=0
+LINUX IOVPIN ROUND: ordinary=1 round=2 failures=0
+LINUX IOVPIN ROUND: ordinary=1 round=3 failures=0
+LINUX IOVPIN CASE: ordinary=1 reads=16 writes=12 PASS
+LINUX IOVPIN SLAB: ordinary=0 size=16 live=1621/1621 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=32 live=2876/2876 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=48 live=326/326 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=64 live=154/154 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=96 live=20/20 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=128 live=19/19 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=192 live=375/375 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=256 live=786/786 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=384 live=545/545 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=512 live=494/494 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=768 live=12/12 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=1024 live=13/13 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=1536 live=13/13 cycles=200
+LINUX IOVPIN SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX IOVPIN STORAGE: ordinary=0 cycles=200 big_pages=160/160 PASS
+LINUX IOVPIN ROUND: ordinary=0 round=0 failures=0
+LINUX IOVPIN ROUND: ordinary=0 round=1 failures=0
+LINUX IOVPIN ROUND: ordinary=0 round=2 failures=0
+LINUX IOVPIN ROUND: ordinary=0 round=3 failures=0
+LINUX IOVPIN CASE: ordinary=0 reads=16 writes=12 PASS
+LINUX IOVPIN PASS: root/UID1000 blocked readv and multi-chunk writev retain the original open description through close/dup2, never consume or modify replacements, and release the final writer reference
+LINUX IOVPIN: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 64  248k   64  159k    0     0   399k      0 --:--:-- --:--:-- --:--:--  398k100  248k  100  248k    0     0   592k      0 --:--:-- --:--:-- --:--:--  591k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 34 2880k   34 1007k    0     0  1061k      0  0:00:02 --:--:--  0:00:02 1061k100 2880k  100 2880k    0     0  1636k      0  0:00:01  0:00:01 --:--:-- 1637k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  43042      0 --:--:-- --:--:-- --:--:-- 42992
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   436k      0 --:--:-- --:--:-- --:--:--  437k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   123k      0 --:--:-- --:--:-- --:--:--  123k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   253k      0 --:--:-- --:--:-- --:--:--  253k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/pathio/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/pathio/.vinix-amd64.iso.AXlqGz'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 3957m free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/pathio/iso-build/.iso-staging.NGqlNI/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  90.80% done
+ISO image produced: 13480 sectors
+Written to medium : 13480 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/pathio/.vinix-amd64.iso.AXlqGz' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd29f.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/pathio/test.iso (27607040 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/pathio
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=47592
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf90e00
+initramfs: Done (9 entries)
+LINUX PATHIO CASE: ordinary=1 checks=240 PASS
+LINUX PATHIO CASE: ordinary=0 checks=240 PASS
+LINUX PATHIO PASS: root/UID1000 scalar read/pread and empty/nonempty vectors refuse O_PATH files/directories/FIFOs/symlinks and duplicates; vector EBADF precedes copy errors; metadata and valid vectored I/O remain usable and root-owned private contents stay inaccessible
+LINUX PATHIO: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   411k      0 --:--:-- --:--:-- --:--:--  412k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 90 2880k   90 2619k    0     0  1994k      0  0:00:01  0:00:01 --:--:-- 1993k100 2880k  100 2880k    0     0  2055k      0  0:00:01  0:00:01 --:--:-- 2055k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  71459      0 --:--:-- --:--:-- --:--:-- 71517
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   487k      0 --:--:-- --:--:-- --:--:--  487k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   141k      0 --:--:-- --:--:-- --:--:--  141k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   338k      0 --:--:-- --:--:-- --:--:--  338k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/readerror/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/readerror/.vinix-amd64.iso.DCKy7K'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 3535m free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/readerror/iso-build/.iso-staging.yqvE3w/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  45.23% done
+ISO image produced: 13477 sectors
+Written to medium : 13477 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/readerror/.vinix-amd64.iso.DCKy7K' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd293.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/readerror/test.iso (27600896 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/readerror
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=41032
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91600
+initramfs: Done (9 entries)
+LINUX READERROR CASE: ordinary=0 checks=64 PASS
+LINUX READERROR CASE: ordinary=1 checks=64 PASS
+LINUX READERROR PASS: root/UID1000 directory EISDIR before copying at zero/one/4096 bytes; bad ranges and descriptors preserve EFAULT/EBADF; regular zero/data/EOF reads preserve offsets
+LINUX READERROR: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  2  248k    2  5615    0     0   7699      0  0:00:32 --:--:--  0:00:32  7691100  248k  100  248k    0     0   286k      0 --:--:-- --:--:-- --:--:--  286k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 18 2880k   18  527k    0     0   617k      0  0:00:04 --:--:--  0:00:04  617k 86 2880k   86 2491k    0     0  1356k      0  0:00:02  0:00:01  0:00:01 1356k100 2880k  100 2880k    0     0  1414k      0  0:00:02  0:00:02 --:--:-- 1415k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  44831      0 --:--:-- --:--:-- --:--:-- 44876
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   341k      0 --:--:-- --:--:-- --:--:--  341k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  87343      0 --:--:-- --:--:-- --:--:-- 87508
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   221k      0 --:--:-- --:--:-- --:--:--  221k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/pipezero/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/pipezero/.vinix-amd64.iso.0BQofo'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 2980m free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/pipezero/iso-build/.iso-staging.FIJMr6/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  67.06% done
+ISO image produced: 13480 sectors
+Written to medium : 13480 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/pipezero/.vinix-amd64.iso.0BQofo' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd29f.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/pipezero/test.iso (27607040 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/pipezero
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=48040
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91000
+initramfs: Done (9 entries)
+LINUX PIPEZERO CASE: kind=0 PASS
+LINUX PIPEZERO CASE: kind=1 PASS
+LINUX PIPEZERO CASE: kind=2 PASS
+LINUX PIPEZERO CASE: kind=3 PASS
+LINUX PIPEZERO CASE: kind=4 PASS
+LINUX PIPEZERO CASE: kind=5 PASS
+LINUX PIPEZERO CASE: kind=6 PASS
+LINUX PIPEZERO PASS: blocking/nonblocking empty, populated/full, hangup/broken and named FIFO zero I/O preserves readiness/data; null/unmapped/protected buffers and exact descriptor errors
+LINUX PIPEZERO: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   543k      0 --:--:-- --:--:-- --:--:--  543k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0 2880k    0 25290    0     0  56986      0  0:00:51 --:--:--  0:00:51 56959100 2880k  100 2880k    0     0  2170k      0  0:00:01  0:00:01 --:--:-- 2171k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  61922      0 --:--:-- --:--:-- --:--:-- 61890
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 92  207k   92  192k    0     0   226k      0 --:--:-- --:--:-- --:--:--  226k100  207k  100  207k    0     0   244k      0 --:--:-- --:--:-- --:--:--  244k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0   125k      0 --:--:-- --:--:-- --:--:--  125k
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   274k      0 --:--:-- --:--:-- --:--:--  273k100  117k  100  117k    0     0   273k      0 --:--:-- --:--:-- --:--:--  273k
+==> Building the Limine host installer...
+==> Assembling /private/tmp/vinix-iovstream-1013/after-x86/runtime/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/runtime/.vinix-amd64.iso.OVKqoU'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 4684m free
+Added to ISO image: directory '/'='/private/tmp/vinix-iovstream-1013/after-x86/runtime/iso-build/.iso-staging.H7yxdG/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13479 sectors
+Written to medium : 13479 sectors at LBA 0
+Writing to 'stdio:/private/tmp/vinix-iovstream-1013/after-x86/runtime/.vinix-amd64.iso.OVKqoU' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd29b.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /private/tmp/vinix-iovstream-1013/after-x86/runtime/test.iso (27604992 bytes)
+Guest artifacts: /private/tmp/vinix-iovstream-1013/after-x86/runtime
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=46592
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX RUNTIME page_size=4096 pointer_bits=64
+LINUX RUNTIME PASS: atomics SIMD TLS
+LINUX RUNTIME PASS: JIT page sizes
+LINUX RUNTIME PASS: wide offsets time64
+LINUX RUNTIME: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+Linux compatibility qualification failed; see /private/tmp/vinix-iovstream-1013/after-x86/receipt.json

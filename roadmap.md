@@ -663,6 +663,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Qualify real data/cursors/pipe queues, import/seek/access errors and negative
   positions as root/UID1000, with flat retention on both architectures. See
   [the descriptor-width receipts](docs/linux-posix-qualification.md#native-vector-descriptor-words).
+- [x] Scatter one available pipe/socket receive across native readv and v2
+  current-position vectors; qualify UNIX record boundaries, truncation, next
+  messages and 1 MiB payloads as root/UID1000 on both architectures, with flat
+  retention and published destination-fault limits. See
+  [the stream-vector receipts](docs/linux-posix-qualification.md#native-stream-vector-receives).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

@@ -1,0 +1,5 @@
+/private/tmp/vinix-iovstream-1013/before-arm/iovstream/fixture.c:1863:31: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1863 |                                         i32 version = __in_lhs_0[v_fixed_index(__for_idx_1, 2)];
+      |                                                                  ^
+1 error generated.
+Linux compatibility qualification failed; see /private/tmp/vinix-iovstream-1013/before-arm/receipt.json

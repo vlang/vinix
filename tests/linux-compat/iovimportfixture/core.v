@@ -200,7 +200,8 @@ fn storage(ordinary bool) bool {
 		return valid
 	}
 }
-fn scratch_bytes(fd i32) ?u64 {
+struct ScratchState { objects u64 bytes u64 }
+fn scratch_state(fd i32) ?ScratchState {
 	unsafe {
 		mut data := [4096]char{}
 		length := C.pread(fd, &data[0], usize(data.len - 1), 0)
@@ -209,7 +210,7 @@ fn scratch_bytes(fd i32) ?u64 {
 		mut position := 0
 		for position < int(length) {
 			mut objects := u64(0); mut bytes := u64(0)
-			if C.sscanf(&data[position], c'scratch %lu %lu', &objects, &bytes) == 2 { return bytes }
+			if C.sscanf(&data[position], c'scratch %lu %lu', &objects, &bytes) == 2 { return ScratchState{objects, bytes} }
 			for position < int(length) && data[position] != char(10) { position++ }; position++
 		}
 		return none
@@ -232,19 +233,19 @@ fn read_case(count i32, protect bool) bool {
 		observer := C.open(c'/proc/kernel-resources', C.O_RDONLY)
 		if observer < 0 { return false }
 		defer { C.close(observer) }
-		baseline := scratch_bytes(observer) or { return false }
+		baseline := scratch_state(observer) or { return false }
 		mut request := Operation{fd: pipes[0], vector: vector, count: count}
 		mut worker := C.pthread_t{}
 		if C.pthread_create(&worker, nil, operation, &request) != 0 { return false }
 		if !ready(&request) { abandon(c'LINUX IOVIMPORT FAIL: read worker start') }
-		// The first one-byte read reserves 130 scratch bytes after header
-		// import; vector reservations are multiples of128. The observer's
-		// own read is present in both snapshots. This checkpoint works on
-		// the unchanged kernel too, which has no vector reservation.
+		// A receive reservation follows header import. Larger vectors own
+		// another reservation: require both objects so header admission alone
+		// cannot satisfy the checkpoint. The observer's own read is in both
+		// snapshots. This works with both scalar and aggregate receives.
 		mut entered := false
 		for _ in 0 .. 5000 {
-			current := scratch_bytes(observer) or { abandon(c'LINUX IOVIMPORT FAIL: scratch observer'); u64(0) }
-			if current > baseline && (current - baseline) % 128 == 2 { entered = true; break }
+			current := scratch_state(observer) or { abandon(c'LINUX IOVIMPORT FAIL: scratch observer'); ScratchState{} }
+			if current.bytes > baseline.bytes && current.objects == baseline.objects + if count > 8 { u64(2) } else { u64(1) } { entered = true; break }
 			C.usleep(1000)
 		}
 		if !entered { abandon(c'LINUX IOVIMPORT FAIL: read import checkpoint') }
