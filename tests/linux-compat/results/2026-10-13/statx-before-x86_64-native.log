@@ -1,0 +1,73 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=74936
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91a00
+initramfs: Done (9 entries)
+LINUX STATX DETAIL: ordinary=1 kind=0 flags=1000 mask=0 destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=1 kind=0 flags=1234567800001000 mask=1234567800000000 destination=0 ret=-1 errno=9 expected=0
+LINUX STATX DETAIL: ordinary=1 kind=0 flags=1234567800001000 mask=1234567800000000 destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=1 kind=0 flags=ffffffff00001000 mask=ffffffff00000000 destination=0 ret=-1 errno=9 expected=0
+LINUX STATX DETAIL: ordinary=1 kind=0 flags=ffffffff00001000 mask=ffffffff00000000 destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=1 kind=0 flags=1000 mask=1 destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=1 kind=1 flags=1 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=1 flags=2 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=1 flags=4 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=1 flags=8 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=1 flags=10 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=1 flags=20 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=2 flags=1000 mask=7ff destination=0 ret=-1 errno=14 expected=9
+LINUX STATX DETAIL: ordinary=1 kind=2 flags=0 mask=7ff destination=1 ret=-1 errno=14 expected=2
+LINUX STATX DETAIL: ordinary=1 kind=2 flags=1000 mask=7ff destination=1 ret=-1 errno=14 expected=9
+LINUX STATX DETAIL: ordinary=1 kind=2 flags=1000 mask=7ff destination=1 ret=-1 errno=14 expected=9
+LINUX STATX DETAIL: ordinary=1 kind=2 flags=0 mask=7ff destination=1 ret=-1 errno=14 expected=2
+LINUX STATX DETAIL: ordinary=1 kind=2 flags=0 mask=7ff destination=1 ret=-1 errno=14 expected=20
+LINUX STATX DETAIL: ordinary=1 kind=3 flags=1800 mask=7ff destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=1 kind=3 flags=0 mask=80000000 destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=3 flags=1 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=3 flags=3800 mask=7ff destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=1 kind=3 flags=2000 mask=80000000 destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=1 kind=3 flags=2001 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX CASES: ordinary=1 kind=0 calls=1620 failures=840
+LINUX STATX CASES: ordinary=1 kind=1 calls=1440 failures=1440
+LINUX STATX CASES: ordinary=1 kind=2 calls=32 failures=7
+LINUX STATX CASES: ordinary=1 kind=3 calls=15 failures=9
+LINUX STATX DETAIL: ordinary=0 kind=0 flags=1000 mask=0 destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=0 kind=0 flags=1234567800001000 mask=1234567800000000 destination=0 ret=-1 errno=9 expected=0
+LINUX STATX DETAIL: ordinary=0 kind=0 flags=1234567800001000 mask=1234567800000000 destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=0 kind=0 flags=ffffffff00001000 mask=ffffffff00000000 destination=0 ret=-1 errno=9 expected=0
+LINUX STATX DETAIL: ordinary=0 kind=0 flags=ffffffff00001000 mask=ffffffff00000000 destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=0 kind=0 flags=1000 mask=1 destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=0 kind=1 flags=1 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=1 flags=2 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=1 flags=4 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=1 flags=8 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=1 flags=10 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=1 flags=20 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=2 flags=1000 mask=7ff destination=0 ret=-1 errno=14 expected=9
+LINUX STATX DETAIL: ordinary=0 kind=2 flags=0 mask=7ff destination=1 ret=-1 errno=14 expected=2
+LINUX STATX DETAIL: ordinary=0 kind=2 flags=1000 mask=7ff destination=1 ret=-1 errno=14 expected=9
+LINUX STATX DETAIL: ordinary=0 kind=2 flags=1000 mask=7ff destination=1 ret=-1 errno=14 expected=9
+LINUX STATX DETAIL: ordinary=0 kind=2 flags=0 mask=7ff destination=1 ret=-1 errno=14 expected=2
+LINUX STATX DETAIL: ordinary=0 kind=2 flags=0 mask=7ff destination=1 ret=-1 errno=14 expected=20
+LINUX STATX DETAIL: ordinary=0 kind=3 flags=1800 mask=7ff destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=0 kind=3 flags=0 mask=80000000 destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=3 flags=1 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=3 flags=3800 mask=7ff destination=0 ret=-1 errno=14 expected=0
+LINUX STATX DETAIL: ordinary=0 kind=3 flags=2000 mask=80000000 destination=0 ret=0 errno=0 expected=22
+LINUX STATX DETAIL: ordinary=0 kind=3 flags=2001 mask=7ff destination=0 ret=0 errno=0 expected=22
+LINUX STATX CASES: ordinary=0 kind=0 calls=1620 failures=840
+LINUX STATX CASES: ordinary=0 kind=1 calls=1440 failures=1440
+LINUX STATX CASES: ordinary=0 kind=2 calls=32 failures=7
+LINUX STATX CASES: ordinary=0 kind=3 calls=15 failures=9
+LINUX STATX FAIL: metadata, errors, output or retained storage
+QEMU: Terminated
+

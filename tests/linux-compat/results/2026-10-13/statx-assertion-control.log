@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/statx-audit.v:145: FAIL: fn main.main: assert false, 'audit assertions must execute';
+      message: audit assertions must execute
+V panic: Assertion failed...

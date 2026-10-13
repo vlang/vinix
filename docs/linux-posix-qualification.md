@@ -3645,3 +3645,91 @@ Sibling exec/exit, retirement races, full procfs ownership, complete exec
 allocation retention, GNU/translated/ELF32 paths and application installation,
 sandbox and portal requirements remain separate. The three broad section 15
 acceptance gates remain open.
+
+## Native statx requests and error precedence
+
+The native statx adapter now validates the reserved request-mask bit,
+mutually exclusive synchronization selectors and unknown flag bits before
+touching a pathname, descriptor or output buffer. Refusals return EINVAL
+and leave valid output untouched. Descriptor/flag/request words use their
+lower 32 bits; metadata and pointers retain their native full width. Lookup
+errors precede output-copy faults. Valid local metadata queries accept
+AS_STAT, FORCE_SYNC, DONT_SYNC, NO_AUTOMOUNT, NOFOLLOW and EMPTY_PATH.
+The underlying fstat/fstatat snapshots and 256-byte statx conversion remain
+unchanged, with their existing ownership and stack scratch.
+
+NULL with EMPTY_PATH uses the held descriptor path for nonnegative signed
+descriptor words; NO_AUTOMOUNT and one sync selector may accompany it.
+Negative descriptor words with NULL, including AT_FDCWD, retain EFAULT;
+an invalid positive descriptor returns EBADF. NULL plus NOFOLLOW retains
+EFAULT. Empty strings retain ordinary descriptor/current-directory lookup.
+These distinctions are checked against actual Linux reference kernels,
+alongside the [Linux 6.12 stat implementation](https://raw.githubusercontent.com/torvalds/linux/v6.12/fs/stat.c)
+and [flag definitions](https://raw.githubusercontent.com/torvalds/linux/v6.12/include/uapi/linux/fcntl.h).
+
+| Calls per architecture, across root and UID/GID1000 | Baseline failures | Candidate failures | Linux reference failures |
+| --- | ---: | ---: | ---: |
+| 3240 raw metadata/argument-word calls | 1680 | 0 | 0 |
+| 2880 raw invalid flag/mask/sync calls | 2880 | 0 | 0 |
+| 64 raw lookup/output error calls | 14 | 0 | 0 |
+| 30 musl wrapper calls | 18 | 0 | 0 |
+
+Each architecture passes all 6214 calls on both Vinix and Linux 6.12.51.
+The baseline fails 4592 calls. Three upper-word patterns, five request masks
+and all 27 unknown single flag bits cover width/error behavior. Regular
+files, directory-relative and absolute names, followed/unfollowed symlinks,
+unlinked descriptors and pipes return actual fields matching native fstat.
+Every call checks output canaries; refused calls retain the whole writable
+output sentinel. File bytes and the preexisting cursor remain unchanged.
+
+Both native candidates pass statx, open and runtime guest suites. The runtime
+retains atomics, SIMD, TLS, JIT/page-size and wide-offset/time64 checks.
+Each 200-cycle retention cohort issues 18 successful/refused statx calls
+per cycle after warmup/grace, using stable descriptors. All 18 ARM and 14
+x86 live slab classes remain exact; large pages stay 63/63 and 160/160 in
+both credential groups. Allocation scans retain 658/654 source files and
+403/292 sites, with identical existing allowance refusals. Eight host test
+files and the native inventory check pass; no allowances change.
+
+The maintained [V reference controller](../tests/linux-compat/statx-reference.v)
+boots the exact same native musl probe ELF against caller-supplied Linux
+kernels, using a V-generated newc archive and a small V exec wrapper. The
+`--reference` argument selects the same semantic matrix while omitting
+Vinix-specific slab reporting. Dated reference inputs are fixed-release
+[Alpine 3.22.2 ARM](https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/aarch64/netboot-3.22.2/vmlinuz-virt)
+and [x86 kernels](https://dl-cdn.alpinelinux.org/alpine/v3.22/releases/x86_64/netboot-3.22.2/vmlinuz-virt).
+Both boot logs identify Linux 6.12.51. Their hashes, QEMU binary/command,
+wrapper source/C/ELF, unchanged probe ELF, archive and serial capture are
+bound in the reference receipts. ARM uses macOS HVF and x86 uses TCG.
+
+Kernels build in isolated worktrees at
+`1940edfc04b77f7937ac03e54f4fe3870c23d787`, changing only linux_common.v.
+Replacing the statx definition/prototype and removing three flag constants
+reproduces the entire baseline kernel C, ignoring only unused-loop
+source-offset identifiers. Independent [lifetime review](../tests/linux-compat/results/2026-10-13/statx-lifetime-review.md)
+checks the unchanged descriptor owners and stack borrows against emitted C
+and actual native/reference captures.
+
+The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/statx-audit.v)
+checks exact baseline failures, candidate/reference outcomes, output/metadata
+controls, flat retention, whole-C scope, source isolation and receipt hashes.
+Both negative assertion controls execute, including refusal of a passing
+candidate log as baseline failure evidence.
+[ARM evidence](../tests/linux-compat/results/2026-10-13/statx-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/statx-evidence-x86_64.json)
+bind all 63 isolated inputs plus compiler/controller/kernel/C/source/ELF/ISO/
+Linux kernel/wrapper/archive/QEMU/capture/build/audit/review hashes. Captures:
+[ARM baseline](../tests/linux-compat/results/2026-10-13/statx-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/statx-after-aarch64.log),
+[ARM Linux reference](../tests/linux-compat/results/2026-10-13/statx-reference-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/statx-before-x86_64.log),
+[x86 candidate](../tests/linux-compat/results/2026-10-13/statx-after-x86_64.log),
+[x86 Linux reference](../tests/linux-compat/results/2026-10-13/statx-reference-x86_64.log).
+Initial compiler-alias, kernel-string and negative-NULL expectation drafts
+remain in private artifacts with their actual failures. Public inventory
+fingerprints use the committed parent plus this fix, separately from semantic
+build inputs.
+
+Remote synchronization, actual automount triggers, extended statx fields,
+concurrent close/disk metadata, GNU wrappers and translated/ELF32 paths remain
+separate. The three broad section 15 acceptance gates remain open.

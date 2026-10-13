@@ -1,0 +1,2 @@
+arm: whole kernel C restores from statx body/prototype and three constants, ignoring unused-loop source offsets
+x86: whole kernel C restores from statx body/prototype and three constants, ignoring unused-loop source offsets

@@ -738,6 +738,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Serialize native exec name/path replacement with procfs readers;
   qualify concurrent old/new records, real child execs and flat observer
   retention on both architectures. See [the exec receipts](docs/linux-posix-qualification.md#procfs-metadata-publication-during-exec).
+- [x] Validate native statx requests and argument words before lookup/output;
+  qualify real metadata, NULL descriptors, exact errors and flat retention
+  against Linux on both architectures. See [the statx receipts](docs/linux-posix-qualification.md#native-statx-requests-and-error-precedence).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

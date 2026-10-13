@@ -796,6 +796,9 @@ fn syscall_linux_dup(gpr_state voidptr, oldfd int) (u64, u64) {
 // struct statx, the 256-byte form statx(2) fills. Its timestamps and its
 // split-out device numbers mean it cannot share the struct stat conversion.
 const statx_basic_stats = u32(0x7ff)
+const statx_reserved = u32(0x80000000)
+const statx_no_automount = u32(0x800)
+const statx_sync_type = u32(0x6000)
 
 fn write_statx_timestamp(dst u64, sec i64, nsec i64) {
 	unsafe {
@@ -839,14 +842,27 @@ fn convert_stat_to_statx(src &stat.Stat, user_dst u64) bool {
 // statx(dirfd, path, flags, mask, buf). The mask is a request, and a kernel is
 // free to answer with more than was asked for as long as stx_mask says what it
 // actually filled.
-fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, _mask u32, buf u64) (u64, u64) {
-	if buf == 0 {
-		return errno.err, errno.efault
+fn syscall_linux_statx(gpr_state voidptr, dirfd int, path charptr, flags int, mask u32, buf u64) (u64, u64) {
+	query_flags := u32(flags)
+	allowed := u32(fs.at_symlink_nofollow | fs.at_empty_path) | statx_no_automount | statx_sync_type
+	if mask & statx_reserved != 0 || query_flags & statx_sync_type == statx_sync_type
+		|| query_flags & ~allowed != 0 {
+		return errno.err, errno.einval
 	}
 
 	mut vinix_stat := unsafe { &stat.Stat(C.vinix_stack_alloc(sizeof(stat.Stat))) }
 	unsafe { *vinix_stat = stat.Stat{} }
-	ret, err := fs.syscall_fstatat(gpr_state, dirfd, path, vinix_stat, flags)
+	// NULL is the descriptor-only spelling for nonnegative descriptor words.
+	// It must use the held descriptor path, not a kernel string passed to the
+	// user-path reader. Negative words retain the pathname EFAULT behavior.
+	mut ret := u64(0)
+	mut err := u64(0)
+	if path == unsafe { nil } && i32(u32(dirfd)) >= 0
+		&& query_flags & ~(statx_no_automount | statx_sync_type) == u32(fs.at_empty_path) {
+		ret, err = fs.syscall_fstat(gpr_state, int(u32(dirfd)), vinix_stat)
+	} else {
+		ret, err = fs.syscall_fstatat(gpr_state, int(u32(dirfd)), path, vinix_stat, int(query_flags))
+	}
 	if err != 0 {
 		return ret, err
 	}

@@ -221,6 +221,30 @@ allocation retention. Procself/runtime regressions pass across final and
 completion captures; host disk failures and partial receipts remain visible.
 See [the exec receipts and limits](../../docs/linux-posix-qualification.md#procfs-metadata-publication-during-exec).
 
+The `statx` case checks 6214 raw/musl calls per architecture as root/UID1000,
+covering low-32-bit descriptor/flag/mask words, real file/link/unlinked/pipe
+metadata, exact invalid flag/mask/sync and lookup/output errors, unchanged
+output canaries/bytes/cursors and descriptor-only NULL paths. Each 200-cycle
+retention cohort makes 18 successful/refused calls per cycle, keeping every
+live slab class and 63 ARM/160 x86 large pages exact. Baselines fail 4592
+calls; both candidates and Linux 6.12.51 references pass using unchanged ELFs.
+See [the statx receipts and limits](../../docs/linux-posix-qualification.md#native-statx-requests-and-error-precedence).
+
+On macOS, boot the same native probe ELF against a supplied Linux kernel:
+
+```sh
+build-support/run-v-tool.sh tests/linux-compat/statx-reference.v \
+  --arch aarch64 --kernel /path/to/pinned/linux-vmlinuz \
+  --init /path/to/native/statx/init --state-dir /path/to/fresh-linux-reference
+```
+
+The reference controller generates a newc archive in V and uses an exec
+wrapper to select `--reference`. This mode runs the same semantics, omitting
+Vinix-specific allocator observations; native receipt audits still require
+them. ARM uses HVF; `--arch x86_64` uses TCG and a matching kernel/ELF.
+Reference receipts bind kernel, unchanged probe, wrapper/source/C/ELF,
+archive, QEMU binary/command and raw capture; failed outcomes remain failures.
+
 The `readlinkempty` case checks 3,648 raw/musl calls per root/UID1000 child
 on both architectures. Empty paths name the retained symlink description,
 including O_PATH handles after unlink or private-directory search denial.

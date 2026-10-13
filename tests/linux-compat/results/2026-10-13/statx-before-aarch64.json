@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "6e27c76a9bd575941ec47ef1b269c4504da041f21e2ec0d6ff6b94a6a680b50b",
+    "results": [
+        {
+            "name": "statx",
+            "source_sha256": "8e267e3f8b68c25dfc8544738f019ad8c5039a41d0dc3cab693618eccdd4e57c",
+            "init_sha256": "3d52e3d76c2db18050f64c466e938311c942f56e1e7b045cc74524e6619c2df2",
+            "iso_sha256": "4fb277249256abcf957d9ad7d2f03ac098f0ea2dfc83f677ed64d5b3b33e08ac",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
