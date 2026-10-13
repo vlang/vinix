@@ -104,13 +104,16 @@ fn purge_child(parent int, name &char, original C.stat, uid u32, device u64, dep
 	if C.unlinkat(parent, name, C.AT_REMOVEDIR) != 0 { return error('cannot remove personal data directory') }
 }
 
-fn purge_personal_data(home string, id string, uid u32) !bool {
-	if !home.starts_with('/') || !printable(home, 4096) || home == '/' || !identifier(id) {
-		return error('purge-data requires a valid application ID and an absolute ordinary account home')
+// Returns an owned descriptor, or -1 when the personal data parent is absent.
+// Inventory and deletion share the same no-follow account-home traversal.
+fn personal_data_parent(home string, uid u32) !int {
+	if !home.starts_with('/') || !printable(home, 4096) || home == '/' {
+		return error('personal application data requires an absolute ordinary account home')
 	}
 	mut directory := C.open(c'/', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC)
 	if directory < 0 { return error('cannot capture the account home') }
-	defer { C.close(directory) }
+	mut retained := false
+	defer { if !retained { C.close(directory) } }
 	parts := home.split('/')
 	defer { unsafe { for part in parts { part.free() }; (&array(&parts)).free() } }
 	for index, part in parts {
@@ -122,15 +125,24 @@ fn purge_personal_data(home string, id string, uid u32) !bool {
 		C.close(directory); directory = next
 	}
 	purge_directory_info(directory, uid, true)!
-	for part in ['.local', 'share', 'vinix-apps'] {
+	for part in ['.local', 'share', 'vinix-apps']! {
 		next := C.openat(directory, part.str, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 		if next < 0 {
-			if C.errno == C.ENOENT { return false }
+			if C.errno == C.ENOENT { return -1 }
 			return error('personal application data parent must be an ordinary directory: ${part}')
 		}
 		C.close(directory); directory = next
 		purge_directory_info(directory, uid, true)!
 	}
+	retained = true
+	return directory
+}
+
+fn purge_personal_data(home string, id string, uid u32) !bool {
+	if !identifier(id) { return error('purge-data requires a valid application ID') }
+	directory := personal_data_parent(home, uid)!
+	if directory < 0 { return false }
+	defer { C.close(directory) }
 	parent := purge_directory_info(directory, uid, true)!
 	data := C.openat(directory, id.str, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 	if data < 0 {

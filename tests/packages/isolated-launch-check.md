@@ -83,6 +83,8 @@ The receipts below retain the original isolation/stream qualification; that
 followup records its own guest inputs and results.
 The current controller also requires the subsequent
 [personal-data purge workflow](purge-data-check.md), with separate receipts.
+It also requires the subsequent [personal-data inventory](personal-data-check.md)
+marker and account-isolation checks; its receipts retain their original scope.
 
 Run the package host driver with the reviewed V compiler and headless UI module:
 

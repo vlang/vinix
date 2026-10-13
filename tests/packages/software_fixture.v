@@ -361,6 +361,7 @@ fn main() {
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
 	if os.args.len == 2 && os.args[1] == 'admin-memory' { check_software_admin_memory() or { panic(err) }; return }
 	if os.args.len == 2 && os.args[1] == 'window-memory' { check_window_broker_memory() or { panic(err) }; return }
+	if os.args.len == 2 && os.args[1] == 'data-memory' { check_software_data_memory() or { panic(err) }; return }
 	mut args := os.args.clone()
 	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
@@ -386,6 +387,7 @@ fn main() {
 			eprintln('fixture: granted file is unavailable to the ordinary account')
 			exit(27)
 		}
+		if software_data_service_fixture(args) or { panic(err) } { return }
 		if software_deployment_service_fixture(args) or { panic(err) } { return }
 		if software_mirror_service_fixture(args) or { panic(err) } { return }
 		if software_repository_service_fixture(args) or { panic(err) } { return }
@@ -546,6 +548,7 @@ fn main() {
 	check_software_launch_options() or { panic(err) }
 	check_software_window() or { panic(err) }
 	check_software_admin() or { panic(err) }
+	check_software_data() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
 }
 

@@ -68,6 +68,8 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_launch.v', work + '/software/software_launch.v')!
 	os.cp(repository + '/desktop/software_window.v', work + '/software/software_window.v')!
 	os.cp(repository + '/desktop/software_admin.v', work + '/software/software_admin.v')!
+	os.cp(repository + '/desktop/software_data.v', work + '/software/software_data.v')!
+	os.cp(repository + '/tests/packages/software_data_fixture.v', work + '/software/data_fixture.v')!
 	os.cp(repository + '/tests/packages/software_terminal_fixture.v', work + '/software/terminal_fixture.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
 	modules := os.getenv_opt('VINIX_PACKAGE_TEST_UI2') or { repository + '/build/vmodules' }
@@ -82,6 +84,7 @@ fn check() ! {
 		'@vlib|' + modules + '|@vmodules|' + repository, '-o', work + '/window-broker-memory', work + '/software'])!
 	run(work + '/window-broker-memory', ['window-memory'])!
 	run(work + '/window-broker-memory', ['admin-memory'])!
+	run(work + '/window-broker-memory', ['data-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

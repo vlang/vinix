@@ -78,6 +78,14 @@ mut:
 	worker_review   bool
 	worker_run      bool
 	worker_failed   bool
+	data_mode       bool
+	data_status     pkgprotocol.PersonalDataStatus
+	data_ready      bool
+	data_selected   int = -1
+	data_scroll     int
+	data_pending    string // frozen ID shown in the deletion confirmation
+	data_result     string
+	data_worker     SoftwareDataWorker
 	progress_snapshot pkgprotocol.Progress
 	progress_pending []u8
 	progress_seen bool
@@ -203,6 +211,7 @@ fn (mut a SoftwareApp) start(arguments []string, view bool) {
 	a.worker_run = false
 	a.worker_mirror = false
 	a.repository_worker = .none
+	a.data_worker = .none
 	a.worker = os.new_process(a.service_path.clone())
 	mut owned := []string{cap: arguments.len + 1}
 	authorized := a.administration_required && pkgadmin.administrative(arguments)
@@ -481,6 +490,7 @@ fn (mut a SoftwareApp) poll() bool {
 	reviewing := a.worker_review
 	running := a.worker_run
 	repository_worker := a.repository_worker
+	data_worker := a.data_worker
 	mirroring := a.worker_mirror
 	a.retire_worker()
 	a.clear_admin_prompt()
@@ -501,6 +511,12 @@ fn (mut a SoftwareApp) poll() bool {
 			'The package service failed. Check administrator access, repository configuration and disk space.'
 		})
 		unsafe { diagnostic.free() }
+	} else if data_worker == .list {
+		if !a.worker_failed { a.load_personal_data() }
+	} else if data_worker == .purge {
+		unsafe { a.data_result.free() }
+		a.data_result = 'Personal data deleted for ' + a.data_pending + '.'
+		a.read_personal_data()
 	} else if repository_worker == .list {
 		if !a.worker_failed { a.load_repositories() }
 	} else if repository_worker == .review {
@@ -592,6 +608,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		return
 	}
 	if event_id.starts_with(packagecore.request_prefix) {
+		if a.data_mode { a.set_status('Return to the catalog before opening an application.'); return }
 		if a.launch_mode { a.set_status('Close launch options before opening another application.'); return }
 		if a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
 			a.set_status('An operation is already running in this window.')
@@ -604,12 +621,24 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		a.run_requested()
 		return
 	}
-	if event_id == 'software.search' && !a.deployment_mode && !a.mirror_mode {
+	if event_id == 'software.search' && !a.data_mode && !a.deployment_mode && !a.mirror_mode {
 		a.focus = true
 		return
 	}
 	if a.worker != unsafe { nil } { return }
+	if a.data_mode { a.handle_personal_data(event_id); return }
 	if a.launch_mode { a.handle_launch_options(event_id); return }
+	if event_id == 'software.data' {
+		a.clear_review()
+		a.clear_repository_review()
+		a.repository_mode = false
+		a.deployment_mode = false
+		a.mirror_mode = false
+		a.focus = false
+		a.data_mode = true
+		a.read_personal_data()
+		return
+	}
 	if event_id == 'software.mirror' {
 		a.clear_review()
 		a.repository_mode = false
@@ -774,6 +803,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 	if a.admin_prompt { a.admin_key_input(input); return }
 	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
+	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input); return }
 	if a.mirror_mode { a.mirror_key_input(input); return }
@@ -799,6 +829,7 @@ fn (mut a SoftwareApp) paste_input(input string) {
 	if a.admin_prompt { a.admin_paste_input(input); return }
 	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
+	if a.data_mode { return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {
 		a.deployment_key_input(input)
@@ -855,6 +886,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 	}
 	a.page_rows = if height > 400 { (height - 236) / 30 } else { 5 }
 	if a.page_rows > software_row_actions.len { a.page_rows = software_row_actions.len }
+	if a.data_mode { return a.build_personal_data(width, height) }
 	if a.launch_mode { return a.build_launch_options(width, height) }
 	if a.repository_mode { return a.build_repositories(width, height) }
 	if a.mirror_mode && (a.review == '' || a.mirror_details) { return a.build_mirror(width, height) }
@@ -974,8 +1006,9 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 			children << software_button('software.mirror.details', 'Export details', width - 150, 8, 136)
 		}
 	} else {
-		children << software_button('software.upgrade', 'Update all', 274, height - 138, 130)
-		children << software_button('software.rollback', 'Rollback', 416, height - 138, 130)
+		children << software_button('software.upgrade', 'Update all', 274, height - 138, 112)
+		children << software_button('software.rollback', 'Rollback', 394, height - 138, 100)
+		children << software_button('software.data', 'Personal data', 502, height - 138, 124)
 	}
 	if a.progress_seen { children << a.progress_bar(width, height) }
 	children << software_label(a.status, 14, height - if a.progress_seen { 88 } else { 98 }, width - 28, if a.progress_seen { 80 } else { 90 }, false)
@@ -993,7 +1026,9 @@ fn (mut a SoftwareApp) prepare_close() bool {
 		return false
 	}
 	if a.worker != unsafe { nil } && !a.worker_view && !a.worker_review {
-		a.set_status(if a.worker_run {
+		a.set_status(if a.data_worker == .purge {
+			'Wait for personal data deletion to finish before closing Software.'
+		} else if a.worker_run {
 			'Close the application first, then close Software.'
 		} else {
 			'Wait for the package transaction to finish before closing Software.'
@@ -1021,6 +1056,7 @@ fn (mut a SoftwareApp) close_app() {
 	a.clear_review()
 	a.clear_repository_review()
 	a.repository_status.close()
+	a.clear_personal_data()
 	a.clear_progress()
 	unsafe {
 		a.launch_request.free()

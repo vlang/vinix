@@ -24,7 +24,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  apply REVIEW_FINGERPRINT OPERATION [ID...]\n' +
 	'  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json\n' +
 	'  deployment-lock [ID...] | deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
-	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
+	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
 	'  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
@@ -352,6 +352,20 @@ fn checked(arguments []string) !int {
 			if command == 'run-terminal' { return service.run_terminal(names[0], names[1..]) }
 			if command == 'run-window' { return service.run_window(names[0], names[1..]) }
 			return service.run(names[0], names[1..])
+		}
+		'data-list' {
+			if names.len != 0 { return error('data-list takes no arguments') }
+			mut status := service.personal_data()!
+			defer { status.close() }
+			if as_json {
+				text := json2.encode(status)
+				if text.len > pkgcore.max_metadata { return error('personal data status exceeds metadata limit') }
+				println(text)
+			} else {
+				for row in status.rows {
+					println('${row.id}\t${if row.installed { 'installed' } else { 'uninstalled' }}\t${row.diagnostic}')
+				}
+			}
 		}
 		'purge-data' {
 			if names.len != 1 {

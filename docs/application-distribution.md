@@ -346,6 +346,23 @@ app data directory is refused. Storage errors, concurrent file operations or a
 tree deeper than 64 directories can leave partial cleanup; correct the reported
 problem and retry. See the [personal-data purge qualification](../tests/packages/purge-data-check.md).
 
+Software’s **Personal data** page lists the current ordinary account’s retained
+application directories, including IDs no longer present in a repository.
+Installed apps require uninstall first. Unsafe directories show a diagnostic
+and cannot be selected for deletion. **Review deletion** shows the exact ID,
+scope and permanent-loss warning; **Delete permanently** starts cleanup without
+an administrator password. The ID stays fixed through confirmation and retries.
+Live-generation failures keep the confirmation available and explain what to
+stop before retrying. A successful purge reloads the inventory. Root desktops
+show a sign-in explanation and cannot choose another account’s data.
+
+`vinix-package --json data-list` provides the same bounded, read-only inventory;
+it uses installed state without refreshing repositories and works offline. The
+inventory is an observation; deletion rechecks current installation, leases and
+filesystem safety. Names that are not valid package IDs are outside this view.
+No disk-size estimate or recovery promise is made for personal data. See the
+[personal-data manager qualification](../tests/packages/personal-data-check.md).
+
 ## Software and execution
 
 **Software** offers catalog, installed and updates filters, description search,

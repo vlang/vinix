@@ -4,9 +4,28 @@ module main
 import accountcore
 import os
 import tools.packages.pkgcore
+import tools.packages.pkgprotocol
+
+fn package_personal_data(db accountcore.Database, user accountcore.User) !pkgprotocol.PersonalDataStatus {
+	listed := run(['/usr/bin/vinix-package', '--json', 'data-list'], '', db, user)
+	assert listed.status == 0, listed.output
+	return pkgprotocol.decode_personal_data(listed.output)
+}
 
 fn qualify_package_data_purge(mut t Test, db accountcore.Database, alex accountcore.User, sam accountcore.User) ! {
 	data := alex.home + '/.local/share/vinix-apps/isolated-cli'
+	for user in [alex, sam] {
+		own_id := user.name + '-data'
+		own := user.home + '/.local/share/vinix-apps/' + own_id
+		os.mkdir(own)!; os.chown(own, int(user.uid), int(user.gid))!
+		mut listed := package_personal_data(db, user)!
+		assert listed.rows.any(it.id == 'isolated-cli' && it.installed && it.diagnostic == '')
+		assert listed.rows.any(it.id == own_id && !it.installed)
+		assert !listed.rows.any(it.id == if user.name == 'alex' { 'sam-data' } else { 'alex-data' })
+		listed.close()
+	}
+	root_list := run(['/usr/bin/vinix-package', '--json', 'data-list'], '', none, none)
+	assert root_list.status != 0 && root_list.output.contains('ordinary user session'), root_list.output
 	installed := run(['/usr/bin/vinix-package', 'purge-data', 'isolated-cli'], '', db, alex)
 	assert installed.status != 0 && installed.output.contains('remove the application'), installed.output
 	assert os.exists(data + '/ran')
@@ -30,6 +49,9 @@ fn qualify_package_data_purge(mut t Test, db accountcore.Database, alex accountc
 	package_success(['gc'])!
 	assert os.is_dir(generation)
 	for user in [alex, sam] {
+		mut retained := package_personal_data(db, user)!
+		assert retained.rows.any(it.id == 'isolated-cli' && !it.installed)
+		retained.close()
 		busy := run(['/usr/bin/vinix-package', 'purge-data', 'isolated-cli'], '', db, user)
 		assert busy.status != 0 && busy.output.contains('still in use'), busy.output
 		assert os.exists(user.home + '/.local/share/vinix-apps/isolated-cli/ran')
@@ -47,11 +69,18 @@ fn qualify_package_data_purge(mut t Test, db accountcore.Database, alex accountc
 			assert purged.status == 0, purged.output
 			assert !os.exists(user.home + '/.local/share/vinix-apps/isolated-cli')
 		}
+		mut deleted := package_personal_data(db, user)!
+		assert !deleted.rows.any(it.id == 'isolated-cli')
+		assert deleted.rows.any(it.id == user.name + '-data')
+		deleted.close()
 	}
 	outside := '/tmp/purge-outside'
 	os.mkdir_all(outside + '/isolated-cli')!
 	os.write_file(outside + '/isolated-cli/kept', 'outside')!
 	os.symlink(outside + '/isolated-cli', data)!
+	mut linked := package_personal_data(db, alex)!
+	assert linked.rows.any(it.id == 'isolated-cli' && it.diagnostic.contains('ordinary directory'))
+	linked.close()
 	alias := run(['/usr/bin/vinix-package', 'purge-data', 'isolated-cli'], '', db, alex)
 	assert alias.status != 0 && alias.output.contains('ordinary directory'), alias.output
 	assert os.read_file(outside + '/isolated-cli/kept')! == 'outside' && os.is_link(data)
@@ -59,6 +88,8 @@ fn qualify_package_data_purge(mut t Test, db accountcore.Database, alex accountc
 	parent := alex.home + '/.local/share/vinix-apps'
 	os.rename(parent, parent + '.saved')!
 	os.symlink(outside, parent)!
+	unsafe_list := run(['/usr/bin/vinix-package', '--json', 'data-list'], '', db, alex)
+	assert unsafe_list.status != 0 && unsafe_list.output.contains('ordinary directory'), unsafe_list.output
 	ancestor := run(['/usr/bin/vinix-package', 'purge-data', 'isolated-cli'], '', db, alex)
 	assert ancestor.status != 0 && ancestor.output.contains('ordinary directory'), ancestor.output
 	assert os.read_file(outside + '/isolated-cli/kept')! == 'outside'
@@ -75,4 +106,5 @@ fn qualify_package_data_purge(mut t Test, db accountcore.Database, alex accountc
 	// Restore the catalog installation for the existing trust/tamper checks.
 	package_success(['install', 'isolated-cli', 'isolated-window'])!
 	t.say('PACKAGE PURGE installed-root-refusal live-uninstalled-lease retained-data safe-links nested-fifo idempotent-own-account PASS')
+	t.say('PACKAGE DATA ordinary-admin-standard own-inventory installed-removed uncatalogued safe-links root-refusal post-purge-reload PASS')
 }

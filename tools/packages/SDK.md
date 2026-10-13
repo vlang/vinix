@@ -743,6 +743,36 @@ Cleanup is not transactional: storage errors or concurrent changes may require
 a retry, and nested directory depth is bounded at 64. See the
 [purge qualification](../../tests/packages/purge-data-check.md).
 
+The additive SDK 1 method `Service.personal_data() !pkgprotocol.PersonalDataStatus`
+and CLI `--json data-list` return `{format:1,rows:[{id,installed,diagnostic}]}` for
+the calling ordinary account. Root, alternate roots and extra positional
+arguments are refused. Rows are sorted by ID; all fields are present. The list
+comes from captured, caller-owned `~/.local/share/vinix-apps` descriptors and
+installed state, so repository availability does not affect retained-data
+discovery. Valid package IDs absent from the catalog are included. Names that
+are not valid package IDs are ignored, but count towards the 4096-directory-entry
+limit. Missing data parents return an empty list; unsafe parents fail the whole
+request. Aliased, special, shared, foreign-owned or filesystem-crossing app
+entries carry diagnostics. Inventory never follows links or opens app entries.
+
+`pkgprotocol.decode_personal_data` requires the complete format-1 schema and
+rejects unknown/duplicate fields, duplicate IDs, incorrect types, missing fields,
+trailing input, invalid UTF-8 and excessive bounds. Replies are limited to 8 MiB,
+4096 rows, 128-byte IDs and 512-byte diagnostics. Produced/decoded statuses own
+their rows and strings; call `.close()` after use. Its bounded parser releases
+partial rows on failure and uses arrays that release replaced buffers under
+`-gc none`. Neither an `installed:false` row nor an empty diagnostic authorizes
+deletion: `purge-data` repeats all live checks at execution time.
+
+Software exposes this inventory through **Personal data** and requires explicit
+confirmation of permanent deletion for a frozen ID. Purge failures retain the
+confirmation for retry/cancel; success reloads the list. Personal-data commands
+run as the caller, without the package administrator transport or a password.
+The root desktop cannot redirect cleanup through `launch_user`. Forced process
+termination or storage errors can leave partial cleanup; reload and retry after
+resolving the diagnostic. See the
+[manager qualification](../../tests/packages/personal-data-check.md).
+
 ### Interactive terminal execution
 
 `run-terminal ID [ABSOLUTE_FILE...]` is an additive SDK 1 command. Standard input

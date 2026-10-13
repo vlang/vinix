@@ -38,6 +38,7 @@ fn suite(repository string, sandbox string) !hwhost.Suite {
 				'PACKAGE ISOLATED native-window terminal-tty geometry input trust-and-payload-refusal audit clean-runtime PASS',
 				'PACKAGE DOCUMENTS ordinary-admin-standard regular-and-alias read-write outside-denied special-target-refusal before-data clean-runtime PASS',
 				'PACKAGE PURGE installed-root-refusal live-uninstalled-lease retained-data safe-links nested-fifo idempotent-own-account PASS',
+				'PACKAGE DATA ordinary-admin-standard own-inventory installed-removed uncatalogued safe-links root-refusal post-purge-reload PASS',
 				'HWTEST PASS packages-isolated-launch'], forbidden: ['V panic:'], ending: .poweroff, timeout: 300 }]
 	}
 }
