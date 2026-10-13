@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+Direct recovery-key unlock extends the discovery model with exact private
+backup/key inputs, header/authentication ordering, erased credentials before
+disk access and input/recheck/import/report failures. The `--recovery-unlock`
+guest mode measures 200 warmup and 200 measured unlock/remove lifetimes, then
+reopens RW/RO ciphertext after disk reordering with ordinary keys, credentials
+and configurations deleted. See [direct recovery unlock](recovery-unlock.md).
+
 Encrypted configuration recovery adds independent ChaCha20/HMAC oracle checks,
 every-byte tamper/key-half refusal and real private-reader/publication fault
 coverage. The targeted `--volume-recovery` guest mode measures four warmup and

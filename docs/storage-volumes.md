@@ -618,6 +618,39 @@ disk. Unlock and boot replay keep their physical identity/conflict checks and
 normal limits. Recovery does not repair corrupted ciphertext or authenticate
 AES-XTS data. See [configuration recovery qualification](../tests/storage-volumes/volume-recovery.md).
 
+## Direct recovery-key unlock
+
+`open-recovery-volume-auto BACKUP RECOVERY_KEYFILE [ro]` opens the encrypted
+mapping directly from its authenticated `VINIXVR1` backup and independent
+64-byte recovery key. It needs no original passphrase/configuration, new
+passphrase or writable configuration destination. For example:
+
+```sh
+vinix-volume open-recovery-volume-auto /root/data.vrecover /root/recovery.key ro
+```
+
+Both inputs must be exact-size private owned regular files opened without
+following symlinks and rechecked on their retained descriptors after EOF.
+Canonical format and geometry checks precede recovery-key access; the entire
+backup authenticates before `/dev` discovery. Recovery credentials erase
+before device access, and the decoded key and complete workspace erase on
+every return. Nothing is published or written to either input.
+
+The saved identity, physical capacity, native sectors, slot, offset and length
+remain exact. Bounded physical discovery accepts aliases of one disk and
+refuses distinct disks with the same saved identity. The selected descriptor
+stays pinned through two final identity/geometry/mode rechecks and encrypted
+import. Saved read-only mappings stay read-only; `ro` additionally restricts a
+saved read-write mapping. Successful commands print the mapper path. Syntax
+returns 2, controlled failures 1 and successful import/reporting 0. A reporting
+failure after import can leave the mapping open; inspect it before retrying.
+
+The recovery key remains an independent access credential; changing a
+passphrase does not revoke it. Saved geometry must still match, and occupied
+slots/protected extents retain normal import refusal. This is explicit data
+volume rescue; encrypted-root startup, RAID and ciphertext authentication
+remain separate work. See [direct unlock qualification](../tests/storage-volumes/recovery-unlock.md).
+
 ## Authenticated encrypted-volume growth
 
 `plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`

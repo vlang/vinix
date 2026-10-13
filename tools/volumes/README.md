@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`open-recovery-volume-auto BACKUP RECOVERY_KEYFILE [ro]` directly discovers and
+unlocks the backed-up encrypted mapping after credential loss. It authenticates
+before disk access, erases recovery credentials before discovery, preserves
+saved read-only mode and allows an additional `ro` restriction. It creates no
+configuration or raw keyfile. See [direct recovery unlock](../../docs/storage-volumes.md#direct-recovery-key-unlock).
+
 `backup-volume CONFIG PASSPHRASE_FILE RECOVERY_KEYFILE BACKUP` preserves an
 authenticated encrypted mapping and its key under an independent recovery key.
 `recover-volume BACKUP RECOVERY_KEYFILE NEW_PASSPHRASE_FILE CONFIG` rebuilds an

@@ -37,6 +37,10 @@ mut:
 	expected_requests [64]EncryptedRequest
 	expected_slots [64]u32
 	imported_slots [64]u32
+	recovery bool
+	key_opens int
+	key_reads int
+	key_stats int
 }
 __global volume_discovery_io VolumeDiscoveryIO
 
@@ -53,8 +57,9 @@ fn volume_discovery_mock_open(path &char, flags i32) i32 {
 	}
 	if C.strcmp(path, c'/dev') == 0 {
 		assert volume_discovery_io.derives == volume_discovery_io.goal_derives
+		if volume_discovery_io.recovery { assert volume_discovery_io.wrapping != unsafe { nil } }
 		unsafe {
-			for i in 0 .. 1024 { assert volume_discovery_io.password[i] == 0 }
+			if volume_discovery_io.password != nil { for i in 0 .. 1024 { assert volume_discovery_io.password[i] == 0 } }
 			for i in 0 .. 64 { assert volume_discovery_io.wrapping[i] == 0 }
 		}
 		volume_discovery_io.scans++
@@ -63,6 +68,13 @@ fn volume_discovery_mock_open(path &char, flags i32) i32 {
 		if volume_discovery_io.mode == 137 && volume_discovery_io.scans == 2 { unsafe { C.errno = C.EACCES }; return -1 }
 		fd := volume_discovery_track(C.open(volume_discovery_io.directory.str, flags), -1)
 		volume_discovery_io.stream_fd = fd; return fd
+	}
+	if volume_discovery_io.recovery {
+		assert flags == C.O_RDONLY | C.O_NOFOLLOW | C.O_CLOEXEC | C.O_NONBLOCK
+		length := C.strlen(path)
+		key := length >= 4 && unsafe { C.strcmp(path + length - 4, c'/key') == 0 }
+		if key { volume_discovery_io.key_opens++ }
+		return volume_discovery_track(C.open(path, flags), if key { -8 } else { -7 })
 	}
 	return volume_discovery_track(C.open(path, flags), -1)
 }
@@ -131,6 +143,10 @@ fn volume_discovery_mock_openat(fd i32, name &char, flags i32) i32 {
 }
 
 fn volume_discovery_mock_fstat(fd i32, info &C.stat) i32 {
+	if volume_discovery_io.recovery && volume_discovery_io.indices[fd] == -8 {
+		volume_discovery_io.key_stats++
+		if volume_discovery_io.mode == 24 { unsafe { C.errno = C.EIO }; return -1 }
+	}
 	if volume_discovery_io.mode == 22 && volume_discovery_io.indices[fd] >= 0 { unsafe { C.errno = C.EIO }; return -1 }
 	result := C.fstat(fd, info)
 	if result == 0 && volume_discovery_io.boot {
@@ -151,6 +167,13 @@ fn volume_discovery_mock_fstat(fd i32, info &C.stat) i32 {
 			if index == -3 && volume_discovery_io.mode == 118 && volume_discovery_io.vinix_stats == 3 { info.st_mode |= 0o002 }
 		}
 	}
+	if result == 0 && volume_discovery_io.recovery && volume_discovery_io.indices[fd] == -8 && volume_discovery_io.key_stats == 2 {
+		unsafe {
+			if volume_discovery_io.mode == 28 { info.st_mode |= 0o040 }
+			if volume_discovery_io.mode == 30 { info.st_uid++ }
+			if volume_discovery_io.mode == 31 { info.st_size++ }
+		}
+	}
 	if result == 0 && volume_discovery_io.indices[fd] >= 0 && volume_discovery_io.mode != 8 { unsafe { info.st_mode = C.S_IFBLK | 0o600 } }
 	return result
 }
@@ -160,6 +183,14 @@ fn volume_discovery_mock_geteuid() u32 {
 }
 
 fn volume_discovery_mock_read(fd i32, output voidptr, size usize) i64 {
+	if volume_discovery_io.recovery && volume_discovery_io.indices[fd] == -8 {
+		volume_discovery_io.key_reads++
+		if size == 64 { volume_discovery_io.wrapping = unsafe { &u8(output) } }
+		if volume_discovery_io.mode == 25 { unsafe { C.errno = C.EIO }; return -1 }
+		if volume_discovery_io.mode == 26 { return 0 }
+		if volume_discovery_io.mode == 27 && volume_discovery_io.key_reads == 1 { unsafe { C.errno = C.EINTR }; return -1 }
+		if volume_discovery_io.mode == 29 && size == 1 { unsafe { *(&u8(output)) = 7 }; return 1 }
+	}
 	if volume_discovery_io.boot {
 		volume_discovery_io.input_reads++
 		if volume_discovery_io.mode == 112 && volume_discovery_io.indices[fd] == -4 { return 0 }
@@ -173,6 +204,7 @@ fn volume_discovery_mock_read(fd i32, output voidptr, size usize) i64 {
 fn volume_discovery_mock_ioctl(fd i32, number u64, output voidptr) i32 {
 	index := volume_discovery_io.indices[fd]; assert index >= 0 && index < 7
 	if number == 0x56560006 {
+		if volume_discovery_io.recovery { unsafe { for i in 0 .. 64 { assert volume_discovery_io.wrapping[i] == 0 } } }
 		request := unsafe { &EncryptedRequest(output) }
 		if volume_discovery_io.multi {
 			assert request.data.slot < 64 && *request == volume_discovery_io.expected_requests[request.data.slot]
