@@ -72,7 +72,7 @@ fn test_app_icons_keep_original_artwork_without_an_installed_directory() {
 		'files':      u32(0xb20a2a39)
 		'firefox':    u32(0x75b54b5e)
 		'minecraft':  u32(0xb77ccee8)
-		'settings':   u32(0x8755c18b)
+		'settings':   u32(0x3d169df3)
 		'steam':      u32(0x2f793638)
 		'terminal':   u32(0x77f5f3db)
 	}
