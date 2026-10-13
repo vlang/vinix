@@ -33,6 +33,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.uuid_owned = objc_is_kind(object, ios_runtime.names['NSUUID'])
 	header.date_owned = ns_date_family(cls)
 	header.input_stream_owned = ns_input_stream_family(cls)
+	header.connection_owned = connection_family(cls)
 	if header.input_stream_owned { header.input_stream_fd = -1 }
 	header.pool_owned = objc_is_kind(object, ios_runtime.names['NSAutoreleasePool'])
 	header.cookie_owned = objc_is_kind(object, ios_runtime.names['NSHTTPCookie'])
@@ -69,6 +70,7 @@ fn objc_destruct_instance(object u64) u64 {
 
 fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	if header.destroyed || header.destroying { return }
+	connection_dispose(header)
 	ns_pool_require_inactive(header)
 	header.destroying = true
 	if destructors {

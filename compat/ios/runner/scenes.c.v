@@ -34,6 +34,10 @@ fn objc_responds(object u64, selector &char) bool {
 		if name in ['init', 'new', 'copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return false }
 		if ns_input_stream_selector(object, name) { return true }
 	}
+	if connection_family(if object in ios_runtime.classes { object } else { read64(object) }) {
+		if name in ['init', 'new', 'copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return false }
+		if connection_selector(object, name) { return true }
+	}
 	if ns_process_info_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return native_method(read64(object), name) != 0 }
 		if ns_process_info_selector(object, name) { return true }

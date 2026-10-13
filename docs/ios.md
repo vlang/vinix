@@ -3941,17 +3941,76 @@ at the required `_OBJC_CLASS_$_NSURLConnection` import. Evidence is retained und
 published runners are unchanged. Game entry, rendering and gameplay remain
 unverified.
 
+`NSURLConnection` now resolves its Foundation class/metaclass imports through
+a V adapter. Its measured NSObject subclass has 16 public bytes; private
+Foundation state remains opaque. Fixed metadata tracks the lifecycle and
+generic object fields own the original request, delegate and transport
+snapshot. Delayed construction retains the supplied request: both getters
+observe later mutations before start, as measured on this Mac. Vinix takes
+an immutable transport snapshot at start and retains the original separately.
+
+The local-file profile provides synchronous NSData/NSURLResponse loading and
+asynchronous delegate callbacks on the main dispatch queue. Lifecycle calls
+and scheduling use the main thread and default run-loop mode. Unscheduling
+pauses delivery; scheduling resumes it. Cancellation before delivery sends no
+callbacks, and cancellation from didReceiveResponse suppresses data and
+completion. Delegates and connections stay alive through callback return.
+Successful synchronous loads leave the NSError output untouched. Missing
+files report NSURLErrorDomain/-1100 and directory reads NSPOSIXErrorDomain/21,
+with failing URL information. Both outputs have guarded typed native cases.
+
+Only regular local files are in the profile, with a 16 MiB body limit and
+1023-byte POSIX paths. MIME classification distinguishes simple ASCII text
+from binary bytes; full platform sniffing and extension mappings are absent.
+HTTP/HTTPS loading remains unsupported and rejects explicitly. canHandleRequest
+therefore reports this local-file capability rather than the Mac's broader
+HTTP/HTTPS/data-URL protocol set. Other run-loop modes, background lifecycle,
+operation-queue completion blocks, custom connection subclasses, default
+construction, copying, coding, private properties and reinitialization are
+unsupported. setDefersCallbacks: is ignored, matching the installed Foundation
+measurement. Scheduling changes during callbacks and callback-driven runtime
+shutdown reject explicitly.
+
+All 75 programs build and 103 original generated C streams restore to their
+recorded hashes. Twenty-eight host suites pass ASAN/UBSAN in both hashing modes.
+Vinix passes 29 Objective-C and 33 Swift/loader programs. Shared native/Vinix
+fixtures cover real file loading, errors, request ownership, callback order,
+cancellation and delegate lifetimes. Runtime cases cover transport isolation,
+pause/resume, guarded 16-byte caller storage, 100 pending isa changes per cycle,
+13 exact rejections including real callback shutdown, and two zero-live-object
+shutdowns with pending callbacks discarded. Every opened descriptor closes on
+all returns. Body and registry arrays use noslices storage; generic fields
+retire inputs and snapshots independently of isa. Dispatch stops before pending
+connection references retire, and queued work has one explicit registry pin.
+
+Evidence uses persistent disk, copied pinned tooling and verified inputs.
+Preflight corrected mutable-request ownership, NSError output assumptions,
+fixture dispatch initialization and the generated array-push symbol. These
+failed outputs are not counted as passed checks. Disk pressure was relieved
+by retiring only a quiescent failed prior run's temporary binaries/payloads
+and duplicate toolchain; its logs, generated C and retirement hashes remain.
+A later disk-full interruption during audit preparation was retained as a
+failed attempt. Audits resumed through a joined V driver. Completed host and
+guest executables are retained as gzip archives with verified restoration
+hashes; runtime runners and module replay remain available. Guest payloads
+retire after joined success; five published runners are unchanged.
+
+Fortnite passes the NSURLConnection binding and exits with status 1 before entry
+at the required `_$sBOWV` import. Evidence is retained under
+`build/ios/fortnite/connection-checks`. Full regression remains unpassed.
+Game entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,442 | 718 | 79 |
-| EOSSDK | 657 | 5 | 18 |
+| EOSSDK | 658 | 4 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,214 | 784 | 120 |
+| All images | 2,215 | 783 | 120 |
 
-The C++/GLES/Text variant reports 2,227 resolved imports, 771 unresolved strong
+The C++/GLES/Text variant reports 2,228 resolved imports, 770 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

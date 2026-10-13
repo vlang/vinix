@@ -120,6 +120,14 @@ mut:
 	input_stream_fd int
 	input_stream_status u64
 	input_stream_position u64
+	connection_owned bool
+	connection_initialized bool
+	connection_started bool
+	connection_pending bool
+	connection_queued bool
+	connection_running bool
+	connection_scheduled bool
+	connection_cancelled bool
 	uuid_owned bool
 	pool_owned bool
 	pool_initialized bool
@@ -236,6 +244,8 @@ mut:
 	process_info u64 // One owned NSProcessInfo singleton reference.
 	process_arguments u64 // Owned app arguments, configured before image initialization.
 	distant_dates [2]u64 // Owned immutable date cache references, retired at shutdown.
+	connections []u64 // Main-thread pending connections, one owning reference each.
+	connection_callbacks int
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
 	timers       []u64
 	display_links []u64
@@ -286,6 +296,7 @@ fn objc_start() {
 	ios_runtime.load_classes.flags |= .noslices
 	ios_runtime.load_categories.flags |= .noslices
 	ios_runtime.display_links.flags |= .noslices
+	ios_runtime.connections.flags |= .noslices
 	ios_runtime.main_thread = u64(C.pthread_self())
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
@@ -298,7 +309,7 @@ fn objc_start() {
 		'UIScreen', 'UIGestureRecognizer', 'UISwipeGestureRecognizer', 'UIAlertView', 'UIAlertController', 'UIAlertAction',
         'NSData', 'NSMutableData', 'NSLocale', 'NSBundle', 'NSNotification', 'NSNotificationCenter', 'NSCharacterSet',
         'NSAttributedString', 'NSAssertionHandler', 'NSFileHandle', 'NSOperationQueue',
-        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSUserDefaults',
+        'NSPropertyListSerialization', 'NSRunLoop', 'NSURL', 'NSURLComponents', 'NSURLRequest', 'NSMutableURLRequest', 'NSURLResponse', 'NSHTTPURLResponse', 'NSURLConnection', 'NSUserDefaults',
         'UIDevice', 'UIScene', 'UIWindowScene', 'UISceneSession', 'UISceneConnectionOptions', 'UIOpenURLContext', 'NSSet', 'NSMutableSet', 'UITouch', 'UIEvent', 'UITraitCollection', 'UIImage', 'UIPasteboard', 'WKWebView', 'WKBackForwardList',
         'UIActivityViewController', 'UIDocumentPickerViewController', 'UIImagePickerController',
         'UIScreenEdgePanGestureRecognizer', 'UISelectionFeedbackGenerator', 'CADisplayLink',
@@ -363,6 +374,7 @@ fn objc_start() {
 			'NSURLRequest', 'NSMutableURLRequest' { u32(24) }
 			'NSURLResponse' { u32(24) }
 			'NSHTTPURLResponse' { u32(32) }
+			'NSURLConnection' { u32(16) }
 			'UIAlertController' { u32(1400) }
 			'UIAlertAction' { u32(144) }
 			'NSLayoutConstraint' { u32(sizeof(AbiLayoutConstraint)) }
@@ -425,6 +437,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	if connection_family(cls) && cls != ios_runtime.names['NSURLConnection'] { panic('iOS: custom connection subclass construction is not implemented') }
 	ns_input_stream_require_class(cls)
 	ns_pool_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
@@ -520,6 +533,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
 	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
 	if obj_header(object).input_stream_owned { panic('iOS: input stream requires designated construction') }
+	if obj_header(object).connection_owned { panic('iOS: connection requires designated construction') }
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }
@@ -538,9 +552,11 @@ fn objc_new(cls u64) u64 {
 }
 
 fn objc_stop() {
+	connection_require_shutdown()
 	ns_threads_join()
 	swift_tasks_join()
 	dispatch_stop()
+	connection_stop()
 	audio_stop()
 	ui_context_stop()
 	$if ios_gles ? { gles_set_current(0) }
