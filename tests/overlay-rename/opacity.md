@@ -96,7 +96,7 @@ concurrent sessions' unrelated changes. Both builds use the preserved
 
 The final kernels also pass `opacity-arm-http-b` and `opacity-x86-http-b`, with
 19 independently validated authenticated HTTP/account/job/build records each.
-`opacity-evidence.log` verifies current/copied input hashes, source identity,
+`opacity-evidence-checked.log` verifies committed/copied input hashes, source identity,
 control failures, final verdicts, filesystem checks and slab samples. The
 allocation allowlist audit still fails: all 182 file/kind counts exactly match
 the earlier whiteout audit. The allowlist was not expanded.
@@ -116,6 +116,8 @@ in that interval. `opacity-arm-failure-tracked-c` and its named-sites log retain
 the diagnostic inputs and output; read-only `e2fsck` is clean. Only the separate
 diagnostic kernel's report threshold was lowered to one. Root coordinates
 authorized allocation reads while the mutation worker remains UID/GID 1000.
+The subsequent [filesystem-stat correction](statfs.md) removes the measured
+interface leak; both ordinary space calls and failure samples then stay flat.
 
 The final ARM kernel completed `ops,churn,cache,idle,apps,drag` in
 `opacity-desktop-perf-b`. All 36 batches of 200 syscall operations retain zero
@@ -125,7 +127,7 @@ A focused two-round repeat in `opacity-churn-repeat-a` records zero retained
 bytes in all eight 300-process batches. The cache workload writes 32 MiB and
 records 16 MiB cached; desktop process-count and duration checks pass.
 `opacity-desktop-perf-b.json`, `opacity-desktop-shots-b`,
-`opacity-desktop-serial.log` and `opacity-perf-evidence-final.log` retain the results.
+`opacity-desktop-serial.log` and `opacity-perf-evidence-checked.log` retain the results.
 Both full and repeated runs' extracted boot-disk inputs match the final ARM hash.
 
 Earlier setup failures, the intermediate parent-count filesystem errors and

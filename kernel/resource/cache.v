@@ -190,6 +190,11 @@ mut:
 	filesystem_stat() FileSystemStat
 }
 
+struct FileSystemStatCall {
+mut:
+	resource FileSystemStatResource
+}
+
 pub fn sync_resource(mut res Resource, handle voidptr) ? {
 	if mut res is SyncableResource {
 		mut syncable := SyncableResource(res)
@@ -313,7 +318,14 @@ pub fn add_seals(mut res Resource, seals u32) ? {
 
 pub fn filesystem_stat(mut res Resource) FileSystemStat {
 	if mut res is FileSystemStatResource {
-		return res.filesystem_stat()
+		// The synchronous callback borrows the backend; narrowed-interface
+		// dispatch would allocate an unfreed wrapper on every statfs call.
+		// Returning a composite value can also promote an address-taken V
+		// local. Use explicit caller-frame storage for this capability header.
+		mut call := unsafe { &FileSystemStatCall(C.vinix_stack_alloc(sizeof(FileSystemStatCall))) }
+		unsafe { call.resource = FileSystemStatResource(res) }
+		mut backend := unsafe { &call.resource }
+		return backend.filesystem_stat()
 	}
 	return FileSystemStat{
 		@type:   0

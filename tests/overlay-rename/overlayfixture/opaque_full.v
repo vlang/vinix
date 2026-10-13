@@ -4,6 +4,8 @@ module overlayfixture
 #include <native-abi.h>
 
 struct C.statfs {
+	f_type  u64
+	f_bsize u64
 	f_bfree u64
 	f_ffree u64
 }
@@ -53,6 +55,7 @@ fn opaque_full() {
 		check(worker >= 0, 190)
 		if worker == 0 {
 			full_drop_identity()
+			statfs_probe()
 			for iteration in 0 .. 3 {
 				mut before := C.statfs{}
 				mut after := C.statfs{}

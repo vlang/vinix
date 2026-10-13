@@ -291,6 +291,10 @@ an upper directory. Trusted-attribute authorization remains enforced.
 Slab samples still show the pre-existing overlay-node retention leak.
 Allocation tracking attributes the four small objects across two further
 failed creations to the existing `statfs` measurement-interface allocation.
+The [filesystem-stat correction](../tests/overlay-rename/statfs.md) removes
+that wrapper allocation: 2,000 pathname/descriptor calls and the repeated
+storage-failure samples stay flat on both architectures, with consistent
+backing values and all four read-only filesystem checks clean.
 Crash consistency, full OCI/rootless-runtime acceptance and broader server-load
 qualification remain open. Full pins and native CI
 instructions are recorded in [the guest evidence](../tests/development/README.md).

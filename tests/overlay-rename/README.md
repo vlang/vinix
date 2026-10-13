@@ -71,6 +71,11 @@ recovery after space is released and persisted markers after remount. It prints
 slab samples after the first and third failures. This longer case is not part
 of the default `all` selection.
 
+That case also runs 2,000 `statfs`/`fstatfs` measurements as UID/GID 1000 and
+checks consistent backing values. The host compares live slab samples and
+fails on retained objects even if guest functional checks pass. See the
+[filesystem-stat leak qualification](statfs.md).
+
 The default `all` case additionally removes the shared work directory beneath
 two mounted overlays, waits past the grace period and verifies that both refuse
 further staging with `ENOENT` while preserving the destination. `disk` leaves

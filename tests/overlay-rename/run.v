@@ -63,6 +63,7 @@ fn main() {
 		'fixture':             digest(state + '/sources/overlayfixture/core.v')!
 		'opaque_fixture':      digest(state + '/sources/overlayfixture/opaque.v')!
 		'opaque_full_fixture': digest(state + '/sources/overlayfixture/opaque_full.v')!
+		'statfs_fixture':      digest(state + '/sources/overlayfixture/statfs.v')!
 		'abi_header':          digest(state + '/sources/overlayfixture/native-abi.h')!
 	}
 	disk := state + '/store.ext2'
@@ -148,7 +149,36 @@ fn run_guest(state string, arch string, case_name string, disk string, timeout i
 	if case_name in ['opaque', 'all'] {
 		expected << ['OVERLAY OPAQUE CHANGES: PASS', 'OVERLAY OPAQUE REMOUNT: PASS']
 	}
-	if case_name == 'opaque-full' { expected << 'OVERLAY OPAQUE STORAGE FULL: PASS' }
+	if case_name == 'opaque-full' {
+		expected << ['OVERLAY OPAQUE STORAGE FULL: PASS', 'OVERLAY STATFS: PASS']
+	}
 	positive, negative := guesthost.verdict_policy(expected, ['FAIL: overlay'], false)
-	return guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
+	code := guesthost.boot(command, configured.env, state, positive, negative, timeout, true)!
+	if code == 0 && case_name == 'opaque-full' {
+		if !statfs_samples_flat(os.read_file(state + '/serial.log')!) {
+			eprintln('statfs/fstatfs retained live kernel allocations')
+			return 1
+		}
+	}
+	return code
+}
+
+fn statfs_samples_flat(serial string) bool {
+	mut phase := -1
+	mut before := map[string]int{}
+	mut after := map[string]int{}
+	for raw in serial.split_into_lines() {
+		line := raw.trim_space()
+		if line.starts_with('OVERLAY SLAB: phase=') { phase = line.all_after('phase=').int() }
+		if phase !in [20, 21] { continue }
+		fields := line.fields()
+		if fields.len != 4 || (!line.starts_with('size-') && !line.starts_with('large ')) {
+			continue
+		}
+		live := fields[if fields[0] == 'large' { 3 } else { 2 }].int()
+		if phase == 20 { before[fields[0]] = live } else { after[fields[0]] = live }
+	}
+	if before.len == 0 || before.len != after.len { return false }
+	for name, live in before { if name !in after || after[name] != live { return false } }
+	return true
 }
