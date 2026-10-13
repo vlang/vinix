@@ -27,35 +27,6 @@ pub:
 	catalog_sha256 string
 }
 
-// A catalog lock must disclose these fields, even when false/zero. Package's
-// older manifest defaults remain available to the single-package pack commands.
-struct CatalogPinnedFile {
-	path string @[required]
-	sha256 string @[required]
-	bytes u64 @[required]
-	executable bool @[required]
-}
-
-struct CatalogDeclarations {
-	packages []CatalogImportDeclaration @[required]
-}
-
-struct CatalogImportDeclaration {
-	recipe CatalogRecipeDeclaration @[required]
-}
-
-struct CatalogRecipeDeclaration {
-	format int @[required]
-	manifest CatalogManifestDeclaration @[required]
-	entries []RootEntry @[required]
-}
-
-struct CatalogManifestDeclaration {
-	proprietary bool @[required]
-	firmware bool @[required]
-	files []CatalogPinnedFile @[required]
-}
-
 struct CatalogOptions {
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 	available_space fn (string) !u64 = free_bytes
@@ -102,9 +73,11 @@ fn catalog_source_root(root int, source string) !int {
 }
 
 fn catalog_recipe(text string) !CatalogRecipe {
-	input := json2.decode[CatalogRecipe](text)!
-	json2.decode[CatalogDeclarations](text)!
-	document_keys(text, catalog_key)!
+	if text.len > max_metadata { return error('catalog recipe exceeds metadata limit') }
+	input := json2.decode[CatalogRecipe](text, strict: true)!
+	mut accepted := false
+	defer { if !accepted { close_decoded_catalog(input) } }
+	document_keys_schema(text, catalog_key, catalog_required_fields, catalog_value_type)!
 	if input.format != 1 || input.architectures.len == 0 || input.architectures.len > 2
 		|| input.packages.len == 0 || input.packages.len > 4096 {
 		return error('unsupported, empty or oversized catalog recipe')
@@ -147,6 +120,7 @@ fn catalog_recipe(text string) !CatalogRecipe {
 	// Structural resolution never enrolls a publisher or accepts consumer licenses.
 	release_closures(Index{ repository: 'catalog', sequence: 1, packages: packages }, '0'.repeat(64))!
 	imports.sort_with_compare(catalog_import_order)
+	accepted = true
 	return CatalogRecipe{ format: 1, architectures: architectures, packages: imports }
 }
 

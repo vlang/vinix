@@ -189,6 +189,10 @@ dependency ranges and payload inventories. Unknown fields, duplicate fields
 after signature verification. The legacy omitted `window_protocol` still means
 zero. Publisher templates keep their documented defaults but reject ambiguous
 fields; stored packed manifests require complete declarations before publication.
+Prepared-root templates and catalog locks also reject ambiguous fields/types
+before import. Catalog composition requires complete pinned declarations and
+cannot normalize missing or null permissions into a publishable lock. See
+[publisher schema qualification](../tests/packages/publisher-schema-check.md).
 A refused refresh or enrollment preserves the previous cached catalog, trust
 history, configuration and installed generation. See
 [signed metadata qualification](../tests/packages/index-schema-check.md).

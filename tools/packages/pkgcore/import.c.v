@@ -242,8 +242,9 @@ fn validate_root_recipe(recipe RootRecipe) ! {
 }
 
 pub fn pack_root(recipe_file string, source_root string, repository string) !Package {
-	recipe := json2.decode[RootRecipe](read_metadata(recipe_file)!)!
-	validate_root_recipe(recipe)!
+	text := read_metadata(recipe_file)!
+	defer { unsafe { text.free() } }
+	recipe := decode_root_recipe(text)!
 	root := C.open(source_root.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if root < 0 { return error('prepared source root must be an ordinary directory') }
 	defer { C.close(root) }

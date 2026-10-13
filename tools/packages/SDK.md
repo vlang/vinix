@@ -213,6 +213,12 @@ order or the upstream aliases. Do not select account databases, host settings,
 devices or unrelated applications. Proprietary and firmware flags stay explicit
 publisher declarations, subject to administrator policy.
 
+Prepared-root recipes reject unknown or duplicate fields (including escaped
+spellings), null collections and mismatched JSON types before opening the input
+root or creating an import workspace. `manifest`, `entries`, and each selector's
+`source`/`path` are explicit. The omitted format still defaults to 1, and manifest
+templates retain the same omitted-field defaults as `pack`.
+
 ### Build a pinned application catalog
 
 `pack-catalog catalog.json /build/prepared-roots /build/new-workspace` builds an
@@ -243,6 +249,14 @@ As in release publication, `all` data must resolve on both supported hosts.
 The recipe rejects unknown fields, duplicate fields (including escaped spelling),
 missing disclosures and missing file pins. The existing 8 MiB metadata limit
 applies, and normal package/selector bounds still apply.
+
+Catalog locks require complete manifest, dependency and payload declarations,
+using the same fields as signed indexes; only legacy `window_protocol` may be
+omitted at zero. All fields have their declared JSON types. Null collections,
+quoted counters, fractional/overflowing integers and unknown/duplicate fields
+are refused before importing, staging or composing a lock. Canonical output for
+valid existing complete locks is unchanged. See
+[publisher schema qualification](../../tests/packages/publisher-schema-check.md).
 
 The builder captures every selected source directory before copying any package.
 Every profile/source component must be an ordinary directory; ancestor and final

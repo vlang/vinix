@@ -1,0 +1,18 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1.
+Nine affected core runners and scanner ownership: -no-skip-unused -gc none -manualfree, exit 0.
+PASS publisher_schema_test
+PASS catalog_test
+PASS import_test
+PASS composition_test
+PASS sqlite_profile_test
+PASS ffmpeg_profile_test
+PASS release_test
+PASS distribution_test
+PASS index_schema_test
+PASS memory
+Publisher recipe scanners: 1000 valid/null/missing/unknown/duplicate cycles retain zero tracked bytes
+PASS signed CLI with catalog/composition/prepared-root schema refusals
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+Publisher schema and catalog runners: clang ASan/UBSan, exit 0; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1.
+PASS aarch64 static ELF service build; build only, no guest execution
+PASS x86_64 static ELF service build; build only, no guest execution

@@ -68,7 +68,25 @@ fn qualify_catalog_cli(binary string, work string) ! {
 			entries: [pkgcore.RootEntry{ source: 'bin/app', path: 'bin/app' }] } },
 	] }
 	path := work + '/catalog recipe.json'
-	os.write_file(path, json2.encode(recipe))!
+	canonical_input := json2.encode(recipe)
+	for invalid in [canonical_input.replace('"permissions":["files"]', '"permissions":null'),
+		canonical_input.replace('"firmware":false,', ''),
+		canonical_input.replace('"executable":true', '"executable":"true"')] {
+		assert invalid != canonical_input
+		os.write_file(path, invalid)!
+		for args in [['pack-catalog', path, roots, work + '/schema-workspace'],
+			['compose-catalog', work + '/schema-lock', 'fixture', path]] {
+			refused := command(binary, args)!
+			assert refused.code == 1 && refused.text != '' && !refused.text.contains('V panic:'), refused.text
+		}
+		assert !os.exists(work + '/schema-workspace') && !os.exists(work + '/schema-lock')
+	}
+	root_input := json2.encode(recipe.packages[0].recipe)
+	os.write_file(path, root_input.replace('"firmware":false', '"firmware":true,"firm\\u0077are":false'))!
+	root_refused := command(binary, ['pack-root', path, roots + '/aarch64', work + '/schema-root'])!
+	assert root_refused.code == 1 && root_refused.text.contains('duplicate administration document field: firmware'), root_refused.text
+	assert !os.exists(work + '/schema-root')
+	os.write_file(path, canonical_input)!
 	workspace := work + '/catalog workspace'
 	info := json2.decode[pkgcore.CatalogInfo](success(binary, ['pack-catalog', path, roots, workspace])!)!
 	assert info.format == 1 && info.directory == workspace && info.architectures == ['aarch64']

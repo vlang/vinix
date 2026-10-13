@@ -1,0 +1,8 @@
+Pre-change regression compiled from the retained ce17efa7c catalog/import sources and baseline test.
+Expected nonzero assertion exit: a null permissions list was accepted and normalized into a canonical catalog.
+
+build/package-recipe-schema-work/baseline/publisher_schema_test.v:32: fn test_catalog_refuses_coercion_before_it_can_become_a_canonical_lock
+    assert refused, 'accepted ambiguous publisher catalog: ' + invalid
+        Message: accepted ambiguous publisher catalog: {"format":1,"architectures":["aarch64","x86_64"],"packages":[{"source":"shared","recipe":{"format":1,"manifest":{"id":"notice","version":"1.0.0","architecture":"all","name":"Redistribution notice","description":"","homepage":"","license":"MIT","proprietary":false,"firmware":false,"kind":"data","runtime":"","entrypoint":"","arguments":[],"permissions":null,"associations":[],"dependencies":[],"files":[{"path":"COPYING","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","bytes":1,"executable":false}],"sdk":1},"entries":[{"source":"COPYING","path":"COPYING"}]}}]}
+
+Initial static cross builds incorrectly retained every standard-library declaration with -no-skip-unused. Standalone generated C then referenced unused capture/thread glue that is linked only by native V builds. Retrying with the production guest build flags (ordinary pruning, -gc none, no signal/backtrace wrappers) linked both static services. The initial C and compiler logs are retained.
