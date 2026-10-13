@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/duppublish-audit.v:118: FAIL: fn main.failure: assert log.contains('LINUX DUPPUBLISH FAIL:'), 'duppublish baseline failure markers required';
+      message: duppublish baseline failure markers required
+V panic: Assertion failed...

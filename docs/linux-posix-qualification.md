@@ -3901,8 +3901,97 @@ negative-target libc controls. Public inventory fingerprints use the committed
 parent plus this fix, separately from the isolated semantic inputs.
 
 Descriptor-limit pressure, actual exec inheritance, GNU wrappers and foreign
-ABIs remain separate. Concurrent dup/close/fork/exec is unqualified: the
-existing fdnum_dup publishes its new descriptor before finalizing its flags,
-leaving a separate lifetime/publication issue. These tests observe completed
-calls and do not certify that concurrent path. The three broad section 15
-acceptance gates remain open.
+ABIs remain separate. This dated run left concurrent publication unqualified:
+fdnum_dup published its new descriptor before finalizing its flags. Its
+completed-call tests do not certify that path. The following qualification
+addresses initialization before publication and selected concurrent observers;
+actual exec inheritance remains separate. The three broad section 15 acceptance
+gates remain open.
+
+## Descriptor flags before publication
+
+`fdnum_dup` now initializes the new descriptor's flags before transferring
+ownership to the descriptor table. Once insertion releases the table lock,
+another thread may close that descriptor or fork a copy of its flags. The
+old successful path wrote through the descriptor pointer after insertion,
+allowing a write after concurrent close and exposing copied source flags to
+observers. The successful path now uses only the returned descriptor number.
+Failure cleanup, source references, handle references and allocations are
+unchanged.
+
+Native musl probes run root and UID/GID1000 cohorts on both architectures.
+Each cohort performs 128 calls and 16 actual fork snapshots for each of dup,
+dup2, dup3 without CLOEXEC, dup3 with CLOEXEC, F_DUPFD and F_DUPFD_CLOEXEC.
+The source starts with the opposite descriptor flag to the expected result;
+an observer accepts only the requested flags, or EBADF during intentional
+holes for dynamic allocation. Completed-call controls require the same
+flags before allowing the worker to advance. Each run contains 1536 duplicate
+calls and 192 fork checks across both credentials.
+
+Production kernels contain no test hook. A maintained V instrumenter creates
+private kernel copies with 32 reschedules immediately after inserting target
+63. Both baseline and candidate get the same window. Both baseline credentials
+fail all six visibility phases, including bad fork snapshots, while producer
+and completed-call controls pass. Baselines intentionally skip close/reuse
+after those failures. Both corrected production and instrumented candidates
+pass the visibility, fork and close/reuse controls. The same native probe ELF
+also passes on actual Linux 6.12.51 for each architecture; reference boots
+omit only Vinix allocator reporting.
+
+Each candidate and Linux cohort runs 200 close/reuse rounds: observe source
+identity at 63, close it, immediately seed 64 with CLOEXEC, wait for duplicate
+completion and check the return value plus the sentinel's inode, mode, size,
+cursor and flags. After observing worker completion, the probe takes a fresh
+metadata sample before deciding whether publication succeeded. This avoids
+rejecting a stale sample taken just before the worker completed. Final source
+and seed bytes, cursors and parent descriptor flags remain exact. Instrumented
+receipts must show an unfinished producer immediately before close in both
+credentials. That timing counter is an observed load, not synchronization
+that proves the close itself happened before syscall return.
+
+After the concurrent phases, two sequential 200-cycle storage cohorts retain
+all 18 ARM/14 x86 live slab classes and 63/160 large pages exactly. These measurements
+qualify sequential retention; they do not claim whole-concurrency retention.
+Both production kernels also pass dupabi, open and runtime guest suites,
+including native atomics, SIMD, TLS, JIT and page-size checks. Eight host test
+files pass. Allocation scanning still reports the existing allowance failures:
+659 ARM/655 x86 source files and 400/292 sites are unchanged. This patch adds
+no allocation, free, reference-count or locking operations.
+
+Whole generated production and instrumented kernel C restores by replacing
+only `file__fdnum_dup`, ignoring only compiler-generated unused-return names.
+Instrumented versus production C adds that function's scheduling window and,
+on x86, relocates one byte-identical block of 48 literal mmap macros because
+of the added sched import. After checking that block, the remaining C matches
+with only the function restored. The source and generated-C lifetime review checks ownership transfer,
+failure cleanup, source retention, explicit stack worker state and joins.
+The probe compiler is pinned separately from the frozen kernel/controller
+compiler, and a reconstruction must reproduce the exact tested C and ELF.
+Initial stale-sample probe failures on Vinix and Linux and interrupted x86
+timing captures remain private; published receipts use the corrected frozen
+probe with 16 fork samples per method and a 600-second cohort alarm.
+
+The [V audit](../tests/linux-compat/results/2026-10-13/duppublish-audit.v)
+requires complete credential/method rows, real baseline failures, production
+and instrumented candidate verdicts, Linux semantics, observed scheduling
+overlap, flat storage, whole-C scope and exact artifact hashes. Both a deliberate
+assertion and passing evidence supplied as a baseline must fail.
+[ARM evidence](../tests/linux-compat/results/2026-10-13/duppublish-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/duppublish-evidence-x86_64.json)
+bind all 63 isolated inputs and compiler/controller/source/C/kernel, native
+ELF/ISO, Linux kernel/wrapper/archive/QEMU, serial/build/audit/review hashes.
+Captures:
+[ARM baseline QA](../tests/linux-compat/results/2026-10-13/duppublish-before-qa-aarch64.log),
+[ARM production](../tests/linux-compat/results/2026-10-13/duppublish-after-aarch64.log),
+[ARM candidate QA](../tests/linux-compat/results/2026-10-13/duppublish-after-qa-aarch64.log),
+[ARM Linux](../tests/linux-compat/results/2026-10-13/duppublish-reference-aarch64.log),
+[x86 baseline QA](../tests/linux-compat/results/2026-10-13/duppublish-before-qa-x86_64.log),
+[x86 production](../tests/linux-compat/results/2026-10-13/duppublish-after-x86_64.log),
+[x86 candidate QA](../tests/linux-compat/results/2026-10-13/duppublish-after-qa-x86_64.log),
+[x86 Linux](../tests/linux-compat/results/2026-10-13/duppublish-reference-x86_64.log).
+Public inventory fingerprints use the committed parent plus this fix,
+separately from the isolated semantic inputs.
+
+Actual exec inheritance, concurrent F_SETFD or source close, descriptor-limit
+pressure, GNU wrappers and translated/ELF32 paths remain separate. The three
+broad section 15 acceptance gates remain open.

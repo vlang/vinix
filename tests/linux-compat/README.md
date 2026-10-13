@@ -1010,8 +1010,8 @@ flags must return EINVAL before replacing a distinct seeded target; negative
 libc targets retain EBADF. Six source classes check alias metadata/status,
 descriptor CLOEXEC, shared cursor movement and preservation of source/target
 state on errors, plus unchanged bytes/queued pipe data and two allocation
-cohorts. The underlying descriptor owner and concurrent publication remain
-outside this subset; see [the dated limits](../../docs/linux-posix-qualification.md#native-descriptor-duplication-errors-and-words).
+cohorts. Concurrent publication has its own `duppublish` qualification below;
+see [the dated dupabi limits](../../docs/linux-posix-qualification.md#native-descriptor-duplication-errors-and-words).
 
 ```sh
 tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases dupabi,statabi,open,runtime
@@ -1024,3 +1024,27 @@ wrapper/initramfs and retains exact hashes and serial output, including on
 failure. ARM uses macOS HVF; x86 uses TCG. `--reference` omits Vinix allocator
 reporting while running the identical semantic matrix. The native audit
 requires the allocation cohorts and refuses reference-only qualification.
+
+The `duppublish` case checks flag visibility and real fork snapshots while a
+worker duplicates a descriptor with opposing source flags. Both root and
+UID/GID1000 run six methods with 128 calls and 16 fork checks per method, then
+200 close/reuse rounds. A completed worker is synchronized before the final
+metadata sample. Sequential storage cohorts require flat slab objects and
+large pages after 200 cycles; they measure retention separately from the
+concurrent controls.
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases duppublish,dupabi,open,runtime --timeout 1300
+v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/duppublish-reference.v --arch aarch64 --kernel LINUX-KERNEL --init FRESH-NATIVE/duppublish/init --state-dir FRESH-LINUX
+v run tests/linux-compat/duppublish-instrument.v INPUT-FILE FRESH-OUTPUT-FILE
+```
+
+Use matching x86 inputs and `--arch x86_64` for x86. The instrumenter creates
+a private copy of `kernel/file/file.v` that yields 32 times immediately after
+inserting target 63. Apply that copy only in an isolated qualification build,
+to both baseline and candidate. Production kernels contain no scheduling
+hook. A known-bad baseline stops after visibility controls, avoiding the
+deliberate close/reuse exercise on a freed descriptor. The audit requires
+complete baseline failures, candidate and Linux passes, unchanged probe ELFs,
+and an observed unfinished producer before close in each instrumented cohort.
+See [the publication receipts and limits](../../docs/linux-posix-qualification.md#descriptor-flags-before-publication).

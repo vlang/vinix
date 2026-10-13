@@ -1,0 +1,12 @@
+{
+    "aarch64_c": "2c8652632ca046d2ba488141497dd2e3dfb8f42336fadda40f4fdb4ffe4c3815",
+    "aarch64_elf": "464dc71b48a4de8abaa0acdd607db05c05e5e9836e1917deb0e7239bddaf780a",
+    "build": "58c0a5b87dc318bf2312d002303734a67cd6071f89a873b86ae668e91d8a5d8a",
+    "compiler": "0640ac69f682e4132215ff08f286f391150b070fe35ef7f14ad1251959755926",
+    "compiler_path": "/Users/alex/code/v/v",
+    "generator": "3a6a4402a3cd68f3a4acc2db6563e78b8191d41fd85a9b9c78882073c1b81a67",
+    "generator_core": "93149f4ec6df7f85d8556ca863a232717d74a08006824de0a275529fccb16092",
+    "version": "V 0.5.2 c020355",
+    "x86_64_c": "2c8652632ca046d2ba488141497dd2e3dfb8f42336fadda40f4fdb4ffe4c3815",
+    "x86_64_elf": "a72e4bc1673354d7979b9c6da5a7e13aac19874b1fc99b7dcc6d83edb96f251a"
+}

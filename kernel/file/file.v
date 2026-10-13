@@ -1002,14 +1002,16 @@ pub fn fdnum_dup(_old_process &proc.Process, oldfdnum int, _new_process &proc.Pr
 	new_fd.refcount = 1
 	katomic.inc(mut &oldfd.handle.refcount)
 
-	new_fdnum := fdnum_create_from_fd(new_process, new_fd, newfdnum, specific) or {
-		new_fd.unref()
-		return none
-	}
-
+	// Finalize the descriptor while it is still owned by this call. Once
+	// inserted, another thread may close it or fork a snapshot of its flags.
 	new_fd.flags = flags & resource.file_descriptor_flags_mask
 	if cloexec {
 		new_fd.flags |= resource.o_cloexec
+	}
+
+	new_fdnum := fdnum_create_from_fd(new_process, new_fd, newfdnum, specific) or {
+		new_fd.unref()
+		return none
 	}
 
 	return new_fdnum

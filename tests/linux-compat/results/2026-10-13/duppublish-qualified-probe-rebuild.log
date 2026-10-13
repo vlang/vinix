@@ -1,0 +1,2 @@
+aarch64: selected probe compiler reconstructs exact tested C and ELF: PASS
+x86_64: selected probe compiler reconstructs exact tested C and ELF: PASS

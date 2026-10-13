@@ -750,6 +750,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Validate native dup/dup3 argument words and reject unknown flags;
   preserve x86 dup2 self calls and qualify alias/target state, real errors
   and flat retention against Linux. See [the duplicate receipts](docs/linux-posix-qualification.md#native-descriptor-duplication-errors-and-words).
+- [x] Finalize duplicate descriptor flags before publication; qualify concurrent
+  flag observers, fork snapshots and close/reuse with isolated scheduling controls
+  on both architectures. See [the publication receipts](docs/linux-posix-qualification.md#descriptor-flags-before-publication).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

@@ -1,0 +1,87 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   206k      0  0:00:01  0:00:01 --:--:--  206k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 72 2880k   72 2095k    0     0  1523k      0  0:00:01  0:00:01 --:--:-- 1523k100 2880k  100 2880k    0     0  1637k      0  0:00:01  0:00:01 --:--:-- 1637k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  18389      0  0:00:01  0:00:01 --:--:-- 18390
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0 31  207k   31 66019    0     0  40394      0  0:00:05  0:00:01  0:00:04 40378100  207k  100  207k    0     0   122k      0  0:00:01  0:00:01 --:--:--  122k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  49550      0 --:--:-- --:--:-- --:--:-- 49537100 49092  100 49092    0     0  49528      0 --:--:-- --:--:-- --:--:-- 49537
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   135k      0 --:--:-- --:--:-- --:--:--  135k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/duppublish-20261013/qualified-yield-before-x86/duppublish/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/duppublish-20261013/qualified-yield-before-x86/duppublish/.vinix-amd64.iso.iJ3yrf'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 1163m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/duppublish-20261013/qualified-yield-before-x86/duppublish/iso-build/.iso-staging.Rz6huV/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  91.83% done
+ISO image produced: 13590 sectors
+Written to medium : 13590 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/duppublish-20261013/qualified-yield-before-x86/duppublish/.vinix-amd64.iso.iJ3yrf' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd457.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/duppublish-20261013/qualified-yield-before-x86/duppublish/test.iso (27832320 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/duppublish-20261013/qualified-yield-before-x86/duppublish
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=80536
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91000
+initramfs: Done (9 entries)
+LINUX DUPPUBLISH FLAGS: ordinary=1 method=0 calls=128 samples=4947 bad=3265 forks=16 fork_bad=2 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=1 method=1 calls=128 samples=8923 bad=5221 forks=16 fork_bad=1 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=1 method=2 calls=128 samples=23360 bad=12878 forks=16 fork_bad=1 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=1 method=3 calls=128 samples=17875 bad=8524 forks=16 fork_bad=1 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=1 method=4 calls=128 samples=3177 bad=2009 forks=16 fork_bad=0 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=1 method=5 calls=128 samples=3045 bad=1427 forks=16 fork_bad=0 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=0 method=0 calls=128 samples=5088 bad=2772 forks=16 fork_bad=1 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=0 method=1 calls=128 samples=6251 bad=2878 forks=16 fork_bad=2 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=0 method=2 calls=128 samples=14945 bad=4229 forks=16 fork_bad=1 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=0 method=3 calls=128 samples=19058 bad=6370 forks=16 fork_bad=0 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=0 method=4 calls=128 samples=10689 bad=4187 forks=16 fork_bad=3 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FLAGS: ordinary=0 method=5 calls=128 samples=10472 bad=4312 forks=16 fork_bad=3 post_bad=0 producer_bad=0 FAIL
+LINUX DUPPUBLISH FAIL: visibility, fork snapshots, close/reuse or retention
+QEMU: Terminated
+Missing verdicts: ['LINUX DUPPUBLISH: PASS']; failures: ['FAIL:', 'LINUX DUPPUBLISH FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/duppublish-20261013/qualified-yield-before-x86/receipt.json
