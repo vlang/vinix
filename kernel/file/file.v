@@ -1,6 +1,7 @@
 module file
 
 import kbudget
+import krandom
 import resource
 import proc
 import klock
@@ -563,6 +564,7 @@ pub fn (mut this Handle) read_to_user(address u64, count u64) ?i64 {
 		return none
 	}
 	defer {
+		krandom.explicit_bzero(buffer, usize(size))
 		unsafe { free(buffer) }
 	}
 	// A file or disk can be read in chunks. A stream supplies one piece;
@@ -674,6 +676,7 @@ pub fn (mut this Handle) write_from_user(address u64, count u64) ?i64 {
 		return none
 	}
 	defer {
+		krandom.explicit_bzero(buffer, usize(size))
 		unsafe { free(buffer) }
 	}
 	mut done := u64(0)
@@ -1183,7 +1186,7 @@ pub fn pread_pinned_descriptor(mut fd FD, buf voidptr, count u64, offset i64, to
 	if buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
-	defer { unsafe { free(buffer) } }
+	defer { krandom.explicit_bzero(buffer, usize(if count < user_io_chunk { count } else { user_io_chunk })); unsafe { free(buffer) } }
 	mut done := u64(0)
 	for done < count {
 		chunk := if count - done < user_io_chunk { count - done } else { user_io_chunk }
@@ -1258,7 +1261,7 @@ pub fn pwrite_pinned_descriptor(mut fd FD, buf voidptr, count u64, offset i64) (
 	if buffer == unsafe { nil } {
 		return errno.err, errno.enomem
 	}
-	defer { unsafe { free(buffer) } }
+	defer { krandom.explicit_bzero(buffer, usize(if allowed < user_io_chunk { allowed } else { user_io_chunk })); unsafe { free(buffer) } }
 	mut done := u64(0)
 	for done < allowed {
 		chunk := if allowed - done < user_io_chunk { allowed - done } else { user_io_chunk }

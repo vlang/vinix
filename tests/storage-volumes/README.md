@@ -231,6 +231,17 @@ and output errors. Guests preserve both held views while scanning and restore
 all test corruption before repeated workloads and the nine persistence boots.
 See [complete scrub qualification](scrub-data.md).
 
+Encrypted-volume checks include the FIPS-197 AES-256 example, 60 aligned NIST
+CAVP XTS vector prefixes in both directions, and an independent AES oracle for
+512/4096-byte sectors and full-width tweak indices. Mapper models check allocation
+and budget refusal, failed publication, short/error I/O, balanced repeated
+lifetimes, zeroed scratch storage and erased keys with retained descriptors.
+CLI models cover private regular keyfiles, interrupted/short reads, changed
+length/owner, parent/ioctl failures and complete request erasure. Guest tests
+exercise ciphertext, positioned/vector/sendfile I/O, growth, removal, read-only
+reopen and persistent data after device reordering, alongside all earlier
+storage workloads. See [encrypted-volume qualification](encrypted-volumes.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,

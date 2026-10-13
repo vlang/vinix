@@ -40,7 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test', 'crypt_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -53,6 +53,7 @@ fn host(root string, work string) ! {
 	capacity_io_tests(root, work, v)!
 	capacity_batch_io_tests(root, work, v)!
 	data_io_tests(root, work, v)!
+	crypt_io_tests(root, work, v)!
 	for arch in ['aarch64', 'x86_64'] {
 		path := work + '/volume-' + arch + '.c'
 		generate(root, root + '/tools/volumes/volumecli', path, arch)!
@@ -60,6 +61,29 @@ fn host(root string, work string) ! {
 	}
 	init_policy(root, work)!
 	println('PASS host: plan format, identity, corruption, bounded plan sets, atomic publication and sanitizers')
+}
+
+fn crypt_io_tests(root string, work string, v string) ! {
+	fixture := work + '/cryptio'
+	os.mkdir(fixture)!
+	for file in os.ls(root + '/tools/volumes/volumecli')! {
+		if !file.ends_with('.v') || file.ends_with('_test.v') { continue }
+		mut source := os.read_file(root + '/tools/volumes/volumecli/' + file)!
+		if file == 'crypt.v' {
+			for name in ['open', 'close', 'read', 'fstat', 'ioctl'] {
+				source = source.replace('C.' + name + '(', 'crypt_mock_' + name + '(')
+			}
+			source = source.replace('erase_key(', 'crypt_mock_bzero(').replace('fn crypt_mock_bzero(', 'fn erase_key(')
+		}
+		os.write_file(fixture + '/' + file, source)!
+	}
+	os.cp(root + '/tests/storage-volumes/crypt_io_test.v', fixture + '/crypt_io_test.v')!
+	binary := work + '/crypt-io-test'
+	command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
+		'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
+		'-fsanitize=address,undefined', '-o', binary, fixture + '/crypt_io_test.v'])!
+	print(command([binary])!)
+	println('PASS encrypted import: short/EINTR reads, owner checks, key growth, parent/ioctl failures, descriptor balance and full request erasure under ASan/UBSan')
 }
 
 fn data_io_tests(root string, work string, v string) ! {
@@ -465,6 +489,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN LOCK PASSED:') { return error('Missing saved-plan locking qualification') }
 	if !first.contains('PLAN DATA PASSED:') { return error('Missing data checksum and corruption qualification') }
 	if !first.contains('PLAN SCRUB PASSED:') { return error('Missing complete multi-corruption scrub report qualification') }
+	if !first.contains('PLAN CRYPT PASSED:') || first.count('PLAN CRYPT CYCLES count=200') != 2 { return error('Missing encrypted volume IO and 400 import/remove cycles') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
@@ -481,6 +506,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !second.contains('PLAN POOL BOOT PRESERVED') { return error('Pool configuration did not survive reordered boot') }
 	if !second.contains('PLAN DATA BOOT VERIFIED') { return error('Data manifest did not verify across reordered boot') }
 	if !second.contains('PLAN SCRUB REORDERED BOOT PRESERVED') { return error('Scrub report failed after physical device reorder') }
+	if !second.contains('PLAN CRYPT REORDERED BOOT PRESERVED') { return error('Encrypted ciphertext/key reopen failed after physical device reorder') }
 	// Enlarge the existing disposable backing file without changing its MBR or
 	// prior bytes. The saved bundle and all guest files remain guest-produced.
 	mut disk := os.open_file(work + '/volume.raw', 'r+')!

@@ -2,6 +2,7 @@
 @[has_globals]
 module fs
 
+import aesxts
 import errno
 import event.eventstruct
 import file
@@ -19,6 +20,7 @@ import usercopy
 const volume_create = u64(0x56560001)
 const volume_resize = u64(0x56560002)
 const volume_remove = u64(0x56560003)
+const volume_create_encrypted = u64(0x56560006)
 const volume_limit = 64
 
 struct VolumeRequest {
@@ -28,6 +30,12 @@ mut:
 	offset  u64
 	length  u64
 	flags   u64
+}
+
+struct EncryptedVolumeRequest {
+mut:
+	data VolumeRequest
+	key [64]u8
 }
 
 struct VolumeResourceBox {
@@ -56,13 +64,20 @@ mut:
 	removed       bool
 	metrics       resource.BlockMetrics
 	policy_token  int = -1
+	encrypted     bool
+	cipher        aesxts.Cipher
 }
 
 __global (
 	logical_volumes           [volume_limit]&LogicalVolume
 	logical_volumes_lock      klock.Lock
 	logical_volume_generation u64
+	encrypted_block_used      int
 )
+
+// Monotonic for the boot: an unencrypted RAM image must never persist keys
+// or plaintext, including after a mapping has been closed or rejected.
+pub fn block_encryption_used() bool { return katomic.load(&encrypted_block_used) != 0 }
 
 fn volume_extent(parent resource.BlockIdentity, offset u64, bytes u64, sector u64) ?resource.BlockIdentity {
 	if !parent.valid() || sector == 0 || bytes == 0 || offset % sector != 0
@@ -107,9 +122,11 @@ fn (mut volume LogicalVolume) block_status() resource.BlockStatus {
 	mut flags := resource.block_volume
 	if volume.readonly { flags |= resource.block_readonly }
 	if volume.removed { flags |= resource.block_offline }
+	if volume.encrypted { flags |= resource.block_encrypted }
 	if parent := resource.block_status(mut volume.parent) {
 		flags |= parent.flags & (resource.block_offline | resource.block_flush | resource.block_discard)
 	}
+	if volume.encrypted { flags &= ~resource.block_discard }
 	mut result := volume.metrics.snapshot(u64(volume.stat.size), u64(volume.stat.blksize), flags, volume.identity)
 	result.slot = volume.slot
 	result.generation = volume.generation
@@ -169,7 +186,7 @@ fn (mut volume LogicalVolume) transfer(buffer voidptr, offset u64, bytes u64, wr
 			errno.set(errno.enomem)
 			return none
 		}
-		defer { memory.free(copy) }
+		defer { if volume.encrypted { aesxts.erase(copy, usize(if bytes < 65536 { bytes } else { u64(65536) })) }; memory.free(copy) }
 		mut done := u64(0)
 		for done < bytes {
 			count := if bytes - done < 65536 { bytes - done } else { u64(65536) }
@@ -186,6 +203,7 @@ fn (mut volume LogicalVolume) transfer(buffer voidptr, offset u64, bytes u64, wr
 		}
 		return i64(bytes)
 	}
+	if volume.encrypted { return volume.encrypted_transfer(buffer, offset, bytes, writing) }
 	volume.l.acquire()
 	defer { volume.l.release() }
 	if volume.removed {
@@ -203,14 +221,9 @@ fn (mut volume LogicalVolume) transfer(buffer voidptr, offset u64, bytes u64, wr
 		return none
 	}
 	if bytes == 0 { return 0 }
-	result := if writing {
-		volume.parent.write(unsafe { nil }, buffer, volume.parent_offset + offset, bytes)
-	} else {
-		volume.parent.read(unsafe { nil }, buffer, volume.parent_offset + offset, bytes)
-	} or {
-		volume.metrics.failed()
-		return none
-	}
+	mut result := i64(0)
+	if writing { result = volume.parent.write(unsafe { nil }, buffer, volume.parent_offset + offset, bytes) or { volume.metrics.failed(); return none } }
+	else { result = volume.parent.read(unsafe { nil }, buffer, volume.parent_offset + offset, bytes) or { volume.metrics.failed(); return none } }
 	if result != i64(bytes) {
 		errno.set(errno.eio)
 		volume.metrics.failed()
@@ -247,6 +260,7 @@ fn (mut volume LogicalVolume) discard(offset u64, bytes u64) ? {
 	defer { volume.l.release() }
 	if volume.removed { errno.set(errno.enodev); return none }
 	if volume.readonly { errno.set(errno.erofs); return none }
+	if volume.encrypted { errno.set(errno.eopnotsupp); return none }
 	if !resource.discard_range_valid(u64(volume.stat.size), u64(volume.stat.blksize), offset, bytes) {
 		errno.set(errno.einval); return none
 	}
@@ -279,6 +293,7 @@ fn (mut volume LogicalVolume) unlink(_ voidptr) ? {
 
 fn (mut volume LogicalVolume) unref(_ voidptr) ? {
 	if !katomic.dec(mut &volume.refcount) {
+		aesxts.clear(mut volume.cipher)
 		release_resource_after_grace(volume.parent)
 		free_after_grace(volume.box)
 		free_charged_after_grace(volume, volume.charge)
@@ -287,6 +302,7 @@ fn (mut volume LogicalVolume) unref(_ voidptr) ? {
 
 fn storage_request(request u64) bool {
 	return request == volume_create || request == volume_resize || request == volume_remove
+		|| request == volume_create_encrypted
 		|| request == resource.block_status_ioctl || request == 0x80081272 || request == 0x1260
 		|| request == 0x1268 || request == 0x125e
 		|| request == resource.block_discard_ioctl
@@ -302,7 +318,7 @@ fn storage_admin() bool {
 fn storage_ioctl(mut descriptor file.FD, request u64, argument voidptr) ?int {
 	if request == resource.block_health_ioctl { return storage_health(mut descriptor, argument) }
 	if request == resource.block_discard_ioctl { return storage_discard(mut descriptor, argument) }
-	if request != volume_create && request != volume_resize && request != volume_remove {
+	if request != volume_create && request != volume_resize && request != volume_remove && request != volume_create_encrypted {
 		snapshot := resource.block_status(mut descriptor.handle.resource)?
 		if request == resource.block_status_ioctl {
 			if !usercopy.copy_to_user(u64(argument), &snapshot, sizeof(snapshot)) {
@@ -331,6 +347,14 @@ fn storage_ioctl(mut descriptor file.FD, request u64, argument voidptr) ?int {
 	if !storage_admin() {
 		errno.set(errno.eperm)
 		return none
+	}
+	if request == volume_create_encrypted {
+		katomic.store(mut &encrypted_block_used, 1)
+		mut encrypted := EncryptedVolumeRequest{}
+		defer { aesxts.erase(unsafe { &encrypted }, sizeof(encrypted)) }
+		if !usercopy.copy_from_user(unsafe { &encrypted }, u64(argument), sizeof(encrypted)) { errno.set(errno.efault); return none }
+		if encrypted.data.version != 1 { errno.set(errno.einval); return none }
+		return create_encrypted_volume(mut descriptor, encrypted.data, unsafe { &encrypted.key })
 	}
 	mut data := VolumeRequest{}
 	if request != volume_remove {
@@ -411,6 +435,18 @@ fn storage_discard(mut descriptor file.FD, argument voidptr) ?int {
 }
 
 fn create_logical_volume(mut descriptor file.FD, data VolumeRequest) ?int {
+	return create_volume(mut descriptor, data, unsafe { nil })
+}
+
+fn create_encrypted_volume(mut descriptor file.FD, data VolumeRequest, key &[64]u8) ?int {
+	katomic.store(mut &encrypted_block_used, 1)
+	mut cipher := unsafe { &aesxts.Cipher(C.vinix_stack_alloc(sizeof(aesxts.Cipher))) }; unsafe { *cipher = aesxts.Cipher{} }
+	defer { aesxts.clear(mut cipher) }
+	if !aesxts.initialize(mut cipher, key) { errno.set(errno.einval); return none }
+	return create_volume(mut descriptor, data, cipher)
+}
+
+fn create_volume(mut descriptor file.FD, data VolumeRequest, cipher &aesxts.Cipher) ?int {
 	if data.slot >= volume_limit || data.flags & ~u64(1) != 0 {
 		errno.set(errno.einval)
 		return none
@@ -440,6 +476,7 @@ fn create_logical_volume(mut descriptor file.FD, data VolumeRequest) ?int {
 		errno.set(errno.einval)
 		return none
 	}
+	if cipher != unsafe { nil } && info.sector != 512 && info.sector != 4096 { errno.set(errno.einval); return none }
 	descriptor.handle.mac_check(if readonly { proc.mac_read } else { proc.mac_write })?
 	identity := volume_extent(resource.block_identity(mut parent), data.offset, data.length, info.sector)?
 	logical_volumes_lock.acquire()
@@ -495,6 +532,7 @@ fn create_logical_volume(mut descriptor file.FD, data VolumeRequest) ?int {
 		}
 	}
 	volume.stat.mode = stat.ifblk | if readonly { u32(0o440) } else { u32(0o600) }
+	if cipher != unsafe { nil } { volume.encrypted = true; volume.cipher = unsafe { *cipher } }
 	volume.stat.rdev = resource.create_dev_id()
 	volume.stat.size = i64(data.length)
 	volume.stat.blocks = i64(data.length / 512)
@@ -504,6 +542,7 @@ fn create_logical_volume(mut descriptor file.FD, data VolumeRequest) ?int {
 	mut name := [32]u8{}
 	devtmpfs_add_volume(box, volume_name(data.slot, &name[0])) or {
 		resource.release_resource(mut parent)
+		aesxts.clear(mut volume.cipher)
 		memory.free(box)
 		memory.free(volume)
 		return none
@@ -562,6 +601,7 @@ fn change_logical_volume(mut volume LogicalVolume, request u64, data VolumeReque
 			return none
 		}
 		security.release_dynamic_block_device(volume.policy_token)
+		volume.l.acquire(); aesxts.clear(mut volume.cipher); volume.l.release()
 		volume.policy_token = -1
 		logical_volumes[volume.slot] = unsafe { nil }
 		volume.unref(unsafe { nil })?

@@ -194,7 +194,7 @@ fn snapshot_plan(fd i32, mut plan Plan, mut parent Status) bool {
 		C.close(view)
 		if !valid { return false }
 		if status.disk_id != parent.disk_id { continue }
-		if status.flags & 8 == 0 || status.slot != slot || status.sector != parent.sector {
+		if status.flags & 8 == 0 || status.flags & 64 != 0 || status.slot != slot || status.sector != parent.sector {
 			plan_error(c'mapper slot has incompatible metadata'); return false
 		}
 		plan.rows[plan.count] = Request{slot: slot, offset: status.start, length: status.bytes, flags: status.flags & 1}
@@ -210,7 +210,7 @@ fn snapshot_plan(fd i32, mut plan Plan, mut parent Status) bool {
 }
 
 fn mapping_matches(status &Status, parent &Status, row &Request) bool {
-	return status.flags & 8 != 0 && status.slot == row.slot && status.disk_id == parent.disk_id
+	return status.flags & 8 != 0 && status.flags & 64 == 0 && status.slot == row.slot && status.disk_id == parent.disk_id
 		&& status.start == row.offset && status.bytes == row.length && status.sector == parent.sector
 		&& status.flags & 1 == row.flags
 }
@@ -251,7 +251,7 @@ mut:
 }
 
 fn mapping_growable(status &Status, parent &Status, row &Request) bool {
-	return status.flags & 8 != 0 && status.slot == row.slot && status.disk_id == parent.disk_id
+	return status.flags & 8 != 0 && status.flags & 64 == 0 && status.slot == row.slot && status.disk_id == parent.disk_id
 		&& status.start == row.offset && status.sector == parent.sector
 		&& status.flags & 1 == row.flags && status.generation != 0
 		&& status.bytes > 0 && status.bytes < row.length && parent.sector != 0

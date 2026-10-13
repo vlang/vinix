@@ -56,6 +56,63 @@ replacement. Object, interface, parent and node ownership drain through the
 normal VFS grace period. Metadata is charged to the creating process, including
 retired objects, and dynamic policy rows are recycled with a fixed bound.
 
+## Keyfile-encrypted block volumes
+
+`open-crypt` exposes an AES-256-XTS view of an unused physical extent. It uses
+two independent 256-bit keys from one 64-byte binary file. Generate fresh random
+key material for each volume and retain a secure backup outside that volume.
+The file must be regular, owned by the caller and inaccessible to group/others;
+the utility rejects a final symlink, wrong length and identical key halves.
+Keys travel through a bounded ioctl request and never appear in arguments,
+status, reports or saved plans.
+
+```sh
+# Choose an unused extent; this command does not encrypt existing plaintext.
+umask 077
+dd if=/dev/urandom of=/root/data.key bs=64 count=1
+chmod 600 /root/data.key
+vinix-volume open-crypt /dev/vda 0 1048576 8388608 /root/data.key
+vinix-volume status /dev/mapper/vinix0
+vinix-volume grow /dev/mapper/vinix0 16777216
+vinix-volume remove /dev/mapper/vinix0
+# Reopen after removal or reboot; geometry and key must match.
+vinix-volume open-crypt /dev/vda 0 1048576 16777216 /root/data.key ro
+```
+
+The resulting block node uses the same privileges, extent protection, resource
+charges, generation rules and removal semantics as a plain linear view. Status
+reports `encrypted=1` (ABI flag 64). Native sectors must be 512 or 4096 bytes;
+each native sector is one XTS data unit. Its little-endian tweak index starts
+at zero relative to the view, independent of the physical offset or slot.
+Whole-sector I/O is required. Growth preserves existing ciphertext and tweak
+indices; new sectors must receive plaintext through the encrypted view before
+their content is meaningful. A read-only reopen exposes previously written
+data without allowing writes. Raw parent reads expose ciphertext.
+
+This format is headerless: callers retain the exact physical extent, native
+sector size and key. Opening never formats, converts existing data or verifies
+a key. AES-XTS provides confidentiality without authentication; a wrong key or
+tampered ciphertext yields unverified plaintext. There is no password derivation,
+key rotation/recovery, authenticated metadata or encrypted-root boot integration.
+The keyfile example uses the current root filesystem; its storage must meet the
+user's key protection requirements. Losing the key loses access to the data.
+
+Encrypted views disable TRIM/discard. Saving a plain plan for a disk containing
+an encrypted view fails before publication, and plain replay refuses an occupied
+encrypted slot even when geometry matches. Plans do not persist encrypted
+configuration; reopen it explicitly with its key after boot.
+
+Removal serializes with each sector operation and clears the expanded key even
+while old descriptors await final release. Kernel buffers used for key import
+and encrypted block I/O, and the utility's ioctl request, are erased before release. Ordinary
+user buffers, caches and the keyfile remain their owners' responsibility.
+After any privileged encrypted-key import attempt, x86 hibernation refuses an
+unencrypted RAM image for the rest of that boot, including after removal.
+This restriction covers imported keys; it does not classify arbitrary key
+material in userspace before import. ARM hibernation remains unsupported.
+
+See [encrypted-volume qualification](../tests/storage-volumes/encrypted-volumes.md).
+
 ## Saved volume plans
 
 ```sh

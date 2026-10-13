@@ -51,6 +51,7 @@ module hibernate
 
 import block.fence
 import devcore
+import fs
 import limine
 import memory
 import x86.wake
@@ -153,6 +154,7 @@ pub fn device_ready() bool {
 pub fn prepare() bool {
 	hib_failure = ''
 	release()
+	if fs.block_encryption_used() { return fail('block encryption was used; an unencrypted memory image is prohibited for this boot') }
 	if page_size != block_bytes {
 		return fail('pages are not the size the image is written in')
 	}
@@ -237,6 +239,7 @@ pub fn set_taken_at(seconds u64) {
 pub fn take_snapshot() {
 	hib_count = 0
 	hib_taken = 0
+	if fs.block_encryption_used() { fail('block encryption was used; an unencrypted memory image is prohibited for this boot'); return }
 	started := devcore.now_ns()
 	frames := memory.pmm_page_count()
 	mut count := u64(0)

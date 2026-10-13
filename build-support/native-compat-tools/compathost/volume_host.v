@@ -10,7 +10,7 @@ fn volume_host(args []string) !int {
 	keep := os.getenv('VINIX_VOLUME_HOST_DIR')
 	work := hosttest.work_dir(keep, 'vinix-volume-host-')!
 	defer { if keep == '' { retire(work) } }
-	for source in ['kernel/fs/storage_control.v', 'kernel/fs/storage_health.v',
+	for source in ['kernel/fs/storage_control.v', 'kernel/fs/storage_health.v', 'kernel/fs/storage_crypt.v', 'kernel/aesxts/core.v',
 		'kernel/resource/block_health.v', 'kernel/resource/block_health_arm64.v',
 		'kernel/resource/block_health_amd64.v', 'kernel/resource/block_status.v',
 		'kernel/resource/block_discard.v', 'kernel/resource/block_identity.v',
@@ -27,12 +27,14 @@ fn volume_host(args []string) !int {
 	}
 	write(work + '/v.mod', "Module { name: 'volume_host' }\n")!
 	os.cp(root() + '/tests/storage-volumes/volume_test.v', work + '/fs/volume_test.v')!
+	os.cp(root() + '/tests/storage-volumes/aesxts_test.v', work + '/aesxts/core_test.v')!
+	os.cp(root() + '/tests/storage-volumes/aesxts_vectors.rsp', work + '/aesxts/aesxts_vectors.rsp')!
 	v := output(['sh', '-c', '. "$1/build-support/find-v.sh"; printf "%s" "$V"', 'find-v', root()])!
 	mut argv := [v, '-enable-globals', '-cc', 'clang', '-arch', policyhost.caller_arch()]
 	if os.getenv('VINIX_HOST_SANITIZE') == '1' {
 		argv << ['-cflags', '-fsanitize=address,undefined', '-ldflags', '-fsanitize=address,undefined']
 	}
-	argv << ['test', 'fs']
+	argv << ['test', 'fs', 'aesxts']
 	mut env := policyhost.environment()
 	env['ASAN_OPTIONS'] = 'detect_leaks=0'
 	result := hosttest.capture_in(argv, work + '/tests.log', -1, env, work)!

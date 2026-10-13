@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume open-crypt DEVICE SLOT OFFSET_BYTES LENGTH_BYTES KEYFILE [ro]\n')
 	C.printf(c'usage: vinix-volume status DEVICE\n       vinix-volume health DEVICE\n       vinix-volume monitor DEVICE INTERVAL_SECONDS [SAMPLES]\n       vinix-volume create DEVICE SLOT OFFSET_BYTES LENGTH_BYTES [ro]\n       vinix-volume grow DEVICE LENGTH_BYTES\n       vinix-volume remove DEVICE\n       vinix-volume discard DEVICE OFFSET_BYTES LENGTH_BYTES\n       vinix-volume save DEVICE PLAN\n       vinix-volume restore DEVICE PLAN\n       vinix-volume discover PLAN\n       vinix-volume restore-auto PLAN\n       vinix-volume restore-set DIRECTORY\n       vinix-volume boot-restore\n')
 	C.printf(c'       vinix-volume save-set BUNDLE DEVICE [DEVICE ...]\n       vinix-volume plan-grow BUNDLE SLOT LENGTH_BYTES\n       vinix-volume restore-bundle BUNDLE [grow]\n')
 	C.printf(c'       vinix-volume show-bundle BUNDLE\n       vinix-volume check-bundle BUNDLE [grow]\n')
@@ -88,6 +89,13 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'open-crypt') == 0 {
+			if argc != 7 && argc != 8 { return usage() }
+			slot := decimal(argv[3]) or { return usage() }; offset := decimal(argv[4]) or { return usage() }; length := decimal(argv[5]) or { return usage() }
+			if slot >= 64 || length == 0 || (argc == 8 && C.strcmp(argv[7], c'ro') != 0) { return usage() }
+			data := Request{slot: u32(slot), offset: offset, length: length, flags: if argc == 8 { u64(1) } else { u64(0) }}
+			return open_encrypted_volume(argv[2], argv[6], &data)
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'show-data') == 0 {
 			if argc != 3 { return usage() }; return verify_manifest_data(argv[2], nil, true)
 		}
@@ -521,9 +529,9 @@ pub fn run(argc i32, argv &&char) i32 {
 			C.printf(c'vinix-volume: unsupported status version\n')
 			return 1
 		}
-		C.printf(c'bytes=%lu sector=%lu readonly=%lu offline=%lu flush=%lu discard=%lu\nreads=%lu writes=%lu read_bytes=%lu write_bytes=%lu flushes=%lu\nerrors=%lu last_error=%lu disk=%lu offset=%lu slot=%lu generation=%lu\n',
+		C.printf(c'bytes=%lu sector=%lu readonly=%lu offline=%lu flush=%lu discard=%lu encrypted=%lu\nreads=%lu writes=%lu read_bytes=%lu write_bytes=%lu flushes=%lu\nerrors=%lu last_error=%lu disk=%lu offset=%lu slot=%lu generation=%lu\n',
 			result.bytes, result.sector, result.flags & 1, (result.flags >> 1) & 1, (result.flags >> 2) & 1,
-			(result.flags >> 5) & 1,
+			(result.flags >> 5) & 1, (result.flags >> 6) & 1,
 			result.reads, result.writes, result.read_bytes, result.write_bytes, result.flushes,
 			result.errors, result.last_error, result.disk_id, result.start, result.slot, result.generation)
 	} else if request == 0x1277 {

@@ -10,6 +10,7 @@ pub const block_offline = u64(2)
 pub const block_flush = u64(4)
 pub const block_volume = u64(8)
 pub const block_parent_counters = u64(16)
+pub const block_encrypted = u64(64)
 
 // Version-one userspace ABI: sixteen native little-endian 64-bit words.
 pub struct BlockStatus {

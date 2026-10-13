@@ -161,6 +161,7 @@ fn heap_snapshot(mut snapshot Heap) {
 
 fn cycles(parent &char, count int) {
 	other := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
+	crypt_cycles(parent, count)
 	for _ in 0 .. count {
 		scrub_tool(c'/root/data.vhash', c'/root/scrub-report.txt', parent, other, 0, unsafe { nil })
 		data_tool(unsafe { nil }, c'/root/data.vhash', parent, other, false, 0, unsafe { nil })
@@ -480,6 +481,7 @@ fn first_boot(parent &char) {
 		planned_data(parent, wrong)
 		planned_scrub(parent, wrong)
 		planned_lock(parent, wrong)
+		planned_crypt(parent)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -588,6 +590,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		C.printf(c'PLAN BOOT RESTORED\n')
 		data_tool(unsafe { nil }, c'/root/data.vhash', actual, other, false, 0, unsafe { nil }); C.printf(c'PLAN DATA BOOT VERIFIED\n')
 		scrub_reordered_boot(actual, other)
+		crypt_reordered_boot(actual)
 		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation
 		second_before := status(c'/dev/mapper/vinix9').generation

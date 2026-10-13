@@ -7,7 +7,11 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
+#include <string.h>
 struct vinix_volume_request { uint32_t version, slot; uint64_t offset, length, flags; };
+struct vinix_encrypted_volume_request { struct vinix_volume_request data; uint8_t key[64]; };
+_Static_assert(sizeof(struct vinix_encrypted_volume_request) == 96, "encrypted volume request ABI");
+_Static_assert(offsetof(struct vinix_encrypted_volume_request, key) == 32, "encrypted volume key ABI");
 struct vinix_block_status {
     uint64_t version, bytes, sector, flags, reads, writes, read_bytes, write_bytes;
     uint64_t flushes, errors, last_error, disk_id, start, slot, generation, reserved;

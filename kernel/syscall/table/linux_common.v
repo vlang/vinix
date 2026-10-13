@@ -280,6 +280,7 @@ fn linux_writev_flags(_ voidptr, fdnum int, iov_ptr u64, iovcnt int, flags u32) 
 		return errno.err, errno.enomem
 	}
 	defer {
+		krandom.explicit_bzero(buffer, usize(size))
 		unsafe { free(buffer) }
 	}
 
@@ -605,6 +606,7 @@ fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u
 		return errno.err, errno.enomem
 	}
 	defer {
+		krandom.explicit_bzero(buffer, usize(page_size))
 		unsafe { free(buffer) }
 	}
 
