@@ -224,6 +224,7 @@ fn swift_buffers_stop() {
 	swift_heap_stop()
 	swift_arc_stop()
 	swift_cstring_stop()
+	swift_sequence_stop()
 	swift_foundation_stop()
 	swift_metadata_stop()
 	swift_hash_stop()
@@ -244,6 +245,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF' { swift_sequence_arena() }
 		'_$sSS9UTF16ViewV5index_8offsetBySS5IndexVAF_SitF' { u64(unsafe { voidptr(swift_utf16_offset) }) }
 		'_$sSS8UTF8ViewV17_foreignSubscript8positions5UInt8VSS5IndexV_tF' { u64(unsafe { voidptr(swift_foreign_subscript) }) }
 		'_$sSS8UTF8ViewV13_foreignIndex_8offsetBySS0D0VAF_SitF' { u64(unsafe { voidptr(swift_foreign_offset) }) }

@@ -4401,17 +4401,57 @@ Five published runners remain unchanged. Fortnite passes the former UTF-16
 offset import and exits with status 1 before entry at `_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF`.
 Full regression remains unpassed; entry, rendering and gameplay are unverified.
 
+`Swift Sequence compactMap` now implements the measured protocol-dispatched transform helper
+`_$sSTsE10compactMapySayqd__Gqd__Sg7ElementQzKXEKlF` from libswiftCore.
+Installed macOS code and the MarketplaceKitWrapper callsite establish
+transform/context in x0/x1, Sequence/Result metadata in x2/x3, Sequence
+witnesses in x4, borrowed self in x20, owned Array in x0 and thrown error
+in x21. All 150 native comparisons match ordered Int/String/Objective-C
+results, nil filtering, exhaustion, growth and throws. The actual Fortnite
+closure casts Objective-C objects; registered Objective-C wrapper result
+arrays now carry the measured verbatim capacity flag and use ARC witnesses.
+
+The V implementation copies the borrowed Sequence before consuming
+makeIterator, calls next and the throwing transform with indirect Optional
+results, and destroys each owned input temporary and Iterator once.
+Aligned stack scratch is bounded to 64 KiB per value; typed result tails are
+bounded to 1 MiB. Relocation takes initialized elements and clears the old
+count before releasing storage. Throws release partial results and forward
+the original owned error; failed growth also destroys the produced Result.
+No registry lock crosses a witness or transform. Complete direct associated
+witnesses are supported; tagged mangled/accessor entries still reject.
+Objective-C result metadata must be the canonical registered wrapper with
+one-word ARC layout. Arbitrary Swift classes, class-constrained existential
+result storage, covariance, reflection and NSArray bridging remain unsupported.
+
+All 88 programs build and 129 generated C streams restore to their hashes.
+Forty-one host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 43 Swift/loader programs. The compactMap fixture checks
+exact input/result/error ownership, result-limit failure, four concurrent
+readers, reentrant workers, guarded/tagged/mismatched/incomplete/retired
+rejection, sealed adapters and two drained runtime lifetimes. Evidence is
+retained under `build/ios/fortnite/sequence-checks`, including native protocol
+and callsite inspection, original generated C, executable/debug archives
+and pinned copies of the compiler and libraries actually used. The mutable
+canonical V checkout is outside these build inputs. Checks ran on an owned
+8 GiB RAM volume; evidence and compiler bytes were hash-verified after
+persistence to the repository and that volume was detached. The initial
+fixture compile failure is retained separately. Five published runners
+remain unchanged. Fortnite passes the former compactMap import and exits
+with status 1 before entry at `_$sSTsE5first5where7ElementQzSgSbADKXE_tKF`. Full regression remains unpassed;
+entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,448 | 712 | 79 |
+| Fortnite executable | 1,449 | 711 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 128 | 48 | 23 |
-| All images | 2,235 | 763 | 120 |
+| MarketplaceKitWrapper | 129 | 47 | 23 |
+| All images | 2,237 | 761 | 120 |
 
-The C++/GLES/Text variant reports 2,248 resolved imports, 750 unresolved strong
+The C++/GLES/Text variant reports 2,250 resolved imports, 748 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

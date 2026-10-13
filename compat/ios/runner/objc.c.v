@@ -195,6 +195,7 @@ mut:
 	swift_empty_array u64 // Canonical sealed immortal empty storage, retired at quiescent shutdown.
 	swift_arc_code u64 // Sealed ARM64 preserve-most entry points, released at quiescent teardown.
 	swift_cstring_arena u64 // Sealed Swift closure/context/result adapter, retired after callbacks drain.
+	swift_sequence_arena u64 // Sealed Sequence witness/throwing transform adapters, retired after callbacks drain.
 	swift_metadata_arena u64 // Adjacent sealed String metadata/accessor pages, under the runtime lock.
 	swift_interpolation_arena u64 // Frozen interpolation metadata and TextOutputStream witnesses.
 	swift_array_arena u64 // Array accessor/descriptor/witness pages and zero-filled generic cache.

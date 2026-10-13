@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+struct SwiftObjCArrayFailure {}
+fn (_ &SwiftObjCArrayFailure) msg() string { return 'iOS: unsupported Swift ObjC Array representation' }
+fn (_ &SwiftObjCArrayFailure) code() int { return 1 }
+__global swift_objc_array_failure_value = SwiftObjCArrayFailure{}
+fn swift_objc_array_failure() IError { return unsafe { &swift_objc_array_failure_value } }
+
 struct SwiftArrayAllocation {
 	owner u64
 	bytes u64
@@ -14,6 +20,7 @@ struct SwiftArrayStorage {
 	tail u64
 	capacity u64
 	destroy u64 // Zero for POD; otherwise Element's actual destroy witness.
+	verbatim bool // Registered ObjC wrapper elements use native verbatim-bridge capacity flags.
 }
 
 struct SwiftArrayLayout {
@@ -34,9 +41,20 @@ __global swift_array_storage_descriptor = SwiftArrayStorageDescriptor{}
 fn swift_array_layout(count i64, element u64) !SwiftArrayLayout {
 	if count < 0 || element < 8 { return error('iOS: invalid Swift Array allocation') }
 	kind := read64(element)
-	// Class and class-constrained existential storage needs a different class
-	// and the verbatim ObjC bridging flag. Reject it before allocating.
-	if kind !in [u64(0x200), 0x201, 0x202, 0x300, 0x301, 0x302, 0x303, 0x304, 0x306]! {
+	// ObjC wrappers supplied by our metadata factory have known one-word ARC
+	// witnesses. Arbitrary Swift classes and class-constrained existentials
+	// still require separate storage/reflection/bridging implementations.
+	verbatim := kind == 0x305
+	if verbatim {
+		if ios_runtime == unsafe { nil } || ios_runtime.swift_concurrency_retired {
+			return swift_objc_array_failure()
+		}
+		C.ios_objc_initialize_lock()
+		valid := (ios_runtime.swift_objc_metadata[read64(element + 8)] or { u64(0) }) == element
+		C.ios_objc_initialize_unlock()
+		if !valid { return swift_objc_array_failure() }
+	}
+	if !verbatim && kind !in [u64(0x200), 0x201, 0x202, 0x300, 0x301, 0x302, 0x303, 0x304, 0x306]! {
 		return error('iOS: Swift reference-type Array storage is not implemented')
 	}
 	if kind == 0x303 && unsafe { *(&u32(element + 8)) } & 0x80000000 == 0 {
@@ -52,6 +70,9 @@ fn swift_array_layout(count i64, element u64) !SwiftArrayLayout {
 		|| stride == 0 || size > stride || stride & (alignment - 1) != 0 {
 		return error('iOS: invalid Swift Array Element layout')
 	}
+	if verbatim && (size != 8 || stride != 8 || alignment != 8 || flags & 0x10000 == 0) {
+		return swift_objc_array_failure()
+	}
 	tail := (u64(32) + alignment - 1) & ~(alignment - 1)
 	if u64(count) > (u64(0x7fffffffffffffff) - tail) / stride {
 		return error('iOS: Swift Array allocation size overflow')
@@ -60,7 +81,7 @@ fn swift_array_layout(count i64, element u64) !SwiftArrayLayout {
 	if flags & 0x10000 != 0 && destroy == 0 { return error('iOS: Swift Array requires an Element destroy witness') }
 	return SwiftArrayLayout{
 		storage: SwiftArrayStorage{ element: element, stride: stride, tail: tail,
-			capacity: u64(count), destroy: destroy }
+			capacity: u64(count), destroy: destroy, verbatim: verbatim }
 		alignment: if alignment < 16 { u64(16) } else { alignment }
 		total: tail + u64(count) * stride
 	}
@@ -108,7 +129,7 @@ fn swift_array_allocate(count i64, element u64) SwiftArrayAllocation {
 		*(&u64(owner)) = u64(&swift_array_storage_descriptor)
 		*(&u64(owner + 8)) = 3
 		*(&u64(owner + 16)) = u64(count)
-		*(&u64(owner + 24)) = u64(count) << 1
+		*(&u64(owner + 24)) = (u64(count) << 1) | if layout.storage.verbatim { u64(1) } else { u64(0) }
 	}
 	C.ios_objc_initialize_lock()
 	ios_runtime.swift_arrays[owner] = layout.storage
