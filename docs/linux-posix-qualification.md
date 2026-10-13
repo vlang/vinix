@@ -2858,3 +2858,85 @@ attributes and restrictive policy combinations, huge sparse growth and
 concurrent truncation, allocation exhaustion, GNU/foreign/ELF32 paths and
 complete Linux installation/sandbox/portal/runtime support remain separate
 work. The three broad section-15 gates stay open.
+
+## Native readlink size words
+
+Native readlinkat previously accepted zero sizes and used the full unsigned
+register word for copying. The shared Linux adapter now consumes the low
+signed32 size. Nonpositive sizes return EINVAL before pathname copying,
+directory-FD lookup, permissions or destination access; positive sizes ignore
+the upper register bits. Both native readlinkat dispatches and x86 readlink
+use that adapter. This follows
+[Linux v6.12 do_readlinkat and syscall declarations](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/stat.c).
+The filesystem callee and its allocation/ownership paths remain unchanged.
+
+The V `readlinkabi` fixture passes **4,320 checks on AArch64 and 5,760 on
+x86-64** in root and UID/GID1000 children. Sixteen classes cover ordinary and
+dangling links, directory-relative and absolute paths with ignored invalid
+FDs, invalid/non-directory relative FDs, private search permissions, regular
+files/directories, missing/empty paths, null/inaccessible pathname pointers,
+a symlink loop and procfs self/exe links. Fifteen size words cover zero,
+short/exact/oversized positive copies, INT_MAX, negative low words and several
+upper-word patterns. Three destinations are a 64-byte canary array, null and
+an inaccessible pointer. AArch64 tests raw readlinkat plus both musl wrappers;
+x86 also tests raw readlink.
+
+Copies must return the exact prefix length and bytes, without a NUL or changes
+beyond that prefix. Native invalid sizes precede real ENOENT/EFAULT/EACCES/
+EBADF/ENOTDIR/ELOOP and nonlink EINVAL controls. Musl's exact zero is distinct:
+its wrappers substitute a one-byte scratch buffer, perform lookup, and convert
+a positive result to zero. The caller's buffer remains untouched, and real
+path errors remain errors. A nonzero size word whose low32 bits are zero still
+reaches the native EINVAL check. Captured staged musl source hashes are pinned
+in the evidence alongside the guest builder's `/sbin/init` staging contract.
+
+Initial fixture expectations incorrectly treated libc zero as a raw syscall
+and assumed `/init` for procfs exe. Those failures, their sources/C and receipts
+remain preserved. The intermediate version fixes musl zero; the final version
+also fixes the executable target. Only the probe changes. All other generated
+functions remain identical after normalizing compiler return/unused-loop names.
+
+| Fixture expectations | ARM baseline UID1000/root failures | x86 baseline UID1000/root failures | Fixed ARM/x86 failures per cohort |
+| --- | --- | --- | --- |
+| Original | 814 / 820 | 1,088 / 1,096 | 105 / 112 |
+| Musl exact-zero corrected | 730 / 736 | 1,004 / 1,012 | 21 / 28 |
+| Musl zero and executable target corrected | 712 / 718 | 980 / 988 | 0 / 0 |
+
+Every final baseline failure is an invalid signed32 size or excess copying
+caused by upper bits. Original/intermediate candidate failures are confined
+to the two expectation mistakes; they remain failed aggregate receipts.
+Both aggregates independently pass open/pathio/namespace/runtime with the
+same kernel binaries and matching fixture C. Fresh final new-fixture suites
+pass on those identical kernels.
+
+Six stable cohort descriptors plus transient directory aliases survive 32
+warm-ups and 200 measured cycles of 52 raw probes plus one alias-relative copy
+and state controls. Types/sizes, public ABCD bytes, shared regular-file cursors,
+FD flags and private search refusals stay correct. All live slab classes remain
+flat; big pages stay **63/63 ARM and 160/160 x86** in both cohorts. Loop and
+bad pathname-pointer outcomes remain outside the repeated storage loop.
+Handles/Slabs use bounded alloca; probe buffers remain on the stack, without
+hidden fixture allocation. All child descriptor, transient-alias and observer
+paths close their owned references.
+
+The [independent final lifetime review](../tests/linux-compat/results/2026-10-13/readlinkabi-lifetime-review.md)
+confirms generated cleanup on every return, synchronous borrowing, matching
+final source/C captures and flat retention, with no new kernel ownership.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/readlinkabi-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/readlinkabi-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/readlinkabi-audit.v)
+bind all original/intermediate/final results, source/init/image hashes,
+compiler/controller/kernel binaries/C and both executed failing audit controls.
+Both builds, eight host test files and generated inventory checks pass. The
+allocation allowance audit still fails with **406 ARM/295 x86** sites and exact
+unchanged NEW rows; no allowance is raised. Private trees pin `ddefb845b`; only
+three syscall-table files differ. Reversing the adapter, native dispatch and
+legacy routing restores the entire baseline kernel C. All 63 isolated semantic
+inputs are pinned separately from the public committed-parent inventory.
+
+Empty-path symlink descriptor support, Linux procfs target spelling, link atime,
+restrictive MAC/pledge/unveil combinations, concurrent link/FD changes,
+partial-copy boundaries, disk/overlays, GNU/translated/ELF32 paths and complete
+Linux installation/sandbox/portal/runtime acceptance remain separate work.
+The three broad section-15 gates stay open.

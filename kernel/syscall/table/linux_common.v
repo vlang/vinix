@@ -684,6 +684,14 @@ fn syscall_linux_ftruncate(gpr_state voidptr, fdnum int, length i64) (u64, u64) 
 	return file.syscall_ftruncate(gpr_state, int(u32(fdnum)), length)
 }
 
+// Linux receives a signed C-int size, including through readlink(2).
+// Reject it before pathname lookup or destination access.
+fn syscall_linux_readlinkat(gpr_state voidptr, dirfd int, path charptr, buf voidptr, limit u64) (u64, u64) {
+	size := i32(u32(limit))
+	if size <= 0 { return errno.err, errno.einval }
+	return fs.syscall_readlinkat(gpr_state, dirfd, path, buf, u64(size))
+}
+
 // pread64: read at offset without changing file position.
 fn syscall_linux_pread64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
 	return file.syscall_pread(gpr_state, int(u32(fdnum)), buf, count, offset)

@@ -706,6 +706,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   preserving directory EISDIR and other-type EINVAL independently of prior
   errors; qualify symlink targets, real resizing, aliases, metadata, queued
   bytes and flat storage on both architectures. See [the pathname receipts](docs/linux-posix-qualification.md#native-pathname-truncate-type-errors).
+- [x] Decode native readlink/readlinkat sizes as signed32 and reject nonpositive
+  sizes before lookup/copying; qualify exact target prefixes, musl zero-size
+  scratch behavior, real errors, retained descriptor state and flat storage on
+  both architectures. See [the readlink receipts](docs/linux-posix-qualification.md#native-readlink-size-words).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

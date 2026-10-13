@@ -90,7 +90,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | 75 | vmsplice | `pipe.syscall_vmsplice` | wired; unqualified |
 | 76 | splice | `pipe.syscall_splice` | wired; unqualified |
 | 77 | tee | `pipe.syscall_tee` | wired; unqualified |
-| 78 | readlinkat | `fs.syscall_readlinkat` | wired; unqualified |
+| 78 | readlinkat | `syscall_linux_readlinkat` | wired; unqualified |
 | 79 | newfstatat | `syscall_linux_fstatat` | wired; unqualified |
 | 80 | fstat | `syscall_linux_fstat` | wired; unqualified |
 | 81 | sync | `fs.syscall_sync` | wired; unqualified |
@@ -595,7 +595,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | 264 | renameat | `fs.syscall_renameat` | wired; unqualified |
 | 265 | linkat | `fs.syscall_linkat` | wired; unqualified |
 | 266 | symlinkat | `fs.syscall_symlinkat` | wired; unqualified |
-| 267 | readlinkat | `fs.syscall_readlinkat` | wired; unqualified |
+| 267 | readlinkat | `syscall_linux_readlinkat` | wired; unqualified |
 | 268 | fchmodat | `fs.syscall_fchmodat` | wired; unqualified |
 | 269 | faccessat | `syscall_linux_faccessat` | wired; unqualified |
 | 270 | pselect6 | `file.syscall_pselect6` | wired; unqualified |
@@ -741,10 +741,10 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/sched/sched_arm64.v` | `7fbd982e9ea4567b1a60e684bb55bc800ed240be3f8cf9439d8c0807740c768f` |
 | `kernel/socket/unix/unix.v` | `790740ff96eb65fe24310b97a08e49c38cdd94f9d60b84a4af9da91fb213ed80` |
 | `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
-| `kernel/syscall/table/linux_common.v` | `6cf0b095022f1baedc173f00d842113f8aa3e83237d06017726b975f3c018ea0` |
+| `kernel/syscall/table/linux_common.v` | `c9f5fe7cbc11fee5a4d4bc6f2bf2e54b58fdcfdf0aca77d19d12af49fd55897d` |
 | `kernel/syscall/table/linux_compat.v` | `3cff2259bc5463ef6d5b0cad84231e9c93139566dbf8ef31b29d73364b3642d6` |
-| `kernel/syscall/table/linux_table_amd64.v` | `e7773ac6e3e9a7c44de06b3192867f56a7b3469a076eb9c1fb6e9c7568a14745` |
-| `kernel/syscall/table/syscall_table_arm64.v` | `6cd21812045e1f90b9ec5c3f3fbf89a3e991b5780228c6884a75af297ff7eda8` |
+| `kernel/syscall/table/linux_table_amd64.v` | `9c4e7e0053271b5e86ad449b90191848e248a6ce46df62f6eb666a867deef018` |
+| `kernel/syscall/table/syscall_table_arm64.v` | `3e329ea476d16804c52bc32dfd7fd7c2a37fbea78ecf007a68de36cdee0435ad` |
 | `kernel/syscall/table/trace_amd64.v` | `886f920865046fc589e5e923fd2ae9c1bf1ed0a6731b5344026b480470b3cd18` |
 | `kernel/usercopy/usercopy.v` | `4c36b49cd3abe25aa70897981d0d1695edc1244c2d449c4c849fb0750e712f9e` |
 | `kernel/usercopy/word_atomic_amd64.v` | `bf4c0c08a9d6e8251fdd62d50e3d698bb3799c1aae0e0752a06ea23ff9936048` |

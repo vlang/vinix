@@ -134,6 +134,24 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `readlinkabi` case checks 2,160 AArch64 or 2,880 x86-64 calls in each
+root/UID1000 child. Raw readlinkat, x86 readlink and both musl wrappers cover
+sixteen path classes, fifteen size words and valid/null/inaccessible buffers.
+The native ABI consumes a signed32 size: nonpositive values return EINVAL
+before path, directory FD, permission or destination access; positive values
+ignore upper bits and copy exact target prefixes without a NUL. Musl's exact
+zero uses a scratch lookup and returns zero or the real path error, leaving
+the caller's buffer untouched. Missing/empty/private/nonlink/loop paths,
+relative/absolute FD behavior and procfs links retain their errors or bytes.
+The supervisor stages the executable at `/sbin/init`; `/proc/self` retains
+Vinix's existing absolute spelling, whose Linux conformance is separate.
+Six stable descriptors retain metadata/types/sizes, file bytes/shared cursors
+and descriptor flags. After 32 warm-ups, 200 cycles of 52 probes and a transient
+directory alias retain flat slab live objects and large pages. Original
+fixture expectation failures remain published alongside corrected runs.
+Empty-path symlink descriptors, atime, restrictive policy, concurrency and
+partial-copy boundaries require separate qualification.
+
 The `truncatepath` case checks 384 raw/musl pathname truncate calls in each
 root and UID/GID1000 child. Twenty-four classes cover regular/private files,
 directories, FIFOs, UNIX sockets, devices, direct/symlink targets and lookup

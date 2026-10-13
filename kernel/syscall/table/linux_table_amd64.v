@@ -179,7 +179,7 @@ fn syscall_linux_unlink(gpr_state voidptr, path charptr) (u64, u64) {
 }
 
 fn syscall_linux_readlink(gpr_state voidptr, path charptr, buf voidptr, size u64) (u64, u64) {
-	return fs.syscall_readlinkat(gpr_state, fs.at_fdcwd, path, buf, size)
+	return syscall_linux_readlinkat(gpr_state, fs.at_fdcwd, path, buf, size)
 }
 
 fn syscall_linux_getdents64(gpr_state voidptr, fdnum int, dirp u64, count u64) (u64, u64) {
@@ -417,7 +417,7 @@ pub fn init_syscall_table() {
 	syscall_table[264] = voidptr(fs.syscall_renameat) // renameat
 	syscall_table[265] = voidptr(fs.syscall_linkat) // linkat
 	syscall_table[266] = voidptr(fs.syscall_symlinkat) // symlinkat
-	syscall_table[267] = voidptr(fs.syscall_readlinkat) // readlinkat
+	syscall_table[267] = voidptr(syscall_linux_readlinkat) // readlinkat
 	syscall_table[268] = voidptr(fs.syscall_fchmodat) // fchmodat
 	syscall_table[269] = voidptr(syscall_linux_faccessat) // faccessat
 	syscall_table[270] = voidptr(file.syscall_pselect6) // pselect6

@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "bbf0076988ea7a698f5ea910b25cb2c82a556864c6876fb0f69a3473991b90cc",
+    "results": [
+        {
+            "name": "readlinkabi",
+            "source_sha256": "58c826d69030aa62356b81583a0b666c59eadee27608cfb785310b1d1e498d67",
+            "init_sha256": "ff995b81037e7b6adc2c673df98344b67b94319dffbafaff087a390f244280d5",
+            "iso_sha256": "9eb2551d2b4f035ef81cec947f5dc9c3c08d8f69c706a5a97606d0b6cf260c26",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
