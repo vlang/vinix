@@ -3190,3 +3190,82 @@ zombie/task retirement, overmount/unmount and concurrent teardown, additional
 status/stat fields, full mount retention and glibc/translated/ELF32 or application
 installation/sandbox/portal acceptance remain separate. The three broad section
 15 gates remain open.
+
+## Selected task stat identity and scheduling
+
+Native `/proc/<pid>/task/<tid>/stat` now uses the validated selected task for
+field 1 (namespace TID), field 18 (effective priority), field 40 (real-time
+priority) and field 41 (policy). Process paths retain their leader's values.
+Linux's [do_task_stat](https://github.com/torvalds/linux/blob/master/fs/proc/array.c)
+selects task identity and scheduling for these fields. Previously every worker
+used the process leader. The existing process-table lock retains the selected
+task through validation, scheduler snapshot, namespace lookup and Text
+serialization. No reference ownership, allocation or freeing path changes.
+
+The extended native musl `procself` fixture retains 1,620 link probes per
+architecture and selected status identity checks, adding 84 initial stat reads
+through named and explicit numeric paths: 72 across root/UID1000 main/pthread
+readers and three procfs aliases, eight across namespace leader/worker inherited
+root and own procfs views, and four in a chroot without `/proc`. Main and process
+paths retain ordinary policy. Workers set FIFO priority 17 and RR priority 33;
+the PID-namespace worker sets FIFO priority 23. Pthread getters verify requested
+values and targeted raw syscall queries independently supply expected stat
+fields. Real-time policies require effective priority `-1 - rt_priority`.
+Workers restore ordinary scheduling before returning.
+
+| Architecture | Baseline | Candidate | Large pages before/after, both credential groups |
+| --- | --- | --- | --- |
+| AArch64 | 28 worker records show leader PID and priority/rtprio/policy 20/0/0 | All 84 initial records and existing link/status controls pass | 63/63 |
+| x86-64 | 28 worker records show leader PID and priority/rtprio/policy 20/0/0 | All 84 initial records and existing link/status controls pass | 160/160 |
+
+Each baseline has 12 FIFO17, 12 RR33 and four FIFO23 failures. The existing
+status Pid/NSpid and relative-link targets remain correct; leader stat controls
+pass. After 32 warmups, each credential group runs 200 cycles containing 120
+link probes, six status checks and 12 stat reads. All 18 ARM and 14 x86 live slab
+classes stay exact. Namespace creation occurs once before sampling; repeated
+namespace creation/reclamation remains separate. Both architectures also pass
+`nnpthread`, `seccompthread`, `namespace`, `open` and `runtime`. Eight host test
+files and the isolated 63-input dispatch inventory check pass. Allocation
+audits retain their existing exit 1: identical `NEW:` rows, 406 ARM/295 x86 sites
+and 657/653 source files. No allowance changes.
+
+The first fixture used bundled musl-1.2.5 process-level `sched_setscheduler`,
+`sched_getscheduler` and `sched_getparam`, all of which return ENOSYS. Both first
+baseline runs exited during setup before matrix markers; their owned QEMUs were
+terminated, leaving failed missing-verdict receipts. Diagnostic candidate runs
+then show errno 38 from the ordinary-policy setup call on both architectures.
+These draft sources, compiled-source hashes, logs and failed receipts remain
+published. Final tests use real musl pthread scheduling APIs and raw targeted
+queries, and explicitly require the unchanged ENOSYS process-wrapper refusals.
+Root sets `RLIMIT_RTPRIO` to 99 before forking both credential groups.
+
+Both kernels build in isolated worktrees at
+`21f57bbae976c4165a8b9dca7c431a049f7d9416`; only the formatter and its procfs
+callback change. Restoring that formatter body, its prototype/definition
+parameter and the single callback, then normalizing only unused-loop source
+offset names, reproduces the complete baseline generated C. Actual before and
+after guest C equals the final previews. Independent lifetime review verifies
+table locking, synchronous stack scheduling/parser borrows, descriptor cleanup
+and worker state surviving joins. Failed joins exit before stack state unwinds.
+
+The assertion-enabled [auditor](../tests/linux-compat/results/2026-10-13/procstat-audit.v)
+requires exact baseline failures, candidate fields and namespace columns,
+all six compatibility verdicts, source/C/ELF/ISO/kernel receipts, review hashes,
+generated-C scope, flat retention and unchanged allocation audit failures.
+Both deliberately failing controls execute. The evidence binds all 63 isolated
+inputs and compiler/controller/build/kernel/C/capture/receipt hashes:
+[AArch64](../tests/linux-compat/results/2026-10-13/procstat-evidence-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-13/procstat-evidence-x86_64.json),
+[ARM baseline](../tests/linux-compat/results/2026-10-13/procstat-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/procstat-after-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/procstat-before-x86_64.log)
+and [x86 candidate](../tests/linux-compat/results/2026-10-13/procstat-after-x86_64.log).
+Public inventory fingerprints are regenerated from the committed parent plus
+this fix, separately from the semantic build input set.
+
+This qualifies only selected native identity and scheduling fields. CPU/fault
+accounting, state, nice, start time and command remain process-wide in this
+formatter. Scheduler timing, task retirement, overmount/unmount races, full
+procfs mount retention and glibc/translated/ELF32 or application installation,
+sandbox and portal acceptance remain separate. The three broad section 15 gates
+remain open.

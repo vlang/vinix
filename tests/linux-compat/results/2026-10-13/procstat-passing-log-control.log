@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/procstat-audit.v:146: FAIL: fn main.failure: assert log.contains('LINUX PROCSELF STAT DETAIL:'), 'task-stat baseline failure markers required'
+      message: task-stat baseline failure markers required
+V panic: Assertion failed...

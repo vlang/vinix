@@ -156,6 +156,18 @@ published. See [the task-status receipts](../../docs/linux-posix-qualification.m
 retention bound on both baseline and candidate; those failures remain visible.
 See [the relative-link receipts and limits](../../docs/linux-posix-qualification.md#relative-procfs-self-and-thread-self-links).
 
+Stat controls additionally check fields 1/18/40/41 (selected PID, effective
+priority, real-time priority and policy) through both named and numeric paths.
+Workers use musl pthread scheduling APIs with FIFO17/RR33; the namespace worker
+uses FIFO23, while leader/process paths retain ordinary scheduling. Raw targeted
+queries independently provide expected policies. The fixture requires the stock
+musl process-level sched wrappers to retain their actual ENOSYS refusal. There
+are 84 initial stat reads per architecture and 12 more per retention cycle.
+Both baselines fail 28 worker records; both candidates pass all fields with flat
+63 ARM/160 x86 large pages. Initial setup failures caused by musl wrappers remain
+published. See [the task-stat receipts](../../docs/linux-posix-qualification.md#selected-task-stat-identity-and-scheduling).
+Per-thread CPU/fault/state/name/nice/start-time accounting remains separate.
+
 The `readlinkempty` case checks 3,648 raw/musl calls per root/UID1000 child
 on both architectures. Empty paths name the retained symlink description,
 including O_PATH handles after unlink or private-directory search denial.

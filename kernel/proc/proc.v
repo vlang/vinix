@@ -1449,10 +1449,11 @@ fn dump_threads() {
 	}
 }
 
-// The first fields of /proc/<pid>/stat. Everything Vinix does not account for
+// The first fields of /proc/<pid>/stat and /proc/<pid>/task/<tid>/stat.
+// Everything Vinix does not account for
 // is reported as zero rather than invented; readers take the fields they know.
 // Ids are shown as `viewer` numbers them.
-pub fn process_stat_line(pid int, viewer &Namespace) string {
+pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
 	lock_table()
 	defer { unlock_table() }
 	process := process_at(pid)
@@ -1461,10 +1462,12 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	}
 	threads := if process.threads.len > 0 { process.threads.len } else { 1 }
 
-	// The main thread's policy is what `ps -c` and `top` report for the
-	// process. Under a real-time policy Linux puts -1 - rt_priority in the
-	// priority field, which is how those tools tell the two bands apart.
-	params := threads_by_tid[pid].sched_or_default()
+	// The table lock retains the selected thread through this snapshot.
+	target := threads_by_tid[if tid == 0 { pid } else { tid }]
+	if tid != 0 && (target == unsafe { nil } || voidptr(target.process) != voidptr(process)) { return '' }
+	// Process stat uses the leader; task stat uses that thread's policy.
+	// Linux's real-time priority field is -1 - rt_priority.
+	params := target.sched_or_default()
 	mut priority := 20 + process.nice
 	if params.policy == sched_fifo || params.policy == sched_rr {
 		priority = -1 - params.priority
@@ -1473,7 +1476,7 @@ pub fn process_stat_line(pid int, viewer &Namespace) string {
 	// Fields 21 to 39, which nothing here keeps, and then rt_priority and
 	// policy in 40 and 41.
 	state := match process_state(process) { `Z` { 'Z' } `T` { 'T' } `S` { 'S' } else { 'R' } }
-	shown_pid := pid_in(process, viewer)
+	shown_pid := if tid == 0 { pid_in(process, viewer) } else { tid_in(target, viewer) }
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	shown_pgid := pgid_in(process, viewer)
 	shown_sid := sid_in(process, viewer)

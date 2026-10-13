@@ -713,7 +713,7 @@ fn (this &ProcFSResource) contents() string {
 			return text_with_ending(proc.process_command(this.pid), `\n`)
 		}
 		.process_stat {
-			return proc.process_stat_line(this.pid, unsafe { &proc.Namespace(this.view) })
+			return proc.process_stat_line(this.pid, this.tid, unsafe { &proc.Namespace(this.view) })
 		}
 		.statm {
 			// Linux's first two fields: the size of the address space and what

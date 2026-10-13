@@ -8,8 +8,10 @@ module procselffixture
 #include <pthread.h>
 #include <sched.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/mount.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -18,6 +20,8 @@ module procselffixture
 @[typedef]
 struct C.pthread_t {}
 struct C.stat { st_mode u32 st_ino u64 st_dev u64 }
+struct C.sched_param { mut: sched_priority i32 }
+struct C.rlimit { rlim_cur u64 rlim_max u64 }
 struct Handles { mut: dirs [3]i32 links [6]i32 }
 struct Worker { bank &Handles ordinary bool slot i32 mut: tid i32 failed bool }
 struct Slabs { mut: sizes [32]u64 live [32]u64 rows i32 large u64 }
@@ -47,6 +51,15 @@ fn C.waitpid(i32, &i32, i32) i32
 fn C._exit(i32)
 fn C.pthread_create(&C.pthread_t, voidptr, fn (voidptr) voidptr, voidptr) i32
 fn C.pthread_join(C.pthread_t, voidptr) i32
+fn C.pthread_self() C.pthread_t
+fn C.pthread_setschedparam(C.pthread_t, i32, &C.sched_param) i32
+fn C.pthread_getschedparam(C.pthread_t, &i32, &C.sched_param) i32
+fn C.sched_setscheduler(i32, i32, &C.sched_param) i32
+fn C.sched_getscheduler(i32) i32
+fn C.sched_getparam(i32, &C.sched_param) i32
+fn C.setrlimit(i32, &C.rlimit) i32
+fn C.strrchr(&char, i32) &char
+fn C.strtoll(&char, &&char, i32) i64
 fn C.snprintf(&char, usize, &char, ...) i32
 fn C.sscanf(&char, &char, ...) i32
 fn C.strstr(&char, &char) &char
@@ -100,7 +113,31 @@ fn probe(bank &Handles, view i32, kind i32, form i32, size i32, destination i32,
 		return valid
 	}
 }
-fn status(dirfd i32, kind i32) bool {
+fn scheduling(policy i32, priority i32) bool {
+	unsafe {
+		param := C.sched_param{sched_priority: priority}; mut actual := C.sched_param{}; mut actual_policy := i32(-1); current := C.pthread_self()
+		return C.pthread_setschedparam(current, policy, &param) == 0 && C.pthread_getschedparam(current, &actual_policy, &actual) == 0 && actual_policy == policy && actual.sched_priority == priority
+	}
+}
+fn stat_record(dirfd i32, path &char, wanted_pid i32, policy i32, rtprio i32, verbose bool) bool {
+	unsafe {
+		fd := C.openat(dirfd, path, C.O_RDONLY); if fd < 0 { return false }; defer { C.close(fd) }
+		mut data := [4096]char{}; length := C.read(fd, &data[0], 4095)
+		if length <= 0 || length >= 4096 { return false }; data[int(length)] = 0
+		mut pid := i32(-1); if C.sscanf(&data[0], c'%d', &pid) != 1 { return false }
+		end_name := C.strrchr(&data[0], i32(`)`)); if end_name == nil || end_name[1] != char(32) || end_name[2] == 0 || end_name[3] != char(32) { return false }
+		mut cursor := end_name + 4; mut priority := i64(0); mut actual_rtprio := i64(0); mut actual_policy := i64(-1)
+		for field in 4 .. 42 {
+			mut next := &char(nil); value := C.strtoll(cursor, &next, 10); if next == cursor { return false }; cursor = next
+			if field == 18 { priority = value }; if field == 40 { actual_rtprio = value }; if field == 41 { actual_policy = value }
+		}
+		wanted_priority := if policy == i32(C.SCHED_FIFO) || policy == i32(C.SCHED_RR) { i64(-1 - rtprio) } else { i64(20) }
+		valid := pid == wanted_pid && priority == wanted_priority && actual_rtprio == rtprio && actual_policy == policy
+		if !valid && verbose { C.printf(c'LINUX PROCSELF STAT DETAIL: path=%s pid=%d/%d priority=%ld/%ld rtprio=%ld/%d policy=%ld/%d\n', path, pid, wanted_pid, priority, wanted_priority, actual_rtprio, rtprio, actual_policy, policy); C.fflush(nil) }
+		return valid
+	}
+}
+fn status(dirfd i32, kind i32, verbose bool) bool {
 	unsafe {
 		pid := C.getpid(); tid := if kind == 0 { pid } else { i32(C.syscall(isize(C.SYS_gettid))) }
 		mut named := [64]char{}; mut numeric := [64]char{}
@@ -113,10 +150,17 @@ fn status(dirfd i32, kind i32) bool {
 		length := C.read(fd, &data[0], 4095); if length <= 0 || length >= 4096 { return false }; data[int(length)] = 0
 		tgid_line := C.strstr(&data[0], c'\nTgid:'); pid_line := C.strstr(&data[0], c'\nPid:'); ns_line := C.strstr(&data[0], c'\nNSpid:')
 		mut actual_tgid := i32(-1); mut actual_pid := i32(-1); mut actual_ns := i32(-1); mut extra := i32(-1)
-		return tgid_line != nil && pid_line != nil && ns_line != nil
+		valid_status := tgid_line != nil && pid_line != nil && ns_line != nil
 			&& C.sscanf(tgid_line, c'\nTgid: %d', &actual_tgid) == 1 && actual_tgid == pid
 			&& C.sscanf(pid_line, c'\nPid: %d', &actual_pid) == 1 && actual_pid == tid
 			&& C.sscanf(ns_line, c'\nNSpid: %d %d', &actual_ns, &extra) == 1 && actual_ns == tid
+		policy := i32(C.syscall(isize(C.SYS_sched_getscheduler), isize(tid))); mut param := C.sched_param{}
+		if policy < 0 || C.syscall(isize(C.SYS_sched_getparam), isize(tid), &param) != 0 { return false }
+		C.snprintf(&named[0], 64, c'%s/stat', link_name(kind))
+		if kind == 0 { C.snprintf(&numeric[0], 64, c'%d/stat', pid) } else { C.snprintf(&numeric[0], 64, c'%d/task/%d/stat', pid, tid) }
+		first := stat_record(dirfd, &named[0], tid, policy, param.sched_priority, verbose)
+		second := stat_record(dirfd, &numeric[0], tid, policy, param.sched_priority, verbose)
+		return valid_status && first && second
 	}
 }
 fn matrix(bank &Handles, ordinary bool, slot i32) bool {
@@ -126,19 +170,25 @@ fn matrix(bank &Handles, ordinary bool, slot i32) bool {
 			cases++; if !probe(bank, i32(view), i32(kind), i32(form), size, i32(destination), true) { bad++ }
 		} } } } }
 		mut controls := true
-		for view in 0 .. 3 { for kind in 0 .. 2 { if !status(bank.dirs[view], i32(kind)) { controls = false } } }
+		for view in 0 .. 3 { for kind in 0 .. 2 { if !status(bank.dirs[view], i32(kind), true) { controls = false } } }
 		C.printf(c'LINUX PROCSELF OUTCOMES: ordinary=%d slot=%d pid=%d tid=%ld cases=%d failures=%d status=%d\n', i32(ordinary), slot, C.getpid(), C.syscall(isize(C.SYS_gettid)), cases, bad, i32(controls)); C.fflush(nil)
 		return bad == 0 && controls
 	}
 }
 fn worker(arg voidptr) voidptr {
-	unsafe { mut state := &Worker(arg); state.tid = i32(C.syscall(isize(C.SYS_gettid))); state.failed = !matrix(state.bank, state.ordinary, state.slot); return nil }
+	unsafe {
+		mut state := &Worker(arg); state.tid = i32(C.syscall(isize(C.SYS_gettid)))
+		policy := if state.slot == 1 { i32(C.SCHED_FIFO) } else { i32(C.SCHED_RR) }; priority := if state.slot == 1 { i32(17) } else { i32(33) }
+		if !scheduling(policy, priority) { state.failed = true; return nil }
+		state.failed = !matrix(state.bank, state.ordinary, state.slot)
+		if !scheduling(i32(C.SCHED_OTHER), 0) { state.failed = true }; return nil
+	}
 }
 fn cycle(bank &Handles) bool {
 	unsafe {
 		for view in 0 .. 3 { for kind in 0 .. 2 { for form in 0 .. 5 { for size in [i32(1), 64]! { for destination in 0 .. 2 {
 			if !probe(bank, i32(view), i32(kind), i32(form), size, i32(destination), false) { return false }
-		} } } }; for kind in 0 .. 2 { if !status(bank.dirs[view], i32(kind)) { return false } } }
+		} } } }; for kind in 0 .. 2 { if !status(bank.dirs[view], i32(kind), false) { return false } } }
 		return true
 	}
 }
@@ -180,7 +230,7 @@ fn chroot_test() bool {
 			if C.chroot(c'/tmp/linux-procself/jail') != 0 || C.chdir(c'/') != 0 { C._exit(1) }
 			fd := C.open(c'/view', C.O_PATH | C.O_DIRECTORY); if fd < 0 { C._exit(1) }
 			missing := C.open(c'/proc', C.O_PATH); if missing >= 0 { C.close(missing); C.close(fd); C._exit(1) }
-			valid := status(fd, 0) && status(fd, 1); C.close(fd)
+			valid := status(fd, 0, true) && status(fd, 1, true); C.close(fd)
 			C.printf(c'LINUX PROCSELF CHROOT: no-/proc relative-self/thread-self-status %s\n', if valid { &char(c'PASS') } else { &char(c'FAIL') }); C.fflush(nil)
 			C._exit(if valid { 0 } else { 1 })
 		}
@@ -202,7 +252,12 @@ fn namespace_identity(fd i32, local bool, outer_pid i32) bool {
 		mut pid := i32(-1); mut tgid := i32(-1); mut first := i32(-1); mut second := i32(-1); mut third := i32(-1)
 		if C.sscanf(pid_line, c'\nPid: %d', &pid) != 1 || C.sscanf(tgid_line, c'\nTgid: %d', &tgid) != 1 { return false }
 		count := C.sscanf(ns_line, c'\nNSpid: %d %d %d', &first, &second, &third)
-		valid := pid == outer_tid && tgid == parsed_pid && first == outer_tid && count == if local { 1 } else { 2 } && (local || second == local_tid)
+		policy := i32(C.syscall(isize(C.SYS_sched_getscheduler), isize(0))); mut param := C.sched_param{}
+		if policy < 0 || C.syscall(isize(C.SYS_sched_getparam), isize(0), &param) != 0 { return false }
+		mut numeric := [96]char{}; C.snprintf(&numeric[0], 96, c'%s/stat', &link[0])
+		alias_valid := stat_record(fd, c'thread-self/stat', outer_tid, policy, param.sched_priority, true)
+		numeric_valid := stat_record(fd, &numeric[0], outer_tid, policy, param.sched_priority, true)
+		valid := pid == outer_tid && tgid == parsed_pid && first == outer_tid && count == if local { 1 } else { 2 } && (local || second == local_tid) && alias_valid && numeric_valid
 		C.printf(c'LINUX PROCSELF TASKIDS: local=%d leader=%d pid=%d/%d tgid=%d/%d nspid=%d:%d count=%d expected_count=%d %s\n', i32(local), i32(local_tid == 1), pid, outer_tid, tgid, parsed_pid, first, second, count, if local { 1 } else { 2 }, if valid { &char(c'PASS') } else { &char(c'FAIL') }); C.fflush(nil)
 		return valid
 	}
@@ -211,8 +266,9 @@ fn namespace_worker(arg voidptr) voidptr {
 	unsafe {
 		mut state := &NamespaceWorker(arg)
 		if C.getpid() != 1 || C.syscall(isize(C.SYS_gettid)) <= 1 { state.failed = true; return nil }
+		if !scheduling(i32(C.SCHED_FIFO), 23) { state.failed = true; return nil }
 		outer := namespace_identity(state.outer, false, state.outer_pid); inner := namespace_identity(state.inner, true, state.outer_pid)
-		state.failed = !outer || !inner; return nil
+		state.failed = !outer || !inner; if !scheduling(i32(C.SCHED_OTHER), 0) { state.failed = true }; return nil
 	}
 }
 fn namespace_child(outer i32) i32 {
@@ -266,6 +322,18 @@ fn qualify(bank &Handles, ordinary bool) bool {
 @[export: 'main']
 pub fn run() i32 {
 	unsafe {
+		C.puts(c'LINUX PROCSELF SETUP: rtprio limit'); C.fflush(nil)
+		param := C.sched_param{}; mut scratch := C.sched_param{}; e := C.__errno_location()
+		*e = 0; if C.sched_setscheduler(0, C.SCHED_OTHER, &param) != -1 || *e != C.ENOSYS { C.puts(c'LINUX PROCSELF FAIL: musl sched_setscheduler refusal'); C.fflush(nil); return 1 }
+		*e = 0; if C.sched_getscheduler(0) != -1 || *e != C.ENOSYS { C.puts(c'LINUX PROCSELF FAIL: musl sched_getscheduler refusal'); C.fflush(nil); return 1 }
+		*e = 0; if C.sched_getparam(0, &scratch) != -1 || *e != C.ENOSYS { C.puts(c'LINUX PROCSELF FAIL: musl sched_getparam refusal'); C.fflush(nil); return 1 }
+		C.puts(c'LINUX PROCSELF MUSL SCHED: process wrappers refuse ENOSYS'); C.fflush(nil)
+		*e = 0
+		limit := C.rlimit{rlim_cur: 99, rlim_max: 99}; result := C.setrlimit(C.RLIMIT_RTPRIO, &limit)
+		C.printf(c'LINUX PROCSELF SETUP: setrlimit=%d errno=%d\n', result, *C.__errno_location()); C.fflush(nil)
+		if result != 0 { C.puts(c'LINUX PROCSELF FAIL: rtprio limit'); C.fflush(nil); return 1 }
+		C.puts(c'LINUX PROCSELF SETUP: ordinary policy'); C.fflush(nil)
+		if !scheduling(i32(C.SCHED_OTHER), 0) { C.printf(c'LINUX PROCSELF FAIL: ordinary policy errno=%d\n', *C.__errno_location()); C.fflush(nil); return 1 }
 		if C.mkdir(c'/tmp/linux-procself', u32(0o755)) != 0 || C.mkdir(c'/tmp/linux-procself/alias', u32(0o755)) != 0
 			|| C.mkdir(c'/tmp/linux-procself/jail', u32(0o755)) != 0 || C.mkdir(c'/tmp/linux-procself/jail/view', u32(0o755)) != 0
 			|| C.mount(c'proc', c'/tmp/linux-procself/alias', c'proc', 0, nil) != 0 || C.mount(c'proc', c'/tmp/linux-procself/jail/view', c'proc', 0, nil) != 0 { return 1 }

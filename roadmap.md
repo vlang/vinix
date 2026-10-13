@@ -721,6 +721,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Report selected task Pid/NSpid with process Tgid; qualify main/pthread
   readers, inherited root and own PID views, namespace columns and flat storage
   on both native architectures. See [the task-status receipts](docs/linux-posix-qualification.md#selected-task-status-identities).
+- [x] Report selected task stat identity and scheduling fields; qualify FIFO/RR
+  workers, named/numeric paths, root/own PID views and flat native storage on
+  both architectures. See [the task-stat receipts](docs/linux-posix-qualification.md#selected-task-stat-identity-and-scheduling).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
