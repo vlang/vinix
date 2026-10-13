@@ -104,7 +104,7 @@ for source in GHOST_VinixProtocol.hh GHOST_SystemVinix.hh GHOST_SystemVinix.cc \
         "$SOURCE_DIR/intern/ghost/intern/$source"
 done
 
-PYTHON_VERSION="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+PYTHON_VERSION="$("$SCRIPT_DIR/build-support/source-tools/run" cpython-version "${VINIX_HOST_PYTHON:-python3}")"
 echo "==> Building Blender $VERSION with native Vinix GHOST"
 cmake -S "$SOURCE_DIR" -B "$TARGET_BUILD" -G Ninja -Wno-dev \
     -C "$SOURCE_DIR/build_files/cmake/config/blender_full.cmake" \

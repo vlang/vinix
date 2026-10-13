@@ -9,15 +9,7 @@ mkdir -p "$output"
 "${IOS_CLANGXX:-clang++}" -DIOS_CXX_REFERENCE -std=c++17 -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/cxx-extended.cpp" -o "$output/cxx-extended"
 "$output/cxx-extended"
-python3 - "$output/cxx-extended" <<'PY'
-import signal
-import subprocess
-import sys
-result = subprocess.run([sys.argv[1], "abort"], capture_output=True)
-assert result.returncode == -signal.SIGABRT, (result.returncode, result.stderr)
-assert b"IOS-CXX-ABORT: stack 17 1099511627776 2.500 0x1234\n" in result.stderr, result.stderr
-print("IOS-CXX-REFERENCE: formatted diagnostic and SIGABRT")
-PY
+"$repo/build-support/source-tools/run" darwin-signals cxx "$output/cxx-extended"
 "${IOS_CLANG:-clang}" -DIOS_KEYCHAIN_REFERENCE -fno-objc-arc -O1 -Wall -Wextra -Werror \
     -framework Security -framework Foundation "$repo/tests/ios/keychain.m" -o "$output/keychain"
 "$output/keychain"
@@ -30,32 +22,14 @@ PY
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/assertions.c" -o "$output/assertions"
 "$output/assertions"
-python3 - "$output/assertions" <<'PY'
-import signal
-import subprocess
-import sys
-for mode, expected in (("with-function", b"Assertion failed: (1 == 2), function fixture, file synthetic.c, line 17.\n"),
-                       ("no-function", b"Assertion failed: (1 == 2), file synthetic.c, line 17.\n")):
-    result = subprocess.run([sys.argv[1], mode], capture_output=True)
-    assert result.returncode == -signal.SIGABRT, (mode, result.returncode, result.stderr)
-    assert expected in result.stderr, result.stderr
-print("IOS-ASSERT-REFERENCE: diagnostics and SIGABRT with/without function names")
-PY
+"$repo/build-support/source-tools/run" darwin-signals assertions "$output/assertions"
 "${IOS_CLANG:-clang}" -DIOS_STACK_REFERENCE -O1 -fno-stack-protector -Wall -Wextra -Werror \
     "$repo/tests/ios/stack-probe.c" -o "$output/stack-probe"
 "$output/stack-probe"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/libsystem-safety.c" -o "$output/libsystem-safety"
 "$output/libsystem-safety"
-python3 - "$output/libsystem-safety" <<'PY'
-import signal
-import subprocess
-import sys
-for mode in ("memcpy", "memmove", "memset", "strncpy", "strcat", "unterminated", "zero-capacity"):
-    result = subprocess.run([sys.argv[1], mode], capture_output=True)
-    assert result.returncode == -signal.SIGTRAP, (mode, result.returncode, result.stderr)
-print("IOS-LIBSYSTEM-SAFETY-REFERENCE: seven genuine SIGTRAP overflow cases")
-PY
+"$repo/build-support/source-tools/run" darwin-signals safety "$output/libsystem-safety"
 "${IOS_CLANG:-clang}" -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/runes.c" -o "$output/runes"
 "$output/runes"
@@ -137,13 +111,7 @@ test -L "$output/permissions-loop" || ln -s permissions-loop "$output/permission
     "$repo/tests/ios/pthread-mach.c" -o "$output/pthread-mach"
 "$output/pthread-mach"
 "$output/pthread-mach" --saturated
-python3 - "$output/process" <<'PY'
-import subprocess, sys
-for mode, number in [("usr1", 30), ("usr2", 31), ("bus", 10)]:
-    result = subprocess.run([sys.argv[1], mode], capture_output=True)
-    assert result.returncode == -number, (mode, result.returncode, result.stdout, result.stderr)
-print("IOS-PROCESS-REFERENCE: native Darwin SIGUSR1, SIGUSR2 and SIGBUS delivery")
-PY
+"$repo/build-support/source-tools/run" darwin-signals process "$output/process"
 "${IOS_CLANG:-clang}" -DIOS_IOCTL_REFERENCE -O1 -Wall -Wextra -Werror \
     "$repo/tests/ios/ioctl.c" -o "$output/ioctl"
 "$output/ioctl"

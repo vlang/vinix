@@ -31,30 +31,12 @@ done < <(find "$APP" -name '*.m' -type f | LC_ALL=C sort)
     -fixup_chains -e _main "${objects[@]}" "$SOURCE"/sdk/*.tbd \
     -o "$OUTPUT/NumberTileGame.app/NumberTileGame"
 # Preserve upstream resources; substitute Xcode build variables in the plist.
-python3 - "$APP" "$OUTPUT/NumberTileGame.app" <<'PY'
-import plistlib, shutil, sys
-from pathlib import Path
-src, bundle = map(Path, sys.argv[1:])
-info = plistlib.loads((src/'NumberTileGame-Info.plist').read_bytes())
-for key in ('CFBundleDisplayName', 'CFBundleExecutable', 'CFBundleName'):
-    info[key] = 'NumberTileGame'
-info['CFBundleIdentifier'] = 'f3nghuang.NumberTileGame'
-info['UIRequiredDeviceCapabilities'] = ['arm64']
-(bundle/'Info.plist').write_bytes(plistlib.dumps(info))
-shutil.copytree(src/'Base.lproj', bundle/'Base.lproj', dirs_exist_ok=True)
-PY
+"$REPO/build-support/source-tools/run" game-bundle "$APP" "$OUTPUT/NumberTileGame.app"
 cp "$UPSTREAM/LICENSE" "$OUTPUT/NumberTileGame.app/LICENSE"
 printf '%s\n' "$REVISION" > "$OUTPUT/NumberTileGame.app/UPSTREAM_REVISION"
 if command -v codesign >/dev/null 2>&1; then
     codesign --force --sign - --timestamp=none "$OUTPUT/NumberTileGame.app"
     codesign --verify --strict "$OUTPUT/NumberTileGame.app"
 fi
-python3 - "$OUTPUT" <<'PY'
-import sys, zipfile
-from pathlib import Path
-root = Path(sys.argv[1])
-with zipfile.ZipFile(root/'NumberTileGame.ipa', 'w', zipfile.ZIP_DEFLATED) as z:
-    for path in sorted((root/'NumberTileGame.app').rglob('*')):
-        if path.is_file(): z.write(path, 'Payload/'+str(path.relative_to(root)))
-PY
+"$REPO/build-support/source-tools/run" ipa "$OUTPUT" NumberTileGame
 echo "Built $OUTPUT/NumberTileGame.app/NumberTileGame"

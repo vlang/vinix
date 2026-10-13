@@ -1,0 +1,139 @@
+{
+    "embedded_blocks": [
+        {
+            "bytes": 348,
+            "lines": 7,
+            "path": "tests/ios/reference-frameworks.sh",
+            "sha256": "2229a4558ce7e1e12f09a7549fcbdfbd72da4e3b71201a1784ec99886dbd7d61"
+        },
+        {
+            "bytes": 561,
+            "lines": 9,
+            "path": "tests/ios/reference-frameworks.sh",
+            "sha256": "3d9a81858e115cf86ecb043160706e2f2a5b30de1f57be8a474215c5369b331f"
+        },
+        {
+            "bytes": 380,
+            "lines": 7,
+            "path": "tests/ios/reference-frameworks.sh",
+            "sha256": "e392be2ff3bdc8be97fac0af34076b4ba93a0469b11acc928fd741bb275b9baf"
+        },
+        {
+            "bytes": 336,
+            "lines": 5,
+            "path": "tests/ios/reference-frameworks.sh",
+            "sha256": "783a0d2066cee98aeac590fdeebc190ae5606a7d4c903ce01ab087a8ad4e5726"
+        },
+        {
+            "bytes": 505,
+            "lines": 10,
+            "path": "examples/ios-2048/build.sh",
+            "sha256": "7b5c429a7582e5e41fcf14e33a02719d24801b2fb14f911895b01b78b49e5e23"
+        },
+        {
+            "bytes": 296,
+            "lines": 6,
+            "path": "examples/ios-2048/build.sh",
+            "sha256": "1d5dfd0fe24f7ae7d0c4b583d3ca3823f4fbee47e706c98065547314400fd0ee"
+        },
+        {
+            "bytes": 318,
+            "lines": 7,
+            "path": "examples/ios-calculator/build.sh",
+            "sha256": "eea41c093e368a3e6adc0e706ba19584c004c3339e1786676a467726bcf65000"
+        },
+        {
+            "bytes": 71,
+            "lines": 1,
+            "path": "scripts/build-blender-native-aarch64.sh",
+            "sha256": "aa6387a974c8d42f0b2ff904837487bbac92fb9362a8a6cba7bc1fcd13c9ab7d"
+        },
+        {
+            "bytes": 320,
+            "lines": 9,
+            "path": "build-support/build-v-host-library.sh",
+            "sha256": "b0568c797af6a9b5e3b2d908858caf8f1e5f64289269c89f23177348ef6cfdfb"
+        }
+    ],
+    "embedded_bytes": 3135,
+    "embedded_lines": 61,
+    "evidence": "~/.cache/vinix-host-tools-native-20261013",
+    "limits": "No Python, interpreter initialization, Security/Keychain/credential fixture, Blender build, UI application or Vinix guest executes. An initial x86 Darwin overflow fixture raises SIGILL, failing the original SIGTRAP oracle; that expectation is unchanged. X86 controller qualification uses native ARM reference children. System zlib and reference fixtures are SDK inputs. IPA helper implements classic ZIP with explicit limits; no ZIP64 claim. Existing pending Python files and index entries are untouched.",
+    "original_sha256": {
+        "build-support/build-v-host-library.sh": "d20ed543077c662408a4bee2693b3cf34c64c52250fadf70db73b8b7f9264df6",
+        "build-support/source-tools/main.v": "969ed6bbf5b229cc4107fb4bade6c48b934efe23154356703b467dd22a697c38",
+        "examples/ios-2048/build.sh": "a36b3ee0a6d6edffa8295b47acd620efab58142643ce7d33eb4a38658f70d661",
+        "examples/ios-calculator/build.sh": "ffc8874a78eccb4c4fcffddb3ec6bf98b0002a8662ad935b4bf2982bb5323b8a",
+        "scripts/build-blender-native-aarch64.sh": "663b5d33e3fa1886de69443e66b39ca04c0ca241cd12be237164732f55d5b0f1",
+        "tests/ios/reference-frameworks.sh": "1add03f52dea98e3a82306827a43a2baf2bf352df149ebe40d54820ebcc5542c"
+    },
+    "profiles": [
+        {
+            "limits": "Nine embedded blocks in five Shell callers. Native ARM Darwin C/C++ references, including signal-only process modes, run under ARM/x86/sanitized V controllers. The separate x86 Darwin overflow attempt raises SIGILL and fails the retained original SIGTRAP oracle. SDK headers are inert data; original source checks and real signed calculator/2048 Mach-O builds on ARM pass. No Python, interpreter initialization, Keychain/security/credentials fixture, Blender build, UI application or Vinix guest executes. Sanitizers instrument V; zlib and reference fixtures are unchanged SDK inputs. IPA archives retain classic ZIP limits.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "14b795aa377e5eb8e2ffea43f98741a5a0ce713dc5b4ecebea4e85f112cd3be0"
+                },
+                {
+                    "name": "host-check",
+                    "sha256": "887cf6f10cdb1d73d8c1db1f89fd1e441260a56734b8170def66bc614f1ab316"
+                },
+                {
+                    "name": "source-check",
+                    "sha256": "5135a7c6fe684bab0edbbaeada588a6e4ef5a0268f3c8fde81a951bb01993a77"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "Nine embedded blocks in five Shell callers. Native ARM Darwin C/C++ references, including signal-only process modes, run under ARM/x86/sanitized V controllers. The separate x86 Darwin overflow attempt raises SIGILL and fails the retained original SIGTRAP oracle. SDK headers are inert data; original source checks and real signed calculator/2048 Mach-O builds on ARM pass. No Python, interpreter initialization, Keychain/security/credentials fixture, Blender build, UI application or Vinix guest executes. Sanitizers instrument V; zlib and reference fixtures are unchanged SDK inputs. IPA archives retain classic ZIP limits.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "89f6eb4f175c6c24e823f3b78bd6c65dfcb3c4b1266d41cf77784cd21b855b1c"
+                },
+                {
+                    "name": "host-check",
+                    "sha256": "e6e661d2abdaad0052e7e95b2c705be13c15e1a38b25404ab6e0a3cce305ca11"
+                },
+                {
+                    "name": "source-check",
+                    "sha256": "cc68b1c8fe34af7d2c71047cd5220e377b4b8da17001a91f7814bb9cdac103c0"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "Nine embedded blocks in five Shell callers. Native ARM Darwin C/C++ references, including signal-only process modes, run under ARM/x86/sanitized V controllers. The separate x86 Darwin overflow attempt raises SIGILL and fails the retained original SIGTRAP oracle. SDK headers are inert data; original source checks and real signed calculator/2048 Mach-O builds on ARM pass. No Python, interpreter initialization, Keychain/security/credentials fixture, Blender build, UI application or Vinix guest executes. Sanitizers instrument V; zlib and reference fixtures are unchanged SDK inputs. IPA archives retain classic ZIP limits.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "c6960f8a311a0c8e2c05e28117051401c9675e60993aaaf8ee03ff6b9e9aa470"
+                },
+                {
+                    "name": "host-check",
+                    "sha256": "49e26a5954b7cb80c5b67bb95a3b658a3ef08f51bdae15d2bbb4f253cff379e6"
+                },
+                {
+                    "name": "source-check",
+                    "sha256": "6752987469bcfb1fd98b729f3acb4af55e416f73e91e0470ea5b97c8e9336f72"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirement_credit": 0,
+    "qualification": "18 successful cold V builds: nine command/host-check/source-check builds, three public header-command builds, three optional C-API shared library builds and three ARM packaging-command builds. Twelve cold native ARM C/C++ reference builds check all thirteen signal modes under ARM/Rosetta x86/sanitized V controllers. Real signed Calculator/2048 Mach-O bundles and both IPA archives pass. Original source checks, SDK/venv/error/explicit selection, pinned plist and resource bytes, ZIP CRC/content/order/mode/local timestamp/Unicode/link/error cases pass.",
+    "reference_inputs": {
+        "tests/ios/assertions.c": "b14304b6a876e01522584e88bbf8c59f61a5da44c61dd6f7737a83fcc80586e9",
+        "tests/ios/cxx-extended.cpp": "ca045b32546470daf0fde96f39f9dbc5182c9e1df7bdc736fbd77d22d0161bf0",
+        "tests/ios/libsystem-safety.c": "4a2b205b01a8bd14f155030cacce78ab8b5f6ae06ae589d8f5a60d94840200e4",
+        "tests/ios/process.c": "fec9a922257896b7805182382344916c138b4090ea8b5c27427aa10b8e9ab6b1"
+    },
+    "source_commit": "b1c9c8c13a62748f9fed22ed4f7b1caccc326ee8",
+    "upstream_2048_revision": "7c0840a0f7bd77b01d6a36778a253f8f4b2e6529"
+}

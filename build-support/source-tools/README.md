@@ -45,3 +45,49 @@ EXT2 mapping, four private/file/paging combinations and disposable M1
 deployment workflows. All eight translated shell callers receive syntax
 checks. Full desktop UI suites and Vinix guests are outside this qualification;
 no Python, GUI application, live ESP or Vinix kernel executes.
+
+The host helpers replace nine embedded Python blocks in five more callers:
+
+```sh
+build-support/source-tools/run darwin-signals cxx|assertions|safety|process EXECUTABLE
+build-support/source-tools/run game-bundle UPSTREAM_APP_DIRECTORY BUNDLE_DIRECTORY
+build-support/source-tools/run ipa BUILD_DIRECTORY Calculator|NumberTileGame
+build-support/source-tools/run cpython-headers EXECUTABLE [INCLUDE_DIRECTORY]
+build-support/source-tools/run cpython-version EXECUTABLE [INCLUDE_DIRECTORY]
+```
+
+Darwin signal checks retain all thirteen original modes, negative signal exit
+values, exact stderr markers and success labels. The existing command owner
+drains both streams and retires its private child group before the sole reap.
+The complete reference script still contains Security/Keychain and credential
+fixtures; focused qualification runs only its four signal fixtures and the
+non-credential normal modes.
+
+The 2048 helper uses the native XML/binary plist reader, preserves every
+unmodified property, replaces the original five bundle properties, and merges
+the upstream resources. IPA writing preserves sorted regular-file selection,
+file-symlink bytes, directory-symlink exclusion, raw zlib compression, CRCs,
+Unicode names, Unix modes, local DOS timestamps and the Payload layout.
+Its classic ZIP bounds reject members above 2 GiB, more than 65,535 entries,
+archives above 4 GiB and timestamps outside 1980–2107. These example bundles
+are small; ZIP64 is outside this helper's scope. Plist whitespace and compression
+bytes need not match old output while parsed properties and archive contents do.
+
+CPython SDK discovery reads `Python.h` and `patchlevel.h`; it never launches an
+interpreter. `VINIX_CPYTHON_INCLUDE` selects an explicit include directory.
+Otherwise the selected executable's symlink target, base prefix, `pyvenv.cfg`,
+versioned includes and framework Headers select a unique SDK. Apple's system
+launcher uses the active developer SDK, queried by native `xcode-select`.
+Missing or ambiguous SDKs fail with the explicit include override documented.
+The optional C-API library and Blender still depend on the foreign CPython SDK.
+
+`qualify-host.v COMPILER NEW_EVIDENCE arm|x86|san` cold-builds the command,
+host/source behavior checks, four C/C++ references, public command and actual
+header library. It checks all signal modes, diagnostic failure, SDK/venv/errors,
+the pinned upstream plist/resources, ZIP CRC/content/order/mode/timestamp/link
+policies, empty archives and old timestamps. ARM also builds and verifies the
+real signed Calculator/2048 Mach-O bundles and both IPA archives. The Rosetta
+V controller checks native ARM reference children: the separate x86 Darwin
+overflow fixture raises SIGILL, which fails the original required SIGTRAP
+verdict. That verdict stays unchanged. No Python, interpreter initialization,
+Security/Keychain/credential fixture, Blender build, UI app or Vinix guest runs.

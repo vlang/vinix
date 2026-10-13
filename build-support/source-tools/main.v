@@ -6,10 +6,19 @@ import cachecli
 import os
 import sourcefixture
 import sourcecommand
+import hostfixture
 
 fn run(args []string) ! {
 	if args.len == 0 || args[0] in ['--help', '-h'] {
-		println('Usage: source-tools clock|ext2-mmap|private-fixture|private-install INPUT OUTPUT\n       source-tools m1-kernel OUTPUT\n       source-tools test-directory COMPILER DIRECTORY [compiler flags...]')
+		println('Usage: source-tools clock|ext2-mmap|private-fixture|private-install INPUT OUTPUT\n       source-tools m1-kernel OUTPUT\n       source-tools test-directory COMPILER DIRECTORY [compiler flags...]\n       source-tools darwin-signals cxx|assertions|safety|process EXECUTABLE\n       source-tools game-bundle SOURCE BUNDLE\n       source-tools ipa BUILD_DIRECTORY Calculator|NumberTileGame\n       source-tools cpython-headers|cpython-version EXECUTABLE [INCLUDE_DIRECTORY]')
+		return
+	}
+	if args.len == 3 && args[0] == 'darwin-signals' { hostfixture.signals(args[1], args[2], cachecli.cancelled)!; return }
+	if args.len == 3 && args[0] == 'game-bundle' { hostfixture.game_bundle(args[1], args[2])!; return }
+	if args.len == 3 && args[0] == 'ipa' { hostfixture.ipa(args[1], args[2])!; return }
+	if args.len in [2, 3] && args[0] in ['cpython-headers', 'cpython-version'] {
+		include_dir := if args.len == 3 { args[2] } else { os.getenv('VINIX_CPYTHON_INCLUDE') }
+		println(if args[0] == 'cpython-headers' { hostfixture.cpython_headers(args[1], include_dir)! } else { hostfixture.cpython_version(args[1], include_dir)! })
 		return
 	}
 	if args.len >= 3 && args[0] == 'test-directory' {

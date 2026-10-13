@@ -42,14 +42,6 @@ if command -v codesign >/dev/null 2>&1; then
     codesign --verify --strict "$OUTPUT/Calculator.app"
 fi
 # Package only owned bundle files, with the standard IPA Payload layout.
-python3 - "$OUTPUT" <<'PY'
-from pathlib import Path
-import sys, zipfile
-root = Path(sys.argv[1])
-with zipfile.ZipFile(root / "Calculator.ipa", "w", zipfile.ZIP_DEFLATED) as archive:
-    for path in sorted((root / "Calculator.app").rglob("*")):
-        if path.is_file():
-            archive.write(path, "Payload/" + str(path.relative_to(root)))
-PY
+"$REPO/build-support/source-tools/run" ipa "$OUTPUT" Calculator
 echo "Built $OUTPUT/Calculator.app/Calculator"
 echo "Packaged $OUTPUT/Calculator.ipa"

@@ -12,17 +12,7 @@ shift 2
 support_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$support_dir/find-v.sh"
 host_python=${VINIX_HOST_PYTHON:-python3}
-host_python_headers=$("$host_python" -c '
-from pathlib import Path
-import sys, sysconfig
-candidates = [Path(sysconfig.get_paths()["include"]), Path(sys.base_prefix) / "Headers"]
-for candidate in candidates:
-    if (candidate / "Python.h").is_file():
-        print(candidate)
-        break
-else:
-    raise SystemExit("CPython development headers were not found")
-')
+host_python_headers=$("$support_dir/source-tools/run" cpython-headers "$host_python")
 host_library_cflags="-I$host_python_headers"
 if [ "$(uname -s)" = Darwin ]; then
     host_library_cflags="$host_library_cflags -undefined dynamic_lookup"
