@@ -134,6 +134,23 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `truncatepath` case checks 384 raw/musl pathname truncate calls in each
+root and UID/GID1000 child. Twenty-four classes cover regular/private files,
+directories, FIFOs, UNIX sockets, devices, direct/symlink targets and lookup
+faults. Negative lengths retain EINVAL before lookup; resolved directories
+require EISDIR and other nonregular targets EINVAL before policy/copy-up/growth.
+A verified failed-open ENOENT seed prevents stale kernel errno from accidentally
+satisfying the oracle; original unseeded baseline runs remain published.
+Actual resizing checks prefixes/zero tails, metadata/blocks/flags, shared
+cursors and private permissions. Ten inherited descriptors retain queued AB
+bytes/readiness; both children drain and replenish queues. Two 200-cycle
+cohorts measure eighty-eight raw probes plus three transient-alias controls,
+requiring flat storage. Symlink loops and inaccessible pointers are outcome
+checks outside that repeated loop. Disk/overlays/readonly mounts, timestamps,
+privilege-bit clearing, restrictive policies, huge growth, concurrency and
+GNU/foreign ABIs remain separate. See
+[the pathname receipts](../../docs/linux-posix-qualification.md#native-pathname-truncate-type-errors).
+
 The `truncateabi` case checks 2,784 native ftruncate calls in each root and
 UID/GID1000 child. Five raw upper-descriptor patterns and one libc control
 combine twenty descriptor classes, aliases and eight signed64 lengths.

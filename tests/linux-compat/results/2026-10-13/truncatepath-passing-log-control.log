@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/truncatepath-audit.v:88: FAIL: fn main.native_failure: assert log.contains('kind=6 raw=1 length=0 result=0/0 expected=-1/22 size=0/0'), 'native failure markers required'
+      message: native failure markers required
+V panic: Assertion failed...

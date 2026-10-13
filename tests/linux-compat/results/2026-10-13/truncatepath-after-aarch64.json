@@ -1,0 +1,39 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "242d4723bea2a08fa5f0ecb71ae667b36661b7ae11b6824256515ab1bcbe1997",
+    "results": [
+        {
+            "name": "truncatepath",
+            "source_sha256": "80a6f919c2b9c15213894135f514e3a4d48c12e0b15b7843f6db588894d7b059",
+            "init_sha256": "26334ecdf5504f95d8503a46ba18e4c0721d38c72404a8b4760409d30a6c17ba",
+            "iso_sha256": "fead341ce760ce6d765cabd37806078349969037a1c9d52f1cd33c2fa9e2404a",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "truncateabi",
+            "source_sha256": "4130103bf13ab1524f817785a5f5b7eb67fa23cc33377625c3fcd1c046fedd00",
+            "init_sha256": "5332aadfaeb5c6bc4365719d704c37405a2509d6f6cdf46b0d2977bfd46a2f68",
+            "iso_sha256": "79986342c07cdcbca1370dfe87ab1e6b07c8ed792c54b990fa224f6fcb1b0fea",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seekextent",
+            "source_sha256": "b84d060a0e206f0ee7701bb91b6ac3576094b0f806f881ef44a6c3079a55bf31",
+            "init_sha256": "d7c9599e909e826bde69c16ef1b323a3d3f429724c7a310ece121e1258b6011d",
+            "iso_sha256": "8c2748d1ba82c880fe0ec458326b06245cdcd4cb3798e8ffbca95dd1eda58b77",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sharedmem",
+            "source_sha256": "99ee2c57a20feb6bcf30b333373985c214e4142769506e76374626e4ccc71f44",
+            "init_sha256": "f013d12f9f1faa2f7136eb171d1197102b306e780f6a89c18db77a05fd420676",
+            "iso_sha256": "f0449959eae3b4ca2bd85c175e45da1eb3b1ce4cc8a8760feacfb12b00aa0ca6",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

@@ -2419,6 +2419,9 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	mut node := get_node(proc.current_directory_of(process), path, true) or {
 		return errno.err, errno.get()
 	}
+	mode := node.resource.stat.mode
+	if stat.isdir(mode) { return errno.err, errno.eisdir }
+	if !stat.isreg(mode) { return errno.err, errno.einval }
 	if !policy_check(node, proc.policy_write) {
 		return errno.err, errno.get()
 	}
@@ -2427,9 +2430,6 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	}
 	mut res := node.resource
 
-	if stat.isdir(res.stat.mode) {
-		return errno.err, errno.eisdir
-	}
 	check_access(node, access_write, true) or { return errno.err, errno.get() }
 	res = resource_to_change(node) or { return errno.err, errno.get() }
 

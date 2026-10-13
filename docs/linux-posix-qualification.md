@@ -2762,3 +2762,99 @@ Other FD APIs, huge growth, protected attributes/privilege-bit clearing,
 readonly mounts/disk, concurrent close/truncate, allocation exhaustion,
 GNU/foreign/ELF32 paths and complete Linux installation/sandbox/portal/runtime
 support remain separate work. The three broad section-15 gates stay open.
+
+## Native pathname truncate type errors
+
+Pathname truncate previously allowed nonregular nodes to reach their growth
+hooks. Device stubs could return success; FIFO/socket hooks could return an
+unrelated prior errno. The handler now checks the resolved inode type before
+write policy, attributes, overlay copy-up or growth: directories return
+EISDIR, other nonregular types EINVAL. Negative lengths still return EINVAL
+before copying or resolving the path. Regular-file policy and growth remain
+unchanged. This ordering follows
+[Linux v6.12 vfs_truncate](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/open.c).
+
+The V `truncatepath` fixture checks 384 raw/musl calls in each root and
+UID/GID1000 child, passing **768 checks per architecture**. Twenty-four classes
+cover public/private regular files, directories and FIFOs; null/zero/full
+devices and UNIX datagram socket paths; relative/absolute symlink targets;
+missing/empty paths, a symlink loop and an inaccessible pointer. Eight signed64
+lengths cover zero, small shrink/unchanged/grow sizes, -1 and INT64_MIN.
+Private regular paths still require EACCES from ordinary users.
+
+Each call observes the actual result and inode/device/type/UID/GID/size/blocks
+before restoring repeatability after an incorrect baseline mutation. Actual
+regular-file bytes preserve ABCD prefixes and zero-filled tails. Existing
+normal/private aliases retain shared cursors and FD flags. Public/private
+FIFO and UNIX datagram FIONREAD/poll retain two AB bytes; both children drain,
+compare and replenish those real queues before releasing their inherited
+descriptor references. New private opens remain refused despite the inherited
+observer authority used to inspect and restore the fixtures.
+
+Initial unseeded baselines fail **121 ordinary / 96 root checks** on each
+architecture. Some FIFO errors accidentally match EINVAL because their hooks
+reuse an earlier kernel error. The final probe first verifies an ENOENT open
+failure, then clears libc errno before the tested call. An unexpectedly
+successful seed descriptor is closed. This is the sole fixture source change;
+all other generated functions remain identical after normalizing compiler
+return and unused-loop names. Original source/C/logs/failed receipts remain
+preserved alongside fresh seeded baseline and candidate runs.
+
+The seeded baselines fail **144 checks in every cohort**: 72 device false
+successes, 72 root or 48 ordinary stale-ENOENT FIFO/socket refusals, and 24
+ordinary private-FIFO EACCES results instead of type errors. Negative, lookup,
+directory and eligible regular-file controls pass. All final candidate
+cohorts have zero failures.
+
+Ten inherited descriptors survive 32 warm-ups and 200 measured cycles of
+eighty-eight raw probes plus three temporary dup/metadata/close controls.
+Every slab live-object class remains flat, with big pages **75/75 ARM and
+198/198 x86** in both credential groups. Loop and inaccessible-pointer outcome
+checks stay outside this repeated loop. Book/Slabs/socket-address storage is
+bounded alloca; repeated probe buffers remain on the stack, with no hidden
+fixture heap allocation or promotion.
+
+Both first candidate builds failed on host disk exhaustion while writing
+dependency files. Their logs and unchanged-source successful retries remain
+published. Only audited rebuildable images/objects from owned work areas were
+retired; older C captures were losslessly gzip-archived with round-trip/hash
+verification and a V restoration helper. Current kernel/C/source/init/logs/
+receipts remain retained.
+
+The initial candidate aggregates stopped during the CLI continuation after
+four recorded ARM and three x86 successes. Fresh completions qualify only
+the missing cases on identical kernel binaries, with matching fixture C.
+The first ARM runtime completion failed during image staging on host disk
+exhaustion; its failed receipt retains a real init hash and blank image hash.
+That log/receipt is preserved separately from the successful fresh completion.
+
+Independent final lifetime review verifies each new error frees the existing
+path exactly once. The mode snapshot is scalar from the borrowed node; no
+owner, allocation or lock is added. The negative/copy/lookup prefix and
+policy/attributes/access/copy-up/grow tail retain their generated bodies,
+apart from moving the directory check. Replacing that function body restores
+the entire baseline kernel C. All four actual final fixture C captures equal
+the final preview; inherited owners and seed/permission/dup/observer cleanup
+are complete. The successful parent intentionally keeps ten stable descriptors
+while paused until guest teardown.
+
+Both candidates additionally pass truncateabi, seekextent, sharedmem and
+runtime across their initial and completion receipts. Eight host test files,
+fresh kernel builds and inventory checks pass. Existing allocation allowance
+failures retain **406 ARM / 295 x86** sites and identical NEW rows; no allowance
+is increased.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/truncatepath-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/truncatepath-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/truncatepath-audit.v)
+bind original/final/partial/completion logs, source/init/image hashes, kernel
+binaries/C, host/allocation checks and both executed failing controls. Private
+worktrees pin `dd2c181c1`; only `fs/vfs.v` differs. The compiler is the clean
+`f6358ecff9` snapshot. All 63 isolated semantic inputs are fingerprinted
+separately from the public committed-parent dispatch inventory.
+
+Disk/readonly mounts/overlays, timestamps, privilege-bit clearing/protected
+attributes and restrictive policy combinations, huge sparse growth and
+concurrent truncation, allocation exhaustion, GNU/foreign/ELF32 paths and
+complete Linux installation/sandbox/portal/runtime support remain separate
+work. The three broad section-15 gates stay open.

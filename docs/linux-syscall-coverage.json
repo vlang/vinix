@@ -8,7 +8,7 @@
         "kernel/fs/mount_policy.v": "6755ca918d30d05263520d1f3d25a2e4c31d7f1b7e619aabcf7e276218f9bc4a",
         "kernel/fs/procfs.v": "2f55b33b127e0a02ccd563df76934875167049e459b61cb3dfaa4a78cd41a532",
         "kernel/fs/tmpfs.v": "99a10d885597ccb745530e639685f282703332667066a28dd79f18195ec3e010",
-        "kernel/fs/vfs.v": "32a4b03d946a348b3643ab58c0c04c5b3865b00c4793045f240c0cf16f6abbd4",
+        "kernel/fs/vfs.v": "81a24a888a82f5826fbc735752df26e58704ad25575a5de5f354dcc0c57e1d46",
         "kernel/futex/futex.v": "171c2e30ac47d2b0d682e00e7aca04a8a1ddd7d3c65e27fae4a2e7d7dd9e015d",
         "kernel/futex/pi.v": "69a0a836bcaba1fc18b7e3298d31cb848f885798e37a8d6fdd095b910ba073ba",
         "kernel/kbudget/budget.v": "980b9ae894bda6376f920e22bbca0aa953e02bd0349977bfe054a24580869b06",

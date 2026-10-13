@@ -701,6 +701,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   preserve signed64 lengths and existing ownership, qualifying real resizing,
   access/type/negative errors, bytes, aliases, queued data and flat storage on
   both architectures. See [the descriptor-word receipts](docs/linux-posix-qualification.md#native-ftruncate-descriptor-words).
+- [x] Reject native truncate nonregular pathname targets before policy/growth,
+  preserving directory EISDIR and other-type EINVAL independently of prior
+  errors; qualify symlink targets, real resizing, aliases, metadata, queued
+  bytes and flat storage on both architectures. See [the pathname receipts](docs/linux-posix-qualification.md#native-pathname-truncate-type-errors).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
