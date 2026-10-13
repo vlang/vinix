@@ -1,0 +1,35 @@
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1189:19: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1189 |                         if (__in_arr_0[v_fixed_index(__contains_idx_3, 7)] == __contains_needle_1) {
+      |                                        ^
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1209:21: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1209 |                                         if (__in_arr_0[v_fixed_index(__contains_idx_3, 2)] == __contains_needle_1) {
+      |                                                        ^
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1225:23: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1225 |                                                         if (__in_arr_4[v_fixed_index(__contains_idx_7, 2)] == __contains_needle_5) {
+      |                                                                        ^
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1241:25: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1241 |                                                                         if (__in_arr_8[v_fixed_index(__contains_idx_11, 2)] == __contains_needle_9) {
+      |                                                                                        ^
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1263:30: error: call to undeclared function 'v_fixed_index'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 1263 |                                                                                                         if (__in_arr_12[v_fixed_index(__contains_idx_15, 2)] == __contains_needle_13) {
+      |                                                                                                                         ^
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1710:17: error: assigning to 'u8 *' (aka 'unsigned char *') from 'char[33]' converts between pointers to integer types where one is of the unique plain 'char' type and the other is not [-Werror,-Wpointer-sign]
+ 1710 |                                         __if_val_0 = "/tmp/linux-truncateaccess/normal";
+      |                                                    ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1712:17: error: assigning to 'u8 *' (aka 'unsigned char *') from 'char[34]' converts between pointers to integer types where one is of the unique plain 'char' type and the other is not [-Werror,-Wpointer-sign]
+ 1712 |                                         __if_val_0 = "/tmp/linux-truncateaccess/private";
+      |                                                    ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1715:33: error: passing 'u8 *' (aka 'unsigned char *') to parameter of type 'const char *' converts between pointers to integer types where one is of the unique plain 'char' type and the other is not [-Werror,-Wpointer-sign]
+ 1715 |                                 (observers)[v_index] = open(path, (O_CREAT | O_TRUNC) | O_RDWR, (u32)(0666));
+      |                                                             ^~~~
+/Users/alex/code/vinix/build-aarch64-userland/sysroot/include/fcntl.h:34:22: note: passing argument to parameter here
+   34 | int open(const char *, int, ...);
+      |                      ^
+/private/tmp/vinix-truncateaccess-1013/before-arm/truncateaccess/fixture.c:1723:11: error: passing 'u8 *' (aka 'unsigned char *') to parameter of type 'const char *' converts between pointers to integer types where one is of the unique plain 'char' type and the other is not [-Werror,-Wpointer-sign]
+ 1723 |                                 chmod(__order_snapshot_1, __if_val_2) != 0;})) {
+      |                                       ^~~~~~~~~~~~~~~~~~
+/Users/alex/code/vinix/build-aarch64-userland/sysroot/include/sys/stat.h:84:23: note: passing argument to parameter here
+   84 | int chmod(const char *, mode_t);
+      |                       ^
+9 errors generated.
+Linux compatibility qualification failed; see /private/tmp/vinix-truncateaccess-1013/before-arm/receipt.json

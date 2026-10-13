@@ -2618,3 +2618,80 @@ Physical extent discovery, concurrent truncation/shared-offset races,
 disk-backed qualification, GNU wrappers, foreign/ELF32 paths, allocation
 exhaustion and complete Linux installation/sandbox/portal/runtime support
 remain separate work. The three broad section-15 gates stay open.
+
+## Native ftruncate descriptor eligibility
+
+O_PATH descriptors previously reached file growth, including handles to
+private files, unfollowed links and FIFOs. Character-device grow stubs could
+return success, while directories returned EISDIR. The eligibility check now
+rejects O_PATH with EBADF, and nonregular, readonly or access-mode3 handles
+with EINVAL before MAC or growth. Negative lengths still return EINVAL before
+descriptor lookup. Writable regular-file policy, protected-attribute checks
+and growth retain their existing behavior. This ordering follows
+[Linux v6.12 ftruncate](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/open.c).
+Pathname truncate has its own directory error contract.
+
+The V `truncateaccess` fixture checks 928 raw/musl calls in each root and
+UID/GID1000 child, passing **1,856 checks per architecture**. Twenty classes
+cover regular readonly/writeonly/readwrite/mode3 handles, public/private
+O_PATH files, directories, pipe ends, UNIX streams, null/zero/full devices,
+invalid descriptors, unfollowed links and named FIFOs. Original/dup/
+F_DUPFD_CLOEXEC aliases combine eight signed64 lengths: zero, small shrink/
+unchanged/grow sizes, -1 and INT64_MIN.
+
+Each probe observes the syscall result before restoration, then checks
+inode/device/type/UID/GID/size, descriptor flags, original and shared cursors,
+file prefixes and zero-filled growth. FIONREAD/poll preserve two queued AB
+bytes on pipe/socket/FIFO; final controls drain and compare those real bytes.
+Private files remain inaccessible through a new ordinary readonly open. Two
+pre-opened readwrite observers are inherited solely to inspect and restore
+the normal/private fixtures. Incorrect baseline nonregular O_PATH resizes
+are observed before metadata restoration; correct candidates never need
+that restoration path.
+
+Unchanged kernels fail **504 ordinary / 432 root checks on ARM**, and **432
+in each x86 cohort**. The additional 72 ARM ordinary failures are thirty-six
+pipe and thirty-six socket EACCES results from MAC running before type
+validation. Every eligible ordinary regular-file resize already passes the
+baseline. The auditor checks those exact groups and failure counts; all final
+candidate cohorts have zero failures.
+
+Sixty cohort descriptors remain live through 32 warm-ups and 200 measured
+cycles. Each cycle performs eighty probes plus three temporary dup/truncate/
+close controls. Both credential groups retain every slab live-object count,
+with big pages **75/75 ARM and 198/198 x86**. Observer and Handles/Slabs
+buffers are bounded stack allocations; no hidden fixture promotion or heap
+allocation appears in the generated C.
+
+Initial guest attempts were rejected by strict C compilation: two helpers
+needed explicit unsafe fixed-array membership, and conditional pathname
+pointers needed explicit char casts. Their original logs/source/C/failed
+receipts remain preserved with blank init/image hashes. Fresh baseline and
+candidate runs bind the corrected fixture; all four actual generated C
+captures equal the final preview exactly.
+
+Independent final lifetime review confirms the Resource pointer remains
+borrowed from the pinned handle. Every new refusal releases that FD exactly
+once, with no new allocation or lock. Negative-length/lookup prefix and
+protected/grow cleanup tail retain their generated bodies; replacing only
+the ftruncate body restores the entire baseline kernel C.
+
+Four additional cases pass on both candidates: pathio, sharedmem, seekextent
+and runtime. Eight host test files, fresh kernel builds and dispatch inventory
+checks pass. Existing allocation allowance failures retain **406 ARM / 295
+x86** sites and identical NEW rows; no allowance is increased.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/truncateaccess-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/truncateaccess-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/truncateaccess-audit.v)
+bind original rejected and final logs, source/init/image hashes, kernel
+binaries/C, host/allocation checks and both executed failing controls. Private
+worktrees pin `538d93af808`; only `file/file.v` differs. The compiler is the
+clean `f6358ecff9` snapshot. All 63 isolated semantic inputs are fingerprinted
+separately from the public committed-parent dispatch inventory.
+
+Upper descriptor words, GNU/foreign/ELF32 paths, protected attributes and
+privilege-bit clearing, readonly mounts, disk-backed qualification,
+concurrent close/truncate, huge growth/allocation exhaustion and complete
+Linux installation/sandbox/portal/runtime support remain separate work. The
+three broad section-15 gates stay open.

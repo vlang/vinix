@@ -134,6 +134,22 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `truncateaccess` case checks 928 native raw/musl ftruncate calls in each
+root and UID/GID1000 child. Twenty descriptor classes, original/dup/
+F_DUPFD_CLOEXEC aliases and eight signed64 lengths require negative-length
+EINVAL before lookup, O_PATH EBADF before policy/type, and nonregular,
+readonly or mode3 EINVAL before MAC. Writable regular files shrink and grow
+with preserved prefixes, zero-filled tails and unchanged shared cursors.
+Every probe checks metadata/flags, private-file permissions and real queued
+pipe/socket/FIFO bytes and readiness. Sixty stable cohort descriptors plus
+temporary aliases warm 32 and measure 200 cycles of eighty probes and three
+duplicate controls, requiring flat slab objects and big pages. Initial strict-C
+compile rejections remain published alongside corrected native baselines and
+candidates. Upper descriptor words, GNU/foreign ABIs, protected attributes,
+privilege-bit clearing, readonly mounts, disk, concurrent close/truncate and
+huge growth remain separate. See
+[the ftruncate receipts](../../docs/linux-posix-qualification.md#native-ftruncate-descriptor-eligibility).
+
 The `seekextent` case checks 9,000 raw/musl SEEK_DATA/SEEK_HOLE calls in each
 root and UID/GID1000 child. Generic reporting treats every in-file byte as
 data and EOF as the final hole. Five sizes cover empty, small, page-crossing

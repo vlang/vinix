@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "7448da18366c6336897cae27b78ec1f21087c8b686f048da42f34ca047e6f005",
+    "results": [
+        {
+            "name": "truncateaccess",
+            "source_sha256": "bb1914ad756b852f6977e6ac10f4327f5f72ec07ec67cd107abdc59933e20950",
+            "init_sha256": "",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        }
+    ]
+}

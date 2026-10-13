@@ -692,6 +692,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   boundaries; qualify signed64 sparse positions, shared aliases, retained
   bytes/metadata/blocks, bounded backup-style copies and flat storage on both
   architectures. See [the DATA/HOLE receipts](docs/linux-posix-qualification.md#generic-native-data-and-hole-seeks).
+- [x] Validate native ftruncate descriptor eligibility before policy/growth;
+  enforce O_PATH EBADF and nonregular/readonly/mode3 EINVAL, qualifying real
+  shrink/grow bytes, metadata, aliases, queued data and flat storage on both
+  architectures. See [the ftruncate receipts](docs/linux-posix-qualification.md#native-ftruncate-descriptor-eligibility).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

@@ -1100,15 +1100,13 @@ pub fn syscall_ftruncate(_ voidptr, fdnum int, length i64) (u64, u64) {
 	}
 
 	mut handle := fd.handle
-	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
+	if handle.flags & resource.o_path != 0 { return errno.err, errno.ebadf }
 	mut res := handle.resource
-
-	if stat.isdir(res.stat.mode) {
-		return errno.err, errno.eisdir
-	}
-	if handle.flags & resource.o_accmode == resource.o_rdonly {
+	access := handle.flags & resource.o_accmode
+	if !stat.isreg(res.stat.mode) || (access != resource.o_wronly && access != resource.o_rdwr) {
 		return errno.err, errno.einval
 	}
+	handle.mac_check(proc.mac_write) or { return errno.err, errno.get() }
 	// An immutable or append-only file cannot be truncated.
 	if resource.is_protected(mut res) {
 		return errno.err, errno.eperm

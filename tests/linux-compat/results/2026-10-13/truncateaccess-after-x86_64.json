@@ -1,0 +1,47 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "9c9cc6d47352105e50ccbfd5719d82214065ce681221aa96d21e47aacaaa96e9",
+    "results": [
+        {
+            "name": "truncateaccess",
+            "source_sha256": "3eda3db3ade5797e9efd918839c9bcd00f2ffb3c6f59db43a76af3147803e940",
+            "init_sha256": "e2a27a9f5aab2a9c5d5feb30fa2a77018cbd08a9770a33a070c9a5f79756c2e3",
+            "iso_sha256": "8ddbbdc36ab9eb30e27491d7cdbbf687e449c233f519c772eee08d250e526680",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "pathio",
+            "source_sha256": "28a7d58e04956b559c2024bcf6a3c081a770982a357724b7f52a54c536720d16",
+            "init_sha256": "7c27300260b8997b6f9510119b6db4464aed54c2d5f15eb7d2bdd6a4d0c49cfe",
+            "iso_sha256": "7a53ff1294e684f4a5d3eb345a321d90e52f8212eb9165cdff79270d94c91a43",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "sharedmem",
+            "source_sha256": "99ee2c57a20feb6bcf30b333373985c214e4142769506e76374626e4ccc71f44",
+            "init_sha256": "d58f5693f10e7729ec5d4602879c605e0599b04a94015c3c243a971b6a92117a",
+            "iso_sha256": "c5b2d26f32107517afee9f88e0e54098c4d20818bfd788e87319daf3b49288db",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "seekextent",
+            "source_sha256": "b84d060a0e206f0ee7701bb91b6ac3576094b0f806f881ef44a6c3079a55bf31",
+            "init_sha256": "71ff5a35727082ffd363d96603b82585d395f10388fec07faf1a67117393e400",
+            "iso_sha256": "6e364e04dd97d66f4b640842160e7e8e8e7d5ce77b9a4e103ba7436edf431dad",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "2d8f02cd7cc0196e277db03d53e8530387f1eca046300b0e9c7743a5c5d31a62",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}
