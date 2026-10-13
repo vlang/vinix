@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+Persistent encrypted scrub findings extend the actual recovery/ciphertext model
+with complete clean/changed reports, operational failure precedence, private
+no-overwrite cleanup and offline report validation. `--host-ciphertext-scrub`
+and `--ciphertext-scrub` qualify both domains/modes, independent reference
+fingerprints, restored corruption, stable live views, real-KDF lifetimes and
+historical findings across device-reordered boots. See [scrub reports](ciphertext-scrub.md).
+
 Encrypted ciphertext references add exact public geometry/CRC binding,
 full-extent native-sector streaming, independent digest checks, corruption and
 post-read/post-lock device changes to the actual recovery reader/publisher

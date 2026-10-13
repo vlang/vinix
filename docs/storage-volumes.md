@@ -826,6 +826,69 @@ or output failures return 1, and invalid syntax returns 2. Diagnostics may be
 printed on failure; output failure can leave a partial report. See
 [recovery inspection qualification](../tests/storage-volumes/recovery-inspect.md).
 
+## Persistent encrypted ciphertext scrub findings
+
+`scrub-volume DEVICE CONFIG PASSPHRASE_FILE REFERENCE REPORT` and
+`scrub-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE REFERENCE REPORT`
+authenticate saved mapping geometry, read its complete physical ciphertext
+extent, then publish a private finding. A SHA mismatch is a complete finding,
+so scanning continues through the entire extent before reporting it:
+
+```sh
+vinix-volume scrub-volume /dev/vda /root/data.vcrypt /root/volume.pass /root/data.vchash /root/scan-1.vcscrub
+vinix-volume show-volume-scrub /root/scan-1.vcscrub
+vinix-volume scrub-recovery-volume /dev/vdb /root/data.vrecover /root/recovery.key /root/data.vchash /root/scan-2.vcscrub
+```
+
+Each report preserves the exact `VINIXCH1` reference, the observed full-extent
+SHA-256 digest and SHA-256 of every reference byte. Metadata, saved mode,
+expected digest, observed digest and reference fingerprint appear in two output
+records. The header is `format=VINIXCS1 operation=scrubbed-ciphertext mappings=1
+matched=0|1 changed=0|1 algorithm=sha256 reference_sha256=HEX`; the row has
+`disk_bytes=N sector=N identity=ID slot=N offset=N bytes=N readonly=0|1
+result=match|changed expected_sha256=HEX actual_sha256=HEX`. Reports are identical
+across credential domains for the same reference and observed ciphertext.
+
+Scrubbing returns 0 for a completed matching report, 2 for a completed changed
+report, and 1 for authentication, input, device, read, publication or output
+failure. Invalid syntax returns 2 without a finding. A completed scan publishes
+before printing; late cleanup, directory-flush or output failure can leave the
+complete private report present while returning 1, including for changed data.
+No incomplete scan publishes a report. Existing destinations are preserved by
+the private no-overwrite protocol, including symlink/lexical/hard-link aliases
+of configurations, credentials and references; choose a new report name for
+each run. The physical pin and destination lock remain held through output.
+
+The existing ciphertext reader's signed-end/SHA limits, native-sector alignment,
+EINTR/short-read handling and exact identity/geometry checks apply. Every decoded
+secret erases before reference access, physical reads, publication and reports.
+The parent is read-only, nonblocking, no-follow and close-on-exec, with two
+pre-read rechecks, a post-read recheck and a final recheck after destination
+locking. No decryption, entropy, raw keyfile, mapping import or physical write
+occurs. Existing live mapping status, counters, generations and descriptors
+remain unchanged.
+
+`show-volume-scrub REPORT` reads an exact private 224-byte report owned by the
+effective user and inaccessible to group/others. It validates the complete
+report before printing: header/version/algorithm/reserved bytes, whole CRC,
+nested reference structure/CRC/ranges, exact reference fingerprint and
+agreement between `changed` and both full digests. Invalid input produces no
+successful finding. Viewing a valid clean or changed historical report returns
+0; input/output failure returns 1. Viewing opens no disk, reads no credential,
+performs no KDF, acquires no writer lock and publishes nothing.
+
+`VINIXCS1` version 1 is little endian: magic at 0; version/224-byte size at
+8/12; result (0 match, 1 changed) at 16; algorithm (1 SHA-256) at 20; four zero
+reserved bytes at 24; whole CRC-32 at 28 with that field zero; the exact 128-byte
+reference at 32; observed digest at 160; reference fingerprint at 192. It
+contains public metadata/digests and no keys or credential binding.
+
+Keep data writes quiescent and use a trusted reference. This records corruption
+findings against that reference, without providing coherent snapshots,
+plaintext authentication, malicious-reference authentication or repair. Offline
+reports describe their completed historical scan; they do not describe current
+disk contents. See [scrub qualification](../tests/storage-volumes/ciphertext-scrub.md).
+
 ## Encrypted ciphertext checksum references
 
 `hash-volume DEVICE CONFIG PASSPHRASE_FILE REFERENCE` and

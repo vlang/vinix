@@ -145,7 +145,8 @@ fn recovery_mock_unlinkat(fd i32, name &char, flags i32) i32 {
 	return C.unlinkat(fd, name, flags)
 }
 fn recovery_mock_fflush(stream voidptr) i32 {
-	if ciphertext_model { ciphertext_report_ready() }
+	if volume_scrub_model { volume_scrub_report_ready() }
+	else if ciphertext_model { ciphertext_report_ready() }
 	else if growth_preview_model { recovery_growth_erased(); assert !recovery_io.locked && recovery_growth_io.parent_live && recovery_growth_io.statuses == 3 }
 	else { assert recovery_io.locked }
 	if recovery_io.mode == 21 { unsafe { C.errno = C.EIO }; return -1 }

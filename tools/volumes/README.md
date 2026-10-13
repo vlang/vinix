@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`scrub-volume` and `scrub-recovery-volume` publish complete private ciphertext
+findings with expected/observed SHA-256, exact reference fingerprints and
+clean/changed/operational exit status. `show-volume-scrub` validates and displays
+them offline. Reports preserve existing files; use a new destination per scan.
+See [scrub rules](../../docs/storage-volumes.md#persistent-encrypted-ciphertext-scrub-findings).
+
 `hash-volume`/`verify-volume` and `hash-recovery-volume`/`verify-recovery-volume`
 authenticate encrypted geometry and record/verify a trusted full-extent SHA-256
 ciphertext reference through pinned read-only physical reads. Secrets erase
