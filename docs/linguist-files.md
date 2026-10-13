@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `ddb80a662be5a6907ecda43221dd1fe90376bb49`,
+at source commit `84b7ae2e012fee408bc409375d81e376f8acf173`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -13,9 +13,9 @@ This is a snapshot; regenerate it when source files change.
 | --- | ---: | ---: | ---: |
 | C | 602 | 2,401,099 | 5.42% |
 | Python | 10 | 89,440 | 0.20% |
-| Shell | 824 | 1,356,876 | 3.06% |
+| Shell | 825 | 1,357,170 | 3.06% |
 
-All `.v` files are classified as V. The resulting V share is 84.27%, with no
+All `.v` files are classified as V. The resulting V share is 84.28%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev ddb80a662be5a6907ecda43221dd1fe90376bb49 --breakdown --json
+github-linguist --rev 84b7ae2e012fee408bc409375d81e376f8acf173 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -731,6 +731,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/ext2-set-root-owner` | 174 |
 | `build-support/find-v.sh` | 3,160 |
 | `build-support/firefox/run-firefox` | 4,380 |
+| `build-support/generator-sdk` | 168 |
 | `build-support/gimp/run-gimp` | 2,536 |
 | `build-support/graphics-tools/run` | 145 |
 | `build-support/human-size` | 130 |
@@ -811,7 +812,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/vinix-pkg` | 44,282 |
 | `build-support/vinix-pkg-wrapper` | 616 |
 | `build-support/vinix-version-check` | 1,591 |
-| `build-support/virglrenderer/build-host.sh` | 3,251 |
+| `build-support/virglrenderer/build-host.sh` | 3,543 |
 | `build-support/x86-translation/compile-v-office` | 165 |
 | `build-support/x86-translation/patch-msxml-unicode` | 177 |
 | `build-support/x86-translation/patch-wine-i386-qemu` | 178 |
@@ -873,7 +874,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-codex-aarch64.sh` | 4,845 |
 | `scripts/build-desktop-aarch64.sh` | 93,116 |
 | `scripts/build-desktop-amd64.sh` | 15,186 |
-| `scripts/build-developer-tools-aarch64.sh` | 4,319 |
+| `scripts/build-developer-tools-aarch64.sh` | 4,420 |
 | `scripts/build-dhewm3-aarch64.sh` | 193 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |
 | `scripts/build-doom-aarch64.sh` | 3,151 |
@@ -898,7 +899,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-ps2-aarch64.sh` | 2,879 |
 | `scripts/build-python-aarch64.sh` | 3,650 |
 | `scripts/build-python-amd64.sh` | 175 |
-| `scripts/build-qemu-input.sh` | 3,417 |
+| `scripts/build-qemu-input.sh` | 3,183 |
 | `scripts/build-qemu-ovmf-aarch64.sh` | 4,720 |
 | `scripts/build-qemu-system-aarch64.sh` | 5,206 |
 | `scripts/build-roblox-aarch64.sh` | 128 |
@@ -1124,7 +1125,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/desktop-perf/run-saved` | 143 |
 | `tests/desktop-perf/run-saved-driver` | 150 |
 | `tests/desktop/first-run-apps-init.sh` | 4,535 |
-| `tests/developer-tools/smoke.sh` | 4,577 |
+| `tests/developer-tools/smoke.sh` | 4,544 |
 | `tests/development/run-guest` | 172 |
 | `tests/devicetree-string-list/run.sh` | 240 |
 | `tests/dhewm3/guest-init.sh` | 2,668 |

@@ -2,9 +2,9 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `ddb80a662be5a6907ecda43221dd1fe90376bb49`,
+not been reached. At source `84b7ae2e012fee408bc409375d81e376f8acf173`,
 Linguist 7.27.0 reports **Python 0.20%** (10 files, 89,440 bytes) and
-**V 84.27%** (4,112 files, 37,336,071 bytes). The complete committed-blob inventory and reproduction
+**V 84.28%** (4,116 files, 37,349,517 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
@@ -3490,3 +3490,22 @@ JSON and other error-description types are outside the native contract.
 No Python, SDK interpreter initialization, target ELF, guest, ISO boot or GUI app
 executes. Pending Python/index edits remain untouched; these Shell blocks receive
 zero Python-file credit. See [native QMP/source helpers](../build-support/source-tools/README.md).
+
+Supplement `84b7ae2e` moves the developer-tools fcntl import probe
+into the native V CPython C-API controller and stages it with the overlay.
+The original success label remains; module/error references retire before
+finalization, with import/interrupt/finalization statuses checked by the native
+model. The 52-byte one-line embedded body receives zero Python-file credit.
+QEMU tomli and VirGL Meson/PyYAML environment/package bootstrap callers now
+use V prerequisite checks for separately provisioned upstream generator SDKs.
+QEMU retains tomli 2.2.1; VirGL retains its unpinned requirements. The V checker
+reads declared metadata and module paths without launching an interpreter.
+Missing SDKs fail before downloading or patching sources. This changes setup
+workflow: external SDK provisioning is required; metadata does not prove
+importability. Eighteen final cold host builds pass across ARM, Rosetta x86
+and ARM ASanUBSan, along with six real musl guest ELF builds, runtime export
+checks and compiler-failure preservation. Native SDK fixtures cover symlinked
+executables, spaces/Unicode, version mismatch, UTF-8, duplicate distributions,
+missing modules, alias directories and ambiguous layouts. No interpreter,
+upstream generator, target ELF or Vinix guest executes. Concurrent legacy
+Python/index edits remain untouched. See [generator SDK prerequisites](../build-support/generatorsdk/README.md).
