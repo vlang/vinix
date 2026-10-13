@@ -1165,6 +1165,15 @@ Aero 窗口边框，能看到后面的内容，
 settings.theme.windows7_note_2
 按钮位于窗口上边缘，任务栏也一样。
 -----
+settings.theme.windowsxp
+Windows XP
+-----
+settings.theme.windowsxp_note_1
+蓝色标题栏，圆角和白色文字，
+-----
+settings.theme.windowsxp_note_2
+方形按钮，蓝色任务栏配绿色“开始”按钮。
+-----
 settings.wallpaper.colour
 颜色
 -----

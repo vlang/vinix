@@ -3,7 +3,7 @@
 // that can be found in the LICENSE file.
 
 // SPDX-License-Identifier: GPL-2.0-or-later
-// What the desktop looks like and how its chrome behaves, and the three themes
+// What the desktop looks like and how its chrome behaves, and the four themes
 // it can wear.
 //
 // The preference model lives in settings_model.v. The window manager
@@ -20,11 +20,23 @@ module main
 // focused and show their glyphs only while the pointer is over the set.
 // `aero` is Windows 7's caption group: three glass buttons hanging from the
 // window's top edge, the close button wider than the other two and red while
-// its window is focused. glass.v draws them.
+// its window is focused. glass.v draws them. `luna` is Windows XP's three
+// square buttons with white edges, the close button red; luna.v draws them.
 enum ButtonLook {
 	flat
 	traffic
 	aero
+	luna
+}
+
+// Chrome says who paints a window's frame, the taskbar and the Start menu's
+// shell: `flat` is the colours their elements declare, and the other two are
+// renderers that know a look whole -- glass.v for Windows 7, luna.v for
+// Windows XP. Under those a title bar is only there to be dragged and found.
+enum Chrome {
+	flat
+	aero
+	luna
 }
 
 // Theme is every colour and measurement that changes between looks. Anything
@@ -38,14 +50,20 @@ struct Theme {
 	shadow_alpha  u32
 	// How far the drop shadow reaches, at most shadow_max_spread.
 	shadow_spread int = 7
+	chrome Chrome
 	// Aero glass: the window frame, the taskbar and the Start menu show what
 	// is behind them, blurred and tinted with Settings.glass_color. glass.v.
 	glass bool
 	// The frame around a window's body on its left, right and bottom. Zero is a
 	// body that reaches the window's edges; Windows 7's glass is 8 pixels.
 	frame_border int
-	// The window's icon leads its title.
-	title_icon bool
+	// The window's 16-pixel icon leads its title: how far in from the body's
+	// left edge it starts, the gap between it and the text, and the colour a
+	// builtin glyph is drawn in (an application's own artwork keeps its own).
+	title_icon       bool
+	title_icon_inset int
+	title_icon_gap   int
+	title_icon_color u32
 	// Title bar
 	title_height             int
 	title_active_bg          u32
@@ -252,9 +270,13 @@ const theme_windows7 = Theme{
 	window_radius: 7
 	shadow_alpha: 64
 	shadow_spread: 12
+	chrome: .aero
 	glass: true
 	frame_border: 8
 	title_icon: true
+	title_icon_inset: 8
+	title_icon_gap: 6
+	title_icon_color: 0x1e3a5f
 	title_height: 30
 	title_active_bg: 0xb9d1ea
 	title_active_bg2: 0xb9d1ea
@@ -301,17 +323,80 @@ const theme_windows7 = Theme{
 	shortcut_panel: 0x000000
 }
 
+// Windows XP's Luna in its blue. A window has the blue title bar with round
+// upper corners, white bold text and three square buttons, and a 4-pixel blue
+// frame; the taskbar is the blue bar with the green Start button. luna.v
+// paints all of it, so most colours below only mark a state for it. The
+// measurements are Windows XP's at 96 DPI: 30 pixels from a window's top
+// edge to its body, 21-pixel caption buttons two pixels apart.
+const theme_windows_xp = Theme{
+	name: 'Windows XP'
+	window_body: 0xece9d8
+	window_edge: 0x0831d9
+	// Only the upper corners are round, so luna.v cuts them itself.
+	window_radius: 0
+	shadow_alpha: 0
+	chrome: .luna
+	frame_border: 4
+	title_icon: true
+	title_icon_inset: 2
+	title_icon_gap: 4
+	title_icon_color: 0xffffff
+	title_height: 30
+	title_active_bg: 0x0054e3
+	title_active_bg2: 0x0054e3
+	title_inactive_bg: 0x7a96df
+	title_inactive_bg2: 0x7a96df
+	title_highlight: 0
+	title_inactive_highlight: 0
+	title_divider: 0x003092
+	title_inactive_divider: 0xabbae3
+	title_text_active: 0xffffff
+	title_text_inactive: 0xd8e4f8
+	title_centered: false
+	title_bold: true
+	title_size: 13
+	button_look: .luna
+	button_size: luna_caption_size
+	button_gap: luna_caption_gap
+	button_inset: luna_caption_inset
+	button_hover: 0x3c81f3
+	button_close_hover: 0xe0432b
+	button_face: 0x2263d5
+	button_edge: 0xffffff
+	glyph_color: 0xffffff
+	glyph_on_close: 0xffffff
+	dock: false
+	dock_bg: 0x245edb
+	dock_radius: 12
+	dock_padding: 8
+	taskbar_bg: 0x245edb
+	taskbar_edge: 0x1f2f86
+	taskbar_text: 0xffffff
+	taskbar_text_active: 0xffffff
+	taskbar_muted: 0xd6e4fb
+	taskbar_item_bg: 0x3c81f3
+	taskbar_item_hover: 0x53a3ff
+	taskbar_item_active: 0x1e52b7
+	accent: 0x316ac5
+	accent_dim: 0x3c873c
+	shortcut_label: 0xffffff
+	shortcut_hover: 0xffffff
+	shortcut_panel: 0x000000
+}
+
 fn (d &Desktop) theme() Theme {
 	return match d.settings.theme {
 		.default_ { theme_default }
 		.macos { theme_macos }
 		.windows7 { theme_windows7 }
+		.windows_xp { theme_windows_xp }
 	}
 }
 
 // window_border is the frame around this window's body on its left, right and
-// bottom. A maximized window has none: Windows 7 pushes that part of the
-// frame off the screen.
+// bottom. A maximized window has none: Windows pushes that part of the frame
+// off the screen.
 fn (d &Desktop) window_border(window &Window) int {
 	return if window.maximized { 0 } else { d.theme().frame_border }
 }

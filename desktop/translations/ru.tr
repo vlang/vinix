@@ -1165,6 +1165,15 @@ settings.theme.windows7_note_1
 settings.theme.windows7_note_2
 кнопки у верхнего края и стеклянная панель задач.
 -----
+settings.theme.windowsxp
+Windows XP
+-----
+settings.theme.windowsxp_note_1
+Синий заголовок со скруглёнными углами и белым текстом,
+-----
+settings.theme.windowsxp_note_2
+квадратные кнопки и синяя панель задач с зелёной кнопкой «Пуск».
+-----
 settings.wallpaper.colour
 Цвет
 -----

@@ -1165,6 +1165,15 @@ settings.theme.windows7_note_1
 settings.theme.windows7_note_2
 上端のボタンとガラスのタスクバー。
 -----
+settings.theme.windowsxp
+Windows XP
+-----
+settings.theme.windowsxp_note_1
+角の丸い青いタイトルバーと明るいタイトル、
+-----
+settings.theme.windowsxp_note_2
+右上の3つのボタンと、緑のスタートボタンがある青いタスクバー。
+-----
 settings.wallpaper.colour
 色
 -----

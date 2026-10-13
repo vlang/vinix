@@ -52,6 +52,38 @@ const app_feature_horizontal_scroll = u8(32)
 const app_feature_glass = u8(64)
 const app_feature_rich_clipboard = u8(128)
 const app_features = app_feature_toolbar | app_feature_close_guard | app_feature_desktop_services | app_feature_text_copy | app_feature_capture_cursor | app_feature_horizontal_scroll | app_feature_glass | app_feature_rich_clipboard
+// The header byte is full. What a compositor draws beyond those eight it says
+// when it starts an application, with --app-extended=, and the application
+// says what it understands in the payload of its first response: this mark,
+// then the bits. A program built before either existed ignores both, and is
+// taken to have none.
+const app_extended_luna = u32(1) // the Windows XP theme
+const app_extended = app_extended_luna
+const app_extended_option = '--app-extended='
+const app_extended_mark = [u8(`V`), `E`, `X`, `T`]!
+
+// app_hello is that payload, and app_hello_extended reads one.
+fn app_hello() []u8 {
+	mut hello := []u8{cap: 8}
+	for letter in app_extended_mark {
+		hello << letter
+	}
+	wire_put_u32(mut hello, app_extended)
+	return hello
+}
+
+fn app_hello_extended(payload []u8) u32 {
+	if payload.len < 8 {
+		return 0
+	}
+	for index, letter in app_extended_mark {
+		if payload[index] != letter {
+			return 0
+		}
+	}
+	return u32(payload[4]) | (u32(payload[5]) << 8) | (u32(payload[6]) << 16) | (u32(payload[7]) << 24)
+}
+
 // Header byte 7 was reserved and zero in version 10. Bit 0 now requests a
 // cursor-free Capture frame, with the unchanged header/state sizes. Older
 // compositors do not advertise the feature, so new Capture clients send zero.
@@ -60,6 +92,7 @@ const app_state_hide_cursor = u8(1)
 // What the compositor at the other end of the pipe draws: this program's own
 // features until a request says otherwise.
 __global app_compositor_features = app_features
+__global app_compositor_extended = app_extended
 const native_app_directory = '/usr/bin/'
 
 // A local PollingApp can cheaply answer "nothing changed" on every compositor
@@ -131,6 +164,8 @@ struct AppProcessOptions {
 	response_fd int
 	tz_offset   i64
 	language    DesktopLanguage
+	// The compositor's app_extended; none from one that does not say.
+	extended u32
 }
 
 struct AppWireState {
@@ -240,7 +275,8 @@ fn (mut r WireReader) take_string() !string {
 // The theme travels with the Windows 7 glass colour above it in the same
 // field. A desktop and an application built before that colour existed only
 // ever say 0 or 1 there, which reads back as that theme with the first
-// colour, and reject anything else: app_state_for_peer keeps it from them.
+// colour, and reject anything else, as one built before Windows XP's theme
+// rejects that: app_state_for_peer keeps from each what it cannot read.
 const wire_theme_kind_mask = 0xff
 const wire_theme_glass_shift = 8
 
@@ -251,26 +287,32 @@ fn wire_theme(settings Settings) int {
 fn wire_theme_valid(value int) bool {
 	kind := value & wire_theme_kind_mask
 	glass := value >> wire_theme_glass_shift
-	return value >= 0 && kind <= int(ThemeKind.windows7) && glass < glass_colors.len
+	return value >= 0 && kind <= int(ThemeKind.windows_xp) && glass < glass_colors.len
 }
 
-// app_state_for_peer is the state as a program without app_feature_glass can
-// read it: it knows neither the Windows 7 theme nor a glass colour, and is
-// told the desktop wears its own look.
-fn app_state_for_peer(state AppWireState, peer_features u8) AppWireState {
-	if peer_features & app_feature_glass != 0 {
+// app_theme_hidden says whether a program with these features cannot read
+// this theme: Windows 7 without app_feature_glass, Windows XP without
+// app_extended_luna.
+fn app_theme_hidden(theme ThemeKind, peer_features u8, peer_extended u32) bool {
+	return (theme == .windows7 && peer_features & app_feature_glass == 0)
+		|| (theme == .windows_xp && peer_extended & app_extended_luna == 0)
+}
+
+// app_state_for_peer is the state as a program built before a theme can read
+// it: it is told the desktop wears its own look, and one without
+// app_feature_glass is told no glass colour either.
+fn app_state_for_peer(state AppWireState, peer_features u8, peer_extended u32) AppWireState {
+	glass := peer_features & app_feature_glass != 0
+	hidden := app_theme_hidden(state.settings.theme, peer_features, peer_extended)
+	if glass && !hidden {
 		return state
 	}
 	return AppWireState{
 		...state
 		settings: Settings{
 			...state.settings
-			theme:       if state.settings.theme == .windows7 {
-				ThemeKind.default_
-			} else {
-				state.settings.theme
-			}
-			glass_color: 0
+			theme:       if hidden { ThemeKind.default_ } else { state.settings.theme }
+			glass_color: if glass { state.settings.glass_color } else { 0 }
 		}
 	}
 }
@@ -278,20 +320,22 @@ fn app_state_for_peer(state AppWireState, peer_features u8) AppWireState {
 // app_state_from_peer undoes that in what such a program answers: the theme
 // it was told is not a choice it made, and the glass colour was never its to
 // change. `current` is what the desktop has.
-fn app_state_from_peer(state AppWireState, peer_features u8, current Settings) AppWireState {
-	if peer_features & app_feature_glass != 0 {
+fn app_state_from_peer(state AppWireState, peer_features u8, peer_extended u32, current Settings) AppWireState {
+	glass := peer_features & app_feature_glass != 0
+	hidden := app_theme_hidden(current.theme, peer_features, peer_extended)
+	if glass && !hidden {
 		return state
 	}
 	return AppWireState{
 		...state
 		settings: Settings{
 			...state.settings
-			theme:       if current.theme == .windows7 && state.settings.theme == .default_ {
-				ThemeKind.windows7
+			theme:       if hidden && state.settings.theme == .default_ {
+				current.theme
 			} else {
 				state.settings.theme
 			}
-			glass_color: current.glass_color
+			glass_color: if glass { state.settings.glass_color } else { current.glass_color }
 		}
 	}
 }
@@ -790,6 +834,7 @@ fn app_process_options(args []string) ?AppProcessOptions {
 	mut response_fd := -1
 	mut tz_offset := i64(0)
 	mut language := DesktopLanguage.en
+	mut extended := u32(0)
 	for arg in args {
 		if arg.starts_with('--vinix-app=') {
 			name = arg['--vinix-app='.len..]
@@ -801,6 +846,8 @@ fn app_process_options(args []string) ?AppProcessOptions {
 			tz_offset = arg['--app-tz='.len..].i64()
 		} else if arg.starts_with('--app-lang=') {
 			language = desktop_language_from_code(arg['--app-lang='.len..]) or { DesktopLanguage.en }
+		} else if arg.starts_with(app_extended_option) {
+			extended = arg[app_extended_option.len..].u32()
 		}
 	}
 	if name == '' {
@@ -815,6 +862,7 @@ fn app_process_options(args []string) ?AppProcessOptions {
 		response_fd: response_fd
 		tz_offset:   tz_offset
 		language:    language
+		extended:    extended
 	}
 }
 
@@ -1073,6 +1121,7 @@ fn free_app_payload(payload string) {
 fn run_app_process(options AppProcessOptions) {
 	desktop_set_cloexec(options.request_fd, true)
 	desktop_set_cloexec(options.response_fd, true)
+	app_compositor_extended = options.extended
 	// The compositor supplies its active user's folder. A direct app launch
 	// without that environment still resolves the saved desktop profile.
 	user_home := os.getenv('VINIX_USER_HOME')
@@ -1107,7 +1156,10 @@ fn run_app_process(options AppProcessOptions) {
 		send_app_error(options.response_fd, app_current_state(desktop), 'application sandbox: ${err.msg()}')
 		return
 	}
-	if !send_app_response(options.response_fd, true, app_current_state(desktop), []u8{}) {
+	hello := app_hello()
+	started := send_app_response(options.response_fd, true, app_current_state(desktop), hello)
+	unsafe { hello.free() }
+	if !started {
 		return
 	}
 
@@ -1281,6 +1333,8 @@ mut:
 	keyboard         bool
 	standalone       bool
 	peer_features    u8
+	// Its app_extended, from its first response.
+	peer_extended u32
 	desktop_services bool
 	clipboard_copy bool
 	color_sample     ColorMeterReport
@@ -1353,7 +1407,7 @@ fn start_remote_app_at(path string, factory AppFactory, mut desktop Desktop) !Na
 fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop Desktop, timeout_ms int) !NativeApp {
 	process := desktop_spawn_app(path, factory.process_name, desktop.tz_offset_seconds,
 		desktop.settings.language.code(),
-		factory.standalone, desktop.pending_status_path) or {
+		factory.standalone, desktop.pending_status_path, app_extended) or {
 		return error('cannot execute ${path}')
 	}
 	mut remote := &RemoteApp{
@@ -1380,6 +1434,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 		return app_reply_error(reply)
 	}
 	remote.peer_features = reply.features
+	remote.peer_extended = app_hello_extended(reply.payload)
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}
@@ -1404,8 +1459,8 @@ fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload
 		AppWireState{}
 	}
 	started := desktop_monotonic_ms()
-	if !send_app_request(a.request_fd, command, width, height, app_state_for_peer(state, a.peer_features),
-		payload) {
+	if !send_app_request(a.request_fd, command, width, height, app_state_for_peer(state, a.peer_features,
+		a.peer_extended), payload) {
 		a.remember_transport_failure('application request pipe closed')
 		a.abort_transport()
 		return error(a.failure_reason)
@@ -1420,7 +1475,8 @@ fn (mut a RemoteApp) transact(command AppCommand, width int, height int, payload
 		return error(a.failure_reason)
 	}
 	if unsafe { a.desktop != nil } {
-		apply_app_state(mut a.desktop, app_state_from_peer(reply.state, a.peer_features, a.desktop.settings))
+		apply_app_state(mut a.desktop, app_state_from_peer(reply.state, a.peer_features, a.peer_extended,
+			a.desktop.settings))
 	}
 	return reply
 }

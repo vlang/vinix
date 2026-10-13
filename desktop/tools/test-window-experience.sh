@@ -38,7 +38,7 @@ PY
 rm -f "$work/ui/main.v"
 printf "Module { name: 'window_experience_tests' }\n" > "$work/ui/v.mod"
 
-suites='window_isolation window_placement window_edges window_overview window_layout window_snap_assist window_actions windows_shortcuts titlebar_click workspace taskbar_features switcher quick_launch utilities color_meter app_icon glass'
+suites='window_isolation window_placement window_edges window_overview window_layout window_snap_assist window_actions windows_shortcuts titlebar_click workspace taskbar_features switcher quick_launch utilities color_meter app_icon glass luna'
 if [ "$#" -gt 0 ]; then
     suites="$*"
 fi

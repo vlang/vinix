@@ -36,7 +36,7 @@ fn desktop_preferences_valid(p DesktopPreferences) bool {
 		&& int(p.settings.taskbar_mode) >= int(TaskbarMode.standard)
 		&& int(p.settings.taskbar_mode) <= int(TaskbarMode.combined)
 		&& int(p.settings.theme) >= int(ThemeKind.default_)
-		&& int(p.settings.theme) <= int(ThemeKind.windows7)
+		&& int(p.settings.theme) <= int(ThemeKind.windows_xp)
 		&& p.settings.glass_color >= 0 && p.settings.glass_color < glass_colors.len
 		&& int(p.settings.language) >= 0 && int(p.settings.language) < desktop_languages.len
 		&& p.settings.wallpaper_color >= 0
@@ -115,6 +115,7 @@ fn desktop_encode_preferences(p DesktopPreferences) ?string {
 		.default_ { 'default' }
 		.macos { 'macos' }
 		.windows7 { 'windows7' }
+		.windows_xp { 'windowsxp' }
 	}
 	language := p.settings.language.code()
 	clock_24_hour := if p.settings.clock_24_hour { 'true' } else { 'false' }
@@ -243,6 +244,7 @@ fn desktop_parse_preferences(record string) ?DesktopPreferences {
 					'default' { ThemeKind.default_ }
 					'macos' { ThemeKind.macos }
 					'windows7' { ThemeKind.windows7 }
+					'windowsxp' { ThemeKind.windows_xp }
 					else { return none }
 				}
 			}

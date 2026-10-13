@@ -38,11 +38,19 @@ const aero_caption_width = aero_caption_minimize_width + aero_caption_maximize_w
 const aero_caption_height = 19
 const aero_caption_inset = 6
 const aero_caption_radius = 4
-// The title's 16-pixel icon: how far in from the body's left edge it starts,
-// and the gap between it and the text.
-const aero_title_icon_size = 16
-const aero_title_icon_inset = 8
-const aero_title_icon_gap = 6
+// The icon that leads a title, under the themes that show one.
+const title_icon_size = 16
+
+// Windows XP's caption buttons are three 21-pixel squares two pixels apart,
+// six in from the window's edge and five down from its top, with corners
+// rounded by three pixels inside a white line.
+const luna_caption_size = 21
+const luna_caption_gap = 2
+const luna_caption_inset = 6
+const luna_caption_top = 5
+const luna_caption_radius = 3
+// A Luna window's upper corners.
+const luna_corner_radius = 8
 
 // ── Window contents ────────────────────────────────────────────────
 // ── Application interiors ──────────────────────────────────────────

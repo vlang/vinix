@@ -13,7 +13,7 @@ struct SettingsSearchEntry {
 const settings_search_limit = 128
 // Room for every entry below to match at once: SettingsApp keeps the indices
 // of its results inline. An entry added here needs one more.
-const settings_search_capacity = 45
+const settings_search_capacity = 46
 const settings_search_entries = [
 	SettingsSearchEntry{.appearance, 'settings.appearance.buttons', [
 		'settings.appearance.buttons_note',
@@ -84,6 +84,14 @@ const settings_search_entries = [
 		'settings.theme.windows7',
 		'settings.theme.windows7_note_1',
 		'settings.theme.windows7_note_2',
+		'',
+		'',
+	]!},
+	SettingsSearchEntry{.theme, 'settings.theme.windowsxp', [
+		'settings.theme.windowsxp_note_1',
+		'settings.theme.windowsxp_note_2',
+		'settings.theme.heading',
+		'',
 		'',
 		'',
 	]!},

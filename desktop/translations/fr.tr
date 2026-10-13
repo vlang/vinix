@@ -1165,6 +1165,15 @@ Cadres de verre qui floutent ce qui est derrière,
 settings.theme.windows7_note_2
 boutons au bord supérieur et barre des tâches en verre.
 -----
+settings.theme.windowsxp
+Windows XP
+-----
+settings.theme.windowsxp_note_1
+Barre de titre bleue aux coins arrondis et texte blanc,
+-----
+settings.theme.windowsxp_note_2
+boutons carrés et barre des tâches bleue au bouton Démarrer vert.
+-----
 settings.wallpaper.colour
 Couleur
 -----

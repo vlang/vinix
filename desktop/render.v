@@ -30,6 +30,21 @@ enum ActionWorld {
 	application
 }
 
+// ChromeWalk is where the tree walk is, under a theme whose chrome a renderer
+// paints (Theme.chrome): on the taskbar, in the Start menu's shell, in a
+// window's title bar. The controls painted there are drawn for that surface
+// rather than as the flat boxes their elements declare.
+struct ChromeWalk {
+mut:
+	kind     Chrome
+	on_bar   bool
+	on_menu  bool
+	on_title bool
+	// What is under the title's icon, which a builtin glyph fills its holes
+	// with. See Desktop.surface_under.
+	title_under u32
+}
+
 // HitTarget is one clickable or draggable region, recorded in painting order.
 struct HitTarget {
 	// A remote application's decoded tree is released as soon as its frame has
@@ -292,6 +307,9 @@ fn (mut d Desktop) render_scene_clipped(root ui2.Element, clip Clip, desktop_ove
 	d.clear_hit_targets()
 	d.canvas.clip = clip
 	d.glass_begin_pass(clip)
+	d.walk = ChromeWalk{
+		kind: d.theme().chrome
+	}
 	d.paint_wallpaper()
 	d.render_element(&root, 0, 0, 0)
 	// Only a complete frame shows every window as it is now.
@@ -395,22 +413,24 @@ fn (mut d Desktop) render_element(el &ui2.Element, off_x int, off_y int, depth i
 	if depth == 1 && el.kind == .view && el.id.starts_with('win.') {
 		d.inactive_window = !el.focused
 	}
-	// The taskbar's controls know from this that they sit on glass.
-	was_on_bar := d.glass.on_bar
+	// Under a theme whose chrome is painted for it, the taskbar's controls
+	// know from this that they sit on its bar.
+	painted := d.walk.kind != .flat
+	was_on_bar := d.walk.on_bar
 	if depth == 1 && el.id == taskbar_id {
-		d.glass.on_bar = d.glass.active
+		d.walk.on_bar = painted
 	}
-	// A glass title bar's icon is told what is under it rather than reading
+	// A painted title bar's icon is told what is under it rather than reading
 	// the canvas. See surface_under.
-	was_on_title := d.glass.on_title
-	d.glass.on_title = d.glass.active && depth == 2 && el.id.ends_with('.titlebar')
+	was_on_title := d.walk.on_title
+	d.walk.on_title = painted && depth == 2 && el.id.ends_with('.titlebar')
 	// So do the Start menu's own controls, but not those of the opaque
 	// program pane inside it.
-	was_on_menu := d.glass.on_menu
+	was_on_menu := d.walk.on_menu
 	if depth == 1 && el.id == action_start_panel {
-		d.glass.on_menu = d.glass.active
+		d.walk.on_menu = painted
 	} else if depth > 1 {
-		d.glass.on_menu = false
+		d.walk.on_menu = false
 	}
 
 	// By reference: an Element is several hundred bytes, and copying each one
@@ -420,9 +440,9 @@ fn (mut d Desktop) render_element(el &ui2.Element, off_x int, off_y int, depth i
 	}
 
 	d.inactive_window = was_inactive
-	d.glass.on_bar = was_on_bar
-	d.glass.on_menu = was_on_menu
-	d.glass.on_title = was_on_title
+	d.walk.on_bar = was_on_bar
+	d.walk.on_menu = was_on_menu
+	d.walk.on_title = was_on_title
 	if pushed {
 		d.canvas.restore_clip(saved)
 	}
@@ -558,6 +578,29 @@ fn (mut d Desktop) draw_surface(el &ui2.Element, x int, y int, w int, h int, dep
 		}
 		if el.id == taskbar_edge_id {
 			// The glass bar draws its own top lines.
+			return
+		}
+	}
+	// Luna: Windows XP's blue frame and bar are gradients no box style says.
+	// See luna.v.
+	if d.walk.kind == .luna {
+		if depth == 1 && el.id.starts_with('win.') {
+			d.draw_luna_window(el, x, y, w, h)
+			return
+		}
+		if depth == 1 && el.id == taskbar_id {
+			d.draw_luna_taskbar(x, y, w, h)
+			return
+		}
+		if depth == 1 && el.id == action_start_panel {
+			d.draw_luna_menu(x, y, w, h)
+			return
+		}
+		if el.id == taskbar_tray_id {
+			d.draw_luna_tray(x, y, w, h)
+			return
+		}
+		if el.id == taskbar_edge_id {
 			return
 		}
 	}
@@ -762,12 +805,18 @@ fn (mut d Desktop) draw_label(el &ui2.Element, x int, y int, w int, h int) {
 		// Padded, so the run is not touched by whatever it is sitting on.
 		d.canvas.fill_rect(text_x - 6, y + 2, text_width + 12, h - 4, el.text_style.background_color)
 	}
-	if d.glass.active && el.id.starts_with('win.') && el.id.ends_with('.title') {
-		d.draw_aero_title_glow(text_x, y, text_width, h)
+	if d.walk.on_title && el.id.ends_with('.title') {
+		if d.walk.kind == .aero {
+			d.draw_aero_title_glow(text_x, y, text_width, h)
+		} else if !d.inactive_window {
+			// Windows XP sets a focused window's white title on its own dark
+			// blue shadow.
+			d.canvas.draw_text(face, text_x + 1, baseline_y + 1, text, luna_title_shadow)
+		}
 	}
 	// Text on the glass taskbar is backed like a shortcut's label, for the
 	// same reason: what shows through behind it could be anything.
-	if el.text_style.shadow || d.glass.on_bar || d.glass.on_menu {
+	if el.text_style.shadow || (d.glass.active && (d.walk.on_bar || d.walk.on_menu)) {
 		// A shortcut's label sits on a wallpaper that could be any photograph,
 		// so it cannot rely on contrast with what is behind it. The shadow's
 		// colour comes from the text's own: dark text is backed with light and
@@ -1208,9 +1257,15 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	// backing-store resolution instead.
 	is_title_button := el.id.ends_with('.close') || el.id.ends_with('.minimize')
 		|| el.id.ends_with('.maximize')
-	if is_title_button && el.id.starts_with('win.') && d.theme().button_look == .aero {
-		d.draw_aero_caption_button(el, x, y, w, h)
-		return
+	if is_title_button && el.id.starts_with('win.') {
+		if d.theme().button_look == .aero {
+			d.draw_aero_caption_button(el, x, y, w, h)
+			return
+		}
+		if d.theme().button_look == .luna {
+			d.draw_luna_caption_button(el, x, y, w, h)
+			return
+		}
 	}
 	is_traffic_light := d.theme().button_look == .traffic && is_title_button
 	mut text_color := if el.kind == .toggle_button && el.checked {
@@ -1221,13 +1276,17 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 	if (el.kind == .button || el.kind == .toggle_button) && el.native_style
 		&& d.settings.theme == .macos {
 		text_color = d.draw_catalina_button(el, x, y, w, h)
-	} else if !el.box.transparent && (d.glass.on_bar || d.glass.on_menu) {
+	} else if !el.box.transparent && (d.walk.on_bar || d.walk.on_menu) {
 		control_box := if el.kind == .toggle_button && el.checked {
 			el.toggle_down_box
 		} else {
 			el.box
 		}
-		d.draw_glass_bar_box(el, x, y, w, h, control_box.bg, int(control_box.radius))
+		if d.walk.kind == .aero {
+			d.draw_glass_bar_box(el, x, y, w, h, control_box.bg, int(control_box.radius))
+		} else {
+			d.draw_luna_bar_box(el, x, y, w, h, control_box.bg)
+		}
 	} else if !el.box.transparent {
 		control_box := if el.kind == .toggle_button && el.checked {
 			el.toggle_down_box
@@ -2022,8 +2081,8 @@ fn (mut d Desktop) draw_battery_glyph(name string, cx int, cy int, w int, h int,
 // frame's clip is not what is behind anything: the window's own glass is
 // what its backdrop makes it.
 fn (d &Desktop) surface_under(x int, y int) u32 {
-	if d.glass.on_title {
-		return d.glass.title_under
+	if d.walk.on_title {
+		return d.walk.title_under
 	}
 	if x < 0 || y < 0 || x >= d.canvas.width || y >= d.canvas.height {
 		return d.theme().title_active_bg

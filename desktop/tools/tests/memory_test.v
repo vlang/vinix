@@ -216,6 +216,38 @@ fn test_glass_redraws_keep_only_their_backdrops() {
 	assert glass_memory_backdrops(&desktop) == 0
 }
 
+fn test_luna_redraws_release_all_temporary_allocations() {
+	mut desktop := memory_fixture_desktop()
+	desktop.settings.theme = .windows_xp
+	// Warm the frame pool for this layout, with the Start menu open and shut.
+	for open in [false, true, false] {
+		desktop.start_menu_open = open
+		render_and_release(mut desktop)
+	}
+	C.vinix_heap_begin()
+	for iteration in 0 .. 24 {
+		// Whole frames and partial ones, a window moving, another taking the
+		// focus and the Start menu opening: Luna keeps nothing between frames.
+		desktop.windows[0].x = 150 + iteration % 3
+		desktop.focus = desktop.windows[iteration % desktop.windows.len].id
+		desktop.start_menu_open = iteration % 4 == 3
+		render_and_release(mut desktop)
+		tree := desktop.build_tree()
+		desktop.render_clipped(tree, desktop.damage_clip(DamageRect{
+			x:     120
+			y:     96
+			w:     480
+			h:     304
+			valid: true
+		}), false)
+		free_tree(tree)
+	}
+	live := C.vinix_heap_end()
+	if live != 0 { print_heap_sizes('Luna allocations by size') }
+	assert live == 0, 'Luna redraws retained ${live} bytes'
+	assert !desktop.glass.allocated
+}
+
 fn glass_memory_backdrops(desktop &Desktop) int {
 	mut count := 0
 	for slot in desktop.glass.slots {

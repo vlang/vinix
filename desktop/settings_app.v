@@ -426,12 +426,19 @@ fn settings_glass_offered() bool {
 	return app_compositor_features & app_feature_glass != 0
 }
 
+// settings_luna_offered says the same of the Windows XP theme.
+fn settings_luna_offered() bool {
+	return app_compositor_extended & app_extended_luna != 0
+}
+
 fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	settings := a.desktop.settings
 	inner := width - 2 * settings_padding
 	// Settings published to a running desktop on its own offers only the
 	// themes that desktop can draw.
-	columns := if settings_glass_offered() { 3 } else { 2 }
+	glass_offered := settings_glass_offered()
+	luna_offered := settings_luna_offered()
+	columns := 2 + if glass_offered { 1 } else { 0 } + if luna_offered { 1 } else { 0 }
 	choice := (inner - (columns - 1) * settings_row_gap) / columns
 
 	mut out := frame_elements(9 + glass_colors.len)
@@ -443,8 +450,13 @@ fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 	y += 22
 	out << settings_choice('settings.theme.0', tr('settings.theme.default'), settings_padding, y, choice, settings.theme == .default_)
 	out << settings_choice('settings.theme.1', tr('settings.theme.macos'), settings_padding + choice + settings_row_gap, y, choice, settings.theme == .macos)
-	if columns == 3 {
-		out << settings_choice('settings.theme.2', tr('settings.theme.windows7'), settings_padding + 2 * (choice + settings_row_gap), y, choice, settings.theme == .windows7)
+	mut slot := 2
+	if glass_offered {
+		out << settings_choice('settings.theme.2', tr('settings.theme.windows7'), settings_padding + slot * (choice + settings_row_gap), y, choice, settings.theme == .windows7)
+		slot++
+	}
+	if luna_offered {
+		out << settings_choice('settings.theme.3', tr('settings.theme.windowsxp'), settings_padding + slot * (choice + settings_row_gap), y, choice, settings.theme == .windows_xp)
 	}
 	y += 28 + 10
 
@@ -464,6 +476,11 @@ fn (a &SettingsApp) theme_pane(width int) []ui2.Element {
 			out << settings_note(tr('settings.theme.windows7_note_1'), y, width)
 			y += 16
 			out << settings_note(tr('settings.theme.windows7_note_2'), y, width)
+		}
+		.windows_xp {
+			out << settings_note(tr('settings.theme.windowsxp_note_1'), y, width)
+			y += 16
+			out << settings_note(tr('settings.theme.windowsxp_note_2'), y, width)
 		}
 	}
 	if settings.theme != .windows7 {
@@ -676,7 +693,14 @@ fn (mut a SettingsApp) handle(event_id string) ! {
 		return
 	}
 	if event_id.starts_with(settings_action_theme) {
-		if event_id.ends_with('2') {
+		if event_id.ends_with('3') {
+			if !settings_luna_offered() {
+				return
+			}
+			a.desktop.settings.theme = .windows_xp
+			// Windows XP's caption buttons are at the right too.
+			a.desktop.settings.button_side = .right
+		} else if event_id.ends_with('2') {
 			if !settings_glass_offered() {
 				return
 			}

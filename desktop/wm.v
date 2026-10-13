@@ -135,6 +135,8 @@ mut:
 	inactive_window bool
 	// What is behind each glass surface of the Windows 7 theme. See glass.v.
 	glass GlassCache
+	// Where the tree walk is in chrome that a theme's renderer paints.
+	walk ChromeWalk
 	// The pixels under the software pointer, so a pointer that only moved can
 	// be redrawn without recomposing anything else.
 	cursor_backing CursorBacking
@@ -679,22 +681,22 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	}
 
 	// The title takes what the buttons leave. Centred themes centre it over the
-	// whole bar and simply accept a shorter run. Windows 7 leads it with the
+	// whole bar and simply accept a shorter run. Windows leads it with the
 	// window's icon, a little in from the body's left edge.
 	title_lead := if buttons_left {
 		theme.button_inset + span + 10
 	} else if theme.title_icon {
-		border + aero_title_icon_inset
+		border + theme.title_icon_inset
 	} else {
 		14
 	}
 	text_inset_left := if theme.title_icon {
-		title_lead + aero_title_icon_size + aero_title_icon_gap
+		title_lead + title_icon_size + theme.title_icon_gap
 	} else {
 		title_lead
 	}
 	// The frame's top line is not part of what the title is centred in.
-	title_top := if theme.glass { 1 } else { 0 }
+	title_top := if theme.chrome != .flat { 1 } else { 0 }
 	title_limit := window.width - span - theme.button_inset - text_inset_left - 10
 	// A folder's title carries its icon, as Finder's does, the two centred as one.
 	title_icon_width := if toolbar.image_path.len > 0 && theme.title_centered && d.fonts.len > 0 {
@@ -716,10 +718,10 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	if theme.title_icon {
 		title_children << ui2.Element{
 			...ui2.image('', window.icon, ui2.rect(f64(title_lead), f64(title_top +
-				(theme.title_height - title_top - aero_title_icon_size) / 2), aero_title_icon_size,
-				aero_title_icon_size))
+				(theme.title_height - title_top - title_icon_size) / 2), title_icon_size,
+				title_icon_size))
 			text_style: ui2.TextStyle{
-				color: aero_title_icon_color
+				color: theme.title_icon_color
 			}
 		}
 	}
@@ -745,18 +747,19 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 			}
 		}
 	}
-	// A glass frame is painted whole by the window's own surface, so the bar
-	// and its divider are only there to be dragged and found.
+	// A frame of glass or of Luna is painted whole by the window's own
+	// surface, so the bar and its divider are only there to be dragged and
+	// found.
 	title_bar := ui2.draggable_view(window.id_titlebar, ui2.rect(0, 0, f64(window.width), f64(theme.title_height +
 		toolbar_height)), ui2.BoxStyle{
 		bg:          title_bg
-		transparent: theme.glass
+		transparent: theme.chrome != .flat
 	}, title_children)
 
 	divider := ui2.view(window.id_divider, ui2.rect(0, f64(theme.title_height + toolbar_height - 1),
 		f64(window.width), 1), ui2.BoxStyle{
 		bg:          if active { theme.title_divider } else { theme.title_inactive_divider }
-		transparent: theme.glass
+		transparent: theme.chrome != .flat
 	}, [])
 
 	// Clickable so that touching a window anywhere brings it to the front,
@@ -777,7 +780,7 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	// adding chrome over the application's surface.
 	if !window.maximized && window.snap == .none_ {
 		grip := window_resize_grip_size
-		// All of a glass frame's width resizes, as it does in Windows 7.
+		// All of a painted frame's width resizes, as it does in Windows.
 		edge := if border > window_resize_edge_size { border } else { window_resize_edge_size }
 		right := window.width - grip
 		bottom := window.height - grip
@@ -823,12 +826,12 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 			ui2.cursor_resize_nesw)
 	}
 	// `focused` tells the renderer which window's controls are drawn as the
-	// key window's. A maximized glass window is square: its corners are the
-	// screen's.
+	// key window's. A maximized window of glass or of Luna is square: its
+	// corners are the screen's.
 	return ui2.Element{
 		...ui2.view(window.id_frame, window.frame_rect(), ui2.BoxStyle{
 			bg:     background
-			radius: if theme.glass && window.maximized { 0 } else { theme.window_radius }
+			radius: if theme.chrome != .flat && window.maximized { 0 } else { theme.window_radius }
 		}, window_children)
 		focused: active
 	}
@@ -1440,6 +1443,16 @@ fn aero_caption_button(id string, glyph string, x int, width int, top int) ui2.E
 
 fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_hovered bool) ui2.Element {
 	theme := d.theme()
+	if theme.button_look == .luna {
+		// Where it is and which mark it carries; draw_luna_caption_button
+		// paints the square, its colour and the mark.
+		return ui2.button_with_image(id, '', glyph, ui2.rect(f64(x), luna_caption_top, luna_caption_size,
+			luna_caption_size), ui2.BoxStyle{
+			transparent: true
+		}, ui2.TextStyle{
+			color: theme.glyph_color
+		})
+	}
 	y := (theme.title_height - theme.button_size) / 2
 	hovered := d.hover == id
 	is_close := glyph == 'builtin:close' || glyph == 'builtin:traffic_close'
@@ -1507,6 +1520,8 @@ fn (d &Desktop) title_button(id string, glyph string, x int, active bool, set_ho
 // bar from the first and leaves the second out.
 const taskbar_id = 'taskbar'
 const taskbar_edge_id = 'taskbar.edge'
+// The panel Luna puts behind the notification area and the clock.
+const taskbar_tray_id = 'taskbar.tray'
 
 fn (d &Desktop) taskbar_element() ui2.Element {
 	theme := d.theme()
@@ -1523,7 +1538,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	defer {
 		unsafe { entries.free() }
 	}
-	mut children := frame_elements(3 * entries.len + workspace_count + tray_item_count + 10)
+	mut children := frame_elements(3 * entries.len + workspace_count + tray_item_count + 11)
 	item_height := if icon_only { taskbar_icon_item_height } else { taskbar_item_height }
 	item_y := (taskbar_height - item_height) / 2
 
@@ -1634,6 +1649,15 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	// immediately left of the live clock, as the Windows 7 tray did. The input
 	// source goes right up against the time, in the room its box leaves free.
 	tray_x := if dock { x } else { status_right - status_width }
+	if theme.chrome == .luna && !dock {
+		// Windows XP sets the notification area and the clock apart in a
+		// lighter blue, from here to the end of the bar. It is behind them, so
+		// it comes first.
+		children << ui2.view(taskbar_tray_id, ui2.rect(f64(tray_x - taskbar_item_gap), 0, f64(width -
+			tray_x + taskbar_item_gap), f64(taskbar_height)), ui2.BoxStyle{
+			bg: theme.accent
+		}, [])
+	}
 	d.tray_elements(mut children, tray_x, item_y, item_height)
 	center_x := tray_x + tray_span
 	build_x := center_x + 24
@@ -1809,9 +1833,9 @@ fn (d &Desktop) taskbar_entry_elements(mut children []ui2.Element, entry Taskbar
 	button_style := ui2.BoxStyle{
 		bg:     bg
 		radius: radius
-		// On a glass bar a program that is only pinned is its icon alone, as
-		// it is in Windows 7; one that is running sits in a pane.
-		transparent: theme.glass && entry.window_count == 0 && bg == theme.taskbar_item_bg
+		// On a bar of glass or of Luna a program that is only pinned is its
+		// icon alone, as it is in Windows; one that is running sits in a pane.
+		transparent: theme.chrome != .flat && entry.window_count == 0 && bg == theme.taskbar_item_bg
 	}
 	if icon_only {
 		// An icon consumes the full button when it has no label, making an

@@ -931,16 +931,16 @@ fn test_windows7_theme_is_kept_from_programs_built_before_it() {
 		requested_scale: desktop_scale_100
 	}
 	// A program that knows the theme is told all of it, and believed.
-	assert app_state_for_peer(glass, app_features) == glass
-	assert app_state_from_peer(glass, app_features, Settings{}) == glass
+	assert app_state_for_peer(glass, app_features, app_extended) == glass
+	assert app_state_from_peer(glass, app_features, app_extended, Settings{}) == glass
 	// One that does not is told the desktop wears its own look, which it can
 	// read, and its answer does not undo the theme or the colour.
 	old := app_features & ~app_feature_glass
-	plain := app_state_for_peer(glass, old)
+	plain := app_state_for_peer(glass, old, app_extended)
 	assert plain.settings.theme == .default_ && plain.settings.glass_color == 0
 	assert plain.settings.language == .ru
 	assert wire_theme(plain.settings) == 0
-	assert app_state_from_peer(plain, old, glass.settings) == glass
+	assert app_state_from_peer(plain, old, app_extended, glass.settings) == glass
 	// Its own choice of theme still counts.
 	chosen := AppWireState{
 		...plain
@@ -949,7 +949,7 @@ fn test_windows7_theme_is_kept_from_programs_built_before_it() {
 			theme: .macos
 		}
 	}
-	answered := app_state_from_peer(chosen, old, glass.settings)
+	answered := app_state_from_peer(chosen, old, app_extended, glass.settings)
 	assert answered.settings.theme == .macos && answered.settings.glass_color == 11
 	macos := AppWireState{
 		settings:        Settings{
@@ -958,8 +958,9 @@ fn test_windows7_theme_is_kept_from_programs_built_before_it() {
 		}
 		requested_scale: desktop_scale_100
 	}
-	assert app_state_for_peer(macos, old).settings.theme == .macos
-	assert app_state_from_peer(app_state_for_peer(macos, old), old, macos.settings) == macos
+	assert app_state_for_peer(macos, old, app_extended).settings.theme == .macos
+	assert app_state_from_peer(app_state_for_peer(macos, old, app_extended), old, app_extended,
+		macos.settings) == macos
 
 	// Settings shown by a compositor without the glass does not offer it.
 	mut desktop := Desktop{}
@@ -982,8 +983,118 @@ fn test_windows7_theme_is_kept_from_programs_built_before_it() {
 	assert desktop.settings.theme == .windows7
 }
 
+fn test_selecting_windows_xp_theme_puts_controls_on_right() {
+	mut desktop := Desktop{
+		settings: Settings{
+			theme:       .macos
+			button_side: .left
+			glass_color: 5
+		}
+	}
+	mut app := &SettingsApp{
+		category: .theme
+		desktop:  &desktop
+	}
+	begin_frame_elements()
+	pane := app.theme_pane(480)
+	// Four themes in one row, each as wide as the next, inside the pane.
+	mut choices := 0
+	mut last_right := 0
+	for element in pane {
+		if element.id.starts_with(settings_action_theme) {
+			assert int(element.frame.x) >= last_right
+			if choices > 0 {
+				assert int(element.frame.width) == int(pane[2].frame.width)
+			}
+			last_right = int(element.frame.x + element.frame.width)
+			choices++
+		}
+	}
+	assert choices == 4
+	assert last_right <= 480 - settings_padding
+	app.handle('${settings_action_theme}3') or { panic(err) }
+	assert desktop.settings.theme == .windows_xp
+	assert desktop.settings.button_side == .right
+	// The glass colour is Windows 7's: it is neither offered nor lost.
+	assert desktop.settings.glass_color == 5
+	begin_frame_elements()
+	for element in app.theme_pane(480) {
+		assert !element.id.starts_with(settings_action_glass)
+	}
+	app.handle('${settings_action_theme}0') or { panic(err) }
+	assert desktop.settings.theme == .default_
+}
+
+fn test_windows_xp_theme_is_kept_from_programs_built_before_it() {
+	luna := AppWireState{
+		settings:        Settings{
+			theme:       .windows_xp
+			glass_color: 9
+			language:    .fr
+		}
+		requested_scale: desktop_scale_100
+	}
+	// A program says what it understands in its first response, after the
+	// mark; one that says nothing, or something else, understands none of it.
+	hello := app_hello()
+	assert hello.len == 8 && app_hello_extended(hello) == app_extended
+	assert app_extended & app_extended_luna != 0
+	assert app_hello_extended([]u8{}) == 0
+	assert app_hello_extended([u8(`V`), `E`, `X`, `T`, 1, 0, 0]) == 0
+	assert app_hello_extended([u8(`T`), `E`, `X`, `T`, 1, 0, 0, 0]) == 0
+	// One that knows the theme is told it, and believed.
+	assert app_state_for_peer(luna, app_features, app_extended) == luna
+	assert app_state_from_peer(luna, app_features, app_extended, Settings{}) == luna
+	// One built before it reads the desktop's own look and keeps the glass
+	// colour it does understand; its answer does not undo the theme.
+	plain := app_state_for_peer(luna, app_features, 0)
+	assert plain.settings.theme == .default_ && plain.settings.glass_color == 9
+	assert plain.settings.language == .fr
+	assert wire_theme_valid(wire_theme(plain.settings))
+	assert app_state_from_peer(plain, app_features, 0, luna.settings) == luna
+	// One built before the glass as well reads neither.
+	oldest := app_features & ~app_feature_glass
+	bare := app_state_for_peer(luna, oldest, 0)
+	assert bare.settings.theme == .default_ && bare.settings.glass_color == 0
+	assert app_state_from_peer(bare, oldest, 0, luna.settings) == luna
+	// Windows 7 still reaches a program that knows it but not Windows XP.
+	glass := AppWireState{
+		settings:        Settings{
+			theme:       .windows7
+			glass_color: 4
+		}
+		requested_scale: desktop_scale_100
+	}
+	assert app_state_for_peer(glass, app_features, 0) == glass
+	assert app_state_from_peer(glass, app_features, 0, glass.settings) == glass
+
+	// An application told nothing at its start was started by a compositor
+	// without the theme, and Settings there does not offer it.
+	options := app_process_options(['vinix-settings', '--vinix-app=vinix-settings', '--request-fd=5',
+		'--response-fd=6']) or { panic('no options') }
+	assert options.extended == 0
+	told := app_process_options(['vinix-settings', '--vinix-app=vinix-settings', '--request-fd=5',
+		'--response-fd=6', '${app_extended_option}${app_extended}']) or { panic('no options') }
+	assert told.extended == app_extended
+	mut desktop := Desktop{}
+	mut app := &SettingsApp{
+		category: .theme
+		desktop:  &desktop
+	}
+	app_compositor_extended = 0
+	begin_frame_elements()
+	for element in app.theme_pane(480) {
+		assert element.id != 'settings.theme.3'
+	}
+	app.handle('${settings_action_theme}3') or { panic(err) }
+	assert desktop.settings.theme == .default_
+	app_compositor_extended = app_extended
+	app.handle('${settings_action_theme}3') or { panic(err) }
+	assert desktop.settings.theme == .windows_xp
+}
+
 fn test_theme_and_glass_colour_share_one_wire_field() {
-	for theme in [ThemeKind.default_, ThemeKind.macos, ThemeKind.windows7]! {
+	for theme in [ThemeKind.default_, ThemeKind.macos, ThemeKind.windows7, ThemeKind.windows_xp]! {
 		for glass in [0, 7, 15]! {
 			state := AppWireState{
 				settings:        Settings{
@@ -1006,7 +1117,8 @@ fn test_theme_and_glass_colour_share_one_wire_field() {
 	// What a desktop built before the colour existed sends is still a theme.
 	assert wire_theme(Settings{ theme: .macos }) == 1
 	assert wire_theme_valid(0) && wire_theme_valid(1) && wire_theme_valid(2 | (15 << 8))
-	assert !wire_theme_valid(3) && !wire_theme_valid(-1) && !wire_theme_valid(16 << 8)
+	assert wire_theme_valid(3) && wire_theme_valid(3 | (15 << 8))
+	assert !wire_theme_valid(4) && !wire_theme_valid(-1) && !wire_theme_valid(16 << 8)
 }
 
 fn test_settings_missing_offline_readonly_and_stale_hits() {

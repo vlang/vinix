@@ -1006,7 +1006,7 @@ fn test_roblox_apk_paths_survive_app_exec() {
 	assert os.setenv(keys[0], apk, true) == 0
 	assert os.setenv(keys[1], splits, true) == 0
 	for name in ['vinix-roblox', 'vinix-firefox'] {
-		process := desktop_spawn_app(fixture, name, 0, 'en', true, '') or {
+		process := desktop_spawn_app(fixture, name, 0, 'en', true, '', 0) or {
 			panic('cannot execute environment fixture')
 		}
 		desktop_close(process.to_child)

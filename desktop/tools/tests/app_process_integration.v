@@ -146,7 +146,7 @@ fn main() {
 		return
 	}
 	desktop_ignore_broken_pipe()
-	standalone := desktop_spawn_app(arguments()[0], 'voffice-calc', 0, 'en', true, '') or {
+	standalone := desktop_spawn_app(arguments()[0], 'voffice-calc', 0, 'en', true, '', 0) or {
 		panic('could not start standalone app fixture')
 	}
 	mut standalone_marker := [1]u8{}
@@ -329,6 +329,11 @@ fn main() {
 	assert desktop.settings.button_side == .right
 	settings.handle('${settings_action_glass}9') or { panic(err) }
 	assert desktop.settings.theme == .windows7 && desktop.settings.glass_color == 9
+	// Windows XP reaches the application because it said at its start that it
+	// understands the theme, and was told that this compositor draws it.
+	settings.handle('${settings_action_theme}3') or { panic(err) }
+	assert desktop.settings.theme == .windows_xp && desktop.settings.glass_color == 9
+	assert desktop.settings.button_side == .right
 	settings.handle('${settings_action_theme}1') or { panic(err) }
 	assert desktop.settings.theme == .macos && desktop.settings.glass_color == 9
 	settings.handle('${settings_action_category}${settings_categories.index(SettingsCategory.display)}') or {

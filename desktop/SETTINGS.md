@@ -31,7 +31,7 @@ power_profile=auto
 ```
 
 `scale` is `auto`, `1` (100%) or `2` (200%). The other choices are `right`/`left`,
-`standard`/`combined` and `default`/`macos`/`windows7`. `glass_color` is the
+`standard`/`combined` and `default`/`macos`/`windows7`/`windowsxp`. `glass_color` is the
 zero-based index of one of the sixteen Windows 7 glass colours, from Sky (0)
 to Frost (15); it is kept whichever theme is worn. `language` is `en` (the default),
 `ru` or `es`; see [the system language](#system-language) below. Clock choices are `true`/`false`;

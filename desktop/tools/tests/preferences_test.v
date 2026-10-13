@@ -141,6 +141,20 @@ fn test_preferences_keep_the_windows7_theme_and_its_glass_colour() {
 	})
 }
 
+fn test_preferences_keep_the_windows_xp_theme() {
+	home := preference_test_home('luna')
+	defer { os.rmdir_all(home) or {} }
+	mut p := desktop_load_preferences(home)
+	p.configure_scale(1920, 1080)
+	assert p.save_changes(Settings{ theme: .windows_xp }, desktop_current_scale(), home)
+	assert desktop_load_preferences(home).settings.theme == .windows_xp
+	record := os.read_file(desktop_preferences_path(home))!
+	assert record.contains('\ntheme=windowsxp\n')
+	if _ := desktop_parse_preferences('version=1\ntheme=windows_xp') {
+		assert false, 'accepted a theme nobody writes'
+	}
+}
+
 fn test_preferences_optional_keys_comments_and_unknown_keys() {
 	assert desktop_parse_preferences('version=1')? == DesktopPreferences{}
 	p := desktop_parse_preferences('# desktop\r\n version = 1 \r\n\n theme = macos\nfuture_key=value\n')?

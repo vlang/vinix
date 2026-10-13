@@ -39,6 +39,9 @@ What it does:
   behind them, the caption buttons hanging from the top edge with a red close
   on the focused window, a glass taskbar and Start menu, and Windows 7's
   sixteen glass colours
+- a **Windows XP theme**: Luna's blue title bars with round upper corners and
+  white bold titles, three square caption buttons with a red close, a blue
+  frame, and the blue taskbar with a green Start button
 - dragging a window by its title bar, with top-edge maximize, side halves,
   corner quarters and a translucent placement preview; shake the title bar to
   hide other windows on its workspace, and shake again to restore them
@@ -234,6 +237,7 @@ typing any word with a q in it drop the user back to the console.
     clock.v        CLOCK_REALTIME and the calendar arithmetic on top of it
     theme.v        every colour and measurement in one place
     glass.v        Aero glass for the Windows 7 theme: blur, tint, caption buttons
+    luna.v         Luna for the Windows XP theme: blue title bars, frame, taskbar
 
 The interesting part is the split between `wm.v` and `render.v`. The window
 manager never draws: it describes the whole screen as a `ui2.Element` tree —
@@ -802,8 +806,8 @@ as Windows does, left as macOS does, with the inner two swapping order to match
 each convention — and switches the taskbar between one entry per window, as
 Windows XP had, and one per application with a count, as Windows 7 had.
 
-**Theme** chooses between the desktop's own look, *macOS* and *Windows 7*.
-macOS is matched to a
+**Theme** chooses between the desktop's own look, *macOS*, *Windows 7* and
+*Windows XP*. macOS is matched to a
 native 1x AppKit window from macOS Catalina 10.15.7 (19H2): a 22-pixel light
 grey title bar, centred title, 12-pixel traffic lights on 20-pixel centres, and
 a dock — a rounded panel sized to its contents and centred clear of the bottom
@@ -828,6 +832,20 @@ reached the pixels under it are what is behind it; they are averaged into
 that lie inside its clip, so a ticking clock or one redrawing application
 costs the glass around it and nothing else, and when a change behind glass
 shows through past the damaged area the next frame repaints that fringe.
+
+*Windows XP* is Luna in its blue. A window's title bar is the blue gradient
+with its bright band under the top edge and its dark foot, 30 pixels tall
+with round upper corners; the title is white and bold on a dark blue shadow,
+after the window's icon. The three caption buttons are 21-pixel squares two
+pixels apart, six in from the edge and five down, lit from the upper left
+inside a white line: blue for minimise and maximise, red for close. The frame
+is four pixels of blue, brighter on the left than on the right and the
+bottom, and a window casts no shadow. An unfocused window keeps every shape
+and loses the colour. The taskbar is the blue bar with a green Start button,
+labelled window buttons that are pressed in for the window in front, and the
+notification area and the clock in a lighter panel; the Start menu's shell
+takes the same blues. `luna.v` paints all of it from gradients given as
+stops.
 
 The discs are grey until a window is focused and show their glyphs only while
 the pointer is over the set, as macOS does. They also keep red-yellow-green

@@ -26,6 +26,7 @@ enum ThemeKind {
 	default_
 	macos
 	windows7
+	windows_xp
 }
 
 // GlassColor is one of the colours Windows 7 offers for its window borders,

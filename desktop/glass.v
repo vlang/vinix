@@ -92,16 +92,7 @@ mut:
 	// The last pass that repainted the whole canvas.
 	last_full_pass int
 	allocated      bool
-	// Set while the taskbar's children are painted, and the Start menu's:
-	// they sit on glass.
-	on_bar        bool
-	on_menu       bool
-	// Set while a glass title bar's children are painted, with the colour of
-	// the glass under the title's icon: what a builtin glyph fills its holes
-	// with. See Desktop.surface_under.
-	on_title    bool
-	title_under u32
-	streaks       [glass_streak_period]u8
+	streaks        [glass_streak_period]u8
 	streaks_ready bool
 }
 
@@ -793,9 +784,6 @@ const aero_body_inactive_alpha = u32(112)
 const aero_gloss_rows = 17
 // An unfocused window's shadow is this much of a focused one's, in 256ths.
 const aero_inactive_shadow = u32(120)
-// A builtin title icon is drawn in this colour; an application's own artwork
-// keeps its own.
-const aero_title_icon_color = u32(0x1e3a5f)
 
 // draw_glass_window paints a window's frame: its shadow, the glass around
 // the body, and the frame's lines. The body itself is the window's child.
@@ -831,7 +819,7 @@ fn (mut d Desktop) draw_glass_window(el &ui2.Element, x int, y int, w int, h int
 		d.canvas.drop_shadow_behind(x, y, w, h, radius, theme.shadow_spread, shadow)
 	}
 	d.glass_fill(slot, tint, x, y, w, body_y - y, x, y, w, h, radius, y, aero_gloss_rows)
-	d.glass.title_under = d.glass_title_under(el, slot, tint, x, y)
+	d.walk.title_under = d.glass_title_under(el, slot, tint, x, y)
 	if framed {
 		below := body_y + body_h
 		d.glass_fill(slot, tint, x, below, w, y + h - below, x, y, w, h, radius, 0, 0)
@@ -865,7 +853,7 @@ fn (d &Desktop) glass_title_under(el &ui2.Element, slot &GlassBackdrop, tint Gla
 	if slot.cols <= 0 || slot.rows <= 0 || slot.blurred == unsafe { nil } {
 		return d.theme().title_active_bg
 	}
-	mut icon_x := x + d.theme().frame_border + aero_title_icon_inset + aero_title_icon_size / 2
+	mut icon_x := x + d.theme().frame_border + d.theme().title_icon_inset + title_icon_size / 2
 	mut icon_y := y + d.theme().title_height / 2
 	for i in 0 .. el.children.len {
 		bar := unsafe { &el.children[i] }

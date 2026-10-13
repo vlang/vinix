@@ -1165,6 +1165,15 @@ Glass window frames that show what is behind them,
 settings.theme.windows7_note_2
 caption buttons at the top edge, and a glass taskbar.
 -----
+settings.theme.windowsxp
+Windows XP
+-----
+settings.theme.windowsxp_note_1
+The blue title bar with round corners and white text,
+-----
+settings.theme.windowsxp_note_2
+square caption buttons, and the blue taskbar with a green Start.
+-----
 settings.wallpaper.colour
 Colour
 -----

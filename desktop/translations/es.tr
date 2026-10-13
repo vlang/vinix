@@ -1165,6 +1165,15 @@ Marcos de cristal que desenfocan lo que hay detrás,
 settings.theme.windows7_note_2
 botones en el borde superior y barra de tareas de cristal.
 -----
+settings.theme.windowsxp
+Windows XP
+-----
+settings.theme.windowsxp_note_1
+Barra de título azul con esquinas redondeadas y texto blanco,
+-----
+settings.theme.windowsxp_note_2
+botones cuadrados y la barra de tareas azul con Inicio en verde.
+-----
 settings.wallpaper.colour
 Color
 -----
