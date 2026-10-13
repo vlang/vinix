@@ -13,6 +13,7 @@
 module main
 
 import ui2
+import desktop.packagecore
 
 // KeyboardApp is an application that takes typed input. The desktop routes
 // keystrokes to the focused window's application when it is one of these, and
@@ -193,6 +194,8 @@ mut:
 	started  bool
 	exited   bool
 	error    string
+	package_session bool
+	package_argv []string // owned literal service arguments, no shell command
 
 	terminal_rows    int
 	terminal_columns int
@@ -673,6 +676,21 @@ fn (mut a TerminalApp) put_visible_char(ch rune) {
 
 fn (mut a TerminalApp) start_shell(rows int, columns int, width int, height int) {
 	a.started = true
+	if a.package_session {
+		child := desktop_spawn_terminal_command(a.package_argv, rows, columns, width, height) or {
+			a.error = 'Cannot start the package service terminal.'.clone()
+			bytes := a.error.bytes()
+			a.ingest_output(bytes)
+			unsafe { bytes.free() }
+			a.exited = true
+			return
+		}
+		a.pid = child.pid
+		a.terminal = child.terminal
+		a.terminal_rows = rows
+		a.terminal_columns = columns
+		return
+	}
 	// The first Terminal after setup installs the apps chosen there, then
 	// hands the same PTY to the ordinary interactive shell.
 	command := desktop_take_first_run_install()
@@ -719,7 +737,10 @@ fn (mut a TerminalApp) poll() bool {
 	}
 
 	if !a.exited && a.pid >= 0 && desktop_child_exited(a.pid) {
-		a.ingest_output('\r\n[${terminal_shell} exited]'.bytes())
+		message := if a.package_session { '\r\n[Application exited]'.clone() } else { '\r\n[${terminal_shell} exited]' }
+		bytes := message.bytes()
+		a.ingest_output(bytes)
+		unsafe { bytes.free(); message.free() }
 		a.exited = true
 		desktop_close(a.terminal)
 		a.terminal = -1
@@ -1326,12 +1347,13 @@ fn (mut a TerminalApp) close_app() {
 		desktop_close(a.terminal)
 		a.terminal = -1
 	}
-	if a.pid >= 0 && !a.exited {
+	if a.pid >= 0 && !a.exited && !a.package_session {
 		_ = desktop_terminate_child(a.pid)
 	}
 	a.pid = -1
 	a.exited = true
 	a.release_rendered_rows()
+	a.clear_scrollback()
 	if a.screen.cap > 0 { unsafe { a.screen.free() } }
 	if a.main_screen.cap > 0 { unsafe { a.main_screen.free() } }
 	if a.lines.cap > 0 { unsafe { a.lines.free() } }
@@ -1342,6 +1364,20 @@ fn (mut a TerminalApp) close_app() {
 	a.lines = []string{}
 	a.read_buf = []u8{}
 	a.error = ''
+	for argument in a.package_argv { unsafe { argument.free() } }
+	unsafe { (&array(&a.package_argv)).free() }
+	a.package_argv = []string{}
+}
+
+fn (mut a TerminalApp) configure_package(request packagecore.Request, service string) ! {
+	request.validate()!
+	if a.started || a.package_argv.len > 0 || !service.starts_with('/') || service.contains('\x00') {
+		return error('package terminal must be configured before it starts')
+	}
+	a.package_argv = [service.clone(), 'run-terminal'.clone(), request.id.clone()]
+	unsafe { a.package_argv.flags |= .noslices }
+	if request.document.len > 0 { a.package_argv << request.document.clone() }
+	a.package_session = true
 }
 
 fn (mut a TerminalApp) build(size ui2.Rect) !ui2.Element {

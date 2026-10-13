@@ -229,16 +229,17 @@ package unchanged. Changes outside that range require a revised application
 contract. Licenses remain visible in package metadata and payloads; proprietary
 and firmware disclosures are explicitly false for this profile.
 
-The CLI requests no optional permissions or associations. From Terminal, use
-`vinix-package run org.sqlite.cli`; it opens
+The CLI requests no optional permissions or associations. In Software, select
+the installed SQLite application and choose **Launch in Terminal**. From an
+existing Terminal, use `vinix-package run-terminal org.sqlite.cli`; it opens
 `@DATA@/database.sqlite3` in the ordinary account's private app data directory.
 SQLite WAL, journals and temporary files stay inside the existing sandbox
 contract. The baseline file operations include advisory locks (`flock`), which
 operate on open file descriptors and grant no additional paths. The launcher's
 descriptor-closing rules still apply. Arbitrary home-directory databases,
-document arguments, extension loading and an interactive terminal launched from
-Software are outside this profile. Uninstall removes the app/runtime closure
-and registrations while retaining the database; rollback also retains it.
+document arguments and extension loading are outside this profile. Uninstall
+removes the app/runtime closure and registrations while retaining the database;
+rollback also retains it.
 
 Success atomically publishes a new 0700 directory containing only `catalog.json`
 and returns format-1 JSON with `profile: "sqlite-cli"`, `directory`, `catalog`,
@@ -386,6 +387,36 @@ admitted process retains its validated snapshot and lease until exit.
 The built-in `NativeApp` V interface and VAPP version 11 remain internal desktop
 contracts. Third-party ui2 clients need compositor adapter qualification. Importing
 `desktop/app_process.v` is not a supported standalone UI SDK protocol.
+
+### Interactive terminal execution
+
+`run-terminal ID [ABSOLUTE_FILE...]` is an additive SDK 1 command. Standard input
+and output must both be terminals; redirected streams fail before launch. It
+uses the same package state lock, payload/trust/policy verification, ordinary
+identity transition and immutable-generation lease as `run`. The explicit
+terminal launch adds the `tty` promise and `TERM=linux`. Filesystem grants and
+package permissions remain the normal declared closure/private-data/document
+grants; it unveils no device directory. Plain `run` retains its existing promise
+set and batch behavior. Manifests, signatures and metadata digests are unchanged.
+
+Software exposes **Launch in Terminal** for installed applications. Its trusted
+Terminal implementation starts `/usr/bin/vinix-package run-terminal ID` on a
+new PTY through literal `execve` arguments, with an explicit environment and no
+shell. The child claims the controlling terminal and receives only descriptors
+0, 1 and 2. Linux/Vinix closes all higher descriptors with `close_range`; host
+fixtures enumerate their open descriptors before fork. Geometry is set before
+execution, reads are nonblocking, and ordinary Terminal input/paste, resizing,
+UTF-8/VT rendering and bounded scrollback apply.
+
+The application occupies Software until it exits, then **Back to Software**
+refreshes the catalog. Normal close/return is refused while it runs. Forced
+desktop retirement closes the PTY and lets terminal hangup reach its process
+group; it does not kill a package lease holder independently of its sandbox
+child. Applications that ignore hangup may remain alive with their leases.
+The existing Start/Quick Launch requests retain their launch behavior; this
+terminal action is an explicit choice within Software. This provides CLI
+interaction, not a graphical display broker or an arbitrary application runtime.
+See [qualification](../../tests/packages/terminal-check.md).
 
 ## Repository and JSON interfaces
 

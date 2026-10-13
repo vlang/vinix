@@ -48,6 +48,9 @@ fn package_template(id string, version string) pkgcore.Package {
 }
 
 fn qualify_catalog_cli(binary string, work string) ! {
+	terminal := command(binary, ['run-terminal', 'catalog-app'])!
+	assert terminal.code != 0 && terminal.text.contains('terminal standard input and output')
+	assert command(binary, ['--root', work, 'run-terminal', 'catalog-app'])!.text.contains('alternate installation root')
 	roots := work + '/catalog roots; $literal'
 	os.mkdir_all(roots + '/aarch64/bin')!
 	os.write_file(roots + '/aarch64/bin/app', 'pinned catalog application')!

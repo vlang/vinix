@@ -207,6 +207,11 @@ fn test_policy_runtime_and_literal_launch_arguments() {
 	assert launch.program == '/usr/bin/vinix-sandbox'
 	promises := launch.arguments[launch.arguments.index('--promises') + 1].split(' ')
 	assert 'flock' in promises && 'inet' !in promises && 'proc' !in promises
+	assert 'tty' !in promises && 'TERM=linux' !in launch.arguments
+	terminal := terminal_launch_plan(config, '/var/lib/vinix-packages', state, 'app', '/home/user/data', 1000, 1000, [])!
+	assert 'tty' in terminal.arguments[terminal.arguments.index('--promises') + 1].split(' ')
+	assert 'TERM=linux' in terminal.arguments
+	assert terminal.arguments.filter(it == '/home/user' || it == '/dev' || it == '/dev/pts').len == 0
 	assert '/home/user/data' in launch.arguments && '/home/user' !in launch.arguments
 	assert launch.arguments.last() == 'literal;$(do-not-run)'
 	assert '/var/lib/vinix-packages/generations/1/apps/wine/bin/app' in launch.arguments

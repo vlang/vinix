@@ -237,6 +237,19 @@ fn main() {
 	assert tree.children.any(it.id == 'software.refresh')
 	assert tree.children.any(it.id == 'software.run')
 	assert tree.children.any(it.id == 'software.run' && it.text == 'Launch as alex')
+	assert tree.children.any(it.id == 'software.run-terminal' && it.text == 'Launch in Terminal')
+	app.handle('software.run-terminal') or { panic(err) }
+	assert app.terminal_app != unsafe { nil } && app.terminal_app.argv == [app.service_path, 'run-terminal', 'editor']
+	app.key_input('SELECT 42;\n')
+	assert app.terminal_app.input == 'SELECT 42;\n'
+	assert !app.prepare_close()
+	app.handle('software.terminal-back') or { panic(err) }
+	assert app.terminal_app != unsafe { nil }
+	app.terminal_app.exited = true
+	assert app.prepare_close()
+	app.handle('software.terminal-back') or { panic(err) }
+	assert app.terminal_app == unsafe { nil }
+	wait_for_software(mut app)
 	compact := app.build(ui2.rect(0, 0, 480, 300)) or { panic(err) }
 	assert compact.children.len == 2
 	assert !compact.children.any(it.id == 'software.install')

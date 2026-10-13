@@ -5,9 +5,67 @@ import json2
 import os
 import time
 import tools.packages.pkgcore
+import desktop.ptycore
 
 fn sqlite_run_sql(statement string) Ran {
 	return run(['/usr/bin/vinix-package', 'run', pkgcore.sqlite_application_id], '.bail on\n' + statement + '\n', none, none)
+}
+
+fn sqlite_terminal_read(fd int, marker string) !string {
+	mut bytes := []u8{cap: 8192}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	mut buffer := [4096]u8{}
+	for _ in 0 .. 5000 {
+		got := C.read(fd, &buffer[0], usize(buffer.len))
+		if got > 0 {
+			if bytes.len + int(got) > 128 * 1024 { return error('SQLite terminal output exceeded its bound') }
+			for i in 0 .. int(got) { bytes << buffer[i] }
+			text := unsafe { tos(bytes.data, bytes.len) }
+			if text.contains(marker) { return text.clone() }
+		}
+		time.sleep(10 * time.millisecond)
+	}
+	return error('SQLite terminal marker unavailable: ${marker}')
+}
+
+fn qualify_sqlite_terminal(mut t Test, architecture string) ! {
+	denied := run(['/usr/bin/vinix-package', 'run-terminal', pkgcore.sqlite_application_id], '', none, none)
+	assert denied.status != 0 && denied.output.contains('terminal standard input and output')
+	state := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
+	leased := '/var/lib/vinix-packages/generations/' + state.generation.str()
+	child := ptycore.spawn(['/usr/bin/vinix-package', 'run-terminal', pkgcore.sqlite_application_id],
+		['PATH=/usr/bin:/usr/sbin', 'HOME=/root', 'TERM=linux'], '/', 24, 80, 640, 384)!
+	defer { C.close(child.terminal) }
+	prompt := sqlite_terminal_read(child.terminal, 'sqlite> ')!
+	assert prompt.contains('SQLite version 3.53.4'), prompt
+	assert ptycore.resize(child.terminal, 30, 100, 800, 480)
+	for _ in 0 .. 2 {
+		package_success(['--offline', 'remove', pkgcore.sqlite_application_id])!
+		package_success(['--offline', 'install', pkgcore.sqlite_application_id])!
+	}
+	package_success(['gc'])!
+	assert os.is_dir(leased + '/apps/' + pkgcore.sqlite_application_id)
+	for command in ['.headers off\n', '.mode list\n'] {
+		assert C.write(child.terminal, command.str, usize(command.len)) == command.len
+		sqlite_terminal_read(child.terminal, 'sqlite> ')!
+	}
+	statement := 'SELECT sum(v) FROM saved;\n'
+	assert C.write(child.terminal, statement.str, usize(statement.len)) == statement.len
+	result := sqlite_terminal_read(child.terminal, 'sqlite> ')!.replace('\r', '')
+	assert result.contains('42\n'), result
+	quit := '.quit\n'
+	assert C.write(child.terminal, quit.str, usize(quit.len)) == quit.len
+	mut status := i32(0)
+	mut finished := false
+	for _ in 0 .. 5000 {
+		if C.waitpid(child.pid, &status, C.WNOHANG) == child.pid { finished = true; break }
+		time.sleep(10 * time.millisecond)
+	}
+	assert finished && status == 0
+	package_success(['gc'])!
+	assert !os.exists(leased)
+	t.say('PACKAGE TERMINAL real-pty sqlite-prompt input resize ordinary-account leased-runtime live-uninstall clean-exit pipe-refusal PASS')
 }
 
 fn qualify_package_sqlite(mut t Test) ! {
@@ -42,6 +100,7 @@ fn qualify_package_sqlite(mut t Test) ! {
 	assert created.status == 0 && created.output.contains('3.53.4\nwal\n42\nok'), created.output
 	data := '/home/alex/.local/share/vinix-apps/' + pkgcore.sqlite_application_id + '/database.sqlite3'
 	assert os.is_file(data) && os.stat(data)!.uid == 1000
+	qualify_sqlite_terminal(mut t, architecture)!
 	reopened := sqlite_run_sql('SELECT sum(v) FROM saved; PRAGMA integrity_check;')
 	assert reopened.status == 0 && reopened.output.contains('42\nok'), reopened.output
 	outside := sqlite_run_sql('.open /home/alex/denied-sqlite.db')

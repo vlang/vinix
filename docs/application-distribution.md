@@ -218,6 +218,16 @@ refresh, update-all, rollback, launch, progress and recent failure output. A run
 mutation prevents normal window close. Mutations require administrator access;
 there is no setuid service or automatic privilege escalation.
 
+For an installed CLI application, **Launch in Terminal** opens an interactive
+terminal inside Software. Type commands there; for SQLite, `.quit` exits and
+reveals **Back to Software**. Keyboard input, paste, resize and bounded output
+use the existing Terminal implementation. Normal window close and return wait
+for the application to exit. Errors from the package service remain visible in
+the terminal. The command runs directly through the package service and its
+ordinary account session, with no intermediary shell or package-supplied command
+text. [Terminal qualification](../tests/packages/terminal-check.md) covers the
+UI lifetimes and real SQLite PTY execution on both supported hosts.
+
 The progress display accepts fragmented frames, bounds incomplete lines and
 ignores unsupported/malformed presentation events. It keeps human failure output
 separately, so transfer updates cannot hide checksum, disk-space or authorization

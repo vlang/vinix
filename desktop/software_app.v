@@ -102,6 +102,7 @@ mut:
 	deployment_mode bool
 	deployment_path []u8
 	deployment_pending string // frozen file path for deployment-review/apply
+	terminal_app &TerminalApp = unsafe { nil }
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
@@ -359,6 +360,7 @@ fn (mut a SoftwareApp) retire_worker() {
 }
 
 fn (mut a SoftwareApp) poll() bool {
+	if a.terminal_app != unsafe { nil } { return a.terminal_app.poll() }
 	if a.worker == unsafe { nil } { return false }
 	mut changed := false
 	// Drain a bounded number of chunks per UI poll, including after exit.
@@ -487,6 +489,16 @@ fn (mut a SoftwareApp) run_requested() {
 fn (a &SoftwareApp) next_poll_ms() u64 { return 100 }
 
 fn (mut a SoftwareApp) handle(event_id string) ! {
+	if a.terminal_app != unsafe { nil } {
+		if event_id == 'software.terminal-back' {
+			if !a.terminal_app.exited { a.set_status('Exit the application before returning to Software.'); return }
+			a.close_terminal()
+			mut view_args := ['view']
+			a.start(view_args, true)
+			unsafe { (&array(&view_args)).free() }
+		} else { a.terminal_app.handle(event_id)! }
+		return
+	}
 	if event_id.starts_with(packagecore.request_prefix) {
 		if a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
 			a.set_status('An operation is already running in this window.')
@@ -535,6 +547,12 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 		}
 	}
 	match event_id {
+		'software.run-terminal' {
+			if a.selected < 0 || a.selected >= a.rows.len { return }
+			row := a.rows[a.selected]
+			if row.installed_version == '' || row.kind in ['runtime', 'data'] { return }
+			a.open_terminal_request(packagecore.Request{ id: row.id })!
+		}
 		'software.run' {
 			if a.launch_request.len > 0 || (a.worker != unsafe { nil } && !a.worker_view) {
 				a.set_status('An operation is already running in this window.')
@@ -637,6 +655,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 }
 
 fn (mut a SoftwareApp) key_input(input string) {
+	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input); return }
 	if a.deployment_mode { a.deployment_key_input(input); return }
 	if !a.focus { return }
@@ -657,6 +676,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 }
 
 fn (mut a SoftwareApp) paste_input(input string) {
+	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {
 		a.deployment_key_input(input)
 	} else if a.focus { a.key_input(input) }
@@ -696,6 +716,7 @@ fn software_review_row(row pkgprotocol.ReviewPackage) SoftwareRow {
 }
 
 fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
+	if a.terminal_app != unsafe { nil } { return a.build_terminal(size) }
 	width := int(size.width)
 	height := int(size.height)
 	if width < 640 || height < 610 {
@@ -767,7 +788,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 		} else {
 			a.rows[a.selected]
 		}
-		children << software_label(row.name, 274, 90, width - 288, 28, false)
+		children << software_label(row.name, 274, 90, if !reviewing && row.installed_version != '' && row.kind !in ['runtime', 'data'] { width - 466 } else { width - 288 }, 28, false)
 		children << software_label(row.description, 274, 124, width - 288, 72, false)
 		children << software_label(if !reviewing && row.update_action == 'remove' {
 			'Installed: ${row.installed_version}    Removed by Update all'
@@ -806,6 +827,7 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 				children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
 				if row.kind !in ['runtime', 'data'] {
 					children << software_button('software.run', a.launch_label, width - 174, 46, 160)
+					children << software_button('software.run-terminal', 'Launch in Terminal', width - 174, 78, 160)
 				}
 			}
 		}
@@ -825,6 +847,10 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a SoftwareApp) prepare_close() bool {
+	if a.terminal_app != unsafe { nil } && !a.terminal_app.exited {
+		a.set_status('Exit the application before closing Software.')
+		return false
+	}
 	if a.worker != unsafe { nil } && !a.worker_view && !a.worker_review {
 		a.set_status(if a.worker_run {
 			'Close the application first, then close Software.'
@@ -837,6 +863,7 @@ fn (mut a SoftwareApp) prepare_close() bool {
 }
 
 fn (mut a SoftwareApp) close_app() {
+	a.close_terminal()
 	if a.worker != unsafe { nil } {
 		// Forced desktop retirement must not kill the lease holder while its
 		// sandbox child can still use runtime files. Detach it for PID 1 to reap.

@@ -43,3 +43,9 @@ creates the concrete SQLite CLI/musl runtime lock for both supported hosts. It
 retains redistribution notices and separates compatible library updates from
 the CLI. See the [publisher profile](SDK.md#sqlite-cli-publisher-profile) and
 [real SQLite lifecycle qualification](../../tests/packages/sqlite-profile-check.md).
+
+Software's **Launch in Terminal** action runs an installed CLI application in a
+PTY within its window. `run-terminal ID [ABSOLUTE_FILE...]` provides the same
+ordinary-account launch from an existing terminal; it refuses redirected input
+or output. See [terminal execution](SDK.md#interactive-terminal-execution) and
+[qualification](../../tests/packages/terminal-check.md).

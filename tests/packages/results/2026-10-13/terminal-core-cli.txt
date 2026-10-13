@@ -1,0 +1,231 @@
+Package signing: RFC8032 keys/signatures and tamper/canonical-scalar refusal passed
+Passed /Users/alex/code/vinix/tools/packages/signing/signing_test.v
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository unreachable
+Updating trusted repository fixture
+Updating trusted repository fixture
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/administration_test.v
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (19 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (23 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing app 1.0.0 (1/3) from fixture
+Downloading app/bin/application (18 bytes)
+Installing License 1.0.0 (2/3) from fixture
+Downloading license/COPYING (23 bytes)
+Installing runtime 1.0.0 (3/3) from fixture
+Downloading runtime/bin/runner (22 bytes)
+Activated package generation 1
+Activated package generation 2
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/catalog_test.v
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 2.0.0 (1/2) from fixture
+Installing Runtime 2.0.0 (2/2) from fixture
+Activated package generation 2
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 3
+Offline mirror ready: /private/tmp/vinix-deployment-reproducible-94001-1791861532754774/mirror; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (14 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Updating trusted repository fixture
+Installing Data 1.0.0 (1/1) from fixture
+Downloading unused/bin/runner (14 bytes)
+Activated package generation 1
+Installing Application 1.0.0 (1/2) from fixture
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Updating trusted repository fixture
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/deployment_test.v
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Installing app 2.0.0 (1/1) from fixture
+Activated package generation 3
+Activated package generation 4
+Rolled back to generation 3; application data was retained
+Updating trusted repository fixture
+Installing app 1.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing app 2.0.0 (1/1) from fixture
+Downloading app/bin/app (9 bytes)
+Updating trusted repository fixture
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/distribution_test.v
+Document scanner: sibling records, escaped keys, quoted values and repeated ownership retirement passed
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/document_keys_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/import_test.v
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-94749-1791861558708993/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Data 1.0.0 (2/2) from fixture
+Downloading data/share/data (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-94749-1791861558815598/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-94749-1791861558899819/unsafe/nested/export; enroll its file:// repository paths with the same public keys
+Updating trusted repository fixture
+Downloading app/bin/app (19 bytes)
+Downloading data/share/data (19 bytes)
+Offline mirror ready: /private/tmp/vinix-mirror-94749-1791861558994690/interrupted; enroll its file:// repository paths with the same public keys
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/mirror_test.v
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (15 bytes)
+Installing Runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/policy_test.v
+Updating trusted repository trusted
+Installing Application 1.0.0 (1/1) from trusted
+Downloading app/bin/app (77824 bytes)
+Activated package generation 1
+Activated package generation 2
+Installing Application 1.0.0 (1/1) from trusted
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/progress_test.v
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (19 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/2) from fixture
+Downloading app/bin/app (18 bytes)
+Installing Assets 1.0.0 (2/2) from fixture
+Downloading assets/bin/app (23 bytes)
+Activated package generation 1
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/release_test.v
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 2.0.0 (3/3) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/3) from fixture
+Downloading app/bin/runner (22 bytes)
+Installing Licensed firmware assets 1.0.0 (2/3) from fixture
+Installing Runtime 1.0.0 (3/3) from fixture
+Activated package generation 1
+Activated package generation 2
+Rolled back to generation 1; application data was retained
+Activated package generation 3
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/review_test.v
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Activated package generation 2
+Updating trusted repository fixture
+Updating trusted repository fixture
+Installing Application 1.0.0 (1/1) from fixture
+Downloading app/bin/app (19 bytes)
+Activated package generation 1
+Updating trusted repository fixture
+Updating trusted repository fixture
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/service_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/session_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/sqlite_profile_test.v
+Updating trusted repository fixture
+Installing app 1.0.0 (1/2) from fixture
+Downloading app/bin/runner (20 bytes)
+Installing runtime 1.0.0 (2/2) from fixture
+Activated package generation 1
+Updating trusted repository fixture
+Passed /Users/alex/code/vinix/tools/packages/pkgcore/view_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/progress_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/repositories_test.v
+Passed /Users/alex/code/vinix/tools/packages/pkgprotocol/review_test.v
+Passed /Users/alex/code/vinix/desktop/packagecore/registry_test.v
+usage: vinix-package [--root DIR] [--offline] [--json] [--progress] COMMAND [ARGS]
+  update | search [QUERY] | info ID | list | status | updates | view
+  install ID... | remove ID... | upgrade | rollback | gc | verify
+  plan install|remove|upgrade|deploy [ID...] | deploy MANIFEST.json
+  review install|remove|upgrade|deploy|rollback [ID...]
+  repo-list | repo-enroll ID URL PUBLIC_KEY_HEX | repo-revoke ID
+  repo-review enroll ID URL KEY | repo-review revoke ID
+  repo-apply REVIEW_FINGERPRINT enroll ID URL KEY | repo-apply REVIEW_FINGERPRINT revoke ID
+  apply REVIEW_FINGERPRINT OPERATION [ID...]
+  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json
+  deployment-lock [ID...] | deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE
+  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...
+  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)
+  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR
+  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR
+  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE
+  sqlite-catalog SQLITE_VERSION RUNTIME_VERSION PREPARED_ROOTS NEW_LOCK_DIRECTORY
+  publish REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX
+  publish-release REPOSITORY_DIR REPOSITORY_ID SEED_FILE SEQUENCE EXPIRES_UNIX NEW_DIRECTORY
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed

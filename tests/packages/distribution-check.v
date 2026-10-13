@@ -49,11 +49,15 @@ fn check() ! {
 		run(work + '/vinix-package', ['--help'])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-o', work + '/cli-check', repository + '/tests/packages/distribution-cli.v'])!
 		run(work + '/cli-check', [work + '/vinix-package'])!
+		run(v, [...helper_flags, '-o', work + '/terminal-check', repository + '/tests/packages/terminal-check.v'])!
+		run(work + '/terminal-check', [])!
 	}
 	os.cp(repository + '/desktop/software_app.v', work + '/software/software_app.v')!
 	os.cp(repository + '/desktop/software_repositories.v', work + '/software/software_repositories.v')!
 	os.cp(repository + '/desktop/software_progress.v', work + '/software/software_progress.v')!
 	os.cp(repository + '/desktop/software_deployment.v', work + '/software/software_deployment.v')!
+	os.cp(repository + '/desktop/software_terminal.v', work + '/software/software_terminal.v')!
+	os.cp(repository + '/tests/packages/software_terminal_fixture.v', work + '/software/terminal_fixture.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
 	modules := os.getenv_opt('VINIX_PACKAGE_TEST_UI2') or { repository + '/build/vmodules' }
 	if !os.is_file(modules + '/ui2/v.mod') {

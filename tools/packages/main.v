@@ -19,6 +19,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  policy | policy-review POLICY.json | policy-apply REVIEW_FINGERPRINT POLICY.json\n' +
 	'  deployment-lock [ID...] | deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
+	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
 	'  pack-catalog CATALOG.json PREPARED_ROOTS NEW_WORKSPACE\n' +
@@ -276,11 +277,12 @@ fn checked(arguments []string) !int {
 			}
 			service.mirror(names[0], names[1..])!
 		}
-		'run' {
+		'run', 'run-terminal' {
 			if root != '' {
 				return error('application launch cannot use an alternate installation root')
 			}
 			if names.len < 1 { return error('run requires an application ID') }
+			if command == 'run-terminal' { return service.run_terminal(names[0], names[1..]) }
 			return service.run(names[0], names[1..])
 		}
 		'purge-data' {

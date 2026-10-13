@@ -28,6 +28,14 @@ fn application_closure(state State, id string) []Installed {
 }
 
 pub fn launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, documents []string) !Launch {
+	return application_launch_plan(config, directory, state, id, data, uid, gid, documents, false)
+}
+
+pub fn terminal_launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, documents []string) !Launch {
+	return application_launch_plan(config, directory, state, id, data, uid, gid, documents, true)
+}
+
+fn application_launch_plan(config Config, directory string, state State, id string, data string, uid int, gid int, documents []string, terminal bool) !Launch {
 	if !identifier(id) || uid <= 0 || gid <= 0 || !data.starts_with('/') || data.contains('\x00') {
 		return error('launch requires a non-root identity and an absolute application data directory')
 	}
@@ -49,6 +57,7 @@ pub fn launch_plan(config Config, directory string, state State, id string, data
 	// Advisory locks coordinate writes to already unveiled app data. They grant
 	// no additional paths or inherited descriptors; SQLite requires F_SETLK.
 	mut promises := ['stdio', 'rpath', 'wpath', 'cpath', 'flock', 'exec', 'prot_exec']
+	if terminal { promises << 'tty' }
 	if 'network' in p.permissions { promises << ['inet', 'dns'] }
 	if 'process' in p.permissions { promises << 'proc' }
 	if 'display' in p.permissions { promises << 'unix' }
@@ -69,6 +78,7 @@ pub fn launch_plan(config Config, directory string, state State, id string, data
 	args << ['--env', 'HOME=' + data, '--env', 'TMPDIR=' + data + '/tmp', '--env',
 		'PATH=' + runtime + '/bin', '--env', 'LD_LIBRARY_PATH=' + libraries.join(':'), '--env',
 		'WINEPREFIX=' + data + '/wine', '--env', 'LANG=C.UTF-8']
+	if terminal { args << ['--env', 'TERM=linux'] }
 	if 'display' in p.permissions {
 		args << ['--unveil', '/tmp/.X11-unix', 'rw', '--env', 'DISPLAY=' + os.getenv('DISPLAY')]
 	}
@@ -125,13 +135,17 @@ fn generation_lease(directory string, architecture string, id string) !(State, i
 }
 
 fn run_leased_application(config Config, directory string, state State, id string, documents []string) !int {
+	return run_leased_mode(config, directory, state, id, documents, false)
+}
+
+fn run_leased_mode(config Config, directory string, state State, id string, documents []string, terminal bool) !int {
 	uid := int(C.geteuid())
 	gid := int(C.getegid())
 	if uid == 0 || gid == 0 { return error('run applications from an ordinary user session') }
 	home := os.home_dir()
 	if home == '' || !home.starts_with('/') { return error('user home directory is unavailable') }
 	data := home.trim_right('/') + '/.local/share/vinix-apps/' + id
-	launch := launch_plan(config, directory, state, id, data, uid, gid, documents)!
+	launch := application_launch_plan(config, directory, state, id, data, uid, gid, documents, terminal)!
 	for installed in application_closure(state, id) {
 		check_policy(installed.package, config.policy)!
 		if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {

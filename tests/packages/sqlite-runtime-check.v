@@ -64,6 +64,7 @@ fn suite(sandbox string) hwhost.Suite {
 			about: 'real SQLite WAL/database, isolated library upgrade, rollback and offline reinstall'
 			required: ['HWTEST START packages-sqlite',
 				'PACKAGE SQLITE database-wal reopen-integrity ordinary-owner outside-path-refusal PASS',
+				'PACKAGE TERMINAL real-pty sqlite-prompt input resize ordinary-account leased-runtime live-uninstall clean-exit pipe-refusal PASS',
 				'PACKAGE SQLITE runtime-only-real-library-upgrade unchanged-cli rollback offline-cache-reinstall data-preserving-uninstall PASS',
 				'HWTEST PASS packages-sqlite']
 			ending: .poweroff

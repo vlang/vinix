@@ -6,16 +6,23 @@ import desktop.sessioncore
 import ui2
 import os
 import json2
+import time
 import tools.packages.pkgprotocol
 
 #include "@VMODROOT/heap_tracker.h"
 
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
+fn C.vinix_heap_count() u32
+fn C.vinix_heap_size_at(u32) u64
 
 fn package_assert_heap_flat(label string) {
 	retained := C.vinix_heap_end()
-	if retained > 0 { eprintln('${label}: ${retained} retained bytes') }
+	if retained > 0 {
+		mut sizes := map[u64]int{}
+		for i in 0 .. C.vinix_heap_count() { sizes[C.vinix_heap_size_at(i)]++ }
+		eprintln('${label}: ${retained} retained bytes, sizes=${sizes}')
+	}
 	assert retained == 0
 }
 
@@ -23,6 +30,88 @@ fn package_tree_has(element ui2.Element, id string) bool {
 	if element.id == id { return true }
 	for child in element.children { if package_tree_has(child, id) { return true } }
 	return false
+}
+
+fn test_package_terminal_uses_literal_arguments_and_releases_screen_history_and_launch_storage() {
+	input := 'sqlite> SELECT 42;\r\n42\r\n'.bytes()
+	expected := ['/missing-fixture-package-service', 'run-terminal', 'org.sqlite.cli', '/home/alex/a space; \$literal.txt']
+	defer { unsafe { (&array(&expected)).free() } }
+	defer { unsafe { input.free() } }
+	for warmup in 0 .. 2 {
+		if warmup == 1 { C.vinix_heap_begin() }
+		for _ in 0 .. 50 {
+			mut app := SoftwareApp{ service_path: '/missing-fixture-package-service'.clone() }
+			app.open_terminal_request(packagecore.Request{ id: 'org.sqlite.cli', document: '/home/alex/a space; \$literal.txt' })!
+			assert app.terminal_app.package_argv == expected
+			app.terminal_app.started = true // exercise rendering without spawning a host application
+			app.terminal_app.set_geometry(3, 40)
+			for _ in 0 .. 10 { app.terminal_app.ingest_output(input) }
+			assert app.terminal_app.lines.len > 0
+			begin_frame_elements()
+			tree := app.build(ui2.rect(0, 0, 900, 660))!
+			assert !package_tree_has(tree, 'software.terminal-back')
+			free_tree(tree)
+			assert !app.prepare_close()
+			app.handle('software.terminal-back')!
+			assert app.terminal_app != unsafe { nil }
+			app.terminal_app.exited = true
+			begin_frame_elements()
+			finished := app.build(ui2.rect(0, 0, 900, 660))!
+			assert package_tree_has(finished, 'software.terminal-back')
+			free_tree(finished)
+			assert app.prepare_close()
+			app.handle('software.terminal-back')!
+			assert app.terminal_app == unsafe { nil }
+			app.close_app()
+		}
+	}
+	retained := C.vinix_heap_end()
+	if retained > 0 {
+		mut sizes := map[u64]int{}
+		for i in 0 .. C.vinix_heap_count() { sizes[C.vinix_heap_size_at(i)]++ }
+		eprintln('package terminal retained: ${retained}, sizes=${sizes}')
+	}
+	assert retained == 0
+}
+
+fn test_package_terminal_spawn_retires_parent_argv_and_environment_storage() {
+	if !os.is_file('/usr/bin/true') { return }
+	args := ['/usr/bin/true', 'run-terminal', 'fixture']
+	defer { unsafe { (&array(&args)).free() } }
+	for warmup in 0 .. 2 {
+		if warmup == 1 { C.vinix_heap_begin() }
+		for _ in 0 .. 20 {
+			child := desktop_spawn_terminal_command(args, 24, 80, 640, 384) or { panic('PTY wrapper failed') }
+			mut status := i32(0)
+			assert C.waitpid(child.pid, &status, 0) == child.pid
+			// /root is a guest directory; host fixtures may correctly refuse it.
+			assert status == 0 || status == 126 << 8
+			C.close(child.terminal)
+		}
+	}
+	package_assert_heap_flat('package terminal spawn parent storage')
+}
+
+fn test_package_terminal_exit_poll_retires_its_output_buffers() {
+	if !os.is_file('/usr/bin/true') { return }
+	for warmup in 0 .. 2 {
+		if warmup == 1 { C.vinix_heap_begin() }
+		for _ in 0 .. 20 {
+			mut terminal := &TerminalApp{ read_buf: []u8{len: terminal_read_chunk} }
+			terminal.configure_package(packagecore.Request{ id: 'fixture' }, '/usr/bin/true')!
+			terminal.set_geometry(24, 80)
+			terminal.start_shell(24, 80, 640, 384)
+			for _ in 0 .. 1000 {
+				terminal.poll()
+				if terminal.exited { break }
+				time.sleep(time.millisecond)
+			}
+			assert terminal.exited && terminal.terminal == -1
+			terminal.close_app()
+			unsafe { free(terminal) }
+		}
+	}
+	package_assert_heap_flat('package terminal exit poll storage')
 }
 
 fn test_package_entries_share_start_quick_launch_and_paged_document_choices() {

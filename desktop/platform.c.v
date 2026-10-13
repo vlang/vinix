@@ -13,6 +13,7 @@ module main
 import os as platform_os
 import time as platform_time
 import term.termios
+import desktop.ptycore
 
 #include <dirent.h>
 
@@ -532,6 +533,16 @@ fn desktop_spawn_shell(path string, command string, rows int, columns int, width
 		pid: pid
 		terminal: master
 	}
+}
+
+// A package terminal starts the trusted service directly, never a root shell.
+fn desktop_spawn_terminal_command(argv []string, rows int, columns int, width int, height int) ?SpawnedShell {
+	path := 'PATH=' + desktop_command_path
+	home := 'HOME=' + desktop_home
+	mut environment := [path, home, 'TERM=linux']
+	defer { unsafe { path.free(); home.free(); (&array(&environment)).free() } }
+	child := ptycore.spawn(argv, environment, desktop_home, rows, columns, width, height) or { return none }
+	return SpawnedShell{ pid: child.pid, terminal: child.terminal }
 }
 
 fn desktop_terminal_winsize(fd int, rows int, columns int, width int, height int) bool {
