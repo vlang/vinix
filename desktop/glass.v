@@ -1170,12 +1170,8 @@ fn (mut d Desktop) draw_glass_taskbar(el &ui2.Element, x int, y int, w int, h in
 // draw_glass_bar_box paints a taskbar control's background as glass rather
 // than as the flat colour its element declares. The colour says which state
 // the control is in.
-fn (mut d Desktop) draw_glass_bar_box(el &ui2.Element, x int, y int, w int, h int, bg u32, radius int) {
+fn (mut d Desktop) draw_glass_bar_box(x int, y int, w int, h int, bg u32, radius int) {
 	theme := d.theme()
-	if el.id == action_start_toggle {
-		d.draw_aero_start_orb(x, y, w, h, bg == theme.accent)
-		return
-	}
 	if bg == start_menu_shell {
 		// A Start menu row at rest is the menu's own glass.
 		return
@@ -1235,54 +1231,4 @@ fn (mut d Desktop) draw_glass_menu(el &ui2.Element, x int, y int, w int, h int) 
 	d.canvas.stroke_round_rect(x, y, w, h, radius, aero_edge_dark, aero_outer_alpha)
 	d.canvas.stroke_round_rect(x + 1, y + 1, w - 2, h - 2, if radius > 0 { radius - 1 } else { 0 },
 		aero_edge_light, aero_light_alpha * 2 / 3)
-}
-
-// draw_aero_start_orb is the Start button: a glossy blue sphere in a dark
-// ring, lit when the pointer is over it or the menu is open. The V is drawn
-// over it by the caller.
-fn (mut d Desktop) draw_aero_start_orb(x int, y int, w int, h int, lit bool) {
-	scale := d.canvas.scale
-	size := if w < h { w } else { h }
-	diameter := size * scale
-	center_x := f64(x * scale) + f64(w * scale) / 2
-	center_y := f64(y * scale) + f64(h * scale) / 2
-	radius := f64(diameter) / 2
-	ring := 1.5 * f64(scale)
-	top := if lit { u32(0x9bd4ff) } else { u32(0x6fb4f0) }
-	middle := if lit { u32(0x3a9bf0) } else { u32(0x2a7fd6) }
-	bottom := if lit { u32(0x2470cf) } else { u32(0x17509f) }
-	first_x := int(center_x - radius)
-	first_y := int(center_y - radius)
-	for py in first_y .. first_y + diameter + 1 {
-		// Down the sphere: light, the colour itself, then its shade.
-		position := (f64(py) + 0.5 - (center_y - radius)) / f64(diameter)
-		mut color := if position < 0.5 {
-			mix(top, middle, u32(glass_clamp(int(position * 510), 0, 255)))
-		} else {
-			mix(middle, bottom, u32(glass_clamp(int((position - 0.5) * 510), 0, 255)))
-		}
-		for px in first_x .. first_x + diameter + 1 {
-			sample_x := f64(px) + 0.5
-			sample_y := f64(py) + 0.5
-			outer := corner_coverage(sample_x, sample_y, center_x, center_y, radius)
-			if outer == 0 {
-				continue
-			}
-			inner := corner_coverage(sample_x, sample_y, center_x, center_y, radius - ring)
-			if outer > inner {
-				d.canvas.blend_physical_pixel(px, py, 0x0b223d, (outer - inner) * 215 / 255)
-			}
-			if inner == 0 {
-				continue
-			}
-			d.canvas.blend_physical_pixel(px, py, color, inner)
-			// The gloss: an ellipse of light over the upper half.
-			gloss_x := (sample_x - center_x) / (radius * 0.80)
-			gloss_y := (sample_y - (center_y - radius * 0.42)) / (radius * 0.50)
-			distance := gloss_x * gloss_x + gloss_y * gloss_y
-			if distance < 1.0 {
-				d.canvas.blend_physical_pixel(px, py, 0xffffff, u32((1.0 - distance) * 120) * inner / 255)
-			}
-		}
-	}
 }

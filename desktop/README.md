@@ -830,9 +830,9 @@ its window is focused. The frame shows what is behind it, blurred, through
 Windows 7's colourisation (for its own Sky: 8% colour, 43% afterglow that
 follows the backdrop's brightness, 49% blur), under the diagonal reflection
 bands. The taskbar and the Start menu's shell are the same glass under a
-shade, the Start button is an orb, and a maximized window keeps only the glass
-along its top. **Glass colour** offers the sixteen colours of Windows 7's
-Window Color page.
+shade, the Start button is a standalone V with a rectangular hover highlight,
+and a maximized window keeps only the glass along its top. **Glass colour**
+offers the sixteen colours of Windows 7's Window Color page.
 
 Glass is painted by `glass.v` from the canvas itself. When a surface is
 reached the pixels under it are what is behind it; they are averaged into

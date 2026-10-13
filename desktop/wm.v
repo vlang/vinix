@@ -1556,7 +1556,7 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 	}
 	item_y := (taskbar_height - item_height) / 2
 
-	// The Start orb is the taskbar's anchor. Its standalone V is the first
+	// The Start button is the taskbar's anchor. Its standalone V is the first
 	// letterform of the wallpaper wordmark, not a font-dependent character.
 	start_x, start_width := d.start_button_span(edge_padding)
 	if d.start_button_luna() {
@@ -1576,12 +1576,13 @@ fn (d &Desktop) taskbar_element() ui2.Element {
 		})
 	} else {
 		children << ui2.button_with_image(action_start_toggle, '', 'builtin:vinix', ui2.rect(f64(start_x), f64(item_y), f64(start_width), f64(item_height)), ui2.BoxStyle{
-			bg:     if d.start_menu_open || d.hover == action_start_toggle {
-				theme.accent
+			bg: if d.start_menu_open || d.hover == action_start_toggle {
+				theme.taskbar_item_hover
 			} else {
-				theme.accent_dim
+				theme.taskbar_item_bg
 			}
-			radius: item_height / 2
+			radius:      5
+			transparent: !d.start_menu_open && d.hover != action_start_toggle
 		}, ui2.TextStyle{
 			color: theme.taskbar_text_active
 		})

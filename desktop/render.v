@@ -1288,7 +1288,7 @@ fn (mut d Desktop) draw_button(el &ui2.Element, x int, y int, w int, h int) {
 			el.box
 		}
 		if d.walk.kind == .aero {
-			d.draw_glass_bar_box(el, x, y, w, h, control_box.bg, int(control_box.radius))
+			d.draw_glass_bar_box(x, y, w, h, control_box.bg, int(control_box.radius))
 		} else {
 			d.draw_luna_bar_box(el, x, y, w, h, control_box.bg)
 		}
