@@ -101,6 +101,7 @@ refused before creating state. The current reference catalog is:
 | `node` | `node` |
 | `go` | `go`, with its matching standard library and native compiler subprograms |
 | `java` | `java`, `javac`, `jar`, with a complete matching JDK |
+| `http` | `busybox`, with the HTTP applet, Basic authentication and CGI support |
 
 The controller imports the prefix as `/opt/reference`, excludes Python helpers,
 installs its runtime in `/lib` and pins both complete trees separately. It
@@ -126,6 +127,74 @@ must contain the expected `42`. Reports retain workspace paths and timestamps;
 their contents are validated independently rather than required to hash equally.
 Missing tools, failed projects and differing artifacts fail the gate. Failed
 runs retain version/command diagnostics and the failed build receipt.
+
+The [minimal server builder](../../tools/development/build-http.v) prepares
+BusyBox 1.36.1 from a pinned archive with the required HTTP/Basic-auth/CGI
+configuration; see [the source-build command](../../tools/development/README.md).
+The [HTTP SDK stager](../../tools/development/stage-http.v) creates a small
+reference prefix from already-prepared BusyBox and musl ELF inputs:
+
+```
+V_C_ERROR_BUG_REPORT_DISABLED=1 v -cc cc run tools/development/stage-http.v \
+  aarch64 /path/to/native-busybox /path/to/native-musl /path/to/new-http-stage
+
+V_C_ERROR_BUG_REPORT_DISABLED=1 \
+VINIX_DEVELOPMENT_REFERENCE_SDK=/path/to/new-http-stage/sdk \
+VINIX_DEVELOPMENT_REFERENCE_PROFILES=http \
+tests/development/run-guest aarch64 /path/to/kernel /path/to/staged-tools /path/to/new-state
+```
+
+The `http` profile starts the pinned server on an unprivileged loopback port.
+The V client verifies unauthenticated/wrong-password refusal, GET/HEAD, missing
+and private-config paths, encoded traversal refusal, an authenticated V CGI
+POST and 16 repeated requests. The exact qualifier binary is copied as the
+CGI application and pinned as a produced artifact. A random credential stays
+in an exclusively created, no-follow, mode-0600 file outside the document root;
+the fixture verifies its account ownership/privacy without emitting it.
+Unauthenticated requests must not create the CGI's private data artifact.
+
+After protocol checks, the owner retires the server process group; its command
+receipt must record SIGTERM (`-15`). The normal account/job/build checks still
+run. Both native HTTP case records are emitted as well, for 19 records in
+this reference mode. The host independently validates the actual server argv,
+loopback/port restrictions, executable/CGI pins, empty JIT overrides, response
+cases, owner, request count and retirement. Each native case record must match
+its build artifact hash, and helper/content/case/data artifacts must match in
+both fresh workspaces. Credential files, ephemeral ports and PIDs are excluded
+from those reproducible public artifacts. This remains a local HTTP/CGI gate;
+TLS, remote exposure, production load and SSH/CI have separate acceptance work.
+
+On 13 October 2026 AArch64 HVF and x86_64 TCG passed the complete HTTP
+workflow as UID/GID 1000 in two fresh native workspaces each. Final receipts
+and serial logs remain in
+`build/development17-20261013/guest-arm-reference-http-g` and
+`build/development17-20261013/guest-x86-reference-http-g`. Both receipts
+retain 19 independently validated records, including the ordinary account,
+build and job regressions. The prepared BusyBox 1.36.1 servers were built
+with musl GCC 14.2.0 from archive pin
+`b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314`.
+Two fresh host source builds per architecture produced identical configurations
+and server binaries. The patched export pin is
+`36c3c870168778dd9e7802544e3393a7db6c257203fe23617d1b2ae4c05f7c1c`,
+with configuration pin
+`e4c35f6fd082f7133c99c4fe331fafe2583ffa95554b1ff0be6ebc5aa7548667`.
+
+| Native HTTP input | AArch64 | x86_64 |
+| --- | --- | --- |
+| Server | `5b6f58617cdefe71661cb81f5fb4bd755b562c034aa270f13056c131288d338c` | `77434ed738dc65ee794b73232ff71024eecffef6bce80a12a4128c7efb07afb2` |
+| Reference prefix | `50b96f8a95efe51cfb3a789b1df577159b42a5dffeea861310e4054cbbc72581` | `f7284aff43571c97833e094cbbbd3ff3d1ee208d921c8f81c47ea940a8c73f48` |
+| Imported runtime | `24ad3df555386b91a3d98feb75518aaa2ae62982ba6c8060ddc16729f632e313` | `585797fa6e5628bd118c5541a4573a301b447c88ee702cdff3a14cdeed032d75` |
+| Qualifier / CGI | `9a5d7746a31fab9999f51ebbdd4026b738b05d9dbf932bd84812af6defbbe8f0` | `83b014a5f0f7cdc4e3105a9666eee0f3c92a89dc090ba7a9ea092399f8da54f0` |
+
+Source-build evidence remains in
+`build/development17-20261013/http-server-{arm,x86}-{d,e}`, with reference
+stages in `reference-{arm,x86}-http-d`. The unadapted minimal server failed
+HEAD by sending two body bytes; the recorded adaptation fixes that failure.
+Earlier prepared binaries also failed: the x86 package lacked `httpd`, and
+the older AArch64 binary terminated with SIGSEGV before serving. Those runs
+remain failed receipts; qualification applies to the exact tuples above.
+Server diagnostics remain in private logs, including on failure; the guest
+emits bounded qualifier diagnostics and public case receipts.
 
 On 13 October 2026 AArch64 HVF passed GNU make 4.4.1, Samurai's Ninja-compatible
 CLI reporting `1.9`, and SQLite 3.53.4 in

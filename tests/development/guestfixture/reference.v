@@ -20,10 +20,12 @@ fn reference_checks() {
 			mut st := C.stat{}
 			check(C.stat(output, &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o777 == 0o700, 383)
 			mut path := [512]char{}
-			for name in [&char(c'cc'), &char(c'make'), &char(c'ninja'), &char(c'cmake'), &char(c'sqlite3'), &char(c'node'), &char(c'go'), &char(c'java'), &char(c'javac'), &char(c'jar')]! {
+			for name in [&char(c'cc'), &char(c'make'), &char(c'ninja'), &char(c'cmake'), &char(c'sqlite3'), &char(c'node'), &char(c'go'), &char(c'java'), &char(c'javac'), &char(c'jar'), &char(c'busybox')]! {
 				C.snprintf(&path[0], path.len, c'%s/version-%s.log', output, name)
 				emit_command_log(&path[0])
 			}
+			// Server diagnostics can contain credentials on a failed request.
+			// Keep them inside the private output; emit only qualifier verdicts.
 			C.snprintf(&path[0], path.len, c'%s/qualify.log', output)
 			emit_command_log(&path[0])
 			for index in 0 .. 6 {
@@ -43,6 +45,16 @@ fn reference_checks() {
 			check(status == 0, 381)
 			C.snprintf(&path[0], path.len, c'%s/work/qualification/report.json', output)
 			emit_receipt(&path[0], c'vinix-native', false)
+			C.snprintf(&path[0], path.len, c'%s/work/qualification/http/server.json', output)
+			proof := C.open(&path[0], C.O_RDONLY)
+			if proof >= 0 {
+				check(C.close(proof) == 0, 401)
+				emit_receipt(&path[0], c'group_retired', false)
+				C.snprintf(&path[0], path.len, c'%s/work/qualification/http/server.conf', output)
+				mut config := C.stat{}
+				check(C.stat(&path[0], &config) == 0 && config.st_uid == 1000 && config.st_mode & 0o777 == 0o600, 402)
+				C.puts(c'DEVELOPMENT HTTP PASS: UID 1000, authenticated loopback server, CGI, private credentials, traversal refusal and owned retirement')
+			}
 		}
 		C.puts(c'DEVELOPMENT REFERENCE PASS: UID 1000, pinned SDK/runtime/tools, two fresh workspaces, real reference projects and artifact receipts')
 	}

@@ -604,6 +604,7 @@ fn run() !int {
 	if selfhost_v { expected << 'DEVELOPMENT SELFHOST PASS:' }
 	if reference_hash != '' { expected << 'DEVELOPMENT REFERENCE PASS:' }
 	if reference_jit { expected << ['DEVELOPMENT JIT APPROVAL PASS:', 'DEVELOPMENT JIT REVOCATION PASS:'] }
+	if 'http' in reference.profiles { expected << 'DEVELOPMENT HTTP PASS:' }
 	if 'lscpu-smoke' in hashes { expected << 'DEVELOPMENT CPU PASS:' }
 	if 'v-smoke' in hashes { expected << 'DEVELOPMENT V SMOKE PASS:' }
 	result := guesthost.boot(command, launch.env, state, expected,
@@ -625,13 +626,14 @@ fn run() !int {
 			'/home/developer/int-state/state.json', '/home/developer/watch-state/state.json',
 			'/home/developer/interrupted-before.json', '/home/developer/interrupted-state/state.json',
 			'/home/developer/reference-build.json', '/home/developer/reference-a/receipt.json', '/home/developer/reference-b/receipt.json',
-			'/home/developer/reference-a/work/qualification/report.json', '/home/developer/reference-b/work/qualification/report.json'] {
+			'/home/developer/reference-a/work/qualification/report.json', '/home/developer/reference-b/work/qualification/report.json',
+			'/home/developer/reference-a/work/qualification/http/server.json', '/home/developer/reference-b/work/qualification/http/server.json'] {
 			return error('unexpected guest receipt path')
 		}
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
+	if result == 0 && receipts.len != if 'http' in reference.profiles { 19 } else if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
 		return error('missing native workflow receipts')
 	}
 	if result == 0 {
@@ -668,6 +670,13 @@ fn run() !int {
 				}
 				referencecore.verify_report_jit(receipts[work + '/qualification/report.json'], arch, reference.profiles,
 					hashes['vinix-qualify'], tool_pins, work, receipt.steps.last().artifacts, reference_jit)!
+				if 'http' in reference.profiles {
+					proof := receipts[work + '/qualification/http/server.json']
+					referencecore.verify_http_proof(proof)!
+					if sha256.sum((proof + '\n').bytes()).hex() != receipt.steps.last().artifacts['qualification/http/server.json'] {
+						return error('HTTP native evidence does not match its artifact pin')
+					}
+				}
 			}
 		}
 		for name in ['deadline', 'term', 'int', 'watch', 'interrupted', 'interrupted-before'] {

@@ -7,7 +7,7 @@ import os
 import time
 
 pub const catalog = ['c', 'cpp', 'v', 'node', 'typescript', 'rust', 'cargo', 'go', 'java', 'make',
-	'cmake', 'ninja', 'npm', 'gdb', 'sqlite']
+	'cmake', 'ninja', 'npm', 'gdb', 'sqlite', 'http']
 const marker = 'VINIX-TOOLCHAIN:PASS'
 
 struct MissingTool {
@@ -156,7 +156,7 @@ pub fn qualify(profiles []string, output_path string, require_vinix bool) !Repor
 		if jit { env['VINIX_ALLOW_WX'] = '1' }
 		mut runner := Runner{ work: work, env: env, timeout_seconds: timeout, jit_requested: jit }
 		mut status := 'passed'
-		mut detail := 'project compiled and completed its checks'
+		mut detail := 'project completed its checks'
 		runner.profile(profile) or {
 			status = if err is MissingTool { 'unsupported' } else { 'failed' }
 			detail = err.msg()

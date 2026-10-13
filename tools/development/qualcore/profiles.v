@@ -164,6 +164,7 @@ fn (mut runner Runner) profile(name string) ! {
 				return error('database transaction, reopen or integrity check failed')
 			}
 		}
+		'http' { runner.http_project()! }
 		else { return error('unknown profile') }
 	}
 }

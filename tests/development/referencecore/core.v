@@ -5,7 +5,7 @@ import json2
 import os
 import tools.development.devcore
 
-pub const catalog = ['make', 'cmake', 'ninja', 'sqlite', 'node', 'go', 'java']
+pub const catalog = ['make', 'cmake', 'ninja', 'sqlite', 'node', 'go', 'java', 'http']
 
 pub struct Settings {
 pub:
@@ -25,6 +25,7 @@ pub fn required_tools(profiles []string) []string {
 			'node' { ['node'] }
 			'go' { ['go'] }
 			'java' { ['java', 'javac', 'jar'] }
+			'http' { ['busybox'] }
 			else { []string{} }
 		}
 		for name in selected { if name !in names { names << name } }
@@ -39,7 +40,7 @@ pub fn options(root string, selection string, arch string) !Settings {
 	}
 	profiles := selection.split(',')
 	if profiles.len == 0 || profiles.any(it !in catalog) {
-		return error('reference profiles must select make,cmake,ninja,sqlite,node,go,java')
+		return error('reference profiles must select make,cmake,ninja,sqlite,node,go,java,http')
 	}
 	mut seen := map[string]bool{}
 	for name in profiles {
@@ -67,7 +68,7 @@ pub fn options(root string, selection string, arch string) !Settings {
 }
 
 pub fn version_arguments(name string) []string {
-	return if name == 'go' { ['version'] } else { ['--version'] }
+	return match name { 'go' { ['version'] } 'busybox' { ['--help'] } else { ['--version'] } }
 }
 
 fn elf(path string, arch string) ! {
@@ -90,6 +91,7 @@ pub fn artifacts(profiles []string) []string {
 			'node' { paths << [base + 'project.js', base + 'project.data'] }
 			'cmake' { paths << [base + 'build/project', base + 'project.data'] }
 			'java' { paths << [base + 'Project.class', base + 'project.jar', base + 'project.data'] }
+			'http' { paths << [base + 'www/cgi-bin/api', base + 'www/index.html', base + 'server.json', base + 'project.data'] }
 			else { paths << [base + 'project', base + 'project.data'] }
 		}
 	}
@@ -124,6 +126,28 @@ struct Report {
 	complete bool
 	all_selected_passed bool
 	results []Verdict
+}
+
+struct HttpProof {
+	schema int
+	uid int
+	unauthenticated int
+	wrong_password int
+	get int
+	head int
+	missing int
+	private_config int
+	traversal int
+	cgi int
+	repeated_requests int
+	group_retired bool
+}
+
+pub fn verify_http_proof(text string) ! {
+	proof := json2.decode[HttpProof](text, strict: true)!
+	if proof != HttpProof{1, 1000, 401, 401, 200, 200, 404, 404, 400, 200, 16, true} {
+		return error('HTTP authentication, serving, CGI or retirement evidence changed')
+	}
 }
 
 // Independent receipt contracts for the public reference workflows. A passing
@@ -166,6 +190,29 @@ pub fn verify_report_jit(text string, arch string, profiles []string, qualifier_
 	}
 	for i, result in report.results {
 		profile := profiles[i]
+		if profile == 'http' {
+			if result.profile != profile || result.status != 'passed' || result.commands.len != 1 { return error('HTTP server workflow is incomplete') }
+			actual := result.commands[0]
+			if actual.argv.len != 9 { return error('HTTP server argv changed') }
+			address := actual.argv[4]
+			port := address.all_after('127.0.0.1:')
+			if !address.starts_with('127.0.0.1:') || port.len < 1 || port.len > 5
+				|| !port.bytes().all(it >= `0` && it <= `9`) || port.int() < 1024 || port.int() > 65535 {
+				return error('HTTP server must use an unprivileged loopback port')
+			}
+			project := work + '/qualification/http'
+			pin := tool_pins['busybox'] or { return error('HTTP server executable is not pinned') }
+			if actual.argv != ['/opt/reference/bin/busybox', 'httpd', '-f', '-p', address, '-h', project + '/www', '-c', project + '/server.conf']
+				|| actual.executable_sha256 != pin.sha256 || actual.exit_code != -15 || actual.environment_overrides.len != 0
+				|| actual.log != project + '/command-0.log' || outputs['qualification/http/www/cgi-bin/api'] != qualifier_sha {
+				return error('HTTP server tool, CGI, exit or child environment failed validation')
+			}
+			for name in ['www/index.html', 'server.json', 'project.data'] {
+				hash := outputs['qualification/http/' + name]
+				if hash.len != 64 || !hash.bytes().all(it.is_hex_digit()) { return error('missing HTTP workload artifact pin') }
+			}
+			continue
+		}
 		if profile == 'java' {
 			for name in ['Project.class', 'project.jar', 'project.data'] {
 				hash := outputs['qualification/java/' + name]

@@ -40,6 +40,7 @@ uploads are disabled in project command environments.
 | npm | Pack a local dependency, install its archive offline with scripts disabled, and resolve it from the real Node project. |
 | GDB | Compile a child with symbols, break at main, run, obtain a source-level backtrace and continue to the success marker. No attach to another user's process or permission override. |
 | SQLite | Commit and roll back transactions, reopen the database, check integrity and validate the retained row. |
+| HTTP | Start a pinned BusyBox server on an unprivileged loopback port; refuse missing/wrong credentials and traversal, serve GET/HEAD requests, execute an authenticated V CGI application, and retire the owned server group. |
 
 `--require-vinix` rejects a host OS before creating output. Without it, host
 checks are labelled `host-only`. An unsupported tool remains an open gate; a
@@ -68,7 +69,7 @@ qualify the complete catalog or IDE workflows.
 
 The guest controller also accepts a separate prepared reference prefix through
 `VINIX_DEVELOPMENT_REFERENCE_SDK`, with an explicit comma-separated
-`VINIX_DEVELOPMENT_REFERENCE_PROFILES` selection from `make,cmake,ninja,sqlite,node,go,java`.
+`VINIX_DEVELOPMENT_REFERENCE_PROFILES` selection from `make,cmake,ninja,sqlite,node,go,java,http`.
 Its [reference-mode instructions](../../tests/development/README.md) describe the
 flat prefix, required tool entries and native runtime closure. Each selected
 workflow runs twice as UID/GID 1000 through a pinned build plan. The controller
@@ -133,3 +134,24 @@ uses a sandbox-disable flag to turn one of those into a pass.
 Run host integration checks with `v -cc cc test tools/development/qualcore`.
 The host receipt is separate from a guest receipt and cannot satisfy an installed
 Vinix acceptance gate.
+
+The `http` profile uses the installed `busybox` HTTP/CGI applet and the exact
+qualifier binary as its V CGI fixture. Both server and fixture run under the
+calling account. A fresh private configuration gets a random credential and
+mode 0600 from its exclusive, no-follow creation. The file stays outside the
+document root. No credential appears in argv or the public receipt, and logs
+are checked for its plain and encoded values. Missing/wrong credentials must
+leave the CGI artifact absent. Authorized POST creates the private `42`
+artifact; GET/HEAD, missing/private paths, encoded traversal and 16 repeated
+requests have explicit expected results. Requests use bounded TCP I/O and
+response sizes, with the selected overall command deadline.
+
+The server runs in an owned process group and is deliberately retired with
+SIGTERM after the checks. Its successful command receipt therefore records
+`exit_code: -15`; the profile also requires the completed protocol checks and
+private artifact. Other command failures remain failures. `server.json`
+contains deterministic case evidence with no credential, port or PID.
+[stage-http.v](stage-http.v) prepares the two native server/musl ELF inputs as
+a pinned reference prefix. This gate qualifies a local authenticated HTTP/CGI
+workload; TLS, remote exposure, production load and authenticated SSH/CI retain
+their own acceptance checks.

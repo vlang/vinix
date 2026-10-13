@@ -13,7 +13,7 @@ missing kernel isolation, debugger or hardware virtualization interfaces.
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
 | VM integration and lifecycle | Private per-VM qcow2 disks/firmware variables, QMP lifecycle, offline paired snapshots, explicit user networking/loopback SSH forwarding, read-only 9p shares and a guest-agent transport. | Qualify guest OS workflows inside Vinix, provide Vinix guest tools/drivers, qualify shared folders and network behavior, and implement running-state snapshots and crash-atomic snapshot transactions if required. |
-| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity projects on both architectures and [per-account interval jobs](../tools/development/scheduled-jobs.md) with pinned executables, selected environment, protected credential files and persisted status. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify UID/GID 1000 execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. | Installed-system service/boot integration and complete database/server, authenticated SSH development and CI project workflows under ordinary-user policy. |
+| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity and authenticated HTTP/CGI projects on both architectures. The HTTP gate checks private credentials, unauthorized-request and traversal refusal, GET/HEAD, a pinned V CGI application and owned server retirement as UID/GID 1000. [Per-account interval jobs](../tools/development/scheduled-jobs.md) use pinned executables, selected environment, protected credential files and persisted status. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify ordinary-account execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. | Installed-system service/boot integration, wider database/server/TLS/load qualification, authenticated SSH development and CI project workflows under ordinary-user policy. |
 
 Validation on 12 October 2026 used the Darwin ARM host, V 0.5.2 `f6358ec`,
 QEMU 11.1.1 and the installed musl cross-compilers. All checks below passed:
@@ -157,7 +157,7 @@ identity; it does not implement the remaining debugger or container interfaces.
 
 The additional [reference-SDK gate](../tests/development/README.md) imports a
 prepared native prefix, independently pins its runtime and selects explicit
-`make,cmake,ninja,sqlite,node,go,java` workflows. It runs pinned versions and real
+`make,cmake,ninja,sqlite,node,go,java,http` workflows. It runs pinned versions and real
 projects through the build runner twice as UID/GID 1000, validating exact plan,
 input and executed-command pins and matching produced artifacts. On 13 October
 2026 AArch64 passed GNU make 4.4.1 and the Ninja-compatible Samurai CLI with
@@ -218,6 +218,30 @@ JIT disabled, and the x86_64 account/job/build regression passed using the
 updated fixture. These receipts remain in
 `build/development17-20261013/guest-arm-reference-go-jit-regression-a` and
 `build/development17-20261013/guest-x86-java-fixture-regression-a`.
+
+The maintained [minimal HTTP server builder](../tools/development/build-http.v),
+[SDK stager](../tools/development/stage-http.v) and HTTP reference gate passed
+on AArch64 HVF and x86_64 TCG on 13 October 2026. Each native run served real
+requests from the V client and executed the pinned V CGI fixture in two fresh
+UID/GID 1000 workspaces. Missing/wrong credentials left the data artifact
+absent; GET/HEAD, missing/private paths, encoded traversal and 16 repeated
+requests matched their expected results. Configuration/data files stayed
+private to the account, and the owner retired each server group. Public case
+records and artifacts matched across workspaces; each host controller validated
+all 19 records alongside the account/job/build regressions. Final receipts
+and serial logs remain in
+`build/development17-20261013/guest-arm-reference-http-g` and
+`build/development17-20261013/guest-x86-reference-http-g`.
+
+The BusyBox 1.36.1 builder records and applies a HEAD correction before native
+compilation. The unadapted server sent a file body with HEAD and failed the
+gate. Two fresh source builds per architecture with musl GCC 14.2.0 produced
+identical server binaries/configurations. Earlier prepared binaries also failed
+for a missing x86 HTTP applet and an AArch64 startup SIGSEGV. Those failed
+receipts remain evidence; acceptance applies only to the new pinned tuples.
+Full source, SDK, runtime and executable pins are recorded in
+[the guest qualification evidence](../tests/development/README.md).
+TLS, production load, service boot integration and SSH/CI remain open.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,

@@ -172,6 +172,50 @@ inspects every JDK ELF and recursively imports external runtime libraries.
 Only `complete: true` represents a prepared SDK; native qualification and
 explicit administrator-controlled JIT approval use the separate guest gate.
 
+[build-http.v](build-http.v) builds a minimal static BusyBox 1.36.1 server
+from an already-downloaded, caller-pinned source archive:
+
+```
+V_C_ERROR_BUG_REPORT_DISABLED=1 v -cc cc run tools/development/build-http.v \
+  aarch64 /path/to/busybox-1.36.1.tar.bz2 \
+  b8cc24c9574d809e7279c3be349795c5d5ceb6fdf19ca709f80cde50e47de314 \
+  /path/to/new-http-build
+```
+
+Use `x86_64` for the other architecture. The builder requires GNU make,
+the platform `cc` and `ARCH-linux-musl-gcc` on PATH. It exports sources into
+a fresh private directory, excludes Python helpers, enables the BusyBox
+dispatcher, usage text and HTTP/Basic-authentication/CGI support, and verifies
+those selections before compiling. Kconfig retains its required dependencies.
+A recorded source adaptation fixes BusyBox 1.36.1's static-file HEAD path:
+after sending headers it exits before entering the body loop. The ordinary
+GET path and CGI body handling keep their upstream behavior. Unexpected
+source layouts are refused. `http-server.json` records the source
+archive/export, adaptation hashes, patched tree, resolved configuration,
+compiler/make/tar and resulting native ELF pins, with epoch 1700000000.
+Build/configuration logs remain beside it on
+failure, with `complete: false`. Preserve the compilers' complete SDKs as
+well: executable pins alone do not identify their subprogram/header/library
+closures. Nothing is fetched or installed by this command.
+
+[stage-http.v](stage-http.v) prepares the native HTTP reference prefix from
+already-prepared BusyBox and musl ELF files:
+
+```
+V_C_ERROR_BUG_REPORT_DISABLED=1 v -cc cc run tools/development/stage-http.v \
+  aarch64 /path/to/native-busybox /path/to/native-musl /path/to/new-http-stage
+```
+
+Inputs must be ordinary files without set-ID bits. The stager records their
+hashes, checks the native architecture, creates loader aliases and records
+the complete `sdk` prefix hash in `reference-sdk.json`. It does not fetch,
+install or add CGI/server permissions. BusyBox must provide HTTP, Basic
+authentication and CGI support. The minimal server above is static; other
+prepared servers must need only the supplied musl runtime. The stager does
+not import arbitrary additional shared-library dependencies. The
+[HTTP guest gate](../../tests/development/README.md) qualifies these applets
+and the actual runtime tuple separately.
+
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links
 and permissions, sets `SOURCE_DATE_EPOCH`, and records command results and output
