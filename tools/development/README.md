@@ -23,6 +23,52 @@ publish or install the overlay through the existing package workflow. The stager
 does not modify the running system. Commands refuse mismatched real/effective
 account IDs and are installed mode 0755, without set-ID bits.
 
+Prepare a matching native V compiler and standard-library closure from an
+existing V Git checkout:
+
+```
+v -cc cc run tools/development/stage-v.v aarch64 /path/to/v-checkout /path/to/new-v-arm
+v -cc cc run tools/development/stage-v.v x86_64 /path/to/v-checkout /path/to/new-v-x86
+```
+
+This V stager exports production files from the checkout's full `HEAD` commit
+using immutable Git blobs and verifies every blob ID and size. Dirty and
+untracked files do not enter the closure. Selected symlinks and special files
+are refused; Python sources/helpers, test fixtures and host TCC installations
+are excluded before their blobs are read. The checkout needs Git objects for
+the selected commit; no network fetch runs. `vlang/VERSION` records the commit.
+Committed help-topic text files are retained for the native compiler's help CLI.
+
+The host V compiler translates that committed compiler source, then the selected
+musl C compiler builds a static native compiler and the adjacent runtime objects
+needed by the reference projects. These include process capture, pthreads,
+compiler profiling/file metadata and the Linux signal handler. The installed
+compiler reports the source commit. `native-v.json` records the source-tree,
+generated-C, helper-object, executable and complete-installation hashes, host
+compiler pins and every translation/compile/link argv. The fourth argument can
+override the C compiler with a JSON argv, using the same default as `stage.v`.
+Only `complete: true` represents a completed installation. After source export,
+the receipt remains at the staging root and command logs/generated files remain
+under `.build`, including on failure. Compiler commands have deadlines;
+also preserve the C compiler's subprogram, header and library closure, since an
+executable pin alone does not identify a complete bootstrap SDK.
+
+Supply the resulting `vlang` root to the
+[native guest checks](../../tests/development/README.md). Pin the entire root
+when using it in an installed-system build plan. This prepares a host bootstrap
+compiler; rebuilding that compiler inside Vinix and qualifying every V external
+tool, default garbage collector and package-manager workflow remain separate
+acceptance work.
+
+On 13 October 2026 both architecture stages completed using V source commit
+`f6358ecff9cffbf2d8b03e6a09269aac7707e26c` and musl GCC 14.2.0. They share
+production-source pin
+`93080ab17dbc7f21dbe8a89bb74ab511b02f6360d75e948f3026d11dd94463a8`.
+Receipts, generated sources and static ELF installations are retained in
+`build/development17-20261013/native-v-arm-final` and
+`build/development17-20261013/native-v-x86-final`. Native execution/compilation
+acceptance is recorded separately by the guest controller.
+
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links
 and permissions, sets `SOURCE_DATE_EPOCH`, and records command results and output
