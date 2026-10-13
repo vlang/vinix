@@ -18,7 +18,7 @@ fn test_native_window_launch_keeps_only_standard_streams_and_declared_paths() {
 		assert 'tty' !in launch.arguments[launch.arguments.index('--promises') + 1].split(' ')
 		assert launch_session_request(config, '/usr/bin/vinix-package', p.id, LaunchInput{ window: true })!.arguments
 			== ['run', '--isolated', 'alex', '/usr/bin/vinix-package', 'run-window', 'counter']
-		for invalid in [Package{ ...p, window_protocol: 2 }, Package{ ...p, permissions: [] }, Package{ ...p, kind: 'data', architecture: 'all' }] {
+		for invalid in [Package{ ...p, window_protocol: 3 }, Package{ ...p, permissions: [] }, Package{ ...p, kind: 'data', architecture: 'all' }] {
 			mut refused := false
 			invalid.validate() or { refused = true }
 			assert refused
@@ -39,5 +39,13 @@ fn test_native_window_launch_keeps_only_standard_streams_and_declared_paths() {
 		assert refused
 		view := catalog_view(config, Catalog{}, state, 'offline')!
 		assert view.rows[0].installed_window_protocol == 1
+		text_package := Package{ ...p, window_protocol: 2 }
+		text_package.validate()!
+		text_state := State{ ...state, packages: [Installed{ ...state.packages[0], package: text_package }] }
+		text_launch := application_launch_plan(config, '/var/lib/vinix-packages', text_state, p.id, '/home/alex/data', 1000, 1000, LaunchInput{ window: true })!
+		assert 'VINIX_WINDOW_PROTOCOL=2' in text_launch.arguments && 'VINIX_WINDOW_PROTOCOL=1' !in text_launch.arguments
+		assert '/tmp/.X11-unix' !in text_launch.arguments && '/dev/dri' !in text_launch.arguments
+		text_pending := catalog_view(config, Catalog{ packages: text_state.packages }, state, '')!
+		assert text_pending.rows[0].installed_window_protocol == 1 && text_pending.rows[0].updatable
 	}
 }

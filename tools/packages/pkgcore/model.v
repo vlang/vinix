@@ -175,7 +175,7 @@ pub fn (p Package) validate() ! {
 		return error('invalid package kind: ${p.kind}')
 	}
 	if p.sdk != 1 { return error('unsupported SDK for ${p.id}') }
-	if p.window_protocol !in [0, 1] || (p.window_protocol == 1 && (p.kind != 'native' || 'display' !in p.permissions)) {
+	if p.window_protocol !in [0, 1, 2] || (p.window_protocol != 0 && (p.kind != 'native' || 'display' !in p.permissions)) {
 		return error('${p.id}: native window protocol requires a native application with display permission')
 	}
 	if !printable(p.name, 256) || p.name == '' || !printable(p.description, 4096)

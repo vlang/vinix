@@ -14,12 +14,18 @@ fn main() {
 	text := frame.encode()!
 	invalid := text.replace('"width":320', '"width":2049')
 	event_text := appsdk.WindowEvent{ kind: 'click', sequence: 1, id: 'increase' }.encode()!
+	input_frame := appsdk.WindowFrame{ format: 2, sequence: 1, title: 'Memo', width: 320, height: 160,
+		elements: [appsdk.WindowElement{ kind: 'input', id: 'memo', text: 'é🚀', x: 12, y: 12, width: 280, height: 32, color: 0, background: 0xffffff }] }
+	input_text := input_frame.encode()!
+	input_event := appsdk.WindowEvent{ format: 2, kind: 'text', sequence: 1, id: 'memo', text: 'é🚀 "literal"' }.encode()!
+	invalid_event := input_event.replace('"text":', '"text":"duplicate","te\\u0078t":')
 	assert os.setenv('VINIX_WINDOW_PROTOCOL', '1', true) == 0
 	saved_stdout := C.dup(1)
 	sink := C.open(c'/dev/null', C.O_WRONLY)
 	assert saved_stdout >= 0 && sink >= 0 && C.dup2(sink, 1) == 1
 	C.close(sink)
-	defer { unsafe { text.free(); invalid.free(); event_text.free(); (&array(&frame.elements)).free() } }
+	defer { unsafe { text.free(); invalid.free(); event_text.free(); input_text.free(); input_event.free(); invalid_event.free();
+		(&array(&frame.elements)).free(); (&array(&input_frame.elements)).free() } }
 	for warmup in 0 .. 2 {
 		if warmup == 1 { C.vinix_heap_begin() }
 		for _ in 0 .. 1000 {
@@ -36,6 +42,17 @@ fn main() {
 			mut refused := false
 			appsdk.decode_window_frame(invalid) or { refused = true; unsafe { err.free() } }
 			assert refused
+			mut input_decoded := appsdk.decode_window_frame(input_text)!
+			encoded_input := input_decoded.encode()!
+			unsafe { encoded_input.free() }
+			mut text_event := appsdk.decode_window_event(input_event)!
+			assert input_decoded.accepts(text_event)
+			encoded_text_event := text_event.encode()!
+			unsafe { encoded_text_event.free() }
+			text_event.close(); input_decoded.close()
+			mut input_refused := false
+			appsdk.decode_window_event(invalid_event) or { input_refused = true; unsafe { err.free() } }
+			assert input_refused
 		}
 	}
 	kept := C.vinix_heap_end()

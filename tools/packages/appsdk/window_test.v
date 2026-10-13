@@ -30,7 +30,7 @@ fn test_native_window_roundtrip_and_owned_retirement() {
 
 fn test_native_window_rejects_unsafe_dimensions_controls_paths_and_versions() {
 	frame := window_fixture()
-	for invalid in [WindowFrame{ ...frame, format: 2 }, WindowFrame{ ...frame, sequence: 0 },
+	for invalid in [WindowFrame{ ...frame, format: 3 }, WindowFrame{ ...frame, sequence: 0 },
 		WindowFrame{ ...frame, width: 0 }, WindowFrame{ ...frame, height: 2049 },
 		WindowFrame{ ...frame, title: 'bad\ncaption' }, WindowFrame{ ...frame, background: 0xffffffff },
 		WindowFrame{ ...frame, elements: [WindowElement{ ...frame.elements[0], kind: 'image', text: '/etc/shadow' }] },
@@ -50,7 +50,7 @@ fn test_native_window_rejects_unsafe_dimensions_controls_paths_and_versions() {
 	}
 	for invalid in [WindowEvent{ kind: 'exec', sequence: 1, id: 'increase' },
 		WindowEvent{ kind: 'click', sequence: 0, id: 'increase' }, WindowEvent{ kind: 'close', id: 'command' },
-		WindowEvent{ format: 2, kind: 'close' }] {
+		WindowEvent{ format: 3, kind: 'close' }] {
 		mut refused := false
 		decode_window_event(json2.encode(invalid)) or { refused = true }
 		assert refused

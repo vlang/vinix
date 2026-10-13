@@ -1,0 +1,1 @@
+{"id":"org.vinix.memo","version":"1.0.0","architecture":"x86_64","name":"Native memo","description":"A native SDK text-entry example with explicit saving to private application data.","license":"MIT","kind":"native","entrypoint":"bin/memo","permissions":["display"],"window_protocol":2}

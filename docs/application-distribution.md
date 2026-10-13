@@ -385,7 +385,13 @@ Start, Quick Launch and document requests select this mode from the installed
 manifest, including when catalog metadata differs. Application data, trust and
 policy remain enforced by the service. See
 [native window SDK](../tools/packages/SDK.md#native-window-protocol-1) and
-[qualification](../tests/packages/window-check.md). Full ordinary-user desktop
+[qualification](../tests/packages/window-check.md). Signed `window_protocol:2`
+adds bounded single-line UTF-8 fields with explicit Enter-to-send and
+Escape-to-discard editing. Software binds field/button identities to each displayed
+frame and refuses a protocol differing from installed metadata. The
+[memo example](../examples/package-memo/README.md) keeps explicit Save behavior and
+ordinary-account private data; [text-entry qualification](../tests/packages/window-input-check.md)
+covers the codec, broker and both native guest workflows. Full ordinary-user desktop
 login and graphical Linux/Windows/Apple/audio runtime brokers remain release work.
 
 Every admitted package process receives the

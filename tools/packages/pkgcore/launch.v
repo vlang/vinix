@@ -53,8 +53,8 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	}
 	installed := selected[0]
 	p := installed.package
-	if input.window && (p.window_protocol != 1 || p.kind != 'native' || 'display' !in p.permissions) {
-		return error('${id}: the installed application does not support native window protocol 1')
+	if input.window && (p.window_protocol !in [1, 2] || p.kind != 'native' || 'display' !in p.permissions) {
+		return error('${id}: the installed application does not support a native window protocol')
 	}
 	check_policy(p, config.policy)!
 	if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
@@ -97,7 +97,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	defer { appsdk.free_values(mut environment) }
 	for value in environment { args << '--env'; args << value.clone() }
 	if input.terminal { args << ['--env', 'TERM=linux'] }
-	if input.window { args << ['--env', 'VINIX_WINDOW_PROTOCOL=1'] }
+	if input.window { args << ['--env', if p.window_protocol == 1 { 'VINIX_WINDOW_PROTOCOL=1' } else { 'VINIX_WINDOW_PROTOCOL=2' }] }
 	if 'display' in p.permissions && !input.window {
 		args << ['--unveil', '/tmp/.X11-unix', 'rw', '--env', 'DISPLAY=' + os.getenv('DISPLAY')]
 	}

@@ -502,11 +502,63 @@ its service lease holder. Forced broker retirement closes streams and leaves
 the service alive until the app exits.
 
 [The signed counter](../../examples/package-counter/README.md) demonstrates
-button input, private data and close/EOF behavior. This initial interface supports
-labels/buttons/rectangles; it does not supply text entry, arbitrary graphics,
-clipboard, file pickers, audio, X11 or a full ordinary-user desktop login. Qualify
+button input, private data and close/EOF behavior. Protocol 1 supports
+labels/buttons/rectangles; protocol 2 adds bounded text entry below. Neither supplies
+arbitrary graphics, clipboard, file pickers, audio, X11 or a full ordinary-user desktop login. Qualify
 those runtimes separately. [Window qualification](../../tests/packages/window-check.md)
 records the host renderer/codec/ownership checks and both native guest tuples.
+
+### Native window protocol 2: text entry
+
+Declare signed `"window_protocol":2` with native kind and display permission.
+The launch service sets `VINIX_WINDOW_PROTOCOL=2`; Software admits only format-2
+frames for that installed declaration. SDK/context and package-format versions
+remain 1. Protocol 1 keeps its original encoding, event limit and reader.
+Publishers using protocol 2 must require a package-tools/Software release that
+supports it; older clients refuse these manifests.
+
+Format-2 frames use the same complete frame/element schema and limits as format
+1. They additionally admit `kind:"input"`: a single-line field with valid UTF-8
+`text` of at most **256 bytes**, without ASCII control characters or DEL. Its ID
+uses the button alphabet/64-byte limit and is unique across both buttons and
+inputs. No application receives raw keys, clipboard access or compositor APIs.
+
+Clicking a field starts a local edit of its displayed value. Ctrl+A selects all,
+Backspace deletes a complete UTF-8 character, Enter sends the complete replacement,
+and Escape discards it. Pasted controls/invalid UTF-8 and oversized replacements
+leave the field intact. Buttons, changing fields and normal close require the
+pending edit to be sent or discarded first. A newer application frame discards
+the old edit and reports that change; stale UI control identities cannot activate
+the new frame. Protocol errors disable editing. The app remains responsible for
+explicit saving and for reporting persistence failures.
+
+Every format-2 event has **five required fields**, including `text` even when it
+is empty. Click/close events require empty text; `text` events require a positive
+sequence and the current input ID. Each JSON line including newline is at most
+2,048 bytes, retaining atomic nonblocking pipe writes.
+
+```json
+{"format":2,"kind":"text","sequence":1,"id":"memo","text":"replacement"}
+{"format":2,"kind":"text","sequence":2,"id":"memo","text":""}
+{"format":2,"kind":"click","sequence":3,"id":"save","text":""}
+{"format":2,"kind":"close","sequence":4,"id":"","text":""}
+```
+
+Use `WindowEvent.encode()` for serialization and
+`read_window_event_for(appsdk.window_text_protocol)` for negotiated input. The
+reader rejects another protocol and translates EOF to a format-2 close at sequence
+zero. `WindowFrame.accepts(event)` checks protocol, frame sequence, control ID and
+kind before an app applies input; it accepts EOF close and current-frame close.
+`validate_window_input(text)` exposes the shared UTF-8/size check. Ownership and
+explicit `.close()` rules remain the same. Window fields/events cannot invoke
+package-manager operations: their IDs remain inside the broker's own namespace.
+
+[The signed memo example](../../examples/package-memo/README.md) builds static
+payloads with SDK/V/musl notices for both targets, commits typed replacements and
+explicitly saves private data. [Text-entry qualification](../../tests/packages/window-input-check.md)
+records host codec/broker checks, repeated heap measurements and actual signed
+ordinary-account guest execution. This adds a bounded native interface; graphical
+foreign runtimes and full ordinary-user desktop login still need qualification.
 
 | Kind | Requirements |
 | --- | --- |

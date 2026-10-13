@@ -125,3 +125,9 @@ and close events over standard streams. `run-window` retains the ordinary-accoun
 sandbox and generation lease without X11 or hardware display grants. The
 [counter example](../../examples/package-counter/README.md) builds both targets;
 see [native window qualification](../../tests/packages/window-check.md).
+
+Signed `window_protocol:2` adds single-line UTF-8 input with 256-byte bounds,
+explicit Enter-to-send/Escape-to-discard editing, and frame-bound field/control
+identities. Protocol 1 remains compatible. The
+[memo example](../../examples/package-memo/README.md) demonstrates explicit saving
+to private data; see [text-entry qualification](../../tests/packages/window-input-check.md).

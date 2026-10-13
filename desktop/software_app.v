@@ -137,12 +137,17 @@ mut:
 	launch_data_cwd bool = true
 	launch_files_allowed bool
 	window_mode bool
+	window_protocol int = 1
 	window_frame appsdk.WindowFrame
 	window_pending []u8
 	window_skip bool
 	window_closing bool
 	window_writable bool
 	window_failure string
+	window_input_id string
+	window_input []u8
+	window_input_dirty bool
+	window_input_select_all bool
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
@@ -541,9 +546,11 @@ fn (mut a SoftwareApp) run_requested() {
 	a.repository_mode = false
 	a.deployment_mode = false
 	a.mirror_mode = false
-	if a.rows.any(it.id == request.id && it.installed_version != '' && it.installed_window_protocol == 1) {
-		a.open_window(request) or { a.set_status(err.msg()); unsafe { err.free() } }
-		return
+	for row in a.rows {
+		if row.id == request.id && row.installed_version != '' && row.installed_window_protocol in [1, 2] {
+			a.open_window(request, row.installed_window_protocol) or { a.set_status(err.msg()); unsafe { err.free() } }
+			return
+		}
 	}
 	a.start(if request.document.len > 0 {
 		['run', request.id, request.document]
@@ -750,7 +757,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 }
 
 fn (mut a SoftwareApp) key_input(input string) {
-	if a.window_mode { return }
+	if a.window_mode { a.window_key_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input); return }
@@ -774,7 +781,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 }
 
 fn (mut a SoftwareApp) paste_input(input string) {
-	if a.window_mode { return }
+	if a.window_mode { a.window_paste_input(input); return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {

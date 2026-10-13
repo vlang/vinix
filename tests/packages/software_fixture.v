@@ -31,6 +31,8 @@ const body_text = u32(0x111111)
 const body_panel = u32(0xeeeeee)
 const settings_choice_bg = u32(0xccccff)
 const app_surface = u32(0xffffff)
+const app_accent = u32(0x4060b0)
+const body_rule = u32(0xcccccc)
 const workflow_owned_text_key = 'owned'
 const workflow_owned_id_text_key = 'owned-id-text'
 
@@ -42,6 +44,7 @@ fn console_backspace(mut bytes []u8, selected bool) {
 	if selected {
 		bytes.clear()
 	} else if bytes.len > 0 {
+		for bytes.len > 1 && bytes[bytes.len - 1] & 0xc0 == 0x80 { bytes.delete_last() }
 		bytes.delete_last()
 	}
 }
@@ -146,6 +149,7 @@ fn check_package_review() {
 }
 
 fn software_window_child(id string) {
+	if id == 'memo' { software_window_text_child(); return }
 	assert id == 'counter'
 	mut count := 0
 	mut sequence := u64(1)
@@ -207,7 +211,7 @@ fn check_software_window() ! {
 	assert app.prepare_close() && app.window_mode && app.status.contains('finished')
 	app.close_app()
 	mut detached := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192} }
-	detached.open_window(packagecore.Request{ id: 'counter' })!
+	detached.open_window(packagecore.Request{ id: 'counter' }, 1)!
 	wait_window_frame(mut detached, 1)!
 	pid := detached.worker.pid
 	detached.close_app()
@@ -233,7 +237,7 @@ fn check_software_window() ! {
 	unsafe { text.free(); line.free() }
 	parser.close_app()
 	// Exercise the same atomic write against a pipe with no reader draining it.
-	mut pipe := [2]int{}
+	mut pipe := [2]i32{} // C pipe descriptors have a fixed 32-bit width
 	assert C.pipe(&pipe[0]) == 0
 	mut blocked := SoftwareApp{ window_writable: true, worker: os.new_process('unused') }
 	blocked.worker.use_stdio_ctl = true
@@ -245,11 +249,112 @@ fn check_software_window() ! {
 		if !blocked.send_window_event(appsdk.WindowEvent{ kind: 'click', sequence: 1, id: 'increase' }) { refused = true; break }
 	}
 	assert refused && time.sys_mono_now() - started < 2_000_000_000
+	blocked.window_protocol = 2
+	blocked.window_frame = appsdk.WindowFrame{ format: 2, sequence: 1 }
+	blocked.window_input_id = 'memo'.clone()
+	blocked.window_input = []u8{len: appsdk.window_input_limit, init: `x`}
+	blocked.window_input_dirty = true
+	blocked.window_key_input('\r')
+	assert blocked.window_input_dirty && blocked.window_input.len == appsdk.window_input_limit && blocked.status.contains('kept')
 	C.close(pipe[0])
-	assert !blocked.send_window_event(appsdk.WindowEvent{ kind: 'close' })
+	blocked.window_key_input('\r')
+	assert blocked.window_input_dirty && blocked.status.contains('kept')
+	assert !blocked.send_window_event(appsdk.WindowEvent{ format: 2, kind: 'close' })
 	blocked.retire_worker()
 	blocked.close_app()
 	println('Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed')
+	check_software_window_text()!
+}
+
+fn software_text_frame(sequence u64, text string) appsdk.WindowFrame {
+	return appsdk.WindowFrame{ format: 2, sequence: sequence, title: 'Memo', width: 320, height: 160, elements: [
+		appsdk.WindowElement{ kind: 'input', id: 'software.confirm', text: text, x: 12, y: 12, width: 280, height: 32, color: 0, background: 0xffffff },
+		appsdk.WindowElement{ kind: 'button', id: 'save', text: 'Save', x: 12, y: 60, width: 120, height: 32, color: 0, background: 0xe0e0ff }] }
+}
+
+fn software_window_text_child() {
+	mut text := 'Initial'.clone()
+	mut sequence := u64(1)
+	for {
+		frame := software_text_frame(sequence, text)
+		encoded := frame.encode() or { panic(err) }
+		println(appsdk.window_prefix + encoded)
+		flush_stdout()
+		mut event := appsdk.read_window_event_for(2) or { panic(err) }
+		assert frame.accepts(event)
+		if event.kind == 'close' { event.close(); return }
+		assert event.kind == 'text' && event.id == 'software.confirm' && event.text == 'é🚀 $literal; $(command)'
+		unsafe { text.free() }
+		text = event.text.clone()
+		event.close(); sequence++
+		unsafe { encoded.free(); (&array(&frame.elements)).free() }
+	}
+}
+
+fn check_software_window_text() ! {
+	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192},
+		rows: [SoftwareRow{ id: 'memo', installed_version: '1.0.0', installed_kind: 'native', installed_window_protocol: 2 }] }
+	app.launch_request = json2.encode(packagecore.Request{ id: 'memo' })
+	app.run_requested()
+	assert app.window_protocol == 2 && app.worker.args == ['run-window', 'memo']
+	wait_window_frame(mut app, 1)!
+	app.key_input('unfocused')
+	assert app.window_input_id == ''
+	tree := app.build(ui2.rect(0, 0, 900, 660))!
+	assert tree.children.any(it.id == software_window_input_action + '1.software.confirm')
+	assert tree.children.any(it.id == software_window_action + '1.save')
+	free_window_tree(tree)
+	app.handle('software.confirm')!
+	app.handle(software_window_input_action + '0.software.confirm')!
+	assert app.window_input_id == ''
+	app.handle(software_window_input_action + '1.software.confirm')!
+	app.key_input('\x01')
+	app.paste_input('é🚀 $literal; $(command)')
+	assert editor_bytes_text(app.window_input) == 'é🚀 $literal; $(command)'
+	app.paste_input('\n')
+	app.paste_input('x'.repeat(257))
+	assert editor_bytes_text(app.window_input) == 'é🚀 $literal; $(command)' && app.window_input_select_all == false
+	app.handle(software_window_action + '1.save')!
+	assert app.status.contains('Enter') && app.window_input_dirty
+	assert !app.prepare_close() && !app.window_closing
+	app.key_input('\r')
+	wait_window_frame(mut app, 2)!
+	assert app.window_frame.elements[0].text == 'é🚀 $literal; $(command)' && app.window_input_id == ''
+	app.handle(software_window_input_action + '1.software.confirm')!
+	app.handle(software_window_action + '1.save')!
+	assert app.window_input_id == ''
+	app.handle(software_window_input_action + '2.software.confirm')!
+	app.key_input('\x7f')
+	assert editor_bytes_text(app.window_input) == 'é🚀 $literal; $(command'
+	app.key_input('\x01'); app.key_input('\x08')
+	assert app.window_input.len == 0
+	app.key_input('🚀'); app.key_input('\x7f')
+	assert app.window_input.len == 0
+	app.paste_input('\x1b') // paste must not activate Escape
+	assert app.window_input_dirty
+	app.key_input('\x1b')
+	assert app.window_input_id == '' && !app.window_input_dirty
+	assert !app.prepare_close() && app.window_closing
+	wait_for_software(mut app)
+	app.close_app()
+	mut parser := SoftwareApp{ window_mode: true, window_protocol: 2 }
+	frame := software_text_frame(1, 'old')
+	text := frame.encode()!
+	parser.window_line(appsdk.window_prefix + text)
+	parser.handle_window(software_window_input_action + '1.software.confirm')
+	parser.window_paste_input(' draft')
+	next := software_text_frame(2, 'new')
+	new_text := next.encode()!
+	parser.window_line(appsdk.window_prefix + new_text)
+	assert parser.window_input_id == '' && parser.status.contains('discarded')
+	parser.handle_window(software_window_input_action + '2.software.confirm')
+	assert editor_bytes_text(parser.window_input) == 'new'
+	legacy := appsdk.WindowFrame{ sequence: 3, title: 'Legacy', width: 64, height: 64 }.encode()!
+	parser.window_line(appsdk.window_prefix + legacy)
+	assert parser.window_failure.contains('manifest') && parser.window_input_id == '' && parser.window_frame.sequence == 2
+	parser.close_app()
+	unsafe { text.free(); new_text.free(); legacy.free(); (&array(&frame.elements)).free(); (&array(&next.elements)).free() }
+	println('Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed')
 }
 
 fn main() {
@@ -432,21 +537,26 @@ fn main() {
 fn check_window_broker_memory() ! {
 	$if !track_heap ? { return error('compile this fixture with -d track_heap') }
 	$if track_heap ? {
-	mut app := SoftwareApp{ window_mode: true, output: []u8{cap: 8192}, window_pending: []u8{cap: appsdk.window_frame_limit + appsdk.window_prefix.len} }
+	mut app := SoftwareApp{ window_mode: true, window_protocol: 2, output: []u8{cap: 8192}, window_pending: []u8{cap: appsdk.window_frame_limit + appsdk.window_prefix.len} }
 	unsafe { app.output.flags |= .noslices; app.window_pending.flags |= .noslices }
 	mut sequence := u64(1)
 	for warmup in 0 .. 2 {
 		if warmup == 1 { C.vinix_heap_begin() }
 		for _ in 0 .. 1000 {
-			frame := appsdk.WindowFrame{ sequence: sequence, title: 'Counter', width: 320, height: 160, background: 0xffffff,
-				elements: [appsdk.WindowElement{ kind: 'button', id: 'increase', text: 'Increase', x: 12, y: 12, width: 128, height: 28, color: 0, background: 0xe0e0ff }] }
+			frame := software_text_frame(sequence, 'é🚀')
 			text := frame.encode()!
 			line := appsdk.window_prefix + text + '\n'
 			middle := line.len / 2
 			app.window_output(unsafe { tos(line.str, middle) })
 			app.window_output(unsafe { tos(line.str + middle, line.len - middle) })
+			value := software_window_sequence(sequence)
+			action := software_window_input_action + value + 'software.confirm'
+			app.handle_window(action)
+			app.window_key_input('\x01')
+			app.window_paste_input('draft')
 			free_window_tree(app.build_window(ui2.rect(0, 0, 900, 660)))
-			unsafe { text.free(); line.free(); (&array(&frame.elements)).free() }
+			app.window_key_input('\x1b')
+			unsafe { text.free(); line.free(); value.free(); action.free(); (&array(&frame.elements)).free() }
 			sequence++
 		}
 		app.window_frame.close()
@@ -456,7 +566,7 @@ fn check_window_broker_memory() ! {
 	kept := C.vinix_heap_end()
 	app.close_app()
 	assert kept == 0, 'native window broker retained ${kept} bytes'
-	println('Native window broker: 1000 fragmented updates, replacements, UI builds and owned-tree retirements retain zero tracked bytes')
+	println('Native window broker: 1000 fragmented text frames, focus/edit/discard, UI builds and owned-tree retirements retain zero tracked bytes')
 	}
 }
 

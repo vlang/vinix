@@ -5,7 +5,7 @@ import encoding.utf8
 
 const window_frame_keys = ['format', 'sequence', 'title', 'width', 'height', 'background', 'elements']
 const window_element_keys = ['kind', 'id', 'text', 'x', 'y', 'width', 'height', 'color', 'background']
-const window_event_keys = ['format', 'kind', 'sequence', 'id']
+const window_event_keys = ['format', 'kind', 'sequence', 'id', 'text']
 
 // This bounded schema has no recursive values. Owned JSON string parsing keeps
 // escape/Unicode behavior without the pinned decoder's per-call allocation.
@@ -189,7 +189,7 @@ fn read_window_frame(text string) !WindowFrame {
 		field := r.member(window_frame_keys, seen)!
 		seen |= u16(1) << field
 		match field {
-			0 { frame = WindowFrame{ ...frame, format: int(r.number(1)!) } }
+			0 { frame = WindowFrame{ ...frame, format: int(r.number(2)!) } }
 			1 { frame = WindowFrame{ ...frame, sequence: r.number(~u64(0))! } }
 			2 { frame = WindowFrame{ ...frame, title: r.quoted()! } }
 			3 { frame = WindowFrame{ ...frame, width: int(r.number(2048)!) } }
@@ -220,15 +220,18 @@ fn read_window_event_json(text string) !WindowEvent {
 		field := r.member(window_event_keys, seen)!
 		seen |= u16(1) << field
 		match field {
-			0 { event = WindowEvent{ ...event, format: int(r.number(1)!) } }
+			0 { event = WindowEvent{ ...event, format: int(r.number(2)!) } }
 			1 { event = WindowEvent{ ...event, kind: r.quoted()! } }
 			2 { event = WindowEvent{ ...event, sequence: r.number(~u64(0))! } }
 			3 { event = WindowEvent{ ...event, id: r.quoted()! } }
+			4 { event = WindowEvent{ ...event, text: r.quoted()! } }
 			else {}
 		}
 	}
 	r.spaces()
-	if seen != 15 || r.position != text.len { return error('missing or trailing native window event fields') }
+	if seen != (if event.format == window_protocol { 15 } else { 31 }) || r.position != text.len {
+		return error('missing or trailing native window event fields')
+	}
 	event.validate()!
 	accepted = true
 	return event

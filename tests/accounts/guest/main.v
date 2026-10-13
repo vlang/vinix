@@ -51,6 +51,7 @@ fn main() {
 		'packages-composition' { scenario_packages_composition(mut t) }
 		'packages-context' { scenario_packages_context(mut t) }
 		'packages-window' { scenario_packages_window(mut t) }
+		'packages-window-input' { scenario_packages_window_input(mut t) }
 		'packages-crash-staged', 'packages-crash-published', 'packages-crash-activated' {
 			scenario_package_recovery(mut t)
 		}
