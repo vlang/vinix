@@ -5,7 +5,12 @@ import crypto.sha256
 import guesthost
 import json2
 import os
+import time
 import tools.development.devcore
+import tools.development.sourcecore
+import tools.packages.pkgcore
+import crypto.ed25519
+import encoding.hex
 
 struct Pin {
 	path   string
@@ -100,6 +105,7 @@ struct NativeQualification {
 	context             string
 	requested           []string
 	results             []Profile
+	command_timeout_seconds int
 }
 
 struct Receipt {
@@ -110,7 +116,9 @@ struct Receipt {
 	fixture_sha256  string
 	sdk_sha256      string
 	v_root_sha256   string
+	v_smoke_root_sha256 string
 	native_source_sha256 string
+	native_source_revision string
 	tools           map[string]string
 	command         []string
 	native_receipts map[string]string
@@ -118,6 +126,16 @@ struct Receipt {
 }
 
 fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
+
+fn build_source(path string) bool {
+	return (path.ends_with('.v') && !path.ends_with('_test.v')) || path.ends_with('.h') || path.ends_with('/v.mod')
+}
+
+struct PackageProof {
+	signature string
+	object_sha256 string
+	object_bytes u64
+}
 
 // Materialize a prepared native SDK while preserving relative links and
 // recording precisely the copied closure. GDB's unused Python helpers are
@@ -177,6 +195,9 @@ fn run() !int {
 	}
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported architecture') }
+	if os.args.len == 8 && os.getenv('VINIX_DEVELOPMENT_V_SMOKE_ROOT') != '' {
+		return error('use either the native V build gate or the prepared V smoke root')
+	}
 	kernel := os.real_path(os.args[2])
 	stage := os.real_path(os.args[3])
 	state := os.abs_path(os.args[4])
@@ -193,6 +214,7 @@ fn run() !int {
 	os.mkdir_all(root + '/usr/bin')!
 	os.mkdir_all(root + '/home/developer')!
 	mut hashes := map[string]string{}
+	mut v_smoke_hash := ''
 	for tool in ['vinix-build', 'vinix-qualify', 'vinix-vm', 'vinix-jobs'] {
 		binary := stage + '/usr/bin/' + tool
 		hash := digest(binary)!
@@ -209,6 +231,21 @@ fn run() !int {
 		os.cp(binary, root + '/usr/bin/' + tool)!
 		os.chmod(root + '/usr/bin/' + tool, 0o755)!
 		hashes[tool] = hash
+	}
+	if source := os.getenv_opt('VINIX_DEVELOPMENT_V_SMOKE_ROOT') {
+		v_root := os.real_path(source)
+		os.mkdir_all(root + '/usr/lib')!
+		mut hash := sha256.new()
+		copy_sdk(v_root, root + '/usr/lib/vlang', v_root, '.', mut hash)!
+		v_smoke_hash = hash.sum([]u8{}).hex()
+		binary := root + '/usr/lib/vlang/v'
+		header := os.read_bytes(binary)!
+		if header.len < 20 || header[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
+			|| (u16(header[18]) | u16(header[19]) << 8) != if arch == 'aarch64' { u16(183) } else { u16(62) } {
+			return error('prepared V compiler has the wrong ELF architecture')
+		}
+		hashes['v-smoke'] = digest(binary)!
+		os.symlink('/usr/lib/vlang/v', root + '/usr/bin/v-smoke')!
 	}
 	// Optional prepared ELF smoke coverage is kept distinct from native builds.
 	if cpu_binary := os.getenv_opt('VINIX_DEVELOPMENT_CPU_BINARY') {
@@ -253,6 +290,7 @@ fn run() !int {
 	}))!
 	mut sdk_hash := ''
 	mut v_root_hash := ''
+	mut source_revision := ''
 	mut native_plan := BuildPlan{}
 	mut profiles := []string{}
 	mut compiler_hashes := map[string]string{}
@@ -314,41 +352,66 @@ fn run() !int {
 			profiles << 'v'
 			userland := root + '/home/developer/native-source'
 			os.mkdir(userland)!
-			mut steps := []BuildStep{}
+			source_revision = sourcecore.revision(guesthost.root())!
+			sourcecore.export(guesthost.root(), source_revision, ['util-vinix', 'init',
+				'tools/packages/main.v', 'tools/packages/pkgcore', 'tools/packages/pkgprotocol', 'tools/packages/signing'], userland, build_source)!
+			os.write_file(userland + '/SOURCE_REVISION', source_revision + '\n')!
+			os.write_file(userland + '/assert-failure.v', 'fn main() {\n    assert 1 == 2\n}\n')!
+			mut steps := [BuildStep{ name: 'help-v', argv: ['{v}', '--help'], artifacts: []string{} }]
+			steps << BuildStep{
+				name: 'compile-package'
+				argv: ['{v}', '-new-compiler', '-nocache', '-showcc', '-no-retry-compilation', '-no-parallel', '-no-memory-limit',
+					'-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-musl', '-gc', 'none',
+					'-cc', '{cc}', '-path', '@vlib|{work}', '-o', '{work}/package-bin', '{work}/tools/packages/main.v']
+				artifacts: ['package-bin']
+			}
+			steps << BuildStep{ name: 'help-package', argv: ['{work}/package-bin', '--help'], artifacts: []string{} }
+			steps << BuildStep{
+				name: 'compile-assertion'
+				argv: ['{v}', '-new-compiler', '-nocache', '-no-retry-compilation', '-no-parallel', '-no-memory-limit',
+					'-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-musl', '-gc', 'none',
+					'-cc', '{cc}', '-o', '{work}/assert-bin', '{work}/assert-failure.v']
+				artifacts: ['assert-bin']
+			}
 			for name in ['fetch', 'mount', 'chsh', 'lscpu', 'init'] {
-				os.mkdir(userland + '/' + name)!
-				source := guesthost.root() + if name == 'init' { '/init' } else { '/util-vinix/' + name }
-				mut files := ['main.v', 'v.mod']
-				if name == 'lscpu' {
-					files << ['cpu/cpu_x64.v', 'cpu/cpu_arm64.v', 'armcpu/info.v']
-				}
-				for file in files {
-					os.mkdir_all(os.dir(userland + '/' + name + '/' + file))!
-					os.cp(source + '/' + file, userland + '/' + name + '/' + file)!
-					os.chmod(userland + '/' + name + '/' + file, 0o644)!
-				}
+				input := if name == 'init' { '/init' } else { '/util-vinix/' + name }
 				steps << BuildStep{
 					name: 'compile-' + name
 					argv: ['{v}', '-new-compiler', '-no-retry-compilation', '-no-parallel',
 						'-no-memory-limit', '-os', 'vinix', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
-						'-musl', '-gc', 'none', '-cc', '{cc}', '-o', '{work}/' + name + '-bin', '{work}/' + name]
+						'-musl', '-gc', 'none', '-cc', '{cc}', '-o', '{work}/' + name + '-bin', '{work}' + input]
 					artifacts: [name + '-bin']
 				}
 				steps << BuildStep{ name: 'run-' + name, argv: ['{work}/' + name + '-bin', '--version'], artifacts: []string{} }
 			}
 			steps << BuildStep{ name: 'inspect-lscpu', argv: ['{work}/lscpu-bin'], artifacts: []string{} }
+			steps << BuildStep{ name: 'prepare-payload', argv: ['{toolbox}', 'mkdir', '-p', '{work}/payload/bin'], artifacts: []string{} }
+			steps << BuildStep{ name: 'copy-payload', argv: ['{toolbox}', 'cp', '{work}/lscpu-bin', '{work}/payload/bin/lscpu'], artifacts: ['payload/bin/lscpu'] }
+			os.write_file(userland + '/package.json', json2.encode(pkgcore.Package{
+				id: 'org.vinix.native-lscpu', version: '1.0.0', architecture: arch, name: 'Native lscpu fixture',
+				license: 'GPL-2.0-or-later', kind: 'native', entrypoint: 'bin/lscpu', permissions: ['files'],
+			}))!
+			// Public deterministic fixture data, never a production signing key.
+			os.write_file(root + '/home/developer/publisher.seed', '00'.repeat(32) + '\n')!
+			steps << BuildStep{ name: 'pack-package', argv: ['{work}/package-bin', 'pack', '{work}/package.json', '{work}/payload', '{work}/repository'],
+				artifacts: ['repository/manifests/org.vinix.native-lscpu-' + arch + '-1.0.0.json'] }
+			steps << BuildStep{ name: 'publish-package', argv: ['{work}/package-bin', 'publish-release', '{work}/repository',
+				'development-fixture', '/home/developer/publisher.seed', '1', '2000000000', '{work}/release'],
+				artifacts: ['release/index.json', 'release/index.sig'] }
 			native_plan = BuildPlan{
 				source: Pin{'/home/developer/native-source', devcore.tree_hash(userland)!}
 				inputs: [Pin{'/opt/native', devcore.tree_hash(root + '/opt/native')!},
 					Pin{'/usr/lib/vlang', devcore.tree_hash(root + '/usr/lib/vlang')!},
-					Pin{'/lib', devcore.tree_hash(root + '/lib')!}]
+					Pin{'/lib', devcore.tree_hash(root + '/lib')!},
+					Pin{'/home/developer/publisher.seed', digest(root + '/home/developer/publisher.seed')!}]
 				tools: {
 					'v': Pin{'/usr/lib/vlang/v', compiler_hashes['v']}
 					'cc': Pin{'/usr/bin/cc', compiler_hashes['c']}
 					'sh': Pin{'/bin/sh', hashes['sh']}
+					'toolbox': Pin{'/bin/busybox', hashes['sh']}
 				}
-				timeout_seconds: 240
-				environment: { 'VJOBS': '1' }
+				timeout_seconds: 600
+				environment: { 'VJOBS': '1', 'V_C_ERROR_BUG_REPORT_DISABLED': '1' }
 				steps: steps
 			}
 			os.write_file(root + '/home/developer/native-build.json', json2.encode(native_plan))!
@@ -376,9 +439,11 @@ fn run() !int {
 	]
 	if sdk_hash != '' { expected << 'DEVELOPMENT TOOLCHAINS PASS:' }
 	if v_root_hash != '' { expected << 'DEVELOPMENT USERLAND PASS:' }
+	if v_root_hash != '' { expected << 'DEVELOPMENT PACKAGES PASS:' }
 	if 'lscpu-smoke' in hashes { expected << 'DEVELOPMENT CPU PASS:' }
+	if 'v-smoke' in hashes { expected << 'DEVELOPMENT V SMOKE PASS:' }
 	result := guesthost.boot(command, launch.env, state, expected,
-		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], 900, true)!
+		['DEVELOPMENT GUEST FAIL', 'KERNEL PANIC', 'vinix-native-fixture-secret'], if v_root_hash != '' { 2400 } else { 900 }, true)!
 	mut receipts := map[string]string{}
 	for line in os.read_lines(state + '/serial.log')! {
 		if !line.starts_with('DEVELOPMENT RECEIPT ') { continue }
@@ -389,13 +454,15 @@ fn run() !int {
 			'/home/developer/public-token/state.json', '/home/developer/link-token/state.json',
 			'/home/developer/build-a/receipt.json', '/home/developer/build-b/receipt.json',
 			'/home/developer/qualification/report.json', '/home/developer/native-build.json',
-			'/home/developer/native-a/receipt.json', '/home/developer/native-b/receipt.json'] {
+			'/home/developer/native-a/receipt.json', '/home/developer/native-b/receipt.json',
+			'/home/developer/native-a/work/release/index.json', '/home/developer/native-b/work/release/index.json',
+			'/home/developer/native-a/work/release/index.sig', '/home/developer/native-b/work/release/index.sig'] {
 			return error('unexpected guest receipt path')
 		}
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != if sdk_hash == '' { 6 } else if v_root_hash == '' { 7 } else { 10 } {
+	if result == 0 && receipts.len != if sdk_hash == '' { 6 } else if v_root_hash == '' { 7 } else { 14 } {
 		return error('missing native workflow receipts')
 	}
 	if result == 0 {
@@ -414,7 +481,7 @@ fn run() !int {
 			report := json2.decode[NativeQualification](receipts['/home/developer/qualification/report.json'],
 				strict: true
 			)!
-			if report.schema != 1 || report.kernel != 'Vinix' || report.architecture != arch
+			if report.schema != 1 || report.kernel != 'Vinix' || report.architecture != arch || report.command_timeout_seconds != 600
 				|| report.runner_sha256 != hashes['vinix-qualify']
 				|| !report.complete || !report.all_selected_passed || report.uid != 1000 || report.context != 'vinix-native'
 				|| report.requested != profiles || report.results.len != profiles.len
@@ -449,14 +516,31 @@ fn run() !int {
 						return error('native userland step order or executed command changed')
 					}
 					if planned.artifacts.len != 0 {
-						name := native_plan.steps[i].artifacts[0]
-						hash := step.artifacts[name]
-						if step.artifacts.len != 1 || hash.len != 64 { return error('missing compiled userland artifact') }
-						if output == 'native-a' { artifacts[name] = hash }
-						else if artifacts[name] != hash { return error('userland artifacts differ between fresh workspaces') }
+						if step.artifacts.len != planned.artifacts.len { return error('missing native build artifacts') }
+						for name in planned.artifacts {
+							hash := step.artifacts[name]
+							if hash.len != 64 { return error('missing native artifact hash') }
+							if output == 'native-a' { artifacts[name] = hash }
+							else if artifacts[name] != hash { return error('native artifact differs between fresh workspaces: ' + name + ': ' + artifacts[name] + ' / ' + hash) }
+						}
 					} else if step.artifacts.len != 0 {
 						return error('unexpected native userland output artifact')
 					}
+				}
+				release := '/home/developer/' + output + '/work/release/'
+				proof := json2.decode[PackageProof](receipts[release + 'index.sig'], strict: true)!
+				public_key := ed25519.new_key_from_seed(hex.decode('00'.repeat(32))!).public_key().hex()
+				index_text := receipts[release + 'index.json'] + '\n'
+				index := pkgcore.verify_index(pkgcore.Repository{id: 'development-fixture', public_key: public_key},
+					index_text, proof.signature, time.now().unix())!
+				if index.sequence != 1 || index.expires != 2000000000 || index.packages.len != 1
+					|| index.packages[0].id != 'org.vinix.native-lscpu' || index.packages[0].architecture != arch
+					|| index.packages[0].files.len != 1 || index.packages[0].files[0].path != 'bin/lscpu'
+					|| !index.packages[0].files[0].executable || index.packages[0].files[0].sha256 != artifacts['lscpu-bin']
+					|| index.packages[0].files[0].sha256 != proof.object_sha256 || index.packages[0].files[0].bytes != proof.object_bytes
+					|| sha256.sum(index_text.bytes()).hex() != artifacts['release/index.json']
+					|| sha256.sum((proof.signature + '\n').bytes()).hex() != artifacts['release/index.sig'] {
+					return error('signed native package failed independent payload/index validation')
 				}
 			}
 		}
@@ -467,7 +551,9 @@ fn run() !int {
 		fixture_sha256:  digest(init)!
 		sdk_sha256:      sdk_hash
 		v_root_sha256:   v_root_hash
+		v_smoke_root_sha256: v_smoke_hash
 		native_source_sha256: native_plan.source.sha256
+		native_source_revision: source_revision
 		tools:           hashes
 		command:         command
 		native_receipts: receipts

@@ -15,6 +15,7 @@ struct C.utsname {
 struct C.stat {
 	st_uid  u32
 	st_mode u32
+	st_size i64
 }
 
 @[c_extern]
@@ -128,7 +129,7 @@ fn command_output(program &char, action &char, argument &char, extra &char, outp
 		if pid == 0 {
 			if output != nil {
 				fd := C.open(output, C.O_WRONLY | C.O_CREAT | C.O_TRUNC, u32(0o600))
-				if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(125) }
+				if fd < 0 || C.dup2(fd, 1) != 1 || C.dup2(fd, 2) != 2 { C._exit(125) }
 				if fd > 2 { C.close(fd) }
 			}
 			C.execv(program, &argv[0])
@@ -255,6 +256,83 @@ fn cpu_output_checks(path &char) {
 	}
 }
 
+fn package_checks(output &char) {
+	unsafe {
+		mut path := [512]char{}
+		C.snprintf(&path[0], path.len, c'%s/work/package-bin', output)
+		mut st := C.stat{}
+		check(C.stat(&path[0], &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o111 != 0, 280)
+		for name in [&char(c'help-v'), &char(c'help-package')]! {
+			C.snprintf(&path[0], path.len, c'%s/%s.log', output, name)
+			mut help := [8192]char{}
+			fd := C.open(&path[0], C.O_RDONLY)
+			length := C.read(fd, &help[0], help.len - 1)
+			expected := if C.strcmp(name, c'help-v') == 0 { &char(c'V is a tool for managing V source code.') } else { &char(c'usage: vinix-package') }
+			check(fd >= 0 && length > 0 && length < help.len - 1 && C.close(fd) == 0
+				&& C.strstr(&help[0], expected) != nil, 281)
+		}
+		C.snprintf(&path[0], path.len, c'%s/work/release/index.json', output)
+		emit_receipt(&path[0], c'org.vinix.native-lscpu', false)
+		C.snprintf(&path[0], path.len, c'%s/work/release/index.sig', output)
+		mut signature := [130]char{}
+		fd_sig := C.open(&path[0], C.O_RDONLY)
+		check(fd_sig >= 0 && C.fstat(fd_sig, &st) == 0 && st.st_uid == 1000
+			&& C.read(fd_sig, &signature[0], 130) == 129 && C.close(fd_sig) == 0
+			&& signature[128] == char(10), 282)
+		for i in 0 .. 128 {
+			check((signature[i] >= char(`0`) && signature[i] <= char(`9`))
+				|| (signature[i] >= char(`a`) && signature[i] <= char(`f`)), 283)
+		}
+		signature[128] = 0
+		mut executable := [512]char{}
+		mut log := [512]char{}
+		C.snprintf(&executable[0], executable.len, c'%s/work/lscpu-bin', output)
+		C.snprintf(&log[0], log.len, c'%s/lscpu.sha', output)
+		check(command_output(c'/usr/bin/vinix-build', c'hash', &executable[0], nil, &log[0]) == 0, 284)
+		mut hash := [66]char{}
+		fd_hash := C.open(&log[0], C.O_RDONLY)
+		check(fd_hash >= 0 && C.read(fd_hash, &hash[0], hash.len) == 65
+			&& C.close(fd_hash) == 0 && hash[64] == char(10), 285)
+		hash[64] = 0
+		C.snprintf(&executable[0], executable.len, c'%s/work/release/objects/%s', output, &hash[0])
+		check(C.stat(&executable[0], &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o777 == 0o644, 286)
+		bytes := u64(st.st_size)
+		check(command_output(c'/usr/bin/vinix-build', c'hash', &executable[0], nil, &log[0]) == 0, 287)
+		mut object_hash := [66]char{}
+		fd_object := C.open(&log[0], C.O_RDONLY)
+		check(fd_object >= 0 && C.read(fd_object, &object_hash[0], object_hash.len) == 65
+			&& C.close(fd_object) == 0 && object_hash[64] == char(10), 288)
+		object_hash[64] = 0
+		check(C.strcmp(&hash[0], &object_hash[0]) == 0, 289)
+		C.printf(c'DEVELOPMENT RECEIPT %s {"signature":"%s","object_sha256":"%s","object_bytes":%zu}\n',
+			&path[0], &signature[0], &object_hash[0], usize(bytes))
+		C.snprintf(&path[0], path.len, c'%s/work/release/publisher.seed', output)
+		check(C.open(&path[0], C.O_RDONLY) == -1, 290)
+		C.snprintf(&path[0], path.len, c'%s/work/release/.publisher', output)
+		check(C.open(&path[0], C.O_RDONLY) == -1, 291)
+	}
+}
+
+fn assertion_checks(output &char) {
+	unsafe {
+		mut executable := [512]char{}
+		mut log := [512]char{}
+		C.snprintf(&executable[0], executable.len, c'%s/work/assert-bin', output)
+		C.snprintf(&log[0], log.len, c'%s/assert-failure.log', output)
+		mut st := C.stat{}
+		check(C.stat(&executable[0], &st) == 0 && st.st_uid == 1000 && st.st_mode & 0o111 != 0, 301)
+		check(command_output(&executable[0], nil, nil, nil, &log[0]) == 1, 302)
+		mut text := [2048]char{}
+		fd := C.open(&log[0], C.O_RDONLY)
+		count := C.read(fd, &text[0], text.len - 1)
+		check(fd >= 0 && count > 0 && count < text.len - 1 && C.close(fd) == 0
+			&& C.strstr(&text[0], c'assert-failure.v:2: FAIL: fn main.main: assert 1 == 2') != nil
+			&& C.strstr(&text[0], c'V panic: Assertion failed...') != nil
+			&& C.strstr(&text[0], c'/home/developer/') == nil, 303)
+		emit_command_log(&log[0])
+	}
+}
+
 fn native_userland_checks() {
 	unsafe {
 		private_receipt(c'/home/developer/native-build.json', c'/home/developer/native-source')
@@ -266,7 +344,8 @@ fn native_userland_checks() {
 				check(command(c'/bin/busybox', c'ls', c'-la', c'/opt/native/lib') == 0, 268)
 				check(command_output(c'/usr/bin/vinix-build', c'hash', c'/opt/native', nil, c'/home/developer/sdk-pin.sha') == 0, 269)
 				emit_command_log(c'/home/developer/sdk-pin.sha')
-				for step in [&char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh'), &char(c'compile-lscpu'), &char(c'compile-init'), &char(c'inspect-lscpu')]! {
+				for step in [&char(c'help-v'), &char(c'compile-assertion'), &char(c'compile-fetch'), &char(c'compile-mount'), &char(c'compile-chsh'), &char(c'compile-lscpu'), &char(c'compile-init'), &char(c'inspect-lscpu'),
+					&char(c'compile-package'), &char(c'help-package'), &char(c'pack-package'), &char(c'publish-package')]! {
 					C.snprintf(&path[0], path.len, c'%s/%s.log', output, step)
 					emit_command_log(&path[0])
 				}
@@ -303,8 +382,11 @@ fn native_userland_checks() {
 			}
 			C.snprintf(&path[0], path.len, c'%s/inspect-lscpu.log', output)
 			cpu_output_checks(&path[0])
+			assertion_checks(output)
+			package_checks(output)
 		}
 		C.puts(c'DEVELOPMENT USERLAND PASS: UID 1000, pinned SDK/V/runtime, two fresh workspaces, fetch/mount/chsh/lscpu/init compiled and executed, procfs CPU count matched')
+		C.puts(c'DEVELOPMENT PACKAGES PASS: UID 1000, native package CLI, compiled lscpu payload, signed releases in two workspaces, verified copied objects')
 	}
 }
 
@@ -316,6 +398,35 @@ fn account_checks() {
 		for program in [&char(c'/usr/bin/vinix-build'), &char(c'/usr/bin/vinix-qualify'),
 			&char(c'/usr/bin/vinix-vm'), &char(c'/usr/bin/vinix-jobs')]! {
 			check(command(program, c'--help', nil, nil) == 0, 120)
+		}
+		v_smoke := C.open(c'/usr/bin/v-smoke', C.O_RDONLY)
+		if v_smoke >= 0 {
+			check(C.close(v_smoke) == 0, 293)
+			check(command_output(c'/usr/bin/v-smoke', c'--help', nil, nil, c'/home/developer/v-help.log') == 0
+				&& command_output(c'/usr/bin/v-smoke', c'--version', nil, nil, c'/home/developer/v-version.log') == 0, 294)
+			mut help := [8192]char{}
+			fd_help := C.open(c'/home/developer/v-help.log', C.O_RDONLY)
+			length := C.read(fd_help, &help[0], help.len - 1)
+			check(fd_help >= 0 && length > 0 && length < help.len - 1 && C.close(fd_help) == 0
+				&& C.strstr(&help[0], c'V is a tool for managing V source code.') != nil, 295)
+			mut version := [128]char{}
+			fd_version := C.open(c'/home/developer/v-version.log', C.O_RDONLY)
+			bytes := C.read(fd_version, &version[0], version.len - 1)
+			check(fd_version >= 0 && bytes > 0 && bytes < version.len - 1 && C.close(fd_version) == 0
+				&& C.strstr(&version[0], c'V 0.') != nil, 296)
+			mut revision := [66]char{}
+			fd_revision := C.open(c'/usr/lib/vlang/VERSION', C.O_RDONLY)
+			count := C.read(fd_revision, &revision[0], revision.len)
+			check(fd_revision >= 0 && count in [isize(41), isize(65)]!
+				&& C.close(fd_revision) == 0 && revision[count - 1] == char(10), 297)
+			for i in 0 .. count - 1 {
+				check((revision[i] >= char(`0`) && revision[i] <= char(`9`))
+					|| (revision[i] >= char(`a`) && revision[i] <= char(`f`)), 298)
+			}
+			revision[7] = 0
+			check(C.strstr(&version[0], &revision[0]) != nil, 299)
+			emit_command_log(c'/home/developer/v-version.log')
+			C.puts(c'DEVELOPMENT V SMOKE PASS: UID 1000, prepared compiler, matching version revision and help assets')
 		}
 		cpu := C.open(c'/usr/bin/lscpu-smoke', C.O_RDONLY)
 		if cpu >= 0 {
@@ -354,6 +465,7 @@ fn account_checks() {
 			check(count > 0 && count < profiles.len - 1 && C.close(sdk) == 0, 257)
 			check(C.setenv(c'PATH', c'/usr/bin:/bin:/opt/native/bin', 1) == 0, 251)
 			C.puts(c'DEVELOPMENT COMPILER VERSIONS:')
+			check(C.setenv(c'VINIX_QUALIFY_TIMEOUT_SECONDS', c'600', 1) == 0, 300)
 			check(command(c'/usr/bin/cc', c'--version', nil, nil) == 0, 253)
 			check(command(c'/usr/bin/c++', c'--version', nil, nil) == 0, 254)
 			if C.strstr(&profiles[0], c',v') != nil {
@@ -397,6 +509,8 @@ pub fn run() i32 {
 		if native_plan >= 0 {
 			check(C.close(native_plan) == 0 && C.chown(c'/home/developer/native-build.json', 1000, 1000) == 0
 				&& C.chmod(c'/home/developer/native-build.json', 0o600) == 0, 267)
+			check(C.chown(c'/home/developer/publisher.seed', 1000, 1000) == 0
+				&& C.chmod(c'/home/developer/publisher.seed', 0o600) == 0, 292)
 		}
 		// Even root must not silently run a schedule labelled as another account.
 		check(command(c'/usr/bin/vinix-jobs', c'init', c'/home/developer/jobs.json', c'/root/wrong-owner') == 1, 159)

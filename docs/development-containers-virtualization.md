@@ -7,8 +7,8 @@ missing kernel isolation, debugger or hardware virtualization interfaces.
 
 | Requirement | Available implementation | Remaining acceptance / implementation |
 | --- | --- | --- |
-| Installed-system self-hosting | [V build plans](../tools/development/README.md) pin prepared source/tool/SDK inputs, build in a private copy, enforce deadlines and record output hashes. Native kernel, utility, init and package-CLI recipes are documented. [Guest runner checks](../tests/development/README.md) qualify UID 1000 source/link copying, epoch/environment control, matching artifacts and changed-input refusal on both architectures. AArch64 also compiles and executes all four `util-vinix` utilities and `init` in two fresh workspaces with matching binary hashes and full SDK/V/runtime pins, including `lscpu` procfs CPU inspection. | Complete native desktop/dependency/package recipes, init boot/login qualification and the remaining userland workflows; rebuild all four requested layers inside an installed system on both architectures, repeat in fresh workspaces and compare artifact hashes. Basic runner checks use a prebuilt V payload; the utility/init checks use native compilation and version entry points. No full self-hosted rebuild was run here. |
-| Toolchains and developer applications | [Project qualification](../tools/development/qualification.md) covers C/C++/V, Node/TypeScript, Rust/Cargo, Go, Java, make/CMake/Ninja, npm, GDB and SQLite. [Native guest checks](../tests/development/README.md) passed the C/C++ thread/file projects and the V file project as UID/GID 1000 on AArch64 with GCC/G++ 11.2.1 and V 0.5.2, retaining SDK/V/compiler hashes and compile/run receipts. Missing tools and failed workflows remain failing gates. | Qualify the remaining profiles and native x86 compiler projects with exact package versions and retained receipts; qualify IDE workflows and broader package ecosystems. Python/Meson execution is excluded by the repository's no-Python rule, so their acceptance stays open. |
+| Installed-system self-hosting | [V build plans](../tools/development/README.md) pin prepared source/tool/SDK inputs, build in a private copy, enforce deadlines and record output hashes. Native kernel, utility, init and package-CLI recipes are documented. [Guest runner checks](../tests/development/README.md) qualify UID 1000 source/link copying, epoch/environment control, matching artifacts and changed-input refusal on both architectures. AArch64 compiles the four `util-vinix` utilities, `init` and the package CLI in two fresh workspaces from immutable committed sources, executes the tools, packs the compiled `lscpu` and signs a consumer release. Executable/payload/manifest/index/signature hashes match; the controller independently verifies the signature and payload metadata with full SDK/V/runtime pins. | Complete native kernel/desktop/dependency recipes, init boot/login qualification and the remaining userland/package workflows; rebuild all four requested layers inside an installed system on both architectures. Basic runner checks use a prebuilt V payload; utility/init/package checks use native compilation. No full self-hosted rebuild was run here. |
+| Toolchains and developer applications | [Project qualification](../tools/development/qualification.md) covers C/C++/V, Node/TypeScript, Rust/Cargo, Go, Java, make/CMake/Ninja, npm, GDB and SQLite. A [V compiler stager](../tools/development/stage-v.v) exports committed compiler/library sources, records portable-source adaptations and prepares matching static ELF installations for both architectures. [Native guest checks](../tests/development/README.md) passed C/C++ thread/file projects and the V file project as UID/GID 1000 on AArch64 with GCC/G++ 11.2.1 and V 0.5.2 `f6358ec`. Both architectures passed prepared V version/help gates; AArch64 also verified actual assertion failures with relative source paths. Missing tools and failed workflows remain failing gates. | Qualify native compiler rebuilding, the remaining profiles and native x86 compiler projects with exact package versions and retained receipts; qualify IDE workflows and broader package ecosystems. Python/Meson execution is excluded by the repository's no-Python rule, so their acceptance stays open. |
 | Debugging and diagnostics | Dumpability and authorized `process_vm_readv/writev` already exist. The GDB profile requires a real source breakpoint, backtrace and continued execution. | Native ptrace attach/register/step/events, ELF core generation and output/limit policy, profiler events, process stack sampling and authorized hang/crash reporting. No new kernel tracing implementation is claimed. |
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
@@ -73,6 +73,33 @@ on both the unchanged `1c2e33ce` baseline and the ownership refactor. Comparing
 the 215 file/kind counts showed no increases. The global allowlist was not
 expanded to conceal those baseline failures; they remain a separate failing
 gate, alongside the hardware VM-entry and wider section 17 acceptance work.
+
+Native package validation on 13 October 2026 used isolated production kernels
+from `776b9f0d3`, the development commands in
+`build/development17-20261013/tools-arm-budget`, GCC/G++ 11.2.1 (20211120),
+BusyBox 1.36.1 and V compiler sources at
+`f6358ecff9cffbf2d8b03e6a09269aac7707e26c`. Both architecture compiler stages
+completed with musl GCC 14.2.0 and `VINIX_V_COPT=-O0`. The source adaptations
+are recorded in their receipts, including relative assertion diagnostics for
+reproducible builds. The native failure project still exits 1 and reports its
+file, line, expression and panic; no assertion-disable flag is used.
+
+The AArch64 HVF run passed all 19 steps in each fresh workspace as UID/GID 1000,
+including native package compilation, packing and signing. Its independently
+validated 14-record receipt and transcript are retained in
+`build/development17-20261013/guest-arm-package-assertions`. The committed source
+revision is `49070d4e39f4d4c64c7658a7f1e03492297b2ea0`; the prepared source pin,
+including the generated assertion fixture, is
+`08e2fa118cb5eefd23ed5d13a096e55527d7f02d34c26dd88b155419da59f2d5`.
+The copied SDK pin is
+`ad1baf20e589e88e753cccbe863127d5e8e1cc9782d228dc956eaaff79ab8717`
+and V installation pin is
+`45468219a77a74bfb970078509adc707c46fc6df067483f828f0434c9cff55da`.
+The x86 TCG startup/help and account/job/build regression passed in
+`build/development17-20261013/guest-x86-v-assertions`; no native x86 GCC SDK was
+supplied. The signed fixture uses a public synthetic zero seed. It proves
+ordinary-user native package publication; enrollment, installed-app execution,
+compiler rebuilding and complete kernel/desktop builds retain their own gates.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,

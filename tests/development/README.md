@@ -68,6 +68,13 @@ loader dependencies:
 tests/development/run-guest aarch64 /path/to/kernel /tmp/development-arm /tmp/new-v-state /path/to/aarch64-linux-musl-native /path/to/vlang /path/to/native-static-busybox
 ```
 
+The maintained [V compiler stager](../../tools/development/stage-v.v) prepares
+that matching installation from committed compiler/library sources:
+
+```
+v -cc cc run tools/development/stage-v.v aarch64 /path/to/v-checkout /path/to/new-native-v
+```
+
 This copies and hashes the V root with Python helpers excluded, installs the
 compiler beside its matching library at `/usr/lib/vlang`, checks V/BusyBox ELF
 architectures and records both executable hashes. The V project uses the
@@ -76,8 +83,11 @@ must compile, write/read a file and execute its resulting binary. These runs
 receive 3 GiB of RAM. Failed qualification retains bounded command-log excerpts
 in the serial transcript as well as the native report.
 
-V runs also copy this repository's `fetch`, `mount`, `chsh`, `lscpu` and `init`
-sources and generate a build plan pinning those sources, V, GCC, the shell and
+V runs export this repository's committed `fetch`, `mount`, `chsh`, `lscpu`,
+`init` and package-CLI sources from one full Git commit. Each immutable blob is
+verified; dirty/untracked files and Python helpers are excluded, and selected
+symlinks are refused. `SOURCE_REVISION` and the host receipt record that commit.
+The controller generates a build plan pinning those sources, V, GCC, the shell and
 the complete SDK/V/runtime trees. UID/GID 1000 builds them in two fresh
 workspaces with private HOME/temporary directories, then executes each recorded artifact's
 `--version` entry point. The fixture checks ownership, executable ELF headers
@@ -94,6 +104,48 @@ This checks native compilation and safe execution; booting it as PID 1 and
 qualifying its login workflow remain separate acceptance work.
 The ARM CPU backend reports the kernel's raw IDs and common feature names;
 it does not infer a model or independently qualify the kernel's hardware IDs.
+
+The same plan compiles the package CLI with the documented Linux/musl ABI target,
+checks both V and package help entry points, packs the freshly compiled `lscpu`
+as a native package and publishes a signed consumer repository. Both workspaces
+must complete all 19 steps and produce identical executable, manifest, index,
+signature and payload-copy hashes. A pinned BusyBox supplies the payload
+directory/copy commands. The public synthetic signing seed lives outside the
+source closure as an additional pinned input, owned by UID 1000 with mode 0600.
+
+The source closure also includes a generated V assertion-failure project. Both
+workspaces compile it to matching binaries; each must exit 1 and report its
+relative source filename, line, expression and panic diagnostic. This verifies
+that workspace-independent binaries retain working assertion failures. The
+matching compiler stager normalizes project assertion paths when the build
+runner sets `SOURCE_DATE_EPOCH`; it preserves explicit logical source names.
+
+The fixture checks the exported object's ownership/mode, size and SHA-256
+against the compiled executable and checks that `publisher.seed` and `.publisher`
+are absent from the release. The controller separately verifies the
+Ed25519 signature, repository identity, sequence, current expiry, package
+architecture and exact executable payload metadata against both build receipts.
+It retains the two signed indexes and signature/object proofs. This tests
+native compilation, packing and publication under ordinary account permissions;
+repository enrollment, package installation and sandboxed installed-app launch
+remain separate qualification gates. No production signing key is used.
+The full compiler/package gate uses 600-second command deadlines and a
+2400-second guest deadline. The selected qualifier command budget is recorded
+and independently checked in its report; other guest runs retain 900 seconds.
+
+For prepared compiler startup/help coverage without a GCC SDK, set
+`VINIX_DEVELOPMENT_V_SMOKE_ROOT` to the complete matching installation root:
+
+```
+VINIX_DEVELOPMENT_V_SMOKE_ROOT=/path/to/x86-vlang tests/development/run-guest x86_64 /path/to/kernel /tmp/development-x86 /tmp/new-v-smoke
+```
+
+The controller copies and pins the root and executable; UID 1000 executes help
+and version and compares the reported revision with `VERSION`. The receipt
+records `v_smoke_root_sha256` and `v-smoke`; the version output stays in the
+transcript. This option is separate from the native V build gate and cannot be
+combined with its V-root argument. Startup/help coverage does not qualify native
+project compilation.
 
 To run the CPU inspection check with a separately prepared `lscpu` ELF, set
 `VINIX_DEVELOPMENT_CPU_BINARY` to its host path. The controller checks the
@@ -114,7 +166,8 @@ also retain the SDK hash and native compiler report. `serial.log`,
 the ISO and compiled fixture remain beside it. Credential values do not enter
 the receipts. The credential in this fixture is public synthetic test data.
 V runs additionally record `v_root_sha256`, `native_source_sha256`, the `v`/`sh`
-executable pins, the utility build plan and two native build receipts.
+executable pins, `native_source_revision`, the build plan, two native build
+receipts and four signed-release proofs, for 14 native receipt records.
 Once the initramfs archive is complete, its duplicate staging tree is removed
 before ISO assembly. The standalone archive is removed once the ISO is complete.
 The ISO, compiled fixture, receipts and transcripts remain; obsolete
@@ -220,6 +273,30 @@ The x86 controller/fixture regression passed without a native compiler SDK in
 Both architectures also passed after moving duplicate staging-tree retirement
 before ISO assembly, in `/tmp/vinix-development-prune-arm-20261013-a` and
 `/tmp/vinix-development-prune-x86-20261013-a`.
+
+The committed-source, native package and assertion-failure gates passed on
+13 October 2026 with V source revision
+`f6358ecff9cffbf2d8b03e6a09269aac7707e26c`, staged with `VINIX_V_COPT=-O0`, and
+the GCC/G++ 11.2.1 SDK. The AArch64 HVF run retained a passing 14-record receipt
+and all 19 successful build steps per workspace in
+`build/development17-20261013/guest-arm-package-assertions`. Its source revision
+is `49070d4e39f4d4c64c7658a7f1e03492297b2ea0`, prepared-source pin is
+`08e2fa118cb5eefd23ed5d13a096e55527d7f02d34c26dd88b155419da59f2d5`, copied
+SDK pin is `ad1baf20e589e88e753cccbe863127d5e8e1cc9782d228dc956eaaff79ab8717`
+and V installation pin is
+`45468219a77a74bfb970078509adc707c46fc6df067483f828f0434c9cff55da`.
+Both workspaces produced package-CLI hash
+`481b5f11b1865ee462cb02cb9d5353bbc04ba8167606a8aac0b7ae9fede02a2d`, `lscpu`
+payload hash `8c2ba41f687c66f6b3602860f09bae79c19739ae81fc7453cdcd932c19b01f5f`
+and release-index hash
+`9eee3b494a6e92353520db3dd27f00a7fc06b3a1dbc8004ff10292bf91ba672b`.
+The real assertion project exits 1 with its relative source filename and
+line 2 in both workspaces, and its binary hash also matches. The x86 TCG
+prepared-compiler help/version and account/job/build regression passed in
+`build/development17-20261013/guest-x86-v-assertions`. That run pins V compiler
+`1ca3d612caf39e057b18ffe78be4d4c1f790e272aa82d8e9276ab37f9b340326` and
+installation `4d83946b8ab4d99ac938c96da5d72668835abbaca7d18d8dc63f1b689e7d1853`;
+it does not run native compiler projects without an x86 SDK.
 
 This qualifies the tested per-account job workflows in Vinix guests. Watcher
 signal/deadline/interruption tests still have host coverage; installed service
