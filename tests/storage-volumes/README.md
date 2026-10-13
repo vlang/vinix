@@ -1,5 +1,11 @@
 # Storage-volume qualification
 
+`--host-data-scrub-history` and `--data-scrub-history` qualify offline multi-disk
+scrub comparisons: complete reference/row binding, all four transition classes,
+whole-report fingerprints, ordinary reader/output faults, unchanged live views,
+repeated process lifetimes and reordered reboot. See
+[scrub history](data-scrub-history.md).
+
 `--host-data-scrub-view` and `--data-scrub-view` qualify validated offline plain
 scrub inspection: complete canonical syntax and semantic checks, ordinary
 reader/output faults, unchanged live mappings, repeated utility lifetimes and

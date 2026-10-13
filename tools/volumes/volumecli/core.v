@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume compare-data-scrubs BEFORE_REPORT AFTER_REPORT\n')
 	C.printf(c'       vinix-volume show-data-scrub REPORT\n')
 	C.printf(c'       vinix-volume compare-data-references BEFORE_MANIFEST AFTER_MANIFEST\n')
 	C.printf(c'       vinix-volume hash-bundle-auto BUNDLE MANIFEST\n       vinix-volume verify-data-auto MANIFEST\n       vinix-volume scrub-data-auto MANIFEST REPORT\n')
@@ -112,6 +113,10 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'compare-data-scrubs') == 0 {
+			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
+			return compare_data_scrub_files(argv[2], argv[3])
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'show-data-scrub') == 0 {
 			if argc != 3 || argv[2][0] == 0 { return usage() }
 			return show_data_scrub_file(argv[2])

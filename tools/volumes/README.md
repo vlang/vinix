@@ -4,6 +4,11 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`compare-data-scrubs BEFORE_REPORT AFTER_REPORT` compares all recorded plain-disk
+scrub findings with exact reference/row binding and complete report fingerprints.
+Results distinguish stable, new-change, restored and changed-again observations.
+See [scrub history](../../docs/storage-volumes.md#comparing-multi-disk-data-scrub-history).
+
 `show-data-scrub REPORT` validates and prints a complete saved plain-disk scrub
 report. Valid clean and changed reports return 0; malformed inputs or output
 failure return 1. See

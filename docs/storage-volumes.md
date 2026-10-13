@@ -3154,6 +3154,65 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Comparing multi-disk data scrub history
+
+`compare-data-scrubs BEFORE_REPORT AFTER_REPORT` compares complete historical
+plain-data `VINIXSR1` reports from `scrub-data` or `scrub-data-auto`. Both reports
+must have the same reference fingerprint, saved disk count, complete ordered
+mapping rows and expected digests. Every recorded disk index, global slot,
+offset, length and read-only flag must agree. A valid later incompatible row
+causes an operational error even when earlier observed digests differ.
+
+```sh
+vinix-volume compare-data-scrubs /root/before-scrub.txt /root/after-scrub.txt
+```
+
+Both complete bounded ordinary files receive the strict SR1 syntax and semantic
+validation used by inspection before any comparison report is printed. The
+reader rejects final symlinks, nonregular/unbounded files, incomplete reads,
+trailing bytes and inconsistent counts/results. Two independent read-only,
+no-follow, nonblocking input owners retain their file and parent descriptors
+through complete report construction and stdout finalization. Same-path and
+hard-linked inputs work, including during saved-state writer contention.
+Comparison takes no writer lock, reads no devices or credentials, publishes no
+file and preserves existing inputs and live mappings.
+
+Every mapping receives one result, with counts covering the complete report:
+
+| Result | Recorded observed digests |
+| --- | --- |
+| `stable` | Equal before and after, including an unchanged mismatch. |
+| `new-change` | Before matches the expected digest; after differs. |
+| `restored` | Before differs from the expected digest; after matches. |
+| `changed-again` | Both differ from the expected digest and from each other. |
+
+The complete ASCII output fits a fixed 32768-byte stack workspace. Its header
+contains `format=VINIXSR1 operation=compared-data-scrubs`, `disks`, `mappings`,
+`stable`, `changed`, `new_changes`, `restored`, `changed_again`, `algorithm=sha256`,
+`reference_sha256`, `before_report_sha256` and `after_report_sha256`. The two
+report fingerprints cover every canonical input byte, including header counts,
+row order, metadata and both recorded digests. Each row contains `disk`, `slot`,
+`offset`, `bytes`, `readonly`, `before=match|changed`, `after=match|changed`, the
+transition `result`, `expected_sha256`, `before_sha256` and `after_sha256`.
+All digests are 64 lowercase hexadecimal characters. Zero-mapping reports still
+include the saved disk count and both report fingerprints. Comparison output
+is a history view; its different operation and fields are not SR1 input records.
+
+Status **0** means identical observed digests in compatible reports. Status
+**2** means changed observations, including restoration. Status **1** means
+input, compatibility, formatting or output failure; invalid CLI syntax returns
+2. Operational failure takes precedence over findings. Validation failures
+emit no partial comparison; existing diagnostics may use stdout. A late stdout
+failure can leave text visible with status 1.
+
+Ordering is supplied by the caller and is not inferred from timestamps. SR1
+does not carry physical capacities/native sectors or authenticate its text;
+the comparison binds all recorded fields without checking an external reference
+or current disk contents. Retain trusted reports made with quiescent writes and
+use verification or scrubbing for current data. This command provides no repair
+or concurrent snapshot guarantee. See
+[history qualification](../tests/storage-volumes/data-scrub-history.md).
+
 ## Offline multi-disk scrub report inspection
 
 `show-data-scrub REPORT` validates and displays a saved plain-data `VINIXSR1`
