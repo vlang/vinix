@@ -4,6 +4,7 @@ module devcore
 import crypto.sha256
 import os
 import sourcecommand
+import sync.stdatomic
 import time
 
 // os.filelock's emitted sidecar branch also needs the native flock constants
@@ -141,20 +142,49 @@ struct Clock {
 	deadline u64
 }
 
+struct Cancellation {
+mut:
+	requested u64
+	grace f64 = 1
+}
+
+const cancellation = &Cancellation{}
+
+fn stop_command(signal os.Signal) {
+	stdatomic.store_u64(&cancellation.requested, u64(128 + int(signal)))
+}
+
+// Each CLI owns its children until retirement. Give an inner CLI time to
+// propagate interruption before an outer owner falls back to SIGKILL.
+pub fn enable_interrupts(grace f64) ! {
+	if grace < 1 || grace > 10 { return error('invalid command shutdown grace') }
+	mut state := unsafe { &Cancellation(voidptr(cancellation)) }
+	state.grace = grace
+	os.signal_opt(.int, stop_command)!
+	os.signal_opt(.term, stop_command)!
+}
+
+pub fn check_interrupted() ! {
+	if stdatomic.load_u64(&cancellation.requested) != 0 { return error('command interrupted') }
+}
+
 fn wait_command(pid int, context voidptr) ! {
 	clock := unsafe { &Clock(context) }
+	check_interrupted()!
 	for !sourcecommand.child_exited(pid)! {
+		check_interrupted()!
 		if time.sys_mono_now() >= clock.deadline { return error('command deadline expired') }
 		time.sleep(10 * time.millisecond)
 	}
 }
 
 pub fn run(argv []string, directory string, env map[string]string, timeout int, log string) !int {
+	check_interrupted()!
 	if timeout < 1 || timeout > 86400 || argv.len == 0 {
 		return error('command requires argv and a deadline of 1..86400 seconds')
 	}
 	clock := Clock{time.sys_mono_now() + u64(timeout) * u64(time.second)}
 	result := sourcecommand.run_logged_owned(argv, env, unsafe { nil }, log, false,
-		directory, wait_command, unsafe { &clock }, 1)!
+		directory, wait_command, unsafe { &clock }, cancellation.grace)!
 	return result.status
 }

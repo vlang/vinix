@@ -199,7 +199,7 @@ fn execute(job Job, attempt u64) !int {
 	// never enter a scheduler log. The job can explicitly write its own files.
 	arguments := if job.expand_attempt { job.arguments.map(it.replace('{attempt}', attempt.str())) } else { job.arguments }
 	result := sourcecommand.run_logged_owned([job.executable.path, ...arguments], env,
-		unsafe { nil }, '/dev/null', false, job.directory, wait_job, unsafe { &clock }, 1)!
+		unsafe { nil }, '/dev/null', false, job.directory, wait_job, unsafe { &clock }, 8)!
 	return result.status
 }
 

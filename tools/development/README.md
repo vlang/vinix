@@ -222,6 +222,12 @@ and permissions, sets `SOURCE_DATE_EPOCH`, and records command results and outpu
 SHA-256s. It stops on the first failure and retains logs and a failed receipt.
 Each build gets new mode-0700 `home` and `tmp` directories inside its private
 output, selected as `HOME` and `TMPDIR` for compiler caches and temporary files.
+SIGINT/SIGTERM stop active build commands and retain an incomplete receipt.
+The CLI gives an active qualifier/compiler five seconds to retire its own
+children before applying the owned group's SIGKILL fallback. The qualifier
+handles those signals with a one-second child shutdown window. These nested
+windows fit inside the scheduler's eight-second retirement window. Abrupt
+SIGKILL still requires the owner's interrupted-run recovery procedure.
 A plan can explicitly override those environment values when a shared cache
 is intended. Other inherited environment credentials remain omitted.
 Commands receive argument arrays, never an implicit shell. Each command has a

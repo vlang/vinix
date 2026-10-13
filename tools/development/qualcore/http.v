@@ -71,6 +71,7 @@ fn response(text string) !HttpResponse {
 }
 
 fn request(address string, method string, path string, authorization string, body string, deadline u64) !HttpResponse {
+	devcore.check_interrupted()!
 	mut connection := net.dial_tcp(address)!
 	defer { connection.close() or {} }
 	connection.set_read_timeout(2 * time.second)
@@ -81,6 +82,7 @@ fn request(address string, method string, path string, authorization string, bod
 	text += '\r\n' + body
 	mut written := 0
 	for written < text.len {
+		devcore.check_interrupted()!
 		if time.sys_mono_now() >= deadline { return error('HTTP workload deadline expired') }
 		count := connection.write_string(text[written..])!
 		if count <= 0 { return error('incomplete HTTP request write') }
@@ -89,6 +91,7 @@ fn request(address string, method string, path string, authorization string, bod
 	mut received := []u8{}
 	mut buffer := []u8{len: 4096}
 	for {
+		devcore.check_interrupted()!
 		if time.sys_mono_now() >= deadline { return error('HTTP workload deadline expired') }
 		count := connection.read(mut buffer) or {
 			if err is io.Eof { break }
@@ -134,6 +137,7 @@ fn expect_http(actual HttpResponse, status int, body string, check_body bool) ! 
 fn check_http_server(pid int, opaque voidptr) ! {
 	context := unsafe { &HttpSession(opaque) }
 	for {
+		devcore.check_interrupted()!
 		if sourcecommand.child_exited(pid)! { return error('HTTP server exited before readiness: ' + sourcecommand.child_exit(pid)!.return_code.str()) }
 		if time.sys_mono_now() >= context.deadline { return error('HTTP server readiness deadline expired') }
 		if actual := request(context.address, 'POST', '/cgi-bin/api', '', '42', context.deadline) {
@@ -157,6 +161,7 @@ fn check_http_server(pid int, opaque voidptr) ! {
 		return error('CGI artifact content or privacy failed validation')
 	}
 	for _ in 0 .. 16 {
+		devcore.check_interrupted()!
 		if sourcecommand.child_exited(pid)! { return error('HTTP server exited during requests') }
 		expect_http(request(context.address, 'GET', '/index.html', context.authorization, '', context.deadline)!, 200, '42', true)!
 	}

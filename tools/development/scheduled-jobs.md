@@ -18,6 +18,11 @@ tick to reclaim the tick's allocations under Vinix's `gc none` runtime. Jobs run
 serially. The next run is scheduled one interval after the last completion;
 missed intervals are coalesced. There is no backlog or overlapping replay.
 SIGINT/SIGTERM retire an active owned child group before the runner exits.
+Retirement allows up to eight seconds for cooperating development commands
+to stop their own child groups, then applies the owned group's SIGKILL fallback.
+`vinix-build` relays interruption through its active qualifier or compiler;
+the qualifier has a one-second child shutdown window and the build runner
+has five seconds. Each leader remains unreaped until its group is retired.
 
 For repeatable CI builds, set `expand_attempt: true` on the job and put
 `{attempt}` in its output argument. For example, pin `vinix-build` as the

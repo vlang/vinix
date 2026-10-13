@@ -19,6 +19,7 @@ fn main() {
 		println('Usage: vinix-build hash PATH | build PLAN.json FRESH-OUTPUT-DIRECTORY')
 		exit(if args in [['--help'], []string{}] { 0 } else { 2 })
 	}
+	devcore.enable_interrupts(5) or { eprintln(err); exit(1) }
 	devcore.build(os.read_file(args[1])!, args[2]) or {
 		eprintln(err)
 		exit(1)

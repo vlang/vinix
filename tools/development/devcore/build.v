@@ -103,6 +103,7 @@ fn save_receipt(output string, receipt BuildReceipt) ! {
 }
 
 pub fn build(plan_text string, output_path string) !BuildReceipt {
+	check_interrupted()!
 	plan := json2.decode[BuildPlan](plan_text, strict: true)!
 	validate_plan(plan)!
 	absolute_output := os.abs_path(output_path)
@@ -135,6 +136,7 @@ pub fn build(plan_text string, output_path string) !BuildReceipt {
 	for name, value in plan.environment { env[name] = expand(value, work, output, plan.tools)! }
 	mut generated := map[string]string{}
 	for step in plan.steps {
+		check_interrupted()!
 		argv := step.argv.map(expand(it, work, output, plan.tools)!)
 		if expected := generated[argv[0]] { verify(Pin{argv[0], expected})! }
 		cwd := work + '/' + step.directory

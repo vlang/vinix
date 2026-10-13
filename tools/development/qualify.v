@@ -2,6 +2,7 @@
 module main
 
 import os
+import devcore
 import qualcore
 
 fn main() {
@@ -16,6 +17,7 @@ fn main() {
 		println('VINIX_QUALIFY_JIT=1 requests Java JIT execution through an administrator-approved runtime mount')
 		return
 	}
+	devcore.enable_interrupts(1) or { eprintln(err); exit(1) }
 	require := args[0] == '--require-vinix'
 	if require { args.delete(0) }
 	if args.len !in [1, 2] {
