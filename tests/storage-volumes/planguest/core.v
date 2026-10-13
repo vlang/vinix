@@ -46,7 +46,7 @@ fn C.getpid() i32
 fn C.getppid() i32
 fn C.mkdir(&char, u32) i32
 
-struct C.stat { st_rdev u64 }
+struct C.stat { st_rdev u64; st_mode u32; st_size i64; st_uid u32 }
 
 @[typedef]
 struct C.Elf64_Phdr {
@@ -162,6 +162,7 @@ fn heap_snapshot(mut snapshot Heap) {
 fn cycles(parent &char, count int) {
 	other := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 	crypt_cycles(parent, count)
+	recovery_cycles(count)
 	for _ in 0 .. count {
 		scrub_tool(c'/root/data.vhash', c'/root/scrub-report.txt', parent, other, 0, unsafe { nil })
 		data_tool(unsafe { nil }, c'/root/data.vhash', parent, other, false, 0, unsafe { nil })
@@ -482,6 +483,7 @@ fn first_boot(parent &char) {
 		planned_scrub(parent, wrong)
 		planned_lock(parent, wrong)
 		planned_crypt(parent)
+		planned_recovery(parent)
 		health_check(parent)
 		health_cycles(parent)
 		$if nvme_health_test ? { nvme_health_check(); nvme_health_cycles() }
@@ -514,6 +516,7 @@ fn first_boot(parent &char) {
 			C.printf(c'PLAN OBSERVE large=%ld after_wait=%ld\n', after.large, observed.large)
 		}
 		check(!retained, c'heap retention')
+		check(C.unlink(c'/root/crypt.key') == 0, c'remove original key before reboot recovery')
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, wrong, &char(nil), 0)
 		pool_members(c'/etc/vinix/volumes.vset')
 		plan := C.open(c'/root/saved.vmap', C.O_RDONLY); check(plan >= 0, c'open exported plan')
@@ -590,6 +593,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		C.printf(c'PLAN BOOT RESTORED\n')
 		data_tool(unsafe { nil }, c'/root/data.vhash', actual, other, false, 0, unsafe { nil }); C.printf(c'PLAN DATA BOOT VERIFIED\n')
 		scrub_reordered_boot(actual, other)
+		recovery_reordered_boot()
 		crypt_reordered_boot(actual)
 		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation

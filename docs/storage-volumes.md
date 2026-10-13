@@ -93,7 +93,7 @@ This format is headerless: callers retain the exact physical extent, native
 sector size and key. Opening never formats, converts existing data or verifies
 a key. AES-XTS provides confidentiality without authentication; a wrong key or
 tampered ciphertext yields unverified plaintext. There is no password derivation,
-key rotation/recovery, authenticated metadata or encrypted-root boot integration.
+key rotation, authenticated volume metadata or encrypted-root boot integration.
 The keyfile example uses the current root filesystem; its storage must meet the
 user's key protection requirements. Losing the key loses access to the data.
 
@@ -112,6 +112,73 @@ This restriction covers imported keys; it does not classify arbitrary key
 material in userspace before import. ARM hibernation remains unsupported.
 
 See [encrypted-volume qualification](../tests/storage-volumes/encrypted-volumes.md).
+
+## Authenticated volume key recovery
+
+`backup-key KEYFILE RECOVERY_KEYFILE ENVELOPE` saves an encrypted, authenticated
+backup of an existing 64-byte volume key. `recover-key ENVELOPE RECOVERY_KEYFILE
+KEYFILE` verifies that backup and restores the exact key into a new private file.
+Generate a separate random 64-byte recovery key, keep it apart from the backup,
+and retain both outside the volume. The commands reject using the volume key as
+its own recovery key. Inputs must be owned regular files with no group/other
+permissions, exact lengths and no final symlink; FIFOs never block an import.
+The recovery key's two 32-byte halves must differ, as must the XTS key halves.
+
+```sh
+umask 077
+dd if=/dev/urandom of=/root/recovery.key bs=64 count=1
+chmod 600 /root/recovery.key
+vinix-volume backup-key /root/data.key /root/recovery.key /root/data.backup
+# Restore into an absent filename, then reopen using the original geometry.
+vinix-volume recover-key /root/data.backup /root/recovery.key /root/restored.key
+vinix-volume open-crypt /dev/vda 0 1048576 16777216 /root/restored.key ro
+```
+
+Both commands create mode-0600 output through a temporary file in a pinned,
+locked directory owned by the caller and not writable by group/others. They
+flush and close the complete file, publish it with an atomic hard link that
+never replaces any existing entry, remove their own temporary name, then flush
+the directory. Existing files, directories, symlinks, FIFOs and input aliases
+stay intact. The filesystem must support hard links and directory fsync. Status
+0 means publication and stdout flushing succeeded; status 1 means an input,
+verification, I/O, publication or output error; invalid syntax returns 2.
+After publication, cleanup, directory-fsync or stdout failure can leave a
+complete private destination with status 1. Inspect it before retrying into a
+different absent filename; retries never overwrite it. Failed pre-publication
+operations remove only the temporary file they created, and report cleanup
+failure if that file cannot be removed.
+
+The fixed 160-byte `VINIXKR1` envelope uses little-endian header fields:
+
+| Offset | Bytes | Value |
+| --- | --- | --- |
+| 0 | 8 | ASCII `VINIXKR1` |
+| 8 | 4 | Version 1 |
+| 12 | 4 | Algorithm 1: ChaCha20 with HMAC-SHA256 |
+| 16 | 4 | Total bytes 160 |
+| 20 | 4 | Key bytes 64 |
+| 24 | 12 | Fresh random nonce |
+| 36 | 28 | Reserved, zero |
+| 64 | 64 | Encrypted volume key |
+| 128 | 32 | Full authentication tag |
+
+ChaCha20 uses the first 32 recovery-key bytes and counter 1 for one 64-byte
+block, with a fresh 96-bit nonce read from `/dev/urandom` for every backup. The
+tag is HMAC-SHA256 with the last 32 recovery-key bytes over the first 32
+recovery-key bytes followed by envelope bytes 0–127. This binds both key halves,
+all canonical metadata, the nonce and ciphertext. Recovery validates the exact
+format and compares the full tag before decrypting or publishing any key. A
+wrong half of the recovery key or any changed envelope byte rejects recovery.
+Secret buffers, stream/hash workspaces and candidate keys are erased on every
+return; generated production C uses stack workspaces without heap copies.
+
+This backs up key material only. Retain disk identity, physical offset, length
+and native sector size separately. It does not authenticate volume data, derive
+keys from passwords, rotate keys, convert plaintext storage or arrange root
+unlock at boot. Losing both the original volume key and the recovery key still
+loses access. Persistent keyfiles, filesystem caches and ordinary userspace
+memory retain their existing protection requirements, including the hibernation
+limits described above. See [key recovery qualification](../tests/storage-volumes/key-recovery.md).
 
 ## Saved volume plans
 

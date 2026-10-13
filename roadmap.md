@@ -189,6 +189,7 @@ does not panic the machine, and the desktop remains usable during pressure.
   - [x] [SHA-256 manifests for desired volume data, read-only identity-pinned hashing, complete corruption verification and persistent references across device reordering](docs/storage-volumes.md#data-checksum-manifests).
   - [x] [Complete read-only volume data scrubbing with all-mapping corruption findings, reference fingerprints, atomic durable reports, failed-scan rollback and boot persistence](docs/storage-volumes.md#complete-data-scrubbing).
   - [x] [Keyfile-based AES-256-XTS block volumes with native-sector encryption, stable growth/reopen, erased key lifetimes and plain-plan exclusion](docs/storage-volumes.md#keyfile-encrypted-block-volumes).
+  - [x] [Authenticated volume-key backups and exact private recovery with independent recovery keys, no-overwrite publication, erased secret workspaces and ciphertext reopen after key loss/reboot](docs/storage-volumes.md#authenticated-volume-key-recovery).
 - [ ] Implement filesystem snapshots, clones/reflinks, version restoration and
   incremental backup primitives with explicit consistency guarantees.
 - [ ] Complete persistent permissions, ACLs, xattrs, ownership and disk quotas,

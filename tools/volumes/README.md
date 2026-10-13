@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`vinix-volume backup-key KEYFILE RECOVERY_KEYFILE ENVELOPE` wraps a 64-byte volume
+key with a separate random 64-byte recovery key. `recover-key ENVELOPE
+RECOVERY_KEYFILE KEYFILE` authenticates the backup before restoring an exact
+private keyfile. Both commands preserve existing destinations. Retain the
+recovery key separately and save the original volume geometry. See
+[key recovery format, publication and limits](../../docs/storage-volumes.md#authenticated-volume-key-recovery).
+
 `vinix-volume monitor DEVICE INTERVAL_SECONDS [SAMPLES]` periodically reports
 health warnings, offline/error state and completed I/O byte deltas through one
 read-only descriptor. Omit the sample count to run until interrupted. Bounded

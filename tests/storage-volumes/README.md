@@ -242,6 +242,16 @@ exercise ciphertext, positioned/vector/sendfile I/O, growth, removal, read-only
 reopen and persistent data after device reordering, alongside all earlier
 storage workloads. See [encrypted-volume qualification](encrypted-volumes.md).
 
+Key recovery tests cover the RFC ChaCha20/HMAC vectors, an OpenSSL stream oracle,
+independent HMAC transcript checks, every single-bit envelope/key mutation,
+canonical bounds and unchanged outputs on failed verification. Real filesystem
+and syscall models exercise private inputs, fresh nonces, short/EINTR transfers,
+source rechecks, no-overwrite publication, temporary ownership, durability/output
+faults, descriptor balance and secret erasure. Guests delete the original key,
+recover exact private bytes, reopen real ciphertext, repeat 400 backup/restore
+lifetimes and recover after reboot and device reordering. See
+[key recovery qualification](key-recovery.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,

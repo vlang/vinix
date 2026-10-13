@@ -41,6 +41,7 @@ fn data_sha_finish(context &DataSha256, output &[32]u8) bool {
 	if context.used < 0 || context.used >= 64 || context.bytes > data_sha_max_bytes
 		|| context.bytes % 64 != u64(context.used) { return false }
 	mut state := context.state; mut padding := [128]u8{}
+	defer { erase_key(unsafe { &state[0] }, sizeof(state)); erase_key(unsafe { &padding[0] }, sizeof(padding)) }
 	if context.used != 0 { unsafe { C.memcpy(&padding[0], &context.block[0], usize(context.used)) } }
 	padding[context.used] = 0x80; size := if context.used < 56 { 64 } else { 128 }; bits := context.bytes * 8
 	for i in 0 .. 8 { padding[size - 1 - i] = u8(bits >> u64(i * 8)) }
@@ -76,6 +77,7 @@ fn data_sha_rotr(value u32, shift u32) u32 {
 @[direct_array_access]
 fn data_sha_compress(state &[8]u32, block &u8) {
 	mut words := [64]u32{}
+	defer { erase_key(unsafe { &words[0] }, sizeof(words)) }
 	for i in 0 .. 16 {
 		at := i * 4
 		unsafe {
