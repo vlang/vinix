@@ -24,6 +24,30 @@ credential files. The payload deliberately writes the synthetic credential to
 both stdout and stderr; the controller fails if it appears in the serial log.
 Successful jobs produce a file, and rejected jobs must produce none.
 
+The same account also qualifies job lifecycle control with real child groups.
+A one-second deadline must retire a job and its forked descendant. Both SIGINT
+and SIGTERM must stop a watcher during a running job, retire that group and
+persist the interruption. Concurrent execution and acknowledgement are refused
+while the owner holds the schedule lock. A watcher then completes two interval
+jobs across its re-execution ticks; both payloads must observe the same parent
+PID. Finally, killing a runner with SIGKILL must leave an in-flight receipt and
+block automatic retry. The fixture retires its freshly observed live group,
+acknowledges the interruption and verifies one successful recovery run. PID 1
+reaps orphaned descendants during these checks; all signals and schedule actions
+originate from UID/GID 1000.
+
+The controller independently validates all six lifecycle state records against
+the exact generated plan hashes, account, run counts, in-flight flags, deadline
+and signal failure details, completion statuses and next-due intervals. These
+checks extend every guest run, including runs without a native compiler SDK.
+
+On 13 October 2026 these lifecycle gates and the account/build regression passed
+on AArch64 HVF and x86_64 TCG with the isolated production kernels and staged
+commands described below. The independently validated 12-record receipts and
+serial transcripts are retained in
+`build/development17-20261013/guest-arm-job-control-d` and
+`build/development17-20261013/guest-x86-job-control-d`.
+
 The same ordinary account then runs a pinned build plan in two new workspaces.
 Its prebuilt V payload reads through a copied internal symlink, checks the fixed
 build epoch and sanitized environment, and writes an artifact. The fixture
@@ -228,13 +252,14 @@ A prepared ELF check is execution coverage, separate from the native rebuild
 gate above. The receipt records the actual QEMU argv and prepared binary hash.
 
 `receipt.json` records the architecture, UID, kernel/fixture/tool hashes,
-QEMU argv, passing verdict and six native plan/state/build receipts. SDK runs
+QEMU argv, passing verdict and 12 native plan/state/build receipts. SDK runs
 also retain the SDK hash and native compiler report. `serial.log`,
 the ISO and compiled fixture remain beside it. Credential values do not enter
 the receipts. The credential in this fixture is public synthetic test data.
 V runs additionally record `v_root_sha256`, `native_source_sha256`, the `v`/`sh`
 executable pins, `native_source_revision`, the build plan, two native build
-receipts and four signed-release proofs, for 14 native receipt records.
+receipts and four signed-release proofs, for 20 native receipt records. The
+compiler-rebuild run recorded above predates the six added lifecycle records.
 Once the initramfs archive is complete, its duplicate staging tree is removed
 before ISO assembly. The standalone archive is removed once the ISO is complete.
 The ISO, compiled fixture, receipts and transcripts remain; obsolete
@@ -371,7 +396,7 @@ prepared-compiler help/version and account/job/build regression passed in
 installation `4d83946b8ab4d99ac938c96da5d72668835abbaca7d18d8dc63f1b689e7d1853`;
 it does not run native compiler projects without an x86 SDK.
 
-This qualifies the tested per-account job workflows in Vinix guests. Watcher
-signal/deadline/interruption tests still have host coverage; installed service
-and boot integration, server/SSH/CI projects, and complete self-hosted builds
+This qualifies the tested per-account job workflows in Vinix guests, including
+the native watcher, signal, deadline and interruption checks recorded above.
+Installed service and boot integration, server/SSH/CI projects, and complete self-hosted builds
 remain open acceptance work.

@@ -13,7 +13,7 @@ missing kernel isolation, debugger or hardware virtualization interfaces.
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
 | VM integration and lifecycle | Private per-VM qcow2 disks/firmware variables, QMP lifecycle, offline paired snapshots, explicit user networking/loopback SSH forwarding, read-only 9p shares and a guest-agent transport. | Qualify guest OS workflows inside Vinix, provide Vinix guest tools/drivers, qualify shared folders and network behavior, and implement running-state snapshots and crash-atomic snapshot transactions if required. |
-| Server/SSH/CI and automation | SQLite transaction/reopen checks and [per-account interval jobs](../tools/development/scheduled-jobs.md) with pinned executables, selected environment, protected credential files and persisted status. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify UID/GID 1000 execution, private receipts, credential/output isolation and unsafe-file refusal. | Native watcher/deadline/interruption qualification, installed-system service/boot integration and complete database/server, authenticated SSH development and CI project workflows under ordinary-user policy. |
+| Server/SSH/CI and automation | SQLite transaction/reopen checks and [per-account interval jobs](../tools/development/scheduled-jobs.md) with pinned executables, selected environment, protected credential files and persisted status. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify UID/GID 1000 execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. | Installed-system service/boot integration and complete database/server, authenticated SSH development and CI project workflows under ordinary-user policy. |
 
 Validation on 12 October 2026 used the Darwin ARM host, V 0.5.2 `f6358ec`,
 QEMU 11.1.1 and the installed musl cross-compilers. All checks below passed:
@@ -130,6 +130,18 @@ passed in `build/development17-20261013/guest-x86-v-pinned`. Both architecture
 runs also verified the first and last blocks of bounded command logs as UID
 1000. No native x86 GCC SDK was supplied. Full kernel/desktop self-hosting,
 x86 compiler/project rebuilding and the wider toolchain gates remain open.
+
+Native job lifecycle validation on 13 October 2026 passed on both architecture
+kernels above using the staged public scheduler as UID/GID 1000. The fixture
+checked a real job and descendant through a one-second deadline, SIGINT and
+SIGTERM, confirmed eventual PID removal, refused concurrent runners and repeated
+watcher ticks under one owner PID. Killing the owner left the interrupted job
+blocked until its live group was retired and the account acknowledged it; one
+successful recovery then completed. The controller independently checked six
+additional state records and their exact plan pins. The passing 12-record
+receipts are retained in `build/development17-20261013/guest-arm-job-control-d`
+and `build/development17-20261013/guest-x86-job-control-d`. Installed services
+and complete database/server/SSH/CI workflows remain open.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,

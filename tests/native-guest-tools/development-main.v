@@ -108,6 +108,23 @@ struct NativeQualification {
 	command_timeout_seconds int
 }
 
+struct NativeJobState {
+	in_flight bool
+	next_due i64
+	started i64
+	finished i64
+	exit_code int
+	detail string
+	runs u64
+}
+
+struct NativeSchedule {
+	schema int
+	uid int
+	plan_sha256 string
+	jobs map[string]NativeJobState
+}
+
 struct Receipt {
 	schema          int = 1
 	arch            string
@@ -285,6 +302,22 @@ fn run() !int {
 		os.write_file(root + '/home/developer/' + name + '.json', json2.encode(plan))!
 	}
 	os.write_file(root + '/home/developer/token', 'vinix-native-fixture-secret')!
+	mut lifecycle_plans := map[string]string{}
+	for name in ['deadline', 'term', 'int', 'watch', 'interrupted'] {
+		plan := Plan{jobs: [Job{
+			executable: Pin{'/usr/bin/development-payload', digest(init)!}
+			interval_seconds: if name == 'watch' { 2 } else { 3600 }
+			timeout_seconds: if name == 'deadline' { 1 } else { 30 }
+			environment: {
+				'VINIX_DEVELOPMENT_PAYLOAD': if name == 'watch' { 'tick' } else if name == 'interrupted' { 'recover' } else { 'linger' }
+				'VINIX_JOB_PROOF_PREFIX': '/home/developer/' + name
+			}
+			credential_files: { 'TEST_TOKEN': '/home/developer/token' }
+		}]}
+		text := json2.encode(plan)
+		lifecycle_plans[name] = sha256.sum(text.bytes()).hex()
+		os.write_file(root + '/home/developer/' + name + '-jobs.json', text)!
+	}
 	os.mkdir_all(root + '/home/developer/source')!
 	os.write_file(root + '/home/developer/source/input.txt', 'build-fixture-input\n')!
 	os.write_file(root + '/home/developer/build-template.json', json2.encode(BuildPlan{
@@ -478,6 +511,7 @@ fn run() !int {
 		'DEVELOPMENT LOG HEAD SENTINEL',
 		'DEVELOPMENT LOG TAIL SENTINEL',
 		'DEVELOPMENT ACCOUNT PASS:',
+		'DEVELOPMENT JOB CONTROL PASS:',
 		'DEVELOPMENT BUILD PASS:',
 		'DEVELOPMENT GUEST PASS',
 	]
@@ -501,16 +535,42 @@ fn run() !int {
 			'/home/developer/qualification/report.json', '/home/developer/native-build.json',
 			'/home/developer/native-a/receipt.json', '/home/developer/native-b/receipt.json',
 			'/home/developer/native-a/work/release/index.json', '/home/developer/native-b/work/release/index.json',
-			'/home/developer/native-a/work/release/index.sig', '/home/developer/native-b/work/release/index.sig'] {
+			'/home/developer/native-a/work/release/index.sig', '/home/developer/native-b/work/release/index.sig',
+			'/home/developer/deadline-state/state.json', '/home/developer/term-state/state.json',
+			'/home/developer/int-state/state.json', '/home/developer/watch-state/state.json',
+			'/home/developer/interrupted-before.json', '/home/developer/interrupted-state/state.json'] {
 			return error('unexpected guest receipt path')
 		}
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != if sdk_hash == '' { 6 } else if v_root_hash == '' { 7 } else { 14 } {
+	if result == 0 && receipts.len != if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
 		return error('missing native workflow receipts')
 	}
 	if result == 0 {
+		for name in ['deadline', 'term', 'int', 'watch', 'interrupted', 'interrupted-before'] {
+			path := '/home/developer/' + if name == 'interrupted-before' { name + '.json' } else { name + '-state/state.json' }
+			state_receipt := json2.decode[NativeSchedule](receipts[path], strict: true)!
+			plan_name := if name == 'interrupted-before' { 'interrupted' } else { name }
+			if state_receipt.schema != 1 || state_receipt.uid != 1000
+				|| state_receipt.plan_sha256 != lifecycle_plans[plan_name]
+				|| state_receipt.jobs.len != 1 || 'fixture' !in state_receipt.jobs {
+				return error('native schedule identity or plan pin changed')
+			}
+			job := state_receipt.jobs['fixture']
+			interrupted_before := name == 'interrupted-before'
+			failed := name in ['deadline', 'term', 'int']
+			expected_detail := if name == 'deadline' { 'job deadline expired' }
+				else if name in ['term', 'int'] { 'job interrupted' }
+				else if interrupted_before { 'running' } else { 'finished' }
+			if job.in_flight != interrupted_before || job.detail != expected_detail
+				|| job.runs != if interrupted_before { u64(0) } else if name == 'watch' { u64(2) } else { u64(1) }
+				|| job.exit_code != if failed { -1 } else { 0 }
+				|| job.started <= 0 || (!interrupted_before && (job.finished < job.started
+					|| job.next_due != job.finished + if name == 'watch' { 2 } else { 3600 })) {
+				return error('native job deadline, signal, watch or recovery state failed validation')
+			}
+		}
 		expected_artifact := sha256.sum('build-fixture-input\n'.bytes()).hex()
 		for name in ['build-a', 'build-b'] {
 			receipt := json2.decode[NativeBuild](receipts['/home/developer/' + name + '/receipt.json'],

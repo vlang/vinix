@@ -67,5 +67,10 @@ qualification is recorded separately by the
 [native workflow controller](../../tests/development/README.md). Its x86_64
 and AArch64 fixtures run the public scheduler as UID/GID 1000, check private
 credential/receipt ownership, selected environment and discarded child output,
-and refuse public/symlinked credentials. Native watcher, service/boot and
-production server/SSH/CI acceptance remain open.
+and refuse public/symlinked credentials. Native lifecycle checks also require
+deadline and SIGINT/SIGTERM retirement of the active job and its descendant,
+concurrent-owner refusal, repeated watcher ticks with a stable owner PID, and
+blocked retry after a killed owner. Recovery is qualified only after the fixture
+retires its freshly observed group and explicitly acknowledges the interruption.
+The host controller independently checks the native state and exact plan pins.
+Service/boot and production server/SSH/CI acceptance remain open.

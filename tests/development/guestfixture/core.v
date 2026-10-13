@@ -516,6 +516,7 @@ fn account_checks() {
 		private_receipt(c'/home/developer/link-token/state.json', c'cannot open private file')
 		check(C.open(c'/home/developer/payload.done', C.O_RDONLY) == -1, 143)
 		C.puts(c'DEVELOPMENT ACCOUNT PASS: UID 1000 jobs, credentials, environment, receipts, interval, unsafe-file refusal')
+		job_lifecycle_checks()
 		build_checks()
 		sdk := C.open(c'/home/developer/qualify-sdk', C.O_RDONLY)
 		if sdk >= 0 {
@@ -554,6 +555,9 @@ pub fn run() i32 {
 		mode := C.getenv(c'VINIX_DEVELOPMENT_PAYLOAD')
 		if mode != nil {
 			if C.strcmp(mode, c'build') == 0 { return build_payload() }
+			if C.strcmp(mode, c'linger') == 0 || C.strcmp(mode, c'tick') == 0 || C.strcmp(mode, c'recover') == 0 {
+				return lifecycle_payload(mode)
+			}
 			return job_payload()
 		}
 		require_vinix()
@@ -561,6 +565,11 @@ pub fn run() i32 {
 		for path in [&char(c'/home/developer/token'), &char(c'/home/developer/jobs.json'),
 			&char(c'/home/developer/link-jobs.json'), &char(c'/home/developer/build-template.json')]! {
 			check(C.chown(path, 1000, 1000) == 0 && C.chmod(path, 0o600) == 0, 156)
+		}
+		for name in [&char(c'deadline'), &char(c'term'), &char(c'int'), &char(c'watch'), &char(c'interrupted')]! {
+			mut path := [256]char{}
+			C.snprintf(&path[0], path.len, c'/home/developer/%s-jobs.json', name)
+			check(C.chown(&path[0], 1000, 1000) == 0 && C.chmod(&path[0], 0o600) == 0, 361)
 		}
 		check(C.chown(c'/home/developer/source', 1000, 1000) == 0 && C.chmod(c'/home/developer/source', 0o755) == 0, 177)
 		check(C.chown(c'/home/developer/source/input.txt', 1000, 1000) == 0 && C.chmod(c'/home/developer/source/input.txt', 0o644) == 0, 178)
@@ -580,7 +589,14 @@ pub fn run() i32 {
 			C._exit(0)
 		}
 		mut status := i32(0)
-		check(C.waitpid(pid, &status, 0) == pid && status == 0, 164)
+		// The fixture is PID 1: reap descendants orphaned by group retirement
+		// while the account checks continue, so their PID probes can settle.
+		for {
+			reaped := C.waitpid(-1, &status, C.WNOHANG)
+			check(reaped >= 0 || *C.__errno_location() == C.EINTR, 362)
+			if reaped == pid { check(status == 0, 164); break }
+			if reaped <= 0 { C.usleep(10000) }
+		}
 		C.puts(c'DEVELOPMENT GUEST PASS')
 		for { C.pause() }
 		return 0
