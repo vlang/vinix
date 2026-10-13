@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Alexander Medvednikov. All rights reserved.
 // Use of this source code is governed by a GPL v2 license
 // that can be found in the LICENSE file.
+@[has_globals]
 module fonthost
 
 import crypto.sha256
@@ -11,6 +12,18 @@ import json2
 import math
 import math.big
 import os
+
+__global (
+	native_callback fn (string, map[string]json2.Any, voidptr) !json2.Any
+	native_context voidptr
+)
+
+pub fn set_native_callback(binding fn (string, map[string]json2.Any, voidptr) !json2.Any, context voidptr) (fn (string, map[string]json2.Any, voidptr) !json2.Any, voidptr) {
+	previous, pointer := native_callback, native_context
+	native_callback = binding
+	native_context = context
+	return previous, pointer
+}
 
 pub struct FontError {
 pub:
@@ -27,8 +40,8 @@ pub:
 pub fn (e BindingError) msg() string { return value(e.value, 'message').str() }
 pub fn (e BindingError) code() int { return 0 }
 
-// The caller owns Pillow/fontTools objects. Native policy stores opaque IDs,
-// never addresses or borrowed buffers from either Python or a library.
+// Library adapters own their objects. Policy stores opaque identities and
+// receives copied masks, never borrowed SDK buffers.
 pub struct Engine {
 mut:
 	context map[string]json2.Any
@@ -43,6 +56,7 @@ mut:
 }
 
 pub fn callback(operation string, arguments map[string]json2.Any) !json2.Any {
+	if native_callback != unsafe { nil } { return native_callback(operation, arguments, native_context)! }
 	println(json2.encode({'callback': json2.Any(operation), 'arguments': json2.Any(arguments)}, escape_unicode: true))
 	row := hosttest.decode_json(os.get_raw_line())!.as_map()
 	if 'error' in row { return BindingError{value(row, 'error').as_map()} }

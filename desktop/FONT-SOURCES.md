@@ -30,8 +30,9 @@ The [upstream license](https://raw.githubusercontent.com/notofonts/noto-cjk/523d
 is SIL OFL 1.1. The font's copyright notice is “© 2014-2021 Adobe
 (http://www.adobe.com/).”
 
-Run `python3 desktop/tools/genfont.py` from the repository root. Python Pillow
-is required. The generator downloads Noto source fonts on the first run and
+Run `desktop/tools/genfont` from the repository root. The V generator uses
+pinned FreeType and HarfBuzz SDKs, built and cached through CMake on first use.
+It downloads Noto source fonts on the first run and
 checks their hashes, including on later runs. They are cached in
 `~/.cache/vinix/fonts/noto-cjk-2.004/`; set `VINIX_FONT_CACHE` to override the
 `~/.cache/vinix/fonts` directory. Copy verified source files to that cache to
@@ -43,7 +44,8 @@ appears in every size and weight at 1x and 2x, with identical logical advances a
 scales. The atlas includes only the Chinese characters the UI needs, keeping
 the runtime binary smaller than embedding complete CJK fonts.
 
-Run `python3 desktop/tools/tests/test_font_data.py` to verify catalog coverage,
+Run `desktop/tools/tests/test_font_data` to verify catalog coverage,
 real glyph masks, line bounds, face weights, and scale metrics. Setting
 `VINIX_FONT_PREVIEW=/tmp/vinix-fonts.png` also writes a preview rendered from
-the actual baked atlas data.
+the actual baked atlas data. The PNG preview uses the baked small Roboto face
+for its labels.

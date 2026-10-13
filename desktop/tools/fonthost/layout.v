@@ -89,7 +89,7 @@ fn text_offsets(value string) []int {
     return result
 }
 
-// fontTools owns parsing, subsetting and variable-font instantiation. V owns
+// The SDK adapter owns parsing, subsetting and variable-font instantiation. V owns
 // pinned-source verification, missing coverage, subset options, naming and
 // publication order; callbacks only apply the specified library operations.
 fn (mut e Engine) update_japanese(points []int, source_path string) ! {

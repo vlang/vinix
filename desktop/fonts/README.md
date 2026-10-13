@@ -22,20 +22,22 @@ names Adobe as copyright holder and reserves the font name "Source".
 
 ## Regeneration
 
-Normal atlas generation needs Pillow and the bundled subsets. When a
+Normal atlas generation uses the native V command and bundled subsets. When a
 translation adds Japanese characters, update the subsets and atlas together.
-From the repository root, using the versions used for these files:
+From the repository root:
 
 ```sh
-python3 -m venv /tmp/vinix-fonts-venv
-/tmp/vinix-fonts-venv/bin/pip install Pillow==11.3.0 fonttools==4.60.1
-/tmp/vinix-fonts-venv/bin/python desktop/tools/genfont.py --update-japanese-subsets
+desktop/tools/genfont --update-japanese-subsets
 ```
 
 The update downloads the pinned upstream font and verifies its SHA-256 before
 subsetting and instantiating regular/bold faces. To regenerate offline, pass
 `--japanese-source /path/to/NotoSansJP.ttf` with the same verified upstream
 file. Font timestamps are preserved to make subset regeneration reproducible.
+FreeType 2.13.3 preserves the captured raster masks. HarfBuzz 14.5.0 performs
+subsetting and weight instantiation, with outline overlap flags, native V names
+and SFNT checksum publication. The SDK driver builds pinned static libraries
+with CMake on first use and verifies its cache; no interpreter is required.
 The generated subsets and `desktop/font_data.v` must be committed together.
 
 Chinese catalog CJK characters use the Simplified Chinese source documented

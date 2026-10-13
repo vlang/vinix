@@ -1,0 +1,143 @@
+{
+    "bytes": 21749,
+    "evidence": "~/.cache/vinix-fonts-native-20261013",
+    "files": 3,
+    "limits": "Native tool retains the captured direct FreeType character layout; public front pins FreeType 2.13.3 and HarfBuzz 14.5.0. Regenerated font table packing can differ while all captured glyph masks and headers match. Preview labels use the baked small Roboto face and output PNG. SDK libraries are external prerequisites; sanitizers instrument the V implementation.",
+    "lines": 574,
+    "originals": [
+        {
+            "bytes": 9708,
+            "lines": 292,
+            "path": "desktop/tools/_font_native.py",
+            "sha256": "764d9657390bb745438f0d29e30893ec100f53ed1e102555eb6742e342b37e7c"
+        },
+        {
+            "bytes": 4935,
+            "lines": 135,
+            "path": "desktop/tools/genfont.py",
+            "sha256": "6c7289fa88261b8d00039d6d2f5d295657cd7d92d0880a03943eeb9188cdf30d"
+        },
+        {
+            "bytes": 7106,
+            "lines": 147,
+            "path": "desktop/tools/tests/test_font_data.py",
+            "sha256": "f88976ff72f3f73eedfbf9aa800e0cd1946876ed246af66c50e496c74465e236"
+        }
+    ],
+    "profiles": [
+        {
+            "profile": "arm",
+            "programs": [
+                {
+                    "name": "generator",
+                    "sha256": "5df17264e8caa041dd95282e3379ed23469bdce03d6be27edbb6da0bd15dd2b4"
+                },
+                {
+                    "name": "atlas",
+                    "sha256": "5003eee390aabbc333d0760aa59464fccdebe24edd411a4a1970dfe39f189ccc"
+                },
+                {
+                    "name": "compare",
+                    "sha256": "c0d5c58193706760445c32ea65801ab7ef0ef774e828b2bbd489cd931e8065fd"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "8ef05d8e266703c6e79fbc3b2e84ca5f001b921c5d34a817261b3dd7117c7a74"
+                },
+                {
+                    "name": "bindings",
+                    "sha256": "61becd5e8b07b5d2b42ffabe2d5c1a12c0163a177c492c0ef16d96b8441603f6"
+                },
+                {
+                    "name": "policy",
+                    "sha256": "5067ab4f9877ff8498097ff14e90eb431d46b0ab2df7687b3f7a6b44294c07ec"
+                },
+                {
+                    "name": "driver",
+                    "sha256": "7ef555d92d3938a6862f2e8c600e241eedacf897ba8924d43314c5fb6ec4099f"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "x86",
+            "programs": [
+                {
+                    "name": "generator",
+                    "sha256": "b473f009633b0dbeed271db276f9f60da3d212929c06d5a42e2b691a47487c96"
+                },
+                {
+                    "name": "atlas",
+                    "sha256": "c52d67285152b2156a94f2371a135621ed78a111dd0d8439060ab13193da171a"
+                },
+                {
+                    "name": "compare",
+                    "sha256": "ebe72a5b3e3ef4590dc9a44e7ca0fc0504bfba5de25249e940e4656e269bd707"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "22d9c5254360653b3987368d5a63c8e8133650c8e661ce0e875c522f302df0b3"
+                },
+                {
+                    "name": "bindings",
+                    "sha256": "66c7b2d5b2c0cace481ecd1138766093e9687245308d23a4c584e9c262ae4563"
+                },
+                {
+                    "name": "policy",
+                    "sha256": "be453b9307e4417091a8704dc92b2f4b30f639d5016ca75e70f9e82739008260"
+                },
+                {
+                    "name": "driver",
+                    "sha256": "069723ac1e6509b8788325d17ed008b5b435c0f2992200d2c9d5b67ba5b40195"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "profile": "san",
+            "programs": [
+                {
+                    "name": "generator",
+                    "sha256": "3481506fa24e9e5a9cf346a929baa6893e3e028f125e4761899485bdba26bc52"
+                },
+                {
+                    "name": "atlas",
+                    "sha256": "d775f2604c907e6e17fc8e8694288a82864ba71f72d6960e829ced38638f69fb"
+                },
+                {
+                    "name": "compare",
+                    "sha256": "b582ed5e77f15ddff64415d3e71b8f86a901ce19290614acba02f15e1ed156b6"
+                },
+                {
+                    "name": "tests",
+                    "sha256": "35f552e22c9a3b42de2ca6c319b579a4361679abbcba92076bfe1e759c32441c"
+                },
+                {
+                    "name": "bindings",
+                    "sha256": "591980077a033fa0b7b5fd088dccbb1613a5d9d2b13d226eea27e43461d2e2af"
+                },
+                {
+                    "name": "policy",
+                    "sha256": "cfa0b0c51f21518330272dbe1d1263aeef21f0ca36bd635a7ac1d9f23de223a5"
+                },
+                {
+                    "name": "driver",
+                    "sha256": "5e5ef92ebf21cb177e665b3604ac65ef25cbb939070b8cb9fa78689f5dfd8763"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "qualification": "21 cold ARM/x86/ASanUBSan program builds; 20672 original glyph masks and headers across 16 faces per normal/regenerated/driver workflow; all original atlas catalog, source mask/notdef/fallback identity, line-box, logical-scale/terminal advance and weight tests; actual PNG previews; 100 face/mask and 100 failed-font descriptor retirements, idempotent close, malformed SFNT bounds, native variable coverage/names/timestamps/weight/checksum/reproducibility; unchanged numeric/Unicode/catalog/error policy tests; real ARM/x86 FreeType/HarfBuzz static SDKs plus public native cold SDK build and cold fronts; warm hash-qualified SDK and controlled CMake-failure old-library preservation; no Python or Vinix guest",
+    "sdk_sources": [
+        {
+            "sha256": "bc5c898e4756d373e0d991bab053036c5eb2aa7c0d5c67e8662ddc6da40c4103",
+            "url": "https://github.com/freetype/freetype/archive/refs/tags/VER-2-13-3.tar.gz"
+        },
+        {
+            "sha256": "b7132e148358a45185c9feafd049dbaf243649d3c44414b3534d9c95d18592b9",
+            "url": "https://github.com/harfbuzz/harfbuzz/releases/download/14.5.0/harfbuzz-14.5.0.tar.xz"
+        }
+    ],
+    "source_commit": "1a9c278d1874d99f37b0df3ab05a73cdcbcf87fa"
+}
