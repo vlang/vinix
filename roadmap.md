@@ -728,6 +728,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Report selected task stat CPU/minor-fault accounting using real counters
   and live snapshots; qualify positive demand faults, CPU work, process totals
   and flat native storage. See [the accounting receipts](docs/linux-posix-qualification.md#selected-task-stat-cpu-and-fault-accounting).
+- [x] Report the selected task's procfs state even while a sibling runs; qualify
+  real pipe-backed sleeping readers, stopped/zombie controls and flat native
+  storage on both architectures. See [the state receipts](docs/linux-posix-qualification.md#selected-procfs-task-states).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

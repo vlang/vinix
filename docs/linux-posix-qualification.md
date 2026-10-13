@@ -3348,7 +3348,116 @@ Public inventory fingerprints are generated from the committed parent plus this
 fix, separately from semantic build inputs.
 
 Nonzero disk faults, child-time accounting, overflow, timer/scheduler timing,
-state/nice/start/name fields, repeated namespace creation/reclamation, concurrent
+nice/start/name fields, repeated namespace creation/reclamation, concurrent
 retirement/unmount and glibc/translated/ELF32 or application installation,
 sandbox and portal acceptance remain separate. The three broad section 15 gates
 remain open.
+
+## Selected procfs task states
+
+Native stat field 3 and status `State` now describe the selected thread.
+Process paths select the leader, even while another sibling runs. Linux's
+[task_state and do_task_stat](https://github.com/torvalds/linux/blob/master/fs/proc/array.c)
+read the selected task for these fields. Previously a sleeping task appeared
+running whenever any sibling was running or queued. The existing table lock
+retains the validated task while a scalar helper reads exit/dead, completed
+job-stop and selected runnable/running-on state. It adds no lock, allocation or
+ownership transfer. The unused aggregate wrapper is pruned from this build;
+SysRq's unchanged unlocked aggregate helper remains.
+
+The native musl fixture adds a leader and one worker with two shared pipe pairs.
+The worker signals readiness and blocks on a command pipe while the leader
+reads its files. Then the leader blocks on a report pipe while the worker reads
+the leader's files. Each phase settles the actual blocking read before checking
+30 records across three procfs mounts, both stat/status formats and self,
+thread-self, numeric process, leader-task and worker-task paths. Root/UID1000
+cohorts produce 120 initial R/S records. Full status descriptions are compared,
+including spaces and the newline. SIGSTOP plus WUNTRACED supplies 24 stopped
+process/task controls; SIGKILL plus WNOWAIT supplies 12 zombie process controls
+before the child is reaped. Zombie Thread objects are released before wait
+publication in Vinix, so zombie task directories remain unqualified.
+
+| Architecture | Baseline | Candidate | Large pages before/after, both credential groups |
+| --- | --- | --- | --- |
+| AArch64 | 48 sleeping records report R | All 156 initial state records pass | 75/75 |
+| x86-64 | 48 sleeping records report R | All 156 initial state records pass | 198/198 |
+
+Each baseline has six failures for a sleeping worker and 18 for a sleeping
+leader per credential cohort. There are six failures per format in each path
+category: self, numeric process, numeric leader task and numeric worker task.
+Running and stopped/zombie controls pass. The preceding 1,620 link probes, 84
+identity/scheduling/accounting stat reads, positive 256/32/64 demand faults,
+measured CPU work and PID-view/chroot controls remain byte-for-byte unchanged
+in their fixture helpers and still pass.
+
+The worker blocks again and remains held with the two pipe pairs through the
+32 warmups and 200-cycle storage sample in each cohort. Each cycle runs 120
+link probes, six status controls, 12 accounting stat reads and 30 additional
+state reads. All 18 ARM and 14 x86 live slab classes remain exact. Joins precede
+closing all four pipe descriptors; handshake/join failures exit the child
+before stack state can unwind. Child failures kill and reap before returning.
+Independent review confirms explicit stack StateWorker storage, local parser
+buffers, descriptor cleanup and table-retained scalar kernel reads.
+
+An initial StateWorker local was promoted to heap by V. Both native C compilers
+reject its `memdup` call before any ELF/ISO/guest verdict. The final fixture uses
+explicit `alloca`; its four bounded stack allocations include the existing
+Handles and two Slabs objects. No memdup/malloc/new-array/bounds runtime occurs
+in the bare generated C. Draft source/C hashes, error logs and failed receipts
+remain published without claiming kernel conformance results.
+
+Each primary candidate run passes five of six requested cases. Host disk
+exhaustion prevents the ARM runtime ISO and x86 namespace tool compilation;
+the latter also records a failed fallback compiler attempt. Completed verdicts
+are preserved. Fresh state directories using the same kernel and source hashes
+rerun only `runtime` on ARM and `namespace` on x86, both passing. All six
+semantic verdicts (`procself`, `nnpthread`, `seccompthread`, `namespace`, `open`,
+`runtime`) therefore pass across primary and recovery receipts. Original
+aggregate receipts remain failed, with actual missing-artifact fields.
+
+The first after-allocation scan completes ARM but refuses x86 compilation after
+the executable at the shared compiler path changes; it is retained as an
+incomplete audit. That path was observed reporting a27079a while its source
+worktree remained at f6358ec. A private clean-source f6358ec compiler reproducer
+is pinned separately. Its executable differs from the earlier build binary;
+it regenerates all four complete baseline/candidate kernel C files byte-for-byte
+after the kernel recipe's two exact text edits. Reproduced fixture C differs
+only in the compiler's unused stderr-print prelude. Replacing that exact
+validated block reproduces original C; both print helpers have no callers.
+Actual guest C remains identical to the original corrected previews.
+This ties captured C to the private compiler without claiming the earlier
+executable is still available. The pinned re-audit restores the unchanged
+406 ARM/295 x86 allowance failures, 657/653 source files and identical `NEW:`
+rows. Eight host test files and the 63-input inventory check pass with that
+private compiler. No allowance changes.
+
+Kernels build in isolated worktrees at
+`d0694ccac90d48f78ddd4d6cafdad0813e314aa9`. Only two formatter state calls and
+the scalar helper change. Restoring the formatters, removing the new helper and
+reinserting the pruned aggregate wrapper at its original prototype/definition
+sites reproduces complete baseline C, normalizing only unused-loop source
+offset names. Actual before/after guest C equals the corrected previews.
+
+The assertion-enabled [auditor](../tests/linux-compat/results/2026-10-13/procstate-audit.v)
+requires exact 48 baseline failures, state/child controls, preceding field
+qualification, flat storage, source/C/ELF/ISO/kernel receipts, failed primary
+artifacts and same-input recovery verdicts. It also checks the private compiler's
+exact regenerated C, source tree, completed allocation re-audit and independent
+review hashes. Both deliberately failing assertion controls execute.
+[ARM evidence](../tests/linux-compat/results/2026-10-13/procstate-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/procstate-evidence-x86_64.json)
+bind all 63 isolated inputs and relevant compiler/controller/build/C/capture
+hashes. Raw primary and recovery captures are
+[ARM baseline](../tests/linux-compat/results/2026-10-13/procstate-before-aarch64.log),
+[ARM primary](../tests/linux-compat/results/2026-10-13/procstate-after-aarch64.log),
+[ARM recovery](../tests/linux-compat/results/2026-10-13/procstate-retry-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/procstate-before-x86_64.log),
+[x86 primary](../tests/linux-compat/results/2026-10-13/procstate-after-x86_64.log)
+and [x86 recovery](../tests/linux-compat/results/2026-10-13/procstate-retry-x86_64.log).
+Public inventory fingerprints use the committed parent plus this fix, separately
+from the isolated semantic build inputs.
+
+Zombie task directories, leader-only thread exit, D/t/X/I states, stop-transition
+windows, cgroup holding, concurrent retirement, full procfs mount retention and
+glibc/translated/ELF32 or application installation/sandbox/portal acceptance
+remain separate. The three broad section 15 gates remain open.

@@ -181,6 +181,22 @@ AArch64's eager small mappings did not prove positive demand faults. Major
 faults are zero controls here; disk fault production and child-time fields need
 separate qualification. See [the accounting receipts](../../docs/linux-posix-qualification.md#selected-task-stat-cpu-and-fault-accounting).
 
+State controls now require the selected task in stat field 3 and the full status
+State description. A leader and pipe-backed worker alternate real blocking
+reads: 120 initial R/S records cover self/thread-self, numeric process and
+leader/worker task paths across three mounts and both credential groups.
+SIGSTOP/WUNTRACED adds 24 stopped process/task records; SIGKILL/WNOWAIT adds 12
+zombie process records. Baselines fail 48 sleeping records as R; candidates pass
+all 156. A worker and two pipe pairs remain held during the 200-cycle samples,
+adding 30 state reads per cycle with flat live slabs and 75 ARM/198 x86 pages.
+Zombie task directories and stop/retirement transitions remain separate.
+The bare draft's promoted worker record was corrected to explicit stack storage;
+failed builds remain published. Related cases missing after disk exhaustion pass
+through fresh same-kernel recovery receipts. A private compiler reproduces all
+four kernel C captures after a shared executable changed; fixture C differs
+only by an exact unused stderr-print prelude.
+See [the state receipts and limits](../../docs/linux-posix-qualification.md#selected-procfs-task-states).
+
 The `readlinkempty` case checks 3,648 raw/musl calls per root/UID1000 child
 on both architectures. Empty paths name the retained symlink description,
 including O_PATH handles after unlink or private-directory search denial.

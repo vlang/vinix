@@ -7,6 +7,7 @@ module procselffixture
 #include <grp.h>
 #include <pthread.h>
 #include <sched.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,6 +22,8 @@ module procselffixture
 
 @[typedef]
 struct C.pthread_t {}
+@[typedef]
+struct C.siginfo_t {}
 struct C.stat { st_mode u32 st_ino u64 st_dev u64 }
 struct C.sched_param { mut: sched_priority i32 }
 struct C.rlimit { rlim_cur u64 rlim_max u64 }
@@ -31,6 +34,7 @@ struct Handles { mut: dirs [3]i32 links [6]i32 }
 struct Worker { bank &Handles ordinary bool slot i32 mut: tid i32 failed bool }
 struct Slabs { mut: sizes [32]u64 live [32]u64 rows i32 large u64 }
 struct NamespaceWorker { outer i32 inner i32 outer_pid i32 mut: failed bool }
+struct StateWorker { bank &Handles ordinary bool gate [2]i32 report [2]i32 mut: tid i32 failed bool }
 fn C.alloca(usize) voidptr
 fn C.__errno_location() &i32
 fn C.syscall(isize, ...) isize
@@ -39,6 +43,16 @@ fn C.openat(i32, &char, i32, ...) i32
 fn C.close(i32) i32
 fn C.fstat(i32, &C.stat) i32
 fn C.read(i32, voidptr, usize) isize
+fn C.write(i32, voidptr, usize) isize
+fn C.pipe(&i32) i32
+fn C.kill(i32, i32) i32
+fn C.waitid(i32, u32, &C.siginfo_t, i32) i32
+fn C.WIFSTOPPED(i32) i32
+fn C.WSTOPSIG(i32) i32
+fn C.WIFSIGNALED(i32) i32
+fn C.WTERMSIG(i32) i32
+fn C.__atomic_store_n(&i32, i32, i32)
+fn C.__atomic_load_n(&i32, i32) i32
 fn C.pread(i32, voidptr, usize, i64) isize
 fn C.readlink(&char, voidptr, usize) isize
 fn C.readlinkat(i32, &char, voidptr, usize) isize
@@ -73,6 +87,8 @@ fn C.strtoll(&char, &&char, i32) i64
 fn C.snprintf(&char, usize, &char, ...) i32
 fn C.sscanf(&char, &char, ...) i32
 fn C.strstr(&char, &char) &char
+fn C.strncmp(&char, &char, usize) i32
+fn C.strlen(&char) usize
 fn C.printf(&char, ...) i32
 fn C.puts(&char) i32
 fn C.fflush(voidptr) i32
@@ -239,12 +255,109 @@ fn worker(arg voidptr) voidptr {
 		if !scheduling(i32(C.SCHED_OTHER), 0) { state.failed = true }; return nil
 	}
 }
-fn cycle(bank &Handles) bool {
+fn state_name(code u8) &char {
+	unsafe { return if code == `R` { &char(c'R (running)\n') } else if code == `S` { &char(c'S (sleeping)\n') } else if code == `T` { &char(c'T (stopped)\n') } else { &char(c'Z (zombie)\n') } }
+}
+fn state_record(dirfd i32, path &char, status_file bool, wanted u8, verbose bool) bool {
+	unsafe {
+		fd := C.openat(dirfd, path, C.O_RDONLY); if fd < 0 { return false }; defer { C.close(fd) }
+		mut data := [4096]char{}; length := C.read(fd, &data[0], 4095)
+		if length <= 0 || length >= 4096 { return false }; data[int(length)] = 0
+		mut actual := u8(0); mut description := true
+		if status_file {
+			line := C.strstr(&data[0], c'\nState:\t'); if line == nil { return false }
+			actual = u8(line[8]); description = C.strncmp(line + 8, state_name(wanted), C.strlen(state_name(wanted))) == 0
+		} else {
+			end_name := C.strrchr(&data[0], i32(`)`)); if end_name == nil || usize(end_name) + 4 > usize(&data[0]) + usize(length) || end_name[1] != char(32) || end_name[3] != char(32) { return false }
+			actual = u8(end_name[2])
+		}
+		valid := actual == wanted && description
+		if !valid && verbose { C.printf(c'LINUX PROCSELF STATE DETAIL: path=%s actual=%c expected=%c description=%d\n', path, i32(actual), i32(wanted), i32(description)); C.fflush(nil) }
+		return valid
+	}
+}
+fn state_matrix(bank &Handles, ordinary bool, reader i32, worker_tid i32, verbose bool) bool {
+	unsafe {
+		mut records := i32(0); mut failures := i32(0); pid := C.getpid()
+		for view in 0 .. 3 { for form in 0 .. 5 { for format in 0 .. 2 {
+			mut path := [96]char{}; suffix := if format == 0 { &char(c'stat') } else { &char(c'status') }
+			if form == 0 { C.snprintf(&path[0], 96, c'self/%s', suffix) }
+			else if form == 1 { C.snprintf(&path[0], 96, c'thread-self/%s', suffix) }
+			else if form == 2 { C.snprintf(&path[0], 96, c'%d/%s', pid, suffix) }
+			else { C.snprintf(&path[0], 96, c'%d/task/%d/%s', pid, if form == 3 { pid } else { worker_tid }, suffix) }
+			wanted := if form == 1 { u8(`R`) } else if form == 4 { if reader == 0 { u8(`S`) } else { u8(`R`) } } else { if reader == 0 { u8(`R`) } else { u8(`S`) } }
+			records++; if !state_record(bank.dirs[view], &path[0], format == 1, wanted, verbose) { failures++ }
+		} } }
+		if verbose { C.printf(c'LINUX PROCSELF STATES: ordinary=%d reader=%d records=%d failures=%d\n', i32(ordinary), reader, records, failures); C.fflush(nil) }
+		return failures == 0
+	}
+}
+fn state_worker(arg voidptr) voidptr {
+	unsafe {
+		mut state := &StateWorker(arg); C.__atomic_store_n(&state.tid, i32(C.syscall(isize(C.SYS_gettid))), 3)
+		mut token := char(0)
+		if C.write(state.report[1], &token, 1) != 1 || C.read(state.gate[0], &token, 1) != 1 { C._exit(1) }
+		// Main blocks on the report pipe before these reads; this delay lets
+		// the actual blocking read settle on either SMP or a single CPU.
+		C.usleep(50000)
+		state.failed = !state_matrix(state.bank, state.ordinary, 1, C.__atomic_load_n(&state.tid, 2), true)
+		token = if state.failed { char(1) } else { char(0) }
+		if C.write(state.report[1], &token, 1) != 1 || C.read(state.gate[0], &token, 1) != 1 { C._exit(1) }
+		return nil
+	}
+}
+fn stopped_zombie(bank &Handles, ordinary bool) bool {
+	unsafe {
+		child := C.fork(); if child < 0 { return false }
+		if child == 0 { C.alarm(0); for { C.pause() } }
+		mut reaped := false; mut outcome := i32(-1)
+		defer { if !reaped { C.kill(child, C.SIGKILL); if C.waitpid(child, &outcome, 0) != child { C._exit(1) } } }
+		if C.kill(child, C.SIGSTOP) != 0 || C.waitpid(child, &outcome, C.WUNTRACED) != child || C.WIFSTOPPED(outcome) == 0 || C.WSTOPSIG(outcome) != C.SIGSTOP { return false }
+		mut good := true
+		for code in [u8(`T`), `Z`]! {
+			if code == `Z` {
+				mut info := C.siginfo_t{}
+				if C.kill(child, C.SIGCONT) != 0 || C.kill(child, C.SIGKILL) != 0 || C.waitid(C.P_PID, u32(child), &info, C.WEXITED | C.WNOWAIT) != 0 { return false }
+			}
+			mut failures := i32(0); mut records := i32(0)
+			// Vinix removes zombie Thread objects before wait publishes; only
+			// the process path remains. Zombie task-directory support is separate.
+			for view in 0 .. 3 { for task in 0 .. if code == `Z` { 1 } else { 2 } { for format in 0 .. 2 {
+				mut path := [96]char{}; suffix := if format == 0 { &char(c'stat') } else { &char(c'status') }
+				if task == 0 { C.snprintf(&path[0], 96, c'%d/%s', child, suffix) } else { C.snprintf(&path[0], 96, c'%d/task/%d/%s', child, child, suffix) }
+				records++; if !state_record(bank.dirs[view], &path[0], format == 1, code, true) { failures++ }
+			} } }
+			C.printf(c'LINUX PROCSELF CHILDSTATE: ordinary=%d state=%c records=%d failures=%d\n', i32(ordinary), i32(code), records, failures); C.fflush(nil)
+			if failures != 0 { good = false }
+		}
+		if C.waitpid(child, &outcome, 0) != child { return false }; reaped = true
+		return good && C.WIFSIGNALED(outcome) != 0 && C.WTERMSIG(outcome) == C.SIGKILL
+	}
+}
+fn state_test(bank &Handles, ordinary bool) bool {
+	unsafe {
+		mut gate := [i32(-1), -1]!; mut report := [i32(-1), -1]!
+		if C.pipe(&gate[0]) != 0 { return false }
+		if C.pipe(&report[0]) != 0 { for fd in gate { C.close(fd) }; return false }
+		mut state := &StateWorker(C.alloca(usize(sizeof(StateWorker)))); *state = StateWorker{bank: bank, ordinary: ordinary, gate: gate, report: report}; mut helper := C.pthread_t{}
+		if C.pthread_create(&helper, nil, state_worker, state) != 0 { for fd in gate { C.close(fd) }; for fd in report { C.close(fd) }; return false }
+		mut token := char(0); if C.read(report[0], &token, 1) != 1 { C._exit(1) }; C.usleep(50000)
+		tid := C.__atomic_load_n(&state.tid, 2); if tid <= 0 || tid == C.getpid() { C._exit(1) }
+		mut good := state_matrix(bank, ordinary, 0, tid, true)
+		if C.write(gate[1], &token, 1) != 1 || C.read(report[0], &token, 1) != 1 { C._exit(1) }
+		if token != 0 { good = false }; C.usleep(50000)
+		if good && !storage(bank, ordinary, tid) { good = false }
+		if C.write(gate[1], &token, 1) != 1 || C.pthread_join(helper, nil) != 0 { C._exit(1) }
+		for fd in gate { C.close(fd) }; for fd in report { C.close(fd) }
+		return good && !state.failed
+	}
+}
+fn cycle(bank &Handles, sleeper_tid i32) bool {
 	unsafe {
 		for view in 0 .. 3 { for kind in 0 .. 2 { for form in 0 .. 5 { for size in [i32(1), 64]! { for destination in 0 .. 2 {
 			if !probe(bank, i32(view), i32(kind), i32(form), size, i32(destination), false) { return false }
 		} } } }; for kind in 0 .. 2 { if !status(bank.dirs[view], i32(kind), false) { return false } } }
-		return true
+		return state_matrix(bank, false, 0, sleeper_tid, false)
 	}
 }
 fn snapshot(fd i32, destination &Slabs) bool {
@@ -262,12 +375,12 @@ fn snapshot(fd i32, destination &Slabs) bool {
 		return counts.rows > 0 && large
 	}
 }
-fn storage(bank &Handles, ordinary bool) bool {
+fn storage(bank &Handles, ordinary bool, sleeper_tid i32) bool {
 	unsafe {
 		observer := C.open(c'/proc/slabinfo', C.O_RDONLY); if observer < 0 { return false }; defer { C.close(observer) }
-		for _ in 0 .. 32 { if !cycle(bank) { return false } }; C.usleep(13000000)
+		for _ in 0 .. 32 { if !cycle(bank, sleeper_tid) { return false } }; C.usleep(13000000)
 		mut before := &Slabs(C.alloca(usize(sizeof(Slabs)))); *before = Slabs{}; if !snapshot(observer, before) { return false }
-		for _ in 0 .. 200 { if !cycle(bank) { return false } }; C.usleep(13000000)
+		for _ in 0 .. 200 { if !cycle(bank, sleeper_tid) { return false } }; C.usleep(13000000)
 		mut after := &Slabs(C.alloca(usize(sizeof(Slabs)))); *after = Slabs{}; if !snapshot(observer, after) || before.rows != after.rows { return false }
 		mut valid := before.large == after.large
 		for index in 0 .. int(before.rows) {
@@ -370,7 +483,8 @@ fn qualify(bank &Handles, ordinary bool) bool {
 		if started != 2 || states[0].tid == states[1].tid { good = false }
 		if !ordinary && !chroot_test() { good = false }
 		if !ordinary && !namespace_test(bank.dirs[0]) { good = false }
-		if !good || !storage(bank, ordinary) { return false }
+		if !stopped_zombie(bank, ordinary) { good = false }
+		if !good || !state_test(bank, ordinary) { return false }
 		C.alarm(0); return true
 	}
 }

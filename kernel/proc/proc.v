@@ -1486,7 +1486,7 @@ pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
 
 	// Fields 21 to 39, which nothing here keeps, and then rt_priority and
 	// policy in 40 and 41.
-	state := match process_state(process) { `Z` { 'Z' } `T` { 'T' } `S` { 'S' } else { 'R' } }
+	state := match task_state(process, target) { `Z` { 'Z' } `T` { 'T' } `S` { 'S' } else { 'R' } }
 	shown_pid := if tid == 0 { pid_in(process, viewer) } else { tid_in(target, viewer) }
 	shown_ppid := pid_in(process_at(process.ppid), viewer)
 	shown_pgid := pgid_in(process, viewer)
@@ -1564,7 +1564,7 @@ pub fn process_status_text(pid int, tid int, viewer &Namespace) string {
 		katomic.load(&process.leader_no_new_privs)
 	} else { no_new_privs_state(target) }
 	seccomp_state, seccomp_filters := seccomp_status(process, target)
-	state := match process_state(process) { `Z` { 'Z (zombie)' } `T` { 'T (stopped)' } `S` { 'S (sleeping)' } else { 'R (running)' } }
+	state := match task_state(process, target) { `Z` { 'Z (zombie)' } `T` { 'T (stopped)' } `S` { 'S (sleeping)' } else { 'R (running)' } }
 	shown_pid := pid_in(process, viewer)
 	// Process status selects the leader; task status selects its own thread.
 	shown_tid := if tid == 0 { shown_pid } else { tid_in(target, viewer) }

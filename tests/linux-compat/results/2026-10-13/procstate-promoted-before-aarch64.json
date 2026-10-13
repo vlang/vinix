@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "2863b5ca0aaf42fe0682bd601c227359a6b4114988f24483735e6f2ad46ee09d",
+    "results": [
+        {
+            "name": "procself",
+            "source_sha256": "aab290d54a5de27c577608b23d6f8670385fa89a978d74282c93cfde10a2c755",
+            "init_sha256": "",
+            "iso_sha256": "",
+            "exit_code": 1,
+            "detail": "Command failed"
+        }
+    ]
+}

@@ -1,0 +1,12 @@
+/Users/alex/.cache/vinix-linux-compat/procstate-20261013/before-arm/procself/fixture.c:2342:267: error: call to undeclared function 'memdup'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+ 2342 |                 procselffixture__StateWorker* state = (procselffixture__StateWorker*)({procselffixture__StateWorker _t1 = (procselffixture__StateWorker){.bank = bank, .ordinary = ordinary}; memcpy(_t1.gate, gate, sizeof(_t1.gate)); memcpy(_t1.report, report, sizeof(_t1.report)); memdup(&_t1, sizeof(procselffixture__StateWorker));});
+      |                                                                                                                                                                                                                                                                                         ^
+/Users/alex/.cache/vinix-linux-compat/procstate-20261013/before-arm/procself/fixture.c:2342:267: note: did you mean 'memcmp'?
+/Users/alex/code/vinix/build-aarch64-userland/sysroot/include/string.h:30:5: note: 'memcmp' declared here
+   30 | int memcmp (const void *, const void *, size_t);
+      |     ^
+/Users/alex/.cache/vinix-linux-compat/procstate-20261013/before-arm/procself/fixture.c:2342:41: error: cast to 'procselffixture__StateWorker *' (aka 'struct procselffixture__StateWorker *') from smaller integer type 'int' [-Werror,-Wint-to-pointer-cast]
+ 2342 |                 procselffixture__StateWorker* state = (procselffixture__StateWorker*)({procselffixture__StateWorker _t1 = (procselffixture__StateWorker){.bank = bank, .ordinary = ordinary}; memcpy(_t1.gate, gate, sizeof(_t1.gate)); memcpy(_t1.report, report, sizeof(_t1.report)); memdup(&_t1, sizeof(procselffixture__StateWorker));});
+      |                                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2 errors generated.
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/procstate-20261013/before-arm/receipt.json

@@ -1,0 +1,10 @@
+/Users/alex/.cache/vinix-linux-compat/procstate-20261013/before-x86/procself/fixture.c: In function 'procselffixture__state_test':
+/Users/alex/.cache/vinix-linux-compat/procstate-20261013/before-x86/procself/fixture.c:2342:281: error: implicit declaration of function 'memdup'; did you mean 'memcmp'? [-Wimplicit-function-declaration]
+ 2342 |                 procselffixture__StateWorker* state = (procselffixture__StateWorker*)({procselffixture__StateWorker _t1 = (procselffixture__StateWorker){.bank = bank, .ordinary = ordinary}; memcpy(_t1.gate, gate, sizeof(_t1.gate)); memcpy(_t1.report, report, sizeof(_t1.report)); memdup(&_t1, sizeof(procselffixture__StateWorker));});
+      |                                                                                                                                                                                                                                                                                         ^~~~~~
+      |                                                                                                                                                                                                                                                                                         memcmp
+/Users/alex/.cache/vinix-linux-compat/procstate-20261013/before-x86/procself/fixture.c:2342:55: error: cast to pointer from integer of different size [-Werror=int-to-pointer-cast]
+ 2342 |                 procselffixture__StateWorker* state = (procselffixture__StateWorker*)({procselffixture__StateWorker _t1 = (procselffixture__StateWorker){.bank = bank, .ordinary = ordinary}; memcpy(_t1.gate, gate, sizeof(_t1.gate)); memcpy(_t1.report, report, sizeof(_t1.report)); memdup(&_t1, sizeof(procselffixture__StateWorker));});
+      |                                                       ^
+cc1: all warnings being treated as errors
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/procstate-20261013/before-x86/receipt.json
