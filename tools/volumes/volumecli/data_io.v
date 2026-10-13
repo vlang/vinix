@@ -27,11 +27,15 @@ mut:
 	descriptors [64]i32
 	disks [64]u32
 	ids [64]u64
+	automatic bool
+	readonly [64]u64
 }
 
 @[direct_array_access]
 fn data_devices_valid(set &PlanSet, devices &DataDevices) bool {
-	if !data_ranges_valid(set) || devices.count != set.count { return false }
+	if !data_ranges_valid(set) { return false }
+	if devices == unsafe { nil } { return true }
+	if devices.count != set.count { return false }
 	mut seen := u64(0)
 	for i in 0 .. devices.count {
 		if devices.disks[i] >= u32(set.count) || devices.paths[i] == unsafe { nil } || unsafe { devices.paths[i][0] == 0 } { return false }
@@ -44,11 +48,13 @@ fn data_devices_valid(set &PlanSet, devices &DataDevices) bool {
 fn close_data_pins(mut pins DataPins) {
 	for i in 0 .. pins.count { C.close(pins.descriptors[i]) }
 	pins.count = 0
+	pins.automatic = false
 }
 
 @[direct_array_access]
 fn open_data_pins(set &PlanSet, devices &DataDevices, mut pins DataPins) bool {
 	if pins.count != 0 || !data_devices_valid(set, devices) { return false }
+	if devices == unsafe { nil } { return discover_data_pins(set, mut pins) }
 	mut key := DiskKey{}
 	for i in 0 .. devices.count {
 		fd := C.open(devices.paths[i], C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NONBLOCK)
@@ -71,6 +77,7 @@ fn recheck_data_pins(set &PlanSet, pins &DataPins) bool {
 	for i in 0 .. pins.count {
 		mut status := Status{}
 		if !probe_disk(pins.descriptors[i], mut key, mut status) || status.disk_id != pins.ids[i]
+			|| (pins.automatic && status.flags & 1 != pins.readonly[i])
 			|| !key_matches(unsafe { &set.plans[pins.disks[i]].key }, unsafe { &key }) {
 			plan_error(c'checksum disk identity or geometry changed'); return false
 		}
@@ -148,7 +155,9 @@ fn hash_bundle_data(bundle &char, path &char, devices &DataDevices) i32 {
 		|| !read_data_digests(unsafe { &manifest.set }, pins, unsafe { nil }, mut manifest.digests)
 		|| !recheck_data_pins(unsafe { &manifest.set }, pins) { return 1 }
 	mut bytes := [11392]u8{}; size := encode_data_manifest(manifest, &bytes[0])
-	if size == 0 || !data_destination_valid(destination) || !publish_edit_bytes(destination, &bytes[0], size) { return 1 }
+	if size == 0 || !data_destination_valid(destination)
+		|| (pins.automatic && !recheck_data_pins(unsafe { &manifest.set }, pins))
+		|| !publish_edit_bytes(destination, &bytes[0], size) { return 1 }
 	return finish_bundle_report(show_data_digests(manifest, c'recorded-data'))
 }
 

@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`hash-bundle-auto BUNDLE MANIFEST`, `verify-data-auto MANIFEST` and
+`scrub-data-auto MANIFEST REPORT` discover every saved physical disk by identity
+and retain its original read-only descriptor. They use the existing plain-data
+manifest/report formats and match explicit-device operations after reordering.
+Verification stops on a mismatch; scrubbing records all changed mappings.
+See [automatic multi-disk checksums and scrubbing](../../docs/storage-volumes.md#identity-based-automatic-data-checksums-and-scrubbing).
+
 `show-volume-reference REFERENCE` displays complete validated saved geometry,
 recorded ciphertext digest and reference fingerprint.
 `compare-volume-references BEFORE_REFERENCE AFTER_REFERENCE` reports stable or

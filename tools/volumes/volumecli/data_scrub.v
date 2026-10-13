@@ -77,7 +77,9 @@ fn scrub_manifest_data(path &char, report &char, devices &DataDevices) i32 {
 		|| !read_data_digests(unsafe { &manifest.set }, pins, unsafe { nil }, mut observed)
 		|| !recheck_data_pins(unsafe { &manifest.set }, pins) || !compare_scrub_digests(manifest, observed, mut summary) { return 1 }
 	mut text := [32768]char{}; length := encode_scrub_report(manifest, observed, &text[0])
-	if length == 0 || !data_destination_valid(destination) || !publish_edit_bytes(destination, unsafe { &u8(&text[0]) }, length) { return 1 }
+	if length == 0 || !data_destination_valid(destination)
+		|| (pins.automatic && !recheck_data_pins(unsafe { &manifest.set }, pins))
+		|| !publish_edit_bytes(destination, unsafe { &u8(&text[0]) }, length) { return 1 }
 	if finish_bundle_report(C.printf(c'%s', &text[0]) >= 0) != 0 { return 1 }
 	return if summary.changed == 0 { 0 } else { 2 }
 }

@@ -1,5 +1,11 @@
 # Storage-volume qualification
 
+`--host-data-auto` and `--data-auto` qualify automatic plain multi-disk checksum
+creation, verification and complete scrubbing: canonical validation before
+discovery, original physical pins, identity/mode continuity through publication,
+exact manual/automatic artifacts, failure cleanup, bounded lifetimes and
+reordered boot. See [automatic data operations](data-auto.md).
+
 `--host-reference` and `--reference` qualify offline checksum reference
 inspection/comparison: complete private inputs, exact saved metadata, full-width
 reports and fingerprints, stable/changed/error precedence, unchanged inputs

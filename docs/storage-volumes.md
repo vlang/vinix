@@ -3154,6 +3154,63 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Identity-based automatic data checksums and scrubbing
+
+`hash-bundle-auto BUNDLE MANIFEST`, `verify-data-auto MANIFEST` and
+`scrub-data-auto MANIFEST REPORT` select all saved physical disks without
+disk-index/device arguments. They use the same validated desired extents,
+SHA-256 streaming, canonical `VINIXDH1` references and complete ASCII `VINIXSR1`
+reports as the explicit-device commands. Saved disk order and read-only mapping
+flags remain exact, including when device names change after reboot.
+
+```sh
+vinix-volume hash-bundle-auto /etc/vinix/volumes.vset /root/data.vhash
+vinix-volume verify-data-auto /root/data.vhash
+vinix-volume scrub-data-auto /root/data.vhash /root/scrub.txt
+```
+
+The complete bounded bundle or manifest is decoded before discovery. It must
+contain 1–64 unique saved MBR/GPT identities, at most 64 globally unique mapping
+rows, valid native-sector geometry and signed-offset/SHA-256 bounds. Destination
+validation, source/destination alias checks and the ordinary nonblocking writer
+lock precede device access for hash and scrub. Verification needs no writer
+lock. The existing plain-file validation applies; these inputs do not acquire
+the encrypted formats' private ownership or authentication requirements.
+
+Each saved disk uses the existing bounded `/dev` discovery (at most 4096 directory
+entries per participant). Candidates are opened read-only without following final
+symlinks and must identify an online whole physical device with exact identity,
+capacity and native sector size. Aliases for the same physical ID are accepted;
+distinct physical disks matching one identity are ambiguous and fail. Missing
+later participants and distinct saved identities selecting one physical ID also
+fail. The original selected descriptors transfer directly to the scan owner;
+selected paths are never reopened. Every acquired descriptor closes on success
+or failure, including later discovery and duplicate refusals.
+
+Every pin retains its selected physical ID and physical read-only bit. Rechecks
+before and after streaming require those values and saved identity/geometry to
+remain exact. Hash and scrub additionally recheck all participants under the
+writer lock immediately before publishing. The physical read-only bit is
+independent of a saved mapping's read-only flag. No command imports or modifies
+live mappings, writes the physical parents or reads credentials. Existing held
+views and their mapping generations remain intact.
+
+Hashing and verification return 0 on success and 1 on an operational failure or
+verification mismatch; syntax errors return 2. Verification preserves its
+existing fail-fast mismatch behavior and prints no successful records for an
+incomplete verification. Scrubbing reads all rows through mismatches and returns
+0 for a complete clean report, 2 for complete changed findings, or 1 for an
+operational/publication/output failure, which takes precedence over findings.
+
+The ordinary plain-data atomic replacement rules apply to both destinations:
+file-fsync/close/rename/directory-fsync with the lock and pins held through final
+output flushing. Equal retries still perform both flushes. Failures before rename
+preserve the old file; a directory-fsync or output failure after rename can leave
+the complete new file visible with status 1. Retry completes the operation.
+Keep extent writes quiescent and retain a trusted reference separately; pinning
+does not provide a snapshot, authentication or repair. See
+[automatic data qualification](../tests/storage-volumes/data-auto.md).
+
 ## Complete data scrubbing
 
 `scrub-data MANIFEST REPORT DISK_INDEX DEVICE [...]` scans every desired extent
