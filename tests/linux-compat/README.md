@@ -134,6 +134,18 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `scalarabi` case checks 2,795 native read/write/pread64/pwrite64/lseek/close
+probes in each root and UID/GID1000 child. Five upper-word patterns must use
+the lower 32 bits of descriptors and whence, while counts and signed offsets
+stay 64-bit. Seven descriptor classes cover files, invalid/O_PATH/wrong-mode
+handles, both pipe directions and UNIX streams. Checks require actual bytes,
+cursor/queue disposition, access/seek/copy/count errors, closure and surviving
+aliases, and sparse contents above 4GiB/across 8GiB. Two 200-cycle cohorts
+exercise 70 probes per cycle after 32 warm-ups, requiring flat slab objects
+and big pages. Other FD APIs, GNU/foreign ABIs, regular copy-fault cursor
+behavior, cap-sized transfers and shared-offset concurrency remain separate.
+See [the scalar ABI receipts](../../docs/linux-posix-qualification.md#native-scalar-syscall-argument-words).
+
 The `opathseek` case checks 3,024 native lseek refusals in each root and
 UID/GID1000 child. O_PATH handles for readable/private files, directories,
 FIFOs, unfollowed links and devices must return EBADF before policy, type,
@@ -200,7 +212,8 @@ errors. Invalid low descriptors still fail. Counts of 2^32+1 remain invalid;
 they cannot become a one-entry transfer. Data, cursors and queues are checked
 after refusals. Two 200-cycle fast/heap/error cohorts require flat slab and
 big-page counts. Emitted kernel bodies may differ only by the three lookup
-casts; all wrappers and ownership remain identical. Scalar/other FD APIs,
+casts; all wrappers and ownership remain identical. The `scalarabi` case
+separately qualifies six scalar FD APIs; other FD APIs,
 GNU/foreign ABIs, positioned races and shared-offset atomicity remain separate.
 See the [qualification and receipts](../../docs/linux-posix-qualification.md#native-vector-descriptor-words).
 

@@ -661,14 +661,33 @@ fn syscall_linux_sendfile(gpr_state voidptr, out_fd int, in_fd int, offset_ptr u
 	return total, 0
 }
 
+// Linux scalar descriptors and lseek's selector are unsigned-int arguments,
+// even though the native dispatch supplies machine words. Keep byte counts
+// and signed offsets full-width, and leave descriptor ownership to the callee.
+fn syscall_linux_read(gpr_state voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
+	return fs.syscall_read(gpr_state, int(u32(fdnum)), buf, count)
+}
+
+fn syscall_linux_write(gpr_state voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
+	return fs.syscall_write(gpr_state, int(u32(fdnum)), buf, count)
+}
+
+fn syscall_linux_close(gpr_state voidptr, fdnum int) (u64, u64) {
+	return fs.syscall_close(gpr_state, int(u32(fdnum)))
+}
+
+fn syscall_linux_lseek(gpr_state voidptr, fdnum int, offset i64, whence int) (u64, u64) {
+	return fs.syscall_seek(gpr_state, int(u32(fdnum)), offset, int(u32(whence)))
+}
+
 // pread64: read at offset without changing file position.
 fn syscall_linux_pread64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
-	return file.syscall_pread(gpr_state, fdnum, buf, count, offset)
+	return file.syscall_pread(gpr_state, int(u32(fdnum)), buf, count, offset)
 }
 
 // pwrite64: write at offset without changing file position.
 fn syscall_linux_pwrite64(gpr_state voidptr, fdnum int, buf voidptr, count u64, offset i64) (u64, u64) {
-	return file.syscall_pwrite(gpr_state, fdnum, buf, count, offset)
+	return file.syscall_pwrite(gpr_state, int(u32(fdnum)), buf, count, offset)
 }
 
 // Both supported Linux ABIs use four signed 64-bit timeval words.

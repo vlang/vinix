@@ -45,10 +45,10 @@
         "kernel/sched/sched_arm64.v": "7fbd982e9ea4567b1a60e684bb55bc800ed240be3f8cf9439d8c0807740c768f",
         "kernel/socket/unix/unix.v": "790740ff96eb65fe24310b97a08e49c38cdd94f9d60b84a4af9da91fb213ed80",
         "kernel/syscall/table/container.v": "3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f",
-        "kernel/syscall/table/linux_common.v": "c6adfe229c12eee5e76ce31c3ec4a32bc75de19a4f773d3b528578927c17475f",
+        "kernel/syscall/table/linux_common.v": "cad881716387eeb1ff5e9dd26160d219d477da0aafc1e9d0727b7e60d2f7ff7d",
         "kernel/syscall/table/linux_compat.v": "3cff2259bc5463ef6d5b0cad84231e9c93139566dbf8ef31b29d73364b3642d6",
-        "kernel/syscall/table/linux_table_amd64.v": "864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9",
-        "kernel/syscall/table/syscall_table_arm64.v": "1519f6e3ec40f2bc702248ae63e3e9efb79766b81f4890b9d9a3090fbec4b01c",
+        "kernel/syscall/table/linux_table_amd64.v": "9dcc8b76d26658eb51bb9cae74460011e44adcd54ee3b04ce1e7069d0fdc5c87",
+        "kernel/syscall/table/syscall_table_arm64.v": "a5c7900c01cda7f7ba5cc21ba298c0c30f3b57664dd108515703da273bc7a6b1",
         "kernel/syscall/table/trace_amd64.v": "886f920865046fc589e5e923fd2ae9c1bf1ed0a6731b5344026b480470b3cd18",
         "kernel/usercopy/usercopy.v": "4c36b49cd3abe25aa70897981d0d1695edc1244c2d449c4c849fb0750e712f9e",
         "kernel/usercopy/word_atomic_amd64.v": "bf4c0c08a9d6e8251fdd62d50e3d698bb3799c1aae0e0752a06ea23ff9936048",
@@ -469,7 +469,7 @@
             "arch": "aarch64",
             "number": 57,
             "name": "close",
-            "handler": "fs.syscall_close",
+            "handler": "syscall_linux_close",
             "status": "wired; unqualified"
         },
         {
@@ -504,21 +504,21 @@
             "arch": "aarch64",
             "number": 62,
             "name": "lseek",
-            "handler": "fs.syscall_seek",
+            "handler": "syscall_linux_lseek",
             "status": "wired; unqualified"
         },
         {
             "arch": "aarch64",
             "number": 63,
             "name": "read",
-            "handler": "fs.syscall_read",
+            "handler": "syscall_linux_read",
             "status": "wired; unqualified"
         },
         {
             "arch": "aarch64",
             "number": 64,
             "name": "write",
-            "handler": "fs.syscall_write",
+            "handler": "syscall_linux_write",
             "status": "wired; unqualified"
         },
         {
@@ -2233,14 +2233,14 @@
             "arch": "x86_64",
             "number": 0,
             "name": "read",
-            "handler": "fs.syscall_read",
+            "handler": "syscall_linux_read",
             "status": "wired; unqualified"
         },
         {
             "arch": "x86_64",
             "number": 1,
             "name": "write",
-            "handler": "fs.syscall_write",
+            "handler": "syscall_linux_write",
             "status": "wired; unqualified"
         },
         {
@@ -2254,7 +2254,7 @@
             "arch": "x86_64",
             "number": 3,
             "name": "close",
-            "handler": "fs.syscall_close",
+            "handler": "syscall_linux_close",
             "status": "wired; unqualified"
         },
         {
@@ -2289,7 +2289,7 @@
             "arch": "x86_64",
             "number": 8,
             "name": "lseek",
-            "handler": "fs.syscall_seek",
+            "handler": "syscall_linux_lseek",
             "status": "wired; unqualified"
         },
         {

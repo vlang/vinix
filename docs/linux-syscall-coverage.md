@@ -69,14 +69,14 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | 54 | fchownat | `fs.syscall_fchownat` | wired; unqualified |
 | 55 | fchown | `fs.syscall_fchown` | wired; unqualified |
 | 56 | openat | `syscall_linux_openat` | wired; unqualified |
-| 57 | close | `fs.syscall_close` | wired; unqualified |
+| 57 | close | `syscall_linux_close` | wired; unqualified |
 | 58 | vhangup | `vacant` | unavailable |
 | 59 | pipe2 | `pipe.syscall_pipe_checked` | wired; unqualified |
 | 60 | quotactl | `vacant` | unavailable |
 | 61 | getdents64 | `syscall_linux_getdents64` | wired; unqualified |
-| 62 | lseek | `fs.syscall_seek` | wired; unqualified |
-| 63 | read | `fs.syscall_read` | wired; unqualified |
-| 64 | write | `fs.syscall_write` | wired; unqualified |
+| 62 | lseek | `syscall_linux_lseek` | wired; unqualified |
+| 63 | read | `syscall_linux_read` | wired; unqualified |
+| 64 | write | `syscall_linux_write` | wired; unqualified |
 | 65 | readv | `syscall_linux_readv` | wired; unqualified |
 | 66 | writev | `syscall_linux_writev` | wired; unqualified |
 | 67 | pread64 | `syscall_linux_pread64` | wired; unqualified |
@@ -328,15 +328,15 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 
 | Number | Linux name | Handler | Dispatch status |
 | --- | --- | --- | --- |
-| 0 | read | `fs.syscall_read` | wired; unqualified |
-| 1 | write | `fs.syscall_write` | wired; unqualified |
+| 0 | read | `syscall_linux_read` | wired; unqualified |
+| 1 | write | `syscall_linux_write` | wired; unqualified |
 | 2 | open | `syscall_linux_open` | wired; unqualified |
-| 3 | close | `fs.syscall_close` | wired; unqualified |
+| 3 | close | `syscall_linux_close` | wired; unqualified |
 | 4 | stat | `syscall_linux_stat` | wired; unqualified |
 | 5 | fstat | `syscall_linux_fstat` | wired; unqualified |
 | 6 | lstat | `syscall_linux_lstat` | wired; unqualified |
 | 7 | poll | `file.syscall_poll` | wired; unqualified |
-| 8 | lseek | `fs.syscall_seek` | wired; unqualified |
+| 8 | lseek | `syscall_linux_lseek` | wired; unqualified |
 | 9 | mmap | `syscall_linux_mmap` | wired; unqualified |
 | 10 | mprotect | `mmap.syscall_mprotect` | wired; unqualified |
 | 11 | munmap | `mmap.syscall_munmap` | wired; unqualified |
@@ -741,10 +741,10 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/sched/sched_arm64.v` | `7fbd982e9ea4567b1a60e684bb55bc800ed240be3f8cf9439d8c0807740c768f` |
 | `kernel/socket/unix/unix.v` | `790740ff96eb65fe24310b97a08e49c38cdd94f9d60b84a4af9da91fb213ed80` |
 | `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
-| `kernel/syscall/table/linux_common.v` | `c6adfe229c12eee5e76ce31c3ec4a32bc75de19a4f773d3b528578927c17475f` |
+| `kernel/syscall/table/linux_common.v` | `cad881716387eeb1ff5e9dd26160d219d477da0aafc1e9d0727b7e60d2f7ff7d` |
 | `kernel/syscall/table/linux_compat.v` | `3cff2259bc5463ef6d5b0cad84231e9c93139566dbf8ef31b29d73364b3642d6` |
-| `kernel/syscall/table/linux_table_amd64.v` | `864d82fe466cf4e1fba08785d4638655c18cb34ae547478b2853c1d583c3dbd9` |
-| `kernel/syscall/table/syscall_table_arm64.v` | `1519f6e3ec40f2bc702248ae63e3e9efb79766b81f4890b9d9a3090fbec4b01c` |
+| `kernel/syscall/table/linux_table_amd64.v` | `9dcc8b76d26658eb51bb9cae74460011e44adcd54ee3b04ce1e7069d0fdc5c87` |
+| `kernel/syscall/table/syscall_table_arm64.v` | `a5c7900c01cda7f7ba5cc21ba298c0c30f3b57664dd108515703da273bc7a6b1` |
 | `kernel/syscall/table/trace_amd64.v` | `886f920865046fc589e5e923fd2ae9c1bf1ed0a6731b5344026b480470b3cd18` |
 | `kernel/usercopy/usercopy.v` | `4c36b49cd3abe25aa70897981d0d1695edc1244c2d449c4c849fb0750e712f9e` |
 | `kernel/usercopy/word_atomic_amd64.v` | `bf4c0c08a9d6e8251fdd62d50e3d698bb3799c1aae0e0752a06ea23ff9936048` |

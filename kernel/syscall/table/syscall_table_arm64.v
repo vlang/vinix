@@ -390,12 +390,12 @@ pub fn init_syscall_table() {
 	syscall_table[54] = voidptr(fs.syscall_fchownat) // __NR_fchownat
 	syscall_table[55] = voidptr(fs.syscall_fchown) // __NR_fchown
 	syscall_table[56] = voidptr(syscall_linux_openat) // __NR_openat
-	syscall_table[57] = voidptr(fs.syscall_close) // __NR_close
+	syscall_table[57] = voidptr(syscall_linux_close) // __NR_close
 	syscall_table[59] = voidptr(pipe.syscall_pipe_checked) // __NR_pipe2
 	syscall_table[61] = voidptr(syscall_linux_getdents64) // __NR_getdents64
-	syscall_table[62] = voidptr(fs.syscall_seek) // __NR_lseek
-	syscall_table[63] = voidptr(fs.syscall_read) // __NR_read
-	syscall_table[64] = voidptr(fs.syscall_write) // __NR_write
+	syscall_table[62] = voidptr(syscall_linux_lseek) // __NR_lseek
+	syscall_table[63] = voidptr(syscall_linux_read) // __NR_read
+	syscall_table[64] = voidptr(syscall_linux_write) // __NR_write
 	syscall_table[65] = voidptr(syscall_linux_readv) // __NR_readv
 	syscall_table[66] = voidptr(syscall_linux_writev) // __NR_writev
 	syscall_table[67] = voidptr(syscall_linux_pread64) // __NR_pread64

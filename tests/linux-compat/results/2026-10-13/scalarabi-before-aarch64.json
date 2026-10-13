@@ -1,0 +1,15 @@
+{
+    "architecture": "aarch64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "82e4d9dae4752d4649ad78ee48161e835e1ee0be1971309139abfbc496515616",
+    "results": [
+        {
+            "name": "scalarabi",
+            "source_sha256": "61164821366b0ea5cb014c48282e70ba16eae88d4dc15ecf67278ad4d0e31614",
+            "init_sha256": "5fadd80095168bceae1cef0cad5f36ab12e9cf6f0f91f7a15dc19a2d850305c3",
+            "iso_sha256": "1085b557d2f1dc44a43a7726c82fdf28291b092f8ebb00e27b40945c21fb8027",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}

@@ -339,15 +339,15 @@ pub fn init_syscall_table() {
 	// Reference: arch/x86/entry/syscalls/syscall_64.tbl
 
 	// File I/O
-	syscall_table[0] = voidptr(fs.syscall_read) // read
-	syscall_table[1] = voidptr(fs.syscall_write) // write
+	syscall_table[0] = voidptr(syscall_linux_read) // read
+	syscall_table[1] = voidptr(syscall_linux_write) // write
 	syscall_table[2] = voidptr(syscall_linux_open) // open
-	syscall_table[3] = voidptr(fs.syscall_close) // close
+	syscall_table[3] = voidptr(syscall_linux_close) // close
 	syscall_table[4] = voidptr(syscall_linux_stat) // stat
 	syscall_table[5] = voidptr(syscall_linux_fstat) // fstat
 	syscall_table[6] = voidptr(syscall_linux_lstat) // lstat
 	syscall_table[7] = voidptr(file.syscall_poll) // poll
-	syscall_table[8] = voidptr(fs.syscall_seek) // lseek
+	syscall_table[8] = voidptr(syscall_linux_lseek) // lseek
 	syscall_table[16] = voidptr(fs.syscall_ioctl) // ioctl
 	syscall_table[17] = voidptr(syscall_linux_pread64) // pread64
 	syscall_table[18] = voidptr(syscall_linux_pwrite64) // pwrite64

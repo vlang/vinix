@@ -2393,3 +2393,79 @@ Upper-word descriptor/whence decoding, GNU wrappers, foreign/ELF32 paths,
 ordinary SEEK_DATA/SEEK_HOLE, shared-position concurrency, disk-backed handles,
 allocation exhaustion and complete application installation/sandbox/portal
 support remain separate work. The three broad section-15 gates stay open.
+
+## Native scalar syscall argument words
+
+Native read/write/close/lseek dispatched machine-word descriptors directly to
+V's 64-bit `int` consumers. pread64/pwrite64 likewise forwarded the complete
+descriptor word, and lseek retained the entire whence word. Nonzero unused
+upper bits consequently rejected otherwise valid descriptors or selectors.
+Four direct adapters now decode lower-32-bit FD/whence arguments; positioned
+wrappers apply the same FD cast. Counts remain unsigned 64-bit and offsets
+signed 64-bit. The existing consumers retain all descriptor references,
+access checks, locks, buffers and cleanup responsibilities.
+
+[Linux v6.12 read/write/seek declarations](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/read_write.c)
+use unsigned-int descriptors and whence, full-width size_t counts and signed
+offsets; [close](https://raw.githubusercontent.com/torvalds/linux/refs/tags/v6.12/fs/open.c)
+also takes an unsigned-int descriptor. The regression checks argument widths
+and observable results independently of libc's usual argument preparation.
+
+The V `scalarabi` fixture makes 2,795 raw syscall checks in each root and
+UID/GID1000 child on both architectures. Five upper-word patterns include
+zero, a single high bit, mixed high bits, the sign bit and all high bits.
+Seven descriptor classes cover read/write files, invalid and O_PATH handles,
+wrong access modes, both pipe directions and UNIX streams. Fresh unchanged
+kernels fail **1,528 checks per cohort**; candidates pass all **5,590 checks
+per architecture**.
+
+Actual bytes, saved cursors and pipe/socket queue contents are checked after
+success and refusal. Zero counts, unmapped destinations/sources, negative
+positioned offsets, invalid descriptors and access/ESPIPE errors remain real
+controls. lseek tests SET/CUR/END with signed offsets, invalid regular-file
+selectors and preserved cursors. Successful close retires the original FD
+while its separately retained duplicate remains usable for metadata and final
+cleanup. Sparse reads/writes above 4GiB and across 8GiB verify the true position,
+unchanged lower-32-bit aliases, size and ordinary cursor. Two 4GiB-count
+refusal paths detect accidental count truncation without huge transfers.
+
+Two 200-cycle retention cohorts perform 70 probes per cycle after 32 warm-ups.
+Transient descriptor owners are closed on every path; regular inodes are
+reused and socket churn is excluded from the storage workload. Every live
+slab class stays flat, with big pages **335/335 ARM and 4,308/4,308 x86** in
+both credential groups. All four before/after fixture C captures match the
+preview byte for byte, without malloc, memdup, array allocation or fixed-array
+bounds helpers. The observer uses two bounded stack snapshots and retires its
+procfs descriptor on success and failure.
+
+Independent source/C/retention review finds no lifetime blocker. Each new
+adapter emits exactly one direct call and return. Reversing those four
+adapters and native dispatch entries plus the two positioned FD casts restores
+the **entire baseline generated kernel C** on each architecture. No existing
+consuming body, reference or lock owner changes.
+
+Four additional guest cases pass on both candidates: opathseek, iovfd, pathio
+and runtime. Eight host test files, both fresh kernel builds and inventory
+checks pass. Fresh before/after allocation audits retain **406 ARM / 295 x86**
+existing sites and identical allowance failures; no allowance is increased.
+Host disk exhaustion initially prevented command launch before any new guest
+receipt existed. Only this session's rebuildable older images/objects were
+retired; older generated C was losslessly archived with byte/hash verification.
+The actual baseline and candidate suites then ran to completion.
+
+[ARM evidence](../tests/linux-compat/results/2026-10-13/scalarabi-aarch64-evidence.json),
+[x86 evidence](../tests/linux-compat/results/2026-10-13/scalarabi-x86_64-evidence.json)
+and the [assertion-enabled V auditor](../tests/linux-compat/results/2026-10-13/scalarabi-audit.v)
+bind raw logs, source/init/image hashes, kernel binaries/C, host/allocation
+checks and both executed failing controls. Private worktrees pin `53e909df86`;
+only three syscall table files differ. The compiler is the clean `f6358ecff9`
+snapshot. All 63 isolated semantic source inputs are fingerprinted separately
+from the public dispatch inventory, which follows the committed parent plus
+this fix. Earlier broader performance/desktop receipts are not new runs on
+this kernel.
+
+Other FD APIs, GNU wrappers, foreign/ELF32 paths, regular copy-fault cursor
+behavior, actual cap-sized transfers, ordinary SEEK_DATA/SEEK_HOLE, invalid
+selector precedence on streams, shared-offset concurrency, disk-backed paths,
+allocation exhaustion and complete Linux installation/sandbox/portal/runtime
+support remain separate work. The three broad section-15 gates stay open.

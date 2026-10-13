@@ -678,6 +678,10 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   errors; qualify metadata, private permissions and ordinary sparse seeks as
   root/UID1000 on both architectures, with flat descriptor cleanup storage.
   See [the pathname-seek receipts](docs/linux-posix-qualification.md#native-o_path-seek-access).
+- [x] Decode native scalar read/write/pread64/pwrite64/lseek/close descriptor
+  and seek-selector words while retaining full-width counts and signed offsets;
+  qualify real bytes/cursors/queues, closure, sparse data and flat storage on
+  both architectures. See [the scalar-word receipts](docs/linux-posix-qualification.md#native-scalar-syscall-argument-words).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
