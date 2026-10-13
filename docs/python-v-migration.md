@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `e9d7f0f0568c7e9abd9595687cd2e94650731103`,
-Linguist 7.27.0 reports **Python 0.43%** (22 files, 180,153 bytes) and
-**V 83.16%** (3,798 files, 34,919,037 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `f0a0c4f67620863544a5108338277569f9c6e8d4`,
+Linguist 7.27.0 reports **Python 0.35%** (18 files, 145,483 bytes) and
+**V 83.31%** (3,828 files, 35,112,854 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **5,026,132 Python bytes**. All remaining
-180,153 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **5,060,802 Python bytes**. All remaining
+145,483 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -24,7 +24,7 @@ to an archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 82 stages below remove **506 Python files / 2,180,711 original bytes** and
+The 85 stages below remove **510 Python files / 2,215,381 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -114,6 +114,9 @@ changes remain separate from this per-stage scope and the measured graph.
 | Browser, Activity Monitor and pointer-scroll host closure | `vmhost`, direct PTY/pipe controllers, native QMP and static guest recipes | 26,216 / 524 | `2a63a2ea` |
 | Roblox Windows runner closure | native manifest/ZIP/layer/USTAR, owned PTY/FIFO, concurrent uploads and XWD/PNG reports | 12,279 / 278 | `e892a4d9` |
 | Native stdio transport test closure | `nativequery`, private SDK stdin/stdout actions and exact native callback errors | 3,995 / 126 | `e9d7f0f0` |
+| Android binding closure | native `androidrun`/`androidtools` contexts, cold dispatchers and actual native suites | 21,866 / 537 | `3fe13236` |
+| Native wallpaper generation | libjpeg-turbo SDK, V Lanczos-3, native cache/download/index and CLI owners | 5,952 / 144 | `1a9c278d` |
+| Ext2 host fixture generator and runner | native generator, original V fixtures and direct production test-suite builds | 6,852 / 147 | `f0a0c4f6` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -746,9 +749,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 82 stages.
+or hidden in these 85 stages.
 
-The next forty-four stages remove 354 Python files / 1,682,368 original bytes.
+The next forty-seven stages remove 358 Python files / 1,717,038 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -761,7 +764,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **384 Python files / 1,816,645 original bytes**. Earlier qualification
+translates **388 Python files / 1,851,315 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -3225,3 +3228,32 @@ indices are rejected. Cold test/query/value/reader builds, current stress
 requalification, existing streamed archive/reader regressions and the public
 automatic query bootstrap pass. No Python or Vinix guest was executed. See
 [native stdio tests](../tests/native-host/README.md).
+
+The Android closure stage retires two unused bindings whose maintained callers
+already use native V contexts. Twenty-four cold ARM/x86/ASanUBSan builds and
+five native suites pass, including actual PTY/QMP sessions, ten interactive
+cases and ten dispatcher help paths per profile. Fixture socket paths are
+short and canonical; retained cold builds are hash-verified before replay.
+The generic boot transport remains for unported consumers. See
+[native Android runner](../tests/native-android-run/README.md).
+
+The wallpaper stage replaces the maintained image-builder command with V.
+Nine cold ARM/x86/ASanUBSan builds pass. All ten independently captured
+JPEG/VWP pairs match byte for byte: 5,898,330 output bytes per profile. Native
+crop/resample controls, offline and partial caches, exact indexes and source
+text, malformed-cache retention, decoder retirement, streamed download cleanup
+and complete warm CLI/help/guard paths pass. A real x86 libjpeg-turbo 3.2.0
+SDK build is retained. Inputs are the pinned JPEG set; other Pillow image
+formats are outside this command. Curl connection/stall limits replace urllib
+read timeouts. See [native wallpaper tool](../desktop/tools/wallpaperhost/README.md).
+
+The ext2 host stage retires the unchanged 6,852-byte Python generator. Three
+cold host profiles and twelve direct V suite builds/runs pass all 23 unchanged
+production codec, persistence, copy and ACL test functions. Embedded V fixture
+templates match the original bytes, and every generated source hash agrees
+across profiles. Existing-directory and argument guards and the public cold
+front pass. Direct suite compilation preserves argv and avoids rebuilding a
+shared cached test driver. No kernel source or test assertion changes.
+See [native ext2 host tests](../tests/ext2-xattr/README.md).
+
+No Python or Vinix guest is executed during these three qualifications.

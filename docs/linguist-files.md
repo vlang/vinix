@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `e9d7f0f0568c7e9abd9595687cd2e94650731103`,
+at source commit `f0a0c4f67620863544a5108338277569f9c6e8d4`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,555 | 5.71% |
-| Python | 22 | 180,153 | 0.43% |
-| Shell | 809 | 1,373,186 | 3.27% |
+| C | 599 | 2,396,555 | 5.69% |
+| Python | 18 | 145,483 | 0.35% |
+| Shell | 811 | 1,373,463 | 3.26% |
 
-All `.v` files are classified as V. The resulting V share is 83.16%, with no
+All `.v` files are classified as V. The resulting V share is 83.31%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 180,153 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 145,483 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev e9d7f0f0568c7e9abd9595687cd2e94650731103 --breakdown --json
+github-linguist --rev f0a0c4f67620863544a5108338277569f9c6e8d4 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -662,16 +662,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | File | Bytes |
 | --- | ---: |
 | `build-support/android/_boot_native.py` | 20,549 |
-| `build-support/android/_native.py` | 5,749 |
 | `build-support/cpython_host.py` | 1,007 |
 | `build-support/native_host.py` | 6,504 |
 | `desktop/tools/_font_native.py` | 9,708 |
-| `desktop/tools/fetch_wallpapers.py` | 5,952 |
 | `desktop/tools/genfont.py` | 4,935 |
 | `desktop/tools/tests/test_font_data.py` | 7,106 |
 | `installer/macos/vinix_auto.py` | 8,147 |
-| `tests/android/_run_native.py` | 16,117 |
-| `tests/ext2-xattr/host.py` | 6,852 |
 | `tests/ext2-xattr/run.py` | 11,512 |
 | `tests/ios/desktop.py` | 7,962 |
 | `tests/ios/game2048.py` | 3,080 |
@@ -833,6 +829,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/xorg-server/compile-v-host` | 162 |
 | `build-support/xorg-server/startx` | 2,994 |
 | `desktop/tools/build_voffice` | 147 |
+| `desktop/tools/fetch_wallpapers` | 147 |
 | `desktop/tools/input` | 171 |
 | `desktop/tools/screenshot.sh` | 258 |
 | `desktop/tools/stage_app` | 143 |
@@ -872,8 +869,8 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-chromium-aarch64.sh` | 5,588 |
 | `scripts/build-claude-aarch64.sh` | 5,923 |
 | `scripts/build-codex-aarch64.sh` | 4,845 |
-| `scripts/build-desktop-aarch64.sh` | 92,847 |
-| `scripts/build-desktop-amd64.sh` | 15,197 |
+| `scripts/build-desktop-aarch64.sh` | 92,836 |
+| `scripts/build-desktop-amd64.sh` | 15,186 |
 | `scripts/build-developer-tools-aarch64.sh` | 4,319 |
 | `scripts/build-dhewm3-aarch64.sh` | 193 |
 | `scripts/build-docker-aarch64.sh` | 4,096 |
@@ -1163,6 +1160,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/execute-only/run` | 183 |
 | `tests/ext2-sparse/run` | 184 |
 | `tests/ext2-sparse/run-host.sh` | 158 |
+| `tests/ext2-xattr/host` | 152 |
 | `tests/fs-journal/run` | 214 |
 | `tests/fs-journal/run-host.sh` | 1,367 |
 | `tests/fsync-scope/run` | 220 |
