@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume compare-data-references BEFORE_MANIFEST AFTER_MANIFEST\n')
 	C.printf(c'       vinix-volume hash-bundle-auto BUNDLE MANIFEST\n       vinix-volume verify-data-auto MANIFEST\n       vinix-volume scrub-data-auto MANIFEST REPORT\n')
 	C.printf(c'       vinix-volume show-volume-reference REFERENCE\n       vinix-volume compare-volume-references BEFORE_REFERENCE AFTER_REFERENCE\n')
 	C.printf(c'       vinix-volume hash-volume-auto CONFIG PASSPHRASE_FILE REFERENCE\n       vinix-volume verify-volume-auto CONFIG PASSPHRASE_FILE REFERENCE\n       vinix-volume hash-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE\n       vinix-volume verify-recovery-volume-auto BACKUP RECOVERY_KEYFILE REFERENCE\n')
@@ -110,6 +111,10 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'compare-data-references') == 0 {
+			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
+			return data_reference_files(argv[2], argv[3])
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'hash-bundle-auto') == 0 || C.strcmp(argv[1], c'scrub-data-auto') == 0) {
 			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
 			if C.strcmp(argv[1], c'hash-bundle-auto') == 0 { return hash_bundle_data(argv[2], argv[3], nil) }

@@ -4,6 +4,12 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`compare-data-references BEFORE_MANIFEST AFTER_MANIFEST` compares all recorded
+digests in plain multi-disk references when their complete saved metadata agrees.
+It reports both full reference fingerprints offline, returning 0 for stable,
+2 for changed, and 1 for an operational failure. See
+[plain reference comparison](../../docs/storage-volumes.md#offline-multi-disk-data-reference-comparison).
+
 `hash-bundle-auto BUNDLE MANIFEST`, `verify-data-auto MANIFEST` and
 `scrub-data-auto MANIFEST REPORT` discover every saved physical disk by identity
 and retain its original read-only descriptor. They use the existing plain-data

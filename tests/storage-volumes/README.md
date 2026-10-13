@@ -1,5 +1,11 @@
 # Storage-volume qualification
 
+`--host-data-reference` and `--data-reference` qualify offline plain multi-disk
+reference comparisons: exact saved metadata, every recorded digest, complete
+reports/fingerprints, ordinary reader and output failures, unchanged inputs/live
+views, repeated utility lifetimes and reordered reboot. See
+[reference comparison](data-reference.md).
+
 `--host-data-auto` and `--data-auto` qualify automatic plain multi-disk checksum
 creation, verification and complete scrubbing: canonical validation before
 discovery, original physical pins, identity/mode continuity through publication,

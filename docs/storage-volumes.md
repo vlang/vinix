@@ -3154,6 +3154,57 @@ changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
 
+## Offline multi-disk data reference comparison
+
+`compare-data-references BEFORE_MANIFEST AFTER_MANIFEST` compares the recorded
+digests in two complete plain-data `VINIXDH1` references without discovering or
+reading physical devices. Both inputs must contain exactly the same canonical
+saved bundle: disk identities/capacities/native sectors, ordered mapping slots,
+offsets/lengths/read-only flags, and all pool windows and allocation priorities.
+A metadata change is an operational error, even if some recorded digests differ.
+For compatible references the command reports every stable or changed row.
+
+```sh
+vinix-volume compare-data-references /root/before.vhash /root/after.vhash
+```
+
+Both complete bounded regular files are decoded and validated before any
+comparison finding or report is emitted. The ordinary plain-data readers reject
+final symlinks, nonregular/unbounded files, short/inconsistent reads and invalid
+CRC, embedded bundle or record order. Their read-only no-follow/nonblocking
+descriptors and parent directory owners remain pinned through final output
+flushing. Same-path and hard-linked inputs work. Comparison takes no writer
+lock and remains available during saved-state writer contention; it creates no
+destination, reads no credentials and leaves existing files and live mappings
+unchanged. These inputs retain plain-data file rules, without acquiring the
+encrypted formats' private ownership or authentication requirements.
+
+The complete ASCII report fits a fixed 32768-byte stack workspace. Its header
+contains `format=VINIXDH1 operation=compared-data-references`, `disks`, `mappings`,
+`stable`, `changed`, `algorithm=sha256`, `before_reference_sha256` and
+`after_reference_sha256`. Each disk record contains `disk`, `disk_bytes`,
+`sector` and canonical MBR/GPT `identity`; every mapping row contains `disk`,
+`slot`, `offset`, `bytes`, `readonly`, `result=stable|changed`, `before_sha256`
+and `after_sha256`. All digest/fingerprint values are 64 lowercase hexadecimal
+characters. The fingerprints cover each entire canonical reference, including
+its exact bundle, pool metadata and every digest. Pool metadata is checked and
+fingerprinted, rather than repeated as separate output rows. Zero-mapping sets
+still report their saved disks and both reference fingerprints.
+
+Status **0** means compatible references with identical recorded digests,
+**2** means compatible references containing changed digests, and **1** means
+input, metadata, formatting or output failure. Invalid CLI syntax returns 2
+without a finding. Operational/output failure takes precedence over changes;
+all complete validation and report construction precede stdout output. A late
+stdout failure can leave partial or complete text visible with status 1.
+
+The command compares saved records; it establishes neither current disk content
+nor a coherent snapshot of concurrent input replacements, and it does not infer
+time order. Retain trusted references made with quiescent extent writes and use
+verification or scrubbing to check current data. CRC and SHA provide corruption
+detection without authentication or repair. See
+[comparison qualification](../tests/storage-volumes/data-reference.md).
+
 ## Identity-based automatic data checksums and scrubbing
 
 `hash-bundle-auto BUNDLE MANIFEST`, `verify-data-auto MANIFEST` and
