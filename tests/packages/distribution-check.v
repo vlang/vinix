@@ -47,6 +47,8 @@ fn check() ! {
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/tools/packages/appsdk', work)!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/context-memory', repository + '/tests/packages/sdk-context-memory.v'])!
 		run(work + '/context-memory', [])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/window-memory', repository + '/tests/packages/window-memory.v'])!
+		run(work + '/window-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/desktop/packagecore', work)!
 		run(v, [...helper_flags, '-gc', 'none', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
 		run(work + '/vinix-package', ['--help'])!
@@ -62,6 +64,7 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_mirror.v', work + '/software/software_mirror.v')!
 	os.cp(repository + '/desktop/software_terminal.v', work + '/software/software_terminal.v')!
 	os.cp(repository + '/desktop/software_launch.v', work + '/software/software_launch.v')!
+	os.cp(repository + '/desktop/software_window.v', work + '/software/software_window.v')!
 	os.cp(repository + '/tests/packages/software_terminal_fixture.v', work + '/software/terminal_fixture.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
 	modules := os.getenv_opt('VINIX_PACKAGE_TEST_UI2') or { repository + '/build/vmodules' }
@@ -72,6 +75,9 @@ fn check() ! {
 		'@vlib|' + modules + '|@vmodules|' + repository, '-o', work + '/software-check',
 		work + '/software'])!
 	run(work + '/software-check', [])!
+	run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-enable-globals', '-d', 'ui2_headless', '-d', 'track_heap', '-path',
+		'@vlib|' + modules + '|@vmodules|' + repository, '-o', work + '/window-broker-memory', work + '/software'])!
+	run(work + '/window-broker-memory', ['window-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

@@ -375,8 +375,18 @@ account, including their parent directories.
 This application session does not take the hardware seat or authenticate a
 desktop login. Direct display/input/audio device access remains denied without
 the seat, even when a package declares those permissions. Graphical runtimes
-need a separately qualified display/audio broker. Full ordinary-user desktop
-sessions and a public native GUI protocol remain release work.
+need a separately qualified display/audio broker. Native SDK apps can instead
+declare signed `window_protocol:1` metadata and `display` permission. Software
+then runs `run-window` through the same ordinary session and renders bounded
+labels, buttons and rectangles from the application's standard output. Input is
+restricted to current-frame button identities and a close request. The broker
+grants no display/input device or X11 socket; its own window supplies presentation.
+Start, Quick Launch and document requests select this mode from the installed
+manifest, including when catalog metadata differs. Application data, trust and
+policy remain enforced by the service. See
+[native window SDK](../tools/packages/SDK.md#native-window-protocol-1) and
+[qualification](../tests/packages/window-check.md). Full ordinary-user desktop
+login and graphical Linux/Windows/Apple/audio runtime brokers remain release work.
 
 Every admitted package process receives the
 [application-context interface](../tools/packages/SDK.md#application-context-interface):

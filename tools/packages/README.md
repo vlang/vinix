@@ -118,3 +118,10 @@ payload requirements. Invalid complete/oversized partials start fresh; a bad
 source stops without changing activation or rollback. Metadata, verification and
 offline sources reject special files before opening. See
 [download recovery qualification](../../tests/packages/download-recovery-check.md).
+
+Native apps can opt into signed `window_protocol:1` metadata. Software renders
+their bounded label/button/rectangle display lists and returns frame-bound button
+and close events over standard streams. `run-window` retains the ordinary-account
+sandbox and generation lease without X11 or hardware display grants. The
+[counter example](../../examples/package-counter/README.md) builds both targets;
+see [native window qualification](../../tests/packages/window-check.md).

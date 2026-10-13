@@ -6,6 +6,7 @@ import os
 import ui2
 import desktop.packagecore
 import tools.packages.pkgprotocol
+import tools.packages.appsdk
 
 const software_row_actions = ['software.row.0', 'software.row.1', 'software.row.2', 'software.row.3',
 	'software.row.4', 'software.row.5', 'software.row.6', 'software.row.7', 'software.row.8',
@@ -22,6 +23,7 @@ struct SoftwareRow {
 	installed_name    string
 	installed_kind    string
 	installed_permissions []string
+	installed_window_protocol int
 	architecture      string
 	kind              string
 	runtime           string
@@ -134,6 +136,13 @@ mut:
 	launch_file_scroll int
 	launch_data_cwd bool = true
 	launch_files_allowed bool
+	window_mode bool
+	window_frame appsdk.WindowFrame
+	window_pending []u8
+	window_skip bool
+	window_closing bool
+	window_writable bool
+	window_failure string
 }
 
 fn open_software(mut desktop Desktop) !NativeApp {
@@ -410,6 +419,7 @@ fn (mut a SoftwareApp) retire_worker() {
 }
 
 fn (mut a SoftwareApp) poll() bool {
+	if a.window_mode { return a.poll_window() }
 	if a.terminal_app != unsafe { nil } { return a.terminal_app.poll() }
 	if a.worker == unsafe { nil } { return false }
 	mut changed := false
@@ -531,6 +541,10 @@ fn (mut a SoftwareApp) run_requested() {
 	a.repository_mode = false
 	a.deployment_mode = false
 	a.mirror_mode = false
+	if a.rows.any(it.id == request.id && it.installed_version != '' && it.installed_window_protocol == 1) {
+		a.open_window(request) or { a.set_status(err.msg()); unsafe { err.free() } }
+		return
+	}
 	a.start(if request.document.len > 0 {
 		['run', request.id, request.document]
 	} else {
@@ -545,6 +559,7 @@ fn (mut a SoftwareApp) run_requested() {
 fn (a &SoftwareApp) next_poll_ms() u64 { return 100 }
 
 fn (mut a SoftwareApp) handle(event_id string) ! {
+	if a.window_mode { a.handle_window(event_id); return }
 	if a.terminal_app != unsafe { nil } {
 		if event_id == 'software.terminal-back' {
 			if !a.terminal_app.exited { a.set_status('Exit the application before returning to Software.'); return }
@@ -735,6 +750,7 @@ fn (mut a SoftwareApp) handle(event_id string) ! {
 }
 
 fn (mut a SoftwareApp) key_input(input string) {
+	if a.window_mode { return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.key_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input); return }
@@ -758,6 +774,7 @@ fn (mut a SoftwareApp) key_input(input string) {
 }
 
 fn (mut a SoftwareApp) paste_input(input string) {
+	if a.window_mode { return }
 	if a.terminal_app != unsafe { nil } { a.terminal_app.paste_input(input); return }
 	if a.launch_mode { a.launch_key_input(input); return }
 	if a.repository_mode { a.repository_key_input(input) } else if a.deployment_mode {
@@ -801,6 +818,7 @@ fn software_review_row(row pkgprotocol.ReviewPackage) SoftwareRow {
 }
 
 fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
+	if a.window_mode { return a.build_window(size) }
 	if a.terminal_app != unsafe { nil } { return a.build_terminal(size) }
 	width := int(size.width)
 	height := int(size.height)
@@ -915,8 +933,10 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 				children << software_button('software.remove', 'Uninstall', 446, height - 176, 130)
 				if software_launch_kind(row) !in ['runtime', 'data'] {
 					children << software_button('software.run', a.launch_label, width - 174, 46, 160)
-					children << software_button('software.run-terminal', 'Launch in Terminal', width - 174, 78, 160)
-					children << software_button('software.run-options', 'Launch options…', width - 174, 110, 160)
+					if row.installed_window_protocol == 0 {
+						children << software_button('software.run-terminal', 'Launch in Terminal', width - 174, 78, 160)
+						children << software_button('software.run-options', 'Launch options…', width - 174, 110, 160)
+					}
 				}
 			}
 		}
@@ -939,6 +959,10 @@ fn (mut a SoftwareApp) build(size ui2.Rect) !ui2.Element {
 }
 
 fn (mut a SoftwareApp) prepare_close() bool {
+	if a.window_mode && a.worker != unsafe { nil } {
+		a.request_window_close()
+		return false
+	}
 	if a.terminal_app != unsafe { nil } && !a.terminal_app.exited {
 		a.set_status('Exit the application before closing Software.')
 		return false
@@ -955,6 +979,7 @@ fn (mut a SoftwareApp) prepare_close() bool {
 }
 
 fn (mut a SoftwareApp) close_app() {
+	a.clear_window()
 	a.clear_launch_options()
 	a.close_terminal()
 	if a.worker != unsafe { nil } {

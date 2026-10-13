@@ -442,6 +442,72 @@ covers the retained compiler/kernel tuple and enabled media subset.
 
 ## Runtimes and launch
 
+### Native window protocol 1
+
+Set `"window_protocol":1` and declare `"display"` in a **native** manifest.
+The field defaults to zero and is omitted at zero, preserving existing canonical
+manifest bytes and deployment-lock digests. Unknown protocol values, nonnative
+kinds and missing display permission are refused. The signed value participates
+in reviews, update detection and deployment locks. Software's view exposes
+`installed_window_protocol`, so a pending candidate cannot change how installed
+code launches. Start, Quick Launch, document launch and Software's Launch action
+use the installed declaration. Older clients require a package-tools/Software
+update to present these apps.
+
+`run-window ID [ABSOLUTE_DOCUMENT...]` is the broker/client stream boundary.
+It repeats current policy/trust/payload validation and holds the normal generation
+lease until the child exits. Root delegates through `launch_user`; the ordinary
+process gets `VINIX_WINDOW_PROTOCOL=1` alongside its normal SDK context. This mode
+does not unveil X11 sockets or grant Unix/TTY/display-device access. Documents
+still require declared `files` permission and ordinary-account accessibility.
+Do not combine this stream with terminal mode or shell commands.
+
+Use `appsdk.WindowFrame`, `WindowElement`, `publish_window_frame`,
+`read_window_event` and `WindowEvent`. A frame is one stdout line prefixed by
+`VINIX-WINDOW-FRAME ` followed by JSON. Human diagnostics use stderr. The maximum
+JSON frame is 65,536 bytes; publishers send complete frames with increasing,
+positive u64 `sequence`. Every field below is required:
+
+```json
+{"format":1,"sequence":1,"title":"Counter","width":320,"height":160,"background":16777215,"elements":[{"kind":"button","id":"increase","text":"Increase","x":16,"y":60,"width":128,"height":32,"color":1118481,"background":14673407}]}
+```
+
+Frames have at most 128 elements and logical dimensions 64–2048. Element kinds
+are `label`, `button` and `rect`. Bounds must fit the frame; coordinates are
+nonnegative and extents positive. RGB colors are unsigned 24-bit values.
+Titles hold at most 128 UTF-8 bytes and element text 2,048, without control
+characters. Buttons require distinct ASCII IDs of at most 64 bytes using the
+package identifier alphabet. Labels/rectangles have empty IDs; rectangles also
+have empty text. JSON fields, numbers, escapes, duplicate/unknown keys and
+Unicode surrogate pairs are checked without recursive schema values. There are
+no image/resource paths, executable actions, desktop settings or service requests.
+
+The broker scales the logical frame into its application area. It prefixes UI
+action IDs internally and sends only admitted button IDs. Each stdin event is
+one JSON line of at most 512 bytes:
+
+```json
+{"format":1,"kind":"click","sequence":1,"id":"increase"}
+{"format":1,"kind":"close","sequence":1,"id":""}
+```
+
+Ignore stale click sequences. A close request may use sequence zero before the
+first frame. The SDK treats EOF as close; retire owned decoded events with
+`.close()`. Publishers construct borrowed frames, while decoded frames own fields
+and require `.close()`. Encoding returns an owned string. Software accepts
+fragmented lines with bounded buffering, freezes presentation on protocol failure,
+and keeps service diagnostics visible. Writes are nonblocking and atomic; a full
+input pipe reports that a click was not sent. Normal close waits for the app and
+its service lease holder. Forced broker retirement closes streams and leaves
+the service alive until the app exits.
+
+[The signed counter](../../examples/package-counter/README.md) demonstrates
+button input, private data and close/EOF behavior. This initial interface supports
+labels/buttons/rectangles; it does not supply text entry, arbitrary graphics,
+clipboard, file pickers, audio, X11 or a full ordinary-user desktop login. Qualify
+those runtimes separately. [Window qualification](../../tests/packages/window-check.md)
+records the host renderer/codec/ownership checks and both native guest tuples.
+
 | Kind | Requirements |
 | --- | --- |
 | `native` | Executable entrypoint in its own payload or explicit runtime. Static V is the initial portable case. |

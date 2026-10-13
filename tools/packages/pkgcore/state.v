@@ -21,7 +21,7 @@ fn state_document_field(parent string, key string) bool {
 		'packages' { key in ['package', 'repository', 'public_key', 'sequence']! }
 		'package' { key in ['id', 'version', 'architecture', 'name', 'description', 'homepage', 'license',
 			'proprietary', 'firmware', 'kind', 'runtime', 'entrypoint', 'arguments', 'permissions',
-			'associations', 'dependencies', 'files', 'sdk']! }
+			'associations', 'dependencies', 'files', 'sdk', 'window_protocol']! }
 		'dependencies' { key in ['id', 'minimum', 'before']! }
 		'files' { key in ['path', 'sha256', 'bytes', 'executable']! }
 		else { false }

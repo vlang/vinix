@@ -68,7 +68,7 @@ fn catalog_key(context string, key string) bool {
 		'recipe' { key in ['format', 'manifest', 'entries'] }
 		'manifest' { key in ['id', 'version', 'architecture', 'name', 'description', 'homepage',
 			'license', 'proprietary', 'firmware', 'kind', 'runtime', 'entrypoint', 'arguments',
-			'permissions', 'associations', 'dependencies', 'files', 'sdk'] }
+			'permissions', 'associations', 'dependencies', 'files', 'sdk', 'window_protocol'] }
 		'entries' { key in ['source', 'path'] }
 		'files' { key in ['path', 'sha256', 'bytes', 'executable'] }
 		'dependencies' { key in ['id', 'minimum', 'before'] }

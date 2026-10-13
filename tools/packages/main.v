@@ -22,6 +22,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
 	'  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
+	'  run-window ID [ABSOLUTE_FILE...] (native window protocol 1 broker client)\n' +
 	'  run-args|run-terminal-args ID [--data-cwd] [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
 	'  pack-root RECIPE.json PREPARED_GUEST_ROOT REPOSITORY_DIR\n' +
@@ -320,7 +321,7 @@ fn checked(arguments []string) !int {
 			if names.len != 3 { return error('mirror-deployment-apply requires a fingerprint, new destination and format-2 deployment lock') }
 			service.apply_deployment_mirror(names[1], names[2], names[0])!
 		}
-		'run', 'run-terminal', 'run-args', 'run-terminal-args' {
+		'run', 'run-terminal', 'run-window', 'run-args', 'run-terminal-args' {
 			if root != '' {
 				return error('application launch cannot use an alternate installation root')
 			}
@@ -329,6 +330,7 @@ fn checked(arguments []string) !int {
 				return service.run_command(names[0], pkgcore.command_launch(names[1..])!, command == 'run-terminal-args')
 			}
 			if command == 'run-terminal' { return service.run_terminal(names[0], names[1..]) }
+			if command == 'run-window' { return service.run_window(names[0], names[1..]) }
 			return service.run(names[0], names[1..])
 		}
 		'purge-data' {

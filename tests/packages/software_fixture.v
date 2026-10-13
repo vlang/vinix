@@ -8,6 +8,13 @@ import ui2
 import time
 import desktop.packagecore
 import tools.packages.pkgprotocol
+import tools.packages.appsdk
+
+$if track_heap ? {
+	#include "tools/tests/heap_tracker.h"
+}
+fn C.vinix_heap_begin()
+fn C.vinix_heap_end() u64
 
 struct Desktop {
 	tz_offset_seconds i64
@@ -25,6 +32,7 @@ const body_panel = u32(0xeeeeee)
 const settings_choice_bg = u32(0xccccff)
 const app_surface = u32(0xffffff)
 const workflow_owned_text_key = 'owned'
+const workflow_owned_id_text_key = 'owned-id-text'
 
 fn editor_bytes_text(bytes []u8) string { return unsafe { tos(bytes.data, bytes.len) } }
 
@@ -137,12 +145,122 @@ fn check_package_review() {
 	app.close_app()
 }
 
+fn software_window_child(id string) {
+	assert id == 'counter'
+	mut count := 0
+	mut sequence := u64(1)
+	for {
+		frame := appsdk.WindowFrame{ sequence: sequence, title: 'Counter', width: 320, height: 160,
+			background: 0xffffff, elements: [
+				appsdk.WindowElement{ kind: 'label', id: '', text: 'Count: ' + count.str(), x: 12, y: 12, width: 280, height: 24, color: 0x111111, background: 0 },
+				appsdk.WindowElement{ kind: 'button', id: 'increase', text: 'Increase', x: 12, y: 48, width: 120, height: 28, color: 0, background: 0xe0e0ff },
+				appsdk.WindowElement{ kind: 'button', id: 'software.confirm', text: 'Application-owned action', x: 12, y: 92, width: 280, height: 28, color: 0, background: 0xe0e0ff },
+			] }
+		println(appsdk.window_prefix + (frame.encode() or { panic(err) }))
+		flush_stdout()
+		mut event := appsdk.read_window_event() or { panic(err) }
+		if event.kind == 'close' { event.close(); return }
+		assert event.kind == 'click' && event.id == 'increase' && event.sequence == sequence
+		event.close()
+		count++; sequence++
+	}
+}
+
+fn wait_window_frame(mut app SoftwareApp, sequence u64) ! {
+	for _ in 0 .. 500 {
+		app.poll()
+		if app.window_frame.sequence == sequence { return }
+		time.sleep(time.millisecond)
+	}
+	return error('native window frame timed out: ' + app.status)
+}
+
+fn free_window_tree(tree ui2.Element) {
+	for child in tree.children { free_window_tree(child) }
+	unsafe {
+		if tree.key in [workflow_owned_text_key, workflow_owned_id_text_key]! { tree.text.free() }
+		if tree.key == workflow_owned_id_text_key { tree.id.free() }
+		(&array(&tree.children)).free()
+	}
+}
+
+fn check_software_window() ! {
+	mut app := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192},
+		rows: [SoftwareRow{ id: 'counter', installed_version: '1.0.0', installed_kind: 'native', installed_window_protocol: 1 }] }
+	app.launch_request = json2.encode(packagecore.Request{ id: 'counter' })
+	app.run_requested()
+	assert app.window_mode && app.worker_run && app.worker.args == ['run-window', 'counter']
+	wait_window_frame(mut app, 1)!
+	tree := app.build(ui2.rect(0, 0, 900, 660))!
+	assert tree.children.any(it.text == 'Count: 0')
+	assert tree.children.any(it.id == software_window_action + 'increase')
+	assert tree.children.any(it.id == software_window_action + 'software.confirm')
+	assert !tree.children.any(it.id == 'software.confirm')
+	free_window_tree(tree)
+	app.handle('software.confirm')!
+	assert app.window_frame.sequence == 1 && app.worker.args == ['run-window', 'counter']
+	app.handle(software_window_action + 'increase')!
+	wait_window_frame(mut app, 2)!
+	assert app.window_frame.elements[0].text == 'Count: 1'
+	assert !app.prepare_close() && app.window_closing
+	wait_for_software(mut app)
+	assert app.prepare_close() && app.window_mode && app.status.contains('finished')
+	app.close_app()
+	mut detached := SoftwareApp{ service_path: os.executable(), output: []u8{cap: 8192} }
+	detached.open_window(packagecore.Request{ id: 'counter' })!
+	wait_window_frame(mut detached, 1)!
+	pid := detached.worker.pid
+	detached.close_app()
+	mut status := 0
+	assert C.waitpid(pid, &status, 0) == pid && status == 0
+	mut parser := SoftwareApp{ window_mode: true, window_pending: []u8{cap: appsdk.window_frame_limit + appsdk.window_prefix.len} }
+	text := appsdk.WindowFrame{ sequence: 1, title: 'Parser', width: 64, height: 64 }.encode()!
+	line := appsdk.window_prefix + text + '\n'
+	for byte in line {
+		one := byte.ascii_str()
+		parser.window_output(one)
+		unsafe { one.free() }
+	}
+	assert parser.window_frame.sequence == 1
+	parser.window_output(appsdk.window_prefix + '{"format":2}\n')
+	assert parser.window_frame.sequence == 1 && parser.window_failure.contains('Invalid')
+	parser.window_output('x'.repeat(appsdk.window_frame_limit + appsdk.window_prefix.len + 1))
+	assert parser.window_skip && parser.window_pending.len == 0
+	parser.window_output('\n')
+	assert !parser.window_skip && parser.window_failure.contains('size limit')
+	parser.window_output(line)
+	assert parser.window_frame.sequence == 1
+	unsafe { text.free(); line.free() }
+	parser.close_app()
+	// Exercise the same atomic write against a pipe with no reader draining it.
+	mut pipe := [2]int{}
+	assert C.pipe(&pipe[0]) == 0
+	mut blocked := SoftwareApp{ window_writable: true, worker: os.new_process('unused') }
+	blocked.worker.use_stdio_ctl = true
+	blocked.worker.stdio_fd[0] = pipe[1]
+	assert C.fcntl(pipe[1], C.F_SETFL, C.fcntl(pipe[1], C.F_GETFL) | C.O_NONBLOCK) == 0
+	started := time.sys_mono_now()
+	mut refused := false
+	for _ in 0 .. 10000 {
+		if !blocked.send_window_event(appsdk.WindowEvent{ kind: 'click', sequence: 1, id: 'increase' }) { refused = true; break }
+	}
+	assert refused && time.sys_mono_now() - started < 2_000_000_000
+	C.close(pipe[0])
+	assert !blocked.send_window_event(appsdk.WindowEvent{ kind: 'close' })
+	blocked.retire_worker()
+	blocked.close_app()
+	println('Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed')
+}
+
 fn main() {
+	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+	if os.args.len == 2 && os.args[1] == 'window-memory' { check_window_broker_memory() or { panic(err) }; return }
 	mut args := os.args.clone()
 	if args.len > 1 && args[1] == '--progress' { args.delete(1) }
 	// This same executable is a literal-argv service fixture for asynchronous
 	// view/run transitions. It deliberately returns useful launch diagnostics.
 	if args.len > 1 {
+		if args[1] == 'run-window' { software_window_child(args[2]); return }
 		if args[1] == 'run-args' {
 			assert args[2..] == ['editor', '--data-cwd', '--file', '/private/tmp/a space; $literal.txt', '--', '-i', '/private/tmp/a space; $literal.txt', '', '$(literal)']
 			time.sleep(30 * time.millisecond)
@@ -307,7 +425,39 @@ fn main() {
 	check_software_mirror() or { panic(err) }
 	check_software_locked_mirror() or { panic(err) }
 	check_software_launch_options() or { panic(err) }
+	check_software_window() or { panic(err) }
 	println('Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed')
+}
+
+fn check_window_broker_memory() ! {
+	$if !track_heap ? { return error('compile this fixture with -d track_heap') }
+	$if track_heap ? {
+	mut app := SoftwareApp{ window_mode: true, output: []u8{cap: 8192}, window_pending: []u8{cap: appsdk.window_frame_limit + appsdk.window_prefix.len} }
+	unsafe { app.output.flags |= .noslices; app.window_pending.flags |= .noslices }
+	mut sequence := u64(1)
+	for warmup in 0 .. 2 {
+		if warmup == 1 { C.vinix_heap_begin() }
+		for _ in 0 .. 1000 {
+			frame := appsdk.WindowFrame{ sequence: sequence, title: 'Counter', width: 320, height: 160, background: 0xffffff,
+				elements: [appsdk.WindowElement{ kind: 'button', id: 'increase', text: 'Increase', x: 12, y: 12, width: 128, height: 28, color: 0, background: 0xe0e0ff }] }
+			text := frame.encode()!
+			line := appsdk.window_prefix + text + '\n'
+			middle := line.len / 2
+			app.window_output(unsafe { tos(line.str, middle) })
+			app.window_output(unsafe { tos(line.str + middle, line.len - middle) })
+			free_window_tree(app.build_window(ui2.rect(0, 0, 900, 660)))
+			unsafe { text.free(); line.free(); (&array(&frame.elements)).free() }
+			sequence++
+		}
+		app.window_frame.close()
+		unsafe { app.status.free() }
+		app.status = ''
+	}
+	kept := C.vinix_heap_end()
+	app.close_app()
+	assert kept == 0, 'native window broker retained ${kept} bytes'
+	println('Native window broker: 1000 fragmented updates, replacements, UI builds and owned-tree retirements retain zero tracked bytes')
+	}
 }
 
 const mirror_fixture_destination = '/private/tmp/offline export; $literal'

@@ -44,7 +44,7 @@ fn launch_session_request(config Config, executable string, id string, input Lau
 		}
 	}
 	if input.command { validate_command(CommandLaunch{ arguments: input.arguments, documents: input.documents })! }
-	command := if input.command { if input.terminal { 'run-terminal-args' } else { 'run-args' } }
+	command := if input.window { 'run-window' } else if input.command { if input.terminal { 'run-terminal-args' } else { 'run-args' } }
 		else { if input.terminal { 'run-terminal' } else { 'run' } }
 	mut argv := ['run', '--isolated', config.launch_user, executable, command, id]
 	if input.command {

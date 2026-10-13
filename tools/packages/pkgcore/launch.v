@@ -53,6 +53,9 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	}
 	installed := selected[0]
 	p := installed.package
+	if input.window && (p.window_protocol != 1 || p.kind != 'native' || 'display' !in p.permissions) {
+		return error('${id}: the installed application does not support native window protocol 1')
+	}
 	check_policy(p, config.policy)!
 	if !config.repositories.any(it.id == installed.repository && it.public_key == installed.public_key) {
 		return error('${id}: publisher key has been revoked')
@@ -67,7 +70,7 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	if input.terminal { promises << 'tty' }
 	if 'network' in p.permissions { promises << ['inet', 'dns'] }
 	if 'process' in p.permissions { promises << 'proc' }
-	if 'display' in p.permissions { promises << 'unix' }
+	if 'display' in p.permissions && !input.window { promises << 'unix' }
 	args << ['--promises', promises.join(' '), '--unveil', app, 'rx', '--unveil', data, 'rwc']
 	if runtime != app { args << ['--unveil', runtime, 'rx'] }
 	mut libraries := [app + '/lib', app + '/usr/lib', runtime + '/lib', runtime + '/usr/lib']
@@ -94,7 +97,8 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	defer { appsdk.free_values(mut environment) }
 	for value in environment { args << '--env'; args << value.clone() }
 	if input.terminal { args << ['--env', 'TERM=linux'] }
-	if 'display' in p.permissions {
+	if input.window { args << ['--env', 'VINIX_WINDOW_PROTOCOL=1'] }
+	if 'display' in p.permissions && !input.window {
 		args << ['--unveil', '/tmp/.X11-unix', 'rw', '--env', 'DISPLAY=' + os.getenv('DISPLAY')]
 	}
 	if 'audio' in p.permissions { args << ['--unveil', '/dev/snd', 'rw'] }

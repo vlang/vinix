@@ -13,6 +13,7 @@ pub:
 	installed_name    string
 	installed_kind    string
 	installed_permissions []string
+	installed_window_protocol int
 	architecture      string
 	kind              string
 	runtime           string
@@ -119,6 +120,7 @@ fn catalog_view(config Config, catalog Catalog, current State, catalog_error str
 			installed_name:    old.package.name
 			installed_kind:    old.package.kind
 			installed_permissions: old.package.permissions
+			installed_window_protocol: old.package.window_protocol
 			architecture:      p.architecture
 			kind:              p.kind
 			runtime:           p.runtime

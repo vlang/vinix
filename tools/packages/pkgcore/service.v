@@ -131,6 +131,10 @@ pub fn (service Service) run_terminal(id string, documents []string) !int {
 	return service.run_mode(id, LaunchInput{ documents: documents, terminal: true })
 }
 
+pub fn (service Service) run_window(id string, documents []string) !int {
+	return service.run_mode(id, LaunchInput{ documents: documents, window: true })
+}
+
 pub fn (service Service) run_command(id string, input CommandLaunch, terminal bool) !int {
 	validate_command(input)!
 	if terminal && (C.isatty(0) != 1 || C.isatty(1) != 1) {

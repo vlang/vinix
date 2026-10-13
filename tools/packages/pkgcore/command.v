@@ -19,6 +19,7 @@ struct LaunchInput {
 	terminal bool
 	command bool
 	data_cwd bool
+	window bool
 }
 
 fn validate_command(input CommandLaunch) ! {

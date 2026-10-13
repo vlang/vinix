@@ -1,0 +1,1 @@
+{"id":"org.vinix.counter","version":"1.0.0","architecture":"x86_64","name":"Native counter","description":"A native SDK 1 window example with a button and retained private counter data.","license":"MIT","kind":"native","entrypoint":"bin/counter","permissions":["display"],"window_protocol":1}
