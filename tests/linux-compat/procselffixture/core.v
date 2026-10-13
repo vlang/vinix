@@ -11,10 +11,12 @@ module procselffixture
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mount.h>
+#include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 @[typedef]
@@ -22,6 +24,9 @@ struct C.pthread_t {}
 struct C.stat { st_mode u32 st_ino u64 st_dev u64 }
 struct C.sched_param { mut: sched_priority i32 }
 struct C.rlimit { rlim_cur u64 rlim_max u64 }
+struct C.timeval { tv_sec i64 tv_usec i64 }
+struct C.timespec { tv_sec i64 tv_nsec i64 }
+struct C.rusage { ru_utime C.timeval ru_stime C.timeval ru_minflt i64 ru_majflt i64 }
 struct Handles { mut: dirs [3]i32 links [6]i32 }
 struct Worker { bank &Handles ordinary bool slot i32 mut: tid i32 failed bool }
 struct Slabs { mut: sizes [32]u64 live [32]u64 rows i32 large u64 }
@@ -58,6 +63,11 @@ fn C.sched_setscheduler(i32, i32, &C.sched_param) i32
 fn C.sched_getscheduler(i32) i32
 fn C.sched_getparam(i32, &C.sched_param) i32
 fn C.setrlimit(i32, &C.rlimit) i32
+fn C.getrusage(i32, &C.rusage) i32
+fn C.clock_gettime(i32, &C.timespec) i32
+fn C.sysconf(i32) i64
+fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
+fn C.munmap(voidptr, usize) i32
 fn C.strrchr(&char, i32) &char
 fn C.strtoll(&char, &&char, i32) i64
 fn C.snprintf(&char, usize, &char, ...) i32
@@ -119,21 +129,60 @@ fn scheduling(policy i32, priority i32) bool {
 		return C.pthread_setschedparam(current, policy, &param) == 0 && C.pthread_getschedparam(current, &actual_policy, &actual) == 0 && actual_policy == policy && actual.sched_priority == priority
 	}
 }
-fn stat_record(dirfd i32, path &char, wanted_pid i32, policy i32, rtprio i32, verbose bool) bool {
+fn usage_ticks(value C.timeval) i64 { return value.tv_sec * 100 + value.tv_usec / 10000 }
+fn workload(slot i32) bool {
+	unsafe {
+		page := C.sysconf(C._SC_PAGESIZE); if page <= 0 { return false }
+		pages := if slot == 0 { i32(256) } else { i32(slot * 32) }
+		// Large reservations demand-fill on both architectures. ARM eagerly
+		// fills small anonymous mappings, so touching those proves no faults.
+		length := usize(64 * 1024 * 1024)
+		mut fault_before := C.rusage{}; mut fault_after := C.rusage{}
+		if C.getrusage(C.RUSAGE_THREAD, &fault_before) != 0 { return false }
+		memory := C.mmap(nil, length, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+		if memory == voidptr(isize(-1)) { return false }
+		for index in 0 .. int(pages) { (&u8(memory))[index * int(page)] = u8(index) }
+		if C.munmap(memory, length) != 0 { return false }
+		if C.getrusage(C.RUSAGE_THREAD, &fault_after) != 0 { return false }
+		faults := fault_after.ru_minflt - fault_before.ru_minflt
+		if faults < pages || fault_after.ru_majflt != fault_before.ru_majflt { return false }
+		mut first := C.timespec{}; mut now := C.timespec{}
+		if C.clock_gettime(C.CLOCK_THREAD_CPUTIME_ID, &first) != 0 { return false }
+		span := if slot == 0 { i64(200000000) } else { i64(slot * 50000000) }
+		mut checksum := u64(1)
+		for {
+			for index in 0 .. 100000 { checksum = (checksum * 6364136223846793005 + 1) ^ u64(index) }
+			if C.clock_gettime(C.CLOCK_THREAD_CPUTIME_ID, &now) != 0 { return false }
+			if (now.tv_sec - first.tv_sec) * 1000000000 + now.tv_nsec - first.tv_nsec >= span { break }
+		}
+		C.printf(c'LINUX PROCSELF WORK: slot=%d pages=%d faults=%ld cpu_ns=%ld checksum=%lu\n', slot, pages, faults, (now.tv_sec - first.tv_sec) * 1000000000 + now.tv_nsec - first.tv_nsec, checksum); C.fflush(nil)
+		return true
+	}
+}
+fn stat_record(dirfd i32, path &char, wanted_pid i32, policy i32, rtprio i32, task bool, verbose bool) bool {
 	unsafe {
 		fd := C.openat(dirfd, path, C.O_RDONLY); if fd < 0 { return false }; defer { C.close(fd) }
+		mut before := C.rusage{}; mut after := C.rusage{}; who := if task { i32(C.RUSAGE_THREAD) } else { i32(C.RUSAGE_SELF) }
+		if C.getrusage(who, &before) != 0 { return false }
 		mut data := [4096]char{}; length := C.read(fd, &data[0], 4095)
+		if C.getrusage(who, &after) != 0 { return false }
 		if length <= 0 || length >= 4096 { return false }; data[int(length)] = 0
 		mut pid := i32(-1); if C.sscanf(&data[0], c'%d', &pid) != 1 { return false }
 		end_name := C.strrchr(&data[0], i32(`)`)); if end_name == nil || end_name[1] != char(32) || end_name[2] == 0 || end_name[3] != char(32) { return false }
 		mut cursor := end_name + 4; mut priority := i64(0); mut actual_rtprio := i64(0); mut actual_policy := i64(-1)
+		mut minor := i64(-1); mut major := i64(-1); mut user := i64(-1); mut system := i64(-1)
 		for field in 4 .. 42 {
 			mut next := &char(nil); value := C.strtoll(cursor, &next, 10); if next == cursor { return false }; cursor = next
 			if field == 18 { priority = value }; if field == 40 { actual_rtprio = value }; if field == 41 { actual_policy = value }
+			if field == 10 { minor = value }; if field == 12 { major = value }; if field == 14 { user = value }; if field == 15 { system = value }
 		}
 		wanted_priority := if policy == i32(C.SCHED_FIFO) || policy == i32(C.SCHED_RR) { i64(-1 - rtprio) } else { i64(20) }
-		valid := pid == wanted_pid && priority == wanted_priority && actual_rtprio == rtprio && actual_policy == policy
-		if !valid && verbose { C.printf(c'LINUX PROCSELF STAT DETAIL: path=%s pid=%d/%d priority=%ld/%ld rtprio=%ld/%d policy=%ld/%d\n', path, pid, wanted_pid, priority, wanted_priority, actual_rtprio, rtprio, actual_policy, policy); C.fflush(nil) }
+		identity := pid == wanted_pid && priority == wanted_priority && actual_rtprio == rtprio && actual_policy == policy
+		accounting := minor >= before.ru_minflt && minor <= after.ru_minflt && major >= before.ru_majflt && major <= after.ru_majflt
+			&& user >= usage_ticks(before.ru_utime) && user <= usage_ticks(after.ru_utime) && system >= usage_ticks(before.ru_stime) && system <= usage_ticks(after.ru_stime)
+		valid := identity && accounting
+		if !identity && verbose { C.printf(c'LINUX PROCSELF STAT DETAIL: path=%s pid=%d/%d priority=%ld/%ld rtprio=%ld/%d policy=%ld/%d\n', path, pid, wanted_pid, priority, wanted_priority, actual_rtprio, rtprio, actual_policy, policy); C.fflush(nil) }
+		if !accounting && verbose { C.printf(c'LINUX PROCSELF ACCOUNT DETAIL: path=%s task=%d minor=%ld/%ld:%ld major=%ld/%ld:%ld user=%ld/%ld:%ld system=%ld/%ld:%ld\n', path, i32(task), minor, before.ru_minflt, after.ru_minflt, major, before.ru_majflt, after.ru_majflt, user, usage_ticks(before.ru_utime), usage_ticks(after.ru_utime), system, usage_ticks(before.ru_stime), usage_ticks(after.ru_stime)); C.fflush(nil) }
 		return valid
 	}
 }
@@ -158,13 +207,18 @@ fn status(dirfd i32, kind i32, verbose bool) bool {
 		if policy < 0 || C.syscall(isize(C.SYS_sched_getparam), isize(tid), &param) != 0 { return false }
 		C.snprintf(&named[0], 64, c'%s/stat', link_name(kind))
 		if kind == 0 { C.snprintf(&numeric[0], 64, c'%d/stat', pid) } else { C.snprintf(&numeric[0], 64, c'%d/task/%d/stat', pid, tid) }
-		first := stat_record(dirfd, &named[0], tid, policy, param.sched_priority, verbose)
-		second := stat_record(dirfd, &numeric[0], tid, policy, param.sched_priority, verbose)
+		first := stat_record(dirfd, &named[0], tid, policy, param.sched_priority, kind == 1, verbose)
+		second := stat_record(dirfd, &numeric[0], tid, policy, param.sched_priority, kind == 1, verbose)
 		return valid_status && first && second
 	}
 }
 fn matrix(bank &Handles, ordinary bool, slot i32) bool {
 	unsafe {
+		mut own := C.rusage{}; mut group := C.rusage{}
+		if C.getrusage(C.RUSAGE_THREAD, &own) != 0 || C.getrusage(C.RUSAGE_SELF, &group) != 0 { return false }
+		own_ticks := usage_ticks(own.ru_utime) + usage_ticks(own.ru_stime); group_ticks := usage_ticks(group.ru_utime) + usage_ticks(group.ru_stime)
+		if slot != 0 && (group.ru_minflt <= own.ru_minflt || group_ticks - own_ticks < 10) { return false }
+		C.printf(c'LINUX PROCSELF ACCOUNT SAMPLE: ordinary=%d slot=%d faults=%ld/%ld cpu_ticks=%ld/%ld\n', i32(ordinary), slot, own.ru_minflt, group.ru_minflt, own_ticks, group_ticks); C.fflush(nil)
 		mut cases := i32(0); mut bad := i32(0)
 		for view in 0 .. 3 { for kind in 0 .. 2 { for form in 0 .. 5 { for size in [i32(1), 3, 64]! { for destination in 0 .. 3 {
 			cases++; if !probe(bank, i32(view), i32(kind), i32(form), size, i32(destination), true) { bad++ }
@@ -178,6 +232,7 @@ fn matrix(bank &Handles, ordinary bool, slot i32) bool {
 fn worker(arg voidptr) voidptr {
 	unsafe {
 		mut state := &Worker(arg); state.tid = i32(C.syscall(isize(C.SYS_gettid)))
+		if !workload(state.slot) { state.failed = true; return nil }
 		policy := if state.slot == 1 { i32(C.SCHED_FIFO) } else { i32(C.SCHED_RR) }; priority := if state.slot == 1 { i32(17) } else { i32(33) }
 		if !scheduling(policy, priority) { state.failed = true; return nil }
 		state.failed = !matrix(state.bank, state.ordinary, state.slot)
@@ -255,8 +310,8 @@ fn namespace_identity(fd i32, local bool, outer_pid i32) bool {
 		policy := i32(C.syscall(isize(C.SYS_sched_getscheduler), isize(0))); mut param := C.sched_param{}
 		if policy < 0 || C.syscall(isize(C.SYS_sched_getparam), isize(0), &param) != 0 { return false }
 		mut numeric := [96]char{}; C.snprintf(&numeric[0], 96, c'%s/stat', &link[0])
-		alias_valid := stat_record(fd, c'thread-self/stat', outer_tid, policy, param.sched_priority, true)
-		numeric_valid := stat_record(fd, &numeric[0], outer_tid, policy, param.sched_priority, true)
+		alias_valid := stat_record(fd, c'thread-self/stat', outer_tid, policy, param.sched_priority, true, true)
+		numeric_valid := stat_record(fd, &numeric[0], outer_tid, policy, param.sched_priority, true, true)
 		valid := pid == outer_tid && tgid == parsed_pid && first == outer_tid && count == if local { 1 } else { 2 } && (local || second == local_tid) && alias_valid && numeric_valid
 		C.printf(c'LINUX PROCSELF TASKIDS: local=%d leader=%d pid=%d/%d tgid=%d/%d nspid=%d:%d count=%d expected_count=%d %s\n', i32(local), i32(local_tid == 1), pid, outer_tid, tgid, parsed_pid, first, second, count, if local { 1 } else { 2 }, if valid { &char(c'PASS') } else { &char(c'FAIL') }); C.fflush(nil)
 		return valid
@@ -303,7 +358,7 @@ fn qualify(bank &Handles, ordinary bool) bool {
 	unsafe {
 		defer { cleanup(bank) }
 		if ordinary && (C.setgroups(0, nil) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0) { return false }
-		C.alarm(300); mut good := matrix(bank, ordinary, 0)
+		C.alarm(300); if !workload(0) { return false }; mut good := matrix(bank, ordinary, 0)
 		mut states := [Worker{bank: bank, ordinary: ordinary, slot: 1}, Worker{bank: bank, ordinary: ordinary, slot: 2}]!
 		mut threads := [2]C.pthread_t{}; mut started := 0
 		for index in 0 .. 2 { if C.pthread_create(&threads[index], nil, worker, &states[index]) != 0 { good = false; break }; started++ }

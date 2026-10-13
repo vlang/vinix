@@ -727,7 +727,7 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/proc/container.v` | `db3558d2cea2aeb8c5a483cd9cbade7ba37e2d9d13f5d3047874a9ce2319449a` |
 | `kernel/proc/kernel_budget.v` | `763ca9bea7d11825b8abc293e350a3afabe911bab8e718853626d52fd2201553` |
 | `kernel/proc/pidns.v` | `10a1bbd4b6201113d89302b4ad1da9df937a03494279beec02f7e29889b01be5` |
-| `kernel/proc/proc.v` | `ffdf23d610e9d58f1f00b3976ede6543f70691e98dd31318bb506153bbc3cadc` |
+| `kernel/proc/proc.v` | `13380bbfc4265d2a586945d3f076b442769000ee4b6ef1a816cfdad8705bfad3` |
 | `kernel/proc/proc_amd64.v` | `7f82c4426fe63532606503e5dcdbca8379da7029dbc6806ec618b6c3da3af4a5` |
 | `kernel/proc/proc_arm64.v` | `8f0863be166867eeec2cf033d69ebbd48d2c26788062dea8e2e04513ebf1b436` |
 | `kernel/proc/seccomp.v` | `5cb8ae00ab6d3c0597dceae62efdb44d05b902605a450ccc9e34d77a3dab6760` |

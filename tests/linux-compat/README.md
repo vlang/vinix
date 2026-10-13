@@ -166,7 +166,20 @@ are 84 initial stat reads per architecture and 12 more per retention cycle.
 Both baselines fail 28 worker records; both candidates pass all fields with flat
 63 ARM/160 x86 large pages. Initial setup failures caused by musl wrappers remain
 published. See [the task-stat receipts](../../docs/linux-posix-qualification.md#selected-task-stat-identity-and-scheduling).
-Per-thread CPU/fault/state/name/nice/start-time accounting remains separate.
+Per-thread state/name/nice/start-time reporting remains separate. CPU/fault
+controls are extended below.
+
+Stat fields 10/12/14/15 now compare against before/read/after `getrusage` brackets
+using RUSAGE_THREAD for task paths and RUSAGE_SELF for process paths at 100 Hz.
+Leader/worker workloads reserve 64 MiB, touch 256/32/64 native-sized pages,
+unmap and require positive minor-fault deltas, then do 200/50/100 ms of measured
+CPU work. Worker samples must show fewer faults and CPU ticks than the process.
+Both baselines fail 28 task records; both candidates pass the 84 initial reads,
+namespace/chroot controls and all retention cycles, preserving previous
+identity/scheduling checks. Original small-map baselines remain published;
+AArch64's eager small mappings did not prove positive demand faults. Major
+faults are zero controls here; disk fault production and child-time fields need
+separate qualification. See [the accounting receipts](../../docs/linux-posix-qualification.md#selected-task-stat-cpu-and-fault-accounting).
 
 The `readlinkempty` case checks 3,648 raw/musl calls per root/UID1000 child
 on both architectures. Empty paths name the retained symlink description,

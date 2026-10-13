@@ -1468,6 +1468,17 @@ pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
 	// Process stat uses the leader; task stat uses that thread's policy.
 	// Linux's real-time priority field is -1 - rt_priority.
 	params := target.sched_or_default()
+	// Process counters include every sibling (and retired siblings); task
+	// records report only that thread. CPU snapshots include its current turn.
+	minor_faults := if tid == 0 { katomic.load(&process.usage.minor_faults) } else { katomic.load(&target.usage.minor_faults) }
+	major_faults := if tid == 0 { katomic.load(&process.usage.major_faults) } else { katomic.load(&target.usage.major_faults) }
+	mut user_ns := u64(0)
+	mut system_ns := u64(0)
+	if tid == 0 {
+		user_ns, system_ns = process_cpu_times(process, 0)
+	} else {
+		user_ns, system_ns = thread_cpu_times(target, 0)
+	}
 	mut priority := 20 + process.nice
 	if params.policy == sched_fifo || params.policy == sched_rr {
 		priority = -1 - params.priority
@@ -1495,17 +1506,17 @@ pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
 	text.add_decimal(shown_sid)
 	// User/system and reaped children CPU time, in clock ticks.
 	text.add(' 0 -1 0 ')
-	text.add_unsigned(katomic.load(&process.usage.minor_faults))
+	text.add_unsigned(minor_faults)
 	text.add_byte(` `)
 	text.add_unsigned(katomic.load(&process.children_usage.minor_faults))
 	text.add_byte(` `)
-	text.add_unsigned(katomic.load(&process.usage.major_faults))
+	text.add_unsigned(major_faults)
 	text.add_byte(` `)
 	text.add_unsigned(katomic.load(&process.children_usage.major_faults))
 	text.add_byte(` `)
-	text.add_unsigned(katomic.load(&process.cpu_user_ns) / 10000000)
+	text.add_unsigned(user_ns / 10000000)
 	text.add_byte(` `)
-	text.add_unsigned(katomic.load(&process.cpu_system_ns) / 10000000)
+	text.add_unsigned(system_ns / 10000000)
 	text.add_byte(` `)
 	text.add_unsigned(katomic.load(&process.children_cpu_user_ns) / 10000000)
 	text.add_byte(` `)

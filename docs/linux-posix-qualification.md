@@ -3263,9 +3263,92 @@ and [x86 candidate](../tests/linux-compat/results/2026-10-13/procstat-after-x86_
 Public inventory fingerprints are regenerated from the committed parent plus
 this fix, separately from the semantic build input set.
 
-This qualifies only selected native identity and scheduling fields. CPU/fault
-accounting, state, nice, start time and command remain process-wide in this
-formatter. Scheduler timing, task retirement, overmount/unmount races, full
+This qualifies only selected native identity and scheduling fields. At this
+qualification CPU/fault accounting, state, nice, start time and command remain
+process-wide in the formatter. The following extension qualifies CPU/fault
+fields separately. Scheduler timing, task retirement, overmount/unmount races, full
 procfs mount retention and glibc/translated/ELF32 or application installation,
+sandbox and portal acceptance remain separate. The three broad section 15 gates
+remain open.
+
+## Selected task stat CPU and fault accounting
+
+Native task stat now reads the selected thread's minor/major fault counters and
+CPU times for fields 10/12/14/15. Process stat retains all siblings' lifetime
+totals, including retired threads, and both paths use the existing CPU snapshot
+helpers to include unfinished running turns. Linux's
+[do_task_stat](https://github.com/torvalds/linux/blob/master/fs/proc/array.c)
+distinguishes task counters from thread-group totals. Previously task records
+reported process totals and CPU fields read only stored counters. Child fields,
+selected identity/scheduling, Text ownership and allocation/free paths remain
+unchanged. The table lock retains the validated target throughout; process
+snapshots take thread-list then CPU locks, and task snapshots take the CPU lock,
+matching existing readers. CPU charging releases that lock before signal delivery.
+
+The native musl fixture brackets every named/numeric stat read with
+`getrusage(RUSAGE_THREAD)` or `getrusage(RUSAGE_SELF)` and requires minor/major
+faults and 100 Hz user/system ticks within those exact before/after ranges.
+Each credential group's leader and two workers reserve 64 MiB, touch 256/32/64
+`sysconf`-sized pages, unmap, and require positive minor-fault deltas with
+unchanged major counts. Both architectures produce exactly those fault counts.
+Measured thread CPU work lasts at least 200/50/100 ms with a printed checksum
+preserving the computation. Worker samples require more process faults and at
+least ten additional process CPU ticks, ensuring the two views differ.
+
+| Architecture | Baseline | Candidate | Large pages before/after, both credential groups |
+| --- | --- | --- | --- |
+| AArch64 | 28 task records report process fault/CPU totals | All 84 initial bracketed reads and retention cycles pass | 63/63 |
+| x86-64 | 28 task records report process fault/CPU totals | All 84 initial bracketed reads and retention cycles pass | 160/160 |
+
+Each baseline has 12 records exceeding a worker's 32-fault oracle, 12 exceeding
+the other worker's 64-fault oracle and four exceeding the namespace worker's
+zero-fault oracle. User ticks exceed worker brackets in all 24 ordinary worker
+records. Major counts are zero controls; these runs do not qualify nonzero
+disk-backed major-fault production. All previous identity/scheduling and 1,620
+link probes remain correct. Existing status fields and leader controls pass;
+only appended task accounting checks fail.
+
+Candidates retain root/UID1000 main/fork/pthread readers, three proc aliases,
+chroot and inherited-root/own-PID namespace views, plus FIFO17/RR33/FIFO23
+controls. After 32 warmups, 200 cycles per credential group perform 120 link
+probes, six status checks and 12 stat reads per cycle, including the process
+totals after worker retirement. All 18 ARM and 14 x86 live slab classes remain
+exact. Both architectures also pass `nnpthread`, `seccompthread`, `namespace`,
+`open` and `runtime`; eight host test files pass. Allocation audits retain exit
+1, identical `NEW:` rows, 406 ARM/295 x86 sites and 657/653 source files. No
+allowance changes.
+
+Original small-map baseline runs also expose the bug, but ARM eagerly fills
+those mappings and the workers record no positive touch faults. Those failed
+receipts, logs and original source/C remain published. Final tests explicitly
+use demand reservations on both architectures and verify fault deltas. A draft
+MAP_FAILED comparison was corrected before guest compilation.
+
+Both kernels build in isolated worktrees at
+`9880153c2832ad17b0b82c162441cdbc45b1b9d9`. Restoring one formatter body and
+normalizing only unused-loop source offsets reproduces the complete baseline
+generated C. Both actual before/after guest C files equal the final previews.
+Independent lifetime review verifies nested lock order, scalar CPU/fault
+snapshots, stack rusage/clock buffers, unmapping before later errors, descriptor
+closure and worker state through joins. No new ownership transfer occurs.
+
+The assertion-enabled [auditor](../tests/linux-compat/results/2026-10-13/procaccount-audit.v)
+requires positive fault/CPU separation, exact baseline failure counts, source
+unchanged outside described fixture helpers, all six candidate verdicts,
+compiled-source/ELF/ISO/kernel receipts, generated-C scope, review hashes and
+flat storage. Both deliberately failing controls execute. Evidence binds all
+63 isolated inputs and compiler/controller/build/C/capture/receipt hashes:
+[AArch64](../tests/linux-compat/results/2026-10-13/procaccount-evidence-aarch64.json),
+[x86-64](../tests/linux-compat/results/2026-10-13/procaccount-evidence-x86_64.json),
+[ARM baseline](../tests/linux-compat/results/2026-10-13/procaccount-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/procaccount-after-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/procaccount-before-x86_64.log)
+and [x86 candidate](../tests/linux-compat/results/2026-10-13/procaccount-after-x86_64.log).
+Public inventory fingerprints are generated from the committed parent plus this
+fix, separately from semantic build inputs.
+
+Nonzero disk faults, child-time accounting, overflow, timer/scheduler timing,
+state/nice/start/name fields, repeated namespace creation/reclamation, concurrent
+retirement/unmount and glibc/translated/ELF32 or application installation,
 sandbox and portal acceptance remain separate. The three broad section 15 gates
 remain open.

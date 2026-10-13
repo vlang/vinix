@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/procaccount-audit.v:157: FAIL: fn main.failure: assert log.contains('LINUX PROCSELF ACCOUNT DETAIL:'), 'task-account baseline failure markers required'
+      message: task-account baseline failure markers required
+V panic: Assertion failed...
