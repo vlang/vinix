@@ -13,7 +13,7 @@ missing kernel isolation, debugger or hardware virtualization interfaces.
 | OCI and rootless containers | Existing mount/PID/IPC/UTS namespaces, resource-group controls and overlay copy-up provide parts of container support; see [resource groups](resource-groups.md) and [compatibility status](linux-posix-compatibility.md). | User ID mapping, user/network namespace ownership, network isolation, complete delegation and OCI security semantics; mainstream-runtime and rootless adversarial qualification. Existing refusal of unsupported isolation stays intact. |
 | Practical hardware VM hosting | QEMU provides practical RAM sizes and multiple virtual CPUs. The [VM manager](../tools/development/virtual-machines.md) selects an accelerator explicitly. The native Intel backend supports page-backed RAM up to 1 GiB, with allocation rollback, shared mapping lifetimes and EPT invalidation. | Native Intel still has one vCPU and a real-mode entry API. Larger-memory VM entry requires physical/nested VT-x qualification. AMD SVM, ARM virtualization, interrupts and device integration remain open. QEMU TCG inside Vinix does not satisfy hardware acceleration acceptance. |
 | VM integration and lifecycle | Private per-VM qcow2 disks/firmware variables, QMP lifecycle, offline paired snapshots, explicit user networking/loopback SSH forwarding, read-only 9p shares and a guest-agent transport. | Qualify guest OS workflows inside Vinix, provide Vinix guest tools/drivers, qualify shared folders and network behavior, and implement running-state snapshots and crash-atomic snapshot transactions if required. |
-| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity and authenticated HTTP/CGI projects on both architectures. The HTTP gate checks private credentials, unauthorized-request and traversal refusal, GET/HEAD, a pinned V CGI application and owned server retirement as UID/GID 1000. [Per-account interval jobs](../tools/development/scheduled-jobs.md) use pinned executables, selected environment, protected credential files and persisted status. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify ordinary-account execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. | Installed-system service/boot integration, wider database/server/TLS/load qualification, authenticated SSH development and CI project workflows under ordinary-user policy. |
+| Server/SSH/CI and automation | Native SQLite transaction/rollback/reopen/integrity and authenticated HTTP/CGI projects on both architectures. AArch64 also passes two scheduled native Go CI builds with matching artifacts, isolated credentials and refusal of an existing output. [Per-account interval jobs](../tools/development/scheduled-jobs.md) use pinned executables, selected environment, protected credential files and durably reserved attempts for fresh outputs. [Native x86_64/AArch64 job checks](../tests/development/README.md) qualify ordinary-account execution, private receipts, credential/output isolation, unsafe-file refusal, deadlines, INT/TERM group retirement, watcher ticks with one PID, concurrent-owner refusal and killed-owner retry/acknowledgement. | Installed-system service/boot integration, wider database/server/TLS/load qualification, authenticated SSH development, native x86 CI and broader CI/deployment workflows. An intermittent x86 watcher-state read failure remains recorded. |
 
 Validation on 12 October 2026 used the Darwin ARM host, V 0.5.2 `f6358ec`,
 QEMU 11.1.1 and the installed musl cross-compilers. All checks below passed:
@@ -242,6 +242,32 @@ receipts remain evidence; acceptance applies only to the new pinned tuples.
 Full source, SDK, runtime and executable pins are recorded in
 [the guest qualification evidence](../tests/development/README.md).
 TLS, production load, service boot integration and SSH/CI remain open.
+
+The scheduled native Go CI reference gate passed on AArch64 HVF on
+13 October 2026. A pinned `vinix-jobs` schedule dispatched `vinix-build` twice
+as UID/GID 1000, compiling and executing the Go 1.23.9 goroutine/channel/file
+project in distinct reserved-attempt workspaces. Program/data/account-proof
+artifacts matched. The private CI credential reached only the selected
+coordinator; a pinned child verified that it and unselected parent credentials
+were absent from build commands. A third attempt refused an existing output,
+preserved its sentinel and recorded failure with attempt/completion counts
+advanced to three. The controller independently validated all 22 records in
+`build/development17-20261013/guest-arm-reference-ci-d`.
+
+The scheduler reserves attempt numbers before execution and keeps them across
+owner acknowledgement. Host tests cover literal/expanded arguments, legacy
+receipt migration, interrupted-output preservation and counter exhaustion.
+Build/qualifier CLIs now propagate INT/TERM through their active owned groups,
+with nested shutdown windows inside the scheduler's eight-second fallback.
+Host tests interrupted the actual CLI chain with a compiler and descendant
+that ignore TERM, requiring both to retire before the build owner returned.
+Native x86 HTTP/account/job/build regressions passed with these tools in
+`build/development17-20261013/guest-x86-ci-cancellation-c` (19 records).
+An earlier x86 attempt run failed the watcher-state read assertion; the same
+inputs passed on repeat. That retained failure remains a reliability issue
+to investigate, rather than a section 17 closure claim. Full pins and native
+CI instructions are recorded in [the guest evidence](../tests/development/README.md).
+Boot services, remote CI, deployment, broader projects and SSH remain open.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,

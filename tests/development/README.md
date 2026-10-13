@@ -196,6 +196,55 @@ remain failed receipts; qualification applies to the exact tuples above.
 Server diagnostics remain in private logs, including on failure; the guest
 emits bounded qualifier diagnostics and public case receipts.
 
+For the scheduled native Go CI gate, set `VINIX_DEVELOPMENT_REFERENCE_CI=1`
+with the prepared Go prefix and development tools that support reserved
+attempts and nested command interruption:
+
+```
+V_C_ERROR_BUG_REPORT_DISABLED=1 USE_TCG=0 \
+VINIX_DEVELOPMENT_REFERENCE_SDK=/path/to/native-go-stage/sdk \
+VINIX_DEVELOPMENT_REFERENCE_PROFILES=go \
+VINIX_DEVELOPMENT_REFERENCE_CI=1 \
+tests/development/run-guest aarch64 /path/to/kernel /path/to/staged-tools /path/to/new-ci-state
+```
+
+CI mode replaces the two manual reference builds with a pinned `vinix-jobs`
+schedule executing `vinix-build`. Its opt-in `{attempt}` argument produces
+`/home/developer/ci-1` and `ci-2`. Both runs compile and execute the ordinary
+Go goroutine/channel/file project. A pinned child verifies UID/GID 1000 and
+that the schedule's private credential and unselected parent credentials
+are absent from build commands. The credential is passed only to the selected
+build runner; values stay outside schedule/build receipts and serial output.
+
+The third attempt encounters a preexisting output containing a sentinel.
+It must fail without changing that file or creating a build receipt, while
+advancing its reserved and completed attempt counts to three. The host checks
+the exact schedule executable/arguments, credential paths, empty job environment,
+plan pin, completed and failed state, interval, both build/report contracts,
+account-proof hashes, and matching Go program/data artifacts. There are 22
+independently checked native records in this mode. Other profile selections
+are refused before staging. This gate exercises a local native CI reference
+pipeline; service/boot integration, remote CI, deployment and wider project
+workflows retain separate acceptance work.
+
+On 13 October 2026 AArch64 HVF passed this gate with Go 1.23.9 in
+`build/development17-20261013/guest-arm-reference-ci-d`. Its receipt records
+`reference_ci: true`, 22 native records and SDK/runtime pins
+`41be47dff0e19457302ad26ea9b668c9065fc2ddcbfb833ee93a8aecc2f9ee00` /
+`3dce764667a2ad550c540fcd81cfec45f06bd6839acb367446044d0e9a9fc996`.
+Both program hashes are
+`560d3fefeaebf7a545a1b18f7fc33d3b423f2a2b244d2a15fd3e6f9fe1e5371d`;
+both account-proof hashes are
+`a0e36539edcca62f49f8a10d46bf810efb38bda87593f7b28b9940a8b71d576b`.
+The build/qualifier/scheduler pins are
+`4f95aa31ce47966780d5b9b09d5de7ba5246ea2c5079546b69d0de610c501fd2`,
+`c110decd42a2519be785824eef6d1ed10c8e9f0322013c6f44382bba47d61aeb`
+and `5720b53503e7986e2958234a0226d5305b72c4885fa2c8f4f338c315808373d3`.
+Their complete stages remain in `tools-arm-ci-b` and `tools-x86-ci-b` under
+the same evidence root. The x86 HTTP/account/job/build regression passed with
+these tools in `guest-x86-ci-cancellation-c` (19 records). Native x86 Go CI
+has not been qualified by these results.
+
 On 13 October 2026 AArch64 HVF passed GNU make 4.4.1, Samurai's Ninja-compatible
 CLI reporting `1.9`, and SQLite 3.53.4 in
 `build/development17-20261013/guest-arm-reference-buildtools-c`. GCC reported

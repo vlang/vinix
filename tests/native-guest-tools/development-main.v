@@ -12,6 +12,7 @@ import tools.packages.pkgcore
 import crypto.ed25519
 import encoding.hex
 import tests.development.referencecore
+import tests.development.cicore
 
 struct Pin {
 	path   string
@@ -22,6 +23,7 @@ struct Job {
 	id               string = 'fixture'
 	executable       Pin
 	arguments        []string
+	expand_attempt bool
 	directory        string            = '/home/developer'
 	interval_seconds int               = 3600
 	timeout_seconds  int               = 10
@@ -143,6 +145,7 @@ struct Receipt {
 	reference_runtime_sha256 string
 	reference_profiles []string
 	reference_jit bool
+	reference_ci bool
 	reference_tools map[string]Pin
 	native_source_sha256 string
 	native_source_revision string
@@ -227,6 +230,7 @@ fn run() !int {
 	jit_value := os.getenv('VINIX_DEVELOPMENT_REFERENCE_JIT')
 	if jit_value !in ['', '0', '1'] { return error('VINIX_DEVELOPMENT_REFERENCE_JIT must be 0 or 1') }
 	reference_jit := jit_value == '1'
+	reference_ci := cicore.options(os.getenv('VINIX_DEVELOPMENT_REFERENCE_CI'), reference.profiles)!
 	if reference_jit && reference.profiles != ['java'] { return error('reference JIT mode requires only the prepared Java profile') }
 	if reference.root != '' && os.args.len != 5 {
 		return error('reference SDK mode uses only the base arguments; prepare one complete reference SDK instead of mixing runtimes')
@@ -399,6 +403,15 @@ fn run() !int {
 		mut tools := reference_tools.clone()
 		tools['qualifier'] = Pin{'/usr/bin/vinix-qualify', hashes['vinix-qualify']}
 		mut environment := { 'PATH': '/opt/reference/bin:/usr/bin:/bin', 'VINIX_QUALIFY_TIMEOUT_SECONDS': '600' }
+		if reference_ci {
+			tools['ci_proof'] = Pin{'/usr/bin/development-payload', digest(init)!}
+			environment['VINIX_DEVELOPMENT_PAYLOAD'] = 'ci-check'
+			steps.prepend(BuildStep{name: 'ci-isolation', argv: ['{ci_proof}'], artifacts: ['ci-account.json']})
+			ci_plan := Plan{jobs: [Job{id: 'ci', executable: Pin{'/usr/bin/vinix-build', hashes['vinix-build']},
+				arguments: ['build', '/home/developer/reference-build.json', '/home/developer/ci-{attempt}'], expand_attempt: true,
+				interval_seconds: 1, timeout_seconds: 1800, environment: {}, credential_files: {'CI_TOKEN': '/home/developer/token'}}]}
+			os.write_file(root + '/home/developer/ci-jobs.json', json2.encode(ci_plan))!
+		}
 		if reference_jit {
 			environment['VINIX_QUALIFY_JIT'] = '1'
 			os.write_file(root + '/home/developer/reference-jit', 'java\n')!
@@ -605,6 +618,7 @@ fn run() !int {
 	if selfhost_v { expected << 'DEVELOPMENT SELFHOST PASS:' }
 	if reference_hash != '' { expected << 'DEVELOPMENT REFERENCE PASS:' }
 	if reference_jit { expected << ['DEVELOPMENT JIT APPROVAL PASS:', 'DEVELOPMENT JIT REVOCATION PASS:'] }
+	if reference_ci { expected << 'DEVELOPMENT CI PASS:' }
 	if 'http' in reference.profiles { expected << 'DEVELOPMENT HTTP PASS:' }
 	if 'lscpu-smoke' in hashes { expected << 'DEVELOPMENT CPU PASS:' }
 	if 'v-smoke' in hashes { expected << 'DEVELOPMENT V SMOKE PASS:' }
@@ -628,21 +642,29 @@ fn run() !int {
 			'/home/developer/interrupted-before.json', '/home/developer/interrupted-state/state.json',
 			'/home/developer/reference-build.json', '/home/developer/reference-a/receipt.json', '/home/developer/reference-b/receipt.json',
 			'/home/developer/reference-a/work/qualification/report.json', '/home/developer/reference-b/work/qualification/report.json',
-			'/home/developer/reference-a/work/qualification/http/server.json', '/home/developer/reference-b/work/qualification/http/server.json'] {
+			'/home/developer/reference-a/work/qualification/http/server.json', '/home/developer/reference-b/work/qualification/http/server.json',
+			'/home/developer/ci-1/receipt.json', '/home/developer/ci-2/receipt.json',
+			'/home/developer/ci-1/work/qualification/report.json', '/home/developer/ci-2/work/qualification/report.json',
+			'/home/developer/ci-1/work/ci-account.json', '/home/developer/ci-2/work/ci-account.json',
+			'/home/developer/ci-state/plan.json', '/home/developer/ci-state/state.json', '/home/developer/ci-completed.json'] {
 			return error('unexpected guest receipt path')
 		}
 		json2.decode[json2.Any](body)!
 		receipts[path] = body
 	}
-	if result == 0 && receipts.len != if 'http' in reference.profiles { 19 } else if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
+	if result == 0 && receipts.len != if reference_ci { 22 } else if 'http' in reference.profiles { 19 } else if reference_hash != '' { 17 } else if sdk_hash == '' { 12 } else if v_root_hash == '' { 13 } else { 20 } {
 		return error('missing native workflow receipts')
 	}
 	if result == 0 {
+		if reference_ci {
+			cicore.verify(receipts['/home/developer/ci-state/plan.json'], receipts['/home/developer/ci-completed.json'],
+				receipts['/home/developer/ci-state/state.json'], hashes['vinix-build'])!
+		}
 		if reference_hash != '' {
 			mut common := map[string]string{}
 			mut tool_pins := map[string]devcore.Pin{}
 			for name, pin in reference_tools { tool_pins[name] = devcore.Pin{pin.path, pin.sha256} }
-			for output in ['reference-a', 'reference-b'] {
+			for position, output in cicore.outputs(reference_ci) {
 				work := '/home/developer/' + output + '/work'
 				receipt := json2.decode[NativeBuild](receipts['/home/developer/' + output + '/receipt.json'], strict: true)!
 				if receipt.schema != 1 || receipt.plan_sha256 != reference_plan_sha
@@ -662,7 +684,7 @@ fn run() !int {
 						hash := step.artifacts[name]
 						if hash.len != 64 { return error('missing reference output hash') }
 						if name == 'qualification/report.json' { continue }
-						if output == 'reference-a' { common[name] = hash }
+						if position == 0 { common[name] = hash }
 						else if common[name] != hash { return error('reference artifact differs between workspaces: ' + name) }
 						if name.ends_with('/project.data') && hash != sha256.sum('42'.bytes()).hex() {
 							return error('reference project readback artifact changed')
@@ -671,6 +693,12 @@ fn run() !int {
 				}
 				referencecore.verify_report_jit(receipts[work + '/qualification/report.json'], arch, reference.profiles,
 					hashes['vinix-qualify'], tool_pins, work, receipt.steps.last().artifacts, reference_jit)!
+				if reference_ci {
+					if receipts[work + '/ci-account.json'] + '\n' != cicore.account_proof
+						|| receipt.steps[0].artifacts['ci-account.json'] != sha256.sum(cicore.account_proof.bytes()).hex() {
+						return error('CI account or credential-isolation proof changed')
+					}
+				}
 				if 'http' in reference.profiles {
 					proof := receipts[work + '/qualification/http/server.json']
 					referencecore.verify_http_proof(proof)!
@@ -795,6 +823,7 @@ fn run() !int {
 		reference_runtime_sha256: reference_runtime_hash
 		reference_profiles: reference.profiles
 		reference_jit: reference_jit
+		reference_ci: reference_ci
 		reference_tools: reference_tools
 		native_source_sha256: native_plan.source.sha256
 		native_source_revision: source_revision

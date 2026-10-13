@@ -557,12 +557,14 @@ pub fn run() i32 {
 		mode := C.getenv(c'VINIX_DEVELOPMENT_PAYLOAD')
 		if mode != nil {
 			if C.strcmp(mode, c'build') == 0 { return build_payload() }
+			if C.strcmp(mode, c'ci-check') == 0 { return ci_payload() }
 			if C.strcmp(mode, c'linger') == 0 || C.strcmp(mode, c'tick') == 0 || C.strcmp(mode, c'recover') == 0 {
 				return lifecycle_payload(mode)
 			}
 			return job_payload()
 		}
 		require_vinix()
+		ci_prepare()
 		jit_approved := reference_jit_prepare()
 		check(C.chown(c'/home/developer', 1000, 1000) == 0 && C.chmod(c'/home/developer', 0o700) == 0, 154)
 		for path in [&char(c'/home/developer/token'), &char(c'/home/developer/jobs.json'),

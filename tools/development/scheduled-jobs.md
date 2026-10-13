@@ -108,3 +108,15 @@ recovery. The first x86 run, `guest-x86-job-attempt-a`, failed the existing
 watcher-state read assertion; that failed receipt remains retained. Its
 intermittent read failure still needs investigation; the repeat used the same
 kernel, tools and fixture inputs.
+
+The [scheduled native Go CI gate](../../tests/development/README.md) passed
+on AArch64 HVF on 13 October 2026 in
+`build/development17-20261013/guest-arm-reference-ci-d`. The ordinary account
+ran the pinned build CLI twice with expanded attempts, compiled and executed
+matching Go projects, and verified that its private CI token stayed out of
+build children and public evidence. A third reserved attempt refused an
+existing output without changing its sentinel. The controller checked all
+22 records, including exact job/plan pins and completion/failure counters.
+Host nested CLI cancellation tests retired a compiler and descendant that
+ignored TERM under both INT and TERM. These checks qualify the local reference
+pipeline; service boot, remote CI, deployment and broader workflows remain open.
