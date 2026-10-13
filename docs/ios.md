@@ -4135,6 +4135,32 @@ unchanged. Fortnite passes the former secure-memory import and exits with
 status 1 before entry at `_$sS2SycfC`. Full regression remains unpassed;
 entry, rendering and gameplay are unverified.
 
+`Swift empty strings` now resolve the measured zero-argument constructor
+`_$sS2SycfC` from libswiftCore. The installed Mac implementation returns the
+canonical empty ASCII words `0` and `0xe000000000000000` directly in x0/x1.
+LLVM decodes two constant moves and a return; guarded raw calls confirm
+ignored incoming registers and preserved Swift context/error registers x20/x21.
+The V constructor returns the same frozen two-word value without an owner,
+metadata argument, cache or allocation, and matches the existing empty literal.
+
+All 80 programs build and 113 generated C streams restore to their hashes.
+Thirty-three host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 35 Swift/loader programs. The constructor fixture checks
+exact library/symbol scoping, guarded direct and raw result registers before,
+during and after two drained runtime lifetimes, 20,000 constructions with
+unchanged owner/metadata registries, and the existing empty UTF-8 buffer's
+trailing NUL and release lifetime. Other String APIs remain separately scoped.
+
+Evidence is retained under `build/ios/fortnite/empty-string-checks`, with
+pinned tooling and inputs, native instruction/ABI measurements, allocation
+audits and executable/debug archives. Unjoined control attempts during disk
+exhaustion are retained as rejected trials; validated completed caches were
+reused with unchanged source. Transparent filesystem compression preserves
+all prior evidence byte hashes. Five published runners remain unchanged.
+Fortnite passes the former empty-string constructor import and exits with
+status 1 before entry at `_$sSS10describingSSx_tclufC`. Full regression remains unpassed;
+entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4142,10 +4168,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,448 | 712 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 120 | 56 | 23 |
-| All images | 2,227 | 771 | 120 |
+| MarketplaceKitWrapper | 121 | 55 | 23 |
+| All images | 2,228 | 770 | 120 |
 
-The C++/GLES/Text variant reports 2,240 resolved imports, 758 unresolved strong
+The C++/GLES/Text variant reports 2,241 resolved imports, 757 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

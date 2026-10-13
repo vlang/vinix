@@ -10,6 +10,12 @@ mut:
 	second u64
 }
 
+// Installed ARM64 String.init(): x0=0, x1=0xe000000000000000. The
+// canonical empty ASCII value has no heap owner or metadata argument.
+fn swift_string_empty() SwiftStringWords {
+	return SwiftStringWords{ second: u64(0xe000000000000000) }
+}
+
 // A private descriptor for buffers owned by this implementation. It is NOT
 // Swift class/type metadata: generic array storage reflection and casts
 // remain unsupported exports. The measured array body and ARC
@@ -237,6 +243,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'_$sS2SycfC' { u64(unsafe { voidptr(swift_string_empty) }) }
 		'_$sBOWV' { swift_unknown_value_witnesses() }
 		// Darwin SwiftError owners use Cocoa ARC, including boxed Swift errors
 		// and toll-free NSError/CFError objects. These entries use ordinary C
