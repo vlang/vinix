@@ -136,8 +136,9 @@ pub mut:
 	pending_signal_codes    [64]int
 	pending_signal_values   [64]u64
 	pending_signal_overruns [64]int
-	// The name PR_SET_NAME gave the thread; empty for one never named.
+	// Names, including explicit empty names, inherit from the creating task.
 	comm              string
+	comm_named        bool
 	attached_events   [max_events]&eventstruct.Event
 	attached_events_i u64
 	// Valid only while this thread owns an ordinary futex wait frame. The

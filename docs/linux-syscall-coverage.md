@@ -727,9 +727,9 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/proc/container.v` | `db3558d2cea2aeb8c5a483cd9cbade7ba37e2d9d13f5d3047874a9ce2319449a` |
 | `kernel/proc/kernel_budget.v` | `763ca9bea7d11825b8abc293e350a3afabe911bab8e718853626d52fd2201553` |
 | `kernel/proc/pidns.v` | `10a1bbd4b6201113d89302b4ad1da9df937a03494279beec02f7e29889b01be5` |
-| `kernel/proc/proc.v` | `764884518b5c3a480f387a288d47d736ab899fc022f343dafe976c0164a0704e` |
-| `kernel/proc/proc_amd64.v` | `7f82c4426fe63532606503e5dcdbca8379da7029dbc6806ec618b6c3da3af4a5` |
-| `kernel/proc/proc_arm64.v` | `8f0863be166867eeec2cf033d69ebbd48d2c26788062dea8e2e04513ebf1b436` |
+| `kernel/proc/proc.v` | `29bfa676d2c071ccab7b9dbae29536a15d146058c82a492c2b2a9ccf5937c40c` |
+| `kernel/proc/proc_amd64.v` | `8daf8f1150e90db54499f2336659bdecdfc5168559fc05d8aa14dc00e95e8f6e` |
+| `kernel/proc/proc_arm64.v` | `403dc1fcdc67d05864d317a2c0cc5cdc2b6df2f6eaf47bd012d410a931cd52a8` |
 | `kernel/proc/seccomp.v` | `5cb8ae00ab6d3c0597dceae62efdb44d05b902605a450ccc9e34d77a3dab6760` |
 | `kernel/proc/securebits.v` | `292feabca897f6d4eba2455e9e411b8e04c4373a1232c5b26536b3a56d685316` |
 | `kernel/proc/state.v` | `13039f5719e97d5589ffb4b21c1f0d94eac376392236024ebd850e6c39bcf92d` |
@@ -737,11 +737,11 @@ See [behavior and runtime matrix](linux-posix-compatibility.md) for qualificatio
 | `kernel/resource/resource.v` | `90be51bba570db9df5f58282b84cc23a9a67b9918895b747edb2bc390518eb29` |
 | `kernel/sched/inherit.v` | `99bf8fe1ac4e60858774d06d43e09273600dbcfb2395c2befc04d84bc1bad278` |
 | `kernel/sched/reap.v` | `58ba75716ed70697e25209943e38d798b8b4f297a4b8d8e5eb63a38d21411423` |
-| `kernel/sched/sched_amd64.v` | `b7d35c2f8895a7db92734731cd80d03048524afdc4b3cca43eb9116e98c85b54` |
-| `kernel/sched/sched_arm64.v` | `7fbd982e9ea4567b1a60e684bb55bc800ed240be3f8cf9439d8c0807740c768f` |
+| `kernel/sched/sched_amd64.v` | `cc87d7c997c2efc44e5fc86a287e7575c9954493db5eb40a1813fb19ba557642` |
+| `kernel/sched/sched_arm64.v` | `ee720be0a1a43198508cdca76c1afe9eab31220ee31b0da77d01935acb669a77` |
 | `kernel/socket/unix/unix.v` | `790740ff96eb65fe24310b97a08e49c38cdd94f9d60b84a4af9da91fb213ed80` |
 | `kernel/syscall/table/container.v` | `3bd7f741353d73549d61affa8e6a9ee822fef466f997e10498dfd94cbd11c04f` |
-| `kernel/syscall/table/linux_common.v` | `c9f5fe7cbc11fee5a4d4bc6f2bf2e54b58fdcfdf0aca77d19d12af49fd55897d` |
+| `kernel/syscall/table/linux_common.v` | `b069e2118378a9c20b3488d0c28e18a4e10748a8b0e82f87ff8c590d05c6274f` |
 | `kernel/syscall/table/linux_compat.v` | `3cff2259bc5463ef6d5b0cad84231e9c93139566dbf8ef31b29d73364b3642d6` |
 | `kernel/syscall/table/linux_table_amd64.v` | `9c4e7e0053271b5e86ad449b90191848e248a6ce46df62f6eb666a867deef018` |
 | `kernel/syscall/table/syscall_table_arm64.v` | `3e329ea476d16804c52bc32dfd7fd7c2a37fbea78ecf007a68de36cdee0435ad` |

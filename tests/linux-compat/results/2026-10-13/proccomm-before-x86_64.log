@@ -1,0 +1,449 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  248k  100  248k    0     0   313k      0 --:--:-- --:--:-- --:--:--  313k100  248k  100  248k    0     0   313k      0 --:--:-- --:--:-- --:--:--  313k
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  8 2880k    8  239k    0     0   255k      0  0:00:11 --:--:--  0:00:11  255k100 2880k  100 2880k    0     0  1633k      0  0:00:01  0:00:01 --:--:-- 1634k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 22528  100 22528    0     0  34525      0 --:--:-- --:--:-- --:--:-- 34499
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  207k  100  207k    0     0   223k      0 --:--:-- --:--:-- --:--:--  223k
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100 49092  100 49092    0     0  79620      0 --:--:-- --:--:-- --:--:-- 79565
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100  117k  100  117k    0     0   164k      0 --:--:-- --:--:-- --:--:--  164k
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/proccomm-20261013/before-x86/procself/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/proccomm-20261013/before-x86/procself/.vinix-amd64.iso.0AmyUW'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  533m free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/proccomm-20261013/before-x86/procself/iso-build/.iso-staging.i4ijQy/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :  79.66% done
+ISO image produced: 13557 sectors
+Written to medium : 13557 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/proccomm-20261013/before-x86/procself/.vinix-amd64.iso.0AmyUW' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd3d3.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/proccomm-20261013/before-x86/procself/test.iso (27764736 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/proccomm-20261013/before-x86/procself
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=105728
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff00000038061200
+initramfs: Done (9 entries)
+LINUX PROCSELF SETUP: rtprio limit
+LINUX PROCSELF MUSL SCHED: process wrappers refuse ENOSYS
+LINUX PROCSELF SETUP: setrlimit=0 errno=0
+LINUX PROCSELF SETUP: ordinary policy
+LINUX PROCSELF WORK: slot=0 pages=256 faults=256 cpu_ns=205985000 checksum=4899293344413440769
+LINUX PROCSELF ACCOUNT SAMPLE: ordinary=1 slot=0 faults=259/259 cpu_ticks=28/28
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=0 pid=33575 tid=33575 cases=270 failures=0 status=1
+LINUX PROCSELF WORK: slot=1 pages=32 faults=32 cpu_ns=50109000 checksum=7873597368882750209
+LINUX PROCSELF ACCOUNT SAMPLE: ordinary=1 slot=1 faults=32/359 cpu_ticks=6/76
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=1 pid=33575 tid=40582 cases=270 failures=0 status=1
+LINUX PROCSELF WORK: slot=2 pages=64 faults=64 cpu_ns=100079000 checksum=8743528428078953985
+LINUX PROCSELF ACCOUNT SAMPLE: ordinary=1 slot=2 faults=64/359 cpu_ticks=10/89
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=2 pid=33575 tid=24726 cases=270 failures=0 status=1
+LINUX PROCSELF NAMEAPI: ordinary=1 case=short status=0
+LINUX PROCSELF NAMEAPI: ordinary=1 case=fifteen status=0
+LINUX PROCSELF NAMEAPI: ordinary=1 case=empty status=0
+LINUX PROCSELF NAMEAPI: ordinary=1 case=unterminated status=1
+LINUX PROCSELF NAMEAPI: ordinary=1 case=null status=1
+LINUX PROCSELF NAMEAPI: ordinary=1 case=wrap status=1
+LINUX PROCSELF NAMEAPI: ordinary=1 case=protected status=1
+LINUX PROCSELF NAMEAPI: ordinary=1 case=get-null status=1
+LINUX PROCSELF NAMEAPI: ordinary=1 case=get-readonly status=1
+LINUX PROCSELF NAMEAPI: ordinary=1 case=truncated status=1
+LINUX PROCSELF NAMEEXEC: uid=1000 records=36 failures=0 get=0
+LINUX PROCSELF CHILDSTATE: ordinary=1 state=T records=12 failures=0
+LINUX PROCSELF CHILDSTATE: ordinary=1 state=Z records=6 failures=0
+LINUX PROCSELF STATES: ordinary=1 reader=0 records=30 failures=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=0 format=1 empty=0
+LINUX PROCSELF NAMES: ordinary=1 phase=0 records=45 failures=36 get=1
+LINUX PROCSELF STATES: ordinary=1 reader=1 records=30 failures=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=1 format=1 empty=0
+LINUX PROCSELF NAMES: ordinary=1 phase=1 records=45 failures=36 get=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAMES: ordinary=1 phase=2 records=45 failures=42 get=0
+LINUX PROCSELF NAMEINHERIT: ordinary=1 records=36 failures=36 get=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/33575/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=33575/task/42411/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAMES: ordinary=1 phase=3 records=45 failures=39 get=1
+LINUX PROCSELF WORK: slot=0 pages=256 faults=256 cpu_ns=222370000 checksum=7990827338717017857
+LINUX PROCSELF ACCOUNT SAMPLE: ordinary=0 slot=0 faults=259/259 cpu_ticks=22/22
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=0 pid=29571 tid=29571 cases=270 failures=0 status=1
+LINUX PROCSELF WORK: slot=1 pages=32 faults=32 cpu_ns=50435000 checksum=13449286503397658369
+LINUX PROCSELF ACCOUNT SAMPLE: ordinary=0 slot=1 faults=32/359 cpu_ticks=6/47
+LINUX PROCSELF WORK: slot=2 pages=64 faults=64 cpu_ns=100210000 checksum=14036735487835292673
+LINUX PROCSELF ACCOUNT SAMPLE: ordinary=0 slot=2 faults=64/359 cpu_ticks=11/60
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=2 pid=29571 tid=24836 cases=270 failures=0 status=1
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=1 pid=29571 tid=36688 cases=270 failures=0 status=1
+LINUX PROCSELF NAMEAPI: ordinary=0 case=short status=0
+LINUX PROCSELF NAMEAPI: ordinary=0 case=fifteen status=0
+LINUX PROCSELF NAMEAPI: ordinary=0 case=empty status=0
+LINUX PROCSELF NAMEAPI: ordinary=0 case=unterminated status=1
+LINUX PROCSELF NAMEAPI: ordinary=0 case=null status=1
+LINUX PROCSELF NAMEAPI: ordinary=0 case=wrap status=1
+LINUX PROCSELF NAMEAPI: ordinary=0 case=protected status=1
+LINUX PROCSELF NAMEAPI: ordinary=0 case=get-null status=1
+LINUX PROCSELF NAMEAPI: ordinary=0 case=get-readonly status=1
+LINUX PROCSELF NAMEAPI: ordinary=0 case=truncated status=1
+LINUX PROCSELF NAMEEXEC: uid=0 records=36 failures=0 get=0
+LINUX PROCSELF CHROOT: no-/proc relative-self/thread-self-status PASS
+LINUX PROCSELF TASKIDS: local=0 leader=1 pid=29145/29145 tgid=29145/29145 nspid=29145:1 count=2 expected_count=2 PASS
+LINUX PROCSELF TASKIDS: local=1 leader=1 pid=1/1 tgid=1/1 nspid=1:-1 count=1 expected_count=1 PASS
+LINUX PROCSELF TASKIDS: local=0 leader=0 pid=22416/22416 tgid=29145/29145 nspid=22416:2 count=2 expected_count=2 PASS
+LINUX PROCSELF TASKIDS: local=1 leader=0 pid=2/2 tgid=1/1 nspid=2:-1 count=1 expected_count=1 PASS
+LINUX PROCSELF PIDVIEW: outer-and-own leader/worker Pid/Tgid/NSpid PASS
+LINUX PROCSELF CHILDSTATE: ordinary=0 state=T records=12 failures=0
+LINUX PROCSELF CHILDSTATE: ordinary=0 state=Z records=6 failures=0
+LINUX PROCSELF STATES: ordinary=0 reader=0 records=30 failures=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=0 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=0 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=0 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=0 format=1 empty=0
+LINUX PROCSELF NAMES: ordinary=0 phase=0 records=45 failures=36 get=1
+LINUX PROCSELF STATES: ordinary=0 reader=1 records=30 failures=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=1 format=2 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=1 format=1 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=1 format=0 empty=0
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=1 format=1 empty=0
+LINUX PROCSELF NAMES: ordinary=0 phase=1 records=45 failures=36 get=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=2 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=2 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/comm phase=2 format=2 empty=1
+LINUX PROCSELF NAMES: ordinary=0 phase=2 records=45 failures=42 get=0
+LINUX PROCSELF NAMEINHERIT: ordinary=0 records=36 failures=36 get=0
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=self/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=thread-self/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/29571/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/stat phase=3 format=0 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/status phase=3 format=1 empty=1
+LINUX PROCSELF NAME DETAIL: path=29571/task/36920/comm phase=3 format=2 empty=1
+LINUX PROCSELF NAMES: ordinary=0 phase=3 records=45 failures=39 get=1
+LINUX PROCSELF FAIL: relative target, reader identity, resolution or storage
+QEMU: Terminated
+Missing verdicts: ['LINUX PROCSELF: PASS']; failures: ['FAIL:', 'LINUX PROCSELF FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/proccomm-20261013/before-x86/receipt.json

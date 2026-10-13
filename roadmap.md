@@ -731,6 +731,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Report the selected task's procfs state even while a sibling runs; qualify
   real pipe-backed sleeping readers, stopped/zombie controls and flat native
   storage on both architectures. See [the state receipts](docs/linux-posix-qualification.md#selected-procfs-task-states).
+- [x] Report selected task names, including empty names and status escapes;
+  implement bounded prctl name copies and qualify fork/exec inheritance,
+  exact native bytes/errors and flat storage. See [the name receipts](docs/linux-posix-qualification.md#selected-procfs-task-names).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

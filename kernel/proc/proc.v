@@ -1160,6 +1160,37 @@ fn add_command_name(mut text lib.Text, name string) {
 	}
 }
 
+// Borrowed under the table lock; PR_SET_NAME uses that lock when replacing
+// either string. An explicit empty name differs from an unnamed task.
+fn selected_command_bounds(process &Process, task &Thread) (string, int, int) {
+	if task != unsafe { nil } && task.comm_named {
+		return task.comm, 0, task.comm.len
+	}
+	start, end := command_name_bounds(process.name)
+	return process.name, start, end
+}
+
+fn add_task_command(mut text lib.Text, process &Process, task &Thread, escaped bool) {
+	name, start, end := selected_command_bounds(process, task)
+	limit := if end - start > 15 { start + 15 } else { end }
+	for i in start .. limit {
+		if escaped && name[i] == `\n` { text.add('\\n') }
+		else if escaped && name[i] == `\\` { text.add('\\\\') }
+		else { text.add_byte(name[i]) }
+	}
+}
+
+// The caller supplies a zeroed 16-byte stack buffer and copies it to userspace
+// after this snapshot releases the table lock. No borrowed bytes escape.
+pub fn copy_current_command(destination voidptr) {
+	lock_table()
+	defer { unlock_table() }
+	task := current_thread()
+	name, start, end := selected_command_bounds(task.process, task)
+	limit := if end - start > 15 { start + 15 } else { end }
+	for i in start .. limit { unsafe { (&u8(destination))[i - start] = name[i] } }
+}
+
 // The program a process is running, as an absolute path. Empty when the kernel
 // started the process itself and there is no file behind it.
 pub fn process_program(pid int) string {
@@ -1182,7 +1213,7 @@ pub fn process_command(pid int) string {
 	// Formatting helpers borrow this builder; str() returns independent owned bytes.
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(32) }
-	add_command_name(mut text, process.name)
+	add_task_command(mut text, process, threads_by_tid[pid], false)
 	return text.str()
 }
 
@@ -1191,21 +1222,16 @@ pub fn process_command(pid int) string {
 pub fn thread_command(pid int, tid int) string {
 	lock_table()
 	defer { unlock_table() }
-	mut process := process_at(pid)
+	process := process_at(pid)
 	if process == unsafe { nil } {
 		return ''
 	}
-	process.threads_lock.acquire()
-	for t in process.threads {
-		if t.tid == tid && t.comm.len > 0 {
-			name := t.comm.clone()
-			process.threads_lock.release()
-			return name
-		}
-	}
-	process.threads_lock.release()
-	mut text := lib.new_text(32)
-	add_command_name(mut text, process.name)
+	if tid <= 0 || tid >= max_pid { return '' }
+	task := threads_by_tid[tid]
+	if task == unsafe { nil } || voidptr(task.process) != voidptr(process) { return '' }
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(32) }
+	add_task_command(mut text, process, task, false)
 	return text.str()
 }
 
@@ -1495,7 +1521,7 @@ pub fn process_stat_line(pid int, tid int, viewer &Namespace) string {
 	unsafe { *text = lib.new_text(256) }
 	text.add_decimal(shown_pid)
 	text.add(' (')
-	add_command_name(mut text, process.name)
+	add_task_command(mut text, process, target, false)
 	text.add(') ')
 	text.add(state)
 	text.add_byte(` `)
@@ -1573,7 +1599,7 @@ pub fn process_status_text(pid int, tid int, viewer &Namespace) string {
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(512) }
 	text.add('Name:\t')
-	add_command_name(mut text, process.name)
+	add_task_command(mut text, process, target, true)
 	text.add('\nUmask:\t0')
 	text.add_radix(u64(process.umask), 8, 0)
 	text.add('\nState:\t')

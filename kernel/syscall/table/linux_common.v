@@ -410,33 +410,39 @@ fn syscall_linux_prctl(gpr_state voidptr, _option int, arg2 u64, _arg3 u64, _arg
 			// its process went by the last of them -- ps showed DelayedTaskSche,
 			// and pgrep node found nothing. The process goes by its first
 			// thread's name, as on Linux.
-			mut raw := [task_comm_len]u8{}
-			if !usercopy.copy_from_user(voidptr(&raw[0]), arg2, task_comm_len) {
-				return errno.err, errno.efault
+			raw := unsafe { &u8(C.vinix_stack_alloc(task_comm_len)) }
+			unsafe { C.memset(raw, 0, task_comm_len) }
+			// Linux reads up to 15 bytes, stopping at NUL. A short name at a
+			// page boundary must not depend on the following page being mapped.
+			for i in 0 .. task_comm_len - 1 {
+				if u64(i) > ~arg2 || !usercopy.copy_from_user(unsafe { voidptr(raw + i) }, arg2 + u64(i), 1) {
+					return errno.err, errno.efault
+				}
+				if unsafe { raw[i] } == 0 { break }
 			}
-			raw[task_comm_len - 1] = 0
 			mut current := proc.current_thread()
+			new_comm := unsafe { cstring_to_vstring(&char(raw)) }
+			new_process_name := if current.tid == process.pid { new_comm.clone() } else { '' }
+			// Procfs readers retain either name until they release this lock.
+			proc.lock_table()
+			defer { proc.unlock_table() }
 			old_comm := current.comm
-			current.comm = unsafe { cstring_to_vstring(&raw[0]) }
+			current.comm = new_comm
+			current.comm_named = true
 			if old_comm.len > 0 {
 				unsafe { old_comm.free() }
 			}
 			if current.tid == process.pid {
 				unsafe { process.name.free() }
-				process.name = current.comm.clone()
+				process.name = new_process_name
 			}
 			return 0, 0
 		}
 		pr_get_name {
-			mut raw := [task_comm_len]u8{}
-			current := proc.current_thread()
-			own := if current.comm.len > 0 { current.comm } else { process.name }
-			mut length := u64(own.len)
-			if length > task_comm_len - 1 {
-				length = task_comm_len - 1
-			}
-			unsafe { C.memcpy(&raw[0], own.str, length) }
-			if !usercopy.copy_to_user(arg2, voidptr(&raw[0]), task_comm_len) {
+			raw := unsafe { &u8(C.vinix_stack_alloc(task_comm_len)) }
+			unsafe { C.memset(raw, 0, task_comm_len) }
+			proc.copy_current_command(raw)
+			if !usercopy.copy_to_user(arg2, raw, task_comm_len) {
 				return errno.err, errno.efault
 			}
 			return 0, 0

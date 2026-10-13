@@ -13,6 +13,7 @@ module procselffixture
 #include <string.h>
 #include <sys/mount.h>
 #include <sys/mman.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -65,7 +66,9 @@ fn C.setgroups(usize, voidptr) i32
 fn C.setgid(u32) i32
 fn C.setuid(u32) i32
 fn C.getpid() i32
+fn C.getuid() u32
 fn C.fork() i32
+fn C.execl(&char, &char, ...) i32
 fn C.waitpid(i32, &i32, i32) i32
 fn C._exit(i32)
 fn C.pthread_create(&C.pthread_t, voidptr, fn (voidptr) voidptr, voidptr) i32
@@ -82,6 +85,10 @@ fn C.clock_gettime(i32, &C.timespec) i32
 fn C.sysconf(i32) i64
 fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
+fn C.mprotect(voidptr, usize, i32) i32
+fn C.prctl(i32, ...) i32
+fn C.memcmp(voidptr, voidptr, usize) i32
+fn C.strchr(&char, i32) &char
 fn C.strrchr(&char, i32) &char
 fn C.strtoll(&char, &&char, i32) i64
 fn C.snprintf(&char, usize, &char, ...) i32
@@ -89,6 +96,7 @@ fn C.sscanf(&char, &char, ...) i32
 fn C.strstr(&char, &char) &char
 fn C.strncmp(&char, &char, usize) i32
 fn C.strlen(&char) usize
+fn C.strcmp(&char, &char) i32
 fn C.printf(&char, ...) i32
 fn C.puts(&char) i32
 fn C.fflush(voidptr) i32
@@ -258,6 +266,145 @@ fn worker(arg voidptr) voidptr {
 fn state_name(code u8) &char {
 	unsafe { return if code == `R` { &char(c'R (running)\n') } else if code == `S` { &char(c'S (sleeping)\n') } else if code == `T` { &char(c'T (stopped)\n') } else { &char(c'Z (zombie)\n') } }
 }
+fn named_set(name &char) bool {
+	unsafe { return C.prctl(C.PR_SET_NAME, name, isize(0), isize(0), isize(0)) == 0 }
+}
+fn named_get(wanted &char) bool {
+	unsafe {
+		mut data := [24]u8{}; for i in 0 .. 24 { data[i] = 0x5a }
+		if C.prctl(C.PR_GET_NAME, &data[4], isize(0), isize(0), isize(0)) != 0 { return false }
+		length := C.strlen(wanted); if length > 15 { return false }
+		for i in 0 .. 24 {
+			expected := if i < 4 || i >= 20 { u8(0x5a) } else if usize(i - 4) < length { u8(wanted[i - 4]) } else { u8(0) }
+			if data[i] != expected { return false }
+		}
+		return true
+	}
+}
+fn name_api(ordinary bool, label &char, good bool) bool {
+	unsafe { C.printf(c'LINUX PROCSELF NAMEAPI: ordinary=%d case=%s status=%d\n', i32(ordinary), label, i32(good)); C.fflush(nil); return good }
+}
+fn name_boundaries(ordinary bool) bool {
+	unsafe {
+		page := usize(C.sysconf(C._SC_PAGESIZE)); if page != 4096 && page != 16384 { return false }
+		mapping := C.mmap(nil, page * 2, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+		if mapping == voidptr(-1) { return false }; defer { C.munmap(mapping, page * 2) }
+		mut bytes := &char(mapping); if C.mprotect(bytes + page, page, C.PROT_NONE) != 0 || !named_set(c'kept-name') { return false }
+		mut good := true
+		bytes[page - 3] = char(`o`); bytes[page - 2] = char(`k`); bytes[page - 1] = 0
+		short := named_set(bytes + page - 3); if !name_api(ordinary, c'short', short && named_get(c'ok')) { good = false }
+		if !named_set(c'kept-name') { return false }
+		for i in 0 .. 15 { bytes[page - 15 + usize(i)] = char(`a` + i) }
+		fifteen := C.syscall(isize(C.SYS_prctl), isize(C.PR_SET_NAME), bytes + page - 15, isize(0), isize(0), isize(0)) == 0
+		if !name_api(ordinary, c'fifteen', fifteen && named_get(c'abcdefghijklmno')) { good = false }
+		if !named_set(c'kept-name') { return false }; bytes[page - 1] = 0
+		empty := named_set(bytes + page - 1); if !name_api(ordinary, c'empty', empty && named_get(c'')) { good = false }
+		if !named_set(c'kept-name') { return false }
+		for i in 0 .. 5 { bytes[page - 5 + usize(i)] = char(`x`) }
+		e := C.__errno_location(); *e = 0; result := C.prctl(C.PR_SET_NAME, bytes + page - 5, isize(0), isize(0), isize(0)); saved := *e
+		if !name_api(ordinary, c'unterminated', result == -1 && saved == C.EFAULT && named_get(c'kept-name')) { good = false }
+		for index in 0 .. 3 {
+			address := if index == 0 { voidptr(0) } else if index == 1 { voidptr(u64(-1) - 3) } else { voidptr(bytes + page) }
+			*e = 0; failed := C.syscall(isize(C.SYS_prctl), isize(C.PR_SET_NAME), address, isize(0), isize(0), isize(0)); error_code := *e
+			label := if index == 0 { &char(c'null') } else if index == 1 { &char(c'wrap') } else { &char(c'protected') }
+			if !name_api(ordinary, label, failed == -1 && error_code == C.EFAULT && named_get(c'kept-name')) { good = false }
+		}
+		*e = 0; get_null := C.prctl(C.PR_GET_NAME, voidptr(0), isize(0), isize(0), isize(0)); get_null_error := *e
+		if !name_api(ordinary, c'get-null', get_null == -1 && get_null_error == C.EFAULT && named_get(c'kept-name')) { good = false }
+		if C.mprotect(mapping, page, C.PROT_READ) != 0 { return false }
+		*e = 0; get_ro := C.prctl(C.PR_GET_NAME, mapping, isize(0), isize(0), isize(0)); get_ro_error := *e
+		if !name_api(ordinary, c'get-readonly', get_ro == -1 && get_ro_error == C.EFAULT && named_get(c'kept-name')) { good = false }
+		long := named_set(c'abcdefghijklmnop-more'); if !name_api(ordinary, c'truncated', long && named_get(c'abcdefghijklmno')) { good = false }
+		return good
+	}
+}
+fn name_record(dirfd i32, path &char, format i32, wanted &char) bool {
+	unsafe {
+		fd := C.openat(dirfd, path, C.O_RDONLY); if fd < 0 { return false }; defer { C.close(fd) }
+		mut data := [4096]char{}; length := C.read(fd, &data[0], 4095); if length <= 0 || length >= 4096 { return false }; data[int(length)] = 0
+		wanted_length := C.strlen(wanted)
+		if format == 0 {
+			start := C.strchr(&data[0], i32(`(`)); end := C.strrchr(&data[0], i32(`)`))
+			return start != nil && end != nil && usize(end) >= usize(start) + 1 && usize(end) - usize(start) - 1 == wanted_length && C.memcmp(start + 1, wanted, wanted_length) == 0
+		}
+		if format == 2 { return usize(length) == wanted_length + 1 && C.memcmp(&data[0], wanted, wanted_length) == 0 && data[int(wanted_length)] == char(`\n`) }
+		mut prefix := [64]char{}; C.snprintf(&prefix[0], 64, c'Name:\t'); mut offset := 6
+		for i in 0 .. int(wanted_length) {
+			if wanted[i] == char(`\n`) || wanted[i] == char(`\\`) { prefix[offset] = char(`\\`); offset++; prefix[offset] = if wanted[i] == char(`\n`) { char(`n`) } else { char(`\\`) } }
+			else { prefix[offset] = wanted[i] }; offset++
+		}
+		prefix[offset] = char(`\n`); offset++
+		return length >= offset && C.memcmp(&data[0], &prefix[0], usize(offset)) == 0
+	}
+}
+fn name_matrix(bank &Handles, ordinary bool, phase i32, worker_tid i32, worker_empty bool, verbose bool, changed bool) bool {
+	unsafe {
+		main_name := if changed { &char(c'/main[8])\\\n') } else { &char(c'/main[9])\\\n') }
+		worker_name := if worker_empty { &char(c'') } else { &char(c'/work[7])\\\n') }
+		own_name := if phase == 1 || phase == 2 { worker_name } else { main_name }
+		mut cases := i32(0); mut failures := i32(0); pid := C.getpid()
+		get_good := named_get(own_name)
+		for view in 0 .. 3 { for form in 0 .. 5 { for format in 0 .. 3 {
+			mut path := [96]char{}; suffix := if format == 0 { &char(c'stat') } else if format == 1 { &char(c'status') } else { &char(c'comm') }
+			if form == 0 { C.snprintf(&path[0], 96, c'self/%s', suffix) }
+			else if form == 1 { C.snprintf(&path[0], 96, c'thread-self/%s', suffix) }
+			else if form == 2 { C.snprintf(&path[0], 96, c'%d/%s', pid, suffix) }
+			else { C.snprintf(&path[0], 96, c'%d/task/%d/%s', pid, if form == 3 { pid } else { worker_tid }, suffix) }
+			wanted := if form == 1 { own_name } else if form == 4 { worker_name } else { main_name }
+			cases++; if !name_record(bank.dirs[view], &path[0], i32(format), wanted) {
+				failures++; if verbose { C.printf(c'LINUX PROCSELF NAME DETAIL: path=%s phase=%d format=%d empty=%d\n', &path[0], phase, i32(format), i32(worker_empty)); C.fflush(nil) }
+			}
+		} } }
+		if verbose { C.printf(c'LINUX PROCSELF NAMES: ordinary=%d phase=%d records=%d failures=%d get=%d\n', i32(ordinary), phase, cases, failures, i32(get_good)); C.fflush(nil) }
+		return failures == 0 && get_good
+	}
+}
+fn inherited_names(bank &Handles, ordinary bool) bool {
+	unsafe {
+		child := C.fork(); if child < 0 { return false }
+		if child == 0 {
+			mut failures := i32(0); mut records := i32(0); pid := C.getpid(); get_good := named_get(c'')
+			for view in 0 .. 3 { for form in 0 .. 4 { for format in 0 .. 3 {
+				mut path := [96]char{}; suffix := if format == 0 { &char(c'stat') } else if format == 1 { &char(c'status') } else { &char(c'comm') }
+				if form == 0 { C.snprintf(&path[0], 96, c'self/%s', suffix) }
+				else if form == 1 { C.snprintf(&path[0], 96, c'thread-self/%s', suffix) }
+				else if form == 2 { C.snprintf(&path[0], 96, c'%d/%s', pid, suffix) }
+				else { C.snprintf(&path[0], 96, c'%d/task/%d/%s', pid, pid, suffix) }
+				records++; if !name_record(bank.dirs[view], &path[0], i32(format), c'') { failures++ }
+			} } }
+			C.printf(c'LINUX PROCSELF NAMEINHERIT: ordinary=%d records=%d failures=%d get=%d\n', i32(ordinary), records, failures, i32(get_good)); C.fflush(nil)
+			C._exit(if failures == 0 && get_good { 0 } else { 1 })
+		}
+		mut outcome := i32(-1); return C.waitpid(child, &outcome, 0) == child && outcome == 0
+	}
+}
+fn exec_names() i32 {
+	unsafe {
+		mut failures := i32(0); mut records := i32(0); pid := C.getpid(); get_good := named_get(c'init')
+		for view in 0 .. 3 {
+			root := if view == 0 { &char(c'/proc') } else if view == 1 { &char(c'/tmp/linux-procself/alias') } else { &char(c'/tmp/linux-procself/jail/view') }
+			fd := C.open(root, C.O_PATH | C.O_DIRECTORY); if fd < 0 { return 1 }
+			for form in 0 .. 4 { for format in 0 .. 3 {
+				mut path := [96]char{}; suffix := if format == 0 { &char(c'stat') } else if format == 1 { &char(c'status') } else { &char(c'comm') }
+				if form == 0 { C.snprintf(&path[0], 96, c'self/%s', suffix) }
+				else if form == 1 { C.snprintf(&path[0], 96, c'thread-self/%s', suffix) }
+				else if form == 2 { C.snprintf(&path[0], 96, c'%d/%s', pid, suffix) }
+				else { C.snprintf(&path[0], 96, c'%d/task/%d/%s', pid, pid, suffix) }
+				records++; if !name_record(fd, &path[0], i32(format), c'init') { failures++ }
+			} }
+			C.close(fd)
+		}
+		C.printf(c'LINUX PROCSELF NAMEEXEC: uid=%d records=%d failures=%d get=%d\n', i32(C.getuid()), records, failures, i32(get_good)); C.fflush(nil)
+		return if failures == 0 && get_good { 0 } else { 1 }
+	}
+}
+fn exec_name_test() bool {
+	unsafe {
+		child := C.fork(); if child < 0 { return false }
+		if child == 0 { if !named_set(c'old-exec-name') { C._exit(1) }; C.execl(c'/sbin/init', c'init', c'--name-exec', voidptr(0)); C._exit(1) }
+		mut outcome := i32(-1); return C.waitpid(child, &outcome, 0) == child && outcome == 0
+	}
+}
 fn state_record(dirfd i32, path &char, status_file bool, wanted u8, verbose bool) bool {
 	unsafe {
 		fd := C.openat(dirfd, path, C.O_RDONLY); if fd < 0 { return false }; defer { C.close(fd) }
@@ -294,13 +441,17 @@ fn state_matrix(bank &Handles, ordinary bool, reader i32, worker_tid i32, verbos
 }
 fn state_worker(arg voidptr) voidptr {
 	unsafe {
-		mut state := &StateWorker(arg); C.__atomic_store_n(&state.tid, i32(C.syscall(isize(C.SYS_gettid))), 3)
+		mut state := &StateWorker(arg); if !named_get(c'/main[9])\\\n') || !named_set(c'/work[7])\\\n') { C._exit(1) }; C.__atomic_store_n(&state.tid, i32(C.syscall(isize(C.SYS_gettid))), 3)
 		mut token := char(0)
 		if C.write(state.report[1], &token, 1) != 1 || C.read(state.gate[0], &token, 1) != 1 { C._exit(1) }
 		// Main blocks on the report pipe before these reads; this delay lets
 		// the actual blocking read settle on either SMP or a single CPU.
 		C.usleep(50000)
 		state.failed = !state_matrix(state.bank, state.ordinary, 1, C.__atomic_load_n(&state.tid, 2), true)
+		if !name_matrix(state.bank, state.ordinary, 1, state.tid, false, true, false) { state.failed = true }
+		if !named_set(c'') { C._exit(1) }
+		if !name_matrix(state.bank, state.ordinary, 2, state.tid, true, true, false) { state.failed = true }
+		if !inherited_names(state.bank, state.ordinary) { state.failed = true }
 		token = if state.failed { char(1) } else { char(0) }
 		if C.write(state.report[1], &token, 1) != 1 || C.read(state.gate[0], &token, 1) != 1 { C._exit(1) }
 		return nil
@@ -336,6 +487,7 @@ fn stopped_zombie(bank &Handles, ordinary bool) bool {
 }
 fn state_test(bank &Handles, ordinary bool) bool {
 	unsafe {
+		if !named_set(c'/main[9])\\\n') { return false }
 		mut gate := [i32(-1), -1]!; mut report := [i32(-1), -1]!
 		if C.pipe(&gate[0]) != 0 { return false }
 		if C.pipe(&report[0]) != 0 { for fd in gate { C.close(fd) }; return false }
@@ -344,8 +496,10 @@ fn state_test(bank &Handles, ordinary bool) bool {
 		mut token := char(0); if C.read(report[0], &token, 1) != 1 { C._exit(1) }; C.usleep(50000)
 		tid := C.__atomic_load_n(&state.tid, 2); if tid <= 0 || tid == C.getpid() { C._exit(1) }
 		mut good := state_matrix(bank, ordinary, 0, tid, true)
+		if !name_matrix(bank, ordinary, 0, tid, false, true, false) { good = false }
 		if C.write(gate[1], &token, 1) != 1 || C.read(report[0], &token, 1) != 1 { C._exit(1) }
 		if token != 0 { good = false }; C.usleep(50000)
+		if !name_matrix(bank, ordinary, 3, tid, true, true, false) { good = false }
 		if good && !storage(bank, ordinary, tid) { good = false }
 		if C.write(gate[1], &token, 1) != 1 || C.pthread_join(helper, nil) != 0 { C._exit(1) }
 		for fd in gate { C.close(fd) }; for fd in report { C.close(fd) }
@@ -357,6 +511,9 @@ fn cycle(bank &Handles, sleeper_tid i32) bool {
 		for view in 0 .. 3 { for kind in 0 .. 2 { for form in 0 .. 5 { for size in [i32(1), 64]! { for destination in 0 .. 2 {
 			if !probe(bank, i32(view), i32(kind), i32(form), size, i32(destination), false) { return false }
 		} } } }; for kind in 0 .. 2 { if !status(bank.dirs[view], i32(kind), false) { return false } } }
+		for changed in [false, true]! {
+			if !named_set(if changed { &char(c'/main[8])\\\n') } else { &char(c'/main[9])\\\n') }) || !name_matrix(bank, false, 0, sleeper_tid, true, false, changed) { return false }
+		}
 		return state_matrix(bank, false, 0, sleeper_tid, false)
 	}
 }
@@ -481,16 +638,20 @@ fn qualify(bank &Handles, ordinary bool) bool {
 			if states[index].failed || states[index].tid == C.getpid() { good = false }
 		}
 		if started != 2 || states[0].tid == states[1].tid { good = false }
+		if !name_boundaries(ordinary) { good = false }
+		if !exec_name_test() { good = false }
 		if !ordinary && !chroot_test() { good = false }
 		if !ordinary && !namespace_test(bank.dirs[0]) { good = false }
 		if !stopped_zombie(bank, ordinary) { good = false }
-		if !good || !state_test(bank, ordinary) { return false }
+		if !state_test(bank, ordinary) { good = false }
+		if !good { return false }
 		C.alarm(0); return true
 	}
 }
 @[export: 'main']
-pub fn run() i32 {
+pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc == 2 && C.strcmp(argv[1], c'--name-exec') == 0 { return exec_names() }
 		C.puts(c'LINUX PROCSELF SETUP: rtprio limit'); C.fflush(nil)
 		param := C.sched_param{}; mut scratch := C.sched_param{}; e := C.__errno_location()
 		*e = 0; if C.sched_setscheduler(0, C.SCHED_OTHER, &param) != -1 || *e != C.ENOSYS { C.puts(c'LINUX PROCSELF FAIL: musl sched_setscheduler refusal'); C.fflush(nil); return 1 }

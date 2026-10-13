@@ -3461,3 +3461,103 @@ Zombie task directories, leader-only thread exit, D/t/X/I states, stop-transitio
 windows, cgroup holding, concurrent retirement, full procfs mount retention and
 glibc/translated/ELF32 or application installation/sandbox/portal acceptance
 remain separate. The three broad section 15 gates remain open.
+
+## Selected procfs task names
+
+Native comm files, stat field 2 and status `Name` now select the requested
+thread. Process paths select the leader. Explicit names preserve slash,
+bracket, parenthesis, backslash and newline bytes, including an explicitly
+empty name. Status escapes newline and backslash; comm/stat retain raw bytes.
+Unnamed tasks use the executable basename, bounded to 15 bytes. Linux's
+[proc_task_name](https://raw.githubusercontent.com/torvalds/linux/v6.12/fs/proc/array.c)
+uses the selected task and escapes status separately from stat.
+
+`PR_SET_NAME` now stops at NUL while reading at most 15 user bytes, allowing
+short/empty strings terminated at the end of a mapped page and a 15-byte name
+without an accessible sixteenth byte. Unterminated short ranges, null,
+wrapping and protected pointers return EFAULT before changing either name.
+Long names truncate. `PR_GET_NAME` snapshots the selected name and writes all
+16 zero-padded bytes, preserving surrounding canaries; null and readonly
+destinations return EFAULT. This matches Linux's
+[prctl name cases](https://raw.githubusercontent.com/torvalds/linux/master/kernel/sys.c).
+
+Both Thread definitions now distinguish an explicit empty name from an unnamed
+task. Both clone implementations inherit that flag with the existing owned
+comm copy. Successful PR_SET_NAME replacements and frees hold the same table
+lock as procfs readers. New scalar/borrowed-name helpers allocate nothing;
+GET copies a complete stack snapshot before releasing the lock and accessing
+userspace. Thread-command Text now uses explicit stack storage.
+
+| Architecture | Baseline | Candidate | Large pages before/after, both credential groups |
+| --- | --- | --- | --- |
+| AArch64 | 378 wrong name records; six boundary controls fail | All 504 records and 20 prctl controls pass | 75/75 |
+| x86-64 | 378 wrong name records; six boundary controls fail | All 504 records and 20 prctl controls pass | 198/198 |
+
+Root/UID1000 leader and worker readers produce 360 exact name records: four
+45-record phases use three proc mounts, self/thread-self, numeric process and
+leader/worker task paths, and comm/stat/status formats. The worker first uses
+a distinct nonempty name, then an empty name. Named pthread inheritance is
+checked before that replacement. Fork from the empty worker adds 72 records
+and empty-name GET controls. Actual exec of the fixture adds 72 records and
+requires the reset name `init` through GET_NAME. Twenty API controls cover
+page-boundary short/15-byte/empty strings, unchanged names through four SET
+fault cases, two GET faults, exact zero padding/canaries and long truncation.
+
+Each baseline fails 306 phase records (120 stat, 120 status, 66 comm), all 72
+empty-fork records, the six successful boundary cases and GET_NAME for the
+empty worker, inherited empty name and exec reset. Each credential group's
+phase failure counts are 36/36/42/39. Existing exec procfs names already pass;
+its GET_NAME incorrectly returned the path/pid form. The prior 156 task-state
+records, 1,620 link probes, 84 identity/scheduling/accounting stat reads,
+positive demand faults/CPU work, PID-view and chroot controls still pass.
+
+Generated C revealed that both legacy 16-byte prctl scratch arrays were
+promoted by memdup without freeing. Pointer annotations still promoted them.
+The final code uses the kernel's explicit stack allocator; no memdup remains
+in prctl. Original, promoted and pointer-annotation C/build captures remain
+in the private qualification area. Earlier fixture captures are retained
+separately; final before/after receipts use identical source, generated C and
+native init ELF. This diagnosis comes from emitted code; baseline semantic
+failures prevent a repeated storage verdict on the old kernel.
+
+Each credential cohort performs 32 warmups and 200 measured cycles while the
+worker and two pipe pairs remain held. Each cycle performs two SET/GET
+roundtrips, 90 name reads, 30 state reads, 120 link probes, six status checks
+and 12 accounting stat reads. Every live slab class remains exact: 18 on ARM
+and 14 on x86. Explicit scratch storage and thread-command Text remove three
+allocation sites: 406/295 baseline sites become 403/292 in 657/653 source files.
+The two table escapes disappear and the existing proc escape count falls from
+two to one. Other NEW rows remain unchanged; no allowances change.
+
+ARM passes all six related guest cases. The x86 primary passes procself,
+nnpthread and seccompthread; host disk exhaustion prevents namespace ISO
+creation and open/runtime tool compilation. Its failed receipt and missing
+artifact fields remain visible. Fresh same-kernel/source recovery passes
+namespace, open and runtime. All six native semantic verdicts therefore pass
+across primary/recovery captures. Eight host test files and the inventory
+check pass with the same private f6358ec compiler used for both kernel builds.
+
+Kernels build in isolated worktrees at
+`708f21f5fe7d79027ad70db692cbc3c77e43a205` with only the six owned kernel paths
+changed. The [assertion-enabled auditor](../tests/linux-compat/results/2026-10-13/proccomm-audit.v)
+checks exact baseline failure counts, all positive/error controls, flat
+storage, private source isolation, emitted stack/no-allocation helpers,
+before/after fixture C/init ELF identity, unchanged allocation refusals and independent
+[lifetime review](../tests/linux-compat/results/2026-10-13/proccomm-lifetime-review.md)
+hashes. Both deliberately failing assertion controls execute.
+[ARM evidence](../tests/linux-compat/results/2026-10-13/proccomm-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/proccomm-evidence-x86_64.json)
+bind all 63 isolated inputs and compiler/controller/build/kernel/C/source/
+ELF/ISO/capture/review hashes. Raw captures are
+[ARM baseline](../tests/linux-compat/results/2026-10-13/proccomm-before-aarch64.log),
+[ARM primary](../tests/linux-compat/results/2026-10-13/proccomm-after-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/proccomm-before-x86_64.log),
+[x86 primary](../tests/linux-compat/results/2026-10-13/proccomm-after-x86_64.log)
+and [x86 recovery](../tests/linux-compat/results/2026-10-13/proccomm-retry-x86_64.log).
+Public inventory fingerprints use the committed parent plus this fix,
+separately from the isolated semantic build inputs.
+
+Concurrent rename observation timing, exec/retirement races, named zombies,
+leader-only exit, writable proc comm, GNU/translated/ELF32 paths and application
+installation/sandbox/portal acceptance remain separate. Exec still replaces
+process.name outside the table lock. The three broad section 15 gates remain open.

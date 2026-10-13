@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/proccomm-audit.v:190: FAIL: fn main.failure: assert log.contains('LINUX PROCSELF NAME DETAIL:'), 'task-name baseline failure markers required'
+      message: task-name baseline failure markers required
+V panic: Assertion failed...

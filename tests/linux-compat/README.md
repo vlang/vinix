@@ -197,6 +197,18 @@ four kernel C captures after a shared executable changed; fixture C differs
 only by an exact unused stderr-print prelude.
 See [the state receipts and limits](../../docs/linux-posix-qualification.md#selected-procfs-task-states).
 
+Name controls require exact selected comm/stat/status bytes, including empty
+names, slash/brackets/parentheses and escaped status newline/backslash. The
+four reader phases produce 360 records; empty-worker fork inheritance and
+actual exec reset add 144. Twenty prctl controls require bounded page-edge
+copies, truncation, real EFAULT without mutation and exact GET padding/canaries.
+Baselines fail 378 records plus boundary/GET controls; candidates pass all 524
+record/API checks. Each storage cycle adds 90 name reads and two SET/GET
+roundtrips, retaining flat slabs and 75 ARM/198 x86 pages. Explicit kernel
+scratch buffers and thread-command Text remove three allocation sites. Related
+x86 cases blocked by host disk exhaustion pass through same-input recovery
+receipts; original failures remain visible. See [the name receipts and limits](../../docs/linux-posix-qualification.md#selected-procfs-task-names).
+
 The `readlinkempty` case checks 3,648 raw/musl calls per root/UID1000 child
 on both architectures. Empty paths name the retained symlink description,
 including O_PATH handles after unlink or private-directory search denial.
