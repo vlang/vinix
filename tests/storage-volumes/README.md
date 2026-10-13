@@ -1,5 +1,14 @@
 # Storage-volume qualification
 
+Encrypted growth previews extend the actual reader/physical-probe model with
+both credential domains, declared candidate capacity, signed/native-sector
+extent bounds, exact original/candidate/action reports, erased secrets before
+probes/output and no entropy/publication/import. Targeted `--host-growth-preview`
+and `--growth-preview` modes qualify fault cleanup, four warmup/four measured
+paired real-KDF/recovery previews, unchanged live views/inputs/ciphertext and
+actual capacity expansion after reordered reboot. See
+[growth previews](growth-preview.md).
+
 Ordinary encrypted configuration inspection extends the same reader/discovery
 model with VC1 authentication, bounded binary passphrase inputs and failed KDF
 and tag paths. Targeted `--host-volume-inspect` and `--volume-inspect` modes

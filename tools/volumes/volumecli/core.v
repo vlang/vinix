@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume plan-preview-grow-volume DEVICE CONFIG PASSPHRASE_FILE EXPECTED_BYTES LENGTH_BYTES\n       vinix-volume plan-preview-grow-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE EXPECTED_BYTES LENGTH_BYTES\n')
 	C.printf(c'       vinix-volume show-volume CONFIG PASSPHRASE_FILE\n       vinix-volume discover-volume CONFIG PASSPHRASE_FILE\n')
 	C.printf(c'       vinix-volume plan-grow-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE EXPECTED_BYTES LENGTH_BYTES NEW_BACKUP\n')
 	C.printf(c'       vinix-volume rewrap-recovery-volume BACKUP OLD_RECOVERY_KEYFILE NEW_RECOVERY_KEYFILE NEW_BACKUP\n')
@@ -102,6 +103,12 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && (C.strcmp(argv[1], c'plan-preview-grow-volume') == 0 || C.strcmp(argv[1], c'plan-preview-grow-recovery-volume') == 0) {
+			if argc != 7 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 { return usage() }
+			capacity := decimal(argv[5]) or { return usage() }; length := decimal(argv[6]) or { return usage() }
+			if capacity == 0 || length == 0 { return usage() }
+			return preview_volume_growth(argv[2], argv[3], argv[4], capacity, length, C.strcmp(argv[1], c'plan-preview-grow-recovery-volume') == 0)
+		}
 		if argc >= 2 && (C.strcmp(argv[1], c'show-volume') == 0 || C.strcmp(argv[1], c'discover-volume') == 0) {
 			if argc != 4 || argv[2][0] == 0 || argv[3][0] == 0 { return usage() }
 			return inspect_volume_seal(argv[2], argv[3], C.strcmp(argv[1], c'discover-volume') == 0)

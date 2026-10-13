@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`plan-preview-grow-volume DEVICE CONFIG PASSPHRASE_FILE EXPECTED_BYTES LENGTH_BYTES`
+and `plan-preview-grow-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE EXPECTED_BYTES LENGTH_BYTES`
+report authenticated original/candidate geometry and `keep`/`grow` actions after
+explicit capacity checks and read-only pinned rechecks. Secrets erase before
+probes/reports; neither command publishes or applies growth. See
+[growth preview rules](../../docs/storage-volumes.md#read-only-encrypted-growth-previews).
+
 `show-volume CONFIG PASSPHRASE_FILE` authenticates and reports ordinary encrypted
 configuration metadata offline. `discover-volume CONFIG PASSPHRASE_FILE` also
 locates the unique matching whole physical disk through read-only pins and

@@ -826,6 +826,65 @@ or output failures return 1, and invalid syntax returns 2. Diagnostics may be
 printed on failure; output failure can leave a partial report. See
 [recovery inspection qualification](../tests/storage-volumes/recovery-inspect.md).
 
+## Read-only encrypted growth previews
+
+`plan-preview-grow-volume DEVICE CONFIG PASSPHRASE_FILE EXPECTED_BYTES
+LENGTH_BYTES` and `plan-preview-grow-recovery-volume DEVICE BACKUP
+RECOVERY_KEYFILE EXPECTED_BYTES LENGTH_BYTES` authenticate the saved mapping and
+check a complete proposed capacity/extent against a pinned read-only physical
+disk, then report the candidate without publishing it:
+
+```sh
+vinix-volume plan-preview-grow-volume /dev/vda /root/data.vcrypt /root/volume.pass 33554432 12288
+vinix-volume plan-preview-grow-recovery-volume /dev/vda /root/data.vrecover /root/recovery.key 33554432 12288
+```
+
+Capacity and extent length are explicit byte counts. Neither can shrink;
+capacity and length must remain native-sector aligned. The extent must fit
+within `capacity - saved_offset` and the kernel's signed mapping limit
+`0x7fffffffffffffff`. Equal capacity/length are valid `keep` actions. Disk
+identity, native sectors, mapper slot, starting offset, volume key and saved
+read-only mode remain fixed. No publication destination is accepted.
+
+Complete success prints three records: `operation=checked-growth
+format=volume|recovery`; `current_disk_bytes=N planned_disk_bytes=N sector=N
+identity=mbr:XXXXXXXX` (or canonical `gpt:GUID`) `capacity_action=keep|grow`;
+and `slot=N offset=N current_bytes=N planned_bytes=N readonly=0|1
+extent_action=keep|grow`. Integer metadata retains its full unsigned width.
+`current_disk_bytes` and `current_bytes` come from the authenticated saved
+input; `planned_disk_bytes` must equal the currently observed physical capacity.
+For example, adopting a disk already expanded from 16 to 32 MiB reports
+`current_disk_bytes=16777216 planned_disk_bytes=33554432 capacity_action=grow`.
+The mode is the saved mapping's mode independently of the physical parent's
+current read-only state.
+
+Canonical format/geometry checks precede credential access. Ordinary VC1
+configurations use the existing fixed-profile passphrase loader and complete
+KDF allocation/erase/release; recovery VR1 inputs use their independent exact
+64-byte private recovery key. Authentication precedes candidate validation,
+device access and successful reports. Password, wrapping credential and decoded
+volume key erase before opening the disk. Every return erases the complete
+stack workspace. No fresh salt/nonce, entropy read, writer lock, configuration
+publication, raw keyfile, mapper import or physical write is performed.
+
+The physical parent stays pinned read-only with no-follow, nonblocking and
+close-on-exec flags. It must be a whole online physical device with the exact
+declared candidate capacity, saved identity and native sectors. Two final
+rechecks cover identity/geometry/runtime identity and physical read-only mode
+before reporting; the descriptor remains pinned through output flushing and
+closes on every exit. Wrong disks, unobserved capacity declarations, shrinking,
+misaligned/out-of-bounds extents, invalid credentials and changed disks fail
+without a successful candidate report.
+
+These are desired-geometry previews. They preserve source bytes, existing live
+mapping status/generations/descriptors and ciphertext. They do not reserve a
+slot/extent, preflight live admission, resize a device/filesystem, initialize
+new data or guarantee a later publish/unlock. Perform explicit publication and
+live application separately; those operations repeat their own checks. Success
+returns 0, authentication/geometry/device/output failure returns 1, and invalid
+syntax returns 2. Failures can print diagnostics; output failure can leave a
+partial authenticated report. See [growth preview qualification](../tests/storage-volumes/growth-preview.md).
+
 ## Authenticated encrypted-volume growth
 
 `plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`
