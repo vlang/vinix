@@ -111,6 +111,8 @@ fn qualify_busy_configuration(binary string, root string) ! {
 		['mirror', root + '/absent-mirror', 'app'], ['deploy', root + '/absent-deployment.json'],
 		['mirror-review', root + '/absent-mirror', 'app'],
 		['mirror-apply', '0'.repeat(64), root + '/absent-mirror', 'app'],
+		['mirror-deployment-review', root + '/absent-mirror', root + '/absent-lock.json'],
+		['mirror-deployment-apply', '0'.repeat(64), root + '/absent-mirror', root + '/absent-lock.json'],
 		['deployment-lock', 'app'], ['deployment-review', root + '/absent-deployment.json'],
 		['deployment-apply', '0'.repeat(64), root + '/absent-deployment.json'],
 		['policy'], ['policy-review', root + '/absent-policy.json'], ['policy-apply', '0'.repeat(64), root + '/absent-policy.json'],
@@ -308,6 +310,17 @@ fn qualify(binary string) ! {
 	lock_path := work + '/locked-deployment.json'
 	lock_text := success(binary, [...root_args, 'deployment-lock'])!
 	lock_document := json2.decode[pkgcore.DeploymentLock](lock_text)!
+	locked_media := work + '/locked media; $literal'
+	os.write_file(lock_path, lock_text)!
+	mut locked_mirror := pkgprotocol.decode_deployment_mirror_review(success(binary,
+		[...root_args, 'mirror-deployment-review', locked_media, lock_path])!)!
+	defer { locked_mirror.close() }
+	assert locked_mirror.deployment_sha256 == pkgcore.hash_file(lock_path)!
+	assert !os.exists(locked_media)
+	locked_output := success(binary, [...root_args, '--progress', 'mirror-deployment-apply',
+		locked_mirror.mirror.review.fingerprint, locked_media, lock_path])!
+	assert locked_output.contains('"phase":"complete"')
+	assert os.read_file(locked_media + '/_deployment.json')! == lock_text
 	assert lock_document.format == 2 && lock_document.packages == ['app'] && lock_document.locked.len == 1
 	os.write_file(lock_path, lock_text)!
 	mut deploy_review := pkgprotocol.decode_review(success(binary, ['--root', offline_root, 'deployment-review', lock_path])!)!

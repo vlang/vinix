@@ -20,6 +20,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  deployment-lock [ID...] | deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
+	'  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
 	'  run-args|run-terminal-args ID [--data-cwd] [--file ABSOLUTE_FILE]... -- [LITERAL_ARGUMENT...]\n' +
 	'  keygen SEED_FILE | pack MANIFEST.json SOURCE_DIR REPOSITORY_DIR\n' +
@@ -67,8 +68,8 @@ fn checked(arguments []string) !int {
 		return 2
 	}
 	command := args[0]
-	if progress && (as_json || command !in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'mirror', 'mirror-apply']) {
-		return error('--progress supports update, install/remove/upgrade, apply, deploy/deployment-apply, rollback and mirror/mirror-apply without --json')
+	if progress && (as_json || command !in ['update', 'install', 'remove', 'upgrade', 'apply', 'deploy', 'deployment-apply', 'rollback', 'mirror', 'mirror-apply', 'mirror-deployment-apply']) {
+		return error('--progress supports update, install/remove/upgrade, apply, deploy/deployment-apply, rollback and mirror/mirror-apply/mirror-deployment-apply without --json')
 	}
 	names := args[1..].clone()
 	match command {
@@ -306,6 +307,18 @@ fn checked(arguments []string) !int {
 		'mirror-apply' {
 			if names.len < 3 { return error('mirror-apply requires a review fingerprint, new destination directory and package IDs') }
 			service.apply_mirror(names[1], names[2..], names[0])!
+		}
+		'mirror-deployment-review' {
+			if names.len != 2 { return error('mirror-deployment-review requires a new destination and format-2 deployment lock') }
+			mut review := service.review_deployment_mirror(names[0], names[1])!
+			defer { review.close() }
+			text := json2.encode(review)
+			if text.len > pkgcore.max_metadata { return error('deployment mirror review exceeds metadata limit') }
+			println(text)
+		}
+		'mirror-deployment-apply' {
+			if names.len != 3 { return error('mirror-deployment-apply requires a fingerprint, new destination and format-2 deployment lock') }
+			service.apply_deployment_mirror(names[1], names[2], names[0])!
 		}
 		'run', 'run-terminal', 'run-args', 'run-terminal-args' {
 			if root != '' {

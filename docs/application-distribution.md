@@ -550,9 +550,22 @@ dependencies, unrelated locked packages and publisher substitutions fail before
 downloads or cleanup. The usual policy/version/architecture/runtime checks apply;
 the lock grants no permissions, license acceptance or firmware approval.
 
-For offline deployment, export the matching payload closure with `mirror`, enroll
-the mirror with the recorded publisher ID/key, refresh its signed index, then
-review/apply the same lock. URLs are not pinned, so approved mirrors can move;
+For offline deployment, export the exact locked payload closure with
+`mirror-deployment-review NEW_DIRECTORY LOCK.json`, then confirm with
+`mirror-deployment-apply FINGERPRINT NEW_DIRECTORY LOCK.json`. The review has
+the same publisher, license, permission and disk disclosures as a catalog mirror,
+and includes the literal lock filename and its SHA-256. It accepts a nonempty
+format-2 lock and resolves only its authenticated package/runtime pins, even
+when a newer version is advertised. Confirmation binds exact lock bytes, filename,
+signed indexes, policy and destination before acquisition or parent creation.
+The lock is captured once, copied byte-for-byte as `_deployment.json`, and
+published atomically with the verified repository payloads. The leading underscore
+cannot collide with repository identifiers, including on case-insensitive media. `--progress` is supported.
+The installed generation remains unchanged.
+
+Enroll the mirror with the recorded publisher ID/key, refresh its signed index,
+then review/apply the media's `_deployment.json`. URLs are not pinned, so approved
+mirrors can move;
 publisher identities, metadata, expiry and anti-replay checks still apply. Keep
 the approved versions available in the signed index and mirror. Cached payloads
 alone cannot substitute for an authenticated, unexpired catalog.

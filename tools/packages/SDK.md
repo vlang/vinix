@@ -943,6 +943,34 @@ catalog metadata, policy or trust does. Progress emits `resolve`, transfer/copy
 and verification phases, then `complete` after durable publication; it does not
 emit installed-generation activation. The installed state is preserved.
 
+For a locked organization deployment use
+`mirror-deployment-review NEW_DIRECTORY LOCK.json`, followed by
+`mirror-deployment-apply FINGERPRINT NEW_DIRECTORY LOCK.json`. The lock must be
+nonempty format 2; format-1 root lists do not pin a reproducible closure.
+The format-1 `DeploymentMirrorReview` envelope requires `format`, literal
+`deployment` filename, `deployment_sha256` and a nested `mirror` with all fields
+of `MirrorReview`. The nested rows describe the exact authenticated versions,
+permissions, licenses and runtimes in the lock. Its fingerprint has the separate
+`vinix-deployment-mirror-review-1` domain and additionally binds the original
+filename and exact document digest. Whitespace edits also require a fresh review.
+The input is captured once; its parsed pins, digest and exported bytes describe
+one snapshot. Cache recovery does not stale that snapshot.
+
+The atomically published media includes `_deployment.json` (mode 0644) alongside
+the original signed repository directories. `pkgprotocol.deployment_mirror_filename`
+names this case-sensitive file. Its leading underscore avoids collisions with
+repository identifiers. The destination disk budget includes the document and
+its metadata overhead. Consumers still authenticate/enroll the original publisher
+keys, refresh local indexes and review/apply the copied lock; the document grants
+no new trust or license acceptance. Expiry and replay floors remain enforced.
+This export preserves installed state and supports `--progress` on apply.
+
+V clients use `Service.review_deployment_mirror`, `Service.apply_deployment_mirror`
+and `pkgprotocol.decode_deployment_mirror_review`. Produced/decoded envelopes own
+their presentation fields; `.close()` retires nested mirror/row storage too.
+Catalog mirrors and Software's existing export action continue to resolve current
+catalog versions; choose the deployment-specific commands for exact lock media.
+
 V clients use `Service.review_mirror`, `Service.apply_mirror` and
 `pkgprotocol.decode_mirror_review`. Service-produced and decoded envelopes own
 their presentation fields; `MirrorReview.close()` also retires the nested review.

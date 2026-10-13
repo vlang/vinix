@@ -45,6 +45,137 @@ fn write_deployment(work string, document DeploymentLock) !string {
 	return path
 }
 
+fn test_deployment_mirror_exports_pinned_older_application_and_runtime_and_lock_atomically() {
+	work, service, config := deployment_fixture('mirror-pins')!
+	defer { os.rmdir_all(work) or {} }
+	locked := service.lock_deployment(['app'])!
+	path := write_deployment(work, locked)!
+	text := os.read_file(path)!
+	deployment_version(work, '2.0.0')!
+	publish(work + '/repository', 'fixture', work + '/seed', 2, time.now().unix() + 3600)!
+	service.refresh()!
+	destination := work + '/locked export; $literal'
+	mut ordinary := service.review_mirror(destination, ['app'])!
+	defer { ordinary.close() }
+	assert ordinary.review.rows.all(it.version == '2.0.0')
+	mut review := service.review_deployment_mirror(destination, path)!
+	defer { review.close() }
+	assert review.mirror.review.rows.map(it.id) == ['app', 'runtime']
+	assert review.mirror.review.rows.all(it.version == '1.0.0' && it.action == 'export')
+	assert review.deployment_sha256 == index_digest(text) && !os.exists(destination)
+	assert os.ls(state_directory(service.root) + '/objects')!.len == 0
+	mut refused := false
+	service.apply_deployment_mirror(destination, path, ordinary.review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && !os.exists(destination)
+	service.apply_deployment_mirror(destination, path, review.mirror.review.fingerprint)!
+	assert os.read_file(destination + '/_deployment.json')! == text
+	assert os.stat(destination + '/_deployment.json')!.mode & 0o777 == 0o644
+	assert service.state()!.generation == 0
+	os.rmdir_all(work + '/repository')!
+	root := work + '/offline'
+	os.mkdir_all(root + '/etc/vinix-packages')!
+	os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(Config{ ...config,
+		repositories: [Repository{ ...config.repositories[0], url: 'file://' + destination + '/fixture' }],
+		policy: Policy{ offline: true, reserve_bytes: 0 } }))!
+	offline := Service{ root: root }
+	offline.refresh()!
+	mut installation := offline.review_deployment(destination + '/_deployment.json')!
+	defer { installation.close() }
+	assert installation.rows.all(it.version == '1.0.0')
+	state := offline.apply_deployment(destination + '/_deployment.json', installation.fingerprint)!
+	assert state.packages.all(it.package.version == '1.0.0') && state.packages.len == 2
+}
+
+fn test_deployment_mirror_binds_exact_lock_bytes_before_side_effects_and_validates_policy() {
+	work, service, config := deployment_fixture('mirror-intent')!
+	defer { os.rmdir_all(work) or {} }
+	locked := service.lock_deployment(['app'])!
+	path := write_deployment(work, locked)!
+	text := os.read_file(path)!
+	destination := work + '/absent/media/export'
+	mut review := service.review_deployment_mirror(destination, path)!
+	defer { review.close() }
+	os.write_file(path, text + '\n')!
+	mut refused := false
+	service.apply_deployment_mirror(destination, path, review.mirror.review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && !os.exists(work + '/absent') && os.ls(state_directory(service.root) + '/objects')!.len == 0
+	os.write_file(path, text)!
+	os.cp(path, work + '/other.json')!
+	refused = false
+	service.apply_deployment_mirror(destination, work + '/other.json', review.mirror.review.fingerprint) or { refused = err.msg().contains('stale') }
+	assert refused && !os.exists(work + '/absent')
+	for bad in ['{"format":1,"architecture":"aarch64","packages":["app"]}',
+		json2.encode(DeploymentLock{ architecture: 'aarch64' }),
+		text.replace('"format":2', '"format":2,"format":2'),
+		text.replace('"version":"1.0.0"', '"version":"9.0.0"'),
+		text.replace('"architecture":"aarch64"', '"architecture":"x86_64"')] {
+		os.write_file(path, bad)!
+		refused = false
+		service.review_deployment_mirror(destination, path) or { refused = true }
+		assert refused && !os.exists(work + '/absent')
+	}
+	os.write_file(path, text)!
+	os.write_file(service.root + '/etc/vinix-packages/config.json', json2.encode(Config{ ...config,
+		policy: Policy{ ...config.policy, permissions: ['files'] } }))!
+	refused = false
+	service.review_deployment_mirror(destination, path) or { refused = err.msg().contains('permissions blocked') }
+	assert refused && !os.exists(work + '/absent')
+	os.write_file(service.root + '/etc/vinix-packages/config.json', json2.encode(config))!
+	guard := acquire(state_directory(service.root))!
+	defer { guard.release() }
+	refused = false
+	service.review_deployment_mirror(destination, path) or { refused = err.msg().contains('another package transaction') }
+	assert refused
+}
+
+fn deployment_replace_source(phase string, stage string) ! {
+	if phase != 'created' { return }
+	path := os.dir(stage) + '/deployment.json'
+	os.write_file(path, os.read_file(path)! + '\n')!
+}
+
+fn deployment_break_export(phase string, path string) ! {
+	if phase == 'copied' { os.write_file(path, 'corrupted payload')! }
+}
+
+fn test_deployment_mirror_captures_one_document_and_cleans_unpublished_lock_on_failure() {
+	work, service, config := deployment_fixture('mirror-capture')!
+	defer { os.rmdir_all(work) or {} }
+	locked := service.lock_deployment(['app'])!
+	path := write_deployment(work, locked)!
+	text := os.read_file(path)!
+	mut review := service.review_deployment_mirror(work + '/export', path)!
+	defer { review.close() }
+	store := state_directory(service.root)
+	mut refused := false
+	mirror_export(config, store, work + '/export', [], MirrorOptions{ deployment: path,
+		expected_review: review.mirror.review.fingerprint, checkpoint: deployment_break_export }) or {
+		refused = err.msg().contains('payload verification failed')
+	}
+	assert refused && !os.exists(work + '/export')
+	assert os.ls(work)!.all(!it.starts_with('.vinix-mirror-'))
+	mirror_export(config, store, work + '/export', [], MirrorOptions{ deployment: path,
+		expected_review: review.mirror.review.fingerprint, checkpoint: deployment_replace_source })!
+	assert os.read_file(path)! == text + '\n'
+	assert os.read_file(work + '/export/_deployment.json')! == text
+	assert service.state()!.generation == 0
+}
+
+fn test_deployment_mirror_lock_filename_cannot_collide_with_repository_identifiers() {
+	work, service, config := deployment_fixture('mirror-namespace')!
+	defer { os.rmdir_all(work) or {} }
+	changed := Config{ ...config, repositories: [Repository{ ...config.repositories[0], id: 'deployment.json' }] }
+	os.write_file(service.root + '/etc/vinix-packages/config.json', json2.encode(changed))!
+	publish(work + '/repository', 'deployment.json', work + '/seed', 1, time.now().unix() + 3600)!
+	service.refresh()!
+	path := write_deployment(work, service.lock_deployment(['app'])!)!
+	mut review := service.review_deployment_mirror(work + '/export', path)!
+	defer { review.close() }
+	service.apply_deployment_mirror(work + '/export', path, review.mirror.review.fingerprint)!
+	assert os.is_file(work + '/export/_deployment.json')
+	assert os.is_file(work + '/export/deployment.json/index.json')
+}
+
 fn test_locked_deployments_reproduce_versions_and_runtime_closure_after_refresh_and_offline() {
 	work, service, config := deployment_fixture('reproducible')!
 	defer { os.rmdir_all(work) or {} }

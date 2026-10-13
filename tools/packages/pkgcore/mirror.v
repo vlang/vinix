@@ -13,6 +13,7 @@ struct MirrorOptions {
 	available_space fn (string) !u64 = free_bytes
 	progress fn (pkgprotocol.Progress) = no_progress
 	expected_review string
+	deployment string // exact format-2 deployment export; empty for catalog mirrors
 }
 
 fn mirror_no_checkpoint(_ string, _ string) ! {}
@@ -39,6 +40,8 @@ struct MirrorIdentity {
 	ancestor string
 	device u64
 	inode u64
+	deployment string
+	deployment_sha256 string
 }
 
 struct PreparedMirror {
@@ -50,6 +53,8 @@ struct PreparedMirror {
 	acquired u64
 	shared_disk bool
 	fingerprint string
+	deployment_text string
+	deployment_sha256 string
 }
 
 // Resolve missing parents without creating them. The review binds the existing
@@ -75,23 +80,31 @@ fn mirror_location(destination string) !(string, string) {
 
 fn prepare_mirror(config Config, directory string, destination string, names []string) !PreparedMirror {
 	if names.len == 0 || names.len > 4096 { return error('offline mirror requires 1 to 4096 package IDs') }
-	target, ancestor := mirror_location(destination)!
 	catalog := load_catalog(config, directory)!
 	plan := resolve(catalog, config, State{}, names, true)!
+	return prepare_mirror_plan(config, directory, destination, names, plan, '', '')
+}
+
+fn prepare_mirror_plan(config Config, directory string, destination string, names []string, plan Plan, deployment string, text_lock string) !PreparedMirror {
+	target, ancestor := mirror_location(destination)!
 	mut snapshots := []Snapshot{}
 	for snapshot in read_snapshots(directory)! {
 		if config.repositories.any(it == snapshot.repository) { snapshots << snapshot }
 	}
-	exported, acquired := mirror_space(plan, snapshots, directory)!
+	base_exported, acquired := mirror_space(plan, snapshots, directory)!
+	exported := if text_lock == '' { base_exported } else { mirror_cost(base_exported, u64(text_lock.len))! }
+	lock_sha256 := if text_lock == '' { '' } else { index_digest(text_lock) }
 	info := os.stat(ancestor)!
 	text := json2.encode(MirrorIdentity{ config: config, names: names, plan: plan, snapshots: snapshots,
-		destination: destination, target: target, ancestor: ancestor, device: info.dev, inode: info.inode })
+		domain: if deployment == '' { 'vinix-mirror-review-1' } else { 'vinix-deployment-mirror-review-1' },
+		destination: destination, target: target, ancestor: ancestor, device: info.dev, inode: info.inode,
+		deployment: deployment, deployment_sha256: lock_sha256 })
 	bytes := text.bytes()
 	fingerprint := sha256.sum(bytes).hex()
 	unsafe { bytes.free(); text.free() }
 	return PreparedMirror{ target: target, ancestor: ancestor, plan: plan, snapshots: snapshots,
 		exported: exported, acquired: acquired, shared_disk: info.dev == os.stat(directory)!.dev,
-		fingerprint: fingerprint }
+		fingerprint: fingerprint, deployment_text: text_lock, deployment_sha256: lock_sha256 }
 }
 
 fn mirror_destination_cost(prepared PreparedMirror) !u64 {
@@ -106,6 +119,10 @@ pub fn (service Service) review_mirror(destination string, names []string) !pkgp
 	defer { guard.release() }
 	config := service.configuration()!
 	prepared := prepare_mirror(config, directory, destination, names)!
+	return mirror_review(config, directory, destination, names, prepared)
+}
+
+fn mirror_review(config Config, directory string, destination string, names []string, prepared PreparedMirror) !pkgprotocol.MirrorReview {
 	mut rows := []pkgprotocol.ReviewPackage{cap: prepared.plan.packages.len}
 	for installed in prepared.plan.packages {
 		rows << review_row(installed, '', installed.package.id in prepared.plan.requested, 'export')
@@ -169,7 +186,8 @@ fn mirror_space(plan Plan, snapshots []Snapshot, directory string) !(u64, u64) {
 }
 
 fn mirror_export(config Config, directory string, destination string, names []string, options MirrorOptions) ! {
-	prepared := prepare_mirror(config, directory, destination, names)!
+	prepared := if options.deployment == '' { prepare_mirror(config, directory, destination, names)! }
+		else { prepare_deployment_mirror(config, directory, destination, options.deployment)! }
 	if options.expected_review != '' && options.expected_review != prepared.fingerprint {
 		return error('offline mirror review is stale: destination, publisher metadata, policy or resolved packages changed; review the export again')
 	}
@@ -187,6 +205,9 @@ fn mirror_export(config Config, directory string, destination string, names []st
 		if !published { os.rmdir_all(stage) or {} }
 	}
 	options.checkpoint('created', stage)!
+	if prepared.deployment_text != '' {
+		atomic_write(stage + '/' + pkgprotocol.deployment_mirror_filename, prepared.deployment_text)!
+	}
 	for snapshot in prepared.snapshots {
 		path := stage + '/' + snapshot.repository.id
 		os.mkdir_all(path + '/objects')!

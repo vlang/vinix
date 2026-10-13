@@ -85,3 +85,10 @@ cache disk requirements before exporting to new local media. The equivalent
 policy and destination filesystem identity. Both direct and reviewed exports
 support `--progress`. See [offline administration](../../docs/application-distribution.md#offline-and-organization-deployment)
 and [qualification](../../tests/packages/offline-export-check.md).
+
+`mirror-deployment-review` / `mirror-deployment-apply` export the exact package
+and runtime versions pinned by a nonempty format-2 organization deployment lock.
+The media includes the captured lock as `_deployment.json`, published with the
+verified closure. This preserves older approved runtimes when catalog mirrors
+would select newer versions. Publisher keys still require consumer enrollment.
+See [locked mirror qualification](../../tests/packages/locked-mirror-check.md).

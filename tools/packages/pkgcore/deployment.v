@@ -62,6 +62,10 @@ pub fn package_metadata_digest(p Package) !string {
 fn read_deployment(path string, architecture string) !DeploymentLock {
 	text := read_metadata(path)!
 	defer { unsafe { text.free() } }
+	return decode_deployment(text, architecture)
+}
+
+fn decode_deployment(text string, architecture string) !DeploymentLock {
 	header := json2.decode[DeploymentHeader](text)!
 	mut document := DeploymentLock{}
 	match header.format {

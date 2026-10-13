@@ -38,6 +38,8 @@ fn qualify_package_configuration_lock() ! {
 		['deployment-apply', '0'.repeat(64), '/tmp/absent-deployment.json'],
 		['mirror-review', '/tmp/missing-media/export', 'linux-probe'],
 		['mirror-apply', '0'.repeat(64), '/tmp/missing-media/export', 'linux-probe'],
+		['mirror-deployment-review', '/tmp/missing-media/export', '/tmp/missing-lock.json'],
+		['mirror-deployment-apply', '0'.repeat(64), '/tmp/missing-media/export', '/tmp/missing-lock.json'],
 	] {
 		busy := run(['/usr/bin/vinix-package', ...args], '', none, none)
 		assert busy.status != 0 && busy.output.contains('another package transaction'), busy.output
@@ -373,6 +375,30 @@ fn qualify_package_linux(mut t Test) ! {
 	mut locked_review := pkgprotocol.decode_review(package_success(['deployment-review', deployment_path])!)!
 	assert locked_review.rows.all(it.version == '1.0.0' && it.action == 'keep')
 	locked_review.close()
+	// A catalog mirror would select the new (broken) runtime. A deployment
+	// mirror must carry the exact older runtime pinned by the organization.
+	locked_media := '/tmp/locked-media; $literal'
+	mut locked_export := pkgprotocol.decode_deployment_mirror_review(package_success([
+		'mirror-deployment-review', locked_media, deployment_path])!)!
+	defer { locked_export.close() }
+	assert locked_export.mirror.review.rows.all(it.version == '1.0.0' && it.action == 'export')
+	assert !os.exists(locked_media)
+	locked_progress := package_progress_events(package_success(['--progress', 'mirror-deployment-apply',
+		locked_export.mirror.review.fingerprint, locked_media, deployment_path])!)!
+	assert locked_progress.last().phase == 'complete' && locked_progress.all(it.phase != 'activate')
+	assert read_text(locked_media + '/_deployment.json') == deployment_text
+	locked_client := '/tmp/locked-offline-client'
+	os.mkdir_all(locked_client + '/etc/vinix-packages')!
+	os.write_file(locked_client + '/etc/vinix-packages/config.json', json2.encode(pkgcore.Config{
+		architecture: architecture, policy: pkgcore.Policy{ offline: true, reserve_bytes: 0 } }))!
+	package_success(['--root', locked_client, 'repo-enroll', 'fixture', 'file://' + locked_media + '/fixture', key])!
+	package_success(['--root', locked_client, 'update'])!
+	mut locked_install := pkgprotocol.decode_review(package_success(['--root', locked_client, 'deployment-review', locked_media + '/_deployment.json'])!)!
+	defer { locked_install.close() }
+	package_success(['--root', locked_client, 'deployment-apply', locked_install.fingerprint, locked_media + '/_deployment.json'])!
+	assert pkgcore.read_state(pkgcore.state_directory(locked_client), architecture)!.packages.all(it.package.version == '1.0.0')
+	package_success(['--root', locked_client, 'verify'])!
+	t.say('PACKAGE LOCKED MIRROR exact-old-runtime bundled-lock offline-reproduction PASS')
 	updates := json2.decode[pkgcore.SoftwareView](package_success(['view'])!)!
 	assert updates.update_error == '' && updates.rows.filter(it.updatable).map(it.id) == [runtime.id]
 	assert updates.rows.any(it.id == runtime.id && it.kind == 'runtime' && it.version == '1.1.0'
