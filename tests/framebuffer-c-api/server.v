@@ -38,6 +38,7 @@ fn main() {
 	mut request := windowfb.Message{}
 	for !peer.receive(unsafe { &request })! { peer.wait(5000)! }
 	assert request.kind == .create && request.x == 128 && request.y == 96
+	assert request.value == windowfb.client_features
 	file := path + '.pixels'
 	mut surface := windowfb.create_surface(file, 128, 96)!
 	defer {
@@ -47,10 +48,17 @@ fn main() {
 	reply := windowfb.message(.created, 128, 96, 512, file)!
 	send_split(mut peer, unsafe { &reply })!
 	for !peer.receive(unsafe { &request })! { peer.wait(5000)! }
+	assert request.kind == .set_title && request.text() == 'Ardent terminal'
+	for !peer.receive(unsafe { &request })! { peer.wait(5000)! }
 	assert request.kind == .present
 	assert unsafe { surface.back[0] } == 0x123456
 	assert unsafe { surface.back[128 * 96 - 1] } == 0xabcdef
 	surface.copy_frame()
+	new_file := path + '.resized'
+	mut replacement := windowfb.create_surface(new_file, 160, 112)!
+	defer { replacement.close(); os.rm(new_file) or {} }
+	offer := windowfb.message(.configure, 160, 112, 1, new_file)!
+	send_split(mut peer, unsafe { &offer })!
 	for m in [
 		windowfb.message(.frame_done, 0, 0, 0, '')!,
 		windowfb.message(.motion, -12, 34, 3, '')!,
@@ -58,6 +66,13 @@ fn main() {
 	] {
 		send_split(mut peer, unsafe { &m })!
 	}
+	for !peer.receive(unsafe { &request })! { peer.wait(5000)! }
+	assert request.kind == .buffer_ack && request.value == 1
+	for !peer.receive(unsafe { &request })! { peer.wait(5000)! }
+	assert request.kind == .present && request.value == 1
+	assert unsafe { replacement.back[160 * 112 - 1] } == 0x654321
+	done := windowfb.message(.frame_done, 0, 0, 1, '')!
+	send_split(mut peer, unsafe { &done })!
 	for {
 		peer.receive(unsafe { &request }) or {
 			unsafe { err.free() }

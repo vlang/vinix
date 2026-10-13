@@ -80,6 +80,15 @@ struct Keyboard {
 mut:
 	fd    int
 	saved TerminalState
+	key_events bool
+	packet [32]u8
+	packet_used int
+	packet_ms i64
+	held [256]bool
+	owners [256]int
+	aliases [256]int
+	caps bool
+	num bool
 }
 
 fn open_keyboard() Keyboard {
@@ -87,6 +96,10 @@ fn open_keyboard() Keyboard {
 		fd: 0
 	}
 	kbd.saved = desktop_terminal_raw(kbd.fd)
+	kbd.key_events = desktop_ioctl(kbd.fd, u64(0x564b0001), voidptr(1)) == 0
+	kbd.caps = desktop_keyboard_caps_lock(kbd.fd)
+	mut leds := u8(0)
+	if desktop_ioctl(kbd.fd, keyboard_kdgetled, unsafe { &leds }) == 0 { kbd.num = leds & 2 != 0 }
 	return kbd
 }
 
@@ -101,5 +114,6 @@ fn (mut kbd Keyboard) poll() string {
 }
 
 fn (mut kbd Keyboard) close() {
+	if kbd.key_events { desktop_ioctl(kbd.fd, u64(0x564b0001), unsafe { nil }) }
 	desktop_terminal_restore(kbd.fd, mut kbd.saved)
 }

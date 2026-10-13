@@ -6,6 +6,10 @@ pub const magic = u32(0x31465756) // VWF1
 pub const header_size = 24
 pub const max_payload = 4096
 pub const max_clients = 32
+// CREATE.value feature bits. Zero retains the original fixed-buffer protocol.
+pub const resize_buffers = 1
+pub const kitty_keyboard = 2
+pub const client_features = resize_buffers | kitty_keyboard
 
 pub enum Kind as u32 {
 	create = 1
@@ -21,6 +25,8 @@ pub enum Kind as u32 {
 	configure
 	focus
 	close
+	set_title
+	buffer_ack
 }
 
 pub struct Message {
@@ -59,7 +65,7 @@ fn decode_header(bytes &u8) !Message {
 	if take_u32(bytes, 0) != magic { return error('invalid window protocol magic') }
 	kind := take_u32(bytes, 4)
 	length := take_u32(bytes, 20)
-	if kind < u32(Kind.create) || kind > u32(Kind.close) || length > max_payload {
+	if kind < u32(Kind.create) || kind > u32(Kind.buffer_ack) || length > max_payload {
 		return error('invalid window message header')
 	}
 	return Message{

@@ -24,18 +24,6 @@ const default_frame_interval_ms = i64(16)
 // refresh immediate; only genuinely background output waits for the cadence.
 const default_idle_interval_ms = i64(1000)
 
-// The desktop's own shortcuts, as a raw terminal delivers them. The keyboard
-// is read in raw mode, so a control chord arrives as one byte and nothing else
-// can be mistaken for it.
-const key_ctrl_k = u8(0x0b)
-const key_ctrl_n = u8(0x0e)
-const key_ctrl_p = u8(0x10)
-const key_ctrl_q = u8(0x11)
-// F1 and F2, as the Apple SPI keyboard encodes them. They are the brightness
-// keys printed on the machine's own keycaps, so they drive the panel here.
-const key_f1 = '\x1bOP'
-const key_f2 = '\x1bOQ'
-
 // The reload helper removes this before asking PID 1 to replace the session.
 // Recreate it only after the replacement has painted its first frame and
 // completed the startup application handshakes, so an out-of-group watchdog
@@ -288,7 +276,7 @@ fn main() {
 	}
 
 	desktop.session.saving = true
-	mut framebuffer_server := start_framebuffer_server() or {
+	mut framebuffer_server := start_framebuffer_server(keyboard.key_events) or {
 		eprintln('vinix-desktop: framebuffer window service: ${err}')
 		unsafe { err.free() }
 		FramebufferServer{}
@@ -694,145 +682,6 @@ fn (mut d Desktop) pump_pointer(mut pointer PointerDevice, width int, height int
 	}
 	if packet.pressed!=0 { d.mark_session_gesture() }
 	return click
-}
-
-fn (mut d Desktop) pump_keyboard(mut keyboard Keyboard) {
-	raw := keyboard.poll()
-	// A key that only turns the display back on is not also typed.
-	if raw.len > 0 && d.idle_key_input() {
-		unsafe { raw.free() }
-		return
-	}
-	// The console types the US layout. Everything below reads what the chosen
-	// input source types instead; shortcuts arrive as they were.
-	keys := d.type_with_layout(raw, keyboard.fd)
-	if raw.len > 0 && keys.str != raw.str {
-		unsafe { raw.free() }
-	}
-	if keys.len>0 { d.mark_session_gesture() }
-	if d.shell_dialog_keys(keys) || d.capture_session_shortcut(keys) || d.session_workspace_keys(keys) { if keys.len>0 { unsafe { keys.free() } }; return }
-
-	// Window controls own typing; global switching can replace a control.
-	// Empty reads also settle an incomplete terminal escape sequence.
-	controls := d.take_window_overlay_keys(keys)
-	defer {
-		if controls.len > 0 && controls.str != keys.str {
-			unsafe { controls.free() }
-		}
-	}
-	if controls.len == 0 {
-		return
-	}
-
-	// Brightness is the machine's, not the focused window's: F1 and F2 dim and
-	// brighten the panel whatever is on top, and are taken out of the stream so
-	// a terminal does not also receive them as an escape sequence.
-	mut rest := d.take_brightness_keys(controls)
-	if rest.len == 0 {
-		return
-	}
-	rest = d.take_files_settings_shortcut(rest)
-	if rest.len == 0 {
-		return
-	}
-
-	// Window-management chords are taken before a focused app gets text. Cmd-W
-	// must close a terminal or editor window rather than inserting an escape
-	// sequence into it.
-	rest = d.take_window_shortcuts(rest)
-	if rest.len == 0 {
-		return
-	}
-
-	rest = d.take_paste_keys(rest)
-	if rest.len == 0 {
-		return
-	}
-
-	// An open Start menu owns typing before the focused application does:
-	// printable keys search, Backspace edits, Return launches and Escape closes.
-	if d.start_menu_open {
-		d.start_menu_key_input(rest)
-		return
-	}
-
-	// An application that takes typed input gets it while it is focused, and
-	// the desktop's own shortcuts stand down: a terminal cannot have `q` close
-	// the desktop out from under whoever is typing.
-	if d.focused_app_takes_keys() {
-		mut settings_app_index := -1
-		for window in d.windows {
-			if window.id == d.focus && window.title == files_settings_window_title {
-				settings_app_index = window.app_index
-				break
-			}
-		}
-		d.send_keys_to_focused(rest)
-		if settings_app_index >= 0 {
-			d.refresh_files_settings_clients(settings_app_index)
-		}
-		return
-	}
-
-	// Control chords rather than bare letters. These fire whenever no
-	// application has the keyboard, which on a machine with no working pointer
-	// is most of the time -- and a plain `q` meaning "close the desktop" then
-	// means typing a word with a q in it drops the user back to the console.
-	// Esc is out for the same reason: it is a key people press.
-	for i := 0; i < rest.len; i++ {
-		match rest[i] {
-			key_ctrl_p {
-				d.toggle_start_menu()
-			}
-			key_ctrl_q {
-				d.running = false
-			}
-			key_ctrl_n {
-				d.spawn_scattered()
-			}
-			key_ctrl_k {
-				// The first native application, for a keyboard-only session.
-				if available_apps.len > 0 {
-					d.launch(available_apps[0])
-				}
-			}
-			else {}
-		}
-	}
-}
-
-// take_brightness_keys acts on every F1/F2 in the input and returns what is
-// left. The common case is a string containing neither, which is returned as
-// it came rather than rebuilt -- there is no garbage collector here, and this
-// runs on every frame that has input.
-fn (mut d Desktop) take_brightness_keys(keys string) string {
-	if keys.index_u8(0x1b) < 0 {
-		return keys
-	}
-	mut kept := []u8{cap: keys.len}
-	mut i := 0
-	for i < keys.len {
-		if i + key_f1.len <= keys.len {
-			three := keys[i..i + key_f1.len]
-			if three == key_f1 {
-				adjust_brightness(-brightness_step)
-				i += key_f1.len
-				continue
-			}
-			if three == key_f2 {
-				adjust_brightness(brightness_step)
-				i += key_f2.len
-				continue
-			}
-		}
-		kept << keys[i]
-		i++
-	}
-	if kept.len == keys.len {
-		unsafe { kept.free() }
-		return keys
-	}
-	return kept.bytestr()
 }
 
 // FrameStats accumulates where a frame's milliseconds went. It is only kept

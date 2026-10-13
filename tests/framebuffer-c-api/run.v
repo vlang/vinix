@@ -4,6 +4,7 @@ module main
 import os
 import time
 import hosttest
+import applehost
 
 fn run(program string, args []string) ! {
 	mut process := os.new_process(program)
@@ -44,6 +45,17 @@ fn main() {
 	os.mkdir_all(work)!
 	defer { if os.getenv('VINIX_CAPI_KEEP') != '1' { os.rmdir_all(work) or {} } }
 	println('C ABI test artifacts: ' + work)
+	// Exercise the production SPI decoder independently of the old terminal
+	// fixture: simultaneous modifiers, real releases, repeat and bounded output.
+	applehost.copy_provider(root, work + '/spicore', 'spi', false, false)!
+	host_arch := $if amd64 { 'amd64' } $else { 'arm64' }
+	hosttest.generate_module(work + '/spicore', work + '/spi-core.c', host_arch, ['nofloat'])!
+	hosttest.generate_module(@DIR + '/spi', work + '/spi-client.c', host_arch, [])!
+	assert !os.read_file(work + '/spi-core.c')!.contains('memdup(')
+	run('clang', ['-w', '-O1', '-fsanitize=address,undefined', '-iquote', root + '/kernel/c',
+		'-iquote', root + '/tests/apple-ans', '-iquote', root + '/tests/apple-spi-keyboard', work + '/spi-core.c',
+		work + '/spi-client.c', '-o', work + '/spi-test'])!
+	run(work + '/spi-test', [])!
 	sdk := work + '/host'
 	run(v, ['run', root + '/desktop/tools/build-window-capi.v', '--arch=host', '--out=' + sdk])!
 	arch := $if amd64 { 'amd64' } $else { 'arm64' }

@@ -7,7 +7,7 @@ import os
 const exports = ['vinix_window_api_version', 'vinix_window_open', 'vinix_window_open_at',
 	'vinix_window_close', 'vinix_window_event_fd', 'vinix_window_get_framebuffer',
 	'vinix_window_frame_pending', 'vinix_window_wants_write', 'vinix_window_present',
-	'vinix_window_next_event', 'vinix_window_wait']
+	'vinix_window_next_event', 'vinix_window_wait', 'vinix_window_set_title']
 
 fn run(program string, args []string) ! {
 	mut process := os.new_process(program)

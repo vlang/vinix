@@ -39,13 +39,14 @@ fn main() {
 		for window.receive(unsafe { &event }) or { return } {
 			match event.kind {
 				.close { return }
+				.configure { dirty = true }
 				.motion, .button_down {
 					x = int(event.x)
 					y = int(event.y)
 					dirty = true
 				}
 				.keys {
-					if event.text() == 'q' || event.text() == '\x1b' { return }
+					if event.text() == 'q' || event.text() == '\x1b' || event.text() == '\x1b[113;1:1;113u' || event.text() == '\x1b[27;1:1u' { return }
 				}
 				else {}
 			}

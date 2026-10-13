@@ -47,6 +47,8 @@ __global (
 	// Held around console_scancode(): the PS/2 keyboard and a USB one are
 	// read by different threads and share the modifiers.
 	console_key_lock klock.Lock
+	console_event_held [256]bool
+	console_pause_bytes int
 )
 
 fn console_update_alt(right bool, pressed bool) {
@@ -220,6 +222,14 @@ fn keyboard_handler(vect u8) {
 // language (usb_key() below). Call with console_key_lock held: the state of
 // the modifiers is one state, whoever the key came from.
 fn console_scancode(input_byte u8) {
+	if console_key_events && (console_pause_bytes > 0 || input_byte == 0xe1) {
+		if input_byte == 0xe1 && console_pause_bytes == 0 { console_pause_bytes = 5; return }
+		console_pause_bytes--
+		if console_pause_bytes == 0 {
+			add_to_buf(c'\e[?119;1k\e[?119;0k', 18, false)
+		}
+		return
+	}
 	// A key going down ends a sleep, if keys are allowed to. Its release
 	// does not: the release of the key that asked for the sleep arrives
 	// just as the machine has gone down. Break codes have the top bit
@@ -230,6 +240,24 @@ fn console_scancode(input_byte u8) {
 
 	if input_byte == 0xe0 {
 		console_extra_scancodes = true
+		return
+	}
+	if console_key_events {
+		mut code := u16(input_byte & 0x7f)
+		if console_extra_scancodes {
+			console_extra_scancodes = false
+			code = 0
+			for pair in usb_extended_keys {
+				if pair[1] == input_byte & 0x7f { code = u16(pair[0]); break }
+			}
+		}
+		if code > 0 && code < 256 {
+			value := if input_byte & 0x80 != 0 { u32(0) } else if console_event_held[code] { u32(2) } else { u32(1) }
+			console_track_key_event(code, value)
+			mut bytes := [16]u8{}
+			n := keyboard.event_bytes(code, value, &bytes[0])
+			add_to_buf(&bytes[0], n, false)
+		}
 		return
 	}
 
@@ -512,6 +540,8 @@ fn caps_lock_on() bool {
 	return console_capslock_active
 }
 
+fn num_lock_on() bool { return console_numlock_active }
+
 // The framebuffer is the console here; the serial port is a device of its own.
 fn mirror_to_serial(_ voidptr, _ u64) {}
 
@@ -522,6 +552,7 @@ const usb_extended_keys = [
 	[u8(96), 0x1c]!, // keypad Enter
 	[u8(97), 0x1d]!, // right Ctrl
 	[u8(98), 0x35]!, // keypad /
+	[u8(99), 0x37]!, // Print Screen (ignore the preceding fake Shift)
 	[u8(100), 0x38]!, // right Alt
 	[u8(102), 0x47]!, // Home
 	[u8(103), 0x48]!, // Up
@@ -543,6 +574,17 @@ const usb_extended_keys = [
 // there, so that every chord, layout and escape sequence is one piece of
 // code. A key this console has no scancode for is dropped.
 pub fn usb_key(code u16, value u32) {
+	if console_key_events {
+		if code == 0 || code > 255 || value > 2 { return }
+		if value != 0 { wakesrc.report(.keyboard) }
+		console_key_lock.acquire()
+		console_track_key_event(code, value)
+		mut bytes := [16]u8{}
+		n := keyboard.event_bytes(code, value, &bytes[0])
+		add_to_buf(&bytes[0], n, false)
+		console_key_lock.release()
+		return
+	}
 	// Input is decoded only after setup_keyboard() has made its tables.
 	if console_convtab_numpad_numlock.len == 0 || code == 0 || code > 0xff {
 		return
@@ -572,4 +614,17 @@ pub fn usb_key(code u16, value u32) {
 	}
 	console_scancode(scancode)
 	console_key_lock.release()
+}
+
+fn console_track_key_event(code u16, value u32) {
+	console_event_held[code] = value != 0
+	console_shift_active = console_event_held[42] || console_event_held[54]
+	console_ctrl_active = console_event_held[29] || console_event_held[97]
+	console_alt_active = console_event_held[56] || console_event_held[100]
+	console_alt_keys = (if console_event_held[56] { u8(1) } else { u8(0) }) | (if console_event_held[100] { u8(2) } else { u8(0) })
+	console_meta_active = console_event_held[125] || console_event_held[126]
+	console_meta_chorded = false
+	console_alt_tab_chorded = false
+	if code == 58 && value == 1 { console_capslock_active = !console_capslock_active }
+	if code == 69 && value == 1 { console_numlock_active = !console_numlock_active }
 }

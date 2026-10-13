@@ -143,6 +143,7 @@ pub fn enter_graphics_mode(owner_pid int) {
 pub fn leave_graphics_mode() {
 	terminal_print_lock.acquire()
 	if terminal_graphics_mode {
+		console_key_events = false
 		terminal_graphics_mode = false
 		terminal_graphics_owner = 0
 		if flanterm_ctx != unsafe { nil } {

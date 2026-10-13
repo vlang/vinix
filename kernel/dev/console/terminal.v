@@ -40,6 +40,7 @@ __global (
 	console_bigbuf    [console_bigbuf_size]u8
 	console_bigbuf_i  = u64(0)
 	console_decckm    = false
+	console_key_events = false
 )
 
 struct Console {
@@ -203,6 +204,13 @@ fn add_to_buf(ptr &u8, count u64, echo bool) {
 	console_res.l.release()
 	mut signals := u64(0)
 	console_read_lock.acquire()
+	// In physical mode discard a whole batch on overflow; a truncated record
+	// could otherwise turn a release into ordinary serial text at the reader.
+	if console_key_events && count > console_bigbuf_size - console_bigbuf_i {
+		console_read_lock.release()
+		proc.release_job_identity(group, session)
+		return
+	}
 	for i := u64(0); i < count; i++ {
 		c := unsafe { ptr[i] }
 		krandom.add_event(u64(c))
@@ -422,7 +430,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	mut process := proc.current_thread().process
 	if request == ioctl.tcsets || request == ioctl.tcsetsw || request == ioctl.tcsetsf
 		|| request == ioctl.tcflsh || request == ioctl.tcsbrk || request == ioctl.tcxonc
-		|| request == ioctl.tiocspgrp {
+		|| request == ioctl.tiocspgrp || request == 0x564b0001 {
 		permission := this.job_check(userland.sigttou, false)
 		if permission != 0 { errno.set(permission); return none }
 	}
@@ -445,12 +453,23 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	}
 
 	match request {
+		// Vinix physical-key input mode; immediate argument 0/1. Foreground
+		// terminal owners only. Canonical mode/text-mode restoration resets it.
+		0x564b0001 {
+			if u64(argp) > 1 || this.termios.c_lflag & termios.icanon != 0 {
+				errno.set(errno.einval)
+				return none
+			}
+			console_key_events = u64(argp) == 1
+			return 0
+		}
 		// KDSETMODE's argument is the mode itself, not a pointer to it.
 		ioctl.kdsetmode {
 			mode := int(u64(argp) & 0xff)
 			if mode == ioctl.kd_graphics {
 				term.enter_graphics_mode(process.pid)
 			} else if mode == ioctl.kd_text {
+				console_key_events = false
 				term.leave_graphics_mode()
 			} else {
 				errno.set(errno.einval)
@@ -467,7 +486,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 			return 0
 		}
 		ioctl.kdgetled {
-			leds := u8(if caps_lock_on() { ioctl.led_cap } else { 0 })
+			leds := u8(if caps_lock_on() { ioctl.led_cap } else { 0 }) | u8(if num_lock_on() { ioctl.led_num } else { 0 })
 			if !usercopy.copy_to_user(u64(argp), voidptr(&leds), 1) {
 				errno.set(errno.efault)
 				return none
@@ -530,6 +549,7 @@ fn (mut this Console) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 				return none
 			}
 			this.termios = settings
+			if settings.c_lflag & termios.icanon != 0 { console_key_events = false }
 			if request == ioctl.tcsetsf {
 				discard_console_input()
 			}

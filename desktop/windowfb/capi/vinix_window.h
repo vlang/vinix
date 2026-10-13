@@ -8,10 +8,11 @@
 extern "C" {
 #endif
 
-#define VINIX_WINDOW_API_VERSION 1u
+#define VINIX_WINDOW_API_VERSION 2u
 #define VINIX_WINDOW_MAX_PAYLOAD 4096u
 #define VINIX_WINDOW_ERROR_SIZE 256u
 #define VINIX_WINDOW_FORMAT_XRGB8888 1u
+#define VINIX_WINDOW_KEYBOARD_FLAGS 31u
 
 typedef struct vinix_window vinix_window;
 
@@ -68,16 +69,22 @@ void vinix_window_close(vinix_window *window);
  * it yourself. Use next_event to decode readiness, including partial records. */
 int32_t vinix_window_event_fd(vinix_window *window);
 
-/* 0 on success, -1 for a NULL handle/output. Pixels remain valid until close.
+/* 0 on success, -1 for a NULL handle/output. Pixels remain valid until the next
+ * CONFIGURE with a nonempty payload, or close. Reacquire this struct on resize.
  * Draw only when frame_pending is 0; do not change pixels until FRAME_DONE. */
 int32_t vinix_window_get_framebuffer(vinix_window *window, vinix_framebuffer *out);
 int32_t vinix_window_frame_pending(vinix_window *window); /* 1/0, -1 for NULL. */
 int32_t vinix_window_wants_write(vinix_window *window); /* 1/0, -1 for NULL. */
 int32_t vinix_window_present(vinix_window *window, vinix_window_error *error);
+int32_t vinix_window_set_title(vinix_window *window, const char *title,
+                             vinix_window_error *error);
 
 /* Nonblocking: 1 = event, 0 = incomplete/no event, -1 = error/disconnect.
  * out is unchanged on 0/-1. Drain until 0 after readiness. Reading FRAME_DONE
- * clears frame_pending. A CLOSE event or EOF/error ends the window lifetime. */
+ * clears frame_pending. A CONFIGURE with a nonempty payload automatically maps
+ * the replacement and acknowledges it before returning; reacquire pixels and
+ * redraw when frame_pending is 0. KEYS uses Kitty keyboard protocol flags 31.
+ * A CLOSE event or EOF/error ends the window lifetime. */
 int32_t vinix_window_next_event(vinix_window *window, vinix_window_event *out,
                                vinix_window_error *error);
 

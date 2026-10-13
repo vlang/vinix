@@ -68,7 +68,7 @@ fn main() {
 	// sessions have unrelated edits and generated sources in this checkout.
 	workflowbuild.run('git', ['-C', root, 'archive', 'HEAD', 'desktop', '-o', work + '/source.tar'])!
 	workflowbuild.run('tar', ['-xf', work + '/source.tar', '-C', work + '/source'])!
-	for name in ['main.v', 'wm.v', 'framebuffer_server.v'] {
+	for name in ['main.v', 'wm.v', 'framebuffer_server.v', 'input.v', 'keyboard_protocol.v', 'keyboard_events.v'] {
 		os.cp(root + '/desktop/' + name, work + '/source/desktop/' + name)!
 	}
 	os.cp(root + '/desktop/ptycore/pty.c.v', work + '/source/desktop/ptycore/pty.c.v')!

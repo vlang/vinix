@@ -406,7 +406,7 @@ pub fn caps_lock() bool {
 // Called by the existing ARM64 console idle-poll path, never from an IRQ.
 // Try-lock also prevents re-entry if a diagnostic or scheduler path polls.
 // The caller owns output and feeds it to the console AFTER this lock is freed.
-pub fn poll(output &u8, capacity u64, application_cursor bool) int {
+pub fn poll(output &u8, capacity u64, application_cursor bool, key_events bool) int {
 	if !apple_spi_keyboard_lock.test_and_acquire() {
 		return 0
 	}
@@ -419,7 +419,7 @@ pub fn poll(output &u8, capacity u64, application_cursor bool) int {
 	// never gets called again it can never come back. Not calling it is what
 	// used to make three bad reads permanent.
 	pointer_reports := C.vinix_apple_spi_touchpad_reports()
-	count := C.vinix_apple_spi_keyboard_poll(output, capacity, int(application_cursor))
+	count := C.vinix_apple_spi_keyboard_poll(output, capacity, int(application_cursor) | if key_events { 2 } else { 0 })
 	if C.vinix_apple_spi_touchpad_reports() != pointer_reports
 		&& apple_spi_pointer_callback != voidptr(0) {
 		C.vinix_call_void_fn(apple_spi_pointer_callback)

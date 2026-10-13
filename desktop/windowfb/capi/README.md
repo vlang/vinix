@@ -44,17 +44,31 @@ int main(void) {
         return 1;
     }
 
-    int running = 1;
+    int running = 1, dirty = 0;
     while (running) {
         if (vinix_window_wait(window, -1, &error) < 0) break;
         vinix_window_event event;
         int32_t status;
         while ((status = vinix_window_next_event(window, &event, &error)) == 1) {
             if (event.kind == VINIX_WINDOW_CLOSE) running = 0;
+            if (event.kind == VINIX_WINDOW_CONFIGURE && event.length != 0) {
+                if (vinix_window_get_framebuffer(window, &fb) != 0) {
+                    running = 0;
+                    break;
+                }
+                dirty = 1; /* The old fb.pixels pointer is invalid now. */
+            }
             /* FRAME_DONE permits the next draw/present. KEYS carries
                event.length bytes, including possible embedded NULs. */
         }
         if (status < 0) break;
+        if (running && dirty && vinix_window_frame_pending(window) == 0) {
+            for (uint32_t y = 0; y < fb.height; ++y)
+                for (uint32_t x = 0; x < fb.width; ++x)
+                    fb.pixels[y * (fb.stride / 4) + x] = 0x00306090;
+            if (vinix_window_present(window, &error) != 0) break;
+            dirty = 0;
+        }
     }
     vinix_window_close(window);
     return 0;
@@ -85,12 +99,21 @@ For an existing event loop, get the borrowed descriptor with
 `vinix_window_next_event` until it returns 0. Keep decoding through the library,
 so its partial-message state and frame acknowledgements remain synchronized.
 
-The framebuffer pointer stays valid until `vinix_window_close`. It uses XRGB8888
-pixels and a byte stride. Finish drawing, call `vinix_window_present`, then leave
+API version 2 enables replacement buffers and Kitty keyboard flags 31 by default.
+Deploy the updated kernel and desktop together. Public C struct layouts are
+unchanged; the SDK adds `vinix_window_set_title(window, title, &error)`.
+
+The framebuffer pointer stays valid until close or a CONFIGURE event with a
+nonempty payload. It uses XRGB8888 pixels and a byte stride. Finish drawing,
+call `vinix_window_present`, then leave
 the pixels untouched until a FRAME_DONE event is decoded and
 `vinix_window_frame_pending` returns 0. FRAME_DONE acknowledges the copy into the
-compositor, not vsync. Resizing scales the original allocation. Calls and drawing
-on one handle must be serialized; separate handles have separate state.
+compositor, not vsync. On resize, `next_event` maps and acknowledges the new
+buffer before returning CONFIGURE. Call `get_framebuffer` again, discard the
+old pixel pointer and redraw when `frame_pending` is zero. A frame submitted
+before resize remains pending until its own FRAME_DONE; resize does not clear it.
+Calls and drawing on one handle must be serialized; separate handles have
+separate state.
 
 Close each non-NULL handle exactly once and discard its pixel and descriptor
 values afterwards. `vinix_window_close(NULL)` is harmless. Close all windows
@@ -107,6 +130,8 @@ VINIX_CAPI_KEEP=1 v run tests/framebuffer-c-api/run.v --cross
 The fixture includes the public C header and has no V runtime or client-module
 import. It links and runs against both the shared library and static archive,
 checks native struct sizes, paints the mapping, polls the descriptor, decodes
-one-byte fragments and a binary keyboard payload, checks acknowledgement and
-error handling, and closes the handle. `--cross` builds both guest SDKs and
-static foreign-ABI consumers for ARM64 and x86_64.
+one-byte fragments and a binary keyboard payload, checks resize during a pending
+frame, automatic remapping, new-generation presentation, titles and error
+handling, and closes the handle. It also runs the production SPI physical-event
+decoder under ASan/UBSan, checking modifiers, releases and repeat. `--cross`
+builds both guest SDKs and static foreign-ABI consumers for ARM64 and x86_64.

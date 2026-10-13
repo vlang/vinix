@@ -35,8 +35,8 @@ pub fn poll_uart_input() {
 	}
 
 	// The driver releases its lock before entering the console/termios path.
-	mut apple_input := [128]u8{}
-	apple_count := spi_keyboard.poll(&apple_input[0], u64(apple_input.len), console_decckm)
+	mut apple_input := [512]u8{}
+	apple_count := spi_keyboard.poll(&apple_input[0], u64(apple_input.len), console_decckm, console_key_events)
 	if apple_count > 0 {
 		add_to_buf(&apple_input[0], u64(apple_count), true)
 	}
@@ -63,6 +63,8 @@ pub fn initialise() {
 fn caps_lock_on() bool {
 	return vi_caps_active || spi_keyboard.caps_lock()
 }
+
+fn num_lock_on() bool { return vi_num_active }
 
 // What the console shows goes to the UART as well.
 fn mirror_to_serial(buf voidptr, count u64) {

@@ -12,6 +12,7 @@ mut:
 	deadlines [windowfb.max_clients]u64
 	directory string
 	serial    u64
+	key_events bool
 }
 
 struct FramebufferApp {
@@ -26,9 +27,14 @@ mut:
 	content_width  int
 	content_height int
 	focused        int = -1
+	features       int
+	generation     int
+	offer          windowfb.Surface
+	offer_path     string
+	offer_generation int
 }
 
-fn start_framebuffer_server() !FramebufferServer {
+fn start_framebuffer_server(key_events bool) !FramebufferServer {
 	directory := session_runtime_directory()
 	mut accepted := false
 	defer { if !accepted { unsafe { directory.free() } } }
@@ -39,7 +45,7 @@ fn start_framebuffer_server() !FramebufferServer {
 	defer { unsafe { path.free() } }
 	listener := windowfb.listen(path)!
 	accepted = true
-	return FramebufferServer{ listener: listener, directory: directory }
+	return FramebufferServer{ listener: listener, directory: directory, key_events: key_events }
 }
 
 fn (mut s FramebufferServer) drop_pending(slot int) {
@@ -65,9 +71,10 @@ fn framebuffer_title_valid(title string) bool {
 }
 
 fn (mut d Desktop) attach_framebuffer(mut s FramebufferServer, mut c windowfb.Connection, request &windowfb.Message) ! {
-	if request.kind != .create || request.value != 0 || !framebuffer_title_valid(request.text()) {
+	if request.kind != .create || request.value < 0 || request.value & ~windowfb.client_features != 0 || !framebuffer_title_valid(request.text()) {
 		return error('invalid window creation request')
 	}
+	if request.value & windowfb.kitty_keyboard != 0 && !s.key_events { return error('Kitty keyboard input requires physical console events') }
 	_ = windowfb.surface_size(int(request.x), int(request.y))!
 	s.serial++
 	pid_text := C.getpid().str()
@@ -111,6 +118,9 @@ fn (mut d Desktop) attach_framebuffer(mut s FramebufferServer, mut c windowfb.Co
 	app.content_width = 0
 	app.content_height = 0
 	app.focused = -1
+	app.features = int(request.value)
+	app.generation = 0
+	app.offer_generation = 0
 	if slot < 0 {
 		d.apps << app
 		slot = d.apps.len - 1
@@ -187,7 +197,7 @@ fn (mut d Desktop) poll_framebuffer_server(mut s FramebufferServer) {
 		}
 		mut app := d.apps[slot]
 		if mut app is FramebufferApp {
-			app.sync_window(d.windows[index], d)
+			app.sync_window(d.windows[index], d, mut s)
 			app.connection.flush() or {
 				unsafe { err.free() }
 				app.failed = true
@@ -206,12 +216,33 @@ fn (mut d Desktop) poll_framebuffer_server(mut s FramebufferServer) {
 					app.failed = true
 					break
 				}
-				if request.kind != .present || request.length != 0 || request.x != 0 || request.y != 0 || request.value != 0 {
+				if request.kind == .set_title && request.x == 0 && request.y == 0 && request.value == 0 && framebuffer_title_valid(request.text()) {
+					previous := app.title
+					app.title = request.text().clone()
+					d.windows[index].title = app.title
+					unsafe { previous.free() }
+					d.damage_window(index)
+					d.dirty = true
+					continue
+				}
+				if request.kind == .buffer_ack && request.length == 0 && request.x == 0 && request.y == 0 && app.offer_path.len > 0 && request.value == app.offer_generation {
+					app.surface.close()
+					desktop_unlink(app.path)
+					unsafe { app.path.free(); app.image.free() }
+					app.surface = app.offer
+					app.path = app.offer_path
+					app.image = vinix_surface_image_prefix + app.path
+					app.generation = app.offer_generation
+					app.offer = windowfb.Surface{}
+					app.offer_path = ''
+					continue
+				}
+				if request.kind != .present || request.length != 0 || request.x != 0 || request.y != 0 || request.value != app.generation {
 					app.failed = true
 					break
 				}
 				app.surface.copy_frame()
-				app.emit(.frame_done, 0, 0, 0, '')
+				app.emit(.frame_done, 0, 0, app.generation, '')
 				d.damage_window(index)
 			}
 			if app.failed {
@@ -236,14 +267,31 @@ fn (mut app FramebufferApp) emit(kind windowfb.Kind, x int, y int, value int, te
 	}
 }
 
-fn (mut app FramebufferApp) sync_window(w Window, d &Desktop) {
-	border := d.window_border(&w)
+fn (mut app FramebufferApp) sync_window(w Window, d &Desktop, mut s FramebufferServer) {
+	border := d.window_border(unsafe { &w })
 	width := w.width - 2 * border
 	height := w.height - d.theme().title_height - border
-	if width != app.content_width || height != app.content_height {
+	changed := width != app.content_width || height != app.content_height
+	if app.features & windowfb.resize_buffers != 0 && app.offer_path.len == 0 && (width != app.surface.width || height != app.surface.height) {
+		s.serial++
+		pid := C.getpid().str()
+		serial := s.serial.str()
+		path := s.directory + '/framebuffer-' + pid + '-' + serial
+		unsafe { pid.free(); serial.free() }
+		app.offer = windowfb.create_surface(path, width, height) or {
+			unsafe { path.free(); err.free() }
+			app.failed = true
+			return
+		}
+		app.offer_path = path
+		app.offer_generation = app.generation + 1
+		app.emit(.configure, width, height, app.offer_generation, path)
+	} else if changed && app.offer_path.len == 0 {
+		app.emit(.configure, width, height, app.generation, '')
+	}
+	if changed {
 		app.content_width = width
 		app.content_height = height
-		app.emit(.configure, width, height, 0, '')
 	}
 	focused := if w.id == d.focus && !w.minimized && w.workspace == d.current_workspace {
 		1
@@ -257,12 +305,39 @@ fn (mut app FramebufferApp) sync_window(w Window, d &Desktop) {
 }
 
 fn (mut app FramebufferApp) build(size ui2.Rect) !ui2.Element {
+	if app.features & windowfb.resize_buffers != 0 {
+		// Keep retained pixels at their native size during the asynchronous
+		// handoff. The window clips them until the replacement frame arrives.
+		return ui2.screen(0, [ui2.image('', app.image, ui2.Rect{ x: size.x, y: size.y, width: f64(app.surface.width), height: f64(app.surface.height) })])
+	}
 	return ui2.screen(0, [ui2.image('', app.image, size)])
 }
 
 fn (mut app FramebufferApp) handle(_ string) ! {}
 
-fn (mut app FramebufferApp) key_input(text string) { app.emit(.keys, 0, 0, 0, text) }
+fn (mut app FramebufferApp) key_input(text string) {
+	if app.features & windowfb.kitty_keyboard == 0 { app.emit(.keys, 0, 0, 0, text); return }
+	// Paste/IME/serial text has no physical key. Kitty defines key code zero
+	// for this case; keep KEYS decodable without inventing hardware releases.
+	mut at := 0
+	for at < text.len {
+		mut encoded := KeyEncoding{}
+		for byte in '\x1b[0;1:1' { encoded.byte(byte) }
+		mut first := true
+		for at < text.len && encoded.length < 480 {
+			point, width := keyboard_text_point(text, at)
+			at += width
+			if point < 32 || (point >= 127 && point <= 159) { continue }
+			encoded.byte(if first { u8(`;`) } else { u8(`:`) })
+			encoded.decimal(point)
+			first = false
+		}
+		if !first {
+			encoded.byte(`u`)
+			app.emit(.keys, 0, 0, 0, unsafe { tos(&encoded.bytes[0], encoded.length) })
+		}
+	}
+}
 
 fn (mut app FramebufferApp) pointer_input_enabled() bool { return !app.closed && !app.failed }
 
@@ -276,7 +351,8 @@ fn (mut app FramebufferApp) pointer_event(phase AppPointerPhase, button AppPoint
 		.horizontal_scroll { windowfb.Kind.horizontal_wheel }
 	}
 	value := if phase in [.scroll, .horizontal_scroll] { scroll } else { int(button) }
-	app.emit(kind, x * app.surface.width / width, y * app.surface.height / height, value, '')
+	if app.features & windowfb.resize_buffers != 0 { app.emit(kind, x, y, value, '') }
+	else { app.emit(kind, x * app.surface.width / width, y * app.surface.height / height, value, '') }
 }
 
 fn (mut app FramebufferApp) close() {
@@ -287,6 +363,12 @@ fn (mut app FramebufferApp) close() {
 	unsafe { free(app.connection) }
 	app.connection = unsafe { nil }
 	app.surface.close()
+	app.offer.close()
+	if app.offer_path.len > 0 {
+		desktop_unlink(app.offer_path)
+		unsafe { app.offer_path.free() }
+		app.offer_path = ''
+	}
 	desktop_unlink(app.path)
 	unsafe {
 		app.path.free()

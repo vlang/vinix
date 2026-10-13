@@ -58,7 +58,7 @@ fn borrowed(ptr &char, maximum int) !string {
 }
 
 @[export: 'vinix_window_api_version']
-pub fn c_api_version() u32 { return 1 }
+pub fn c_api_version() u32 { return 2 }
 
 @[export: 'vinix_window_open']
 pub fn c_open(title &char, width i32, height i32, out &ApiError) voidptr {
@@ -178,6 +178,24 @@ pub fn c_next_event(opaque voidptr, event &Event, out &ApiError) i32 {
 		C.memcpy(&event.payload[0], &message.payload[0], usize(message.length))
 	}
 	return 1
+}
+
+@[export: 'vinix_window_set_title']
+pub fn c_set_title(opaque voidptr, title &char, out &ApiError) i32 {
+	clear(out)
+	if opaque == unsafe { nil } { report(out, 'null window handle'); return -1 }
+	text := borrowed(title, 128) or {
+		report(out, err.msg())
+		unsafe { err.free() }
+		return -1
+	}
+	mut handle := unsafe { &Handle(opaque) }
+	handle.window.set_title(text) or {
+		report(out, err.msg())
+		unsafe { err.free() }
+		return -1
+	}
+	return 0
 }
 
 @[export: 'vinix_window_wait']

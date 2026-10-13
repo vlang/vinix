@@ -150,13 +150,14 @@ __global (
 	vi_alt_keys      = u8(0)
 	vi_alt_tab_chorded = false
 	vi_caps_active   = false
+	vi_num_active    = false
 	// Cmd, and whether a chord was sent while it was down. The desktop's
 	// window switcher is drawn for as long as Cmd is held, so unlike every
 	// other modifier this one's release has to be reported -- but only to
 	// someone who asked, which is what pressing Cmd-Tab counts as.
 	vi_meta_active   = false
 	vi_meta_chorded  = false
-	vi_outbuf        [64]u8
+	vi_outbuf        [4096]u8
 	vi_outlen        = u64(0)
 	// Pointer state, shared with /dev/pointer. `x`/`y` are raw device
 	// coordinates spanning 0..max, which is what an absolute device reports;
@@ -179,6 +180,7 @@ __global (
 	// Another input driver polled alongside these devices; see
 	// set_extra_poller().
 	vi_extra_poller  = voidptr(0)
+	vi_event_held [256]bool
 )
 
 // /dev/pointer owns readiness and registers this after publishing its resource.
@@ -254,7 +256,7 @@ fn notify_pointer_event() {
 }
 
 fn vi_put(b u8) {
-	if vi_outlen < 64 {
+	if vi_outlen < u64(vi_outbuf.len) {
 		vi_outbuf[vi_outlen] = b
 		vi_outlen++
 	}
@@ -387,8 +389,30 @@ fn process_rel(code u16, value u32) {
 }
 
 fn process_key(code u16, value u32) {
+	if console_key_events {
+		if code == 0 || code > 255 || value > 2 { return }
+		if value != 0 { wakesrc.report(.keyboard) }
+		vi_event_held[code] = value != 0
+		vi_shift_active = vi_event_held[42] || vi_event_held[54]
+		vi_ctrl_active = vi_event_held[29] || vi_event_held[97]
+		vi_alt_active = vi_event_held[56] || vi_event_held[100]
+		vi_alt_keys = (if vi_event_held[56] { u8(1) } else { u8(0) }) | (if vi_event_held[100] { u8(2) } else { u8(0) })
+		vi_meta_active = vi_event_held[125] || vi_event_held[126]
+		vi_meta_chorded = false
+		vi_alt_tab_chorded = false
+		if code == key_capslock && value == 1 { vi_caps_active = !vi_caps_active }
+		if code == 69 && value == 1 { vi_num_active = !vi_num_active }
+		mut bytes := [16]u8{}
+		n := keyboard.event_bytes(code, value, &bytes[0])
+		// Preserve whole records when the bounded input queue fills.
+		if vi_outlen + n <= u64(vi_outbuf.len) {
+			for i in 0 .. n { vi_put(bytes[i]) }
+		}
+		return
+	}
 	// Handle modifier keys (track press/release state)
 	match code {
+		69 { if value == 1 { vi_num_active = !vi_num_active }; return }
 		key_leftshift, key_rightshift {
 			vi_shift_active = value != 0
 			return

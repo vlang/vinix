@@ -646,22 +646,22 @@ pub fn encode_key(key u8, modifiers u8, caps i32, fn_ i32, application_cursor i3
 		// Preserve GUI chords in the console stream for graphical compositors.
 
 		if gui && i32(key) == 43 {
-			csi_u(&out, u32(9), 8 | u32(shift))
+			csi_u(voidptr(&out), u32(9), 8 | u32(shift))
 			return out
 		}
 		if alt && !gui && !ctrl && i32(key) == 43 {
-			csi_u(&out, u32(9), 2 | u32(shift))
+			csi_u(voidptr(&out), u32(9), 2 | u32(shift))
 			return out
 		}
 		if alt && !gui && !ctrl && !shift && i32(key) == 61 {
-			sequence(&out, c'\033[1;3S')
+			sequence(voidptr(&out), c'\033[1;3S')
 			return out
 		}
 		if gui && i32(key) >= 79 && i32(key) <= 82 {
 			encode_key_finals := [i8(`C`), i8(`D`), i8(`B`), i8(`A`)]!
 
 			mods := 8 | u32(shift) | (u32(alt) << 1) | (u32(ctrl) << 2)
-			modified_arrow(&out, i8(encode_key_finals[i32(key) - 79]), mods)
+			modified_arrow(voidptr(&out), i8(encode_key_finals[i32(key) - 79]), mods)
 			return out
 		}
 		if i32(key) >= 4 && i32(key) <= 29 {
@@ -827,14 +827,14 @@ pub fn encode_key(key u8, modifiers u8, caps i32, fn_ i32, application_cursor i3
 		}
 		if gui && i32(c) {
 			mods := 8 | u32(shift) | (u32(alt) << 1) | (u32(ctrl) << 2)
-			csi_u(&out, u32(c), mods)
+			csi_u(voidptr(&out), u32(c), mods)
 			return out
 		}
 		if alt {
 			out.data[out.len++] = u8(27)
 		}
 		if s {
-			sequence(&out, s)
+			sequence(voidptr(&out), s)
 			return out
 		}
 		if ctrl && printable {
@@ -875,6 +875,7 @@ pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity
 	unsafe {
 		keys := [6]u8{}
 		used := usize(0)
+		if app & 2 != 0 { return accept_key_events(d, report, now, out, capacity) }
 		d.modifiers = report[1]
 		d.fn_ = u8(!!report[9])
 		d.reports++
@@ -887,13 +888,13 @@ pub fn accept_report(d &Decoder, report &u8, now u64, app i32, out &u8, capacity
 			release := Key_bytes{}
 
 			d.gui_chorded = u8(0)
-			sequence(&release, c'\033[57444;1:3u')
+			sequence(voidptr(&release), c'\033[57444;1:3u')
 			append_key(out, capacity, &used, release)
 		}
 		if i32(d.alt_tab_chorded) && !(u32(d.modifiers) & 68) {
 			release := Key_bytes{}
 			d.alt_tab_chorded = u8(0)
-			sequence(&release, c'\033[57443;1:3u')
+			sequence(voidptr(&release), c'\033[57443;1:3u')
 			append_key(out, capacity, &used, release)
 		}
 		for i := u32(0); i < u32(6); i++ {
@@ -1009,10 +1010,14 @@ pub fn repeat_key(d &Decoder, now u64, app i32, out &u8, capacity usize) usize {
 			d.repeat_at = u64(0)
 			return usize(0)
 		}
-		append_key(out, capacity, &used, encode_key(d.repeat_key, d.modifiers, i32(d.caps), i32(d.fn_), app))
+		if app & 2 != 0 {
+			append_key(out, capacity, &used, physical_key(d.repeat_key, 2))
+		} else {
+			append_key(out, capacity, &used, encode_key(d.repeat_key, d.modifiers, i32(d.caps), i32(d.fn_), app))
+		}
 		// Modifiers can change while Tab is already repeating. Arm the
 		// release whenever the Alt chord was actually delivered.
-		if used != 0 && d.repeat_key == u8(43) && u32(d.modifiers) & 68 != 0
+		if app & 2 == 0 && used != 0 && d.repeat_key == u8(43) && u32(d.modifiers) & 68 != 0
 			&& u32(d.modifiers) & 153 == 0 {
 			d.alt_tab_chorded = u8(1)
 		}
@@ -1444,3 +1449,83 @@ pub fn vinix_apple_spi_touchpad_read(out &i32) i32 {
 // __AARCH64__
 
 // __AARCH64__ || VINIX_APPLE_SPI_TEST
+
+// CSI ? HID-usage ; value h. No V runtime, allocation or callbacks; the
+// wrapper enters the console only after dropping the SPI transport lock.
+fn physical_key(key u8, value u8) Key_bytes {
+	unsafe {
+		mut bytes := Key_bytes{}
+		bytes.data[0] = 27
+		bytes.data[1] = `[`
+		bytes.data[2] = `?`
+		mut n := usize(3)
+		if key >= 100 {
+			bytes.data[n] = 48 + key / 100
+			n++
+		}
+		if key >= 10 {
+			bytes.data[n] = 48 + key / 10 % 10
+			n++
+		}
+		bytes.data[n] = 48 + key % 10
+		bytes.data[n + 1] = `;`
+		bytes.data[n + 2] = 48 + value
+		bytes.data[n + 3] = `h`
+		bytes.len = n + 4
+		return bytes
+	}
+}
+
+fn accept_key_events(d &Decoder, report &u8, now u64, out &u8, capacity usize) usize {
+	unsafe {
+		d.gui_chorded = 0
+		d.alt_tab_chorded = 0
+		mut used := usize(0)
+		mut keys := [6]u8{}
+		for i := usize(0); i < 6; i++ {
+			key := report[i + 3]
+			if key >= 1 && key <= 3 {
+				d.repeat_at = 0
+				return 0
+			}
+			if key != 0 && !has_key(&keys[0], key) { keys[i] = key }
+		}
+		for i := u8(0); i < 8; i++ {
+			mask := u8(1) << i
+			if (d.modifiers ^ report[1]) & mask != 0 {
+				append_key(out, capacity, &used, physical_key(224 + i, if report[1] & mask != 0 {
+					u8(1)
+				} else {
+					u8(0)
+				}))
+			}
+		}
+		d.modifiers = report[1]
+		if d.fn_ != u8(!!report[9]) {
+			append_key(out, capacity, &used, physical_key(255, u8(!!report[9])))
+		}
+		d.fn_ = u8(!!report[9])
+		d.reports++
+		for i := usize(0); i < 6; i++ {
+			old := d.keys[i]
+			if old != 0 && !has_key(&keys[0], old) {
+				append_key(out, capacity, &used, physical_key(old, 0))
+			}
+		}
+		if d.repeat_key != 0 && !has_key(&keys[0], d.repeat_key) {
+			d.repeat_key = 0
+			d.repeat_at = 0
+		}
+		for i := usize(0); i < 6; i++ {
+			key := keys[i]
+			if key == 0 || has_key(&d.keys[0], key) { continue }
+			if key == 57 { d.caps = u8(!d.caps) }
+			if append_key(out, capacity, &used, physical_key(key, 1)) != 0 && key != 57 {
+				d.repeat_key = key
+				d.repeat_at = now + 500000
+			}
+		}
+		for i := usize(0); i < 6; i++ { d.keys[i] = keys[i] }
+		return used
+	}
+}

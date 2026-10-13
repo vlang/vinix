@@ -56,6 +56,7 @@ fn C.vinix_window_get_framebuffer(&C.vinix_window, &C.vinix_framebuffer) i32
 fn C.vinix_window_frame_pending(&C.vinix_window) i32
 fn C.vinix_window_wants_write(&C.vinix_window) i32
 fn C.vinix_window_present(&C.vinix_window, &C.vinix_window_error) i32
+fn C.vinix_window_set_title(&C.vinix_window, &char, &C.vinix_window_error) i32
 fn C.vinix_window_next_event(&C.vinix_window, &C.vinix_window_event, &C.vinix_window_error) i32
 fn C.vinix_window_wait(&C.vinix_window, i32, &C.vinix_window_error) i32
 fn C._Static_assert(bool, &char)
@@ -80,7 +81,7 @@ pub fn entry(argc i32, argv &&char) i32 {
 	C._Static_assert(sizeof(C.vinix_framebuffer) == 24, c'framebuffer ABI size')
 	C._Static_assert(sizeof(C.vinix_window_error) == 256, c'error ABI size')
 	check(argc == 3, c'expected window socket and open mode arguments')
-	check(C.vinix_window_api_version() == 1, c'API version')
+	check(C.vinix_window_api_version() == 2, c'API version')
 	mut error := C.vinix_window_error{}
 	mut event := C.vinix_window_event{ kind: 777 }
 	mut buffer := C.vinix_framebuffer{}
@@ -93,6 +94,7 @@ pub fn entry(argc i32, argv &&char) i32 {
 	check(C.vinix_window_open(nil, 128, 96, unsafe { &error }) == nil && error.message[0] != 0, c'null title')
 	check(C.vinix_window_open_at(nil, c'test', 128, 96, nil) == nil, c'null explicit socket')
 	check(C.vinix_window_present(nil, nil) == -1, c'optional error output')
+	check(C.vinix_window_set_title(nil, c'title', unsafe { &error }) == -1, c'null title handle')
 	check(C.vinix_window_open(c'invalid', 0, 96, unsafe { &error }) == nil, c'invalid dimensions')
 	mut long_title := [130]char{}
 	C.memset(unsafe { &long_title[0] }, 65, 129)
@@ -111,6 +113,9 @@ pub fn entry(argc i32, argv &&char) i32 {
 	check(C.vinix_window_next_event(window, unsafe { &event }, unsafe { &error }) == 0 && event.kind == 777, c'nonblocking empty receive')
 	check(C.vinix_window_wait(window, -2, unsafe { &error }) == -1, c'invalid wait timeout')
 	check(C.vinix_window_wait(window, 0, unsafe { &error }) == 0 && error.message[0] == 0, c'empty wait')
+	check(C.vinix_window_set_title(window, nil, unsafe { &error }) == -1, c'null new title')
+	check(C.vinix_window_set_title(window, c'bad\ntitle', unsafe { &error }) == -1, c'control in title')
+	check(C.vinix_window_set_title(window, c'Ardent terminal', unsafe { &error }) == 0, c'update title')
 	unsafe {
 		buffer.pixels[0] = 0x123456
 		buffer.pixels[128 * 96 - 1] = 0xabcdef
@@ -122,12 +127,17 @@ pub fn entry(argc i32, argv &&char) i32 {
 	check(C.poll(unsafe { &poll }, 1, 5000) == 1, c'external poll on event fd')
 	mut seen := u32(0)
 	mut attempts := 0
-	for seen != 7 && attempts < 100 {
+	for seen != 15 && attempts < 512 {
 		attempts++
 		check(C.vinix_window_wait(window, 1000, unsafe { &error }) >= 0, c'wait for events')
 		mut status := C.vinix_window_next_event(window, unsafe { &event }, unsafe { &error })
 		for status == 1 {
-			if event.kind == 4 {
+			if event.kind == 11 {
+				check(event.x == 160 && event.y == 112 && event.value == 1 && event.length > 0, c'resize offer')
+				check(C.vinix_window_get_framebuffer(window, unsafe { &buffer }) == 0 && buffer.width == 160 && buffer.height == 112 && buffer.stride == 640, c'automatic resized mapping')
+				check(C.vinix_window_frame_pending(window) == 1, c'old frame remains pending across resize')
+				seen |= 8
+			} else if event.kind == 4 {
 				seen |= 1
 			} else if event.kind == 5 {
 				check(event.x == -12 && event.y == 34 && event.value == 3, c'signed event fields')
@@ -142,7 +152,15 @@ pub fn entry(argc i32, argv &&char) i32 {
 		}
 		check(status == 0, c'event stream drain')
 	}
-	check(seen == 7 && C.vinix_window_frame_pending(window) == 0, c'acknowledgement releases framebuffer')
+	check(seen == 15 && C.vinix_window_frame_pending(window) == 0, c'acknowledgement releases framebuffer')
+	unsafe { buffer.pixels[160 * 112 - 1] = 0x654321 }
+	check(C.vinix_window_present(window, unsafe { &error }) == 0, c'present resized frame')
+	for C.vinix_window_frame_pending(window) == 1 {
+		check(C.vinix_window_wait(window, 5000, unsafe { &error }) >= 0, c'wait for resized frame')
+		status := C.vinix_window_next_event(window, unsafe { &event }, unsafe { &error })
+		check(status >= 0, c'resized frame event')
+		if status == 1 { check(event.kind == 4 && event.value == 1, c'resized frame generation') }
+	}
 	C.vinix_window_close(window)
 	C.vinix_window_close(nil)
 	C.puts(c'WINDOW C ABI PASS')
