@@ -2,15 +2,15 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `2a63a2eaebbccb1e4b21ad49853d711e9d7bdcc3`,
-Linguist 7.27.0 reports **Python 0.47%** (25 files, 196,427 bytes) and
-**V 83.07%** (3,774 files, 34,769,276 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `e892a4d9d422280f39f46675d2b2b747d4c07fdf`,
+Linguist 7.27.0 reports **Python 0.44%** (23 files, 184,148 bytes) and
+**V 83.12%** (3,785 files, 34,841,128 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
 5,206,285 Python bytes in 523 files, or 12.51% of 41,610,938 classified bytes.
-The measured net reduction so far is **5,009,858 Python bytes**. All remaining
-196,427 classified Python bytes must be addressed to reach zero. Absolute
+The measured net reduction so far is **5,022,137 Python bytes**. All remaining
+184,148 classified Python bytes must be addressed to reach zero. Absolute
 bytes and the presence of Python implementations are the completion criteria;
 the relative percentage also changes with other languages. In particular,
 the concurrent font-atlas compression in `9013d012` removed substantial V
@@ -24,7 +24,7 @@ to an archive would receive zero translation credit.
 
 ## Native command ports toward zero
 
-The 80 stages below remove **503 Python files / 2,164,437 original bytes** and
+The 81 stages below remove **505 Python files / 2,176,716 original bytes** and
 replace their commands and selected tests with V. These are complete command
 ports: their maintained entrypoints compile and invoke V directly. No Python
 import bridge is required by these commands. Caller edits and concurrent source
@@ -112,6 +112,7 @@ changes remain separate from this per-stage scope and the measured graph.
 | G17, VirtIO/VirGL and production random controller closure | `renderhost`, direct native G17 APIs, owned PTY/QMP paths and isolated native build runner | 23,037 / 586 | `eca3cb2e` |
 | VNC, Venus and Steam launcher helpers | `launcherhost`, native socket-owner/archive commands, streamed decoder owners and static guest helpers | 18,820 / 419 | `92eff41e` |
 | Browser, Activity Monitor and pointer-scroll host closure | `vmhost`, direct PTY/pipe controllers, native QMP and static guest recipes | 26,216 / 524 | `2a63a2ea` |
+| Roblox Windows runner closure | native manifest/ZIP/layer/USTAR, owned PTY/FIFO, concurrent uploads and XWD/PNG reports | 12,279 / 278 | `e892a4d9` |
 
 Follow-up `29ccceb7` updates the kernel's ACPI make rule and dependencies to
 invoke the native compiler. Make recipe checks on both target architectures
@@ -744,9 +745,9 @@ V policy ports, host/guest supervisors, independent tests, fixture and package
 generators, and frozen benchmark scripts. A V implementation behind a Python
 entrypoint still contributes Python and does not complete this target. Historical
 source must retain its captured bytes and provenance; no snapshots were moved
-or hidden in these 80 stages.
+or hidden in these 81 stages.
 
-The next forty-two stages remove 351 Python files / 1,666,094 original bytes.
+The next forty-three stages remove 353 Python files / 1,678,373 original bytes.
 The nine process commands retain seventeen target build profiles, independent
 C controls, exact retention/progress assertions, real musl signal return and
 private PTY/QMP ownership. ARM, Rosetta x86 and host ASan/UBSan qualification
@@ -759,7 +760,7 @@ guards, genuine instruction probes, physical volumes and original C controls;
 see [optin-tools.md](../build-support/native-compat-tools/optin-tools.md) and
 [policy-guests.md](../build-support/native-compat-tools/policy-guests.md).
 No Python was run. Together with the previous three batches, this continuation
-translates **381 Python files / 1,800,371 original bytes**. Earlier qualification
+translates **383 Python files / 1,812,650 original bytes**. Earlier qualification
 caches were cleared during shared-machine disk cleanup, and later RAM volumes
 detached. Those older local receipts are no longer available. Fresh Minecraft
 and saved-campaign analysis checks and inputs are retained on disk under
@@ -3199,3 +3200,16 @@ along with existing QMP and archive/decoder regressions and cold public fronts.
 The pointer controller retains failure logs even when final cleanup reports an
 error. No Python or Vinix guest was executed. See
 [native VM tools](../tests/native-vm-tools/README.md).
+
+The Roblox Windows stage retires two unchanged Python files, totaling 12,279
+bytes and 278 lines. `tests/roblox-windows/run` invokes V for the entire host
+workflow. Six cold ARM, Rosetta x86 and ASan/UBSan builds pass frozen original
+package/XML data, Unicode/path/cache/duplicate ZIP and pixel checks, actual
+streamed curl responses, twenty concurrent uploads and unfinished-request
+retirement. Each profile passes twelve PTY/FIFO process cases and three complete
+controlled CLI workflows, including prepared-root refresh and an empty timeout
+with exact PID/descriptor retirement. Existing native archive regressions pass.
+The deployment ZIP reader supports stored/deflated archives up to 2 GiB; other
+methods fail explicitly. Curl uses connection/stall limits in place of urllib
+socket-read timeouts. No Python, proprietary client or Vinix guest was executed.
+See [native Roblox Windows runner](../tests/roblox-windows/README.md).

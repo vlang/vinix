@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `2a63a2eaebbccb1e4b21ad49853d711e9d7bdcc3`,
+at source commit `e892a4d9d422280f39f46675d2b2b747d4c07fdf`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,16 +11,16 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,555 | 5.73% |
-| Python | 25 | 196,427 | 0.47% |
-| Shell | 807 | 1,372,921 | 3.28% |
+| C | 599 | 2,396,555 | 5.72% |
+| Python | 23 | 184,148 | 0.44% |
+| Shell | 808 | 1,373,045 | 3.28% |
 
-All `.v` files are classified as V. The resulting V share is 83.07%, with no
+All `.v` files are classified as V. The resulting V share is 83.12%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
 
-The Python-to-V target is 0%; 196,427 Python bytes remain. The concurrent
+The Python-to-V target is 0%; 184,148 Python bytes remain. The concurrent
 font-atlas compression in `9013d012` reduced V source bytes, increasing the
 relative Python share despite a decline in Python bytes. See
 [python-v-migration.md](python-v-migration.md) for completed native command ports
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 2a63a2eaebbccb1e4b21ad49853d711e9d7bdcc3 --breakdown --json
+github-linguist --rev e892a4d9d422280f39f46675d2b2b747d4c07fdf --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -683,8 +683,6 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/native-host/stdio-test.py` | 3,995 |
 | `tests/python3/smoke.py` | 9,112 |
 | `tests/realtime/run_vm.py` | 6,946 |
-| `tests/roblox-windows/_native.py` | 5,099 |
-| `tests/roblox-windows/run.py` | 7,180 |
 | `tools/_package_store_native.py` | 4,314 |
 
 ## Shell files
@@ -1385,6 +1383,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/resource-groups/run-host.sh` | 801 |
 | `tests/resource-open/run` | 186 |
 | `tests/roblox-windows/guest-init.sh` | 3,622 |
+| `tests/roblox-windows/run` | 124 |
 | `tests/roblox/build-test` | 169 |
 | `tests/roblox/launcher-test` | 142 |
 | `tests/scheduler-preemption/policy` | 152 |
