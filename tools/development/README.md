@@ -87,7 +87,7 @@ On 13 October 2026 both architecture stages completed using V source commit
 `f6358ecff9cffbf2d8b03e6a09269aac7707e26c` and musl GCC 14.2.0. They share
 production-source pin
 `93080ab17dbc7f21dbe8a89bb74ab511b02f6360d75e948f3026d11dd94463a8`.
-Receipts, generated sources and static ELF installations are retained in
+Historical stage receipts and logs are retained in
 `build/development17-20261013/native-v-arm-final` and
 `build/development17-20261013/native-v-x86-final`. Native execution/compilation
 acceptance is recorded separately by the guest controller.
@@ -120,6 +120,20 @@ used those matching compilers to build identical userland and signed packages
 in `build/development17-20261013/guest-arm-selfhost-v-m`. The x86 version/help
 and bounded diagnostic-log regression passed in
 `build/development17-20261013/guest-x86-v-pinned`.
+
+Older generated-source scratch, test images and redundant bootstrap
+installations may be pruned after retaining their receipts and transcripts.
+The current `native-v-arm-pinned/vlang` and `native-v-x86-pinned/vlang`
+installations remain available in the workstream state directory.
+
+For additional native build-system qualification, [stage-cmake.v](stage-cmake.v)
+assembles a reference SDK from a prepared compiler/Ninja/shell prefix and native
+developer-package overlay. It imports CMake and its modules, follows the ELF
+shared-library dependency graph, records source/output pins and preserves the
+compiler's musl and shared libgcc inputs. The [guest reference gate](../../tests/development/README.md)
+qualified its resulting CMake 3.31.1 SDK on AArch64 in two private workspaces as
+UID/GID 1000. This is developer test staging; public package distribution and
+wider toolchain/platform qualification retain their own workflows.
 
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links

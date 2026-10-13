@@ -168,8 +168,21 @@ architectures. The 17-record receipts and complete versions remain in
 `build/development17-20261013/guest-x86-reference-sqlite-c`. The existing
 [SQLite package qualification](../tests/packages/sqlite-profile-check.md)
 separately covers WAL and signed application/runtime lifecycle workflows.
-CMake/Node reference gates, native x86 build systems, other language/IDE profiles
+Node reference gates, native x86 build systems, other language/IDE profiles
 and complete server/SSH/CI projects remain open.
+
+The later AArch64 CMake reference gate also passed on 13 October 2026 using the
+maintained [SDK stager](../tools/development/stage-cmake.v). CMake 3.31.1 and its
+module/library closure configured and built the C project, then executed the
+exact resulting binary in both workspaces. The stager preserves the compiler's
+musl/libgcc inputs, resolving the measured older-linker rejection of a newer
+library's `.relr.dyn` sections. Its complete stage is retained in
+`build/development17-20261013/reference-arm-cmake-maintained`, and the passing
+17-record guest receipt is in
+`build/development17-20261013/guest-arm-reference-cmake-maintained-c`.
+SDK/module/runtime pins and matching program hashes are recorded in the guest
+documentation. Wider CMake project/platform support and the remaining language,
+IDE, server, container and hardware-VM gates remain open.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,

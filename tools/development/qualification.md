@@ -72,9 +72,17 @@ flat prefix, required tool entries and native runtime closure. Each selected
 workflow runs twice as UID/GID 1000 through a pinned build plan. The controller
 checks the exact plan, SDK/runtime and executable hashes, executed project argv,
 native reports and matching project artifacts. Startup/version checks cannot
-replace a project. AArch64 has passed GNU make, Samurai/Ninja and SQLite;
+replace a project. AArch64 has passed GNU make, CMake, Samurai/Ninja and SQLite;
 x86_64 has passed SQLite. The remaining reference-mode profiles are supported
 test gates awaiting native qualification, alongside the wider catalog.
+
+[stage-cmake.v](stage-cmake.v) prepares the CMake reference prefix from existing
+compiler/Ninja/shell and developer-package inputs. It records the base closure,
+modules, recursively inspected libraries and final SDK pins, excludes Python
+helpers, and preserves the compiler's musl/libgcc inputs. CMake 3.31.1 passed its
+native AArch64 configure/build/execute workflow in two fresh workspaces using
+the exact maintained stage. The retained receipt covers this project and
+compiler/runtime tuple; other CMake platform/project workflows remain separate.
 
 Python and Python-based build tooling, including Meson, are not executed by this
 runner because the repository requires V tooling and forbids running Python.

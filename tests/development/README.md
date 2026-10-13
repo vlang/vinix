@@ -148,7 +148,48 @@ The prepared SQLite binaries/runtime come from the existing
 [pinned upstream input build](../packages/sqlite-profile-check.md). These are
 developer reference projects; the package suite separately qualifies WAL and
 application lifecycle workflows. CMake, Node, native x86 build systems and
-production server/SSH/CI workloads retain their own acceptance gates.
+production server/SSH/CI workloads retain their own acceptance gates. The later
+CMake acceptance below closes its tested AArch64 reference-project gate.
+
+The maintained [CMake SDK stager](../../tools/development/stage-cmake.v) adds a
+prepared native CMake executable, its module tree and recursively inspected
+shared-library dependencies to a prepared compiler/Ninja/shell prefix:
+
+```
+V_C_ERROR_BUG_REPORT_DISABLED=1 v -cc cc run tools/development/stage-cmake.v \
+  aarch64 /path/to/reference-prefix /path/to/developer-overlay /path/to/new-cmake-stage
+```
+
+The overlay uses `usr/bin/cmake`, `usr/share/cmake*`, `usr/lib` and `lib`.
+The output prefix is `new-cmake-stage/sdk`; `reference-sdk.json` records the
+readelf executable pin, imported base-tree pin, source file pins, module-tree
+pin and final SDK pin. Only `complete: true` represents a finished stage. No
+fetch or package installation runs. Python helpers/templates are excluded
+before copying, escaped links and staging inside an input closure are refused,
+and the selected tools and runtime architecture are checked.
+
+The stager retains the supplied musl and `libgcc_s.so.1`. Blindly replacing the
+compiler's `libgcc_s` with a newer package library made the old linker reject
+`.relr.dyn` sections in the first native CMake run. The stager preserves that
+compiler input and checks its pin. An incompatible CMake runtime still fails
+native qualification; preparation does not establish arbitrary ABI compatibility.
+
+On 13 October 2026 the maintained stage completed in
+`build/development17-20261013/reference-arm-cmake-maintained`, and its exact
+SDK passed CMake 3.31.1, Samurai/Ninja and SQLite 3.53.4 as UID/GID 1000 in
+`build/development17-20261013/guest-arm-reference-cmake-maintained-c`.
+Both fresh workspaces configured and built the CMake project, executed its exact
+binary and produced the same program/data/database hashes as the earlier make
+and Ninja gate. The 17-record receipt independently validated all three CMake
+commands and their tool/artifact pins. The SDK pin is
+`b6c922cb059dd9827dcebb614587002b22609962203989f00ff9205e7beea378`
+and copied runtime pin is
+`e0d2f13520308dadb5acc290783a19018f4b3deb3aea4fc2824b8644b9fb8c1f`.
+The CMake module-tree pin is
+`28e42bb5ce0f2ea9f62fa42d5c2bbe121638ec3e423c0dc29ac81d7f576fa5b2`.
+This qualifies the tested C project and compiler/runtime tuple. Wider CMake
+project and platform support, Node, native x86 build systems and the remaining
+language/IDE/server gates stay open.
 
 Host option/receipt refusal tests run with:
 
