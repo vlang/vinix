@@ -2,9 +2,9 @@
 
 The target is now **0% committed Python**, replacing maintained implementations,
 command entrypoints and tests with native V. The work is in progress; zero has
-not been reached. At source `7da8032f9ea39d0d6dacd0c609aebd77f13ff8ed`,
-Linguist 7.27.0 reports **Python 0.21%** (10 files, 89,440 bytes) and
-**V 84.02%** (4,024 files, 36,636,770 bytes). The complete committed-blob inventory and reproduction
+not been reached. At source `44fb696a51293846e0ad300a9784fdfaa0d7fbd2`,
+Linguist 7.27.0 reports **Python 0.20%** (10 files, 89,440 bytes) and
+**V 84.07%** (4,042 files, 36,774,544 bytes). The complete committed-blob inventory and reproduction
 command are in [linguist-files.md](linguist-files.md).
 
 The starting snapshot, `9a70678887e1188926d6c8eacfc6b8f1432438f6`, counted
@@ -3400,3 +3400,32 @@ staging invokes that same producer. No Python, graphical app, real X11 server
 or Vinix guest executes; this establishes reader behavior/ABI/build contracts
 without claiming a new graphics runtime pass. See
 [native surface checks](../tests/native-surface-tools/README.md).
+
+Supplement `05348143` replaces four embedded graphics-builder Python bodies
+with native V, totaling 2,037 original body bytes and 46 lines. Venus package
+preparation retains the full Mesa 25.0.5 BLAKE2b hash and all 34 Alpine pins,
+eight-worker downloads, source reuse and private library bytes/link metadata.
+Partial downloads stay private until verified; every worker retires before
+returning a failure. Asahi and Aquamarine checks use streamed native digests.
+Venus and QEMU compiler calls use the maintained native producer, and four
+obsolete staging prerequisites are removed. The Mesa generator SDK is supplied
+separately with its original version pins; the builder no longer creates a
+Python environment or invokes pip. Nine cold ARM/x86/ASanUBSan host builds pass
+27 external OpenSSL digest comparisons and 17 actual curl downloads per profile,
+cache/failure/metadata cases, actual Mesa/34-package extraction and all 145
+private library names. Six real static ARM/x86 Venus probes and three dynamic
+ARM musl VNC viewers link. No Python, Mesa generator, graphics application or
+Vinix guest executes. These Shell blocks receive zero Python-file credit. See
+[native graphics build tools](../build-support/graphics-tools/README.md).
+
+Supplement `44fb696a` closes 20 clean test/documentation callers. Kernel guest
+commands, application sandbox and security MAC wrappers now use run-native;
+execinfo uses the native module generator. Browser, Activity Monitor, desktop
+performance, font and CPython smoke instructions use their committed V entry
+points. Shell arguments and workflows compare exactly after substitution.
+Three syntax checks, both invalid-architecture exits, native runner help and
+actual unchanged execinfo runtime tests pass on ARM, Rosetta x86 and ASanUBSan;
+the execinfo checks use six cold generator-wrapper builds. No Python or new
+Vinix guest verdict is claimed. This caller closure receives zero Python-file
+retirement credit. The four concurrently edited legacy adapters and their
+import dependencies remain preserved pending coordination.

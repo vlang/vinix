@@ -1,7 +1,7 @@
 # Files contributing to GitHub language statistics
 
 Inventory of committed files detected as C, Python or Shell by Linguist 7.27.0,
-at source commit `7da8032f9ea39d0d6dacd0c609aebd77f13ff8ed`,
+at source commit `44fb696a51293846e0ad300a9784fdfaa0d7fbd2`,
 with the root
 [`.gitattributes`](../.gitattributes) overrides. Untracked files and working-tree
 edits are excluded. Sizes are committed blob bytes, the unit used by the graph.
@@ -11,11 +11,11 @@ This is a snapshot; regenerate it when source files change.
 
 | Language | Files | Bytes | Share of all counted languages |
 | --- | ---: | ---: | ---: |
-| C | 599 | 2,396,874 | 5.50% |
-| Python | 10 | 89,440 | 0.21% |
-| Shell | 821 | 1,364,453 | 3.13% |
+| C | 599 | 2,396,874 | 5.48% |
+| Python | 10 | 89,440 | 0.20% |
+| Shell | 822 | 1,362,726 | 3.12% |
 
-All `.v` files are classified as V. The resulting V share is 84.02%, with no
+All `.v` files are classified as V. The resulting V share is 84.07%, with no
 Verilog. C includes headers (`.h`) as well as implementation files (`.c`).
 Scripts are grouped by detected language, including extensionless launchers
 and Python scripts whose names end in `.sh`.
@@ -46,7 +46,7 @@ headers remain counted honestly while their ports continue.
 Run the following at the repository root after committing `.gitattributes`:
 
 ```sh
-github-linguist --rev 7da8032f9ea39d0d6dacd0c609aebd77f13ff8ed --breakdown --json
+github-linguist --rev 44fb696a51293846e0ad300a9784fdfaa0d7fbd2 --breakdown --json
 ```
 
 The `files` arrays for `C`, `Python` and `Shell` supply the paths below. Read
@@ -729,6 +729,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `build-support/find-v.sh` | 3,160 |
 | `build-support/firefox/run-firefox` | 4,380 |
 | `build-support/gimp/run-gimp` | 2,536 |
+| `build-support/graphics-tools/run` | 145 |
 | `build-support/human-size` | 130 |
 | `build-support/hyprland/demo.sh` | 8,747 |
 | `build-support/init-aarch64/alpine-init` | 578 |
@@ -834,7 +835,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `desktop/tools/test-battery.sh` | 673 |
 | `desktop/tools/test-cache-tools` | 194 |
 | `desktop/tools/test-clipboard.sh` | 1,356 |
-| `desktop/tools/test-execinfo.sh` | 834 |
+| `desktop/tools/test-execinfo.sh` | 812 |
 | `desktop/tools/test-gpu-present` | 138 |
 | `desktop/tools/test-new-utilities.sh` | 2,637 |
 | `desktop/tools/test-settings.sh` | 5,219 |
@@ -860,9 +861,9 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-all-aarch64.sh` | 6,834 |
 | `scripts/build-amd64.sh` | 3,259 |
 | `scripts/build-android-aarch64.sh` | 196 |
-| `scripts/build-asahi-aarch64.sh` | 11,744 |
+| `scripts/build-asahi-aarch64.sh` | 11,564 |
 | `scripts/build-blender-native-aarch64.sh` | 7,179 |
-| `scripts/build-chromium-aarch64.sh` | 5,588 |
+| `scripts/build-chromium-aarch64.sh` | 5,580 |
 | `scripts/build-claude-aarch64.sh` | 5,923 |
 | `scripts/build-codex-aarch64.sh` | 4,845 |
 | `scripts/build-desktop-aarch64.sh` | 93,116 |
@@ -875,10 +876,10 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-firefox-aarch64.sh` | 6,340 |
 | `scripts/build-firefox-amd64.sh` | 178 |
 | `scripts/build-go-aarch64.sh` | 3,038 |
-| `scripts/build-hyprland-aarch64.sh` | 10,888 |
+| `scripts/build-hyprland-aarch64.sh` | 10,724 |
 | `scripts/build-ios-aarch64.sh` | 5,103 |
 | `scripts/build-java-aarch64.sh` | 4,674 |
-| `scripts/build-libreoffice-aarch64.sh` | 6,556 |
+| `scripts/build-libreoffice-aarch64.sh` | 6,548 |
 | `scripts/build-limine-aarch64.sh` | 4,779 |
 | `scripts/build-macos-installer-payload.sh` | 1,991 |
 | `scripts/build-macos-installer.sh` | 3,567 |
@@ -894,7 +895,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-python-amd64.sh` | 175 |
 | `scripts/build-qemu-input.sh` | 3,417 |
 | `scripts/build-qemu-ovmf-aarch64.sh` | 4,720 |
-| `scripts/build-qemu-system-aarch64.sh` | 5,225 |
+| `scripts/build-qemu-system-aarch64.sh` | 5,206 |
 | `scripts/build-roblox-aarch64.sh` | 128 |
 | `scripts/build-ruby-aarch64.sh` | 2,720 |
 | `scripts/build-steam-aarch64.sh` | 13,488 |
@@ -903,12 +904,12 @@ depend on its deployed Linguist version and the default-branch revision.
 | `scripts/build-userland-amd64.sh` | 5,989 |
 | `scripts/build-v-aarch64.sh` | 12,102 |
 | `scripts/build-v-amd64.sh` | 160 |
-| `scripts/build-venus-aarch64.sh` | 5,339 |
+| `scripts/build-venus-aarch64.sh` | 3,888 |
 | `scripts/build-vinix-guest-disk.sh` | 222 |
 | `scripts/build-voffice-aarch64.sh` | 6,888 |
 | `scripts/build-x11-aarch64.sh` | 20,691 |
 | `scripts/build-x11-amd64.sh` | 197 |
-| `scripts/build-x86-translation-aarch64.sh` | 22,821 |
+| `scripts/build-x86-translation-aarch64.sh` | 22,813 |
 | `scripts/cross-compile-activity.sh` | 227 |
 | `scripts/cross-compile-app.sh` | 4,493 |
 | `scripts/cross-compile-files.sh` | 212 |
@@ -1083,7 +1084,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/apple_smc/compile-fixture` | 186 |
 | `tests/apple_smc/run-host.sh` | 641 |
 | `tests/apple_smc/run.sh` | 190 |
-| `tests/application-sandbox/run-native.sh` | 1,281 |
+| `tests/application-sandbox/run-native.sh` | 1,277 |
 | `tests/application-sandbox/test-host.sh` | 229 |
 | `tests/application-sandbox/test-ui.sh` | 737 |
 | `tests/archive-tools/run.sh` | 333 |
@@ -1396,7 +1397,7 @@ depend on its deployed Linguist version and the default-branch revision.
 | `tests/securelevel/run` | 182 |
 | `tests/security-audit/collector-run.sh` | 227 |
 | `tests/security-mac/host-run.sh` | 225 |
-| `tests/security-mac/run.sh` | 952 |
+| `tests/security-mac/run.sh` | 944 |
 | `tests/security-policy/run.sh` | 2,109 |
 | `tests/shared-streams/run` | 185 |
 | `tests/smt-policy/run` | 183 |
