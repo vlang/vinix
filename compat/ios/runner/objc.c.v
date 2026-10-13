@@ -761,6 +761,26 @@ fn (m ObjMetadata) string_at(address u64) !string {
 	return error('iOS: Objective-C metadata string exceeds 1023 bytes')
 }
 
+// Compiler-emitted C++ aggregate encodings can be much longer than selectors
+// or class names (EOSSDK has a 1605-byte method encoding). Keep those name
+// limits intact; type encodings are opaque, borrowed image bytes with their
+// own bound. Every byte, including the terminator, must be file-backed.
+struct ObjTypeLimitFailure {}
+fn (_failure &ObjTypeLimitFailure) msg() string { return 'iOS: Objective-C type encoding exceeds 65535 bytes' }
+fn (_failure &ObjTypeLimitFailure) code() int { return 0 }
+const objc_type_limit_failures = [ObjTypeLimitFailure{}]!
+fn objc_type_limit_error() IError { return unsafe { &objc_type_limit_failures[0] } }
+
+fn (m ObjMetadata) type_at(address u64) !string {
+	for length in 0 .. 65536 {
+		m.range(address + u64(length), 1, false)!
+		if unsafe { *(&u8(address + u64(length))) } == 0 {
+			return unsafe { tos(&u8(address), length) }
+		}
+	}
+	return objc_type_limit_error()
+}
+
 struct ObjImageMethod {
 	imp u64
 	types string
@@ -808,7 +828,7 @@ fn (m ObjMetadata) methods(list u64) !map[string]ObjImageMethod {
 			return error('iOS: method implementation is not executable')
 		}
 		selector := m.string_at(name)!
-		methods[selector] = ObjImageMethod{imp, if types == 0 { '' } else { m.string_at(types)! }}
+		methods[selector] = ObjImageMethod{imp, if types == 0 { '' } else { m.type_at(types)! }}
 	}
 	return methods
 }
@@ -879,7 +899,7 @@ fn (m ObjMetadata) register(cls u64, depth int) ! {
 			ivar_size := read32(entry + 28)
 			if offset > size || ivar_size > size - offset { return error('iOS: ivar exceeds instance layout') }
 			ivar_name := m.string_at(read64(entry + 8))!
-			ivar_types := m.string_at(read64(entry + 16))!
+			ivar_types := m.type_at(read64(entry + 16))!
 			info.ivars[ivar_name] = &ObjIvar{name: ivar_name.clone(), types: ivar_types.clone(), offset: i64(offset), size: ivar_size}
 		}
 	}

@@ -4037,6 +4037,32 @@ The initial next-blocker recorder expected another import failure; its failed
 attempt remains recorded. A corrected V recorder and joined continuation
 complete native module replay and generated-C validation.
 
+`Objective-C type encodings` now use a separate bounded image reader
+for methods and ivars. EOSSDK's exact 1,605-byte C++ method signature is accepted
+and reflected by this Mac's installed Objective-C runtime, and Vinix retains
+those bytes without widening selector, class-name or ivar-name limits. Types
+remain opaque and bounded to 65,535 bytes. Every byte, including the terminator,
+must lie in a file-backed loaded segment. Parsing returns borrowed views;
+registered method/ivar metadata keeps its existing owned-copy lifetime. The
+new oversized-type error borrows a static record instead of boxing a new error.
+
+All 77 programs build and 107 original generated C streams restore to their
+recorded hashes. Thirty host suites pass ASAN/UBSAN in both hashing modes.
+Vinix passes 30 Objective-C and 34 Swift/loader programs. The encoding fixture
+checks lengths 0, 1, 1,023, 1,024, 1,605 and 65,535; rejects 65,536 and missing
+file-backed terminators; reads protected and guard-adjacent storage; handles
+absolute, direct-relative and indirect-relative method lists; and verifies
+owned reflection after unmapping the image storage across two drained lifetimes.
+
+Evidence is retained under `build/ios/fortnite/encoding-checks`, with pinned
+tooling, native metadata measurements, generated-C allocation audits and
+verified executable/debug archives. Initial fixture-shutdown and error-boxing
+audit failures remain as rejected trials. APFS cloning preserves pinned
+library bytes while sharing canonical blocks; five published runners remain
+unchanged. Fortnite passes the former short-type rejection and exits with
+status 1 before entry at `__os_log_impl`. Full regression remains unpassed;
+game entry, rendering and gameplay remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
