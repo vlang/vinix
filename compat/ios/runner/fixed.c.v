@@ -162,6 +162,7 @@ fn darwin_memset_pattern4(destination voidptr, pattern voidptr, length usize) { 
 fn darwin_memset_pattern8(destination voidptr, pattern voidptr, length usize) { darwin_memset_pattern(destination, pattern, length, 8) }
 fn darwin_memset_pattern16(destination voidptr, pattern voidptr, length usize) { darwin_memset_pattern(destination, pattern, length, 16) }
 fn fixed_symbol(symbol string) ?u64 {
+	if symbol == '_memset_s' { return u64(unsafe { voidptr(darwin_memset_s) }) }
     return match symbol {
 		// wchar_t is signed 32-bit in both Darwin ARM64 and the native libc.
 		'_wmemchr' { u64(unsafe { voidptr(C.wmemchr) }) }

@@ -4104,6 +4104,37 @@ archives. Five published runners remain unchanged. Fortnite passes the former
 OS logging import and exits with status 1 before entry at `_memset_s`.
 Full regression remains unpassed; entry, rendering and gameplay are unverified.
 
+`Secure memory filling` now implements the measured Darwin memset_s ABI
+with fixed pointer/size/int32/size arguments and an int32 errno_t result.
+The V implementation matches this Mac's libSystem: a null destination returns
+EINVAL22 first; a maximum above RSIZE_MAX returns E2BIG7 without accessing
+memory. An oversized count returns E2BIG7 above RSIZE_MAX or EOVERFLOW84 when
+it only exceeds the declared maximum, and still overwrites that bounded
+destination. Fill values convert to an unsigned byte; errno remains unchanged.
+Zero-length calls with a nonnull destination perform no access. Destination
+extent remains the caller's contract.
+
+The implementation uses relaxed atomic byte stores so the secure overwrite
+remains observable under optimization. LLVM inspection of an O3 caller whose
+16-byte buffer is never read confirms that all 16 byte stores remain. The leaf
+allocates no owner or scratch and introduces no runtime cache or lifetime.
+
+All 79 programs build and 111 generated C streams restore to their hashes.
+Thirty-two host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 34 Swift/loader programs. The new fixture compares the
+installed native function's complete return/write matrix across null, zero,
+RSIZE_MAX, oversized bounds/counts and three fill values; verifies unchanged
+errno; and tests protected zero-length pointers and guard-adjacent overwrites.
+
+Evidence is retained under `build/ios/fortnite/memset-checks`, with pinned
+tooling and inputs, native and optimized-code measurements, allocation audits
+and executable/debug archives. Initial ENOSPC build and host-control failures
+are preserved as rejected trials; validated completed caches were reused while
+incomplete suites reran without source changes. Five published runners remain
+unchanged. Fortnite passes the former secure-memory import and exits with
+status 1 before entry at `_$sS2SycfC`. Full regression remains unpassed;
+entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4111,10 +4142,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,448 | 712 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 119 | 57 | 23 |
-| All images | 2,226 | 772 | 120 |
+| MarketplaceKitWrapper | 120 | 56 | 23 |
+| All images | 2,227 | 771 | 120 |
 
-The C++/GLES/Text variant reports 2,239 resolved imports, 759 unresolved strong
+The C++/GLES/Text variant reports 2,240 resolved imports, 758 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
