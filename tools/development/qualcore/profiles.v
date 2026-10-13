@@ -120,7 +120,7 @@ fn (mut runner Runner) profile(name string) ! {
 		}
 		'go' {
 			runner.write('main.go', go_source)!
-			runner.command('go', ['build', '-o', 'project', 'main.go'])!
+			runner.command('go', ['build', '-trimpath', '-buildvcs=false', '-o', 'project', 'main.go'])!
 			runner.verify_binary('project')!
 		}
 		'java' {

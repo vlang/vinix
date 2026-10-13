@@ -75,3 +75,31 @@ fn test_a_version_command_or_forged_executable_pin_cannot_qualify_a_project() {
 		assert false, 'foreign architecture accepted'
 	}
 }
+
+fn test_go_receipts_require_the_trimmed_build_and_execution_of_its_exact_artifact() {
+	work := '/home/developer/reference-a/work'
+	project := work + '/qualification/go'
+	qualifier := 'a'.repeat(64)
+	tool_hash := 'b'.repeat(64)
+	artifact := 'c'.repeat(64)
+	tools := { 'go': devcore.Pin{'/opt/reference/bin/go', tool_hash} }
+	report := Report{schema: 1, kernel: 'Vinix', architecture: 'aarch64', uid: 1000,
+		context: 'vinix-native', runner_sha256: qualifier, requested: ['go'],
+		command_timeout_seconds: 600, complete: true, all_selected_passed: true,
+		results: [Verdict{profile: 'go', status: 'passed', commands: [
+			Command{argv: ['/opt/reference/bin/go', 'build', '-trimpath', '-buildvcs=false', '-o', 'project', 'main.go'],
+				executable_sha256: tool_hash, log: project + '/command-0.log'},
+			Command{argv: [project + '/project'], executable_sha256: artifact, log: project + '/command-1.log'}
+		]}]}
+	outputs := { 'qualification/go/project': artifact }
+	verify_report(json2.encode(report), 'aarch64', ['go'], qualifier, tools, work, outputs)!
+	mut changed := report.results[0].commands.clone()
+	changed[0] = Command{...changed[0], argv: ['/opt/reference/bin/go', 'version']}
+	forged := Report{...report, results: [Verdict{...report.results[0], commands: changed}]}
+	if _ := verify_report(json2.encode(forged), 'aarch64', ['go'], qualifier, tools, work, outputs) {
+		assert false, 'Go version substituted for a native project build'
+	}
+	if _ := verify_report(json2.encode(report), 'aarch64', ['go'], qualifier, tools, work, {}) {
+		assert false, 'execution accepted without a recorded Go artifact'
+	}
+}

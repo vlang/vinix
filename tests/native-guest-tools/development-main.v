@@ -381,7 +381,7 @@ fn run() !int {
 				os.mkdir_all(root + '/bin')!
 				os.symlink('/opt/reference/bin/sh', root + '/bin/sh')!
 			} else {
-				steps << BuildStep{ name: 'version-' + name, argv: ['{' + name + '}', '--version'], artifacts: []string{} }
+				steps << BuildStep{ name: 'version-' + name, argv: ['{' + name + '}', ...referencecore.version_arguments(name)], artifacts: []string{} }
 			}
 		}
 		source := root + '/home/developer/reference-source'

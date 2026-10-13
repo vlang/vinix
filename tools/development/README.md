@@ -121,8 +121,9 @@ in `build/development17-20261013/guest-arm-selfhost-v-m`. The x86 version/help
 and bounded diagnostic-log regression passed in
 `build/development17-20261013/guest-x86-v-pinned`.
 
-Older generated-source scratch, test images and redundant bootstrap
-installations may be pruned after retaining their receipts and transcripts.
+Older generated-source scratch, test images, disposable guest firmware state,
+and redundant SDK imports or bootstrap installations may be pruned after
+retaining their receipts and transcripts.
 The current `native-v-arm-pinned/vlang` and `native-v-x86-pinned/vlang`
 installations remain available in the workstream state directory.
 
@@ -134,6 +135,23 @@ compiler's musl and shared libgcc inputs. The [guest reference gate](../../tests
 qualified its resulting CMake 3.31.1 SDK on AArch64 in two private workspaces as
 UID/GID 1000. This is developer test staging; public package distribution and
 wider toolchain/platform qualification retain their own workflows.
+
+[stage-go.v](stage-go.v) prepares a portable reference prefix from an existing
+native Go overlay, using `usr/lib/go` and its ordinary `lib/ld-musl-ARCH.so.1`:
+
+```
+V_C_ERROR_BUG_REPORT_DISABLED=1 v -cc cc run tools/development/stage-go.v \
+  aarch64 /path/to/prepared-go-overlay /path/to/new-go-stage
+```
+
+The output is `new-go-stage/sdk`. It preserves the Go installation under
+`share/go` with a contained relative `bin/go` alias, letting Go discover its
+standard library beside its resolved executable. Python helpers are excluded
+before copying; links must stay inside their source closure and set-ID inputs
+are refused. Staging through an alias into the input is refused before state
+creation. `reference-sdk.json` records the original/imported installation,
+compiler, musl runtime and final SDK hashes. Only `complete: true` represents
+a prepared SDK; native project acceptance uses the separate guest gate.
 
 `vinix-build` is a V build runner for installed Vinix systems and build hosts.
 It runs a pinned build plan in a new private workspace, preserves source links

@@ -157,7 +157,7 @@ identity; it does not implement the remaining debugger or container interfaces.
 
 The additional [reference-SDK gate](../tests/development/README.md) imports a
 prepared native prefix, independently pins its runtime and selects explicit
-`make,cmake,ninja,sqlite,node` workflows. It runs pinned versions and real
+`make,cmake,ninja,sqlite,node,go` workflows. It runs pinned versions and real
 projects through the build runner twice as UID/GID 1000, validating exact plan,
 input and executed-command pins and matching produced artifacts. On 13 October
 2026 AArch64 passed GNU make 4.4.1 and the Ninja-compatible Samurai CLI with
@@ -183,6 +183,20 @@ library's `.relr.dyn` sections. Its complete stage is retained in
 SDK/module/runtime pins and matching program hashes are recorded in the guest
 documentation. Wider CMake project/platform support and the remaining language,
 IDE, server, container and hardware-VM gates remain open.
+
+The maintained [Go SDK stager](../tools/development/stage-go.v) and reference
+gate also passed Go 1.23.9 on AArch64 HVF on 13 October 2026. The pinned native
+compiler built and executed the goroutine/channel/file project in two fresh
+UID/GID 1000 workspaces. Both program and readback hashes matched. Go uses a
+private cache, local toolchain, offline resolution, trimmed paths and no VCS
+stamping; no permission override was needed. All 17 native receipt records and
+the account/job/build gates passed in
+`build/development17-20261013/guest-arm-reference-go-d`.
+The SDK/runtime/tool and matching artifact hashes are recorded in the guest
+documentation. This qualifies the pure-Go reference project through Vinix's
+Linux ABI. Native x86 Go, cgo, wider module/network/server projects and the
+remaining section 17 gates stay open. Completed image, firmware and redundant
+SDK imports may be pruned; qualification receipts and serial logs remain.
 
 Do not check off section 17 until an installed Vinix system builds, debugs,
 tests and packages a real project, runs a container with the requested isolation,

@@ -5,7 +5,7 @@ import json2
 import os
 import tools.development.devcore
 
-pub const catalog = ['make', 'cmake', 'ninja', 'sqlite', 'node']
+pub const catalog = ['make', 'cmake', 'ninja', 'sqlite', 'node', 'go']
 
 pub struct Settings {
 pub:
@@ -23,6 +23,7 @@ pub fn required_tools(profiles []string) []string {
 			'ninja' { ['ninja', 'cc', 'sh'] }
 			'sqlite' { ['sqlite3'] }
 			'node' { ['node'] }
+			'go' { ['go'] }
 			else { []string{} }
 		}
 		for name in selected { if name !in names { names << name } }
@@ -37,7 +38,7 @@ pub fn options(root string, selection string, arch string) !Settings {
 	}
 	profiles := selection.split(',')
 	if profiles.len == 0 || profiles.any(it !in catalog) {
-		return error('reference profiles must select make,cmake,ninja,sqlite,node')
+		return error('reference profiles must select make,cmake,ninja,sqlite,node,go')
 	}
 	mut seen := map[string]bool{}
 	for name in profiles {
@@ -62,6 +63,10 @@ pub fn options(root string, selection string, arch string) !Settings {
 	}
 	elf(base + '/lib/libc.so', arch)!
 	return Settings{base, profiles, tools}
+}
+
+pub fn version_arguments(name string) []string {
+	return if name == 'go' { ['version'] } else { ['--version'] }
 }
 
 fn elf(path string, arch string) ! {
@@ -127,6 +132,8 @@ fn commands(profile string, work string) [][]string {
 		'cmake' { return [[bin + 'cmake', '-S', '.', '-B', 'build', '-G', 'Ninja', '-DCMAKE_C_COMPILER=' + bin + 'cc'],
 			[bin + 'cmake', '--build', 'build'], [work + '/build/project']] }
 		'node' { return [[bin + 'node', 'project.js']] }
+		'go' { return [[bin + 'go', 'build', '-trimpath', '-buildvcs=false', '-o', 'project', 'main.go'],
+			[work + '/project']] }
 		'sqlite' { return [[bin + 'sqlite3', 'project.db',
 			'CREATE TABLE answer(n INTEGER); BEGIN; INSERT INTO answer VALUES(42); COMMIT; BEGIN; INSERT INTO answer VALUES(7); ROLLBACK;'],
 			[bin + 'sqlite3', 'project.db', 'PRAGMA integrity_check; SELECT n FROM answer;']] }

@@ -14,8 +14,10 @@ v -gc none -cc gcc -o vinix-qualify tools/development/qualify.v
 
 Each output directory must be new. The runner gives each project a private
 HOME, temporary directory and package-manager cache, with a fixed build epoch.
-Cargo and npm use offline operation, and Go disables proxy and checksum-service
-downloads. No system package is installed. Compiler invocations and test
+Cargo and npm use offline operation, and Go disables proxy, checksum-service
+and automatic toolchain downloads. It ignores external Go environment files,
+trims workspace paths and omits VCS stamping from the project build. No system
+package is installed. Compiler invocations and test
 executables use bounded owned child processes. Logs remain private under the
 result directory; inherited environment credentials are omitted.
 
@@ -66,15 +68,17 @@ qualify the complete catalog or IDE workflows.
 
 The guest controller also accepts a separate prepared reference prefix through
 `VINIX_DEVELOPMENT_REFERENCE_SDK`, with an explicit comma-separated
-`VINIX_DEVELOPMENT_REFERENCE_PROFILES` selection from `make,cmake,ninja,sqlite,node`.
+`VINIX_DEVELOPMENT_REFERENCE_PROFILES` selection from `make,cmake,ninja,sqlite,node,go`.
 Its [reference-mode instructions](../../tests/development/README.md) describe the
 flat prefix, required tool entries and native runtime closure. Each selected
 workflow runs twice as UID/GID 1000 through a pinned build plan. The controller
 checks the exact plan, SDK/runtime and executable hashes, executed project argv,
 native reports and matching project artifacts. Startup/version checks cannot
 replace a project. AArch64 has passed GNU make, CMake, Samurai/Ninja and SQLite;
-x86_64 has passed SQLite. The remaining reference-mode profiles are supported
-test gates awaiting native qualification, alongside the wider catalog.
+x86_64 has passed SQLite. AArch64 has also passed Go 1.23.9 native compilation
+and execution with identical artifacts in both fresh workspaces. The remaining
+reference-mode profiles are supported test gates awaiting native qualification,
+alongside the wider catalog.
 
 [stage-cmake.v](stage-cmake.v) prepares the CMake reference prefix from existing
 compiler/Ninja/shell and developer-package inputs. It records the base closure,
@@ -83,6 +87,14 @@ helpers, and preserves the compiler's musl/libgcc inputs. CMake 3.31.1 passed it
 native AArch64 configure/build/execute workflow in two fresh workspaces using
 the exact maintained stage. The retained receipt covers this project and
 compiler/runtime tuple; other CMake platform/project workflows remain separate.
+
+[stage-go.v](stage-go.v) imports the matching Go installation and musl runtime
+from an existing overlay without running its package builder. The relative
+compiler alias lets Go discover its pinned standard library in the reference
+prefix. Its native AArch64 gate validates the version, full SDK/runtime pins,
+actual trimmed compile argv and exact executed artifact hash. This covers the
+pure-Go reference project; x86 Go, cgo, wider modules and network/server projects
+remain open.
 
 Python and Python-based build tooling, including Meson, are not executed by this
 runner because the repository requires V tooling and forbids running Python.

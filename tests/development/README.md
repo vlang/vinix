@@ -99,6 +99,7 @@ refused before creating state. The current reference catalog is:
 | `cmake` | `cmake`, `ninja`, `cc`, `sh` |
 | `sqlite` | `sqlite3` |
 | `node` | `node` |
+| `go` | `go`, with its matching standard library and native compiler subprograms |
 
 The controller imports the prefix as `/opt/reference`, excludes Python helpers,
 installs its runtime in `/lib` and pins both complete trees separately. It
@@ -190,6 +191,39 @@ The CMake module-tree pin is
 This qualifies the tested C project and compiler/runtime tuple. Wider CMake
 project and platform support, Node, native x86 build systems and the remaining
 language/IDE/server gates stay open.
+
+The maintained [Go SDK stager](../../tools/development/stage-go.v) imports an
+existing overlay's `usr/lib/go` and ordinary `lib/ld-musl-ARCH.so.1` into a
+new `sdk` prefix. Its contained `bin/go` alias resolves to `share/go/bin/go`,
+so the native tool discovers its matching source/library/subprogram closure.
+Source/imported tree, executable, runtime and SDK hashes are retained in
+`reference-sdk.json`. Python helpers are excluded before copying, set-ID
+inputs and escaped links are refused, and an output alias into the source is
+rejected before creating state. See [the Go gate commands](../go/README.md).
+
+On 13 October 2026 AArch64 HVF passed Go 1.23.9, reporting
+`go version go1.23.9 linux/arm64`, in
+`build/development17-20261013/guest-arm-reference-go-d`. Both fresh UID/GID
+1000 workspaces built and executed the goroutine/channel/file project with
+the exact pinned compiler. The private cache, `GOENV=off`, `GOTOOLCHAIN=local`,
+offline resolution, `-trimpath` and `-buildvcs=false` keep external configuration,
+downloads and workspace/VCS paths out of the reference build. All 17 native
+records passed independent validation, along with the account/job/build gates.
+
+The SDK pin is
+`41be47dff0e19457302ad26ea9b668c9065fc2ddcbfb833ee93a8aecc2f9ee00`,
+runtime pin is
+`3dce764667a2ad550c540fcd81cfec45f06bd6839acb367446044d0e9a9fc996`
+and Go executable pin is
+`bff41476a04c26ce1db8ab0b69ed4ad52a9a76c4b1d51734ae57821c5d40e001`.
+The matching compiled program hash is
+`560d3fefeaebf7a545a1b18f7fc33d3b423f2a2b244d2a15fd3e6f9fe1e5371d`;
+both readback files contain `42` and hash to
+`73475cb40a568e8da8a045ced110137e159f890ac4da883b6b17dc651b3a8049`.
+The completed stage is retained in
+`build/development17-20261013/reference-arm-go-b`. This qualifies the tested
+pure-Go project through Vinix's Linux ABI; native x86 Go, cgo, wider module,
+network, debugger and production-server workflows remain separate gates.
 
 Host option/receipt refusal tests run with:
 

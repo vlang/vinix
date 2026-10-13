@@ -139,6 +139,8 @@ pub fn qualify(profiles []string, output_path string, require_vinix bool) !Repor
 		env['GOPATH'] = work + '/home/go'
 		env['GOPROXY'] = 'off'
 		env['GOSUMDB'] = 'off'
+		env['GOENV'] = 'off'
+		env['GOTOOLCHAIN'] = 'local'
 		env['npm_config_cache'] = work + '/home/npm-cache'
 		env['VJOBS'] = '1'
 		env['V_C_ERROR_BUG_REPORT_DISABLED'] = '1'
