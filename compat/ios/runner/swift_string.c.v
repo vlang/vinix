@@ -223,6 +223,7 @@ fn swift_buffers_stop() {
 	swift_array_storage_stop()
 	swift_heap_stop()
 	swift_arc_stop()
+	swift_cstring_stop()
 	swift_foundation_stop()
 	swift_metadata_stop()
 	swift_hash_stop()
@@ -243,6 +244,7 @@ fn swift_core_symbol(symbol string) ?u64 {
 	if address := swift_hash_symbol(symbol) { return address }
 	if address := swift_string_protocol_symbol(symbol) { return address }
 	return match symbol {
+		'_$sSS11withCStringyxxSPys4Int8VGKXEKlF' { swift_cstring_entry() }
 		'_$sSS10describingSSx_tclufC' { u64(unsafe { voidptr(swift_string_describing) }) }
 		'_$sS2SycfC' { u64(unsafe { voidptr(swift_string_empty) }) }
 		'_$sBOWV' { swift_unknown_value_witnesses() }

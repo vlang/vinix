@@ -4195,6 +4195,43 @@ remain unchanged. Fortnite passes the former describing constructor import and e
 with status 1 before entry at `_$sSS11withCStringyxxSPys4Int8VGKXEKlF`.
 Full regression remains unpassed; entry, rendering and gameplay are unverified.
 
+`Swift C strings` now implement the measured borrowed closure call
+`_$sSS11withCStringyxxSPys4Int8VGKXEKlF` from libswiftCore. Native library and
+MarketplaceKitWrapper measurements establish closure/context arguments in
+x0/x1, borrowed String words in x2/x3, result metadata in x4, and caller-owned
+indirect result storage in x8. The closure receives NUL-terminated UTF-8 bytes
+in x0, its context in x20 and the original result pointer in x8. Native raw
+calls verify preserved caller context, exactly one closure invocation, direct
+callback result registers and the thrown error in x21; input String ownership
+is unchanged. The native arm64e fixture signs its closure with discriminator
+63553; Vinix ARM64 uses ordinary function pointers.
+
+The V adapter copies the existing supported inline/native-tail String extent
+into one owned UTF-8 buffer and adds NUL, including for an exactly bounded
+large literal without readable source termination. It invokes the closure
+outside registry locks and releases the temporary after success or a throw.
+Generic result storage and thrown-error ownership remain with the caller.
+The sealed adapter page is unmapped after callbacks drain at runtime teardown.
+Foreign/shared String storage remains explicitly unsupported, and the CString
+pointer expires when the closure returns. Rejected representations borrow a
+static error without an additional allocation.
+
+All 82 programs build and 117 generated C streams restore to their hashes.
+Thirty-five host suites pass ASAN/UBSAN in both hashing modes; Vinix passes
+32 Objective-C and 37 Swift/loader programs. The new fixture covers protected
+Int/String/Void output boundaries, owned nontrivial String results, CFError
+throws without ownership changes, empty/inline/long/Unicode/embedded-NUL
+inputs, borrowed input ownership, bounded source copying, reentrant workers,
+four concurrent readers, exact import scoping, rejected unsupported storage
+and two drained/unmapped runtimes.
+
+Evidence is retained under `build/ios/fortnite/cstring-final-checks`, with pinned
+tooling and inputs, native ABI/instruction and actual callsite measurements,
+allocation audits and verified executable/debug archives. Five published
+runners remain unchanged. Fortnite passes the former CString import and exits
+with status 1 before entry at `_$sSS8UTF8ViewV13_foreignCountSiyF`. Full regression remains unpassed;
+entry, rendering and gameplay are unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
@@ -4202,10 +4239,10 @@ the executable, without mapping or executing app code. The static C++ runner rep
 | --- | ---: | ---: | ---: |
 | Fortnite executable | 1,448 | 712 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 122 | 54 | 23 |
-| All images | 2,229 | 769 | 120 |
+| MarketplaceKitWrapper | 123 | 53 | 23 |
+| All images | 2,230 | 768 | 120 |
 
-The C++/GLES/Text variant reports 2,242 resolved imports, 756 unresolved strong
+The C++/GLES/Text variant reports 2,243 resolved imports, 755 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;
