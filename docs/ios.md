@@ -3888,17 +3888,70 @@ the required `_OBJC_CLASS_$_NSInputStream` import. Evidence is retained under
 published runners are unchanged. Game entry, rendering and gameplay remain
 unverified.
 
+`NSInputStream` now resolves its Foundation and CoreFoundation class/metaclass
+imports through a V adapter, with the measured NSStream superclass. The public
+classes have 8 and 136 bytes on this Mac; their private storage stays opaque.
+Fixed owned metadata tracks initialization, cursor, status and descriptor.
+Generic fields own a copied NSData snapshot or file path and an NSError graph.
+The opened descriptor is statted once. Directory reads report POSIX EISDIR
+even though the current guest kernel returns zero for a raw directory read.
+
+The synchronous profile supports data, file-path and file-URL factories and
+designated initializers, open/close, partial reads, availability, status/error
+queries and getBuffer:length:. Mutable data is copied at initialization and
+survives the source pool. Data snapshots retain the existing 16 MiB CFData bound
+and paths retain the 1023-byte POSIX bound. Network URLs, default/abstract
+construction, custom subclasses, reinitialization, copying, delegates,
+run-loop scheduling, coding and seeking are outside the profile. Unsupported
+operations reject explicitly; unsupported properties return nil/false.
+EOS contains delegate/scheduling selectors, so those paths remain work ahead.
+HTTPBodyStream and CFReadStream functions remain unsupported.
+
+Typed installed Foundation calls measure both constructors and read/query
+ABI. A data stream reaches EOF with its last bytes; a file stream reaches EOF
+when a read returns zero, including a zero-length read. An empty data stream
+can reach EOF during getBuffer:length:. Open streams offer no direct buffer
+and leave its pointer output untouched while setting length to zero. Closed,
+unopened and errored streams return the measured null/-1 outputs. Close
+preserves errors and streams do not reopen. Retained NSError values outlive
+the stream; native error object identity is not part of the contract.
+
+All 74 programs build and 101 original generated C streams restore to recorded
+hashes. Twenty-seven host suites pass ASAN/UBSAN in both hashing modes. Vinix
+passes 28 Objective-C and 33 Swift/loader programs. Stream fixtures cover
+mutable snapshots, pool-independent inputs and errors, partial/empty reads,
+guarded outputs, 136-byte caller storage, 100 descriptor retirements after isa
+changes per cycle, 12 explicit rejections and two zero-live-object shutdowns.
+Descriptors are invalidated before close and retire independently of isa;
+generic object destruction releases inputs/errors. Reads and queries allocate
+no scratch. Earlier checks and native module replay remain enabled.
+
+Evidence uses persistent disk, a copied pinned compiler and verified canonical
+libraries/source inputs. Failed preflight assumptions about buffer pointer
+outputs, empty-stream state and NSError identity were corrected before the
+full batch; their outputs are not counted as passed checks. The first guest
+batch exposed the directory-read difference and failed;
+its joined outputs remain in inputstream-preflight-checks. The corrected
+implementation was rebuilt and checked in a fresh stage. Guest payloads
+retire only after joined driver success.
+
+Fortnite passes the NSInputStream binding and exits with status 1 before entry
+at the required `_OBJC_CLASS_$_NSURLConnection` import. Evidence is retained under
+`build/ios/fortnite/inputstream-checks`. Full regression remains unpassed; five
+published runners are unchanged. Game entry, rendering and gameplay remain
+unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,440 | 720 | 79 |
-| EOSSDK | 655 | 7 | 18 |
+| Fortnite executable | 1,442 | 718 | 79 |
+| EOSSDK | 657 | 5 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,210 | 788 | 120 |
+| All images | 2,214 | 784 | 120 |
 
-The C++/GLES/Text variant reports 2,223 resolved imports, 775 unresolved strong
+The C++/GLES/Text variant reports 2,227 resolved imports, 771 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

@@ -113,6 +113,13 @@ mut:
 	process_arguments_array bool
 	date_owned bool
 	date_initialized bool
+	input_stream_owned bool
+	input_stream_initialized bool
+	input_stream_file bool
+	input_stream_directory bool
+	input_stream_fd int
+	input_stream_status u64
+	input_stream_position u64
 	uuid_owned bool
 	pool_owned bool
 	pool_initialized bool
@@ -283,7 +290,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSStream', 'NSInputStream', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -303,6 +310,7 @@ fn objc_start() {
 		parent := match name {
 			'NSObject' { u64(0) }
 			'VinixCFDate' { ios_runtime.names['NSDate'] }
+			'NSInputStream' { ios_runtime.names['NSStream'] }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
 			'__NSConcreteUUID' { ios_runtime.names['_NSUUIDBridge'] }
@@ -346,6 +354,8 @@ fn objc_start() {
 			'NSFileManager' { u32(32) }
 			'NSProcessInfo' { u32(48) }
 			'NSDate', 'VinixCFDate' { u32(8) }
+			'NSStream' { u32(8) }
+			'NSInputStream' { u32(136) }
 			'NSAutoreleasePool' { u32(40) }
 			'NSUUID', '_NSUUIDBridge' { u32(8) }
 			'__NSConcreteUUID' { u32(24) }
@@ -415,6 +425,7 @@ fn obj_header(object u64) &ObjHeader {
 }
 
 fn objc_allocate(cls u64) u64 {
+	ns_input_stream_require_class(cls)
 	ns_pool_require_class(cls)
 	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
@@ -508,6 +519,7 @@ fn objc_new(cls u64) u64 {
 	if obj_header(object).pool_owned { ns_pool_initialize(object); return object }
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
 	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
+	if obj_header(object).input_stream_owned { panic('iOS: input stream requires designated construction') }
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }
