@@ -111,7 +111,7 @@ fn probe(bank &Handles, kind i32, word u64, destination i32, form i32, ordinary 
 		size := i32(u32(word))
 		mut target := [64]char{}
 		length := if kind == 1 { C.snprintf(&target[0], 64, c'missing-target') }
-			else if kind == 11 { C.snprintf(&target[0], 64, c'/proc/%d', C.getpid()) }
+			else if kind == 11 { C.snprintf(&target[0], 64, c'%d', C.getpid()) }
 			else if kind == 12 { C.snprintf(&target[0], 64, c'/sbin/init') }
 			else { C.snprintf(&target[0], 64, c'destination') }
 		if length <= 0 || length >= 64 { return false }

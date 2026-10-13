@@ -1,0 +1,621 @@
+==> Fetching pinned Limine BOOTX64.EFI...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0 28  248k   28 71151    0     0  16427      0  0:00:15  0:00:04  0:00:11 16424 90  248k   90  223k    0     0  42570      0  0:00:05  0:00:05 --:--:-- 52317100  248k  100  248k    0     0  46034      0  0:00:05  0:00:05 --:--:-- 61341
+==> Fetching pinned Limine limine-uefi-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:03 --:--:--     0  3 2880k    3 97856    0     0  20781      0  0:02:21  0:00:04  0:02:17 20780  8 2880k    8  256k    0     0  45783      0  0:01:04  0:00:05  0:00:59 55503 13 2880k   13  384k    0     0  58087      0  0:00:50  0:00:06  0:00:44 89489 17 2880k   17  512k    0     0  67957      0  0:00:43  0:00:07  0:00:36  104k 22 2880k   22  635k    0     0  74053      0  0:00:39  0:00:08  0:00:31  128k 26 2880k   26  763k    0     0  80100      0  0:00:36  0:00:09  0:00:27  132k 30 2880k   30  891k    0     0  84593      0  0:00:34  0:00:10  0:00:24  125k 36 2880k   36 1050k    0     0  90796      0  0:00:32  0:00:11  0:00:21  131k 40 2880k   40 1173k    0     0  94260      0  0:00:31  0:00:12  0:00:19  131k 46 2880k   46 1334k    0     0  99460      0  0:00:29  0:00:13  0:00:16  141k 53 2880k   53 1535k    0     0   103k      0  0:00:27  0:00:14  0:00:13  152k 58 2880k   58 1695k    0     0   107k      0  0:00:26  0:00:15  0:00:11  162k 66 2880k   66 1919k    0     0   114k      0  0:00:25  0:00:16  0:00:09  177k 72 2880k   72 2074k    0     0   116k      0  0:00:24  0:00:17  0:00:07  180k 77 2880k   77 2234k    0     0   119k      0  0:00:24  0:00:18  0:00:06  180k 84 2880k   84 2426k    0     0   122k      0  0:00:23  0:00:19  0:00:04  176k 88 2880k   88 2549k    0     0   122k      0  0:00:23  0:00:20  0:00:03  167k 91 2880k   91 2645k    0     0   121k      0  0:00:23  0:00:21  0:00:02  145k 96 2880k   96 2773k    0     0   121k      0  0:00:23  0:00:22  0:00:01  139k100 2880k  100 2880k    0     0   123k      0  0:00:23  0:00:23 --:--:--  140k
+==> Fetching pinned Limine limine-bios-cd.bin...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:02 --:--:--     0 37 22528   37  8427    0     0   2820      0  0:00:07  0:00:02  0:00:05  2819100 22528  100 22528    0     0   6985      0  0:00:03  0:00:03 --:--:--  6987
+==> Fetching pinned Limine limine-bios.sys...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0  5  207k    5 11239    0     0   4091      0  0:00:51  0:00:02  0:00:49  4089 69  207k   69  143k    0     0  46926      0  0:00:04  0:00:03  0:00:01 46912100  207k  100  207k    0     0  63198      0  0:00:03  0:00:03 --:--:-- 63191
+==> Fetching pinned Limine limine.c...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0 22 49092   22 11239    0     0   6363      0  0:00:07  0:00:01  0:00:06  6360100 49092  100 49092    0     0  25159      0  0:00:01  0:00:01 --:--:-- 25149
+==> Fetching pinned Limine limine-bios-hdd.h...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:--  0:00:01 --:--:--     0 11  117k   11 14051    0     0   6551      0  0:00:18  0:00:02  0:00:16  6553100  117k  100  117k    0     0  50191      0  0:00:02  0:00:02 --:--:-- 50194
+==> Building the Limine host installer...
+==> Assembling /Users/alex/.cache/vinix-linux-compat/procself-20261013/final-before-x86/procself/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/final-before-x86/procself/.vinix-amd64.iso.rBOnBk'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 15.0g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/procself-20261013/final-before-x86/procself/iso-build/.iso-staging.gQaNIh/iso-root'
+xorriso : UPDATE :      10 files added in 1 seconds
+xorriso : UPDATE :      10 files added in 1 seconds
+ISO image produced: 13543 sectors
+Written to medium : 13543 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/final-before-x86/procself/.vinix-amd64.iso.rBOnBk' completed successfully.
+
+Physical block size of 512 bytes.
+Installing to GPT. Logical block size of 512 bytes.
+Secondary header at LBA 0xd39b.
+Secondary header valid.
+Detected ISOHYBRID with a GUID partition table (GPT).
+Converting to MBR for improved compatibility...
+Conversion successful.
+No active partition found, some systems may not boot.
+Setting partition 1 as active to work around the issue...
+Installing to MBR.
+Stage 2 to be located at 0x200 and 0x2800.
+Reminder: Remember to copy the limine-bios.sys file in either
+          the root, /boot, /limine, or /boot/limine directories of
+          one of the partitions on the device, or boot will fail!
+Limine BIOS stages installed successfully!
+    /Users/alex/.cache/vinix-linux-compat/procself-20261013/final-before-x86/procself/test.iso (27736064 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/procself-20261013/final-before-x86/procself
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=81560
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91400
+initramfs: Done (9 entries)
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=0 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=1 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=57828 view=2 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=0 pid=57828 tid=57828 cases=270 failures=90 status=1
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=0 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=1 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=0 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=25271 view=2 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=1 pid=57828 tid=25271 cases=270 failures=90 status=1
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=1 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=57828 tid=40811 view=2 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=2 pid=57828 tid=40811 cases=270 failures=90 status=1
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=0 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=1 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=18004 view=2 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=0 pid=18004 tid=18004 cases=270 failures=90 status=1
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=0 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=1 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=0 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=1 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=2 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=0 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=1 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=2 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=3 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=3 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=0 kind=1 form=4 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=54272 view=2 kind=1 form=4 size=64 dest=0 result=22/0 expected=16/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=0 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=1 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=2 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=3 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=1 kind=1 form=4 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=0 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=1 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=2 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=3 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=0 form=4 size=64 dest=0 result=11/0 expected=5/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=0 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=0 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=0 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=1 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=1 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=1 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=2 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=2 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=2 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=3 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=3 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=3 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=4 size=1 dest=0 result=1/0 expected=1/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=4 size=3 dest=0 result=3/0 expected=3/0
+LINUX PROCSELF DETAIL: pid=18004 tid=7643 view=2 kind=1 form=4 size=64 dest=0 result=21/0 expected=15/0
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=1 pid=18004 tid=54272 cases=270 failures=90 status=1
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=2 pid=18004 tid=7643 cases=270 failures=90 status=1
+LINUX PROCSELF CHROOT: no-/proc relative-self/thread-self-status FAIL
+LINUX PROCSELF FAIL: relative target, reader identity, resolution or storage
+QEMU: Terminated
+Missing verdicts: ['LINUX PROCSELF: PASS']; failures: ['FAIL:', 'LINUX PROCSELF FAIL']
+Linux compatibility qualification failed; see /Users/alex/.cache/vinix-linux-compat/procself-20261013/final-before-x86/receipt.json

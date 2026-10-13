@@ -1,0 +1,1007 @@
+==> Assembling /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/procself/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/procself/.vinix-aarch64.iso.W8Hiic'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 15.3g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/procself/iso-build/.iso-staging.S8xfj7/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 17844 sectors
+Written to medium : 17844 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/procself/.vinix-aarch64.iso.W8Hiic' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/procself/test.iso (36544512 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/procself
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x7732c000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x7732c000 to 0xffffffff80000000, length: 0x2d4000
+vmm: Kernel: Mapping 0x77600000 to 0xffffffff802d4000, length: 0x2c000
+vmm: Kernel: Mapping 0x7762c000 to 0xffffffff80300000, length: 0xf7d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x7732c000 +0x300000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000772fe000
+initramfs: Size:    113152
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=106720
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077319600
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211b70
+vfs: Mounted `proc` to `/tmp/linux-procself/alias` with filesystem `proc`
+vfs: Mounted `proc` to `/tmp/linux-procself/jail/view` with filesystem `proc`
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=0 pid=59005 tid=59005 cases=270 failures=0 status=1
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=1 pid=59005 tid=1023 cases=270 failures=0 status=1
+LINUX PROCSELF OUTCOMES: ordinary=1 slot=2 pid=59005 tid=11134 cases=270 failures=0 status=1
+LINUX PROCSELF SLAB: ordinary=1 size=16 live=1073/1073 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=32 live=93/93 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=48 live=56/56 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=64 live=131/131 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=96 live=16/16 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=128 live=7/7 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=192 live=361/361 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=256 live=659/659 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=384 live=450/450 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=512 live=403/403 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=768 live=18/18 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=1024 live=4/4 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=1536 live=23/23 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=2688 live=0/0 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=4048 live=0/0 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=5392 live=0/0 cycles=200
+LINUX PROCSELF SLAB: ordinary=1 size=8096 live=0/0 cycles=200
+LINUX PROCSELF STORAGE: ordinary=1 cycles=200 big_pages=63/63 PASS
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=0 pid=53921 tid=53921 cases=270 failures=0 status=1
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=1 pid=53921 tid=13394 cases=270 failures=0 status=1
+LINUX PROCSELF OUTCOMES: ordinary=0 slot=2 pid=53921 tid=23605 cases=270 failures=0 status=1
+LINUX PROCSELF CHROOT: no-/proc relative-self/thread-self-status PASS
+random: reseeded from 6439 events, 0 hardware words
+LINUX PROCSELF SLAB: ordinary=0 size=16 live=1110/1110 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=32 live=100/100 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=48 live=58/58 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=64 live=139/139 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=96 live=16/16 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=128 live=7/7 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=192 live=384/384 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=256 live=690/690 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=384 live=464/464 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=512 live=417/417 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=768 live=18/18 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=1024 live=4/4 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=1536 live=23/23 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=2688 live=0/0 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=4048 live=0/0 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=5392 live=0/0 cycles=200
+LINUX PROCSELF SLAB: ordinary=0 size=8096 live=0/0 cycles=200
+LINUX PROCSELF STORAGE: ordinary=0 cycles=200 big_pages=63/63 PASS
+LINUX PROCSELF: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkabi/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkabi/.vinix-aarch64.iso.g6fwBS'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 14.9g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkabi/iso-build/.iso-staging.2xnnNu/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 17840 sectors
+Written to medium : 17840 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkabi/.vinix-aarch64.iso.g6fwBS' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkabi/test.iso (36536320 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkabi
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x7732c000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x7732c000 to 0xffffffff80000000, length: 0x2d4000
+vmm: Kernel: Mapping 0x77600000 to 0xffffffff802d4000, length: 0x2c000
+vmm: Kernel: Mapping 0x7762c000 to 0xffffffff80300000, length: 0xf7d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x7732c000 +0x300000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff000077300000
+initramfs: Size:    104960
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=98608
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077319600
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211d60
+LINUX READLINKABI OUTCOMES: ordinary=1 cases=2160 failures=0
+LINUX READLINKABI SLAB: ordinary=1 size=16 live=1053/1053 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=32 live=92/92 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=48 live=56/56 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=64 live=111/111 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=96 live=17/17 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=128 live=5/5 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=192 live=341/341 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=256 live=643/643 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=384 live=446/446 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=512 live=399/399 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=768 live=18/18 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=1024 live=4/4 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=1536 live=15/15 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=2688 live=0/0 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=4048 live=0/0 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=5392 live=0/0 cycles=200
+LINUX READLINKABI SLAB: ordinary=1 size=8096 live=0/0 cycles=200
+LINUX READLINKABI STORAGE: ordinary=1 cycles=200 big_pages=63/63 PASS
+LINUX READLINKABI CONTROLS: ordinary=1 target-prefix/no-NUL/canaries/aliases/metadata/bytes/cursors/flags/private PASS
+LINUX READLINKABI OUTCOMES: ordinary=0 cases=2160 failures=0
+random: reseeded from 6414 events, 0 hardware words
+LINUX READLINKABI SLAB: ordinary=0 size=16 live=1058/1058 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=32 live=94/94 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=48 live=56/56 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=64 live=112/112 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=96 live=17/17 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=128 live=5/5 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=192 live=343/343 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=256 live=648/648 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=384 live=448/448 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=512 live=401/401 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=768 live=18/18 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=1024 live=4/4 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=1536 live=15/15 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=2688 live=0/0 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=4048 live=0/0 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=5392 live=0/0 cycles=200
+LINUX READLINKABI SLAB: ordinary=0 size=8096 live=0/0 cycles=200
+LINUX READLINKABI STORAGE: ordinary=0 cycles=200 big_pages=63/63 PASS
+LINUX READLINKABI CONTROLS: ordinary=0 target-prefix/no-NUL/canaries/aliases/metadata/bytes/cursors/flags/private PASS
+LINUX READLINKABI PASS: native raw/musl readlinkat and readlink consume signed32 sizes, return EINVAL before path/fd/destination lookup for nonpositive sizes, preserve positive target-prefix/no-NUL/canaries and real lookup/type/permission/copy errors, retain aliases/metadata/bytes/cursors/flags/private permissions, and keep200-cycle storage flat
+LINUX READLINKABI: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkempty/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkempty/.vinix-aarch64.iso.7o3Yph'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 14.1g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkempty/iso-build/.iso-staging.XXFVJn/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 17841 sectors
+Written to medium : 17841 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkempty/.vinix-aarch64.iso.7o3Yph' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkempty/test.iso (36538368 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/readlinkempty
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x7732c000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x7732c000 to 0xffffffff80000000, length: 0x2d4000
+vmm: Kernel: Mapping 0x77600000 to 0xffffffff802d4000, length: 0x2c000
+vmm: Kernel: Mapping 0x7762c000 to 0xffffffff80300000, length: 0xf7d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x7732c000 +0x300000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff0000772ff000
+initramfs: Size:    107520
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=100928
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077319000
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211d40
+LINUX READLINKEMPTY OUTCOMES: ordinary=1 cases=3648 failures=0
+LINUX READLINKEMPTY SLAB: ordinary=1 size=16 live=1053/1053 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=32 live=92/92 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=48 live=56/56 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=64 live=178/178 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=96 live=17/17 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=128 live=5/5 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=192 live=342/342 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=256 live=644/644 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=384 live=449/449 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=512 live=400/400 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=768 live=18/18 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=1024 live=4/4 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=1536 live=29/29 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=2048 live=0/0 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=2688 live=0/0 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=4048 live=0/0 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=5392 live=1/1 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=1 size=8096 live=0/0 cycles=200
+LINUX READLINKEMPTY STORAGE: ordinary=1 cycles=200 big_pages=70/70 PASS
+LINUX READLINKEMPTY CONTROLS: ordinary=1 linked/dangling/unlinked/private/procfs/target-prefix/no-NUL/canaries/aliases/metadata/bytes/cursors/flags/queued-AB PASS
+LINUX READLINKEMPTY OUTCOMES: ordinary=0 cases=3648 failures=0
+random: reseeded from 6707 events, 0 hardware words
+LINUX READLINKEMPTY SLAB: ordinary=0 size=16 live=1058/1058 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=32 live=94/94 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=48 live=56/56 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=64 live=179/179 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=96 live=17/17 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=128 live=5/5 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=192 live=344/344 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=256 live=649/649 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=384 live=451/451 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=512 live=402/402 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=768 live=18/18 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=1024 live=4/4 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=1536 live=29/29 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=2048 live=0/0 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=2688 live=0/0 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=4048 live=0/0 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=5392 live=1/1 cycles=200
+LINUX READLINKEMPTY SLAB: ordinary=0 size=8096 live=0/0 cycles=200
+LINUX READLINKEMPTY STORAGE: ordinary=0 cycles=200 big_pages=70/70 PASS
+LINUX READLINKEMPTY CONTROLS: ordinary=0 linked/dangling/unlinked/private/procfs/target-prefix/no-NUL/canaries/aliases/metadata/bytes/cursors/flags/queued-AB PASS
+LINUX READLINKEMPTY PASS: native raw/musl readlinkat empty paths retain symlink descriptions through lookup/copy after unlink or private-directory denial, include dynamic procfs links and aliases, return real invalid/nonlink/size/copy errors, preserve bytes/metadata/flags/cursors/queued AB and keep200-cycle storage flat
+LINUX READLINKEMPTY: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/open/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/open/.vinix-aarch64.iso.0AP6xp'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 13.5g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/open/iso-build/.iso-staging.AKISLr/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :  92.04% done
+ISO image produced: 17818 sectors
+Written to medium : 17818 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/open/.vinix-aarch64.iso.0AP6xp' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/open/test.iso (36491264 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/open
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x7732c000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x7732c000 to 0xffffffff80000000, length: 0x2d4000
+vmm: Kernel: Mapping 0x77600000 to 0xffffffff802d4000, length: 0x2c000
+vmm: Kernel: Mapping 0x7762c000 to 0xffffffff80300000, length: 0xf7d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x7732c000 +0x300000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff00007730b000
+initramfs: Size:    61440
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=55040
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077319c00
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x2118e0
+vfs: Mounted `tmpfs` to `/tmp/linux-open-mount` with filesystem `tmpfs`
+LINUX OPEN: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/namespace/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/namespace/.vinix-aarch64.iso.fc8XIf'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 13.2g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/namespace/iso-build/.iso-staging.SzQC2g/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 17813 sectors
+Written to medium : 17813 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/namespace/.vinix-aarch64.iso.fc8XIf' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/namespace/test.iso (36481024 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/namespace
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x7732c000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x7732c000 to 0xffffffff80000000, length: 0x2d4000
+vmm: Kernel: Mapping 0x77600000 to 0xffffffff802d4000, length: 0x2c000
+vmm: Kernel: Mapping 0x7762c000 to 0xffffffff80300000, length: 0xf7d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x7732c000 +0x300000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff00007730d000
+initramfs: Size:    50176
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=43936
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077319000
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211180
+LINUX NAMESPACE: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+==> Assembling /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/runtime/test.iso...
+GNU xorriso 1.5.8.pl02 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/runtime/.vinix-aarch64.iso.BZR3DN'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data, 13.0g free
+Added to ISO image: directory '/'='/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/runtime/iso-build/.iso-staging.UqSdNo/iso-root'
+xorriso : UPDATE :       8 files added in 1 seconds
+xorriso : UPDATE :       8 files added in 1 seconds
+ISO image produced: 17821 sectors
+Written to medium : 17821 sectors at LBA 0
+Writing to 'stdio:/Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/runtime/.vinix-aarch64.iso.BZR3DN' completed successfully.
+
+    /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/runtime/test.iso (36497408 bytes)
+Guest artifacts: /Users/alex/.cache/vinix-linux-compat/procself-20261013/after-arm/runtime
+UEFI firmware (version edk2-stable202408-prebuilt.qemu.org built at 16:28:50 on Sep 12 2024)
+ArmTrngLib could not be correctly initialized.
+Error: Image at 0007FDB6000 start failed: 00000001
+Error: Image at 0007FCB2000 start failed: Unsupported
+Error: Image at 0007FC37000 start failed: Not Found
+Error: Image at 0007FB5D000 start failed: Aborted
+Tpm2SubmitCommand - Tcg2 - Not Found
+Tpm2GetCapabilityPcrs fail!
+Tpm2SubmitCommand - Tcg2 - Not Found
+Image type X64 can't be loaded on AARCH64 UEFI system.
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+BdsDxe: starting Boot0001 "UEFI Misc Device" from VenHw(837DCA9E-E874-4D82-B29A-23FE0E23D1E2,003C000A00000000)
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+ConvertPages: Incompatible memory types, the pages to allocate have been allocated
+[2J[01;01H[01;01H[2J[01;01H[01;01H
+=== Vinix aarch64 booting (qemu mode) ===
+vmm: Kernel physical base: 0x7732c000
+vmm: Kernel virtual base: 0xffffffff80000000
+vmm: Kernel: Mapping 0x7732c000 to 0xffffffff80000000, length: 0x2d4000
+vmm: Kernel: Mapping 0x77600000 to 0xffffffff802d4000, length: 0x2c000
+vmm: Kernel: Mapping 0x7762c000 to 0xffffffff80300000, length: 0xf7d000
+vmm: HHDM 0-4GiB mapped (787858 device pages)
+vmm: high RAM mapped (0 pages above 4GiB)
+vmm: pmm bitmap 0x40000000 +0x4000 mapped
+vmm: framebuffer 0x7c7a0000 +0x300000 mapped (memmap FB entries: 1, HHDM 0xffff000000000000)
+vmm: kernel text and rodata read-only in the direct map (0x7732c000 +0x300000)
+vmm: activating kernel page tables
+vmm: kernel page tables live
+vmm: user TLB uses 255 exclusive 8-bit ASIDs
+
+=== Vinix aarch64 ===
+WARNING: No usable device tree blob
+skipping Apple-specific HW init (no device tree)
+init virtio-input...
+virtio-input: found at slot 28
+virtio-input: absolute pointer, range 32767x32767
+virtio-input: ready, queue=16
+virtio-input: found at slot 29
+virtio-input: ready, queue=16
+virtio-input done
+init timer...
+timer: ARM Generic Timer frequency: 24000000 Hz
+timer done
+init gic (QEMU virt)...
+  gic: GICD at 0xffff000008000000 GICR at 0xffff0000080a0000
+gic done
+skipping PCI (ARM64 ECAM setup not implemented)
+init numa...
+numa: one memory node (none)
+numa done
+skipping SMP (no device tree)
+bootstrapping CPU 0...
+security: PAN enabled
+CPU 0 bootstrap done
+init time...
+time done
+init sched...
+sched: ARM64 scheduler initialised
+sched done
+spawning kmain_thread via scheduler...
+spawn done, calling await...
+kmain_thread: started
+kmain_thread: framebuffer done
+kmain_thread: socket done
+virtio-net: no device found
+kmain_thread: pipe done
+kmain_thread: futex done
+kmain_thread: fs done
+vfs: Mounted tmpfs to `/`
+kmain_thread: root mount done
+vfs: Mounted devtmpfs to `/dev`
+vfs: Mounted procfs to `/proc`
+kmain_thread: devtmpfs done
+virtio-blk: ready as /dev/vda
+sysdisk: no blank disk of 4 GiB or more; running from memory
+initramfs: Module:  1
+initramfs: Address: 0xffff000077309000
+initramfs: Size:    67584
+initramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=61088
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xffff000077319400
+initramfs: Done (9 entries)
+kmain_thread: initramfs done
+vfs: Mounted tmpfs to `/dev/shm`
+vfs: Mounted sysfs to `/sys`
+cpuidle: driver wfi, 1 state, counter 24000000 Hz
+kmain_thread: sysfs done
+apple-smc: no device tree; battery not registered
+kmain_thread: skipping GPU/DCP (no device tree)
+kmain_thread: syscall table done
+kmain_thread: streams done
+kmain_thread: random done
+fbdev: registered new framebuffer device (using driver simplefb and mode 1024x768x32)
+fbdev: created device node /dev/fb0
+drm: Registered driver vinix-dumb as card0
+drm: created device node /dev/dri/card0
+simpledrm: software GBM allocator ready
+simplefb: initialized
+kmain_thread: fbdev done
+pci: Building device scan
+pci: Found [0:0:0:-1]
+pci: Found [0:1:0:-1]
+devcore: 2 PCI functions enumerated
+xhci: no USB controller
+virtio-gpu: no GPU transport found
+kmain_thread: pointer done
+kmain_thread: processes done
+kmain_thread: pty done
+apple-spi-kbd: no device tree; not probing
+kmain_thread: console done
+devcore: 4 VirtIO devices listed
+kmain_thread: writeback done
+
+*** aarch64: Kernel initialisation complete ***
+*** Starting /sbin/init ***
+syspower: power button through the event device at 0x9080000
+ELF auxval: base=0x0 phdr=0x200040 entry=0x211430
+LINUX RUNTIME page_size=16384 pointer_bits=64
+LINUX RUNTIME PASS: atomics SIMD TLS
+LINUX RUNTIME PASS: JIT page sizes
+LINUX RUNTIME PASS: wide offsets time64
+LINUX RUNTIME: PASS
+QEMU: Terminated
+All requested guest verdicts passed.
+Linux compatibility guest suite: PASS

@@ -143,7 +143,7 @@ fn namespace_init() i32 {
 		if !require(C.mount(c'proc', c'/proc', c'proc', 0, c'') == 0, 94) { return 1 }
 		link := [32]char{}
 		length := C.readlink(c'/proc/self', &link[0], sizeof(link))
-		if !require(length == 7 && C.memcmp(&link[0], c'/proc/1', 7) == 0, 97) { return 1 }
+		if !require(length == 1 && C.memcmp(&link[0], c'1', 1) == 0, 97) { return 1 }
 		if !require(refuse_self_mounts(c'pid-namespace', 1000) == 0, 98) { return 1 }
 		return 0
 	}
@@ -178,13 +178,13 @@ fn stale_namespace_init(phase i32, ready i32, gate i32) i32 {
 		link := [32]char{}
 		if phase == 0 {
 			if !require(C.mount(c'proc', c'/tmp/proc-stale', c'proc', 0, c'') == 0, 125) { return 1 }
-			if !require(C.readlink(c'/tmp/proc-stale/self', &link[0], sizeof(link)) == 7 && C.memcmp(&link[0], c'/proc/1', 7) == 0, 127) { return 1 }
+			if !require(C.readlink(c'/tmp/proc-stale/self', &link[0], sizeof(link)) == 1 && C.memcmp(&link[0], c'1', 1) == 0, 127) { return 1 }
 			return 0
 		}
 		if phase == 2 {
 			if !require(C.mount(c'proc', c'/tmp/proc-fresh', c'procfs', 0, c'') == 0, 131) { return 1 }
-			if !require(C.readlink(c'/tmp/proc-fresh/self', &link[0], sizeof(link)) == 7 && C.memcmp(&link[0], c'/proc/1', 7) == 0, 133) { return 1 }
-			if !require(C.readlink(c'/tmp/proc-stale/self', &link[0], sizeof(link)) == 7 && C.memcmp(&link[0], c'/proc/1', 7) == 0, 137) { return 1 }
+			if !require(C.readlink(c'/tmp/proc-fresh/self', &link[0], sizeof(link)) == 1 && C.memcmp(&link[0], c'1', 1) == 0, 133) { return 1 }
+			if !require(C.readlink(c'/tmp/proc-stale/self', &link[0], sizeof(link)) == 1 && C.memcmp(&link[0], c'1', 1) == 0, 137) { return 1 }
 			return 0
 		}
 		if !require(C.write(ready, c'r', 1) == 1, 140) { return 1 }

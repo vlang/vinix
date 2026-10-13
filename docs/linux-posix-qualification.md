@@ -3028,3 +3028,85 @@ concurrent close/unlink/exec, partial-copy boundaries, disk/overlays and
 GNU/translated/ELF32 paths, plus complete Linux installation/sandbox/portal/
 runtime acceptance, remain separate work. The three broad section-15 gates
 stay open.
+
+## Relative procfs self and thread-self links
+
+The native procfs formatter now returns the reader's PID for `self` and
+`PID/task/TID` for `thread-self`, relative to the procfs root. Linux uses those
+relative targets in [self.c](https://github.com/torvalds/linux/blob/master/fs/proc/self.c)
+and [thread_self.c](https://github.com/torvalds/linux/blob/master/fs/proc/thread_self.c).
+An absolute `/proc/...` target previously selected the wrong location inside a
+chroot without `/proc`; relative targets resolve inside the mounted tree. The
+existing view supplies both IDs. Buffer construction, synchronous namespace
+borrowing and caller-owned target freeing remain unchanged.
+
+The native musl `procself` guest runs 1,620 raw/libc checks per architecture:
+two credential groups, three readers per forked process, three procfs mounts,
+two links, five call forms, three positive sizes and three destination classes.
+Descriptors are opened before fork and retained through all reader threads;
+empty-path reads name the current reader rather than the opening process.
+Exact target prefixes, untouched canaries, no NUL and EFAULT refusals are
+checked. Named resolution and explicit numeric lookup select equal
+inode/device/mode values with the reader's Tgid. A root child opens both status
+files inside a chroot containing `/view` and no `/proc`.
+
+| Architecture | Baseline failures per reader | Candidate failures | Root/UID1000 large pages, before/after |
+| --- | --- | --- | --- |
+| AArch64 | 90 of 270, all six readers; chroot resolution fails | 0 of 1,620; chroot passes | 63/63 in both groups |
+| x86-64 | 90 of 270, all six readers; chroot resolution fails | 0 of 1,620; chroot passes | 160/160 in both groups |
+
+After 32 warmups, each credential group runs 200 cycles of 120 target reads and
+six status resolutions. Every live slab class stays exact: 18 classes on ARM
+and 14 on x86. Both kernels build in isolated worktrees at
+`7da8032f9ea39d0d6dacd0c609aebd77f13ff8ed`, with only `kernel/fs/procfs.v`
+modified. Restoring the formatter and exact literal-pool symbols/order, then
+normalizing only unused-loop source offsets, reproduces the whole baseline C. The legacy unreferenced helper and its comment also use the relative
+spelling. Both actual before/after fixture C files match their architecture's
+preview. Independent source and generated-C lifetime review checks Text
+ownership, both VFS freeing paths, namespace borrowing, inherited descriptors
+and stack state through successful joins. A failed join exits without unwinding
+state a worker could still access.
+
+Both architectures also pass `readlinkabi`, `readlinkempty`, `open`,
+`namespace` and `runtime`; only the two older readlink fixtures' expected procfs
+target literals change. The allocation audit still exits 1 with 406 ARM and 295
+x86 sites and identical `NEW:` rows; no allowance changes. Eight compatibility
+host test files and the 63-input dispatch inventory check pass. Public inventory
+fingerprints are generated from the committed parent plus this fix; the evidence
+files retain the separate isolated semantic build inputs.
+
+The independent procfs inactive-view reuse suite passes on both architectures,
+including PID-namespace target `1`, invisible readers returning ENOENT and
+retargeted aliases. The full procfs mount suite fails its existing 16 KiB
+retention assertion at diagnostic line 80 on both baseline and candidate.
+Those runs are published as failures without changing that bound. They do not
+qualify full procfs mount retention.
+
+Initial wider status-file assertions also fail because a nonleader task's
+status reports the process PID in its `Pid` field. The initial ARM candidate
+already passes all target probes and chroot resolution, while those status
+assertions fail. The final target suite checks numeric inode selection and Tgid;
+per-task `Pid` reporting remains a separate conformance bug. Original baseline
+receipts on both architectures and the failed ARM candidate receipt remain
+published. CLI steering interrupted the original-assertion x86 candidate before
+it produced a receipt; its partial log/source/C are pinned without claiming a
+verdict. Final runs use fresh state directories. An allocation invocation that
+overlapped candidate source copying is retained separately; the authoritative
+baseline audit was rerun against an immutable worktree.
+
+The assertion-enabled [auditor](../tests/linux-compat/results/2026-10-13/procself-audit.v)
+requires baseline failure markers, the exact reader/copy/retention results,
+compiled source/ELF/ISO and kernel receipts, generated-C scope, review hashes and
+unchanged allocation refusals. Both deliberately failing controls execute:
+`assert false` fails, and a passing guest log cannot satisfy baseline checks.
+Evidence and raw captures are [AArch64](../tests/linux-compat/results/2026-10-13/procself-evidence-aarch64.json)
+and [x86-64](../tests/linux-compat/results/2026-10-13/procself-evidence-x86_64.json),
+with [ARM baseline](../tests/linux-compat/results/2026-10-13/procself-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/procself-after-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/procself-before-x86_64.log)
+and [x86 candidate](../tests/linux-compat/results/2026-10-13/procself-after-x86_64.log).
+
+This qualifies the native relative-link subset. Symlink atime, restrictive
+policy, close/unlink/exec races, partial copying, full mount retention and
+glibc/translated/ELF32 installation/sandbox/portal acceptance remain separate.
+The three broad section 15 gates stay open.

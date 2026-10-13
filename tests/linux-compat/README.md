@@ -134,6 +134,26 @@ character devices, GNU wrappers, foreign ABIs, actual cap-sized transfers,
 disk-backed vectors and shared-offset atomicity remain open. See the
 [qualification and receipts](../../docs/linux-posix-qualification.md#native-positioned-vector-imports-and-errors).
 
+The `procself` case checks 1,620 native raw/musl calls per architecture as
+root/UID1000, with a main reader and two pthread readers in each forked child.
+Three procfs mounts, directory-relative/pathname calls and inherited O_PATH
+empty-path handles return the reading process's relative PID for `self` and
+PID/task/TID for `thread-self`. One/three/full-byte copies preserve exact
+prefixes, no terminating NUL and buffer canaries; null/inaccessible buffers
+return EFAULT. Resolution selects the same inode/device/mode as an explicit
+numeric path, with the correct Tgid. A root child resolves both links inside a
+chroot containing `/view` but no `/proc`. Thirty-two warmups and 200 cycles of
+120 target probes plus six status checks keep all live slab counts and large
+pages flat. Failed pthread joins terminate the process before stack state or
+shared descriptions can unwind. The independent `procfs-mount --case reuse`
+suite checks PID-view numbering, inactive views and retargeted aliases.
+
+Initial wider assertions exposed the separate per-task status `Pid` reporting
+gap; this target suite does not qualify that field. Initial failure artifacts
+remain published. The full procfs mount suite fails its unchanged 16 KiB
+retention bound on both baseline and candidate; those failures remain visible.
+See [the relative-link receipts and limits](../../docs/linux-posix-qualification.md#relative-procfs-self-and-thread-self-links).
+
 The `readlinkempty` case checks 3,648 raw/musl calls per root/UID1000 child
 on both architectures. Empty paths name the retained symlink description,
 including O_PATH handles after unlink or private-directory search denial.

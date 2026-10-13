@@ -1,0 +1,3 @@
+tests/linux-compat/results/2026-10-13/procself-audit.v:130: FAIL: fn main.failure: assert log.contains('cases=270 failures=90 status=1'), 'relative procfs baseline markers required'
+      message: relative procfs baseline markers required
+V panic: Assertion failed...

@@ -1,0 +1,55 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "23aebb9edc118e28071b682ac26c4a40b03181a3a8b6d6db260e06b862a6ef55",
+    "results": [
+        {
+            "name": "procself",
+            "source_sha256": "7152f11a7c5543ef1d904ae831c713c175ed272552dd5440f4137ab7ddad0f37",
+            "init_sha256": "65390c949794e558d7b57de7491b4e4d120e5798aed6f3943654d3a193dac114",
+            "iso_sha256": "2148d24d1e498fc42ca65875aa72e6b1fedfc703dbfaf9eb46446b985fde0bc6",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "readlinkabi",
+            "source_sha256": "6462744aa27ddc7b264b8c3063035e2ad3fe8e84296263f89096323c3f8cd5ae",
+            "init_sha256": "679f44539a5449c09127fabd664848e249727de3cd760b98d0792f5cb832f666",
+            "iso_sha256": "916e0722b1af5f5acb25cd9c20a6ea01ec695aff5afd11235b8842dee419aa43",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "readlinkempty",
+            "source_sha256": "642b7f78afddd9c58b77e1e7f19a299055d5b67b0b509da7a6ecd8bfbf44563d",
+            "init_sha256": "55431aa2ec0f0811ca20c6600f7bb3edc86692325706afe97f140494d84ce8ce",
+            "iso_sha256": "90ca62794d223e27ca722d1c209879fd675c0c0cd85d61a599089225fc50af6a",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "open",
+            "source_sha256": "923b9cfdaa49bf37b0c82d235294b2785f61366c39d9af8f1d5dfe45cbe65262",
+            "init_sha256": "377071b25bf7f8a9b3a048c8eab9ec87c689beb7ca5791e8439a46a4131f222a",
+            "iso_sha256": "fb3de7cb5a5fff346f9bd09479e616875830b752876bacf51cd06dd5fac41107",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "namespace",
+            "source_sha256": "50262bc779a7d3114c9db4499152d668acd8085670904d81b9c85d74b92fcef9",
+            "init_sha256": "1cdc4a73259ea68007cefac1d2078c263b6c68ee8cf86a3317c50e03e78ac95b",
+            "iso_sha256": "c6c03a3db7044f3c6f199716d9ce89259648f285e87f122f7d6b38147f725181",
+            "exit_code": 0,
+            "detail": ""
+        },
+        {
+            "name": "runtime",
+            "source_sha256": "e23fb687c349c454bb7ad310c0c251e4968131781ff5eadb4b2488bd2fe7b6f6",
+            "init_sha256": "3c22f6e44700a031e0c6e9bd04427095e423d595d3f9b81e09f07539d1ea3b9f",
+            "iso_sha256": "219ca9cc81a66382e93c2ee6fe6cc38a6a9c5b2c74b3775685fcdfc6034e09d3",
+            "exit_code": 0,
+            "detail": ""
+        }
+    ]
+}

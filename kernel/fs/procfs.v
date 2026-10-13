@@ -344,7 +344,7 @@ fn (mut this ProcFS) build_root(parent &VFSNode, name string, view voidptr) &VFS
 
 	// `self` is a symlink whose target is the reader's own directory. The
 	// stored target is only what a listing shows; resolution goes through
-	// procfs_self_target().
+	// procfs_dynamic_link_target().
 	mut self_node := create_node(this, root, 'self', false)
 	mut self_resource := new_procfs_resource(.self_link, stat.iflnk | 0o777, 0, 0)
 	self_resource.view = view
@@ -1462,7 +1462,7 @@ pub fn procfs_dynamic_link_target(node &VFSNode) string {
 	// Borrowed synchronously by formatting helpers; the owned bytes are consumed below.
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(40) }
-	text.add('/proc/')
+	// Relative to this procfs root, including alternate mounts and chroots.
 	text.add_decimal(i64(pid))
 	if link.kind == .thread_self_link {
 		text.add('/task/')
@@ -1479,7 +1479,6 @@ pub fn procfs_self_target() string {
 	}
 	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
 	unsafe { *text = lib.new_text(24) }
-	text.add('/proc/')
 	text.add_decimal(i64(proc.own_pid(current.process)))
 	return text.str()
 }

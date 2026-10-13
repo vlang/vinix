@@ -715,6 +715,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   unlinked and private O_PATH descriptions; retain descriptor ownership through
   real lookup/copy errors and qualify aliases, metadata, queues and flat storage
   on both architectures. See [the empty-path receipts](docs/linux-posix-qualification.md#native-empty-path-readlink).
+- [x] Return relative procfs self/thread-self targets for each reading process
+  and thread; qualify inherited handles, alternate mounts, chroot resolution
+  and flat native storage on both architectures. See [the procfs link receipts](docs/linux-posix-qualification.md#relative-procfs-self-and-thread-self-links).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
