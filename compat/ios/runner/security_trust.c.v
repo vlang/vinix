@@ -115,7 +115,7 @@ fn sec_trust_anchors_only(trust u64, only u8) int {
 fn sec_trust_date(trust u64, date u64) int {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	if !security_trust_valid(trust) || (date != 0 && read64(date) != cf_date_id()) { return -50 }
+	if !security_trust_valid(trust) || (date != 0 && !ns_date_is_date(date)) { return -50 }
 	if date != 0 {
 		unix := cf_date_absolute(date) + 978307200.0
 		if !(unix >= -62135596800.0 && unix <= 253402300799.0) { return -50 }

@@ -3832,17 +3832,73 @@ at the required `_OBJC_CLASS_$_NSDate` import. Evidence is retained under
 five published runners are unchanged. Game entry, rendering and gameplay
 remain unverified.
 
+`NSDate` now resolves its Foundation and CoreFoundation class/metaclass
+imports through a V adapter. The installed public class is eight bytes; this
+Mac allocates a placeholder and replaces it with tagged or private dates.
+Vinix uses its existing heap CFDate representation as an NSDate subclass,
+with the immutable double and initialization flags in owned metadata. Apple
+private/tagged layouts and bit-dependent hash values are not emulated.
+
+EOS contains date, now, dateWithTimeIntervalSince1970:,
+timeIntervalSinceReferenceDate, compare: and description selectors. Typed
+Foundation/CFDate tests measure constructors, the 2001 reference epoch,
+fractional intervals, FP/integer calling conventions, immutable copies,
+ordering and UTC descriptions. Nil comparison returns equality, nil
+earlier/later-date selection returns the receiver, and subtraction from a
+nil date returns NaN, as measured. Equal ties select the receiver.
+
+The adapter supports finite designated construction, current/distant dates,
+epoch conversion, arithmetic, comparison, equality, hash, immutable copy and
+whole-second UTC descriptions for years 1 through 9999. Its NSDate objects
+share CFDate type/equality/hash/time operations and work with existing cookie,
+condition, thread-sleep and certificate-date consumers. Existing CFDate
+creation preserves its broader scalar profile and consumer bounds. Parsing,
+coding, locale formatting, mutable copies, custom subclass construction and
+reinitialization are outside the profile and reject explicitly. Native
+NSDate alloc/init replacement is represented by one owned heap object.
+
+This Mac tagged-date implementation turns a reference interval of -0.0 into
+approximately -15.26 microseconds. The native measurement records that result
+and its CFDate agreement separately. Vinix preserves direct double values,
+and equal positive/negative zero dates have the same hash. Shared fixtures
+use normal exact intervals; this difference is not claimed as native parity.
+
+Distant dates have two runtime-owned cache references. Cache slots clear
+before releasing their objects, and shutdown retires caches recreated by
+autorelease destructors. All 73 programs build and 99 original generated C
+streams restore to recorded hashes. Twenty-six host suites pass ASAN/UBSAN
+in both hashing modes, including pure certificate calendar/trust regressions.
+Vinix passes 27 Objective-C and 33 Swift/loader programs. Date fixtures cover
+copied values and CF bridging, guarded caller bytes, 8,000 concurrent queries
+and 100 isa changes per cycle, bare NSDate certificate-date acceptance, eight
+exact rejection reasons, late cache creation and two zero-live-object
+shutdowns. Queries/comparison/hash/copy/retirement allocate no scratch; UTC
+formatting uses stack storage and one owned NSString. Native module replay
+and earlier compatibility checks remain enabled.
+
+Evidence runs on persistent disk with a copied pinned compiler and verified
+canonical library/source snapshots. Preflight corrected a frame-accessor
+name, a fixture umbrella-header dispatch_sync collision and an incorrect
+negative-zero native assumption. Failed preflight outputs are not counted as
+passed checks. Guest payloads retire only after joined driver success.
+
+Fortnite passes the NSDate binding and exits with status 1 before entry at
+the required `_OBJC_CLASS_$_NSInputStream` import. Evidence is retained under
+`build/ios/fortnite/date-checks`. Full regression remains unpassed; five
+published runners are unchanged. Game entry, rendering and gameplay remain
+unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,439 | 721 | 79 |
-| EOSSDK | 654 | 8 | 18 |
+| Fortnite executable | 1,440 | 720 | 79 |
+| EOSSDK | 655 | 7 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,208 | 790 | 120 |
+| All images | 2,210 | 788 | 120 |
 
-The C++/GLES/Text variant reports 2,221 resolved imports, 777 unresolved strong
+The C++/GLES/Text variant reports 2,223 resolved imports, 775 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

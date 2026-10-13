@@ -111,6 +111,8 @@ mut:
 	image_view &ImageViewState = unsafe { nil }
 	image_view_array bool
 	process_arguments_array bool
+	date_owned bool
+	date_initialized bool
 	uuid_owned bool
 	pool_owned bool
 	pool_initialized bool
@@ -226,6 +228,7 @@ mut:
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
 	process_info u64 // One owned NSProcessInfo singleton reference.
 	process_arguments u64 // Owned app arguments, configured before image initialization.
+	distant_dates [2]u64 // Owned immutable date cache references, retired at shutdown.
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
 	timers       []u64
 	display_links []u64
@@ -280,7 +283,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSDate', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -299,6 +302,7 @@ fn objc_start() {
 		'VinixCTDescriptor', 'VinixCTFont', 'VinixCTLine', 'VinixCGContext', 'VinixCGColorSpace', 'VinixCGColor', 'VinixCGImage', 'VinixCGDataProvider', 'VinixSecCertificate', 'VinixSecKey', 'VinixSecPolicy', 'VinixSecTrust', 'VinixCFDate', 'VinixCFError'] {
 		parent := match name {
 			'NSObject' { u64(0) }
+			'VinixCFDate' { ios_runtime.names['NSDate'] }
 			'NSNumber', 'NSConcreteValue' { ios_runtime.names['NSValue'] }
 			'_NSUUIDBridge' { ios_runtime.names['NSUUID'] }
 			'__NSConcreteUUID' { ios_runtime.names['_NSUUIDBridge'] }
@@ -341,6 +345,7 @@ fn objc_start() {
 			'GCKeyboard' { u32(32) }
 			'NSFileManager' { u32(32) }
 			'NSProcessInfo' { u32(48) }
+			'NSDate', 'VinixCFDate' { u32(8) }
 			'NSAutoreleasePool' { u32(40) }
 			'NSUUID', '_NSUUIDBridge' { u32(8) }
 			'__NSConcreteUUID' { u32(24) }
@@ -411,7 +416,7 @@ fn obj_header(object u64) &ObjHeader {
 
 fn objc_allocate(cls u64) u64 {
 	ns_pool_require_class(cls)
-	allocation_class := ns_uuid_allocation_class(cls)
+	allocation_class := ns_date_allocation_class(ns_uuid_allocation_class(cls))
 	objc_initialize(allocation_class)
 	info := ios_runtime.classes[allocation_class] or { panic('iOS: allocation of an unknown class') }
 	if info.dynamic && !info.registered { panic('iOS: allocating an instance of an unregistered class') }
@@ -502,6 +507,7 @@ fn objc_new(cls u64) u64 {
 	game_keyboard_require_discovery(cls)
 	if obj_header(object).pool_owned { ns_pool_initialize(object); return object }
 	if obj_header(object).uuid_owned { ns_uuid_initialize(object, 0, true); return object }
+	if obj_header(object).date_owned { ns_date_initialize(object, cf_absolute_time()); return object }
 	if obj_header(object).value_owned { objc_release(object); return 0 }
 	if obj_header(object).auth_owned { panic('iOS: authentication session requires designated construction') }
 	if obj_header(object).image_view_owned { image_view_initialize(object, 0, 0, ObjRect{}, false) }
@@ -562,8 +568,9 @@ fn objc_stop() {
 	// attach values to immortal objects. Drain both before deleting the TLS pool.
 	for {
 		objc_associations_stop()
+		ns_date_stop()
 		objc_pool_drain_all()
-		if ios_runtime.associations.len == 0 { break }
+		if ios_runtime.associations.len == 0 && ios_runtime.distant_dates[0] == 0 && ios_runtime.distant_dates[1] == 0 { break }
 	}
 	objc_pool_free(C.pthread_getspecific(ios_runtime.pool_key))
 	$if ios_text ? { text_stop() }

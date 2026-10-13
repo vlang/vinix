@@ -28,6 +28,7 @@ fn cf_equal_depth(left u64, right u64, depth int) bool {
 	if left == right { return true }
 	if left == 0 || right == 0 { return false }
 	if objc_is_kind(left, ios_runtime.names['NSUUID']) { return ns_uuid_equal(left, right) }
+	if ns_date_is_date(left) { return ns_date_equal(left, right) }
 	if depth > 64 { panic('iOS: cyclic or excessively nested CF equality') }
 	if objc_is_kind(left, ios_runtime.names['NSSet']) { return ns_set_equal(left, right, depth) }
 	for name in ['NSArray', 'NSDictionary', 'NSData', 'NSString', 'NSNumber']! {
@@ -64,7 +65,6 @@ fn cf_equal_depth(left u64, right u64, depth int) bool {
 	info := ios_runtime.classes[read64(left)] or { return false }
 	name := info.name
 	return match name {
-		'VinixCFDate' { obj_header(left).real_number == obj_header(right).real_number }
 		'VinixSecPolicy' { cf_equal_depth(obj_header(left).fields[0], obj_header(right).fields[0], depth + 1) }
 		'VinixSecCertificate', 'VinixSecKey' {
 			a := obj_header(left)

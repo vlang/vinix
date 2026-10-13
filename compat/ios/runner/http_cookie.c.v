@@ -140,7 +140,7 @@ fn cookie_initialize(object u64, input u64) bool {
 	}
 	mut expires := u64(0)
 	provided := cookie_property(input, 'Expires')
-	if provided != 0 && read64(provided) == cf_date_id() {
+	if ns_date_is_date(provided) {
 		if !math.is_finite(cf_date_absolute(provided)) {
 			panic('iOS: cookie expiry must be finite')
 		}

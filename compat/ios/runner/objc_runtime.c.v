@@ -94,6 +94,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := ns_uuid_types(info.name, info.meta, selector) { return types }
 	if types := ns_file_manager_types(info.name, info.meta, selector) { return types }
 	if types := ns_process_info_types(info.name, info.meta, selector) { return types }
+	if types := ns_date_types(info.name, info.meta, selector) { return types }
 	if types := cookie_builtin_types(info.name, info.meta, selector) { return types }
 	if types := webkit_builtin_types(info.name, info.meta, selector) { return types }
 	if types := http_url_builtin_types(info.name, info.meta, selector) { return types }

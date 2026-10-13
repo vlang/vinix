@@ -24,6 +24,7 @@ fn cf_type_id(object u64) u64 {
 	if objc_is_kind(object, ios_runtime.names['NSDictionary']) { return 3 }
 	if objc_is_kind(object, ios_runtime.names['NSData']) { return 4 }
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) { return if obj_header(object).cf_boolean { u64(6) } else { u64(5) } }
+	if ns_date_is_date(object) { return cf_date_id() }
 	// Private IDs need only be stable and distinct; they are not Apple constants.
 	return read64(object)
 }
@@ -41,12 +42,13 @@ fn cf_date_create(allocator u64, absolute f64) u64 {
 	date := objc_allocate(cf_date_id())
 	mut header := obj_header(date)
 	header.real_number = absolute
+	header.date_initialized = true
 	return date
 }
 
 fn cf_date_absolute(date u64) f64 {
-	if date == 0 || read64(date) != cf_date_id() { panic('iOS: unsupported CFDate object') }
-	return obj_header(date).real_number
+	if !ns_date_is_date(date) { panic('iOS: unsupported CFDate object') }
+	return ns_date_state(date).real_number
 }
 
 fn cf_string_create(allocator u64, text &char, encoding u32) u64 {
@@ -290,10 +292,7 @@ fn cf_callback_release(allocator u64, value u64) { _ = allocator; objc_release(v
 fn cf_hash(object u64) u64 {
 	if object == 0 { return 0 }
 	if objc_is_kind(object, ios_runtime.names['NSUUID']) { return ns_uuid_hash(object) }
-	if read64(object) == cf_date_id() {
-		value := obj_header(object).real_number
-		return if value == 0 { u64(0) } else { unsafe { *(&u64(&value)) } }
-	}
+	if ns_date_is_date(object) { return ns_date_hash(object) }
 	if read64(object) == sec_policy_type_id() { return cf_hash(obj_header(object).fields[0]) }
 	if objc_is_kind(object, ios_runtime.names['NSIndexPath']) { return u64(obj_header(object).number) ^ (u64(obj_header(object).section) * 1099511628211) }
 	if objc_is_kind(object, ios_runtime.names['NSArray']) || objc_is_kind(object, ios_runtime.names['NSDictionary']) || objc_is_kind(object, ios_runtime.names['NSSet']) { return u64(obj_header(object).items.len) }
@@ -321,6 +320,7 @@ fn cf_hash(object u64) u64 {
 
 fn cf_copy_description(object u64) u64 {
 	if objc_is_kind(object, ios_runtime.names['NSUUID']) { return ns_uuid_string(object) }
+	if ns_date_is_date(object) { return ns_date_description(object) }
 	if objc_is_kind(object, ios_runtime.names['NSString']) { return objc_retain(object) }
 	mut bytes := [128]u8{}
 	if objc_is_kind(object, ios_runtime.names['NSNumber']) {

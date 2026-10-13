@@ -31,6 +31,7 @@ fn objc_install_storage(cls u64, object u64, caller_storage bool) {
 	header.auth_owned = objc_is_kind(object, ios_runtime.names['ASWebAuthenticationSession'])
 	header.image_view_owned = objc_is_kind(object, ios_runtime.names['UIImageView'])
 	header.uuid_owned = objc_is_kind(object, ios_runtime.names['NSUUID'])
+	header.date_owned = ns_date_family(cls)
 	header.pool_owned = objc_is_kind(object, ios_runtime.names['NSAutoreleasePool'])
 	header.cookie_owned = objc_is_kind(object, ios_runtime.names['NSHTTPCookie'])
 	header.webview_owned = objc_is_kind(object, ios_runtime.names['WKWebView'])

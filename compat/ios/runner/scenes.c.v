@@ -29,6 +29,7 @@ fn objc_responds(object u64, selector &char) bool {
 	if image_view_selector(object, name) { return true }
 	if game_keyboard_selector(object, name) { return true }
 	if ns_uuid_selector(object, name) { return true }
+	if ns_date_selector(object, name) { return true }
 	if ns_process_info_family(if object in ios_runtime.classes { object } else { read64(object) }) {
 		if name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return native_method(read64(object), name) != 0 }
 		if ns_process_info_selector(object, name) { return true }
