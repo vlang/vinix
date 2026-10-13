@@ -64,98 +64,10 @@ kill -0 "$host_pid" 2>/dev/null || fail "OBS exited after mapping its window"
 grep -q 'Switched to scene' /root/.config/obs-studio/logs/* \
 	|| fail "OBS did not finish loading its default scene"
 
-/usr/bin/python3 - <<'PY' || fail "X11 capture screen or MIT-SHM unavailable"
-import ctypes
-import mmap
-import struct
-
-class XImage(ctypes.Structure):
-    _fields_ = [('width', ctypes.c_int), ('height', ctypes.c_int),
-                ('xoffset', ctypes.c_int), ('format', ctypes.c_int),
-                ('data', ctypes.c_void_p)]
-
-xlib = ctypes.CDLL('libX11.so.6')
-xlib.XOpenDisplay.argtypes = [ctypes.c_char_p]
-xlib.XOpenDisplay.restype = ctypes.c_void_p
-xlib.XScreenCount.argtypes = [ctypes.c_void_p]
-xlib.XScreenCount.restype = ctypes.c_int
-xlib.XQueryExtension.argtypes = [ctypes.c_void_p, ctypes.c_char_p,
-                                 ctypes.POINTER(ctypes.c_int),
-                                 ctypes.POINTER(ctypes.c_int),
-                                 ctypes.POINTER(ctypes.c_int)]
-xlib.XQueryExtension.restype = ctypes.c_int
-xlib.XRootWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
-xlib.XRootWindow.restype = ctypes.c_ulong
-xlib.XGetImage.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_int,
-                           ctypes.c_int, ctypes.c_uint, ctypes.c_uint,
-                           ctypes.c_ulong, ctypes.c_int]
-xlib.XGetImage.restype = ctypes.POINTER(XImage)
-xlib.XCloseDisplay.argtypes = [ctypes.c_void_p]
-display = xlib.XOpenDisplay(b':99')
-if not display:
-    raise SystemExit('cannot open OBS X11 display')
-try:
-    if xlib.XScreenCount(display) != 2:
-        raise SystemExit('OBS display does not have two screens')
-    major = ctypes.c_int()
-    first_event = ctypes.c_int()
-    first_error = ctypes.c_int()
-    if not xlib.XQueryExtension(display, b'MIT-SHM',
-                               ctypes.byref(major), ctypes.byref(first_event),
-                               ctypes.byref(first_error)):
-        raise SystemExit('MIT-SHM is unavailable to OBS')
-    if xlib.XQueryExtension(display, b'RANDR',
-                           ctypes.byref(major), ctypes.byref(first_event),
-                           ctypes.byref(first_error)):
-        raise SystemExit('RandR hides Display 1 from OBS XSHM capture')
-    # The compositor writes this same XWD mapping. Confirm that a written
-    # framebuffer pixel is visible through the X11 root OBS will capture.
-    with open('/run/vinix-obs-screen', 'r+b') as file:
-        framebuffer = mmap.mmap(file.fileno(), 0)
-        header = struct.unpack_from('>I', framebuffer, 0)[0]
-        colors = struct.unpack_from('>I', framebuffer, 76)[0]
-        offset = header + colors * 12
-        old = framebuffer[offset:offset + 4]
-        marker = bytes((0x56, 0x34, 0x12, 0))
-        try:
-            framebuffer[offset:offset + 4] = marker
-            root = xlib.XRootWindow(display, 1)
-            image = xlib.XGetImage(display, root, 0, 0, 1, 1, 0xffffffff, 2)
-            if not image or ctypes.string_at(image.contents.data, 4) != marker:
-                raise SystemExit('compositor capture framebuffer is not visible on Display 1')
-        finally:
-            framebuffer[offset:offset + 4] = old
-            framebuffer.close()
-finally:
-    xlib.XCloseDisplay(display)
-PY
+/usr/share/vinix/surface-probe obs-capture /run/vinix-obs-screen || fail "X11 capture screen or MIT-SHM unavailable"
 
 # A mapped OBS window can still be stuck before Qt paints its controls. The
 # XWD screen is shared memory, so watch its pixels until the UI appears.
-/usr/bin/python3 - <<'PY' || fail "OBS window stayed blank"
-import mmap
-import struct
-import time
-
-with open('/tmp/vinix-obs-test/Xvfb_screen0', 'rb') as file:
-    screen = mmap.mmap(file.fileno(), 0, access=mmap.ACCESS_READ)
-    header = struct.unpack_from('>25I', screen)
-    width, height, stride = header[4], header[5], header[12]
-    offset = header[0] + header[19] * 12
-    if screen.size() < offset + height * stride:
-        raise SystemExit('incomplete XWD screen')
-    deadline = time.monotonic() + 45
-    while time.monotonic() < deadline:
-        colors = {screen[offset + y * stride + x * 4:
-                         offset + y * stride + x * 4 + 3]
-                  for y in range(0, height, 16)
-                  for x in range(0, width, 16)}
-        if len(colors) >= 16:
-            break
-        time.sleep(1)
-    else:
-        raise SystemExit('OBS controls did not paint')
-    screen.close()
-PY
+/usr/share/vinix/surface-probe obs-paint /tmp/vinix-obs-test/Xvfb_screen0 || fail "OBS window stayed blank"
 
 echo "VINIX OBS TEST: PASS"

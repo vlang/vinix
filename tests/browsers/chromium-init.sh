@@ -123,11 +123,7 @@ fi
 # the desktop rescales 1280x900 pixels twenty times a second whether or not
 # anything was drawn, which is enough to starve the browser it is showing.
 read_damage() {
-	/usr/bin/python3 -c 'import struct, sys
-try:
-    print(struct.unpack("<I", open(sys.argv[1], "rb").read(4))[0])
-except Exception:
-    print(-1)' "$surface/damage"
+	/usr/share/vinix/surface-probe damage "$surface/damage"
 }
 
 # What the counter claims is only useful next to what the framebuffer actually
@@ -135,18 +131,7 @@ except Exception:
 # still means the bridge is under-reporting, and both sitting still means the
 # browser simply has not drawn yet.
 read_surface() {
-	/usr/bin/python3 -c 'import sys, zlib
-try:
-    f = open(sys.argv[1], "rb")
-    f.seek(0, 2)
-    size = f.tell()
-    digest = 0
-    for i in range(64):
-        f.seek(size * i // 64)
-        digest = zlib.crc32(f.read(4096), digest)
-    print(digest)
-except Exception:
-    print(-1)' "$surface/Xvfb_screen0"
+	/usr/share/vinix/surface-probe crc "$surface/Xvfb_screen0"
 }
 
 [ -e "$surface/damage" ] || fail "the bridge published no damage counter"

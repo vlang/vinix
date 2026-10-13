@@ -1383,6 +1383,10 @@ install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" \
     "$STAGING/usr/share/vinix/chromium-smoke.html"
 "$SCRIPT_DIR/build-support/build-validation-guest" --arch aarch64 \
     --sysroot "$SYSROOT" --output "$STAGING/usr/share/vinix/x-window-check"
+"$SCRIPT_DIR/build-support/build-validation-guest" --arch aarch64 \
+    --sysroot "$SYSROOT" --source "$SCRIPT_DIR/tests/native-surface-tools/main.v" \
+    --source-input "$SCRIPT_DIR/tests/native-surface-tools/surfacecore" \
+    --output "$STAGING/usr/share/vinix/surface-probe"
 install -m644 "$SCRIPT_DIR/tests/browsers/chromium-smoke.html" "$STAGING/root/chromium-smoke.html"
 mkdir -p "$STAGING/etc/chromium/policies/managed"
 install -m644 "$SCRIPT_DIR/build-support/chromium/policies.json" \

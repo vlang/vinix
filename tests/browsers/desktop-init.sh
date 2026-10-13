@@ -98,25 +98,7 @@ fi
 painted=false
 k=0
 while [ "$k" -lt 300 ]; do
-	sample=$(/usr/bin/python3 -c '
-import mmap, os, sys
-# Look at the surface the way the compositor does — through a shared mapping.
-# Reading the file instead did not reflect what the compositor was showing.
-# Sampling rather than scanning keeps this cheap enough to run once a second
-# beside the browser it is watching.
-#
-# The size is reported with the count so that a check which silently sampled
-# the wrong span cannot pass for the wrong reason.
-f = open(sys.argv[1], "rb")
-size = os.fstat(f.fileno()).st_size
-view = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-seen = set()
-for i in range(1000):
-    at = 4096 + (size - 8192) * i // 1000
-    block = view[at:at + 64]
-    for offset in range(0, len(block) - 3, 4):
-        seen.add(block[offset:offset + 3])
-print(size, len(seen))' "$surface/Xvfb_screen0" 2>/dev/null)
+	sample=$(/usr/share/vinix/surface-probe colors-with-size "$surface/Xvfb_screen0" 2>/dev/null)
 	set -- $sample
 	surface_bytes=${1:-0}
 	colours=${2:-0}

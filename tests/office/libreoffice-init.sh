@@ -100,19 +100,7 @@ echo "VINIX LIBREOFFICE PASS: Writer window mapped after ${i}s"
 painted=false
 k=0
 while [ "$k" -lt 300 ]; do
-	colours=$(/usr/bin/python3 -c '
-import mmap, sys
-f = open(sys.argv[1], "rb")
-f.seek(0, 2)
-size = f.tell()
-view = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-seen = set()
-for i in range(1000):
-    at = 4096 + (size - 8192) * i // 1000
-    block = view[at:at + 64]
-    for offset in range(0, len(block) - 3, 4):
-        seen.add(block[offset:offset + 3])
-print(len(seen))' "$surface/Xvfb_screen0" 2>/dev/null)
+	colours=$(/usr/share/vinix/surface-probe colors "$surface/Xvfb_screen0" 2>/dev/null)
 	[ -n "$colours" ] || colours=0
 	if [ "$colours" -gt 8 ]; then
 		painted=true

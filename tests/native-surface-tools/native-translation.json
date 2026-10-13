@@ -1,0 +1,164 @@
+{
+    "embedded_blocks": [
+        {
+            "bytes": 646,
+            "lines": 17,
+            "operation": "colors",
+            "path": "tests/browsers/firefox-init.sh",
+            "sha256": "f0c078de13493c0c2614bd3516c3d3fade61e5ec8c501c8e17779708556cfb50"
+        },
+        {
+            "bytes": 122,
+            "lines": 5,
+            "operation": "damage",
+            "path": "tests/browsers/chromium-init.sh",
+            "sha256": "51a738c84f4121e5c318032a3efdd768c54b0ecb45514b210fa32723f4b6aadf"
+        },
+        {
+            "bytes": 260,
+            "lines": 12,
+            "operation": "crc",
+            "path": "tests/browsers/chromium-init.sh",
+            "sha256": "0ee0415c09a39169b45a373bad6f120796173ec04f14d75c08a5caa0d9a30491"
+        },
+        {
+            "bytes": 761,
+            "lines": 19,
+            "operation": "colors-with-size",
+            "path": "tests/browsers/desktop-init.sh",
+            "sha256": "67d89d61822976ffd0ff05f9530a2c283e6109eed75d1a56a42f424ef1732bd7"
+        },
+        {
+            "bytes": 344,
+            "lines": 13,
+            "operation": "colors",
+            "path": "tests/office/libreoffice-init.sh",
+            "sha256": "a7710e4116286fae0a1a1b87faee440a7434ec3bee4498b3390ca4ef444e123e"
+        },
+        {
+            "bytes": 2981,
+            "lines": 63,
+            "operation": "obs-capture",
+            "path": "tests/packages/obs-init.sh",
+            "sha256": "7a1e90da8598acad48ccc78b03dcf5d75761af2b83c4533d3659a2e2446daad8"
+        },
+        {
+            "bytes": 853,
+            "lines": 23,
+            "operation": "obs-paint",
+            "path": "tests/packages/obs-init.sh",
+            "sha256": "9b526fff95e47fd6b249c0d7cc2ea4b83a4acafb73bfbbb5766f2ffc1854ab52"
+        }
+    ],
+    "embedded_bytes": 5967,
+    "embedded_lines": 152,
+    "evidence": "~/.cache/vinix-surface-native-20261013",
+    "limits": "No Python, browser, LibreOffice, OBS, actual X11 server or Vinix guest executes. Sampling and shared mappings run natively; X11 ABI/ownership uses a V fixture. Guest result establishes builds and symbol availability, not a new graphics runtime pass. Existing graphical workflows/deadlines/markers remain outside these readers.",
+    "original_sha256": {
+        "scripts/build-desktop-aarch64.sh": "2e79283ed9bf49a2f05893014f73a660de723dbe80504087d08f967896bd754b",
+        "tests/browsers/chromium-init.sh": "68efcd38ff48254c380e055828a426d4f896df70d45337c69ddcac8a0e154846",
+        "tests/browsers/desktop-init.sh": "361569ebd87ce3da88f79199cff2da583eaa1ef57e2745b594e59ca53992d0bf",
+        "tests/browsers/firefox-init.sh": "b55a842f15633ca80eca0b37ab73cebf809bea3f1eaa86f38478d9fc3972fd0e",
+        "tests/office/libreoffice-init.sh": "58f0f7927ee35838d7e925488c8d6613ee6ab555684cbcb7c32bcda628bb3daf",
+        "tests/packages/obs-init.sh": "adf365f349c90d3fb764080cf63b58490f459a2b7a2a84a180a6163a24e3915b"
+    },
+    "profiles": [
+        {
+            "limits": "Actual shared mappings and file samplers run on macOS; X11 ABI/failure/pixel-restore/image/display/library ownership uses a native V fixture. Both real dynamic musl guest ELFs are linked. No Python, browser, office app, OBS, real X11 server or Vinix guest executes.",
+            "profile": "arm",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "468986c8f833cbbdbe1c7b170d9e80e5a54894f40a3a0c629a5fea7a137ca8ac"
+                },
+                {
+                    "name": "core",
+                    "sha256": "d83cb663414859e8f6dcfba9276393968e7bbc824cf8629721635eace2ffaf25"
+                },
+                {
+                    "name": "xlib",
+                    "sha256": "1f59a8c4e4792c55e6b8b351526aebe6d03a927ad95a40c67d32628b38dfc1ec"
+                },
+                {
+                    "name": "builder",
+                    "sha256": "d431aebc6e5f12fabffe021606356fb04008e4794dd7b979486b3f90147d1818"
+                },
+                {
+                    "guest": "aarch64",
+                    "sha256": "5304ed5d9d99eccbc11203495d434aa08da0334163b29a4b3e03f1ca23824785"
+                },
+                {
+                    "guest": "x86_64",
+                    "sha256": "ea6feb850bdb9905b5261aabcdac4fd04f3b1adc559c897d28c98f24a286297a"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "Actual shared mappings and file samplers run on macOS; X11 ABI/failure/pixel-restore/image/display/library ownership uses a native V fixture. Both real dynamic musl guest ELFs are linked. No Python, browser, office app, OBS, real X11 server or Vinix guest executes.",
+            "profile": "x86",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "6593197223a46acc4d928f5f207560d0e66126587752c905948208ff5caabc3b"
+                },
+                {
+                    "name": "core",
+                    "sha256": "28080cf98eb8dd491e831df26b39f79c36d21f2e4ec94b5ae5aa09e75c3a41d4"
+                },
+                {
+                    "name": "xlib",
+                    "sha256": "7de9a54f14fc40055fc0b0514f32144fa9da1d8f9dea658a899d746d45fc3b1f"
+                },
+                {
+                    "name": "builder",
+                    "sha256": "387d4f259fd7f618d2bc35f8fb0a294be1cd4e0073f771bb7a343124352b0f13"
+                },
+                {
+                    "guest": "aarch64",
+                    "sha256": "5304ed5d9d99eccbc11203495d434aa08da0334163b29a4b3e03f1ca23824785"
+                },
+                {
+                    "guest": "x86_64",
+                    "sha256": "ea6feb850bdb9905b5261aabcdac4fd04f3b1adc559c897d28c98f24a286297a"
+                }
+            ],
+            "status": "PASS"
+        },
+        {
+            "limits": "Actual shared mappings and file samplers run on macOS; X11 ABI/failure/pixel-restore/image/display/library ownership uses a native V fixture. Both real dynamic musl guest ELFs are linked. No Python, browser, office app, OBS, real X11 server or Vinix guest executes.",
+            "profile": "san",
+            "receipts": [
+                {
+                    "name": "main",
+                    "sha256": "4f0ceee5d10680c4ef53514c2bd8138e91175d17500a7a3ada50432b4974b9c7"
+                },
+                {
+                    "name": "core",
+                    "sha256": "8b5fe284a7ba2ccce5aa8dee8dae62f7658e6a6ccfa40eef481d30edb2cbf10e"
+                },
+                {
+                    "name": "xlib",
+                    "sha256": "d7cd77fc3f696a955e89c6c96111abea1b2523c36a860d49214685d59cac4028"
+                },
+                {
+                    "name": "builder",
+                    "sha256": "7d526659f4540e24b849467da8c6be6d59e79d655b81d450694af0ec358a243d"
+                },
+                {
+                    "guest": "aarch64",
+                    "sha256": "5304ed5d9d99eccbc11203495d434aa08da0334163b29a4b3e03f1ca23824785"
+                },
+                {
+                    "guest": "x86_64",
+                    "sha256": "ea6feb850bdb9905b5261aabcdac4fd04f3b1adc559c897d28c98f24a286297a"
+                }
+            ],
+            "status": "PASS"
+        }
+    ],
+    "python_file_retirement_credit": 0,
+    "qualification": "12 cold main/core/native-X11-fixture/guest-builder builds across ARM, Rosetta x86 and ARM ASanUBSan; actual shared-mapping updates and eight small/normal file lengths, 8000 signed floor comparisons and maximum signed-size arithmetic, damage signed-boundary values, external-gzip CRC golden, immediate/timed-blank/extent XWD cases. 30 real native fixture capture/failure paths verify pixel restoration and exact image/display retirement; actual ARM SDK exposes all seven symbols as ELF data. Six real dynamic-musl guest ELFs link on both architectures. Desktop stages the same producer and source inputs. Seven embedded blocks replaced; containing files were Shell so Python-file credit is zero.",
+    "sdk_xlib_sha256": "c9656aae6371cd6f17dcb3a7db45ada274acac08d92e167c2b4af9a886a65430",
+    "source_commit": "d87086b9d5788ff18a520691daa2bb3033b52751"
+}
