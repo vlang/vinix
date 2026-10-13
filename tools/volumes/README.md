@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`rewrap-recovery-volume BACKUP OLD_RECOVERY_KEYFILE NEW_RECOVERY_KEYFILE NEW_BACKUP`
+authenticates and reprotects recovery metadata/key directly under a new private
+recovery credential. It preserves geometry/read-only mode, refreshes the nonce,
+erases credentials before reuse/publication and publishes without overwriting
+inputs. Previous backups keep their previous access credentials. See
+[recovery credential changes](../../docs/storage-volumes.md#changing-recovery-backup-credentials).
+
 `open-recovery-volume-auto BACKUP RECOVERY_KEYFILE [ro]` directly discovers and
 unlocks the backed-up encrypted mapping after credential loss. It authenticates
 before disk access, erases recovery credentials before discovery, preserves

@@ -25,11 +25,13 @@ __global recovery_io RecoveryIO
 
 fn recovery_mock_open(path &char, flags i32) i32 {
 	assert flags & C.O_CLOEXEC != 0 && flags & C.O_NOFOLLOW != 0
+	if recovery_rewrap_model && !recovery_rewrap_before_open(path, flags) { return -1 }
 	if volume_recovery_model && (flags & C.O_DIRECTORY != 0 || (volume_recovery_io.derives > 0 && unsafe { C.strstr(path, c'/recovery') != nil })) {
 		volume_recovery_assert_erased()
 	}
 	if C.strcmp(path, c'/dev/urandom') == 0 && recovery_io.mode == 6 { unsafe { C.errno = C.EACCES }; return -1 }
 	fd := C.open(path, flags)
+	if recovery_rewrap_model { recovery_rewrap_io.fd = fd }
 	if fd >= 0 {
 		recovery_io.opened++
 		if flags & C.O_DIRECTORY != 0 { recovery_io.directory = fd }
@@ -45,8 +47,16 @@ fn recovery_mock_close(fd i32) i32 {
 	return result
 }
 fn recovery_mock_fstat(fd i32, info &C.stat) i32 {
+	if recovery_rewrap_model && recovery_rewrap_io.stage == 2 { recovery_rewrap_io.stats++ }
 	if recovery_io.mode == 22 { unsafe { C.errno = C.EIO }; return -1 }
 	result := C.fstat(fd, info); recovery_io.stats++
+	if result == 0 && recovery_rewrap_model && recovery_rewrap_io.stage == 2 {
+		unsafe {
+			if recovery_io.mode == 24 { info.st_uid++ }
+			if recovery_io.mode == 28 && recovery_rewrap_io.stats == 2 { info.st_mode |= 0o004 }
+			if recovery_io.mode == 29 && recovery_rewrap_io.stats == 2 { info.st_size++ }
+		}
+	}
 	if result == 0 {
 		unsafe {
 			if recovery_io.mode == 4 && recovery_io.stats == 1 { info.st_uid = C.geteuid() + 1 }
@@ -59,6 +69,13 @@ fn recovery_mock_fstat(fd i32, info &C.stat) i32 {
 	return result
 }
 fn recovery_mock_read(fd i32, buffer voidptr, size usize) i64 {
+	if recovery_rewrap_model && recovery_rewrap_io.stage == 2 {
+		recovery_rewrap_io.reads++
+		if recovery_io.mode == 25 { unsafe { C.errno = C.EIO }; return -1 }
+		if recovery_io.mode == 26 { return 0 }
+		if recovery_io.mode == 27 && size == 1 { unsafe { *(&u8(buffer)) = 9 }; return 1 }
+		if recovery_io.mode == 30 && recovery_rewrap_io.reads == 1 { unsafe { C.errno = C.EINTR }; return -1 }
+	}
 	recovery_io.reads++
 	if recovery_io.mode == 1 && recovery_io.reads == 1 { unsafe { C.errno = C.EINTR }; return -1 }
 	if recovery_io.mode == 2 && recovery_io.reads == 2 { return 0 }

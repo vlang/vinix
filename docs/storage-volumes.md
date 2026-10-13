@@ -651,6 +651,41 @@ slots/protected extents retain normal import refusal. This is explicit data
 volume rescue; encrypted-root startup, RAID and ciphertext authentication
 remain separate work. See [direct unlock qualification](../tests/storage-volumes/recovery-unlock.md).
 
+## Changing recovery-backup credentials
+
+`rewrap-recovery-volume BACKUP OLD_RECOVERY_KEYFILE NEW_RECOVERY_KEYFILE
+NEW_BACKUP` changes the credential protecting an authenticated `VINIXVR1`
+backup. It preserves the exact volume key, disk identity, capacity, native
+sectors, slot, extent and saved read-only mode, with a fresh random nonce:
+
+```sh
+vinix-volume rewrap-recovery-volume /root/data.vrecover /root/old-recovery.key /root/new-recovery.key /root/new-data.vrecover
+vinix-volume open-recovery-volume-auto /root/new-data.vrecover /root/new-recovery.key ro
+```
+
+The source header and geometry validate before the old key is read. The backup
+authenticates before the new key is opened. The old credential buffer erases
+before reuse; the new credential and decoded volume key erase before acquiring
+the destination directory. Every normal return erases the complete workspace.
+Inputs retain the exact-size, private owned regular-file, pinned descriptor,
+EOF/recheck and symlink-refusal policies above. The new recovery key must have
+distinct halves and differ from the volume key. Reusing the same recovery key
+is allowed as a fresh-nonce refresh.
+
+The operation needs no passphrase, KDF, ordinary configuration, physical-disk
+probe or mapping import. It creates a separate private backup through the
+locked, durable no-overwrite publisher; input aliases and existing destinations
+are preserved. Failures before publication produce no output. Cleanup,
+directory-flush or reporting failures after publication can leave a complete
+private backup with status 1. Completed publication/reporting returns 0;
+controlled failures return 1 and invalid syntax returns 2.
+
+Changing the recovery credential protects the new backup. Previously saved
+backups remain usable with their old credentials; this operation does not
+revoke copies of those backups or rotate the underlying volume key. Deliberate
+capacity/extent changes still require a new backup of the adopted geometry.
+See [recovery credential-change qualification](../tests/storage-volumes/recovery-rewrap.md).
+
 ## Authenticated encrypted-volume growth
 
 `plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`

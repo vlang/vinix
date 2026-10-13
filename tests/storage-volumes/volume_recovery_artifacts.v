@@ -56,15 +56,17 @@ fn xts(key []u8) ![]u8 {
 }
 
 fn main() {
-	assert os.args.len == 3 || (os.args.len == 4 && os.args[3] == '--recovery-unlock'), 'Usage: volume_recovery_artifacts.v COMPLETED_GUEST_WORK NEW_OUTPUT [--recovery-unlock]'
+	assert os.args.len == 3 || (os.args.len == 4 && os.args[3] in ['--recovery-unlock', '--recovery-rewrap']), 'Usage: volume_recovery_artifacts.v COMPLETED_GUEST_WORK NEW_OUTPUT [--recovery-unlock | --recovery-rewrap]'
 	unlock := os.args.len == 4
+	rewrap := unlock && os.args[3] == '--recovery-rewrap'
 	work := os.abs_path(os.args[1]); output := os.abs_path(os.args[2])
 	assert !os.exists(output)
 	os.mkdir(output)!; os.chmod(output, 0o700)!
 	for marker in ['first-boot.log', 'second-boot.log'] { assert os.read_file(work + '/' + marker)!.contains('PLAN DONE') }
 	debugfs := os.getenv_opt('VINIX_DEBUGFS') or { '/opt/homebrew/opt/e2fsprogs/sbin/debugfs' }
 	openssl := os.getenv_opt('VINIX_OPENSSL') or { '/opt/homebrew/opt/openssl@3/bin/openssl' }
-	names := if unlock { ['volume.vrecover', 'volume-ro.vrecover', 'recovery.key'] } else { ['volume.vrecover', 'volume-ro.vrecover', 'recovered.vcrypt', 'recovered-ro.vcrypt', 'recovery.key', 'next.pass'] }
+	names := if rewrap { ['volume.vrecover', 'volume-ro.vrecover', 'rotated.vrecover', 'rotated-ro.vrecover', 'recovery.key'] }
+		else if unlock { ['volume.vrecover', 'volume-ro.vrecover', 'recovery.key'] } else { ['volume.vrecover', 'volume-ro.vrecover', 'recovered.vcrypt', 'recovered-ro.vcrypt', 'recovery.key', 'next.pass'] }
 	for name in names {
 		r := os.exec([debugfs, '-R', 'dump /root/' + name + ' ' + output + '/' + name, work + '/config.ext2']); assert r.exit_code == 0, r.output
 	}
@@ -74,14 +76,25 @@ fn main() {
 	key := []u8{len: 64, init: u8(index * 13 + 7)}
 	recovery := os.read_bytes(output + '/recovery.key')!
 	password := if unlock { []u8{} } else { os.read_bytes(output + '/next.pass')! }
-	assert recovery == []u8{len: 64, init: u8(index * 29 + 41)}
+	assert recovery == if rewrap { []u8{len: 64, init: u8(index * 37 + 23)} } else { []u8{len: 64, init: u8(index * 29 + 41)} }
 	if !unlock { assert password == [u8(0), 10, 0xfe, 0x17, 13, 0x7f, 0, 42] }
 	mut evidence := ''
 	for readonly in [false, true] {
 		name := if readonly { 'volume-ro' } else { 'volume' }; restored := if readonly { 'recovered-ro' } else { 'recovered' }
 		backup := os.read_bytes(output + '/' + name + '.vrecover')!
 		header(backup, true, readonly)
-		unwrap(backup, recovery, key, output + '/' + name, openssl)!
+		old := if rewrap { []u8{len: 64, init: u8(index * 29 + 41)} } else { recovery }
+		unwrap(backup, old, key, output + '/' + name, openssl)!
+		if rewrap {
+			rotated_name := if readonly { 'rotated-ro' } else { 'rotated' }
+			rotated := os.read_bytes(output + '/' + rotated_name + '.vrecover')!
+			header(rotated, true, readonly)
+			assert rotated[80..192] == backup[80..192] && rotated[56..68] != backup[56..68]
+			unwrap(rotated, recovery, key, output + '/' + rotated_name, openssl)!
+			mut wrong := old[..32].clone(); wrong << rotated[..288]
+			assert hmac.new(old[32..], wrong, sha256.sum256, 64) != rotated[288..]
+			evidence += rotated_name + ': independent exact metadata/key, fresh nonce, full HMAC/ChaCha20 and old-credential refusal verified\n'
+		}
 		if unlock { evidence += name + ': independent canonical metadata, complete HMAC and ChaCha20 recovery key verified\n'; continue }
 		sealed := os.read_bytes(output + '/' + restored + '.vcrypt')!
 		header(sealed, false, readonly); assert backup[80..192] == sealed[80..192]

@@ -1,5 +1,12 @@
 # Storage-volume qualification
 
+Recovery-backup credential changes extend the private reader/publisher model
+with authentication before replacement-credential access, erased buffer reuse,
+no-overwrite aliases and per-stage input/publication failures. Targeted
+`--recovery-rewrap` guests measure 200 warmup and 200 measured rewrap/unlock/remove
+lifetimes and reopen RW/RO ciphertext after losing the old credential and
+reordering disks. See [recovery credential changes](recovery-rewrap.md).
+
 Direct recovery-key unlock extends the discovery model with exact private
 backup/key inputs, header/authentication ordering, erased credentials before
 disk access and input/recheck/import/report failures. The `--recovery-unlock`

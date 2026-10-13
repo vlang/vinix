@@ -56,6 +56,7 @@ fn decimal(text &char) ?u64 {
 }
 
 fn usage() i32 {
+	C.printf(c'       vinix-volume rewrap-recovery-volume BACKUP OLD_RECOVERY_KEYFILE NEW_RECOVERY_KEYFILE NEW_BACKUP\n')
 	C.printf(c'       vinix-volume open-recovery-volume-auto BACKUP RECOVERY_KEYFILE [ro]\n')
 	C.printf(c'       vinix-volume backup-volume CONFIG PASSPHRASE_FILE RECOVERY_KEYFILE BACKUP\n       vinix-volume recover-volume BACKUP RECOVERY_KEYFILE NEW_PASSPHRASE_FILE CONFIG\n')
 	C.printf(c'       vinix-volume boot-unlock\n')
@@ -99,6 +100,10 @@ fn usage() i32 {
 
 pub fn run(argc i32, argv &&char) i32 {
 	unsafe {
+		if argc >= 2 && C.strcmp(argv[1], c'rewrap-recovery-volume') == 0 {
+			if argc != 6 || argv[2][0] == 0 || argv[3][0] == 0 || argv[4][0] == 0 || argv[5][0] == 0 { return usage() }
+			return rewrap_volume_recovery(argv[2], argv[3], argv[4], argv[5])
+		}
 		if argc >= 2 && C.strcmp(argv[1], c'open-recovery-volume-auto') == 0 {
 			if (argc != 4 && argc != 5) || argv[2][0] == 0 || argv[3][0] == 0 || (argc == 5 && C.strcmp(argv[4], c'ro') != 0) { return usage() }
 			return open_volume_recovery_auto(argv[2], argv[3], argc == 5)
