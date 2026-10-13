@@ -200,6 +200,8 @@ mut:
 	swift_interpolation_arena u64 // Frozen interpolation metadata and TextOutputStream witnesses.
 	swift_array_arena u64 // Array accessor/descriptor/witness pages and zero-filled generic cache.
 	swift_array_metadata map[u64]u64 // Element metadata -> sealed Array metadata, under the runtime lock.
+	swift_array_sequence_arena u64 // Array Sequence/iterator descriptors, adapters and generic pattern.
+	swift_array_sequence_metadata map[u64]u64 // Element -> sealed iterator metadata and complete Sequence tables.
 	swift_integer_arena u64 // Int metadata, value witnesses and Equatable/Hashable conformances.
 	swift_foundation_arena u64 // Sealed CVarArg calls and Foundation's concrete String conformance.
 	swift_void_arena u64 // Sealed empty-tuple full metadata and zero-size value witnesses.

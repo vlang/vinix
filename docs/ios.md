@@ -4517,17 +4517,64 @@ Five published runners remain unchanged. Fortnite passes the former buffer
 allocator import and exits with status 1 before entry at `_$sSayxGSTsMc`.
 Full regression remains unpassed; entry, rendering and gameplay are unverified.
 
+`Swift Array Sequence conformance` now implements the measured generic table
+`_$sSayxGSTsMc`. Native Swift and the installed interface establish nine
+Sequence requirements, six callable operations and a two-word owned
+IndexingIterator payload: Array owner and Int position. Complete canonical
+tables are specialized by Element and publish direct associated metadata and
+IteratorProtocol witnesses. Lookup accepts this registered Array/Iterator
+family; other generic, resilient, conditional and foreign records still reject.
+
+The V implementation transfers consuming Array ownership into the Iterator,
+copies each returned Element and constructs Optional.some/none with Element
+value witnesses. Count and the default contains optimization match native
+Swift. Contiguous-array conversion transfers the native tail; copyContents
+initializes the complete destination and returns its owned Iterator through
+an explicit output pointer, with the end index in x0. Contiguous-storage
+callbacks borrow a pinned owner, return owned Int/String/generic supported
+results, forward the original x21 error and leave output untouched on throws.
+No registry lock crosses an Element witness or closure. Code and descriptor
+pages are sealed; specialization pages and caches retire after callbacks drain.
+The records include instantiation callbacks using Swift's public
+[generic witness-table layout](https://github.com/swiftlang/swift/blob/main/include/swift/ABI/Metadata.h).
+
+Twelve native Int/String/Objective-C Array fixtures exercise all operations,
+iterator copy/take/assignment and enum witnesses, repeated exhaustion,
+contiguous callbacks and real Array integration with first(where:) and
+compactMap. Runtime checks cover simultaneous first specialization, guarded
+and forged metadata, insufficient destinations, retired lookup, constructor
+trampolines and two drained/unmapped lifetimes. All 89 programs build and
+132 original C streams restore to their hashes. Forty-three host suites pass
+ASAN/UBSAN in both hashing modes; Vinix passes 32 Objective-C and 44 Swift/loader
+programs. Evidence, native inspection, actual copied compiler inputs and
+executable/debug archives are retained under
+`build/ios/fortnite/array-sequence-checks`. Evidence and compiler bytes are
+hash-verified after persistence from the owned 8 GiB RAM volume, which is then
+detached. The initial fixture's malformed Int Optional.nil encoding and its
+correction are retained separately. The mutable canonical V checkout is
+outside the actual build inputs; five published runners remain unchanged.
+
+Supported storage consists of registered native typed tails and canonical
+empty storage with complete supported Element witnesses. Foreign/bridged
+arrays, arbitrary Swift classes, Collection witnesses, iterator reflection
+and general conformance discovery remain unsupported. Caller metadata and
+borrowed storage must stay live; callback Result values are bounded to 64 KiB.
+Fortnite passes the former Array Sequence descriptor import and exits with
+status 1 before entry at `_$sSayxGSlsMc`. Full regression remains unpassed;
+entry, rendering and gameplay are unverified.
+
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,450 | 710 | 79 |
+| Fortnite executable | 1,455 | 705 | 79 |
 | EOSSDK | 659 | 3 | 18 |
-| MarketplaceKitWrapper | 131 | 45 | 23 |
-| All images | 2,240 | 758 | 120 |
+| MarketplaceKitWrapper | 132 | 44 | 23 |
+| All images | 2,246 | 752 | 120 |
 
-The C++/GLES/Text variant reports 2,253 resolved imports, 745 unresolved strong
+The C++/GLES/Text variant reports 2,259 resolved imports, 739 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

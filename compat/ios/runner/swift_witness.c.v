@@ -5,9 +5,17 @@ module main
 // or our existing metadata arenas. This is the ordinary C runtime entry, not a
 // Swift context call. Metadata and instantiation arguments are unused on this
 // path. Resilient/generic tables must be instantiated, never returned as-is.
-fn swift_witness_table_checked(conformance u64, _metadata u64, _arguments u64) !u64 {
+fn swift_witness_table_checked(conformance u64, metadata u64, _arguments u64) !u64 {
 	if conformance == 0 || conformance & 3 != 0 || conformance > ~u64(0) - 15 {
 		return error('iOS: invalid Swift conformance descriptor')
+	}
+	if ios_runtime != unsafe { nil } && ios_runtime.swift_array_sequence_arena != 0
+		&& conformance == ios_runtime.swift_array_sequence_arena + u64(C.getpagesize()) + 128 {
+		return swift_array_sequence_table_checked(metadata)
+	}
+	if ios_runtime != unsafe { nil } && ios_runtime.swift_array_sequence_arena != 0
+		&& conformance == ios_runtime.swift_array_sequence_arena + u64(C.getpagesize()) + 192 {
+		return swift_array_iterator_table_checked(metadata)
 	}
 	flags := read32(conformance + 12)
 	// Only the four type-reference kinds and retroactive flag are supported.

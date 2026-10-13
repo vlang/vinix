@@ -96,6 +96,7 @@ fn main() {
 		require_child('/opt/ios/swift-foreign-subscript-checks')
 		require_child('/opt/ios/swift-utf16-offset-checks')
 		require_child('/opt/ios/swift-sequence-checks')
+		require_child('/opt/ios/swift-array-sequence-checks')
 		require_child('/opt/ios/swift-metadata-checks')
 		require_child('/opt/ios/swift-protocol-checks')
 		require_child('/opt/ios/swift-hash-checks')

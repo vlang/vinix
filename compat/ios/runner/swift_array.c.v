@@ -147,6 +147,7 @@ fn swift_array_arena() u64 {
 }
 
 fn swift_array_symbol(symbol string) ?u64 {
+	if address := swift_array_sequence_symbol(symbol) { return address }
 	return match symbol {
 		'_$ss27_allocateUninitializedArrayySayxG_BptBwlF' { u64(unsafe { voidptr(swift_array_allocate) }) }
 		'_$sSa28_allocateBufferUninitialized15minimumCapacitys06_ArrayB0VyxGSi_tFZ' { u64(unsafe { voidptr(swift_array_buffer_allocate) }) }
@@ -157,6 +158,7 @@ fn swift_array_symbol(symbol string) ?u64 {
 }
 
 fn swift_array_stop() {
+	swift_array_sequence_stop()
 	// Shutdown has joined workers and drained all owners/callbacks. Retire
 	// specialization pages before the witnesses/descriptors they reference.
 	page := usize(C.getpagesize())
