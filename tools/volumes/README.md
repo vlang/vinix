@@ -4,6 +4,13 @@ Native V block-volume management utility. See
 [the storage interface and limits](../../docs/storage-volumes.md) for commands,
 privileges, ABI, lifetime and geometry rules.
 
+`show-recovery-volume BACKUP RECOVERY_KEYFILE` authenticates and reports saved
+disk/mapping metadata offline. `discover-recovery-volume BACKUP RECOVERY_KEYFILE`
+also finds the unique matching physical disk using pinned read-only descriptors
+and final rechecks. Both erase secrets before reporting/discovery and preserve
+live mappings and data. See [recovery queries](../../docs/storage-volumes.md#authenticated-recovery-inspection-and-discovery)
+for report fields, output failures and the distinction from live unlock preflight.
+
 `plan-grow-recovery-volume DEVICE BACKUP RECOVERY_KEYFILE EXPECTED_BYTES LENGTH_BYTES NEW_BACKUP`
 publishes authenticated recovery metadata with explicit nondecreasing physical
 capacity and extent length. It preserves key/start/slot/mode, erases plaintext

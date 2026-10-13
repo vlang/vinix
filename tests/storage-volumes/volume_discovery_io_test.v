@@ -41,6 +41,9 @@ mut:
 	key_opens int
 	key_reads int
 	key_stats int
+	inspect bool
+	inspect_work &VolumeSealFiles = unsafe { nil }
+	reports int
 }
 __global volume_discovery_io VolumeDiscoveryIO
 
@@ -56,6 +59,7 @@ fn volume_discovery_mock_open(path &char, flags i32) i32 {
 		return volume_discovery_track(C.open(volume_discovery_io.etc.str, flags), -2)
 	}
 	if C.strcmp(path, c'/dev') == 0 {
+		if volume_discovery_io.inspect { recovery_inspect_erased() }
 		assert volume_discovery_io.derives == volume_discovery_io.goal_derives
 		if volume_discovery_io.recovery { assert volume_discovery_io.wrapping != unsafe { nil } }
 		unsafe {
@@ -117,6 +121,7 @@ fn volume_discovery_mock_fstatat(fd i32, name &char, info &C.stat, flags i32) i3
 }
 
 fn volume_discovery_mock_openat(fd i32, name &char, flags i32) i32 {
+	if volume_discovery_io.inspect { assert flags & C.O_ACCMODE == C.O_RDONLY; recovery_inspect_erased() }
 	if volume_discovery_io.boot && volume_discovery_io.indices[fd] < -1 {
 		if C.strcmp(name, c'vinix') == 0 {
 			assert volume_discovery_io.indices[fd] == -2 && flags == C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC
@@ -202,6 +207,7 @@ fn volume_discovery_mock_read(fd i32, output voidptr, size usize) i64 {
 }
 
 fn volume_discovery_mock_ioctl(fd i32, number u64, output voidptr) i32 {
+	if volume_discovery_io.inspect { assert number == 0x56560004; recovery_inspect_erased() }
 	index := volume_discovery_io.indices[fd]; assert index >= 0 && index < 7
 	if number == 0x56560006 {
 		if volume_discovery_io.recovery { unsafe { for i in 0 .. 64 { assert volume_discovery_io.wrapping[i] == 0 } } }
@@ -228,7 +234,7 @@ fn volume_discovery_mock_ioctl(fd i32, number u64, output voidptr) i32 {
 	if volume_discovery_io.mode in [9, 12] || index == 6 { unsafe { C.errno = if volume_discovery_io.mode == 9 { C.EIO } else { C.ENOTTY } }; return -1 }
 	mut status := Status{version: 1, bytes: 16777216, sector: volume_discovery_io.sector, flags: 4, disk_id: if index <= 1 { u64(7) } else { u64(8) }, slot: u64(-1)}
 	if index == 4 { status.flags |= 16; status.start = 512 }; if index == 5 { status.flags |= 8 }
-	first_final := if volume_discovery_io.flags == 0 { 3 } else { 2 }
+	first_final := if volume_discovery_io.flags == 0 && !volume_discovery_io.inspect { 3 } else { 2 }
 	match volume_discovery_io.mode {
 		10 { status.flags |= 2 }
 		11 { status.bytes += status.sector }
@@ -236,12 +242,14 @@ fn volume_discovery_mock_ioctl(fd i32, number u64, output voidptr) i32 {
 		17 { if count == first_final { status.disk_id++ } }
 		18 { if count == first_final + 1 { status.bytes += status.sector } }
 		19 { if count == first_final { status.flags |= 1 } }
+		34 { if volume_discovery_io.inspect { status.flags |= 1 } }
 		else {}
 	}
 	unsafe { *(&Status(output)) = status }; return 0
 }
 
 fn volume_discovery_mock_pread(fd i32, output voidptr, size usize, offset i64) i64 {
+	if volume_discovery_io.inspect { recovery_inspect_erased() }
 	volume_discovery_io.reads++
 	if volume_discovery_io.mode == 14 && volume_discovery_io.reads == 1 { unsafe { C.errno = C.EINTR }; return -1 }
 	if volume_discovery_io.mode == 13 { return i64(size - 1) }

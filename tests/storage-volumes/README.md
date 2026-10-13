@@ -1,5 +1,13 @@
 # Storage-volume qualification
 
+Authenticated recovery inspection extends the discovery model with exact report
+capture, full-width metadata, secret erasure before reports and every physical
+probe, read-only candidate opens, preserved modes, input/discovery/output faults
+and no import. Targeted `--host-recovery-inspect` and `--recovery-inspect` modes
+qualify both commands, 200 warmup and 200 measured paired query lifetimes,
+unchanged occupied mappings/ciphertext and reordered reboot. See
+[recovery inspection qualification](recovery-inspect.md).
+
 Recovery volume growth adds explicit declared-capacity checks, secret erasure
 before read-only physical probes, both pinned final rechecks and signed mapping
 bounds to the recovery fault model. The `--recovery-growth` guests measure

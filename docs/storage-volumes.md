@@ -729,6 +729,55 @@ reporting failure after publication can leave a complete private output with
 status 1; completed publication/reporting returns 0 and invalid syntax returns 2.
 See [recovery growth qualification](../tests/storage-volumes/recovery-growth.md).
 
+## Authenticated recovery inspection and discovery
+
+`show-recovery-volume BACKUP RECOVERY_KEYFILE` authenticates a private recovery
+backup and prints its saved disk capacity, native sector size, MBR/GPT identity,
+mapper slot, byte offset/length and saved read-only mode. It works without the
+disk, original passphrase or ordinary configuration. `discover-recovery-volume
+BACKUP RECOVERY_KEYFILE` additionally locates the unique matching whole physical
+disk and reports its current `/dev` name:
+
+```sh
+vinix-volume show-recovery-volume /root/data.vrecover /root/recovery.key
+vinix-volume discover-recovery-volume /root/data.vrecover /root/recovery.key
+```
+
+Offline success begins with `operation=authenticated-recovery`. Online success
+begins with `operation=discovered-recovery device=/dev/NAME`. Both then print
+`disk_bytes=N sector=N identity=mbr:XXXXXXXX` (or canonical `gpt:GUID`) and
+`slot=N offset=N bytes=N readonly=0|1`. Integer fields retain their full unsigned
+64-bit values. These are authenticated saved metadata; the read-only flag is
+the saved mapping mode, independent of the physical disk's current access mode.
+No key bytes, credentials or wrapped key material appear in the report.
+
+The commands use the existing exact private-owned-file reader and authenticated
+VR1 format. Canonical header checks precede recovery-key access, and successful
+authentication precedes metadata reports or device enumeration. The recovery
+credential and decoded volume key erase before any successful report or `/dev`
+access; the complete stack workspace erases on every return. No KDF, entropy
+source, raw keyfile, configuration publication or writer lock is needed.
+
+Discovery pins physical candidates read-only with no-follow, nonblocking and
+close-on-exec flags. It matches exact saved capacity, native sectors and disk
+identity, ignores partitions/logical views and accepts physical aliases with
+the same runtime disk identity. Separate physical clones with the same saved
+identity are ambiguous and fail. Missing/offline or unreadable matching-geometry
+candidates, enumeration failures and changes to identity/geometry/runtime
+identity or physical read-only mode fail before a successful report. Two final
+rechecks precede reporting; the selected descriptor remains pinned through
+output flushing and closes on all exits.
+
+These are recovery queries: they preserve existing mappings, generations, open
+descriptors, backup/key bytes and physical ciphertext. Discovery establishes a
+current physical match; it does not reserve a mapper slot, preflight live
+extent conflicts, prove the volume key matches the disk's unauthenticated
+AES-XTS contents, or guarantee a later unlock. Capacity changes require separate
+explicit backup adoption. Complete reports return 0, authentication/discovery
+or output failures return 1, and invalid syntax returns 2. Diagnostics may be
+printed on failure; output failure can leave a partial report. See
+[recovery inspection qualification](../tests/storage-volumes/recovery-inspect.md).
+
 ## Authenticated encrypted-volume growth
 
 `plan-grow-volume DEVICE CONFIG PASSPHRASE_FILE LENGTH_BYTES NEW_CONFIG`
