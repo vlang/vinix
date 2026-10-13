@@ -760,6 +760,9 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Decode native fcntl words and scalar arguments without narrowing pointers;
   preserve EINVAL for invalid duplicate minima, EBADF for invalid sources and
   EMFILE for valid exhausted requests. See [the fcntl receipts](docs/linux-posix-qualification.md#native-fcntl-words-and-duplicate-minima).
+- [x] Refuse non-pathname fcntl commands on O_PATH handles before pointer copies
+  or state changes; qualify allowed operations, aliases, exact errors and flat
+  retention on both architectures. See [the command receipts](docs/linux-posix-qualification.md#o_path-fcntl-command-refusals).
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

@@ -1,0 +1,2 @@
+arm: unchanged whole kernel C outside O_PATH fcntl refusal and two reserved command constants; PASS
+x86: unchanged whole kernel C outside O_PATH fcntl refusal and two reserved command constants; PASS

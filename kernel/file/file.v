@@ -19,6 +19,8 @@ import security
 
 pub const f_dupfd = 0
 pub const f_dupfd_cloexec = 1030
+pub const f_dupfd_query = 1027
+pub const f_created_query = 1028
 pub const f_setpipe_sz = 1031
 pub const f_getpipe_sz = 1032
 pub const f_getfd = 1
@@ -1413,6 +1415,17 @@ pub fn syscall_fcntl(_ voidptr, fdnum int, cmd int, arg u64) (u64, u64) {
 	mut handle := fd.handle
 
 	mut ret := u64(0)
+
+	if handle.flags & resource.o_path != 0 {
+		match cmd {
+			f_dupfd, f_dupfd_cloexec, f_dupfd_query, f_created_query,
+			f_getfd, f_setfd, f_getfl {}
+			else {
+				fd.unref()
+				return errno.err, errno.ebadf
+			}
+		}
+	}
 
 	if cmd == f_getlk || cmd == f_ofd_getlk {
 		fd.handle.mac_check(proc.mac_inspect) or { failure := errno.get(); fd.unref(); return errno.err, failure }

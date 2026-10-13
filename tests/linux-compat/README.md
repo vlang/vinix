@@ -1068,3 +1068,20 @@ Use matching x86 inputs and `--arch x86_64` for x86. Set `V` to the selected
 compiler for both controllers and their generated guest modules when collecting
 reproducible receipts. Reference boots run the identical frozen native ELF and
 omit only Vinix allocator reporting. See [the fcntl receipts and limits](../../docs/linux-posix-qualification.md#native-fcntl-words-and-duplicate-minima).
+
+The `fcntlpath` case checks 10,812 native raw/musl calls per architecture across
+root and UID/GID1000. Six O_PATH classes cover readable/private regular files,
+a directory, FIFO, unfollowed symlink and unlinked file. Original/ordinary/
+CLOEXEC aliases reject 24 non-pathname commands with EBADF before copying real,
+NULL or invalid user pointers, preserving packet canaries, metadata and flags.
+Allowed flag/duplication controls and ordinary file errors/data/permissions
+remain usable. Two 200-cycle cohorts measure refusal and alias retention.
+
+```sh
+tests/linux-compat/run --arch aarch64 --kernel-dir ARM-KERNEL --state-dir FRESH-NATIVE --cases fcntlpath,fcntlabi,open,runtime --timeout 1300
+v -enable-globals -nocache -gc none -cc cc run tests/linux-compat/fcntlpath-reference.v --arch aarch64 --kernel LINUX-KERNEL --init FRESH-NATIVE/fcntlpath/init --state-dir FRESH-LINUX
+```
+
+Repeat with matching x86 inputs and `--arch x86_64`. Set `V` to the selected
+compiler for both controllers and guest modules. Linux boots run the frozen
+native ELF and skip only Vinix allocator reporting. See [receipts and limits](../../docs/linux-posix-qualification.md#o_path-fcntl-command-refusals).

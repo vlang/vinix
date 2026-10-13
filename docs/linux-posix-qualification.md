@@ -3996,6 +3996,83 @@ Actual exec inheritance, concurrent F_SETFD or source close, descriptor-limit
 pressure, GNU wrappers and translated/ELF32 paths remain separate. The three
 broad section 15 acceptance gates remain open.
 
+## O_PATH fcntl command refusals
+
+The shared fcntl implementation now checks pathname-only access immediately
+after retaining the descriptor/open description. Commands outside Linux's
+O_PATH allowlist return EBADF before MAC checks, lock/resource operations,
+status/ownership changes or user-pointer copies. The new branch releases the
+paired FD/Handle hold exactly once before returning; it adds no allocation,
+stored pointer or lock. It follows [Linux's command gate](https://raw.githubusercontent.com/torvalds/linux/v6.12/fs/fcntl.c).
+
+The five implemented allowed operations remain F_DUPFD, F_DUPFD_CLOEXEC,
+F_GETFD, F_SETFD and F_GETFL. Linux's F_DUPFD_QUERY/F_CREATED_QUERY command
+numbers also pass the access gate, but their underlying implementation remains
+unavailable (EINVAL) and excluded from this qualified subset.
+
+| Root and UID/GID1000 calls | Calls per architecture | Baseline failures | Candidate/Linux failures |
+| --- | ---: | ---: | ---: |
+| Refused O_PATH commands and unchanged state/buffers | 7776 | 7452 | 0 |
+| Allowed getters, descriptor flags and real aliases | 1296 | 0 | 0 |
+| Invalid sources, musl and ordinary file controls | 1740 | 864 | 0 |
+| Total | 10812 | 8316 | 0 |
+
+Each candidate and actual Linux 6.12.51 reference passes all 10,812 calls with
+byte-identical native musl C and ELF. The six O_PATH source classes are a
+readable regular file, root-private regular file, directory, FIFO, unfollowed
+symlink and unlinked regular file. Every class has original, ordinary dup and
+F_DUPFD_CLOEXEC descriptors. Three native word controls independently vary
+descriptor and command upper bits. Twenty-four denied commands include status,
+owner/signal, classic/OFD lock, pipe capacity, seals, leases, notifications,
+write-life hints and unknown commands. NULL, real stack and invalid-address
+arguments require EBADF without touching the whole canary-wrapped packet.
+Metadata, descriptor flags and status remain unchanged.
+
+Allowed getters/setters preserve the pathname status and metadata; duplication
+minima 0/63/127 create actual aliases with the requested CLOEXEC. Each temporary
+alias closes, and descriptor flag setters restore the prior flags. Invalid
+sources retain EBADF, including pointer commands. Musl controls agree. An
+ordinary open description still supports real NONBLOCK changes, reads exact
+bytes, returns EFAULT for NULL pointer commands and EINVAL for unknown commands.
+The ordinary-user child cannot reopen the private pathname for reading while
+its inherited O_PATH handles still support metadata/allowed operations.
+
+After 32 warmup cycles and settling, each credential performs 200 cycles of
+two valid aliases and four refused commands. All 18 ARM/14 x86 slab classes
+stay flat, with 63/63 ARM and 160/160 x86 large pages. Both production kernels
+also pass fcntlabi, open and runtime suites; eight host test files pass.
+Allocation scanning keeps the same 659/655 source files, 400/292 allocation
+sites and existing allowance failures. The prior fcntlabi candidate kernels,
+C and build logs are reused as the exact baseline. The whole-C comparison
+restores the original by removing the refusal and two command constant
+declarations; only local return temporary numbering and unused-return source
+offsets require canonicalization. Everything outside fcntl remains identical.
+
+Independent lifetime review checks paired release, no later descriptor access,
+unchanged allowed cleanup, the actual emitted fixture's ten explicit stack
+allocations, synchronous pointer borrows and temporary alias/status/observer
+cleanup. Initial setup failures still rely on process-exit descriptor cleanup.
+
+The [V audit](../tests/linux-compat/results/2026-10-13/fcntlpath-audit.v)
+requires complete exact counts, baseline failures, candidate/reference verdicts,
+flat retention, whole-C scope and artifact identities; deliberate assertion
+and passing-as-baseline controls must fail. [ARM evidence](../tests/linux-compat/results/2026-10-13/fcntlpath-evidence-aarch64.json)
+and [x86 evidence](../tests/linux-compat/results/2026-10-13/fcntlpath-evidence-x86_64.json)
+bind all 63 isolated inputs and compiler/controller/source/C/kernel/native
+ELF/ISO, Linux kernel/wrapper/archive/QEMU, serial/build/audit/review hashes.
+Captures: [ARM baseline](../tests/linux-compat/results/2026-10-13/fcntlpath-before-aarch64.log),
+[ARM candidate](../tests/linux-compat/results/2026-10-13/fcntlpath-after-aarch64.log),
+[ARM Linux](../tests/linux-compat/results/2026-10-13/fcntlpath-reference-aarch64.log),
+[x86 baseline](../tests/linux-compat/results/2026-10-13/fcntlpath-before-x86_64.log),
+[x86 candidate](../tests/linux-compat/results/2026-10-13/fcntlpath-after-x86_64.log),
+[x86 Linux](../tests/linux-compat/results/2026-10-13/fcntlpath-reference-x86_64.log).
+Public inventory fingerprints use the committed parent plus the owned fix;
+unrelated shared-checkout edits are excluded.
+
+Descriptor-query extensions, full ordinary advisory/OFD lock/status/ownership/
+seal semantics, concurrent close or flag changes, GNU wrappers and foreign
+ABIs remain separate. The three broad section 15 gates remain open.
+
 ## Native fcntl words and duplicate minima
 
 Both native tables now route fcntl through an adapter that consumes lower-32-bit
