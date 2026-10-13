@@ -1155,3 +1155,17 @@ The reference controller boots the identical musl ELF on Linux 6.12.51 and
 mounts procfs for the same wait checkpoints. Sources and executed C/ELF must
 match across baseline, candidate and reference. See the
 [qualification receipts and limits](../../docs/linux-posix-qualification.md#native-open-description-record-locks).
+
+The `lockrange` case checks signed record-lock endpoints and validation order
+for all six native POSIX/OFD commands. It runs 2,096 libc/raw controls per
+architecture as root and UID/GID1000: sixteen accepted ranges, ten refusals,
+compound type/access/PID errors, complete flock records and retained seed locks.
+Finite ranges ending at INT64_MAX return the same zero-length endpoint as
+Linux; the preceding byte remains finite. Boundary splits/bridges/conversion
+and alias/final-close behavior preserve file bytes, metadata, flags and shared
+cursors. Two 200-cycle cohorts measure maximum-byte lock and cleanup retention.
+The Linux reference runs the identical musl ELF and skips allocator accounting.
+The dated x86 qualification combines three original successful cases with
+recovered open/runtime cases after host setup/log-write failure, with exact
+source/kernel/ISO/capture provenance. See the
+[range receipts and limits](../../docs/linux-posix-qualification.md#native-signed-record-lock-ranges).

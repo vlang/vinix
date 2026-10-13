@@ -1,0 +1,303 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+BdsDxe: starting Boot0001 "UEFI QEMU DVD-ROM QM00005 " from PciRoot(0x0)/Pci(0x1F,0x2)/Sata(0x2,0xFFFF,0x0)
+[2J[01;01H[01;01H[2J[01;01H[01;01Hinitramfs: Unpacking...
+>+ [1] ./ sz=0
+>+ [2] ./proc/ sz=0
+!>+ [3] ./sbin/ sz=0
+!>+ [4] ./sys/ sz=0
+!>+ [5] ./root/ sz=0
+!>+ [6] ./dev/ sz=0
+!>+ [7] ./tmp/ sz=0
+!>+ [8] ./sbin/init sz=79840
+!>+ [9] ./.vinix-image-id sz=17
+!>initramfs: no ustar sig at 0xff0000003bf91c00
+initramfs: Done (9 entries)
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=1 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=2 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=3 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=4 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=11 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=12 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=1 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=27 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=2 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=28 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=3 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=29 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=4 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=30 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=11 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=37 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=12 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=38 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=17 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=53 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=18 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=54 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=17 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=18 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=6 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=128 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=6 raw=0 variant=1 ret=-1 errno=9 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=129 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=7 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=135 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=7 raw=0 variant=1 ret=-1 errno=9 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=136 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=142 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=0 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=143 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=0 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=144 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=149 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=4 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=5 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=4 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=5 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=6 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=6 raw=1 variant=1 ret=-1 errno=9 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=7 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=7 raw=1 variant=1 ret=-1 errno=9 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=1 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=1 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=4 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=5 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=4 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=5 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE CASES: ordinary=1 kind=0 calls=128 failures=48
+LINUX LOCKRANGE CASES: ordinary=1 kind=1 calls=64 failures=24
+LINUX LOCKRANGE CASES: ordinary=1 kind=2 calls=204 failures=34
+LINUX LOCKRANGE CASES: ordinary=1 kind=3 calls=340 failures=70
+LINUX LOCKRANGE CASES: ordinary=1 kind=4 calls=312 failures=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=1 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=2 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=3 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=4 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=11 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=12 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=1 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=27 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=2 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=28 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=3 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=29 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=4 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=30 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=11 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=37 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=12 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=38 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=17 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=53 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=0 call=18 tag=range call and complete header
+LINUX LOCKRANGE DETAIL: kind=3 call=54 tag=accepted lock or preserved seed
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=17 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL: kind=1 call=18 tag=range call and complete header
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=0 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=5 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=6 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=7 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=36 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=37 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=0 start=9223372036854775807 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=0 start=9223372036854775806 length=2 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=0 start=9223372036854775799 length=9 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=0 start=1 length=9223372036854775807 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=1 start=9223372036854775804 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL RESULT: cmd=38 raw=1 whence=2 start=9223372036854775791 length=1 ret=-1 errno=75 wanted=0
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=6 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=128 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=6 raw=0 variant=1 ret=-1 errno=9 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=129 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=7 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=135 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=7 raw=0 variant=1 ret=-1 errno=9 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=136 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=142 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=0 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=143 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=0 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=144 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL: kind=2 call=149 tag=range kind access PID precedence and untouched header
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=4 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=0 variant=5 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=4 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=0 variant=5 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=6 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=6 raw=1 variant=1 ret=-1 errno=9 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=7 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=7 raw=1 variant=1 ret=-1 errno=9 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=1 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=36 raw=1 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=4 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=37 raw=1 variant=5 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=0 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=1 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=2 ret=-1 errno=22 wanted=75
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=4 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE DETAIL PRECEDENCE: cmd=38 raw=1 variant=5 ret=-1 errno=22 wanted=9
+LINUX LOCKRANGE CASES: ordinary=0 kind=0 calls=128 failures=48
+LINUX LOCKRANGE CASES: ordinary=0 kind=1 calls=64 failures=24
+LINUX LOCKRANGE CASES: ordinary=0 kind=2 calls=204 failures=34
+LINUX LOCKRANGE CASES: ordinary=0 kind=3 calls=340 failures=70
+LINUX LOCKRANGE CASES: ordinary=0 kind=4 calls=312 failures=0
+LINUX LOCKRANGE FAIL: endpoints, queries, precedence, state or retention
+QEMU: Terminated
+

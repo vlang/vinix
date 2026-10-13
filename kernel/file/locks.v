@@ -75,11 +75,17 @@ fn normalize_lock(handle &Handle, flock Flock) ?LockRange {
 		return LockRange{u64(anchor), u64(-1)}
 	}
 	if flock.l_len > 0 {
-		if anchor > i64(0x7fffffffffffffff) - flock.l_len {
+		// Linux validates the inclusive last byte. The exclusive end can
+		// be INT64_MAX + 1; represent that endpoint with the same sentinel
+		// as length zero, since Linux reports both as l_len == 0.
+		if anchor > i64(0x7fffffffffffffff) - (flock.l_len - 1) {
 			errno.set(errno.eoverflow)
 			return none
 		}
-		return LockRange{u64(anchor), u64(anchor + flock.l_len)}
+		last := anchor + (flock.l_len - 1)
+		return LockRange{u64(anchor), if last == i64(0x7fffffffffffffff) {
+			u64(-1)
+		} else { u64(last) + 1 }}
 	}
 	if flock.l_len < -anchor {
 		errno.set(errno.einval)
@@ -173,8 +179,7 @@ fn notify_lock_waiters() {
 	event.trigger(mut advisory_lock_event, false)
 }
 
-fn set_record_lock(mut handle Handle, mut flock Flock, blocking bool, ofd bool) ? {
-	range := normalize_lock(handle, flock)?
+fn set_record_lock(mut handle Handle, mut flock Flock, blocking bool, ofd bool, range LockRange) ? {
 	resource_id := lock_resource_id(handle.resource)
 	owner := if ofd { u64(handle) } else { u64(proc.current_thread().process.pid) }
 	class := if ofd { lock_class_ofd } else { lock_class_posix }
@@ -214,8 +219,7 @@ fn set_record_lock(mut handle Handle, mut flock Flock, blocking bool, ofd bool) 
 	}
 }
 
-fn get_record_lock(handle &Handle, mut flock Flock, ofd bool) ? {
-	range := normalize_lock(handle, flock)?
+fn get_record_lock(handle &Handle, mut flock Flock, ofd bool, range LockRange) ? {
 	resource_id := lock_resource_id(handle.resource)
 	owner := if ofd { u64(handle) } else { u64(proc.current_thread().process.pid) }
 	class := if ofd { lock_class_ofd } else { lock_class_posix }
@@ -353,17 +357,23 @@ fn fcntl_lock(mut handle Handle, cmd int, arg u64) (u64, u64) {
 	if !usercopy.copy_from_user(voidptr(&flock), arg, sizeof(Flock)) {
 		return errno.err, errno.efault
 	}
+	if !stat.isreg(handle.resource.stat.mode) {
+		return errno.err, errno.ebadf
+	}
+	// POSIX GETLK rejects an invalid query kind before range conversion.
+	// The OFD query and all setters convert ranges before kind/PID/access
+	// validation. Import the normalized range once, before any table work.
+	if cmd == f_getlk && flock.l_type != f_rdlck && flock.l_type != f_wrlck {
+		return errno.err, errno.einval
+	}
+	range := normalize_lock(handle, flock) or { return errno.err, errno.get() }
 	if flock.l_type != f_rdlck && flock.l_type != f_wrlck && flock.l_type != f_unlck {
 		return errno.err, errno.einval
 	}
 	ofd := cmd == f_ofd_getlk || cmd == f_ofd_setlk || cmd == f_ofd_setlkw
-	if ofd && flock.l_pid != 0 { return errno.err, errno.einval }
-	if !stat.isreg(handle.resource.stat.mode) {
-		return errno.err, errno.ebadf
-	}
 	if cmd == f_getlk || cmd == f_ofd_getlk {
-		if cmd == f_getlk && flock.l_type == f_unlck { return errno.err, errno.einval }
-		get_record_lock(handle, mut flock, ofd) or { return errno.err, errno.get() }
+		if ofd && flock.l_pid != 0 { return errno.err, errno.einval }
+		get_record_lock(handle, mut flock, ofd, range) or { return errno.err, errno.get() }
 		if !usercopy.copy_to_user(arg, voidptr(&flock), sizeof(Flock)) {
 			return errno.err, errno.efault
 		}
@@ -376,7 +386,8 @@ fn fcntl_lock(mut handle Handle, cmd int, arg u64) (u64, u64) {
 	if flock.l_type == f_wrlck && access != resource.o_wronly && access != resource.o_rdwr {
 		return errno.err, errno.ebadf
 	}
-	set_record_lock(mut handle, mut flock, cmd == f_setlkw || cmd == f_ofd_setlkw, ofd) or {
+	if ofd && flock.l_pid != 0 { return errno.err, errno.einval }
+	set_record_lock(mut handle, mut flock, cmd == f_setlkw || cmd == f_ofd_setlkw, ofd, range) or {
 		return errno.err, errno.get()
 	}
 	return 0, 0

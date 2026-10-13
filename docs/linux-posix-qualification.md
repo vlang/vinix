@@ -4505,3 +4505,83 @@ Disk/network/overlay filesystems, signed maximum-end boundaries, POSIX deadlock
 detection and concurrent close races, fairness, cancellation/descriptor pressure
 and GNU/translated/ELF32 paths remain unqualified. The three broad section 15
 semantics/installation/foreign-runtime gates stay open.
+
+## Native signed record-lock ranges
+
+The record-lock normalizer checked an exclusive end against INT64_MAX and
+rejected Linux's last valid byte. A lock starting at INT64_MAX with length 1,
+or starting one byte earlier with length 2, incorrectly returned EOVERFLOW.
+Normalization now validates the inclusive last byte using length-1. An
+inclusive INT64_MAX end maps to the existing unbounded sentinel, matching
+Linux query output l_len 0; a range ending one byte earlier remains finite.
+The endpoint calculation avoids signed overflow. The
+[pinned Linux 6.12.51 normalizer/query implementation](https://github.com/gregkh/linux/blob/v6.12.51/fs/locks.c)
+and actual same-ELF references establish these semantics.
+
+For regular files, POSIX F_GETLK checks query kind before normalization.
+OFD queries and all setters normalize before kind validation. Setter access
+checks precede OFD PID validation; query PID checks follow normalization.
+The syscall imports one normalized scalar LockRange and passes it by value
+to the existing get/set helpers under the retained descriptor/Handle.
+Ownership, table storage/reclamation and lock ordering stay intact.
+
+The maintained V fixture runs 2,096 controls per architecture, as root and
+UID/GID1000. Per credential: 128 setter checks, 64 query checks, 204 range/compound
+error checks, 340 retained-range/edge checks and 312 file-state checks. Libc and
+raw upper-word descriptor/command calls retain full-width flock pointers.
+Sixteen accepted cases and ten refusal cases cover absolute/CUR/END origins,
+positive/negative/zero lengths, INT64_MAX, INT64_MIN and real EOVERFLOW/EINVAL.
+Additional combinations distinguish early POSIX query-kind errors, range
+overflow before invalid kind/PID/access, and setter EBADF before invalid OFD
+PID. Full flock bytes remain unchanged on errors and setter calls; successful
+queries return exact type/origin/range/PID. Actual locks are queried through
+the opposite ownership class, including preserved seeds after failed requests.
+
+Maximum-byte partial unlocks preserve finite prefixes and sentinel suffixes;
+bridges coalesce them, last-byte removal restores a finite prefix, and
+conversion reports the correct reader range. Aliases preserve the suffix
+after a nonfinal close; final close releases it. Bytes, size/mode/ownership,
+descriptor flags and shared cursors stay unchanged, including a cursor at
+INT64_MAX. Both baselines reproduce 352 failures, with the same counts on
+both architectures. Candidates and actual Linux 6.12.51 references pass the
+byte-identical corresponding native probe C/ELF. GNU wrappers/foreign ABIs
+are outside these native musl controls.
+
+Two 200-cycle cohorts acquire/query/unlock the maximum byte, set a POSIX range
+ending there, verify process-close cleanup and acquire/release through an OFD
+alias. All 18 ARM/14 x86 live slab classes stay flat; large pages remain 63/63 ARM
+and 160/160 x86. The probe emits 10 explicit allocas and no hidden heap/index
+helpers. Whole kernel C remains byte-identical after removing exactly the
+four reviewed function definitions/prototypes (normalization, get/set record
+locks and fcntl_lock); no whitespace or helper normalization is needed.
+Allocation scans finish with unchanged 400 ARM/292 x86 sites and existing
+allowance refusals. An independent
+[lifetime review](../tests/linux-compat/results/2026-10-14/lockrange-lifetime-review.md)
+binds scalar lifetime/retained references, sources, generated C and captures.
+
+Both production kernels build. The lockrange, ofdlocks, fcntlpath, open and
+runtime cases pass, plus eight host test files. AArch64 uses one ordinary
+five-case controller run. Host disk exhaustion interrupted x86 open/runtime
+image setup and prevented persistence of its outer aggregate; its
+[partial original receipt](../tests/linux-compat/results/2026-10-14/lockrange-original-x86_64.json)
+keeps three passed cases and failed open setup visible. Only open/runtime
+were recovered in a fresh state. The final x86 receipt explicitly composes
+those five successful cases on identical kernel bytes, using the
+[maintained V composer](../tests/linux-compat/results/2026-10-14/lockrange-compose.v)
+and exact source/C/ELF/ISO/serial provenance. Its aggregate is assembled from
+actual case captures; it is not another five-case controller execution.
+Completed private artifacts were losslessly compressed with verified SHA
+manifests to recover space. The audit checks all 64 dispatch/lock inputs,
+exact counts, flat retention, same source/C/ELF and actual kernel/ISO/reference
+receipts. Deliberate assertion and passing-as-baseline controls must fail.
+The public dispatch inventory is refreshed from committed inputs in an isolated
+publication view; these runtime receipts retain their explicit frozen test base.
+
+- [AArch64 receipt](../tests/linux-compat/results/2026-10-14/lockrange-after-aarch64.json), [native capture](../tests/linux-compat/results/2026-10-14/lockrange-after-aarch64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/lockrange-reference-aarch64.json), [evidence](../tests/linux-compat/results/2026-10-14/lockrange-evidence-aarch64.json).
+- [x86-64 receipt](../tests/linux-compat/results/2026-10-14/lockrange-after-x86_64.json), [native capture](../tests/linux-compat/results/2026-10-14/lockrange-after-x86_64-native.log), [Linux reference](../tests/linux-compat/results/2026-10-14/lockrange-reference-x86_64.json), [evidence](../tests/linux-compat/results/2026-10-14/lockrange-evidence-x86_64.json), [recovery receipt](../tests/linux-compat/results/2026-10-14/lockrange-recovery-x86_64.json).
+- [Audit source](../tests/linux-compat/results/2026-10-14/lockrange-audit.v) and [verdict](../tests/linux-compat/results/2026-10-14/lockrange-audit.log); baseline captures, build/host/scope logs, allocation scans and negative controls sit beside them.
+
+Concurrent CUR/END changes, nonregular/disk/network/overlay filesystems,
+arbitrary persistent lock populations, POSIX deadlock detection and close
+races, fairness, cancellation/descriptor pressure and GNU/translated/ELF32
+paths remain separate. The three broad section 15 acceptance gates stay open.

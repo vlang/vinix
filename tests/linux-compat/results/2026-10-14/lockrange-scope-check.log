@@ -1,0 +1,2 @@
+arm complete C byte-identical outside normalize_lock, set/get_record_lock and fcntl_lock bodies/prototypes: PASS
+x86 complete C byte-identical outside normalize_lock, set/get_record_lock and fcntl_lock bodies/prototypes: PASS

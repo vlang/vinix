@@ -784,6 +784,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   qualify blocking unlock/downgrade/EINTR and flat storage on both architectures.
   See [the lock receipts](docs/linux-posix-qualification.md#native-open-description-record-locks).
 
+- [x] Accept native record-lock ranges through INT64_MAX and preserve Linux
+  normalized endpoint/query/error behavior; qualify all six POSIX/OFD commands,
+  boundary splits/merges, aliases, unchanged file state and flat storage.
+  See [the range receipts](docs/linux-posix-qualification.md#native-signed-record-lock-ranges).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

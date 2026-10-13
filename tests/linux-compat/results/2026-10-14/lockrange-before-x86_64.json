@@ -1,0 +1,15 @@
+{
+    "architecture": "x86_64",
+    "context": "QEMU guest; native musl ELF64",
+    "kernel_sha256": "5579cc6d3b6220d9707561a76a052891fa163cfa94ba3fb358c77e9b47e10b3d",
+    "results": [
+        {
+            "name": "lockrange",
+            "source_sha256": "1d07e75cda68db7f74b981be2ed2a086b65958efa5a40da8b9b49280b6b9dcc2",
+            "init_sha256": "ef4e92abd270f6923b393b29518551d4374e53a6eb44bd4b9a1ef528f5ed781c",
+            "iso_sha256": "ce5760b6f4d36d214270e4b9b05ca07c0110b33e04e860e20e93597cfeb0f895",
+            "exit_code": 1,
+            "detail": ""
+        }
+    ]
+}
