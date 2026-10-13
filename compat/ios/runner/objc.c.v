@@ -110,6 +110,7 @@ mut:
 	image_view_owned bool
 	image_view &ImageViewState = unsafe { nil }
 	image_view_array bool
+	process_arguments_array bool
 	uuid_owned bool
 	pool_owned bool
 	pool_initialized bool
@@ -223,6 +224,8 @@ mut:
 	framework_data map[string]u64
 	framework_objects []u64
 	file_manager u64 // One owned NSFileManager cache reference, retired at shutdown.
+	process_info u64 // One owned NSProcessInfo singleton reference.
+	process_arguments u64 // Owned app arguments, configured before image initialization.
 	weak         map[u64]u64 // Location -> object; weak loads retain before returning.
 	timers       []u64
 	display_links []u64
@@ -277,7 +280,7 @@ fn objc_start() {
 	ios_runtime.observers.flags |= .noslices
 	ios_runtime.selectors.flags |= .noslices
 	ios_runtime.transform = [f64(1), 0, 0, 1, 0, 0]!
-	for name in ['NSObject', 'NSAutoreleasePool', 'NSFileManager', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
+	for name in ['NSObject', 'NSAutoreleasePool', 'NSFileManager', 'NSProcessInfo', 'NSUUID', '_NSUUIDBridge', '__NSConcreteUUID', 'NSString', 'NSValue', 'NSConcreteValue', 'NSNumber', 'NSIndexPath', 'NSArray', 'NSMutableArray',
 		'WKWebViewConfiguration', 'WKPreferences', 'WKUserContentController', 'WKProcessPool', 'WKWebsiteDataStore', 'WKWebpagePreferences', 'WKUserScript', 'WKContentWorld', 'WKNSArray',
 		'NSDictionary', 'NSMutableDictionary', 'NSConstantDictionary', 'NSJSONSerialization', 'NSNull', 'NSError', 'NSCondition', 'NSThread', 'ASWebAuthenticationSession', 'GCKeyboard', 'NSHTTPCookie', 'NSHTTPCookieInternal', 'NSLayoutConstraint', 'NSLayoutAnchor',
 		'NSLayoutXAxisAnchor', 'NSLayoutYAxisAnchor', 'NSLayoutDimension', 'NSTimer', 'UIColor', 'UIFont', 'CALayer', 'UIResponder',
@@ -337,6 +340,7 @@ fn objc_start() {
 			'UIImageView' { u32(512) }
 			'GCKeyboard' { u32(32) }
 			'NSFileManager' { u32(32) }
+			'NSProcessInfo' { u32(48) }
 			'NSAutoreleasePool' { u32(40) }
 			'NSUUID', '_NSUUIDBridge' { u32(8) }
 			'__NSConcreteUUID' { u32(24) }
@@ -541,6 +545,10 @@ fn objc_stop() {
 	objc_release(ios_runtime.defaults)
 	objc_release(ios_runtime.file_manager)
 	ios_runtime.file_manager = 0
+	objc_release(ios_runtime.process_info)
+	ios_runtime.process_info = 0
+	objc_release(ios_runtime.process_arguments)
+	ios_runtime.process_arguments = 0
 	objc_release(ios_runtime.locale)
 	objc_release(ios_runtime.run_loop)
 	webkit_stop()

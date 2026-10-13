@@ -3784,17 +3784,65 @@ entry at the required `_OBJC_CLASS_$_NSProcessInfo` import. Evidence is retained
 published runners are unchanged, and game entry, rendering and gameplay remain
 unverified.
 
+`NSProcessInfo` now resolves its class/metaclass imports through a V adapter.
+Installed Foundation measures a 48-byte NSObject subclass. EOS references
+processInfo, arguments, operatingSystemVersion and isiOSAppOnMac. Shared typed
+tests compare ordinary construction, singleton behavior, argument contents and
+ownership, and the 24-byte OS version return/argument ABI against this Mac.
+No application code is invoked by the native measurements.
+
+The adapter supports that measured EOS selector subset, allocWithZone:,
+isOperatingSystemAtLeastVersion: and isMacCatalystApp. Version queries share
+the existing iOS 17.0 compatibility profile with UIDevice and Swift availability
+checks. They use signed lexicographic comparison and Darwin ARM64's indirect
+aggregate registers. The platform flags report the Vinix iOS profile.
+
+App arguments are copied before image initialization, excluding the launcher's
+command-line options. Each process-info instance owns a cached immutable array
+in its existing metadata. Native Foundation may return fresh equivalent arrays;
+the profile preserves contents and ownership while avoiding repeated allocations.
+The shared instance and startup argument snapshot have one runtime-owned
+reference each. Ordinary release, caller-storage destruction, isa changes and
+quiescent shutdown retire arrays through existing ownership paths. Private
+ivars, environment, process naming and hardware/power/activity APIs remain
+unsupported. Argument mutation, late replacement, copies and missing aggregate
+buffers fail explicitly.
+
+All 72 programs build and 96 original generated C streams restore to recorded
+hashes. Twenty-four host suites pass ASAN/UBSAN in both hashing modes; Vinix
+passes 26 Objective-C and 33 Swift/loader programs. Process-info tests verify
+copied Unicode arguments, retained snapshots after owner release, guarded
+aggregate writes, signed comparison boundaries, 8,000 concurrent queries and
+100 isa changes per cycle, caller storage, five exact rejection reasons and
+two zero-live-object shutdowns. Generated C verifies owning cache retirement
+and allocation-free repeated queries. Native module replay and earlier
+compatibility suites remain enabled.
+
+This batch runs on persistent disk with a copied pinned compiler and verified
+canonical library/source snapshots. A fixture fixed-array compile failure and
+an incorrect native array-identity assumption were corrected before the broad
+batch. Its allocation-auditor trial is retained: V mangles the local name
+array, so the audit now checks the owning field assignment without depending
+on that spelling. Passed sanitizer outputs and their original generated C
+were retained and audited. Guest payloads retire only after joined success.
+
+Fortnite passes the NSProcessInfo binding and exits with status 1 before entry
+at the required `_OBJC_CLASS_$_NSDate` import. Evidence is retained under
+`build/ios/fortnite/processinfo-checks`. Full regression remains unpassed; the
+five published runners are unchanged. Game entry, rendering and gameplay
+remain unverified.
+
 `run-ios --audit BINARY` now checks each bundled library's imports as well as
 the executable, without mapping or executing app code. The static C++ runner reports:
 
 | Image | Resolved | Unresolved strong | Unresolved weak |
 | --- | ---: | ---: | ---: |
-| Fortnite executable | 1,438 | 722 | 79 |
-| EOSSDK | 653 | 9 | 18 |
+| Fortnite executable | 1,439 | 721 | 79 |
+| EOSSDK | 654 | 8 | 18 |
 | MarketplaceKitWrapper | 115 | 61 | 23 |
-| All images | 2,206 | 792 | 120 |
+| All images | 2,208 | 790 | 120 |
 
-The C++/GLES/Text variant reports 2,219 resolved imports, 779 unresolved strong
+The C++/GLES/Text variant reports 2,221 resolved imports, 777 unresolved strong
 imports and 120 unresolved weak imports, including its native zlib/text backends.
 
 The executable's available imports include the bundled frameworks' exports;

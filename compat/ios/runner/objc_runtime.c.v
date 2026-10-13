@@ -93,6 +93,7 @@ fn objc_builtin_types(cls u64, selector string) ?string {
 	if types := game_keyboard_types(info.name, info.meta, selector) { return types }
 	if types := ns_uuid_types(info.name, info.meta, selector) { return types }
 	if types := ns_file_manager_types(info.name, info.meta, selector) { return types }
+	if types := ns_process_info_types(info.name, info.meta, selector) { return types }
 	if types := cookie_builtin_types(info.name, info.meta, selector) { return types }
 	if types := webkit_builtin_types(info.name, info.meta, selector) { return types }
 	if types := http_url_builtin_types(info.name, info.meta, selector) { return types }
@@ -126,6 +127,7 @@ fn objc_instance_method(cls u64, selector u64) u64 {
 		if method := info.method_info[name] { return u64(method) }
 		if !info.meta && info.name == 'NSAutoreleasePool' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && info.name == 'NSFileManager' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
+		if !info.meta && info.name == 'NSProcessInfo' && name in ['copy', 'copyWithZone:', 'mutableCopy', 'mutableCopyWithZone:']! { return 0 }
 		if !info.meta && webkit_name(info.name) && name == 'copy' && webkit_builtin_types(info.name, false, name) == none { return 0 }
 		if types := objc_builtin_types(current, name) {
 			return u64(objc_record_method(current, unsafe { &char(selector) }, u64(unsafe { voidptr(C.ios_objc_builtin) }), unsafe { &char(types.str) }, true))

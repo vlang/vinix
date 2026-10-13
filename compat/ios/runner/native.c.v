@@ -29,6 +29,7 @@ fn execute(image macho.Image, arguments []string) !int {
 	defer { C.munmap(mapping, usize(layout.size)) }
 	base := u64(mapping)
 	objc_start()
+	ns_process_info_start(arguments)
 	$if ios_text ? { text_start()! }
 	$if ios_gles ? { gles_start()! }
 	if ios_runtime.trace { eprintln('iOS Mach-O mapping: 0x${base.hex()}') }
