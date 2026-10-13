@@ -162,6 +162,7 @@ fn heap_snapshot(mut snapshot Heap) {
 fn cycles(parent &char, count int) {
 	other := $if amd64 { &char(c'/dev/sd1') } $else { &char(c'/dev/vdb') }
 	for _ in 0 .. count {
+		scrub_tool(c'/root/data.vhash', c'/root/scrub-report.txt', parent, other, 0, unsafe { nil })
 		data_tool(unsafe { nil }, c'/root/data.vhash', parent, other, false, 0, unsafe { nil })
 		tool(c'save-set', c'/etc/vinix/volumes.vset', parent, other, unsafe { &char(nil) }, 0)
 		mapping_growths(c'/etc/vinix/volumes.vset', c'mbr:12345679', c'9', c'8192', c'mbr:12345678', c'2', c'8192', true, 0, unsafe { nil })
@@ -477,6 +478,7 @@ fn first_boot(parent &char) {
 		planned_capacity_contracts(parent, wrong)
 		planned_multi_pool_batch(parent, wrong)
 		planned_data(parent, wrong)
+		planned_scrub(parent, wrong)
 		planned_lock(parent, wrong)
 		health_check(parent)
 		health_cycles(parent)
@@ -552,12 +554,14 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 		data_phase := C.open(c'/data-boot', C.O_RDONLY)
 		if data_phase >= 0 {
 			check(C.close(data_phase) == 0, c'close checksum phase marker'); data_boot_phase(actual, other)
+			scrub_boot_phase(actual, other)
 			C.printf(c'PLAN DONE\n'); for { C.pause() }
 		}
 		multi_growth := C.open(c'/multi-pool-growth-boot', C.O_RDONLY)
 		if multi_growth >= 0 {
 			check(C.close(multi_growth) == 0, c'close multi-pool growth phase marker'); multi_pool_growth_boot_phase(actual, other)
 			prepare_data_boot(actual, other)
+			prepare_scrub_boot(actual, other)
 			C.printf(c'PLAN DONE\n'); for { C.pause() }
 		}
 		multi := C.open(c'/multi-pool-boot', C.O_RDONLY)
@@ -583,6 +587,7 @@ pub fn entry(_argc i32, _argv &&char) i32 {
 			&& status(c'/dev/mapper/vinix9').disk_id == status(other).disk_id, c'init restored reordered physical disks')
 		C.printf(c'PLAN BOOT RESTORED\n')
 		data_tool(unsafe { nil }, c'/root/data.vhash', actual, other, false, 0, unsafe { nil }); C.printf(c'PLAN DATA BOOT VERIFIED\n')
+		scrub_reordered_boot(actual, other)
 		$if nvme_health_test ? { nvme_health_check() }
 		before := status(c'/dev/mapper/vinix2').generation
 		second_before := status(c'/dev/mapper/vinix9').generation

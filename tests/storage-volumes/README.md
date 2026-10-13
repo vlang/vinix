@@ -224,6 +224,13 @@ faults are covered. All eight existing boots remain enabled; a ninth verifies
 nine grown extents against a guest-produced persistent manifest. See
 [data checksum qualification](data-checksums.md).
 
+Complete scrubbing records every match/mismatch and a SHA-256 fingerprint of
+the trusted reference, preserving it and old reports on incomplete scans.
+Host models cover multiple corruptions, later read failure, publication faults
+and output errors. Guests preserve both held views while scanning and restore
+all test corruption before repeated workloads and the nine persistence boots.
+See [complete scrub qualification](scrub-data.md).
+
 Saved-plan lock tests hold directory locks across independent processes, reject
 all writer families, keep read-only previews available and verify publication
 stays locked through rename/directory fsync. They cover directory aliases,
@@ -250,8 +257,8 @@ On AMD64 a V console adapter redirects init's output to serial and execs the
 unchanged packaged desktop init as PID 1.
 The controller boots QEMU directly with disposable disk files, drains serial
 output into retained logs, limits each boot to 1800 seconds and terminates only
-its own process. The allowance includes 16000 utility processes across 200 warmup
-and 200 measured forty-command cycles, with pool membership, query, batch
+its own process. The allowance includes 16400 utility processes across 200 warmup
+and 200 measured forty-one-command cycles, with pool membership, query, batch
 allocation/growth/expansion batch previews/publications,
 physical-capacity batch previews/publications, offline mapping/disk edits and live preflight
 on x86 TCG; the strict retention

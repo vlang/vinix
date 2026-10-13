@@ -227,6 +227,14 @@ offline. Keep data writes quiescent while hashing/verifying and retain a trusted
 manifest separately. See [data checksum manifests](../../docs/storage-volumes.md#data-checksum-manifests)
 for consistency, format and corruption detection limits.
 
+`scrub-data MANIFEST REPORT DISK_INDEX DEVICE [...]` checks all saved extents
+and atomically records every match/mismatch with expected and actual SHA-256.
+The report also fingerprints the trusted reference. Clean scans return 0,
+complete scans with changed data return 2, and scan/publication/output failures
+return 1. Incomplete scans preserve the previous report. Reference bytes, live
+mappings and data remain intact. See
+[complete data scrubbing](../../docs/storage-volumes.md#complete-data-scrubbing).
+
 Saved-plan writers acquire a nonblocking exclusive lock on the destination
 directory before reading or snapshotting, holding it through atomic publication.
 A busy directory returns failure; retry reads the latest complete state. All

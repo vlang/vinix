@@ -38,8 +38,8 @@ audited for heap/V-runtime dependencies and strictly compiled for both targets.
 First-boot guests verify identity selection, alias pinning, later mismatch and
 duplicate rejection, complete previews under writer contention and unchanged
 live views/generations/held data. `PLAN CAPACITY CONTRACTION BATCH PASSED:` is
-required. Both targets retain **200 warmup + 200 measured 40-command cycles /
-16000 utility processes**, including 400 complete contraction previews and
+required. Both targets retain **200 warmup + 200 measured 41-command cycles /
+16400 utility processes**, including 400 complete contraction previews and
 publications with 800 ordered keeps each. Slab classes/large pages must stay
 flat or decrease; each boot retains the 1800-second limit.
 

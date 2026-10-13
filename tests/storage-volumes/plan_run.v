@@ -40,7 +40,7 @@ fn check_generated(path string) ! {
 fn host(root string, work string) ! {
 	v := os.getenv_opt('V') or { @VEXE }
 	os.setenv('ASAN_OPTIONS', 'detect_leaks=0', true)
-	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test'] {
+	for entry in ['plan_test', 'plan_bundle_test', 'plan_growth_test', 'plan_check_test', 'plan_edit_test', 'plan_disks_test', 'plan_space_test', 'plan_capacity_test', 'plan_pool_test', 'plan_pool_growth_test', 'plan_pool_batch_test', 'plan_lock_test', 'plan_pool_grow_batch_test', 'plan_pool_expand_batch_test', 'plan_capacity_batch_test', 'plan_pool_members_batch_test', 'plan_pool_order_test', 'plan_remove_batch_test', 'plan_enroll_batch_test', 'plan_forget_batch_test', 'plan_add_batch_test', 'plan_grow_batch_test', 'plan_pool_contract_batch_test', 'plan_pool_resize_batch_test', 'plan_capacity_contract_batch_test', 'plan_multi_pool_batch_test', 'plan_multi_pool_grow_batch_test', 'data_manifest_test', 'data_scrub_test'] {
 		binary := work + '/' + entry
 		command([v, '-enable-globals', '-cc', 'clang', '-d', 'volume_library', '-cflags',
 			'-I' + root + '/tools/volumes/volumecli -fsanitize=address,undefined', '-ldflags',
@@ -464,6 +464,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !first.contains('PLAN MULTI POOL GROWTH PASSED:') { return error('Missing atomic multi-pool growth qualification') }
 	if !first.contains('PLAN LOCK PASSED:') { return error('Missing saved-plan locking qualification') }
 	if !first.contains('PLAN DATA PASSED:') { return error('Missing data checksum and corruption qualification') }
+	if !first.contains('PLAN SCRUB PASSED:') { return error('Missing complete multi-corruption scrub report qualification') }
 	if !first.contains('HEALTH QUERY PASSED') { return error('Missing physical health ABI qualification') }
 	if !first.contains('STORAGE MONITOR PASSED:') { return error('Missing periodic storage monitor qualification') }
 	if nvme && !first.contains('NVME HEALTH PASSED') { return error('Missing NVMe health ABI qualification') }
@@ -479,6 +480,7 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 	if !second.contains('PLAN BOOT RESTORED') { return error('Production init did not restore before the application started') }
 	if !second.contains('PLAN POOL BOOT PRESERVED') { return error('Pool configuration did not survive reordered boot') }
 	if !second.contains('PLAN DATA BOOT VERIFIED') { return error('Data manifest did not verify across reordered boot') }
+	if !second.contains('PLAN SCRUB REORDERED BOOT PRESERVED') { return error('Scrub report failed after physical device reorder') }
 	// Enlarge the existing disposable backing file without changing its MBR or
 	// prior bytes. The saved bundle and all guest files remain guest-produced.
 	mut disk := os.open_file(work + '/volume.raw', 'r+')!
@@ -537,10 +539,12 @@ fn guest(root string, work string, arch string, kernel string, nvme bool) ! {
 		return error('Production init did not restore complete multi-pool growth')
 	}
 	if !eighth.contains('PLAN DATA SAVED:') { return error('Missing persisted nine-mapping checksum manifest') }
+	if !eighth.contains('PLAN SCRUB SAVED:') { return error('Missing persisted nine-mapping scrub report') }
 	os.cp(work + '/config.ext2', work + '/data-config.ext2')!
 	ninth := boot(second_args, work + '/data-restored-boot.log')!
 	if ninth.contains('init: volume restore failed; continuing') || !ninth.contains('PLAN DATA BOOT PRESERVED') { return error('Data checksum verification failed after production boot') }
-	println('PASS ${arch}: SHA-256 data manifests, atomic multi-pool allocation/growth, physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, nine-boot persistence and 200-cycle retention')
+	if !ninth.contains('PLAN SCRUB BOOT PRESERVED') { return error('Persistent scrub report failed after production boot') }
+	println('PASS ${arch}: complete scrub findings, SHA-256 data manifests, atomic multi-pool allocation/growth, physical capacity/pool batches, previews/retries, saved-plan locks, complete preflight, nine-boot persistence and 200-cycle retention')
 }
 
 fn main() {

@@ -41,8 +41,8 @@ blocks all later live actions, while held views, generations and data remain
 intact. Reverse-order matching imports preserve disk indices. Cleanup restores
 exact baseline bytes. `PLAN ENROLLMENT BATCH PASSED:` is required.
 
-Each architecture runs 200 warmup and 200 measured **40-command cycles**:
-**16000 utility processes**, including 400 two-disk enrollment previews and
+Each architecture runs 200 warmup and 200 measured **41-command cycles**:
+**16400 utility processes**, including 400 two-disk enrollment previews and
 400 publications with 800 ordered add actions each. Two unavailable empty
 disks append, then both are forgotten before live replay. Existing capacity,
 membership, priority, removal, allocation, growth, expansion and query checks

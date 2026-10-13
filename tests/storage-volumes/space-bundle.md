@@ -43,9 +43,9 @@ and unchanged raw data. Removing the desired row restores exact original bytes
 while a held live descriptor and generation survive until explicit removal.
 
 The repeated workload uses first-fit allocation for the scratch mappings in each
-of 200 warmup and 200 measured forty-command cycles, including physical capacity
+of 200 warmup and 200 measured forty-one-command cycles, including physical capacity
 verification and pool membership/query/allocation, growth and expansion batch previews/publications,
-for 16000 utility processes.
+for 16400 utility processes.
 No scratch mapping is created. Slab classes and large allocation pages must
 remain flat; the existing failure-only delayed snapshot does not relax the
 strict verdict. A reordered second boot restores the actual persistent two-disk,

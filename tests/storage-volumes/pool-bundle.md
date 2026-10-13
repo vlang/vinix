@@ -46,8 +46,8 @@ live generation and held descriptor's two data pages. Removing desired rows
 then all members restores the exact original version-1 file; re-adding the
 regions restores the exact configured version-2 file.
 
-Each of 200 warmup and 200 measured cycles launches forty utility processes:
-save-set, plan-preview-grow-batch and plan-grow-batch, plan-preview-capacity-batch and plan-capacity-batch,
+Each of 200 warmup and 200 measured cycles launches forty-one utility processes:
+scrub-data, verify-data, save-set, plan-preview-grow-batch and plan-grow-batch, plan-preview-capacity-batch and plan-capacity-batch,
 plan-preview-contract-capacity-batch and plan-contract-capacity-batch,
 pool-preview-add-batch and pool-add-batch,
 pool-preview-order and pool-order,
@@ -57,7 +57,7 @@ pool-preview-grow-batch, pool-grow-batch,
 plan-preview-add-batch, plan-add-batch, pool-preview-contract-batch, pool-contract-batch, pool-preview-resize-batch, pool-resize-batch,
 check-bundle, plan-preview-remove-batch and plan-remove-batch,
 plan-preview-enroll-batch, plan-enroll-batch, plan-preview-forget-batch, plan-forget-batch, restore-bundle
-and boot-restore. This is 16000 processes, 800 member additions, 400 pool queries
+and boot-restore. This is 16400 processes, 800 member additions, 400 pool queries
 and 800 scratch placements/growths. No scratch mapping is created.
 Four additional commands temporarily add pool-4 eligibility for an existing
 mapping, preview/publish a two-pool keep batch, then remove that membership.

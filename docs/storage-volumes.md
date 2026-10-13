@@ -1922,3 +1922,51 @@ is 11392 bytes. Decoding validates the entire manifest privately before
 changing caller state; embedded identities, bounds, pools and global slots
 retain the ordinary bundle validation. See
 [qualification](../tests/storage-volumes/data-checksums.md).
+
+## Complete data scrubbing
+
+`scrub-data MANIFEST REPORT DISK_INDEX DEVICE [...]` scans every desired extent
+in a trusted checksum manifest and atomically saves a complete corruption
+report. It continues through digest mismatches, identifying all affected
+mappings in one scan. The reference retains its exact bytes. Supply every
+saved disk exactly once, in any order; the same read-only physical pinning,
+identity/geometry checks, pre/post-read rechecks and 64-KiB streaming rules as
+`verify-data` apply.
+
+```sh
+vinix-volume scrub-data /root/data.vhash /root/scrub.txt 1 /dev/vda 0 /dev/vdb
+```
+
+The command returns **0** for a complete clean report, **2** for a complete
+report containing changed data, and **1** for a failed scan, publication or
+output flush. Invalid CLI syntax uses the utility's existing usage status 2.
+An I/O failure or final identity change discards the complete private candidate
+and preserves the old report, even after earlier mismatches. No successful
+report header or row is printed until the full scan and publication succeed.
+Data writes must be quiescent throughout; these reports provide corruption
+detection against a trusted reference, without authentication, snapshots or
+repair.
+
+The stable newline-delimited ASCII format starts with
+`format=VINIXSR1 operation=scrubbed-data disks=N mappings=N matched=N changed=N
+algorithm=sha256 reference_sha256=HEX`. The fingerprint is SHA-256 of the exact
+canonical encoded reference, binding findings to its disk identities,
+geometry, desired rows, pool configuration and saved digests. Every subsequent
+row follows canonical disk/row order and contains `disk`, `slot`, `offset`,
+`bytes`, `readonly`, `result=match|changed`, `expected_sha256` and
+`actual_sha256`; both digests are 64 lowercase hexadecimal characters. An empty
+desired set still reports its verified physical identities and zero rows.
+The fixed 32768-byte workspace covers the full 64-row format with full-width
+decimal geometry.
+
+The report's directory writer lock covers source reads, device scanning,
+file-fsync/close/rename/directory-fsync and final stdout flushing. Pins, source
+descriptor and lock remain alive through that flush. Exact-report retries still
+perform both publication flushes. A publication failure before rename preserves
+the old report; after rename, directory-fsync or stdout failure can leave the
+complete new report visible with status 1. Retry completes the operation. The
+report destination must be absent or regular, is checked before participants
+open and before publication, and cannot name the reference entry through a
+lexical alias. Verification and offline reference inspection remain available
+under report writer contention. See
+[scrub qualification](../tests/storage-volumes/scrub-data.md).

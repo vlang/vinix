@@ -4,6 +4,7 @@ module volumecli
 
 import os
 import crypto.sha256
+import encoding.hex
 
 fn C.fork() i32
 fn C.dup2(i32, i32) i32
@@ -91,13 +92,13 @@ fn data_mock_pread(fd i32, output voidptr, size usize, offset i64) i64 {
 	if data_io.mode == 1 && !data_io.interrupted { data_io.interrupted = true; unsafe { C.errno = C.EINTR }; return -1 }
 	if disk == 1 {
 		if data_io.mode == 2 { return 0 }
-		if data_io.mode == 3 { unsafe { C.errno = C.EIO }; return -1 }
+		if data_io.mode in [3, 20] { unsafe { C.errno = C.EIO }; return -1 }
 		if data_io.mode == 16 { return i64(size + 1) }
 		if data_io.mode == 17 { return i64(size - 1) }
 	}
 	delivered := if data_io.mode == 1 && size > usize(sector) { usize(sector) } else { size }
 	unsafe { for i in 0 .. int(delivered) { (&u8(output))[i] = data_pattern(disk, u64(offset) + u64(i)) } }
-	if data_io.mode == 18 && disk == 1 { unsafe { (&u8(output))[0] ^= 1 } }
+	if (data_io.mode == 18 && disk == 1) || data_io.mode in [19, 20] { unsafe { (&u8(output))[0] ^= 1 } }
 	data_io.delivered[disk] += u64(delivered); return i64(delivered)
 }
 
@@ -206,5 +207,87 @@ fn test_data_checksum_reports_detect_buffered_stdout_failure_and_drain_all_descr
 			C._exit(if result == 1 && data_io.opened == data_io.closed { 0 } else { 4 })
 		}
 		mut code := i32(-1); assert C.waitpid(child, &code, 0) == child && code == 0 && os.read_bytes(path)! == original
+	}
+}
+
+// Build expected observations and text independently of both the production
+// streaming digest and the report codec, including both physical chunk starts.
+fn scrub_io_expected(manifest &DataManifest, mask int) string {
+	changed := int(mask & 1 != 0) + int(mask & 2 != 0)
+	mut bytes := [11392]u8{}; size := encode_data_manifest(manifest, &bytes[0]); fingerprint := hex.encode(sha256.sum(bytes[..size]))
+	mut report := 'format=VINIXSR1 operation=scrubbed-data disks=2 mappings=2 matched=${2 - changed} changed=${changed} algorithm=sha256 reference_sha256=${fingerprint}\n'
+	for disk in 0 .. 2 {
+		mut data := []u8{len: 73728, init: data_pattern(disk, u64(index) + 8192)}
+		if mask & (1 << disk) != 0 { data[0] ^= 1; data[65536] ^= 1 }
+		actual := sha256.sum(data); result := if mask & (1 << disk) != 0 { 'changed' } else { 'match' }
+		report += 'disk=${disk} slot=${20 + disk} offset=8192 bytes=73728 readonly=${disk} result=${result} expected_sha256=' + hex.encode(manifest.digests.values[disk][..]) + ' actual_sha256=' + hex.encode(actual) + '\n'
+	}
+	return report
+}
+
+fn test_scrub_all_rows_multiple_corruptions_later_io_failure_readonly_pins_and_source_destination_rejections() {
+	work := os.join_path(os.temp_dir(), 'vinix-scrub-io-${os.getpid()}'); os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/data.vhash'; report := work + '/scrub.txt'; mut reference := DataManifest{}; mut devices := DataDevices{}
+	data_io_fixture(mut reference, mut devices); mut bytes := [11392]u8{}; size := encode_data_manifest(&reference, &bytes[0]); os.write_file_array(path, bytes[..size])!
+	for mode in [0, 1, 18, 19] {
+		mask := if mode == 18 { 2 } else if mode == 19 { 3 } else { 0 }; expected := scrub_io_expected(&reference, mask)
+		data_io = DataIO{mode: mode}; assert scrub_manifest_data(path.str, report.str, &devices) == if mask == 0 { 0 } else { 2 }
+		assert os.read_file(report)! == expected && os.read_bytes(path)! == bytes[..size] && data_io.statuses == [3, 3]! && data_io.opened == 2 && data_io.closed == 2 && data_io.delivered == [u64(73728), 73728]!
+		data_io = DataIO{mode: mode}; assert scrub_manifest_data(path.str, report.str, &devices) == if mask == 0 { 0 } else { 2 }
+		assert os.read_file(report)! == expected && data_io.flushes == 2 && data_io.renames == 1
+	}
+	old := os.read_file(report)!
+	for mode in [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 20] {
+		data_io = DataIO{mode: mode}; assert scrub_manifest_data(path.str, report.str, &devices) == 1
+		assert os.read_file(report)! == old && os.read_bytes(path)! == bytes[..size] && data_io.opened == data_io.closed && data_io.writes == 0 && data_io.renames == 0
+		if mode == 20 { assert data_io.delivered[0] == 73728 && data_io.delivered[1] == 0 }
+	}
+	for bad in 0 .. 5 {
+		mut wrong := devices; if bad == 0 { wrong.count = 1 } else if bad == 1 { wrong.disks[1] = 1 } else if bad == 2 { wrong.disks[1] = 2 } else if bad == 3 { wrong.paths[1] = unsafe { &char(c'') } } else { wrong.paths[1] = unsafe { nil } }
+		data_io = DataIO{}; assert scrub_manifest_data(path.str, report.str, &wrong) == 1 && data_io.opened == 0 && os.read_file(report)! == old
+	}
+	mut edit := PlanEdit{}; assert open_plan_edit(report.str, mut edit, true); data_io = DataIO{}
+	assert scrub_manifest_data(path.str, report.str, &devices) == 1 && data_io.opened == 0 && os.read_file(report)! == old
+	assert verify_manifest_data(path.str, &devices, false) == 0; close_plan_edit(mut edit)
+	os.symlink(path, work + '/link')!; assert C.mkfifo((work + '/fifo').str, 0o600) == 0
+	for input in [work, work + '/missing', work + '/link', work + '/fifo'] {
+		data_io = DataIO{}; assert scrub_manifest_data(input.str, report.str, &devices) == 1 && data_io.opened == 0 && os.read_file(report)! == old
+	}
+	for destination in [path, work + '/./data.vhash', work, work + '/link', work + '/fifo'] {
+		data_io = DataIO{}; assert scrub_manifest_data(path.str, destination.str, &devices) == 1 && data_io.opened == 0 && os.read_bytes(path)! == bytes[..size]
+	}
+	mut corrupt := os.read_bytes(path)!; corrupt[corrupt.len - 1] ^= 1; os.write_file_array(path, corrupt)!; data_io = DataIO{}
+	assert scrub_manifest_data(path.str, report.str, &devices) == 1 && data_io.opened == 0 && os.read_file(report)! == old
+}
+
+fn test_scrub_clean_and_changed_equal_publications_all_faults_retry_both_flushes_and_no_partial_reports() {
+	work := os.join_path(os.temp_dir(), 'vinix-scrub-publish-${os.getpid()}'); os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/data.vhash'; report := work + '/scrub.txt'; mut reference := DataManifest{}; mut devices := DataDevices{}
+	data_io_fixture(mut reference, mut devices); mut bytes := [11392]u8{}; size := encode_data_manifest(&reference, &bytes[0]); os.write_file_array(path, bytes[..size])!
+	for corrupt in [false, true] { for equal in [false, true] { for mode in 1 .. 7 {
+		expected := scrub_io_expected(&reference, if corrupt { 3 } else { 0 }); result := if corrupt { 2 } else { 0 }; physical := if corrupt { 19 } else { 0 }
+		os.write_file(report, if equal { expected } else { 'older report\n' })!; old := os.read_file(report)!
+		data_io = DataIO{mode: physical, publish_mode: mode}; assert scrub_manifest_data(path.str, report.str, &devices) == if mode == 1 { result } else { 1 }
+		assert data_io.opened == 2 && data_io.closed == 2 && os.read_bytes(path)! == bytes[..size] && os.ls(work)!.len == 2
+		assert os.read_file(report)! == if mode in [1, 4] { expected } else { old }
+		data_io = DataIO{mode: physical}; assert scrub_manifest_data(path.str, report.str, &devices) == result && os.read_file(report)! == expected
+		assert data_io.flushes == 2 && data_io.renames == 1 && data_io.writes > 0 && data_io.closed == 2
+	} } }
+}
+
+fn test_scrub_clean_and_changed_reports_detect_buffered_stdout_failure_after_complete_publication() {
+	work := os.join_path(os.temp_dir(), 'vinix-scrub-output-${os.getpid()}'); os.mkdir(work)!; defer { os.rmdir_all(work) or {} }
+	path := work + '/data.vhash'; report := work + '/scrub.txt'; mut reference := DataManifest{}; mut devices := DataDevices{}
+	data_io_fixture(mut reference, mut devices); mut bytes := [11392]u8{}; size := encode_data_manifest(&reference, &bytes[0]); os.write_file_array(path, bytes[..size])!
+	assert C.fflush(C.stdout) == 0
+	for corrupt in [false, true] {
+		child := C.fork(); assert child >= 0
+		if child == 0 {
+			fd := C.open(c'/dev/null', C.O_RDONLY); if fd < 0 || C.dup2(fd, 1) != 1 { C._exit(2) }; C.close(fd)
+			mut buffer := [4096]char{}; if C.setvbuf(C.stdout, &buffer[0], C._IOFBF, 4096) != 0 { C._exit(3) }; data_io = DataIO{mode: if corrupt { 19 } else { 0 }}
+			result := scrub_manifest_data(path.str, report.str, &devices); C._exit(if result == 1 && data_io.opened == 2 && data_io.closed == 2 { 0 } else { 4 })
+		}
+		mut code := i32(-1); assert C.waitpid(child, &code, 0) == child && code == 0 && os.read_bytes(path)! == bytes[..size]
+		assert os.read_file(report)! == scrub_io_expected(&reference, if corrupt { 3 } else { 0 })
 	}
 }

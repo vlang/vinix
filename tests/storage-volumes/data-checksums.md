@@ -34,7 +34,7 @@ remain intact. `PLAN DATA PASSED:` is required. Second boot verifies this
 guest-produced reference after device reorder (`PLAN DATA BOOT VERIFIED`).
 
 Both targets retain all old assertions, with **200 warmup + 200 measured
-40-command cycles / 16000 utility processes**. Each cycle includes full
+41-command cycles / 16400 utility processes**. Each cycle includes full
 read-only verification of five desired extents. Every slab class and large-page
 total must stay flat or decrease; the 1800-second per-boot limit is unchanged.
 The fixture warms both reusable snapshot buffers and records their ready totals

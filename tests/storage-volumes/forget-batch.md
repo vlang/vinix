@@ -38,7 +38,7 @@ The first guest boot checks later populated/pool member and duplicate-request
 failure, a mixed forget/absent list under a held writer lock, complete action
 and survivor reports, exact durable retries, live generations and held-view
 data. `PLAN FORGET BATCH PASSED:` is required. Each architecture runs 200 warmup
-and 200 measured **40-command cycles / 16000 utility processes**, including
+and 200 measured **41-command cycles / 16400 utility processes**, including
 400 two-disk forgetting previews and publications with 800 ordered forget
 actions each. Existing enrollment previews/publications and all capacity,
 membership, priority, removal, allocation, growth, expansion and query checks
