@@ -16,6 +16,10 @@ The current guest/controller also require the subsequent
 [organization-policy workflow](policy-ui-check.md). Its public-read,
 administrator/standard-role, changed-file refusal and policy-only persistence
 checks have separate receipts; existing receipts keep their original scope.
+The current controller also requires the public
+[complete review-metadata workflow](review-metadata-check.md), covering package,
+repository/history and both offline-export envelopes under administrator and
+standard accounts without mutation or a password.
 Launches, arbitrary executables, alternate roots, publisher tooling and raw
 unreviewed transactions are refused before authentication.
 

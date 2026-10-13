@@ -1312,8 +1312,25 @@ The lightweight [`pkgprotocol` V module](pkgprotocol/review.v) provides `Review`
 for consumers with manual memory management. Service-created and decoded reviews
 own their presentation fields. Renderers should retain the snapshot while it
 is on screen, pass literal arguments to `apply`, then close it on cancellation,
-replacement or handoff. Additional JSON fields are ignored; unknown formats,
-invalid provenance and incomplete requested-package records are refused.
+replacement or handoff. Format 1 requires every declared root and row field,
+including empty strings/arrays, zero counters and false proprietary, firmware and
+requested flags. Missing/null/coerced fields, unknown or duplicate keys (including
+escaped spellings), invalid UTF-8/Unicode, noncanonical or overflowing integers
+and trailing input are refused before a review is presented for confirmation.
+Future schema extensions require a new supported format.
+
+The same bounded reader covers `decode_repositories`, `decode_repository_review`,
+`decode_mirror_review` and `decode_deployment_mirror_review`, including repository
+identities/history and every nested review. Replies are at most 8 MiB; package
+reviews contain at most 8192 rows, 4096 intent/requested IDs and five permissions
+per row; repository and history lists contain at most 4096 entries. Strings are
+bounded while decoding according to their public field contracts. Timestamps
+fit nonnegative signed 64-bit seconds; package counts are at most 4096. Partial
+records and replaced array buffers are released on failure under manual memory
+management. Valid decoded instances retain their existing explicit `.close()`
+ownership contract. Software releases refusal errors and never enables
+confirmation or requests administrator credentials for malformed metadata. See
+[review metadata qualification](../../tests/packages/review-metadata-check.md).
 
 [The V example](../../examples/package-hello/main.v) and target manifests show a
 native payload. `v run examples/package-hello/build.v /build/new-example-repository`

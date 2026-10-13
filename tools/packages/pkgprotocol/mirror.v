@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgprotocol
 
-import json2
-
 pub struct MirrorReview {
 pub:
 	format int
@@ -14,15 +12,6 @@ pub:
 	shared_disk bool // destination disk_needed already includes cache_needed
 }
 
-struct MirrorReviewInput {
-	format int @[required]
-	input_destination string @[required]
-	destination string @[required]
-	review Review @[required]
-	cache_needed u64 @[required]
-	cache_available u64 @[required]
-	shared_disk bool @[required]
-}
 
 pub fn (mirror &MirrorReview) validate() ! {
 	mirror.review.validate()!
@@ -57,15 +46,6 @@ fn mirror_destination_valid(path string) bool {
 	return true
 }
 
-pub fn decode_mirror_review(text string) !MirrorReview {
-	if text.len > 8 * 1024 * 1024 { return error('offline mirror review exceeds metadata limit') }
-	input := json2.decode[MirrorReviewInput](text, strict: true)!
-	mut mirror := MirrorReview{ format: input.format, input_destination: input.input_destination,
-		destination: input.destination, review: input.review, cache_needed: input.cache_needed,
-		cache_available: input.cache_available, shared_disk: input.shared_disk }
-	mirror.validate() or { mirror.close(); return err }
-	return mirror
-}
 
 pub fn (mut mirror MirrorReview) close() {
 	unsafe { mirror.input_destination.free(); mirror.destination.free() }

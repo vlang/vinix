@@ -1,0 +1,33 @@
+Pinned V 0.5.2 826e96f56ca12fcb8fd02dfd6edf1551008e62a8; V_MACOS_V3_NO_FALLBACK=1; direct -no-skip-unused runners.
+Nine package-protocol assertion runners: PASS; strengthened final schema boundary tests rerun separately: PASS, exit 0.
+Final schema clang ASan/UBSan: PASS, exit 0; -fsanitize=address,undefined -fno-omit-frame-pointer; ASAN_OPTIONS=detect_leaks=0 UBSAN_OPTIONS=halt_on_error=1.
+Signed service review and CLI distribution contracts: PASS, exit 0. Both Linux Software frontends: PASS.
+Production Software/headless fixtures and full desktop package-launcher assertion runner: PASS, exit 0; -gc none -manualfree -d track_heap.
+Full desktop test-only stage adds the missing ui2_headless guard to native control-state branches; emitted C links the original pinned os/execute_capture_nix.h and sync/thread_helper.h implementations. No upstream/UI production code was changed.
+Guest package/account/authentication/session programs freshly built; retained production kernels. x86 passing fixture predates only detached-worker timeout diagnostics. ARM retry passes unchanged completion bound/state assertions.
+Old reader reproducer:
+missing firmware flag: ACCEPTED
+unknown root field: ACCEPTED
+escaped duplicate field: ACCEPTED
+Package/repository/offline review readers: 1000 wide valid/partial-invalid decode/close cycles retain zero tracked bytes
+Package CLI: lock-scoped configuration, JSON verification, authenticated enrollment, offline mirror, reviewed deployment locks, rollback and revoked-publisher uninstall passed
+Software offline export memory (deployment lock=false): redraw/paging=0; review retirement=0 bytes
+Software offline export memory (deployment lock=true): redraw/paging=0; review retirement=0 bytes
+Software progress: fragmented frames, bounded buffers, phase bar, diagnostics and worker retirement passed
+Software deployment: full closure, frozen literal path, empty removal, cancellation, bounds, stale/error diagnostics and close guard passed
+Software offline export: destination paging, dependency provenance, literal confirmation, installed scope, progress, stale diagnostics and close guard passed
+Software locked offline export: exact older runtime, source/digest paging, literal frozen confirmation, invalid responses, stale diagnostics, progress and cancellation passed
+Software launch options: quoted literal arguments, separate file grants, frozen worker input, diagnostics and terminal transfer passed
+Software native windows: bounded frames, namespaced controls, ordinary-service launch, clicks, close acknowledgement and EOF retirement passed
+Software native text: focus, UTF-8 bounds, literal replacement, stale controls, explicit commit/discard, close guard and protocol admission passed
+Software administrator approval: frozen literal request, masked bounded UTF-8 password, hidden-action refusal, credential wiping, cancellation and progress passed
+Software personal data: own-account inventory, installed/unsafe refusal, frozen explicit confirmation, cancellation, paging, live-lease diagnostics, reload and close guard passed
+Software organization policy: current restrictions, complete settings/impact paging, literal file review, frozen confirmation, administrator approval/cancel/wipe, stale/error refusal, reload and close guard passed
+Software metadata review: missing firmware and escaped duplicate flags refuse confirmation before administrator approval
+Software UI: catalog, package/trust review, literal confirmation, revocation, URL paging, diagnostics and close guard passed
+Native window broker: 1000 fragmented text frames, focus/edit/discard, UI builds and owned-tree retirements retain zero tracked bytes
+Software administrator approval: 1000 prompt/edit/render/wipe cycles retain zero tracked bytes
+Software personal data: 1000 wide/invalid/valid decode/select/render/confirm/cancel/retire cycles retain zero tracked bytes
+Software organization policy: 1000 wide-document/valid-review/invalid-review/page/redraw/cancel/retire cycles retain zero tracked bytes
+Software package/trust/offline metadata: 1000 valid/partial-invalid review, page/redraw/cancel/retire cycles retain zero tracked bytes
+Software distribution checks passed

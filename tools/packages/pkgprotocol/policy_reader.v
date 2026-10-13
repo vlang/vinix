@@ -7,37 +7,6 @@ const policy_settings_keys = ['offline', 'allowed', 'pins', 'permissions', 'lice
 const policy_pin_keys = ['id', 'minimum', 'before']
 const policy_impact_keys = ['id', 'name', 'version', 'kind', 'license', 'proprietary', 'firmware', 'repository', 'public_key', 'requested', 'diagnostic_before', 'diagnostic_after']
 
-fn (mut r MetadataReader) unsigned(maximum u64) !u64 {
-	r.spaces()
-	start := r.position
-	mut value := u64(0)
-	for r.position < r.text.len && r.text[r.position] >= `0` && r.text[r.position] <= `9` {
-		digit := u64(r.text[r.position] - `0`)
-		if (r.position > start && r.text[start] == `0`) || value > maximum / 10
-			|| (value == maximum / 10 && digit > maximum % 10) { return error('package metadata integer exceeds its canonical bound') }
-		value = value * 10 + digit
-		r.position++
-	}
-	if r.position == start { return error('package metadata requires an unsigned integer') }
-	return value
-}
-
-fn (mut r MetadataReader) policy_strings(limit int, maximum int) ![]string {
-	r.expect(`[` )!
-	mut values := []string{cap: 16}
-	unsafe { values.flags |= .noslices }
-	mut accepted := false
-	defer { if !accepted { unsafe { for value in values { value.free() }; (&array(&values)).free() } } }
-	mut first := true
-	for r.next(first, `]`)! {
-		first = false
-		if values.len == maximum { return error('policy array exceeds its entry limit') }
-		values << r.quoted(limit)!
-	}
-	accepted = true
-	return values
-}
-
 fn (mut r MetadataReader) policy_pin() !PolicyPin {
 	r.expect(`{`)!
 	mut pin := PolicyPin{}
@@ -96,10 +65,10 @@ fn (mut r MetadataReader) policy_settings() !PolicySettings {
 		seen |= u16(1) << field
 		match field {
 			0 { policy = PolicySettings{ ...policy, offline: r.boolean()! } }
-			1 { policy = PolicySettings{ ...policy, allowed: r.policy_strings(128, 4096)! } }
+			1 { policy = PolicySettings{ ...policy, allowed: r.strings(128, 4096)! } }
 			2 { policy = PolicySettings{ ...policy, pins: r.policy_pins()! } }
-			3 { policy = PolicySettings{ ...policy, permissions: r.policy_strings(16, 5)! } }
-			4 { policy = PolicySettings{ ...policy, licenses: r.policy_strings(256, 4096)! } }
+			3 { policy = PolicySettings{ ...policy, permissions: r.strings(16, 5)! } }
+			4 { policy = PolicySettings{ ...policy, licenses: r.strings(256, 4096)! } }
 			5 { policy = PolicySettings{ ...policy, allow_firmware: r.boolean()! } }
 			6 { policy = PolicySettings{ ...policy, reserve_bytes: r.unsigned(u64(1) << 40)! } }
 			else {}

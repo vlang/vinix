@@ -51,6 +51,8 @@ fn check() ! {
 		run(work + '/context-memory', [])!
 		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/window-memory', repository + '/tests/packages/window-memory.v'])!
 		run(work + '/window-memory', [])!
+		run(v, [...helper_flags, '-gc', 'none', '-manualfree', '-d', 'track_heap', '-o', work + '/review-memory', repository + '/tests/packages/review-memory.v'])!
+		run(work + '/review-memory', [])!
 		check_tests(v, ['-gc', 'none', '-manualfree'], repository + '/desktop/packagecore', work)!
 		run(v, [...helper_flags, '-gc', 'none', '-path', '@vlib|@vmodules|' + repository + '|' + repository + '/tools/accounts', '-o', work + '/vinix-package', repository + '/tools/packages/main.v'])!
 		run(work + '/vinix-package', ['--help'])!
@@ -72,6 +74,7 @@ fn check() ! {
 	os.cp(repository + '/desktop/software_policy.v', work + '/software/software_policy.v')!
 	os.cp(repository + '/desktop/software_policy_pages.v', work + '/software/software_policy_pages.v')!
 	os.cp(repository + '/tests/packages/software_policy_fixture.v', work + '/software/policy_fixture.v')!
+	os.cp(repository + '/tests/packages/software_metadata_fixture.v', work + '/software/metadata_fixture.v')!
 	os.cp(repository + '/tests/packages/software_data_fixture.v', work + '/software/data_fixture.v')!
 	os.cp(repository + '/tests/packages/software_terminal_fixture.v', work + '/software/terminal_fixture.v')!
 	os.cp(repository + '/tests/packages/software_fixture.v', work + '/software/main.v')!
@@ -89,6 +92,7 @@ fn check() ! {
 	run(work + '/window-broker-memory', ['admin-memory'])!
 	run(work + '/window-broker-memory', ['data-memory'])!
 	run(work + '/window-broker-memory', ['policy-memory'])!
+	run(work + '/window-broker-memory', ['metadata-memory'])!
 	if '--cross' in os.args {
 		run(v, [...helper_flags, '-o', work + '/package-stage', repository + '/tools/packages/stage.v'])!
 		for architecture in ['aarch64', 'x86_64'] {

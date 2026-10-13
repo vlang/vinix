@@ -66,6 +66,7 @@ fn qualify_package_admin(mut t Test) ! {
 	}
 	assert os.ls('/run/user/1000')!.all(!it.starts_with('pkg-'))
 	t.say('PACKAGE ADMIN ordinary-admin password-required peer-bound reviewed-install progress stale-refusal no-launch PASS')
+	qualify_package_metadata(mut t, db, alex, sam)!
 	qualify_package_policy_admin(mut t, db, alex, sam)!
 	mut removal := service.review('remove', ['admin-fixture'])!
 	defer { removal.close() }
@@ -86,6 +87,15 @@ fn qualify_package_admin(mut t Test) ! {
 		state := service.state() or { C.usleep(50_000); continue }
 		if state.packages.len == 0 { completed = true; break }
 		C.usleep(50_000)
+	}
+	if !completed {
+		t.say('PACKAGE ADMIN disconnected-worker state: ' + json2.encode(service.state()!))
+		for pid in os.ls('/proc')! {
+			command_line := os.read_file('/proc/' + pid + '/cmdline') or { continue }
+			if command_line.contains('vinix-package') {
+				t.say('PACKAGE ADMIN disconnected-worker process: ' + pid + '\n' + (os.read_file('/proc/' + pid + '/status') or { '' }))
+			}
+		}
 	}
 	assert completed && service.verify()!.packages.len == 0
 	mut revoke := pkgcore.review_repository('', 'revoke', pkgcore.Repository{ id: 'admin-publisher' }, false)!

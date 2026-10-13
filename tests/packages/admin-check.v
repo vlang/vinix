@@ -34,6 +34,7 @@ fn suite(repository string) !hwhost.Suite {
 			about: 'reviewed package administration from an ordinary administrator through authenticated peer-bound progress transport',
 			required: ['HWTEST START packages-admin',
 				'PACKAGE ADMIN ordinary-admin password-required peer-bound reviewed-install progress stale-refusal no-launch PASS',
+				'PACKAGE METADATA ordinary-admin-standard complete-package-trust-history-offline-lock typed-flags nested-refusal read-only PASS',
 				'PACKAGE POLICY ordinary-admin-standard public-read complete-impact literal-path password-role stale-file-refusal atomic-policy-only reload clean-runtime PASS',
 				'PACKAGE ADMIN reviewed-remove rollback trust-revocation root-state audit no-password-log clean-runtime PASS', 'HWTEST PASS packages-admin'],
 			forbidden: ['V panic:', 'FAIL: fn main.qualify_package_admin'], ending: .poweroff, timeout: 300 }]

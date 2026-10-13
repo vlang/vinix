@@ -379,11 +379,13 @@ fn (mut a SoftwareApp) load_review() {
 			return
 		}
 	} else { pkgprotocol.decode_review(editor_bytes_text(a.output)) or {
+		unsafe { err.free() }
 		a.clear_review()
 		a.set_status('Unsupported or invalid package review response. Review the operation again.')
 		return
 	} }
 	review.validate() or {
+		unsafe { err.free() }
 		review.close()
 		a.clear_review()
 		a.set_status('Unsupported or incomplete package review. Review the operation again.')

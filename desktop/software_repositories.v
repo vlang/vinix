@@ -72,6 +72,7 @@ fn (mut a SoftwareApp) read_repositories() {
 fn (mut a SoftwareApp) load_repositories() {
 	a.initialize_repository_fields()
 	status := pkgprotocol.decode_repositories(editor_bytes_text(a.output)) or {
+		unsafe { err.free() }
 		a.set_status('Invalid repository status. Reload the list or check the package service.')
 		return
 	}
@@ -100,6 +101,7 @@ fn (mut a SoftwareApp) begin_repository_review(operation string) {
 	if operation == 'enroll' {
 		pkgprotocol.validate_repository(id, url, key) or {
 			a.set_status(err.msg())
+			unsafe { err.free() }
 			return
 		}
 	} else if id.len == 0 {
@@ -145,6 +147,7 @@ fn (mut a SoftwareApp) repository_url_parts(url string, label string) {
 
 fn (mut a SoftwareApp) load_repository_review() {
 	mut review := pkgprotocol.decode_repository_review(editor_bytes_text(a.output)) or {
+		unsafe { err.free() }
 		a.clear_repository_review()
 		a.set_status('Unsupported or incomplete repository review. Review the trust change again.')
 		return

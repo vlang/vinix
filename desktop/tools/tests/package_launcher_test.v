@@ -350,7 +350,7 @@ fn test_package_registry_reload_and_retirement_release_all_storage() {
 	package_assert_heap_flat('cached package registration')
 }
 
-const software_review_fixture = '{"format":1,"operation":"install","names":["editor"],"architecture":"aarch64","generation":1,"target_generation":0,"fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","requested":["editor"],"disk_needed":4096,"disk_available":65536,"disk_reserve":1024,"rows":[{"id":"editor","name":"Editor","description":"Write text","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"linux","runtime":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","permissions":["files"],"requested":true,"action":"update"},{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","repository":"vendor","public_key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","license":"Vendor-EULA","proprietary":true,"firmware":true,"permissions":["network","process"],"action":"update"}]}'
+const software_review_fixture = '{"format":1,"operation":"install","names":["editor"],"architecture":"aarch64","generation":1,"target_generation":0,"fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","requested":["editor"],"rows":[{"id":"editor","name":"Editor","description":"Write text","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"linux","runtime":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","proprietary":false,"firmware":false,"permissions":["files"],"requested":true,"action":"update"},{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","runtime":"","repository":"vendor","public_key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","license":"Vendor-EULA","proprietary":true,"firmware":true,"permissions":["network","process"],"requested":false,"action":"update"}],"disk_needed":4096,"disk_available":65536,"disk_reserve":1024}'
 
 const software_repository_status_fixture = '{"format":1,"architecture":"aarch64","repositories":[{"id":"fixture","url":"https://example.invalid/catalog","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}],"history":[{"id":"fixture","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sequence":7,"index_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}]}'
 const software_repository_review_fixture = '{"format":1,"architecture":"aarch64","operation":"enroll","id":"fixture","url":"https://example.invalid/a/long/catalog/path/which/must/be/reviewed/completely/before/confirmation/including/this/final/segment","public_key":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","previous_url":"https://example.invalid/catalog","previous_public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","fingerprint":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","index_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","sequence":7,"expires":2000000000,"package_count":3,"remembered_sequence":6}'
@@ -368,12 +368,9 @@ fn test_repository_management_redraw_decode_and_retirement_release_storage() {
 	}
 	package_assert_heap_flat('Software repository form redraw')
 	C.vinix_heap_begin()
-	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
-	baseline := C.vinix_heap_end()
-	C.vinix_heap_begin()
 	for _ in 0 .. 100 { app.load_repositories() }
 	app.close_app()
-	assert C.vinix_heap_end() == baseline
+	assert C.vinix_heap_end() == 0
 	mut review := pkgprotocol.decode_repository_review(software_repository_review_fixture)!
 	mut reviewing := SoftwareApp{ repository_mode: true, output: software_repository_review_fixture.bytes(),
 		repository_operation: 'enroll'.clone(), repository_pending: pkgprotocol.Repository{
@@ -396,7 +393,7 @@ fn test_repository_management_redraw_decode_and_retirement_release_storage() {
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 { reviewing.load_repository_review() }
 	reviewing.close_app()
-	assert C.vinix_heap_end() == baseline
+	assert C.vinix_heap_end() == 0
 }
 
 const software_updates_fixture = '{"format":1,"architecture":"aarch64","rows":[{"id":"runtime","name":"Runtime","description":"Explicit runtime","version":"2.0.0","installed_version":"1.0.0","architecture":"aarch64","kind":"runtime","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","permissions":["process"],"updatable":true,"update_action":"update"},{"id":"assets","name":"Retired assets","version":"1.0.0","installed_version":"1.0.0","architecture":"all","kind":"data","repository":"trusted","public_key":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","license":"MIT","updatable":true,"update_action":"remove"}]}'
@@ -451,17 +448,13 @@ fn test_software_review_redraw_cancel_and_decoded_storage_are_released() {
 	}
 	package_assert_heap_flat('Software review redraw')
 	app.clear_review()
-	// Compare the JSON decoder's independent EOF allocation baseline.
-	C.vinix_heap_begin()
-	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
-	baseline := C.vinix_heap_end()
 	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
 		mut review := pkgprotocol.decode_review(software_review_fixture)!
 		review.validate()!
 		review.close()
 	}
-	assert C.vinix_heap_end() == baseline
+	assert C.vinix_heap_end() == 0
 	// Warm the status buffer, then exercise the actual decode/cancel UI path.
 	app.review = 'install'.clone()
 	app.review_names = ['editor'.clone()]
@@ -476,7 +469,7 @@ fn test_software_review_redraw_cancel_and_decoded_storage_are_released() {
 		app.clear_review()
 	}
 	app.close_app() // retire the final persistent status message before measuring
-	assert C.vinix_heap_end() == baseline
+	assert C.vinix_heap_end() == 0
 }
 
 fn test_software_deployment_form_review_and_retirement_release_storage() {
@@ -506,9 +499,6 @@ fn test_software_deployment_form_review_and_retirement_release_storage() {
 	package_assert_heap_flat('Software deployment review redraw')
 	app.clear_review()
 	C.vinix_heap_begin()
-	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
-	baseline := C.vinix_heap_end()
-	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
 		app.review = 'deploy'.clone()
 		app.deployment_pending = '/etc/company/deployment.json'.clone()
@@ -517,7 +507,7 @@ fn test_software_deployment_form_review_and_retirement_release_storage() {
 		app.clear_review()
 	}
 	app.close_app()
-	assert C.vinix_heap_end() == baseline
+	assert C.vinix_heap_end() == 0
 }
 
 fn test_software_progress_redraw_and_stream_storage_are_released() {
@@ -604,9 +594,6 @@ fn software_mirror_memory(locked bool) ! {
 	}
 	package_assert_heap_flat('Software mirror form redraw')
 	C.vinix_heap_begin()
-	for _ in 0 .. 100 { assert json2.decode[bool]('true')! }
-	baseline := C.vinix_heap_end()
-	C.vinix_heap_begin()
 	for _ in 0 .. 100 {
 		app.review = 'mirror'.clone()
 		app.review_names = if locked { []string{} } else { ['editor'.clone()] }
@@ -618,6 +605,6 @@ fn software_mirror_memory(locked bool) ! {
 	}
 	app.close_app()
 	retained := C.vinix_heap_end()
-	assert retained == baseline
-	println('Software offline export memory (deployment lock=${locked}): redraw/paging=0; review retirement=${retained} bytes (decoder baseline ${baseline})')
+	assert retained == 0
+	println('Software offline export memory (deployment lock=${locked}): redraw/paging=0; review retirement=${retained} bytes')
 }

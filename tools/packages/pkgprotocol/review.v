@@ -2,8 +2,6 @@
 // SDK 1 presentation protocol; no package database or privileged operations.
 module pkgprotocol
 
-import json2
-
 pub struct ReviewPackage {
 pub:
 	id                string
@@ -40,15 +38,6 @@ pub:
 	disk_reserve      u64
 }
 
-pub fn decode_review(text string) !Review {
-	if text.len > 8 * 1024 * 1024 { return error('package review exceeds metadata limit') }
-	mut review := json2.decode[Review](text)!
-	review.validate() or {
-		review.close()
-		return err
-	}
-	return review
-}
 
 fn identifier(value string) bool {
 	if value.len == 0 || value.len > 128 || value[0] < `a` || value[0] > `z` { return false }
@@ -135,6 +124,16 @@ pub fn (review &Review) validate() ! {
 	}
 }
 
+fn close_review_package(row ReviewPackage) {
+	unsafe {
+		row.id.free(); row.name.free(); row.description.free(); row.version.free()
+		row.installed_version.free(); row.architecture.free(); row.kind.free(); row.runtime.free()
+		row.repository.free(); row.public_key.free(); row.license.free(); row.action.free()
+		for permission in row.permissions { permission.free() }
+		(&array(&row.permissions)).free()
+	}
+}
+
 // Decoded responses own their strings. UI reload/cancel/close retires all of them.
 pub fn (mut review Review) close() {
 	unsafe {
@@ -145,22 +144,7 @@ pub fn (mut review Review) close() {
 		review.fingerprint.free()
 		for id in review.requested { id.free() }
 		(&array(&review.requested)).free()
-		for row in review.rows {
-			row.id.free()
-			row.name.free()
-			row.description.free()
-			row.version.free()
-			row.installed_version.free()
-			row.architecture.free()
-			row.kind.free()
-			row.runtime.free()
-			row.repository.free()
-			row.public_key.free()
-			row.license.free()
-			row.action.free()
-			for permission in row.permissions { permission.free() }
-			(&array(&row.permissions)).free()
-		}
+		for row in review.rows { close_review_package(row) }
 		(&array(&review.rows)).free()
 	}
 	review = Review{}

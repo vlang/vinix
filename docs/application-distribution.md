@@ -762,6 +762,14 @@ dependencies, constrained version selection, policy/key changes, blocked plans
 and retained publisher ownership. UI checks exercise complete upgrade review
 from each pending row and prevent accidental dependency-root promotion; allocator
 checks cover redraw, decoded view replacement and repeated blocked-plan status.
+Package/trust/offline-export confirmation metadata now uses complete bounded
+schema readers. False proprietary/firmware/requested flags, empty fields and zero
+counters must be explicit. Missing, unknown, duplicate or incorrectly typed
+fields, malformed Unicode and integer overflow refuse confirmation, including
+inside nested deployment-export reviews. Reader and Software lifecycle checks
+retain zero tracked bytes across 1000 valid/partially invalid decode, redraw and
+retirement cycles; historical generic-decoder allocation allowances no longer
+apply to these reviews. See [qualification](../tests/packages/review-metadata-check.md).
 Service fixtures check configuration reads after lock acquisition, policy changes
 invalidating review before acquisition/cleanup, revocation denying rollback/mirror
 export, offline overlays, architecture changes and refusal of unsafe lock links.

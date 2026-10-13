@@ -4,6 +4,7 @@ module pkgcore
 import json2
 import os
 import time
+import tools.packages.pkgprotocol
 
 fn review_fixture(label string) !(string, Config) {
 	work := os.temp_dir() + '/vinix-review-' + label + '-' + os.getpid().str()
@@ -56,6 +57,9 @@ fn test_review_contains_dependencies_provenance_licenses_and_disk_estimate() {
 	assert review.rows[0].runtime == 'runtime' && review.rows[0].permissions == ['files']
 	assert review.rows[1].firmware && review.rows[1].proprietary && review.rows[1].license == 'Vendor-EULA'
 	assert review.rows[2].permissions == ['process'] && !review.rows[2].requested
+	mut decoded := pkgprotocol.decode_review(json2.encode(review))!
+	assert decoded == review
+	decoded.close()
 	assert review.disk_needed > 4 * 1024 * 1024 && review.disk_available > 0
 	assert read_state(directory, 'aarch64')!.generation == 0
 	assert os.ls(directory + '/objects')!.len == 0 && os.ls(directory + '/generations')!.len == 0

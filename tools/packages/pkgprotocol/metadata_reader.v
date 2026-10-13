@@ -121,3 +121,34 @@ fn (mut r MetadataReader) boolean() !bool {
 	}
 	return error('package metadata field must be a boolean')
 }
+
+fn (mut r MetadataReader) unsigned(maximum u64) !u64 {
+	r.spaces()
+	start := r.position
+	mut value := u64(0)
+	for r.position < r.text.len && r.text[r.position] >= `0` && r.text[r.position] <= `9` {
+		digit := u64(r.text[r.position] - `0`)
+		if (r.position > start && r.text[start] == `0`) || value > maximum / 10
+			|| (value == maximum / 10 && digit > maximum % 10) { return error('package metadata integer exceeds its canonical bound') }
+		value = value * 10 + digit
+		r.position++
+	}
+	if r.position == start { return error('package metadata requires an unsigned integer') }
+	return value
+}
+
+fn (mut r MetadataReader) strings(limit int, maximum int) ![]string {
+	r.expect(`[` )!
+	mut values := []string{cap: 16}
+	unsafe { values.flags |= .noslices }
+	mut accepted := false
+	defer { if !accepted { unsafe { for value in values { value.free() }; (&array(&values)).free() } } }
+	mut first := true
+	for r.next(first, `]`)! {
+		first = false
+		if values.len == maximum { return error('package metadata array exceeds its entry limit') }
+		values << r.quoted(limit)!
+	}
+	accepted = true
+	return values
+}

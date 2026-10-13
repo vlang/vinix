@@ -1,0 +1,391 @@
+guest-arm.txt
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v -os linux -arch arm64 -gc none -d no_backtrace -d no_segfault_handler -path @vlib|@vmodules|/Users/alex/code/vinix/.|/Users/alex/code/vinix/tools/accounts|/Users/alex/code/vinix/tools/security-events|/Users/alex/code/vinix/tools/keyring -o /Users/alex/code/vinix/build/pkr/arm/guest/init.c /Users/alex/code/vinix/tests/accounts/guest
+v: exit status 1
+   17 |     for user in [alex, sam] {
+tests/accounts/guest/package_metadata.v:16:15: error: invalid expression: unexpected token `,`
+   14 |     lock := '/tmp/metadata lock é; $literal.json'
+   15 |     os.write_file(lock, json2.encode(service.lock_deployment([])!))!
+   16 |     os.chmod(lock, 0o644)!
+      |                  ^
+   17 |     for user in [alex, sam] {
+   18 |         status_response := run(['/usr/bin/vinix-package', '--json', 'repo-list'], '', db, user)
+tests/accounts/guest/package_metadata.v:16:22: error: invalid expression: unexpected token `)`
+   14 |     lock := '/tmp/metadata lock é; $literal.json'
+   15 |     os.write_file(lock, json2.encode(service.lock_deployment([])!))!
+   16 |     os.chmod(lock, 0o644)!
+      |                         ^
+   17 |     for user in [alex, sam] {
+   18 |         status_response := run(['/usr/bin/vinix-package', '--json', 'repo-list'], '', db, user)
+tests/accounts/guest/package_metadata.v:54:2: error: unexpected token `eof`, expecting `]`
+   52 |     assert !os.exists('/tmp/metadata export é; $literal') && !os.exists('/tmp/metadata locked export')
+   53 |     t.say('PACKAGE METADATA ordinary-admin-standard complete-package-trust-history-offline-lock typed-flags nested-refusal read-only PASS')
+   54 | }
+      |  ^
+
+guest-x86.txt
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v -os linux -arch amd64 -gc none -d no_backtrace -d no_segfault_handler -path @vlib|@vmodules|/Users/alex/code/vinix/.|/Users/alex/code/vinix/tools/accounts|/Users/alex/code/vinix/tools/security-events|/Users/alex/code/vinix/tools/keyring -o /Users/alex/code/vinix/build/pkr/x86/guest/init.c /Users/alex/code/vinix/tests/accounts/guest
+v: exit status 1
+   17 |     for user in [alex, sam] {
+tests/accounts/guest/package_metadata.v:16:15: error: invalid expression: unexpected token `,`
+   14 |     lock := '/tmp/metadata lock é; $literal.json'
+   15 |     os.write_file(lock, json2.encode(service.lock_deployment([])!))!
+   16 |     os.chmod(lock, 0o644)!
+      |                  ^
+   17 |     for user in [alex, sam] {
+   18 |         status_response := run(['/usr/bin/vinix-package', '--json', 'repo-list'], '', db, user)
+tests/accounts/guest/package_metadata.v:16:22: error: invalid expression: unexpected token `)`
+   14 |     lock := '/tmp/metadata lock é; $literal.json'
+   15 |     os.write_file(lock, json2.encode(service.lock_deployment([])!))!
+   16 |     os.chmod(lock, 0o644)!
+      |                         ^
+   17 |     for user in [alex, sam] {
+   18 |         status_response := run(['/usr/bin/vinix-package', '--json', 'repo-list'], '', db, user)
+tests/accounts/guest/package_metadata.v:54:2: error: unexpected token `eof`, expecting `]`
+   52 |     assert !os.exists('/tmp/metadata export é; $literal') && !os.exists('/tmp/metadata locked export')
+   53 |     t.say('PACKAGE METADATA ordinary-admin-standard complete-package-trust-history-offline-lock typed-flags nested-refusal read-only PASS')
+   54 | }
+      |  ^
+
+guest-arm-final.txt
+FAIL aarch64 packages-admin (71.9s)
+  forbidden "FAIL: fn main.qualify_package_admin" in the line: /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:91: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+  last 40 serial lines:
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x250de0
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x250de0
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x250de0
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x250de0
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x27c4d0
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | unix accept: waiting for connection
+  | unix accept: waiting for connection
+  | exec: syscall handler entered; copying user path
+  | ELF auxval: base=0x0 phdr=0x200040 entry=0x250de0
+  | unix accept: got connection, setting up peer
+  | unix accept: done
+  | random: reseeded from 4269 events, 4 hardware words
+  | /Users/alex/code/vinix/tests/accounts/guest/package_admin.v:91: FAIL: fn main.qualify_package_admin: assert completed && service.verify()!.packages.len == 0
+  | V panic: Assertion failed...
+  logs: /Users/alex/code/vinix/build/pkr/arm2/packages-admin
+
+launcher.txt
+build/package-review-reader-work/desktop/app_calculator.v:4:8: warning: module 'ui2' is imported but never used. Use `import ui2 as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | import math
+    4 | import ui2
+      |        ~~~
+    5 | 
+    6 | const window_width = 284
+build/package-review-reader-work/desktop/editor_documents.v:3:8: warning: module 'os' is imported but never used. Use `import os as _`, to silence this warning, or just remove the unused import line
+    1 | // SPDX-License-Identifier: GPL-2.0-or-later
+    2 | module main
+    3 | import os
+      |        ~~
+    4 | import ui2
+    5 | import desktop.workflowcore
+build/package-review-reader-work/desktop/software_policy.v:59:6: notice: variable `arguments` shadows a function declaration
+   57 |     a.clear_policy_pages()
+   58 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   59 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   60 |     a.start(arguments, true)
+   61 |     unsafe { (&array(&arguments)).free() }
+build/package-review-reader-work/desktop/software_policy.v:96:6: notice: variable `arguments` shadows a function declaration
+   94 |     a.policy_pending = path.clone()
+   95 |     a.focus = false; a.select_all = false
+   96 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+   97 |     a.start(arguments, false)
+   98 |     unsafe { (&array(&arguments)).free() }
+build/package-review-reader-work/desktop/software_policy.v:154:8: notice: variable `arguments` shadows a function declaration
+  152 |                 unsafe { encoded.free() }
+  153 |             }
+  154 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  155 |             a.start(arguments, false)
+  156 |             unsafe { (&array(&arguments)).free() }
+build/package-review-reader-work/desktop/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+build/package-review-reader-work/desktop/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:15:9: error: unknown function: state
+   13 |         if id in g_active_toggles { return toggle_button_pressed(id) }
+   14 |     } $else $if macos {
+   15 |         st := state()
+      |               ~~~~~~~
+   16 |         if (st.view_kinds[id] or { Kind.view }) !in [.checkbox, .switch_control, .toggle_button] {
+   17 |             return false
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:15:6: error: assignment mismatch: 1 variable but `state()` returns 0 values
+   13 |         if id in g_active_toggles { return toggle_button_pressed(id) }
+   14 |     } $else $if macos {
+   15 |         st := state()
+      |            ~~
+   16 |         if (st.view_kinds[id] or { Kind.view }) !in [.checkbox, .switch_control, .toggle_button] {
+   17 |             return false
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:16:10: error: `()` has no property `view_kinds`
+   14 |     } $else $if macos {
+   15 |         st := state()
+   16 |         if (st.view_kinds[id] or { Kind.view }) !in [.checkbox, .switch_control, .toggle_button] {
+      |                ~~~~~~~~~~
+   17 |             return false
+   18 |         }
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:16:21: error: non-integer index `string` (array type `unknown`)
+   14 |     } $else $if macos {
+   15 |         st := state()
+   16 |         if (st.view_kinds[id] or { Kind.view }) !in [.checkbox, .switch_control, .toggle_button] {
+      |                           ~~
+   17 |             return false
+   18 |         }
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:19:16: error: `()` has no property `views`
+   17 |             return false
+   18 |         }
+   19 |         native := st.views[id] or { return false }
+      |                      ~~~~~
+   20 |         return macos.msg_i64(native, 'state') != 0
+   21 |     } $else $if windows {
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:19:22: error: non-integer index `string` (array type `unknown`)
+   17 |             return false
+   18 |         }
+   19 |         native := st.views[id] or { return false }
+      |                            ~~
+   20 |         return macos.msg_i64(native, 'state') != 0
+   21 |     } $else $if windows {
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:40:9: error: unknown function: state
+   38 |         if id in g_active_toggles { set_toggle_button_pressed(id, value) }
+   39 |     } $else $if macos {
+   40 |         st := state()
+      |               ~~~~~~~
+   41 |         kind := st.view_kinds[id] or { return }
+   42 |         if kind == .switch_control { set_switch_active(id, value) }
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:40:6: error: assignment mismatch: 1 variable but `state()` returns 0 values
+   38 |         if id in g_active_toggles { set_toggle_button_pressed(id, value) }
+   39 |     } $else $if macos {
+   40 |         st := state()
+      |            ~~
+   41 |         kind := st.view_kinds[id] or { return }
+   42 |         if kind == .switch_control { set_switch_active(id, value) }
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:41:14: error: `()` has no property `view_kinds`
+   39 |     } $else $if macos {
+   40 |         st := state()
+   41 |         kind := st.view_kinds[id] or { return }
+      |                    ~~~~~~~~~~
+   42 |         if kind == .switch_control { set_switch_active(id, value) }
+   43 |         if kind == .toggle_button { set_toggle_button_pressed(id, value) }
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:41:25: error: non-integer index `string` (array type `unknown`)
+   39 |     } $else $if macos {
+   40 |         st := state()
+   41 |         kind := st.view_kinds[id] or { return }
+      |                               ~~
+   42 |         if kind == .switch_control { set_switch_active(id, value) }
+   43 |         if kind == .toggle_button { set_toggle_button_pressed(id, value) }
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:42:32: error: unknown function: set_switch_active
+   40 |         st := state()
+   41 |         kind := st.view_kinds[id] or { return }
+   42 |         if kind == .switch_control { set_switch_active(id, value) }
+      |                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   43 |         if kind == .toggle_button { set_toggle_button_pressed(id, value) }
+   44 |         if kind == .checkbox {
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:43:31: error: unknown function: set_toggle_button_pressed
+   41 |         kind := st.view_kinds[id] or { return }
+   42 |         if kind == .switch_control { set_switch_active(id, value) }
+   43 |         if kind == .toggle_button { set_toggle_button_pressed(id, value) }
+      |                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   44 |         if kind == .checkbox {
+   45 |             native := st.views[id] or { return }
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:45:17: error: `()` has no property `views`
+   43 |         if kind == .toggle_button { set_toggle_button_pressed(id, value) }
+   44 |         if kind == .checkbox {
+   45 |             native := st.views[id] or { return }
+      |                          ~~~~~
+   46 |             macos.msg_void_i64(native, 'setState:', if value { i64(1) } else { i64(0) })
+   47 |         }
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:45:23: error: non-integer index `string` (array type `unknown`)
+   43 |         if kind == .toggle_button { set_toggle_button_pressed(id, value) }
+   44 |         if kind == .checkbox {
+   45 |             native := st.views[id] or { return }
+      |                                ~~
+   46 |             macos.msg_void_i64(native, 'setState:', if value { i64(1) } else { i64(0) })
+   47 |         }
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/v failed (1)
+
+launcher-qualified.txt
+build/package-review-reader-work/desktop/app_calculator.v:4:8: warning: module 'ui2' is imported but never used. Use `import ui2 as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | import math
+    4 | import ui2
+      |        ~~~
+    5 | 
+    6 | const window_width = 284
+build/package-review-reader-work/desktop/editor_documents.v:3:8: warning: module 'os' is imported but never used. Use `import os as _`, to silence this warning, or just remove the unused import line
+    1 | // SPDX-License-Identifier: GPL-2.0-or-later
+    2 | module main
+    3 | import os
+      |        ~~
+    4 | import ui2
+    5 | import desktop.workflowcore
+build/package-review-reader-work/desktop/modules/ui2/ui/control_state.c.v:4:9: warning: module 'macos' is imported but never used. Use `import macos as _`, to silence this warning, or just remove the unused import line
+    2 | 
+    3 | $if macos && !ui2_custom_rendering ? {
+    4 |     import macos
+      |            ~~~~~
+    5 | }
+    6 |
+build/package-review-reader-work/desktop/software_policy.v:59:6: notice: variable `arguments` shadows a function declaration
+   57 |     a.clear_policy_pages()
+   58 |     a.policy_ready = false; a.focus = false; a.select_all = false
+   59 |     mut arguments := ['policy']
+      |         ~~~~~~~~~
+   60 |     a.start(arguments, true)
+   61 |     unsafe { (&array(&arguments)).free() }
+build/package-review-reader-work/desktop/software_policy.v:96:6: notice: variable `arguments` shadows a function declaration
+   94 |     a.policy_pending = path.clone()
+   95 |     a.focus = false; a.select_all = false
+   96 |     mut arguments := ['policy-review', a.policy_pending]
+      |         ~~~~~~~~~
+   97 |     a.start(arguments, false)
+   98 |     unsafe { (&array(&arguments)).free() }
+build/package-review-reader-work/desktop/software_policy.v:154:8: notice: variable `arguments` shadows a function declaration
+  152 |                 unsafe { encoded.free() }
+  153 |             }
+  154 |             mut arguments := ['policy-apply', a.policy_snapshot.fingerprint, a.policy_pending]
+      |                 ~~~~~~~~~
+  155 |             a.start(arguments, false)
+  156 |             unsafe { (&array(&arguments)).free() }
+build/package-review-reader-work/desktop/software_window.v:39:6: notice: variable `arguments` shadows a function declaration
+   37 |     unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
+   38 |     a.clear_window()
+   39 |     mut arguments := ['run-window', request.id]
+      |         ~~~~~~~~~
+   40 |     if request.document != '' { arguments << request.document }
+   41 |     defer { unsafe { (&array(&arguments)).free() } }
+build/package-review-reader-work/desktop/software_window.v:157:7: notice: variable `arguments` shadows a function declaration
+  155 |     if event_id == 'software.window.back' && a.worker == unsafe { nil } {
+  156 |         a.clear_window()
+  157 |         mut arguments := ['view']
+      |             ~~~~~~~~~
+  158 |         a.start(arguments, true)
+  159 |         unsafe { (&array(&arguments)).free() }
+tools/packages/pkgadmin/socket.c.v:84:2: notice: variable `path` shadows a function declaration
+   82 |     private_directory(directory, uid)!
+   83 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+   84 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+   85 |     mut accepted := false
+   86 |     defer { if !accepted { unsafe { path.free() } } }
+tools/packages/pkgadmin/socket.c.v:103:2: notice: variable `path` shadows a function declaration
+  101 |     private_directory(directory, uid)!
+  102 |     if !hex(nonce, 32) { return error('invalid package administrator nonce') }
+  103 |     path := directory + '/pkg-' + nonce + '.sock'
+      |     ~~~~
+  104 |     defer { unsafe { path.free() } }
+  105 |     location := address(path)!
+error: unable to open output file '/var/folders/5s/gdmd5zq90y52hchygpfzp2m00000gn/T/test-094b53.o': 'No space left on device'
+1 error generated.
+clang failed (1)
+
+launcher-pass.txt
+Undefined symbols for architecture arm64:
+  "_v_os_exec_capture_start", referenced from:
+      _os__exec in test-260190.o
+  "_v_os_execute_capture_start", referenced from:
+      _os__execute_shell in test-260190.o
+  "_v_sync_thread_create_detached_with_stack", referenced from:
+      _sync__start_waitgroup_thread in test-260190.o
+      _sync__start_timer in test-260190.o
+ld: symbol(s) not found for architecture arm64
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+clang failed with 1
+
+launcher-final-pass.txt
+In file included from /Users/alex/code/vinix/build/package-review-reader-work/desktop/runtime.c:6:
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/vlib/os/execute_capture_nix.h:100:12: error: conflicting types for 'posix_spawn'
+  100 | extern int posix_spawn(pid_t *, const char *, const void *, const void *, char *const [], char *const []);
+      |            ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/spawn.h:60:9: note: previous declaration is here
+   60 | int     posix_spawn(pid_t * __restrict, const char * __restrict,
+      |         ^
+In file included from /Users/alex/code/vinix/build/package-review-reader-work/desktop/runtime.c:6:
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/vlib/os/execute_capture_nix.h:101:12: error: conflicting types for 'posix_spawnp'
+  101 | extern int posix_spawnp(pid_t *, const char *, const void *, const void *, char *const [], char *const []);
+      |            ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/spawn.h:66:9: note: previous declaration is here
+   66 | int     posix_spawnp(pid_t * __restrict, const char * __restrict,
+      |         ^
+In file included from /Users/alex/code/vinix/build/package-review-reader-work/desktop/runtime.c:6:
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/vlib/os/execute_capture_nix.h:102:12: error: conflicting types for 'posix_spawn_file_actions_init'
+  102 | extern int posix_spawn_file_actions_init(void *);
+      |            ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/spawn.h:89:9: note: previous declaration is here
+   89 | int     posix_spawn_file_actions_init(posix_spawn_file_actions_t *) __API_AVAILABLE(macos(10.5), ios(2.0)) __API_UNAVAILABLE(watchos, tvos);
+      |         ^
+In file included from /Users/alex/code/vinix/build/package-review-reader-work/desktop/runtime.c:6:
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/vlib/os/execute_capture_nix.h:103:12: error: conflicting types for 'posix_spawn_file_actions_destroy'
+  103 | extern int posix_spawn_file_actions_destroy(void *);
+      |            ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/spawn.h:87:9: note: previous declaration is here
+   87 | int     posix_spawn_file_actions_destroy(posix_spawn_file_actions_t *) __API_AVAILABLE(macos(10.5), ios(2.0)) __API_UNAVAILABLE(watchos, tvos);
+      |         ^
+In file included from /Users/alex/code/vinix/build/package-review-reader-work/desktop/runtime.c:6:
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/vlib/os/execute_capture_nix.h:104:12: error: conflicting types for 'posix_spawn_file_actions_adddup2'
+  104 | extern int posix_spawn_file_actions_adddup2(void *, int, int);
+      |            ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/spawn.h:80:9: note: previous declaration is here
+   80 | int     posix_spawn_file_actions_adddup2(posix_spawn_file_actions_t *, int,
+      |         ^
+In file included from /Users/alex/code/vinix/build/package-review-reader-work/desktop/runtime.c:6:
+/Users/alex/code/vinix/build/package-release-work/v-toolchain/vlib/os/execute_capture_nix.h:105:12: error: conflicting types for 'posix_spawn_file_actions_addclose'
+  105 | extern int posix_spawn_file_actions_addclose(void *, int);
+      |            ^
+/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/spawn.h:78:9: note: previous declaration is here
+   78 | int     posix_spawn_file_actions_addclose(posix_spawn_file_actions_t *, int) __API_AVAILABLE(macos(10.5), ios(2.0)) __API_UNAVAILABLE(watchos, tvos);
+      |         ^
+6 errors generated.
+clang failed with 1

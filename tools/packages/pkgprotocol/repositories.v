@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgprotocol
 
-import json2
-
 pub struct Repository {
 pub:
 	id         string
@@ -75,15 +73,6 @@ pub fn validate_repository(id string, url string, public_key string) ! {
 	}
 }
 
-pub fn decode_repositories(text string) !RepositoryStatus {
-	if text.len > 8 * 1024 * 1024 { return error('repository status exceeds metadata limit') }
-	mut status := json2.decode[RepositoryStatus](text)!
-	status.validate() or {
-		status.close()
-		return err
-	}
-	return status
-}
 
 pub fn (status &RepositoryStatus) validate() ! {
 	if status.format != 1 || status.architecture !in ['aarch64', 'x86_64']
@@ -111,15 +100,6 @@ pub fn (status &RepositoryStatus) validate() ! {
 	}
 }
 
-pub fn decode_repository_review(text string) !RepositoryReview {
-	if text.len > 8 * 1024 * 1024 { return error('repository review exceeds metadata limit') }
-	mut review := json2.decode[RepositoryReview](text)!
-	review.validate() or {
-		review.close()
-		return err
-	}
-	return review
-}
 
 pub fn (review &RepositoryReview) validate() ! {
 	if review.format != 1 || review.operation !in ['enroll', 'revoke'] || !digest(review.fingerprint)
@@ -143,20 +123,20 @@ pub fn (review &RepositoryReview) validate() ! {
 	}
 }
 
+fn close_repository(repository Repository) {
+	unsafe { repository.id.free(); repository.url.free(); repository.public_key.free() }
+}
+
+fn close_repository_floor(floor RepositoryFloor) {
+	unsafe { floor.id.free(); floor.public_key.free(); floor.index_sha256.free() }
+}
+
 pub fn (mut status RepositoryStatus) close() {
 	unsafe {
 		status.architecture.free()
-		for repository in status.repositories {
-			repository.id.free()
-			repository.url.free()
-			repository.public_key.free()
-		}
+		for repository in status.repositories { close_repository(repository) }
 		(&array(&status.repositories)).free()
-		for floor in status.history {
-			floor.id.free()
-			floor.public_key.free()
-			floor.index_sha256.free()
-		}
+		for floor in status.history { close_repository_floor(floor) }
 		(&array(&status.history)).free()
 	}
 	status = RepositoryStatus{}
